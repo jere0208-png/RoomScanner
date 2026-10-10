@@ -14285,6 +14285,120 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le natif, plus sobre et plus net : la passe d'audit
+
+Relevé du patron : « améliore sans ajout le côté natif de l'app dans tout ce
+que tu peux trouver à améliorer : qualité, vitesse, performances ». Quatre
+audits ont relu les 7 400 lignes de Swift ; voici ce qui a été corrigé, sans
+rien ajouter.
+
+**Le scan** (`RoomScanManager.swift`).
+- **Une pause n'assemble plus pour rien.** Elle arrête la session, et RoomPlan
+  rappelait comme pour « Terminer » : export du modèle, photos, orthophotos —
+  des secondes de calcul et des fichiers orphelins, pour personne. Le passage
+  est gardé pour la fusion, rien n'est écrit. Et « Terminer » pendant une
+  pause livre ce qui est assemblé (la promesse pouvait attendre pour toujours).
+- **L'assemblage démarre plus tôt** : notre passe (`RoomBuilder`) part dès les
+  données brutes, en même temps que celle de la vue, au lieu de l'attendre.
+- **Le relevé n'est plus perdu** si l'export du modèle 3D échoue (il part sans
+  modèle) ou si la vue échoue (notre passe repart des données brutes).
+- Un second « Terminer » reçoit le même résultat ; sans vue, on le dit.
+- Les commandes du pont passent sur le fil principal (des listes étaient
+  écrites de deux fils à la fois) ; la sérialisation des surfaces et des
+  meubles quitte le fil de l'interface ; le maillage d'un arrêt précédent ne
+  peut plus partir avec celui-ci ; la consigne de RoomPlan n'est envoyée que
+  si elle change ; la mesure de batterie couvre tout le relevé, pauses
+  comprises.
+
+**Ce qui tourne pendant le scan.**
+- **La couche de pose** (`RoomScanPoseAR.swift`) se redessinait en plein écran
+  soixante fois par seconde par-dessus RoomPlan dès qu'un produit était
+  choisi, même quand on ne visait aucun mur : elle ne rend plus que ce qui se
+  voit.
+- **La chaleur décide** : orthophotos et photos des murs une fois sur trois
+  quand iOS dit le téléphone chaud, plus du tout quand il est brûlant ; les
+  couleurs, une fois sur deux. Files en arrière-plan (`.utility`), réveils
+  regroupés.
+- **La confiance du LiDAR** : une profondeur douteuse (bord d'un canapé,
+  surface sombre) ne décide plus de ce qu'on lit — moins de meubles plaqués
+  sur les murs.
+- **Les couleurs** : adresses des images lues une fois (une quarantaine
+  d'appels de moins par échantillon), lots modifiés en place, et le sol
+  renouvelle ses relevés comme les murs au lieu de garder les 24 premiers.
+
+**Les murs en vraie image** (`RoomScanOrtho.swift`).
+- **Un mur qui grandit garde ce qu'on en a vu** : un centimètre de plus
+  changeait la taille de la toile et effaçait toutes les vues fondues. Les
+  pixels sont maintenant recopiés à leur place dans le monde.
+- **La moyenne en seize bits** : en huit, passé une dizaine de vues, le grain
+  des premières restait figé.
+- Une seule conversion de couleur par pixel au lieu de quatre ; les faces
+  s'encodent en parallèle ; les trous se comblent sans allocation.
+
+**La 3D** (`RoomScanVisite.swift`, `RoomScanRealiteAugmentee.swift`).
+- **Chaque famille se rebâtit seule** (murs, sols, images, meubles) : basculer
+  le voile ne change qu'une matière, l'arrivée des images ne refait pas les
+  meubles.
+- **Les grands tableaux se convertissent une fois** : plus de nombres objets
+  gardés toute la vie de la vue (quatre à huit fois leur poids).
+- Les sommets des meubles copiés d'un bloc, partagés avec leur liseré ; une
+  seule matière pour tous les liserés ; les images décodées d'avance, dans un
+  cache plafonné à 64 Mo ; parquet, carrelage, bois et tissus dessinés une
+  fois pour toutes les vues, en 8 bits ; le bois et le tissu nets de biais.
+- L'export en réalité augmentée écrit son fichier hors du fil de l'interface.
+
+**Le reste.** Photos traitées hors du fil de l'interface et réduites par
+ImageIO ; aperçu du dossier PDF sans accumulation de mémoire (un contexte
+Core Image partagé) ; laser sans accès concurrent ; classeur tarifaire protégé
+contre une taille aberrante ; boussole à la fréquence où on la lit ; trousseau
+qui dit vrai sur son écriture ; canevas qui ne relit plus ses styles à chaque
+dessin ; maillage écrit sans double copie.
+
+Écarté à dessein : bâtir la scène 3D hors du fil principal et partager une
+même image caméra entre les modules (refontes lourdes, à faire avec un
+profileur) ; convertir les couleurs des murs en linéaire (le rendu changerait
+visiblement).
+
+Bancs mis à jour : `performances`, `maillage`, `batterie`, `reproduction`,
+`moderne`.
+
+## Il faut traverser l'ouvrant : la pièce vue par la porte n'est pas relevée
+
+Relevé du patron : « fais en sorte que l'app comprenne que si on est dans une
+pièce, ça ne scanne pas la pièce au fond derrière la porte. Il faut traverser
+l'ouvrant pour que le scan de l'autre pièce où l'on se trouve démarre ».
+
+RoomPlan relève tout ce que la caméra voit : par une porte ouverte, le mur du
+fond de la chambre, un bout de ses cloisons, sa fenêtre, son armoire — des
+morceaux de pièce qui ne se referment pas.
+
+- **Le chemin de la caméra** : le natif note la position du téléphone au sol,
+  tous les quinze centimètres (`trajet`), sur tout le relevé et ses passages.
+- **La règle** (`geometry/traversee.ts`) : un mur, une ouverture, un meuble
+  n'est gardé que si un point du chemin le voit en ligne droite SANS
+  TRAVERSER DE MUR. Ce qu'on n'a vu que par une porte ne se voit qu'à travers
+  le plan de son mur : écarté. Dès qu'on franchit l'ouvrant, le chemin passe
+  de l'autre côté, et la pièce est relevée depuis là. Une pièce en L, un
+  recoin vu d'un point du chemin, restent.
+- Les murs sont allongés de huit centimètres aux deux bouts : un regard ne se
+  glisse pas par l'interstice d'un coin.
+- **Prudence** : sans chemin, avec un chemin trop court, ou si le chemin n'est
+  pas dans le repère des murs, rien n'est écarté ; jamais au point de laisser
+  moins de trois murs.
+- **Pendant le scan** (`RoomScanTraversee.swift`) : les compteurs ne font pas
+  « +1 » pour ce qu'on voit par la porte, les murs douteux et l'alerte « il
+  manque un mur » l'ignorent aussi (ses bouts libres la déclenchaient).
+- À l'arrêt, une phrase le dit : « La pièce vue par la porte n'est pas
+  relevée : entrez-y pour la scanner ».
+
+À savoir : le dessin que RoomPlan superpose à la caméra pendant le scan
+montre toujours ce qu'il aperçoit par la porte — ce dessin lui appartient ;
+c'est le relevé qui ne le garde pas.
+
+Bancs : `traversee` (9 : resté dans le séjour, la porte franchie, la pièce en
+L, sans chemin, hors repère, l'échantillonnage du chemin, le relevé
+multi-passages, le natif, l'arrêt du scan).
+
 ## Au-dessus de la concurrence : le bilan du relevé, la maquette chez soi en réalité augmentée, Spotlight, et un menu « … » redessiné
 
 Relevés du patron : « améliore encore nativement l'application pour être au

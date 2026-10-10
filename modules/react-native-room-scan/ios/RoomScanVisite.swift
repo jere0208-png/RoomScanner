@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 import React
 import SceneKit
 import UIKit
@@ -83,12 +84,39 @@ final class RoomScanVisite: UIView {
     dizaines de milliers de nombres reconvertis en géométrie — pour une
     couleur de fond. Comparer deux tableaux coûte une fraction de ce prix.
   */
-  @objc var maillage: [NSNumber] = [] {
-    didSet { if maillage != oldValue { rebatir() } }
+  /*
+    LES GRANDS TABLEAUX SE CONVERTISSENT UNE FOIS, À L'ARRIVÉE. Gardés en
+    nombres objets, ils pesaient quatre à huit fois leur poids en flottants
+    toute la vie de la vue, se comparaient élément par élément à chaque
+    réaffectation, et se reconvertissaient à chaque reconstruction. On ne
+    garde que les flottants ; la propriété ne sert plus qu'à les recevoir.
+  */
+  private var fMaillage: [Float] = []
+  private var fSols: [Float] = []
+  private var fOrientes: [Float] = []
+  private var fEcorche: [Float] = []
+  private var fMeubles: [Float] = []
+  private var fTexturees: [Float] = []
+
+  /// Convertit et compare : vrai si les nombres ont changé (ils sont alors gardés).
+  private static func recevoir(_ nombres: [NSNumber], dans cible: inout [Float]) -> Bool {
+    let ns = nombres as NSArray
+    var neufs: [Float] = []
+    neufs.reserveCapacity(ns.count)
+    for case let x as NSNumber in ns { neufs.append(x.floatValue) }
+    if neufs == cible { return false }
+    cible = neufs
+    return true
   }
 
-  @objc var sols: [NSNumber] = [] {
-    didSet { if sols != oldValue { rebatir() } }
+  @objc var maillage: [NSNumber] {
+    get { [] }
+    set { if Self.recevoir(newValue, dans: &fMaillage) { rebatir(.bati) } }
+  }
+
+  @objc var sols: [NSNumber] {
+    get { [] }
+    set { if Self.recevoir(newValue, dans: &fSols) { rebatir(.sols) } }
   }
 
   @objc var camera: [NSNumber] = [] {
@@ -99,16 +127,19 @@ final class RoomScanVisite: UIView {
     didSet { vue.backgroundColor = couleur(fond) ?? .white }
   }
 
-  @objc var orientes: [NSNumber] = [] {
-    didSet { if orientes != oldValue { rebatir() } }
+  @objc var orientes: [NSNumber] {
+    get { [] }
+    set { if Self.recevoir(newValue, dans: &fOrientes) { rebatir(.bati) } }
   }
 
-  @objc var ecorche: [NSNumber] = [] {
-    didSet { if ecorche != oldValue { rebatir() } }
+  @objc var ecorche: [NSNumber] {
+    get { [] }
+    set { if Self.recevoir(newValue, dans: &fEcorche) { rebatir(.bati) } }
   }
 
+  /// Le voile de l'écorché : une matière qui change, pas un logement à rebâtir.
   @objc var voile: Bool = true {
-    didSet { if voile != oldValue { rebatir() } }
+    didSet { if voile != oldValue { appliquerVoile() } }
   }
 
   @objc var orbite: [NSNumber] = [] {
@@ -123,18 +154,20 @@ final class RoomScanVisite: UIView {
     didSet { if solY != oldValue { lever() } }
   }
 
-  @objc var meubles: [NSNumber] = [] {
-    didSet { if meubles != oldValue { rebatir() } }
+  @objc var meubles: [NSNumber] {
+    get { [] }
+    set { if Self.recevoir(newValue, dans: &fMeubles) { rebatir(.meubles) } }
   }
 
   /// Les vraies images du relevé (chemins des orthophotos), dans l'ordre.
   @objc var textures: [NSString] = [] {
-    didSet { if textures != oldValue { rebatir() } }
+    didSet { if textures != oldValue { rebatir(.images) } }
   }
 
   /// Les faces habillées d'une vraie image : 16 nombres par triangle.
-  @objc var texturees: [NSNumber] = [] {
-    didSet { if texturees != oldValue { rebatir() } }
+  @objc var texturees: [NSNumber] {
+    get { [] }
+    set { if Self.recevoir(newValue, dans: &fTexturees) { rebatir(.images) } }
   }
 
   /*
@@ -390,8 +423,35 @@ final class RoomScanVisite: UIView {
     }
   }
 
-  /// Le fil du bois et la trame des tissus, dessinés une fois par teinte.
-  private var texturesDesMeubles: [String: UIImage] = [:]
+  /// Le fil du bois et la trame des tissus, dessinés une fois par teinte —
+  /// pour toutes les vues : la visite et la maquette ne les redessinent plus
+  /// chacune (fil principal seulement).
+  private static var texturesDesMeubles: [String: UIImage] = [:]
+  /// Le parquet et le carrelage, dessinés une fois par matière et par teinte.
+  private static var imagesDesSols: [String: UIImage] = [:]
+
+  /*
+    CHAQUE FAMILLE A SON NŒUD, ET NE SE REBÂTIT QUE SI ELLE CHANGE. Tout
+    changement — le voile basculé, les images arrivées, une lampe de plus —
+    défaisait le logement entier et le renvoyait à la carte graphique. Les
+    murs, les sols, les images et les meubles ont chacun leur nœud ; seul
+    celui qui a changé se refait.
+  */
+  private struct Sale: OptionSet {
+    let rawValue: Int
+    static let bati = Sale(rawValue: 1)
+    static let sols = Sale(rawValue: 2)
+    static let images = Sale(rawValue: 4)
+    static let meubles = Sale(rawValue: 8)
+    static let tout: Sale = [.bati, .sols, .images, .meubles]
+  }
+  private var sale: Sale = []
+  private let gBati = SCNNode()
+  private let gSols = SCNNode()
+  private let gImages = SCNNode()
+  private let gMeubles = SCNNode()
+  /// La matière de l'écorché : le voile s'y pose ou s'en retire.
+  private var matiereEcorche: SCNMaterial?
 
   /**
    * LE LISERÉ DES MEUBLES — relevé du patron : « les meubles blancs sont trop
@@ -407,8 +467,13 @@ final class RoomScanVisite: UIView {
    * Son épaisseur se recalcule à chaque mouvement de caméra pour rester
    * d'un point à l'écran, quel que soit le zoom.
    */
-  private var materiauxContour: [SCNMaterial] = []
   private var epaisseurContour: Float = 0.006
+  /*
+    UNE SEULE MATIÈRE POUR TOUS LES LISERÉS. Elles étaient toutes identiques,
+    une par meuble — et pendant un pincement de la maquette, l'épaisseur se
+    réécrivait dans chacune, à chaque image. Une matière, une écriture.
+  */
+  private lazy var matiereContour: SCNMaterial = Self.fabriquerContour(epaisseur: self.epaisseurContour)
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -484,6 +549,7 @@ final class RoomScanVisite: UIView {
     scene.rootNode.addChildNode(eclairage)
 
     scene.rootNode.addChildNode(bati)
+    for g in [gBati, gSols, gImages, gMeubles] { bati.addChildNode(g) }
 
     // L'ENVIRONNEMENT des matériaux physiques : un ciel clair au-dessus, un
     // sol chaud dessous. Sans lui, un chrome ne reflète rien et paraît noir.
@@ -635,7 +701,8 @@ final class RoomScanVisite: UIView {
   */
   private var rebatirPrevu = false
 
-  private func rebatir() {
+  private func rebatir(_ s: Sale = .tout) {
+    sale.formUnion(s)
     guard !rebatirPrevu else { return }
     rebatirPrevu = true
     DispatchQueue.main.async { [weak self] in
@@ -645,46 +712,72 @@ final class RoomScanVisite: UIView {
     }
   }
 
+  private static func vider(_ n: SCNNode) {
+    for enfant in n.childNodes { enfant.removeFromParentNode() }
+  }
+
   private func rebatirMaintenant() {
-    for enfant in bati.childNodes { enfant.removeFromParentNode() }
-    materiauxContour.removeAll()
-    diffuseurs.removeAll()
-    if let g = geometrie(maillage, deuxFaces: true) {
-      bati.addChildNode(SCNNode(geometry: g))
-    }
-    if let g = geometrie(orientes, deuxFaces: false) {
-      bati.addChildNode(SCNNode(geometry: g))
-    }
-    if let g = geometrie(ecorche, deuxFaces: false) {
-      if voile, let m = g.firstMaterial {
-        /*
-          L'ÉCORCHÉ, CALCULÉ AU PIXEL. Une face extérieure de mur qui nous
-          fait face masque la pièce : elle se voile, jusqu'à quinze pour cent,
-          de quoi garder la trace du mur. Vue de champ, elle reste pleine. La
-          normale est dans le repère de l'œil : sa composante z dit à quel
-          point la face nous regarde — le même nombre que le JavaScript
-          appelait « vers ».
-        */
-        m.shaderModifiers = [
-          .fragment: """
-          #pragma transparent
-          #pragma body
-          float vers = normalize(_surface.normal).z;
-          float a = 1.0 - 0.85 * smoothstep(0.08, 0.5, vers);
-          _output.color = float4(_output.color.rgb * a, a);
-          """
-        ]
-        m.blendMode = .alpha
-        m.writesToDepthBuffer = false
+    let s = sale
+    sale = []
+    if s.contains(.bati) {
+      Self.vider(gBati)
+      matiereEcorche = nil
+      if let g = geometrie(fMaillage, deuxFaces: true) {
+        gBati.addChildNode(SCNNode(geometry: g))
       }
-      let n = SCNNode(geometry: g)
-      // Peint après le reste : un voile se pose sur ce qu'il voile.
-      n.renderingOrder = 10
-      bati.addChildNode(n)
+      if let g = geometrie(fOrientes, deuxFaces: false) {
+        gBati.addChildNode(SCNNode(geometry: g))
+      }
+      if let g = geometrie(fEcorche, deuxFaces: false) {
+        matiereEcorche = g.firstMaterial
+        appliquerVoile()
+        let n = SCNNode(geometry: g)
+        // Peint après le reste : un voile se pose sur ce qu'il voile.
+        n.renderingOrder = 10
+        gBati.addChildNode(n)
+      }
     }
-    for n in noeudsDesSols() { bati.addChildNode(n) }
-    for n in noeudsTextures() { bati.addChildNode(n) }
-    for n in noeudsDesMeubles() { bati.addChildNode(n) }
+    if s.contains(.sols) {
+      Self.vider(gSols)
+      for n in noeudsDesSols() { gSols.addChildNode(n) }
+    }
+    if s.contains(.images) {
+      Self.vider(gImages)
+      for n in noeudsTextures() { gImages.addChildNode(n) }
+    }
+    if s.contains(.meubles) {
+      Self.vider(gMeubles)
+      diffuseurs.removeAll()
+      for n in noeudsDesMeubles() { gMeubles.addChildNode(n) }
+    }
+  }
+
+  /*
+    L'ÉCORCHÉ, CALCULÉ AU PIXEL. Une face extérieure de mur qui nous fait face
+    masque la pièce : elle se voile, jusqu'à quinze pour cent, de quoi garder
+    la trace du mur. Vue de champ, elle reste pleine. La normale est dans le
+    repère de l'œil : sa composante z dit à quel point la face nous regarde —
+    le même nombre que le JavaScript appelait « vers ».
+  */
+  private static let nuanceurVoile = """
+    #pragma transparent
+    #pragma body
+    float vers = normalize(_surface.normal).z;
+    float a = 1.0 - 0.85 * smoothstep(0.08, 0.5, vers);
+    _output.color = float4(_output.color.rgb * a, a);
+    """
+
+  /// Pose ou retire le voile de l'écorché, sans rien rebâtir.
+  private func appliquerVoile() {
+    guard let m = matiereEcorche else { return }
+    if voile {
+      m.shaderModifiers = [.fragment: Self.nuanceurVoile]
+      m.blendMode = .alpha
+      m.writesToDepthBuffer = false
+    } else {
+      m.shaderModifiers = nil
+      m.writesToDepthBuffer = true
+    }
   }
 
   // ------------------------------------------------------------- vraies images
@@ -703,11 +796,12 @@ final class RoomScanVisite: UIView {
    pas une seconde fois sous l'éclairage de la scène.
    */
   private func noeudsTextures() -> [SCNNode] {
-    let n = texturees.count / 16
+    let v = fTexturees
+    let n = v.count / 16
     guard n > 0, !textures.isEmpty else { return [] }
     var parImage: [Int: [Int]] = [:]
     for t in 0..<n {
-      parImage[texturees[t * 16].intValue, default: []].append(t)
+      parImage[Int(v[t * 16]), default: []].append(t)
     }
     var noeuds: [SCNNode] = []
     for (k, liste) in parImage {
@@ -724,8 +818,8 @@ final class RoomScanVisite: UIView {
         var q: [CGPoint] = []
         for s in 0..<3 {
           let o = b + s * 5
-          p.append(SIMD3<Float>(texturees[o].floatValue, texturees[o + 1].floatValue, texturees[o + 2].floatValue))
-          q.append(CGPoint(x: CGFloat(texturees[o + 3].floatValue), y: CGFloat(texturees[o + 4].floatValue)))
+          p.append(SIMD3<Float>(v[o], v[o + 1], v[o + 2]))
+          q.append(CGPoint(x: CGFloat(v[o + 3]), y: CGFloat(v[o + 4])))
         }
         let c = simd_cross(p[1] - p[0], p[2] - p[0])
         let l = simd_length(c)
@@ -766,14 +860,29 @@ final class RoomScanVisite: UIView {
   }
 
   /// Les images déjà lues : un passage de la caméra ne relit pas le disque.
-  private static let imagesLues = NSCache<NSString, UIImage>()
+  /// Soixante-quatre mégaoctets d'images décodées au plus : au-delà, le cache
+  /// rend la mémoire au système au lieu de grossir sans fin.
+  private static let imagesLues: NSCache<NSString, UIImage> = {
+    let c = NSCache<NSString, UIImage>()
+    c.totalCostLimit = 64 << 20
+    return c
+  }()
 
-  /// L'image d'un chemin — retrouvée par son nom si l'app a été réinstallée.
+  /**
+   L'image d'un chemin — retrouvée par son nom si l'app a été réinstallée.
+   DÉCODÉE ICI, PAS À LA PREMIÈRE IMAGE : lue paresseusement, chaque JPEG se
+   décodait au moment où la carte graphique le réclamait — tous ensemble, sur
+   la première image de la visite, qui sautait.
+   */
   static func image(_ chemin: String) -> UIImage? {
     if let deja = imagesLues.object(forKey: chemin as NSString) { return deja }
     guard let url = RoomScanExport.resolveFile(chemin),
-          let image = UIImage(contentsOfFile: url.path) else { return nil }
-    imagesLues.setObject(image, forKey: chemin as NSString)
+          let src = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+    let options: [CFString: Any] = [kCGImageSourceShouldCacheImmediately: true]
+    guard let cg = CGImageSourceCreateImageAtIndex(src, 0, options as CFDictionary) else { return nil }
+    let image = UIImage(cgImage: cg)
+    let cout: Int = cg.bytesPerRow * cg.height
+    imagesLues.setObject(image, forKey: chemin as NSString, cost: cout)
     return image
   }
 
@@ -781,7 +890,7 @@ final class RoomScanVisite: UIView {
 
   /** Les meubles : un nœud par matière, toutes les pièces de la scène dedans. */
   private func noeudsDesMeubles() -> [SCNNode] {
-    let v = meubles.map { $0.floatValue }
+    let v = fMeubles
     var k = 0
     var out: [SCNNode] = []
     while k + 8 <= v.count {
@@ -797,19 +906,19 @@ final class RoomScanVisite: UIView {
       let nI = Int(v[k + 7])
       k += 8
       guard nS > 0, nI > 0, k + nS * 8 + nI <= v.count else { break }
-      var sommets: [SCNVector3] = []
-      var normales: [SCNVector3] = []
-      var uvs: [CGPoint] = []
-      sommets.reserveCapacity(nS)
-      normales.reserveCapacity(nS)
-      uvs.reserveCapacity(nS)
-      for s in 0..<nS {
-        let b = k + s * 8
-        sommets.append(SCNVector3(x: v[b], y: v[b + 1], z: v[b + 2]))
-        normales.append(SCNVector3(x: v[b + 3], y: v[b + 4], z: v[b + 5]))
-        uvs.append(CGPoint(x: CGFloat(v[b + 6]), y: CGFloat(v[b + 7])))
-      }
-      k += nS * 8
+      /*
+        LES SOMMETS PARTENT D'UN BLOC. Le JavaScript les range déjà comme la
+        carte graphique les lit — position, normale, coordonnées d'image,
+        huit flottants par sommet : on les copie tels quels, au lieu de trois
+        tableaux refaits sommet par sommet (et une seconde fois pour la coque).
+      */
+      let debut = k
+      let fin = k + nS * 8
+      let donnees: Data = v[debut..<fin].withUnsafeBufferPointer { Data(buffer: $0) }
+      let positions = Self.source(donnees, .vertex, nS, composantes: 3, decalage: 0)
+      let normales = Self.source(donnees, .normal, nS, composantes: 3, decalage: 12)
+      let uvs = Self.source(donnees, .texcoord, nS, composantes: 2, decalage: 24)
+      k = fin
       var indices: [UInt32] = []
       indices.reserveCapacity(nI)
       let dernier = Float(nS - 1)
@@ -818,13 +927,7 @@ final class RoomScanVisite: UIView {
       }
       k += nI
       let element = SCNGeometryElement(indices: indices, primitiveType: .triangles)
-      let g = SCNGeometry(
-        sources: [
-          SCNGeometrySource(vertices: sommets),
-          SCNGeometrySource(normals: normales),
-          SCNGeometrySource(textureCoordinates: uvs),
-        ],
-        elements: [element])
+      let g = SCNGeometry(sources: [positions, normales, uvs], elements: [element])
       g.materials = [materiauDuMeuble(code, teinte, rugosite, metal)]
       let n = SCNNode(geometry: g)
       if code == 5 && lampe >= 0 {
@@ -838,37 +941,59 @@ final class RoomScanVisite: UIView {
       // Le liseré : pour ce qui a une forme pleine (ni ombre, ni verre, ni
       // feuille, ni lumière — un diffuseur allumé n'a pas de bord sombre).
       if code != 9 && code != 3 && code != 4 && code != 5 && code != 6 {
-        if let coque = noeudDeContour(sommets, indices) { out.append(coque) }
+        if let coque = noeudDeContour(v, debut: debut, nS: nS, indices: indices,
+                                      positions: positions, element: element) {
+          out.append(coque)
+        }
       }
     }
     return out
   }
 
+  /// Une source de sommets lue dans le bloc : huit flottants (32 octets) par sommet.
+  private static func source(
+    _ d: Data, _ s: SCNGeometrySource.Semantic, _ n: Int, composantes: Int, decalage: Int
+  ) -> SCNGeometrySource {
+    SCNGeometrySource(
+      data: d, semantic: s, vectorCount: n, usesFloatComponents: true,
+      componentsPerVector: composantes, bytesPerComponent: 4,
+      dataOffset: decalage, dataStride: 32)
+  }
+
   /**
-   * La coque d'un groupe : les mêmes triangles, avec une normale SOUDÉE par
-   * position (la moyenne des normales des sommets confondus) — sans quoi la
-   * coque se fendrait à chaque arête vive d'une boîte.
+   * La coque d'un groupe : les mêmes triangles (la même source de positions,
+   * le même élément), avec une normale SOUDÉE par position (la moyenne des
+   * normales des sommets confondus) — sans quoi la coque se fendrait à chaque
+   * arête vive d'une boîte.
    */
-  private func noeudDeContour(_ sommets: [SCNVector3], _ indices: [UInt32]) -> SCNNode? {
-    guard !sommets.isEmpty, !indices.isEmpty else { return nil }
+  private func noeudDeContour(
+    _ v: [Float], debut: Int, nS: Int, indices: [UInt32],
+    positions: SCNGeometrySource, element: SCNGeometryElement
+  ) -> SCNNode? {
+    guard nS > 0, !indices.isEmpty else { return nil }
+    func point(_ i: Int) -> SCNVector3 {
+      let b = debut + i * 8
+      return SCNVector3(x: v[b], y: v[b + 1], z: v[b + 2])
+    }
     // La position, arrondie au demi-millimètre, en clé ENTIÈRE : une chaîne
     // fabriquée par sommet coûtait plus que tout le reste de la coque.
     var cumul: [SIMD3<Int32>: SCNVector3] = [:]
     var cles: [SIMD3<Int32>] = []
-    cles.reserveCapacity(sommets.count)
+    cles.reserveCapacity(nS)
     // Les normales géométriques, par triangle, cumulées sur leurs sommets.
-    var parSommet = [SCNVector3](repeating: SCNVector3(x: 0, y: 0, z: 0), count: sommets.count)
+    var parSommet = [SCNVector3](repeating: SCNVector3(x: 0, y: 0, z: 0), count: nS)
     var t = 0
     while t + 2 < indices.count {
       let a = Int(indices[t]), b = Int(indices[t + 1]), c = Int(indices[t + 2])
       t += 3
-      guard a < sommets.count, b < sommets.count, c < sommets.count else { continue }
-      let n = normale(sommets[a], sommets[b], sommets[c])
+      guard a < nS, b < nS, c < nS else { continue }
+      let n = normale(point(a), point(b), point(c))
       parSommet[a] = SCNVector3(x: parSommet[a].x + n.x, y: parSommet[a].y + n.y, z: parSommet[a].z + n.z)
       parSommet[b] = SCNVector3(x: parSommet[b].x + n.x, y: parSommet[b].y + n.y, z: parSommet[b].z + n.z)
       parSommet[c] = SCNVector3(x: parSommet[c].x + n.x, y: parSommet[c].y + n.y, z: parSommet[c].z + n.z)
     }
-    for (k, p) in sommets.enumerated() {
+    for k in 0..<nS {
+      let p = point(k)
       let cle = SIMD3<Int32>(
         Int32((p.x * 2000).rounded()), Int32((p.y * 2000).rounded()), Int32((p.z * 2000).rounded()))
       cles.append(cle)
@@ -877,15 +1002,22 @@ final class RoomScanVisite: UIView {
         x: deja.x + parSommet[k].x, y: deja.y + parSommet[k].y, z: deja.z + parSommet[k].z)
     }
     var soudees: [SCNVector3] = []
-    soudees.reserveCapacity(sommets.count)
+    soudees.reserveCapacity(nS)
     for cle in cles {
-      let v = cumul[cle] ?? SCNVector3(x: 0, y: 1, z: 0)
-      let l = sqrtf(v.x * v.x + v.y * v.y + v.z * v.z)
-      soudees.append(l > 1e-6 ? SCNVector3(x: v.x / l, y: v.y / l, z: v.z / l) : SCNVector3(x: 0, y: 1, z: 0))
+      let w = cumul[cle] ?? SCNVector3(x: 0, y: 1, z: 0)
+      let l = sqrtf(w.x * w.x + w.y * w.y + w.z * w.z)
+      soudees.append(l > 1e-6 ? SCNVector3(x: w.x / l, y: w.y / l, z: w.z / l) : SCNVector3(x: 0, y: 1, z: 0))
     }
-    let g = SCNGeometry(
-      sources: [SCNGeometrySource(vertices: sommets), SCNGeometrySource(normals: soudees)],
-      elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)])
+    let g = SCNGeometry(sources: [positions, SCNGeometrySource(normals: soudees)], elements: [element])
+    g.materials = [matiereContour]
+    let noeud = SCNNode(geometry: g)
+    // Après le reste : un voile se pose sur ce qui est déjà peint.
+    noeud.renderingOrder = 4
+    return noeud
+  }
+
+  /// La matière des liserés — une seule, partagée par tous les meubles.
+  private static func fabriquerContour(epaisseur: Float) -> SCNMaterial {
     let m = SCNMaterial()
     m.lightingModel = .constant
     /*
@@ -911,13 +1043,8 @@ final class RoomScanVisite: UIView {
       _geometry.position.xyz += _geometry.normal * epaisseur;
       """
     ]
-    m.setValue(NSNumber(value: epaisseurContour), forKey: "epaisseur")
-    materiauxContour.append(m)
-    g.materials = [m]
-    let noeud = SCNNode(geometry: g)
-    // Après le reste : un voile se pose sur ce qui est déjà peint.
-    noeud.renderingOrder = 4
-    return noeud
+    m.setValue(NSNumber(value: epaisseur), forKey: "epaisseur")
+    return m
   }
 
   /** L'épaisseur du liseré, en mètres — un point d'écran, au zoom du moment. */
@@ -928,9 +1055,7 @@ final class RoomScanVisite: UIView {
     // réécrivait la même valeur dans chaque matériau.
     if voulue == epaisseurContour { return }
     epaisseurContour = voulue
-    for m in materiauxContour {
-      m.setValue(NSNumber(value: epaisseurContour), forKey: "epaisseur")
-    }
+    matiereContour.setValue(NSNumber(value: epaisseurContour), forKey: "epaisseur")
   }
 
   /** Une matière physique : teinte, rugosité, métal — et ce que son code ajoute. */
@@ -951,6 +1076,8 @@ final class RoomScanVisite: UIView {
         m.diffuse.wrapS = .repeat
         m.diffuse.wrapT = .repeat
         m.diffuse.mipFilter = .linear
+        // De biais, le fil du bois et la trame restent nets.
+        m.diffuse.maxAnisotropy = 4
         // Les coordonnées sont en mètres : le fil se répète tous les
         // quatre-vingt-dix centimètres, la trame tous les trente.
         let pas: Float = code == 1 ? 0.9 : 0.3
@@ -995,10 +1122,13 @@ final class RoomScanVisite: UIView {
     var a: CGFloat = 0
     teinte.getRed(&r, green: &g, blue: &b, alpha: &a)
     let cle = "\(code)-\(Int(r * 255))-\(Int(g * 255))-\(Int(b * 255))"
-    if let deja = texturesDesMeubles[cle] { return deja }
+    if let deja = Self.texturesDesMeubles[cle] { return deja }
     let cote: CGFloat = code == 1 ? 512 : 256
     let format = UIGraphicsImageRendererFormat()
     format.scale = 1
+    // Huit bits par composante : sur un écran P3, le format « automatique »
+    // en prenait seize, pour un fil de bois qui n'en a pas besoin.
+    format.preferredRange = .standard
     let rendu = UIGraphicsImageRenderer(size: CGSize(width: cote, height: cote), format: format)
     let image = rendu.image { ctx in
       let c = ctx.cgContext
@@ -1047,7 +1177,7 @@ final class RoomScanVisite: UIView {
         }
       }
     }
-    texturesDesMeubles[cle] = image
+    Self.texturesDesMeubles[cle] = image
     return image
   }
 
@@ -1083,6 +1213,7 @@ final class RoomScanVisite: UIView {
     let taille = CGSize(width: 256, height: 128)
     let format = UIGraphicsImageRendererFormat()
     format.scale = 1
+    format.preferredRange = .standard
     return UIGraphicsImageRenderer(size: taille, format: format).image { ctx in
       let couleurs =
         [
@@ -1122,8 +1253,8 @@ final class RoomScanVisite: UIView {
    * elles, ne montrent jamais leur dos : vu de l'extérieur, le mur du devant
    * ne cache pas la pièce.
    */
-  private func geometrie(_ source: [NSNumber], deuxFaces: Bool) -> SCNGeometry? {
-    let v = source.map { $0.floatValue }
+  private func geometrie(_ source: [Float], deuxFaces: Bool) -> SCNGeometry? {
+    let v = source
     let parTriangle = 12
     let n = v.count / parTriangle
     guard n > 0 else { return nil }
@@ -1204,8 +1335,23 @@ final class RoomScanVisite: UIView {
    * teinte relevée : parquet ou carrelage, le sol garde SA couleur.
    */
   private func imageDuSol(_ matiere: Int, _ teinte: UIColor) -> UIImage? {
+    // Dessinée une fois par matière et par teinte, pour toutes les vues.
+    var r: CGFloat = 0
+    var g: CGFloat = 0
+    var b: CGFloat = 0
+    var a: CGFloat = 0
+    teinte.getRed(&r, green: &g, blue: &b, alpha: &a)
+    let cle = "\(matiere)-\(Int(r * 255))-\(Int(g * 255))-\(Int(b * 255))"
+    if let deja = Self.imagesDesSols[cle] { return deja }
+    let image = dessinerLeSol(matiere, teinte)
+    if let image = image { Self.imagesDesSols[cle] = image }
+    return image
+  }
+
+  private func dessinerLeSol(_ matiere: Int, _ teinte: UIColor) -> UIImage? {
     let format = UIGraphicsImageRendererFormat.default()
     format.scale = 1
+    format.preferredRange = .standard
     let joint = melange(teinte, UIColor(red: 0.04, green: 0.05, blue: 0.07, alpha: 1), 0.3)
     if matiere == 1 {
       // 1,35 m × 0,44 m → 512 × 167 px : une lame par rang, et le rang du
@@ -1256,7 +1402,7 @@ final class RoomScanVisite: UIView {
   }
 
   private func noeudsDesSols() -> [SCNNode] {
-    let v = sols.map { $0.floatValue }
+    let v = fSols
     var i = 0
     var out: [SCNNode] = []
     while i + 6 <= v.count {

@@ -66,6 +66,22 @@ final class RoomColorSampler {
   private static let minSamples = 4
 
   /**
+   LE MÊME LOT RENOUVELÉ POUR LES MURS, LES MEUBLES ET LE SOL.
+
+   Le sol gardait ses vingt-quatre PREMIERS relevés par case : ceux de
+   l'entrée, de loin et de biais, et plus rien des vues prises ensuite au
+   milieu de la pièce. Une fois le lot plein, une vue nouvelle sur quatre
+   remplace un relevé au hasard — en place, sans recopier le lot.
+   */
+  private static func garder(_ c: SIMD3<Float>, dans lot: inout [SIMD3<Float>]) {
+    if lot.count < maxSamples {
+      lot.append(c)
+    } else if Int.random(in: 0..<4) == 0 {
+      lot[Int.random(in: 0..<lot.count)] = c
+    }
+  }
+
+  /**
    L'ACCUMULATEUR GARDE LES ÉCHANTILLONS, il ne les moyenne plus.
 
    Une moyenne se laisse tirer par n'importe quoi : un seul relevé pris sur
@@ -98,11 +114,7 @@ final class RoomColorSampler {
         nouvelle sur quatre remplace un relevé au hasard : le lot suit le
         scan, et la mémoire ne monte plus.
       */
-      if samples[i].count < RoomColorSampler.maxSamples {
-        samples[i].append(c)
-      } else if Int.random(in: 0..<4) == 0 {
-        samples[i][Int.random(in: 0..<samples[i].count)] = c
-      }
+      RoomColorSampler.garder(c, dans: &samples[i])
     }
 
     /// La médiane d'un lot, canal par canal.
@@ -134,8 +146,22 @@ final class RoomColorSampler {
     }
   }
 
-  private let queue = DispatchQueue(label: "com.roomscan.color")
+  /*
+    EN ARRIÈRE-PLAN, ET LE DIT. Sans qualité de service, la file prenait la
+    priorité par défaut — au-dessus du travail que RoomPlan lui-même range
+    en `.utility`. Le relevé des couleurs ne doit jamais passer devant lui.
+  */
+  private let queue = DispatchQueue(label: "com.roomscan.color", qos: .utility)
   private var timer: DispatchSourceTimer?
+  /**
+   LE TÉLÉPHONE CHAUFFE DÉJÀ : ON LUI LAISSE DE L'AIR.
+
+   RoomPlan fait tourner caméra, LiDAR et réseau de neurones à plein ; nos
+   lectures s'y ajoutent. Quand le système dit « sérieux », on ne lit plus
+   qu'un battement sur deux ; « critique », plus du tout — mieux vaut des
+   couleurs moins nourries qu'un scan que le système bride ou interrompt.
+   */
+  private var battement = 0
   private weak var session: ARSession?
   private var room: CapturedRoom?
   private var walls: [UUID: Accum] = [:]
@@ -159,7 +185,11 @@ final class RoomColorSampler {
       self.session = session
       guard self.timer == nil else { return }
       let t = DispatchSource.makeTimerSource(queue: self.queue)
-      t.schedule(deadline: .now() + 0.5, repeating: 1.0 / Self.rate)
+      // Une marge de 12 % de la période : le système peut caler nos réveils
+      // sur les siens au lieu de rallumer un cœur exprès pour nous.
+      let periode: Double = 1.0 / Self.rate
+      let marge = DispatchTimeInterval.milliseconds(Int(periode * 120))
+      t.schedule(deadline: .now() + 0.5, repeating: periode, leeway: marge)
       t.setEventHandler { [weak self] in self?.tick() }
       t.resume()
       self.timer = t
@@ -193,9 +223,24 @@ final class RoomColorSampler {
   // MARK: - Échantillonnage
 
   private func tick() {
+    battement &+= 1
+    switch ProcessInfo.processInfo.thermalState {
+    case .critical:
+      return
+    case .serious:
+      if battement % 2 != 0 { return }
+    default:
+      break
+    }
     guard let session = session, let room = room,
           let frame = session.currentFrame else { return }
     guard case .normal = frame.camera.trackingState else { return }
+    /*
+      SANS PROFONDEUR, RIEN À RELEVER — et rien à verrouiller. Chaque
+      échantillon serait refusé faute de profondeur : on s'arrête avant de
+      toucher au tampon de la caméra, et sans compter cette pose comme vue.
+    */
+    guard frame.sceneDepth != nil || frame.smoothedSceneDepth != nil else { return }
     let m = frame.camera.transform
     let position = SIMD3<Float>(m.columns.3.x, m.columns.3.y, m.columns.3.z)
     let visee = SIMD3<Float>(m.columns.2.x, m.columns.2.y, m.columns.2.z)
@@ -222,7 +267,13 @@ final class RoomColorSampler {
   private func sampleSurface(_ s: CapturedRoom.Surface, img: FrameImage) {
     let cols = Self.wallCols
     let rows = Self.wallRows
-    var acc = walls[s.identifier] ?? Accum(cells: cols * rows)
+    /*
+      SORTI DU DICTIONNAIRE LE TEMPS DU RELEVÉ. Copié, le lot avait deux
+      propriétaires — le dictionnaire et nous — et le premier ajout recopiait
+      ses vingt-quatre cases à chaque passage. Retiré puis remis, il n'en a
+      qu'un : on écrit en place.
+    */
+    var acc = walls.removeValue(forKey: s.identifier) ?? Accum(cells: cols * rows)
     let w = s.dimensions.x
     let h = s.dimensions.y
     let m = s.transform
@@ -295,10 +346,8 @@ final class RoomColorSampler {
             (Float(i) + 0.5) * cell, p.y, (Float(j) + 0.5) * cell)
           if let c = img.color(at: world, normal: up) {
             let key = (Int64(i) << 32) | Int64(UInt32(bitPattern: Int32(j)))
-            // En place : le lot n'est plus recopié à chaque échantillon.
-            if floorTiles[key, default: []].count < Self.maxSamples {
-              floorTiles[key, default: []].append(c)
-            }
+            // En place, un seul accès : le lot suit le scan sans être recopié.
+            Self.garder(c, dans: &floorTiles[key, default: []])
           }
           j += 1
         }
@@ -314,7 +363,8 @@ final class RoomColorSampler {
    médiane pour tout le meuble les mélangeait.
    */
   private func sampleObject(_ o: CapturedRoom.Object, img: FrameImage) {
-    var acc = objects[o.identifier] ?? Accum(cells: 2)
+    // Retiré puis remis, comme pour un mur : le lot s'écrit en place.
+    var acc = objects.removeValue(forKey: o.identifier) ?? Accum(cells: 2)
     let m = o.transform
     acc.center = SIMD3(m.columns.3.x, m.columns.3.y, m.columns.3.z)
     let d = o.dimensions
@@ -516,23 +566,59 @@ final class RoomColorSampler {
 
  La projection passe par la pose et les intrinsèques de la caméra, donc
  directement dans le repère de `capturedImage` (paysage) : aucune histoire
- d'orientation d'interface à gérer. Quand la carte de profondeur LiDAR est
- disponible, elle sert à écarter les points cachés par un obstacle.
+ d'orientation d'interface à gérer. La carte de profondeur LiDAR est
+ requise — sans elle, l'image n'est pas ouverte : elle sert à écarter les
+ points cachés par un obstacle.
  */
 @available(iOS 16.0, *)
 private struct FrameImage {
   let buffer: CVPixelBuffer
-  let depth: CVPixelBuffer?
+  let depth: CVPixelBuffer
+  /// La confiance LiDAR de la même prise, quand ARKit la donne.
+  let confidence: CVPixelBuffer?
   let width: Int
   let height: Int
   let camPos: SIMD3<Float>
   let camInv: simd_float4x4
   let fx: Float, fy: Float, cx: Float, cy: Float
   let fullRange: Bool
+  /*
+    LES ADRESSES, LUES UNE FOIS. Chaque échantillon demandait à Core Video
+    l'adresse et le pas de chaque plan, puis la taille de la profondeur :
+    une quarantaine d'appels par case, des milliers de cases par passage.
+    Les tampons restent verrouillés tant que l'image sert : ces valeurs ne
+    bougent pas, on les garde.
+  */
+  let yBase: UnsafeMutableRawPointer
+  let yLigne: Int
+  let cBase: UnsafeMutableRawPointer
+  let cLigne: Int
+  let dBase: UnsafeMutableRawPointer
+  let dLigne: Int
+  let dWidth: Int
+  let dHeight: Int
+  let confBase: UnsafeMutableRawPointer?
+  let confLigne: Int
 
   init?(frame: ARFrame) {
+    // Sans profondeur, tout échantillon serait refusé : on ne verrouille rien.
+    guard let donnees = frame.sceneDepth ?? frame.smoothedSceneDepth else { return nil }
     let b = frame.capturedImage
+    let d = donnees.depthMap
+    guard CVPixelBufferGetPlaneCount(b) >= 2 else { return nil }
     guard CVPixelBufferLockBaseAddress(b, .readOnly) == kCVReturnSuccess else {
+      return nil
+    }
+    guard CVPixelBufferLockBaseAddress(d, .readOnly) == kCVReturnSuccess else {
+      CVPixelBufferUnlockBaseAddress(b, .readOnly)
+      return nil
+    }
+    guard let yb = CVPixelBufferGetBaseAddressOfPlane(b, 0),
+          let cb = CVPixelBufferGetBaseAddressOfPlane(b, 1),
+          let db = CVPixelBufferGetBaseAddress(d)
+    else {
+      CVPixelBufferUnlockBaseAddress(b, .readOnly)
+      CVPixelBufferUnlockBaseAddress(d, .readOnly)
       return nil
     }
     buffer = b
@@ -540,17 +626,43 @@ private struct FrameImage {
     height = CVPixelBufferGetHeight(b)
     let fmt = CVPixelBufferGetPixelFormatType(b)
     fullRange = fmt == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
-    guard CVPixelBufferGetPlaneCount(b) >= 2 else {
-      CVPixelBufferUnlockBaseAddress(b, .readOnly)
-      return nil
-    }
+    yBase = yb
+    yLigne = CVPixelBufferGetBytesPerRowOfPlane(b, 0)
+    cBase = cb
+    cLigne = CVPixelBufferGetBytesPerRowOfPlane(b, 1)
+    depth = d
+    dBase = db
+    dLigne = CVPixelBufferGetBytesPerRow(d)
+    let dw = CVPixelBufferGetWidth(d)
+    let dh = CVPixelBufferGetHeight(d)
+    dWidth = dw
+    dHeight = dh
 
-    let d = frame.sceneDepth?.depthMap ?? frame.smoothedSceneDepth?.depthMap
-    if let d = d, CVPixelBufferLockBaseAddress(d, .readOnly) == kCVReturnSuccess {
-      depth = d
-    } else {
-      depth = nil
+    /*
+      LA CONFIANCE DU LIDAR, POINT PAR POINT. Sur une arête, une vitre, un
+      miroir ou une surface sombre, la profondeur est une extrapolation : elle
+      peut tomber à huit centimètres de l'attendu par hasard. ARKit le dit
+      dans sa carte de confiance — même grille, un octet par point. Absente
+      ou illisible, on fait comme avant : la profondeur seule tranche.
+    */
+    var conf: CVPixelBuffer?
+    var qBase: UnsafeMutableRawPointer?
+    var qLigne = 0
+    if let q = donnees.confidenceMap,
+       CVPixelBufferGetWidth(q) == dw, CVPixelBufferGetHeight(q) == dh,
+       CVPixelBufferGetPixelFormatType(q) == kCVPixelFormatType_OneComponent8,
+       CVPixelBufferLockBaseAddress(q, .readOnly) == kCVReturnSuccess {
+      if let base = CVPixelBufferGetBaseAddress(q) {
+        conf = q
+        qBase = base
+        qLigne = CVPixelBufferGetBytesPerRow(q)
+      } else {
+        CVPixelBufferUnlockBaseAddress(q, .readOnly)
+      }
     }
+    confidence = conf
+    confBase = qBase
+    confLigne = qLigne
 
     let t = frame.camera.transform
     camPos = SIMD3(t.columns.3.x, t.columns.3.y, t.columns.3.z)
@@ -564,7 +676,8 @@ private struct FrameImage {
 
   func release() {
     CVPixelBufferUnlockBaseAddress(buffer, .readOnly)
-    if let d = depth { CVPixelBufferUnlockBaseAddress(d, .readOnly) }
+    CVPixelBufferUnlockBaseAddress(depth, .readOnly)
+    if let q = confidence { CVPixelBufferUnlockBaseAddress(q, .readOnly) }
   }
 
   /// Couleur (0…255 par canal) du point monde, ou nil s'il n'est pas
@@ -604,16 +717,20 @@ private struct FrameImage {
      relève moins de cases — celles qui restent disent la vérité, et une
      case sans relevé reprend la teinte dominante de sa surface.
      */
-    guard let d = depth else { return nil }
-    let dw = CVPixelBufferGetWidth(d)
-    let dh = CVPixelBufferGetHeight(d)
+    let dw = dWidth
+    let dh = dHeight
     let dx = min(dw - 1, max(0, Int(u / Float(width) * Float(dw))))
     let dy = min(dh - 1, max(0, Int(v / Float(height) * Float(dh))))
-    let row = CVPixelBufferGetBaseAddress(d)!
-      .advanced(by: dy * CVPixelBufferGetBytesPerRow(d))
+    let row = dBase
+      .advanced(by: dy * dLigne)
       .assumingMemoryBound(to: Float32.self)
     let measured = row[dx]
     guard measured > 0.05, abs(measured - z) < 0.08 else { return nil }
+    // Au même point de la grille, le LiDAR doit être au moins moyennement sûr.
+    if let qb = confBase {
+      let niveau = qb.advanced(by: dy * confLigne).assumingMemoryBound(to: UInt8.self)[dx]
+      guard Int(niveau) >= ARConfidenceLevel.medium.rawValue else { return nil }
+    }
 
     /**
      UNE TACHE DE NEUF PIXELS, ET SA MÉDIANE.
@@ -672,11 +789,11 @@ private struct FrameImage {
 
   /// Conversion Y'CbCr (BT.601) → RGB 0…255.
   private func yuv(x: Int, y: Int) -> SIMD3<Float> {
-    let yRow = CVPixelBufferGetBaseAddressOfPlane(buffer, 0)!
-      .advanced(by: y * CVPixelBufferGetBytesPerRowOfPlane(buffer, 0))
+    let yRow = yBase
+      .advanced(by: y * yLigne)
       .assumingMemoryBound(to: UInt8.self)
-    let cRow = CVPixelBufferGetBaseAddressOfPlane(buffer, 1)!
-      .advanced(by: (y / 2) * CVPixelBufferGetBytesPerRowOfPlane(buffer, 1))
+    let cRow = cBase
+      .advanced(by: (y / 2) * cLigne)
       .assumingMemoryBound(to: UInt8.self)
     var yy = Float(yRow[x])
     let cb = Float(cRow[(x / 2) * 2]) - 128

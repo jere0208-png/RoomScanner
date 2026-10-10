@@ -99,7 +99,7 @@ describe('le natif fabrique les vraies images', () => {
 
   it('la vue 3D native pose une image sur une face', () => {
     const v = lire('modules/react-native-room-scan/ios/RoomScanVisite.swift');
-    expect(v).toContain('didSet { if texturees != oldValue { rebatir() } }');
+    expect(v).toContain('set { if Self.recevoir(newValue, dans: &fTexturees) { rebatir(.images) } }');
     expect(v).toContain('SCNGeometrySource(textureCoordinates: uvs)');
     expect(v).toContain('m.diffuse.contents = image');
     const pont = lire('modules/react-native-room-scan/ios/RoomScan.m');
@@ -121,7 +121,7 @@ describe('la netteté des murs — « la texture murale est de faible qualité �
   it('un centimètre le pixel au mur, un et demi au sol, sur une toile compacte', () => {
     expect(o).toContain('private static let pasMur: Float = 0.01');
     expect(o).toContain('private static let pasSol: Float = 0.015');
-    expect(o).toContain('var couleur: [SIMD4<UInt8>]');
+    expect(o).toContain('var couleur: [SIMD4<UInt16>]');
     expect(o).not.toContain('[SIMD4<Float>]');
   });
 
@@ -133,7 +133,7 @@ describe('la netteté des murs — « la texture murale est de faible qualité �
   });
 
   it('quatre lectures par pixel, des blocs hors champ écartés, des trous comblés de proche en proche', () => {
-    expect(o).toContain('let m: SIMD3<Float> = (haut + bas) * 0.25');
+    expect(o).toContain('let moy: SIMD3<Float> = (haut + bas) * 0.25');
     expect(o).toContain('if blocVisible(');
     expect(o).toContain('while !front.isEmpty && couche < 80');
     expect(o).toContain('jpegData(compressionQuality: 0.9)');

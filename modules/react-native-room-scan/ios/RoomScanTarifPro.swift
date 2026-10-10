@@ -74,6 +74,13 @@ final class RoomScanTarifPro: NSObject, UIDocumentPickerDelegate {
     let resolve = rendre
     rendre = nil
     DispatchQueue.global(qos: .userInitiated).async {
+      /*
+        LA COPIE NE TRAÎNE PAS. Le sélecteur est ouvert `asCopy: true` : ce
+        qu'il rend est une COPIE, posée dans le dossier temporaire de l'app,
+        et non le fichier de l'électricien. Une fois lue, elle ne sert plus
+        à rien — chaque tarif ouvert y laissait sinon ses mégaoctets.
+      */
+      defer { try? FileManager.default.removeItem(at: url) }
       let nom = url.lastPathComponent
       guard let donnees = try? Data(contentsOf: url) else {
         resolve?(["nom": nom, "erreur": "illisible"])
@@ -105,6 +112,15 @@ final class RoomScanTarifPro: NSObject, UIDocumentPickerDelegate {
 enum Classeur {
   /// Au-delà, un tarif n'est plus un tarif d'électricien : on s'arrête.
   static let lignesMax = 60_000
+
+  /**
+   ET UNE ENTRÉE NE DÉPASSE PAS 256 Mo DÉCOMPRESSÉE. La taille annoncée se
+   lit dans l'en-tête de l'archive — jusqu'à 4 Go, et rien ne garantit
+   qu'elle dise vrai : on réservait la mémoire sur sa seule parole. Un
+   classeur abîmé (ou piégé) faisait tomber l'application au lieu de
+   répondre « classeur illisible ».
+   */
+  static let tailleMax = 256 << 20
 
   static func lignes(_ zip: Data) -> [[String]]? {
     guard let entrees = repertoire(zip) else { return nil }
@@ -175,7 +191,7 @@ enum Classeur {
     guard debut + e.tailleCompressee <= d.count else { return nil }
     let brut = d.subdata(in: (d.startIndex + debut)..<(d.startIndex + debut + e.tailleCompressee))
     if e.methode == 0 { return brut }
-    guard e.methode == 8, e.taille > 0 else { return nil }
+    guard e.methode == 8, e.taille > 0, e.taille <= Classeur.tailleMax else { return nil }
     var sortie = Data(count: e.taille)
     let n = sortie.withUnsafeMutableBytes { (dst: UnsafeMutableRawBufferPointer) -> Int in
       brut.withUnsafeBytes { (src: UnsafeRawBufferPointer) -> Int in

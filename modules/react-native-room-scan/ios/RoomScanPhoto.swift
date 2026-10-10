@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 import Photos
 import UIKit
 import React
@@ -23,6 +24,19 @@ class RoomScanPhoto: NSObject {
 
   private var resolve: RCTPromiseResolveBlock?
   private var reject: RCTPromiseRejectBlock?
+
+  /**
+   LA PHOTO S'ÉCRIT À L'ÉCART DE L'ÉCRAN — ramener un original de douze à
+   quarante-huit mégapixels à 1600 px, puis l'encoder en JPEG, coûtait
+   100 à 300 ms sur le fil principal : l'interface se figeait au retour de
+   l'appareil photo. Une file à elle, en série (deux photos ne s'écrivent
+   jamais en même temps), et l'on ne revient au fil principal que pour
+   rendre la main. La réserve est vidée à chaque photo : les grandes images
+   intermédiaires ne s'attardent pas.
+   */
+  private static let atelier = DispatchQueue(label: "fr.echoplan.photo",
+                                             qos: .userInitiated,
+                                             autoreleaseFrequency: .workItem)
 
   /// Efface des photos de repérage. Un scan supprimé ne doit pas laisser
   /// ses images derrière lui : elles s'accumuleraient sans que personne
@@ -92,6 +106,11 @@ class RoomScanPhoto: NSObject {
 
    `nil` si le fichier n'existe plus (photo effacée hors de l'app) : la
    feuille sortira sans elle, ce qui vaut mieux qu'un export qui échoue.
+
+   LA VIGNETTE SE LIT SANS DÉCODER LA PHOTO — ImageIO réduit le JPEG en le
+   lisant : on n'a plus en mémoire, pour chaque mur du dossier, l'image
+   entière de 1600 px décodée puis redessinée pour n'en garder que 900.
+   L'orientation est appliquée, et l'image n'est jamais agrandie.
    */
   @objc func readPhoto(_ path: String,
                        maxSide: NSNumber,
@@ -100,18 +119,19 @@ class RoomScanPhoto: NSObject {
     let url = URL(fileURLWithPath: path)
     // Même garde que pour l'effacement : on ne lit que NOS photos.
     guard url.deletingLastPathComponent().lastPathComponent == "photos",
-          let image = UIImage(contentsOfFile: path) else {
+          let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
       resolve(nil)
       return
     }
-    let cote = CGFloat(truncating: maxSide)
-    let echelle = min(1, cote / max(image.size.width, image.size.height))
-    let taille = CGSize(width: image.size.width * echelle,
-                        height: image.size.height * echelle)
-    let rendu = UIGraphicsImageRenderer(size: taille, format: RoomScanPhoto.pixelParPoint()).image { _ in
-      image.draw(in: CGRect(origin: .zero, size: taille))
-    }
-    guard let data = rendu.jpegData(compressionQuality: 0.62) else {
+    let cote: Int = max(1, maxSide.intValue)
+    let options: [CFString: Any] = [
+      kCGImageSourceCreateThumbnailFromImageAlways: true,
+      kCGImageSourceCreateThumbnailWithTransform: true,
+      kCGImageSourceShouldCacheImmediately: true,
+      kCGImageSourceThumbnailMaxPixelSize: cote,
+    ]
+    guard let vignette = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary),
+          let data = UIImage(cgImage: vignette).jpegData(compressionQuality: 0.62) else {
       resolve(nil)
       return
     }
@@ -239,7 +259,11 @@ class RoomScanPhoto: NSObject {
         resolve(nil)
         return
       }
-      resolve(self.save(image))
+      // La photothèque rend l'image sur le fil principal : l'écriture part
+      // dans l'atelier (voir `atelier`).
+      Self.atelier.async {
+        resolve(self.save(image)?.chemin)
+      }
     }
   }
 
@@ -305,8 +329,9 @@ class RoomScanPhoto: NSObject {
   /**
    UN PIXEL PAR POINT. Sans ce format, le rendu prend l'échelle de l'écran
    (×3) : la photo « ramenée à 1600 px » sortait en 4800 px — neuf fois plus
-   lourde, environ 70 Mo en mémoire avant l'encodage, et autant de plus à
-   chaque relecture pour un PDF.
+   lourde, environ 70 Mo en mémoire avant l'encodage. (La relecture pour un
+   PDF, elle, passe par ImageIO, qui compte déjà en pixels : voir
+   `readPhoto`.)
    */
   static func pixelParPoint() -> UIGraphicsImageRendererFormat {
     let f = UIGraphicsImageRendererFormat.default()
@@ -314,8 +339,10 @@ class RoomScanPhoto: NSObject {
     return f
   }
 
-  /// Écrit l'image en JPEG, côté long ramené à 1600 px.
-  private func save(_ image: UIImage) -> String? {
+  /// Écrit l'image en JPEG, côté long ramené à 1600 px. Rend le chemin ET
+  /// les octets écrits : la photothèque les reçoit sans relire le disque.
+  /// Lourd — à appeler depuis `atelier`, jamais du fil principal.
+  private func save(_ image: UIImage) -> (chemin: String, donnees: Data)? {
     let cote: CGFloat = 1600
     let echelle = min(1, cote / max(image.size.width, image.size.height))
     let taille = CGSize(width: image.size.width * echelle,
@@ -332,7 +359,7 @@ class RoomScanPhoto: NSObject {
     let url = dossier.appendingPathComponent("p-\(Int(Date().timeIntervalSince1970 * 1000)).jpg")
     do {
       try data.write(to: url)
-      return url.path
+      return (chemin: url.path, donnees: data)
     } catch {
       return nil
     }
@@ -346,24 +373,31 @@ extension RoomScanPhoto: UIImagePickerControllerDelegate, UINavigationController
   ) {
     let image = info[.originalImage] as? UIImage
     picker.dismiss(animated: true) {
-      guard let image = image, let chemin = self.save(image) else {
+      guard let image = image else {
         self.finish(nil)
         return
       }
-      /*
-        LE FICHIER D'ABORD, LE COFFRE ENSUITE.
+      // L'écriture part dans l'atelier (voir `atelier`) ; `finish` et la
+      // photothèque restent sur le fil principal, comme avant.
+      Self.atelier.async {
+        let ecrit = self.save(image)
+        DispatchQueue.main.async {
+          guard let fait = ecrit else {
+            self.finish(nil)
+            return
+          }
+          /*
+            LE FICHIER D'ABORD, LE COFFRE ENSUITE.
 
-        Le chemin local est écrit et sûr avant qu'on parle à la
-        photothèque : si l'autorisation est refusée, ou si le rangement
-        échoue, le relevé garde sa photo. On ne perd jamais l'image pour
-        une question de permission.
-      */
-      guard let data = FileManager.default.contents(atPath: chemin) else {
-        self.finish(chemin)
-        return
-      }
-      self.archiver(data) { id in
-        DispatchQueue.main.async { self.finish(chemin, asset: id) }
+            Le chemin local est écrit et sûr avant qu'on parle à la
+            photothèque : si l'autorisation est refusée, ou si le rangement
+            échoue, le relevé garde sa photo. On ne perd jamais l'image pour
+            une question de permission.
+          */
+          self.archiver(fait.donnees) { id in
+            DispatchQueue.main.async { self.finish(fait.chemin, asset: id) }
+          }
+        }
       }
     }
   }

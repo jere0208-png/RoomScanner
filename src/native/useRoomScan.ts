@@ -8,6 +8,7 @@ import { usePannes } from '../ui/journalPannes';
 import { phraseEnergie } from '../ui/energie';
 import { bilanDuReleve } from '../geometry/bilan';
 import { useBilanStore } from '../store/bilanStore';
+import { sansCeQuOnAVuParLaPorte, type Ecartes } from '../geometry/traversee';
 
 /** Instructions RoomPlan (enum Swift) → libellés français. */
 const INSTRUCTIONS_FR: Record<string, string> = {
@@ -155,6 +156,17 @@ function montrerLeBilan() {
   resumerLeReleve();
 }
 
+/**
+ * CE QU'ON N'A VU QUE PAR UNE PORTE, DIT EN UNE PHRASE — sinon on croirait
+ * le scan incomplet, alors qu'il a fait exactement ce qu'on attend de lui.
+ */
+function direCeQuiEstEcarte(e: Ecartes) {
+  if (e.murs + e.ouvertures + e.meubles === 0) return;
+  astuce('La pièce vue par la porte n’est pas relevée : entrez-y pour la scanner.', {
+    icone: 'ouvertures',
+  });
+}
+
 function resumerLeReleve() {
   const st = useScanStore.getState();
   const pieces = st.rooms.length;
@@ -207,7 +219,15 @@ function resumerLeReleve() {
       const etage = useScanStore.getState().etageEnCours;
       try {
         // Le post-traitement RoomPlan prend quelques secondes.
-        const result = await RoomScan.stop();
+        const brut = await RoomScan.stop();
+        /*
+          CE QU'ON A VU PAR LA PORTE N'EST PAS RELEVÉ : il faut traverser
+          l'ouvrant (voir `geometry/traversee`). Écarté ici, une fois, avant
+          les trois issues — scan neuf, étage, passage de plus.
+        */
+        const { releve: result, ecartes } = brut
+          ? sansCeQuOnAVuParLaPorte(brut)
+          : { releve: brut, ecartes: null };
         // Ce que ce scan a coûté : noté même si l'on abandonne ensuite, c'est
         // une mesure, pas un dossier.
         if (result?.energie) {
@@ -257,6 +277,7 @@ function resumerLeReleve() {
         */
         montrerLeBilan();
         annoncerLaDepense(result);
+        if (ecartes) direCeQuiEstEcarte(ecartes);
       } catch (e: any) {
         store.setProcessing(false);
         store.setComplement(false);

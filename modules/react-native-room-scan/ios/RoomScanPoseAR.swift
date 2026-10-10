@@ -310,9 +310,24 @@ final class ScenePoseAR: UIView, SCNSceneRendererDelegate {
     rendreSiBesoin()
   }
 
-  /// Rien à montrer : rien à rendre. La batterie du scan est déjà assez sollicitée.
+  /**
+   RIEN À MONTRER : RIEN À RENDRE. La batterie du scan est déjà assez
+   sollicitée. Un fantôme CACHÉ (on ne vise aucun mur) comptait comme du
+   contenu : la couche se redessinait en plein écran soixante fois par
+   seconde par-dessus RoomPlan, pour ne rien montrer — et après une pause,
+   la scène « jouée » se redessinait même sans rien de posé. On ne rend que
+   ce qui se voit, et l'animation du fantôme s'arrête avec lui.
+   */
   private func rendreSiBesoin() {
-    vue.rendersContinuously = !suspendue && (!poses.isEmpty || fantome != nil)
+    let fantomeVu: Bool = fantome.map { !$0.isHidden } ?? false
+    let aMontrer: Bool = !poses.isEmpty || fantomeVu
+    let actif: Bool = !suspendue && aMontrer
+    fantome?.isPaused = !actif || !fantomeVu
+    let etait: Bool = vue.rendersContinuously
+    vue.rendersContinuously = actif
+    vue.isPlaying = actif
+    // Une dernière image, pour effacer ce qui vient de disparaître.
+    if etait && !actif { vue.setNeedsDisplay() }
   }
 
   /**
@@ -323,7 +338,6 @@ final class ScenePoseAR: UIView, SCNSceneRendererDelegate {
    */
   func suspendre(_ oui: Bool) {
     suspendue = oui
-    vue.isPlaying = !oui
     if oui {
       horloge?.invalidate()
       horloge = nil
@@ -350,11 +364,12 @@ final class ScenePoseAR: UIView, SCNSceneRendererDelegate {
     guard let kind = kindChoisi, let manager = manager else { return }
     let visee = manager.viser(kind: kind)
     if let f = fantome {
-      if let v = visee {
-        f.simdTransform = v.monde
-        f.isHidden = false
-      } else {
-        f.isHidden = true
+      let cacher: Bool = (visee == nil)
+      if let v = visee { f.simdTransform = v.monde }
+      // Le fantôme apparaît ou disparaît : la couche se remet à rendre, ou s'arrête.
+      if f.isHidden != cacher {
+        f.isHidden = cacher
+        rendreSiBesoin()
       }
     }
     let etat = (

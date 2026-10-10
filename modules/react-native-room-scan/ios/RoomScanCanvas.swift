@@ -41,10 +41,23 @@ final class RoomScanCanvas: UIView {
     didSet { setNeedsDisplay() }
   }
 
-  /** Les styles, un par rang. */
+  /**
+   Les styles, un par rang.
+
+   LES PEAUX SE DÉCODENT À LA RÉCEPTION, PAS AU DESSIN — le geste redessine
+   à chaque image, les styles ne changent qu'avec la scène. Découper les
+   chaînes et fabriquer les couleurs (opacité comprise) une fois ici, c'est
+   autant de travail en moins sur chaque image du geste.
+   */
   @objc var styles: [String] = [] {
-    didSet { setNeedsDisplay() }
+    didSet {
+      peaux = styles.map(lire)
+      setNeedsDisplay()
+    }
   }
+
+  /** Les styles décodés, prêts à peindre, dans l'ordre des rangs. */
+  private var peaux: [Peau] = []
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -56,6 +69,9 @@ final class RoomScanCanvas: UIView {
     // conteneur, qui les lit déjà (rotation, pincement).
     isUserInteractionEnabled = false
     contentMode = .redraw
+    // Les ordres de dessin s'exécutent hors du fil principal : le geste
+    // garde la main pendant que les formes se peignent.
+    layer.drawsAsynchronously = true
   }
 
   required init?(coder: NSCoder) { nil }
@@ -72,39 +88,42 @@ final class RoomScanCanvas: UIView {
       alpha: 1)
   }
 
-  /** Un style décodé, prêt à peindre. */
+  /**
+   Un style décodé, prêt à peindre : les couleurs ont déjà leur opacité,
+   le pointillé déjà son rythme.
+   */
   private struct Peau {
-    let fond: UIColor?
-    let trait: UIColor?
+    let fond: CGColor?
+    let trait: CGColor?
     let epaisseur: CGFloat
-    let pointille: Bool
-    let opaciteFond: CGFloat
-    let opaciteTrait: CGFloat
+    let tirets: [CGFloat]
   }
 
   private func lire(_ texte: String) -> Peau {
     let p = texte.components(separatedBy: ",")
     guard p.count >= 6 else {
-      return Peau(
-        fond: nil, trait: nil, epaisseur: 1, pointille: false,
-        opaciteFond: 1, opaciteTrait: 1)
+      return Peau(fond: nil, trait: nil, epaisseur: 1, tirets: [])
     }
+    let opaciteFond = CGFloat(Double(p[4]) ?? 1)
+    let opaciteTrait = CGFloat(Double(p[5]) ?? 1)
+    let pointille = (Double(p[3]) ?? 0) > 0.5
+    // Le pointillé des passages : le même rythme que la vue SVG (6/4),
+    // sans quoi une baie change d'allure selon le chemin de rendu.
+    let tirets: [CGFloat] = pointille ? [6, 4] : []
     return Peau(
-      fond: couleur(p[0]),
-      trait: couleur(p[1]),
+      fond: couleur(p[0])?.withAlphaComponent(opaciteFond).cgColor,
+      trait: couleur(p[1])?.withAlphaComponent(opaciteTrait).cgColor,
       epaisseur: CGFloat(Double(p[2]) ?? 1),
-      pointille: (Double(p[3]) ?? 0) > 0.5,
-      opaciteFond: CGFloat(Double(p[4]) ?? 1),
-      opaciteTrait: CGFloat(Double(p[5]) ?? 1))
+      tirets: tirets)
   }
 
   override func draw(_ rect: CGRect) {
     guard let ctx = UIGraphicsGetCurrentContext(), !formes.isEmpty else { return }
     ctx.setLineJoin(.round)
     ctx.setLineCap(.round)
-    // Les peaux se décodent UNE fois par image, pas une fois par forme :
-    // trois cents formes partagent une poignée de styles.
-    let peaux = styles.map(lire)
+    // Les peaux sont déjà décodées (voir `styles`) : trois cents formes
+    // partagent une poignée de styles.
+    let peaux = self.peaux
 
     var i = 0
     while i + 1 < formes.count {
@@ -133,19 +152,30 @@ final class RoomScanCanvas: UIView {
       let ferme = n > 2
       if ferme { chemin.closeSubpath() }
 
+      var remplir = false
       if ferme, let fond = peau.fond {
-        ctx.setFillColor(fond.withAlphaComponent(peau.opaciteFond).cgColor)
-        ctx.addPath(chemin)
-        ctx.fillPath()
+        ctx.setFillColor(fond)
+        remplir = true
       }
+      var tracer = false
       if let trait = peau.trait, peau.epaisseur > 0 {
-        ctx.setStrokeColor(trait.withAlphaComponent(peau.opaciteTrait).cgColor)
+        ctx.setStrokeColor(trait)
         ctx.setLineWidth(peau.epaisseur)
-        // Le pointillé des passages : le même rythme que la vue SVG (6/4),
-        // sans quoi une baie change d'allure selon le chemin de rendu.
-        ctx.setLineDash(phase: 0, lengths: peau.pointille ? [6, 4] : [])
+        ctx.setLineDash(phase: 0, lengths: peau.tirets)
+        tracer = true
+      }
+      // UN SEUL CHEMIN, UN SEUL ORDRE : le fond puis le trait par-dessus,
+      // comme avant, sans poser le chemin deux fois. Rien à peindre : on
+      // ne pose rien (un chemin laissé en place s'ajouterait au suivant).
+      if remplir && tracer {
         ctx.addPath(chemin)
-        ctx.strokePath()
+        ctx.drawPath(using: .fillStroke)
+      } else if remplir {
+        ctx.addPath(chemin)
+        ctx.drawPath(using: .fill)
+      } else if tracer {
+        ctx.addPath(chemin)
+        ctx.drawPath(using: .stroke)
       }
     }
     ctx.setLineDash(phase: 0, lengths: [])

@@ -38,8 +38,22 @@ final class PhotographeDesMurs {
 
   static let shared = PhotographeDesMurs()
 
-  private let queue = DispatchQueue(label: "com.roomscan.photomur")
+  /*
+    EN ARRIÈRE-PLAN, ET LE DIT. Sans qualité de service, la file passait
+    devant le travail que RoomPlan range en `.utility` : la photo d'un mur
+    ne doit jamais retarder le relevé lui-même.
+  */
+  private let queue = DispatchQueue(label: "com.roomscan.photomur", qos: .utility)
   private var timer: DispatchSourceTimer?
+  /**
+   LE TÉLÉPHONE CHAUFFE DÉJÀ : LA PHOTO PASSE APRÈS.
+
+   Redresser une image, c'est la carte graphique puis l'encodeur JPEG, à
+   côté de RoomPlan qui les tient déjà. Quand le système dit « sérieux », on
+   ne regarde plus qu'un battement sur trois ; « critique », plus du tout —
+   un mur sans photo vaut mieux qu'un scan que le système bride ou coupe.
+   */
+  private var battement = 0
   private weak var session: ARSession?
   private var room: CapturedRoom?
   private var dernierePose: (position: SIMD3<Float>, visee: SIMD3<Float>)?
@@ -77,7 +91,11 @@ final class PhotographeDesMurs {
       self.session = session
       guard self.timer == nil else { return }
       let t = DispatchSource.makeTimerSource(queue: self.queue)
-      t.schedule(deadline: .now() + 1.0, repeating: 1.0 / Self.rate)
+      // Une marge de 12 % de la période : le système peut caler nos réveils
+      // sur les siens au lieu de rallumer un cœur exprès pour nous.
+      let periode: Double = 1.0 / Self.rate
+      let marge = DispatchTimeInterval.milliseconds(Int(periode * 120))
+      t.schedule(deadline: .now() + 1.0, repeating: periode, leeway: marge)
       t.setEventHandler { [weak self] in self?.tick() }
       t.resume()
       self.timer = t
@@ -108,10 +126,19 @@ final class PhotographeDesMurs {
   // MARK: - Regarder
 
   private func tick() {
+    battement &+= 1
+    switch ProcessInfo.processInfo.thermalState {
+    case .critical:
+      return
+    case .serious:
+      if battement % 3 != 0 { return }
+    default:
+      break
+    }
     guard let session = session, let room = room,
-          let frame = session.currentFrame else { return }
-    guard case .normal = frame.camera.trackingState else { return }
-    let cam = frame.camera
+          let prise = Self.lire(session) else { return }
+    let cam = prise.camera
+    guard case .normal = cam.trackingState else { return }
     let m = cam.transform
     let oeil = SIMD3<Float>(m.columns.3.x, m.columns.3.y, m.columns.3.z)
     let visee = -SIMD3<Float>(m.columns.2.x, m.columns.2.y, m.columns.2.z)
@@ -133,13 +160,28 @@ final class PhotographeDesMurs {
       if choix == nil || gain > choix!.gain { choix = (mur, score, cote, gain) }
     }
     guard let c = choix,
-          let jpeg = redresser(c.mur, cote: c.cote, frame: frame, taille: taille) else { return }
+          let jpeg = redresser(c.mur, cote: c.cote, camera: cam, image: prise.image, taille: taille)
+    else { return }
     let t = c.mur.transform
     meilleures[c.mur.identifier] = Meilleure(
       score: c.score, jpeg: jpeg, cote: c.cote, at: Date(),
       milieu: SIMD3<Float>(t.columns.3.x, t.columns.3.y, t.columns.3.z),
       axe: SIMD3<Float>(t.columns.0.x, t.columns.0.y, t.columns.0.z),
       longueur: c.mur.dimensions.x)
+  }
+
+  /*
+    LA CAMÉRA ET L'IMAGE, PAS LA PRISE ENTIÈRE. Une `ARFrame` retient aussi
+    ses cartes de profondeur et de confiance, ses ancres, ses points : la
+    garder pendant le redressement et l'encodage privait ARKit de tampons
+    qu'il recycle. On n'en garde que ce qui sert ; la prise elle-même est
+    rendue en sortant d'ici, même si ARKit l'avait mise en libération différée.
+  */
+  private static func lire(_ session: ARSession) -> (camera: ARCamera, image: CVPixelBuffer)? {
+    autoreleasepool { () -> (camera: ARCamera, image: CVPixelBuffer)? in
+      guard let frame = session.currentFrame else { return nil }
+      return (frame.camera, frame.capturedImage)
+    }
   }
 
   /**
@@ -223,7 +265,7 @@ final class PhotographeDesMurs {
    cette face. Ce que l'image ne montrait pas devient un gris neutre.
    */
   private func redresser(
-    _ mur: CapturedRoom.Surface, cote: Int, frame: ARFrame, taille: CGSize
+    _ mur: CapturedRoom.Surface, cote: Int, camera: ARCamera, image: CVPixelBuffer, taille: CGSize
   ) -> Data? {
     let t = mur.transform
     let L = mur.dimensions.x
@@ -236,12 +278,12 @@ final class PhotographeDesMurs {
     let droite = SIMD3<Float>(n.z, 0, -n.x)
     let x = simd_dot(u, droite) >= 0 ? u : -u
     func dansLImage(_ p: SIMD3<Float>) -> CGPoint {
-      let q = frame.camera.projectPoint(p, orientation: .landscapeRight, viewportSize: taille)
+      let q = camera.projectPoint(p, orientation: .landscapeRight, viewportSize: taille)
       // Core Image compte depuis le bas.
       return CGPoint(x: q.x, y: taille.height - q.y)
     }
     let filtre = CIFilter.perspectiveCorrection()
-    filtre.inputImage = CIImage(cvPixelBuffer: frame.capturedImage)
+    filtre.inputImage = CIImage(cvPixelBuffer: image)
     filtre.topLeft = dansLImage(c - x * (L / 2) + v * (H / 2))
     filtre.topRight = dansLImage(c + x * (L / 2) + v * (H / 2))
     filtre.bottomLeft = dansLImage(c - x * (L / 2) - v * (H / 2))

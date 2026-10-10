@@ -59,7 +59,10 @@ final class RoomScanCompass {
     self.session = session
     guard motion.isDeviceMotionAvailable, count < maxSamples else { return }
     if !motion.isDeviceMotionActive {
-      motion.deviceMotionUpdateInterval = 0.2
+      // AU RYTHME DE LA LECTURE : le relevé se prend à 2 Hz (la minuterie
+      // ci-dessous) ; à 5 Hz, la centrale calculait trois mesures sur cinq
+      // que personne ne lisait.
+      motion.deviceMotionUpdateInterval = 0.5
       motion.startDeviceMotionUpdates(using: .xMagneticNorthZVertical)
     }
     timer?.invalidate()

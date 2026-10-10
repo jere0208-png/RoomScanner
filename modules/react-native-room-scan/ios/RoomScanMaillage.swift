@@ -47,7 +47,23 @@ enum RoomScanMaillage {
       return ["ancres": 0, "faces": 0, "sommets": 0, "classe": false]
     }
 
+    /*
+      LA TAILLE DU FICHIER EST CONNUE D'AVANCE — on la réserve d'un coup.
+      Sans cela, `Data` regrandissait (et recopiait) des mégaoctets au fil
+      des ancres, et chaque tableau passait par un `Data` intermédiaire
+      avant d'être recopié une seconde fois. Les octets écrits sont les
+      mêmes, dans le même ordre.
+    */
+    var total = 8
+    for ancre in ancres {
+      let g = ancre.geometry
+      let deSommets: Int = g.vertices.count * 3 * MemoryLayout<Float>.size
+      let deFaces: Int = g.faces.count * 3 * MemoryLayout<UInt32>.size
+      let deClasses: Int = g.classification != nil ? g.faces.count : 0
+      total += 9 + deSommets + deFaces + deClasses
+    }
     var data = Data()
+    data.reserveCapacity(total)
     data.append(contentsOf: Array("EPM1".utf8))
     func u32(_ v: Int) {
       var x = UInt32(max(0, v)).littleEndian
@@ -85,7 +101,7 @@ enum RoomScanMaillage {
         flottants.append(w.y)
         flottants.append(w.z)
       }
-      flottants.withUnsafeBufferPointer { data.append(Data(buffer: $0)) }
+      flottants.withUnsafeBufferPointer { data.append($0) }
 
       // Les faces : trois indices chacune, sur deux ou quatre octets selon
       // ce qu'ARKit a choisi — on les ressort toujours sur quatre.
@@ -102,7 +118,7 @@ enum RoomScanMaillage {
           }
         }
       }
-      indices.withUnsafeBufferPointer { data.append(Data(buffer: $0)) }
+      indices.withUnsafeBufferPointer { data.append($0) }
 
       // La classe de chaque face, un octet (ARMeshClassification).
       if let c = g.classification {

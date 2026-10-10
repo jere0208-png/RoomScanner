@@ -184,14 +184,17 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
       kSecAttrService as String: service,
     ]
     let update: [String: Any] = [kSecValueData as String: data]
-    let status = SecItemUpdate(base as CFDictionary, update as CFDictionary)
+    var status = SecItemUpdate(base as CFDictionary, update as CFDictionary)
     if status == errSecItemNotFound {
       var ajout = base
       ajout[kSecValueData as String] = data
       ajout[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
-      SecItemAdd(ajout as CFDictionary, nil)
+      status = SecItemAdd(ajout as CFDictionary, nil)
     }
-    resolve(true)
+    // LA RÉPONSE DIT CE QUE LE TROUSSEAU A FAIT : `true` sans condition
+    // laissait croire le marqueur écrit quand l'écriture avait échoué
+    // (trousseau verrouillé, appareil pas encore déverrouillé…).
+    resolve(status == errSecSuccess)
   }
 
   // -------------------------------------------------------------- Apple

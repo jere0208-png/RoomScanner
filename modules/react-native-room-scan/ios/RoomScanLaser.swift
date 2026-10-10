@@ -46,6 +46,16 @@ final class RoomScanLaser: RCTEventEmitter {
     ["onLaserAppareil", "onLaserEtat", "onLaserMesure"]
   }
 
+  /*
+    TOUT SE PASSE SUR LE FIL PRINCIPAL — les méthodes appelées par le
+    JavaScript arrivent sur la file du module, alors que le
+    `CBCentralManager` (créé sans file) rend ses découvertes sur le fil
+    principal. Deux fils touchaient donc `trouves`, `connecte` et `cherche`
+    en même temps : un appareil découvert pendant un « connecter » pouvait
+    corrompre le dictionnaire. Chaque méthode repasse donc sur le fil
+    principal avant de toucher à l'état, et rend sa réponse de là.
+  */
+
   /**
    Ouvre la radio et cherche les télémètres.
 
@@ -55,55 +65,66 @@ final class RoomScanLaser: RCTEventEmitter {
    */
   @objc func chercher(_ resolve: @escaping RCTPromiseResolveBlock,
                       reject: @escaping RCTPromiseRejectBlock) {
-    cherche = true
-    if central == nil {
-      central = CBCentralManager(delegate: self, queue: nil)
-    } else {
-      demarrerRecherche()
+    DispatchQueue.main.async {
+      self.cherche = true
+      if self.central == nil {
+        self.central = CBCentralManager(delegate: self, queue: nil)
+      } else {
+        self.demarrerRecherche()
+      }
+      resolve(true)
     }
-    resolve(true)
   }
 
   /// Ferme la radio. Appelé quand la feuille se referme.
   @objc func arreter(_ resolve: @escaping RCTPromiseResolveBlock,
                      reject: @escaping RCTPromiseRejectBlock) {
-    cherche = false
-    central?.stopScan()
-    resolve(true)
+    DispatchQueue.main.async {
+      self.cherche = false
+      self.central?.stopScan()
+      resolve(true)
+    }
   }
 
   @objc func connecter(_ identifiant: String,
                        resolve: @escaping RCTPromiseResolveBlock,
                        reject: @escaping RCTPromiseRejectBlock) {
-    guard let p = trouves[identifiant] else {
-      resolve(false)
-      return
+    DispatchQueue.main.async {
+      guard let p = self.trouves[identifiant] else {
+        resolve(false)
+        return
+      }
+      self.central?.stopScan()
+      self.central?.connect(p, options: nil)
+      resolve(true)
     }
-    central?.stopScan()
-    central?.connect(p, options: nil)
-    resolve(true)
   }
 
   @objc func deconnecter(_ resolve: @escaping RCTPromiseResolveBlock,
                          reject: @escaping RCTPromiseRejectBlock) {
-    if let p = connecte { central?.cancelPeripheralConnection(p) }
-    connecte = nil
-    resolve(true)
+    DispatchQueue.main.async {
+      if let p = self.connecte { self.central?.cancelPeripheralConnection(p) }
+      self.connecte = nil
+      resolve(true)
+    }
   }
 
   private func demarrerRecherche() {
     guard cherche, central?.state == .poweredOn else { return }
     trouves.removeAll()
-    central?.scanForPeripherals(withServices: [Self.SERVICE], options: nil)
     /*
-      ON CHERCHE AUSSI SANS FILTRE.
+      ON CHERCHE SANS FILTRE.
 
       Certains DISTO n'annoncent pas leur service dans la trame de
       publicité — la place y est comptée, et le nom passe avant. Filtrer
       sur le seul service laissait l'écran vide devant un appareil allumé,
       ce qui est la pire des réponses : l'électricien conclut que ça ne
       marche pas. On regarde donc aussi les noms, et on ne montre que ce
-      qui ressemble à un télémètre.
+      qui ressemble à un télémètre (le tri se fait à la découverte).
+
+      Un seul appel : CoreBluetooth ne garde que la DERNIÈRE recherche
+      demandée. Celle filtrée sur le service, lancée juste avant, était
+      aussitôt remplacée par celle-ci et ne servait à rien.
     */
     central?.scanForPeripherals(withServices: nil, options: nil)
   }

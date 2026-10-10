@@ -21,12 +21,18 @@ import simd
  - Elle est ramenée à SOIXANTE CENTIMÈTRES dans sa plus grande longueur,
    posée au sol, centrée : une maquette de table. AR Quick Look laisse
    l'agrandir du bout des doigts jusqu'à la taille réelle.
- - Écrite en USDZ dans un dossier temporaire, ouverte dans AR Quick Look.
+ - Écrite en USDZ dans un dossier temporaire — HORS DU FIL DE L'INTERFACE :
+   l'écriture réencode chaque image, et l'écran se figeait le temps qu'elle
+   dure. Seule la copie de la scène se fait sur le fil principal.
+ - Ouverte dans AR Quick Look.
  */
 extension RoomScanVisite {
-  func maquetteEnUSDZ(largeur: Float) -> URL? {
+  /// La maquette à l'écran, prête à écrire (fil principal : elle lit la vue).
+  func maquettePourLExport(largeur: Float) -> SCNScene? {
     let copie = SCNNode()
-    for enfant in bati.childNodes {
+    // La vue range ses nœuds par familles (murs, sols, images, meubles).
+    let feuilles: [SCNNode] = bati.childNodes.flatMap { g in g.geometry != nil ? [g] : g.childNodes }
+    for enfant in feuilles {
       // Ni liseré ni ombre de contact : ils ne voyagent pas.
       if enfant.renderingOrder == 4 || enfant.renderingOrder == 5 { continue }
       guard enfant.geometry != nil else { continue }
@@ -65,6 +71,11 @@ extension RoomScanVisite {
 
     let scene = SCNScene()
     scene.rootNode.addChildNode(copie)
+    return scene
+  }
+
+  /// La scène en USDZ, dans un dossier temporaire neuf (n'importe quel fil).
+  static func ecrireEnUSDZ(_ scene: SCNScene) -> URL? {
     // Un dossier par export : AR Quick Look garde en mémoire ce qu'il a ouvert.
     let tmp = FileManager.default.temporaryDirectory
     let dossier = tmp.appendingPathComponent("ra-\(Int(Date().timeIntervalSince1970 * 1000))")
@@ -148,11 +159,24 @@ extension RoomScanVisiteRegie {
     reject: @escaping RCTPromiseRejectBlock
   ) {
     DispatchQueue.main.async {
-      var url: URL?
-      var source = "maquette"
+      var scene: SCNScene?
       if !cle.isEmpty, let vue = RoomScanVisite.parCle(cle) {
-        url = vue.maquetteEnUSDZ(largeur: 0.6)
+        scene = vue.maquettePourLExport(largeur: 0.6)
       }
+      DispatchQueue.global(qos: .userInitiated).async {
+        Self.livrerLaRA(scene: scene, secours: secours, resolve: resolve, reject: reject)
+      }
+    }
+  }
+
+  /// L'écriture et le repli, sur une file de fond ; l'aperçu, sur le fil principal.
+  private static func livrerLaRA(
+    scene: SCNScene?, secours: String?,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+      var url: URL? = scene.flatMap { RoomScanVisite.ecrireEnUSDZ($0) }
+      var source = "maquette"
       if url == nil, let s = secours, !s.isEmpty {
         let fm = FileManager.default
         var chemin = s
@@ -171,8 +195,11 @@ extension RoomScanVisiteRegie {
         reject("RA_VIDE", "Aucune maquette à montrer", nil)
         return
       }
-      ApercuEnRA.montrer(u)
-      resolve(source)
-    }
+      let pret = u
+      let quelle = source
+      DispatchQueue.main.async {
+        ApercuEnRA.montrer(pret)
+        resolve(quelle)
+      }
   }
 }

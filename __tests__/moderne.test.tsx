@@ -285,7 +285,10 @@ describe('la maquette chez soi, en réalité augmentée', () => {
     const ra = lire(
       'modules/react-native-room-scan/ios/RoomScanRealiteAugmentee.swift',
     );
-    expect(ra).toContain('func maquetteEnUSDZ(largeur: Float) -> URL?');
+    expect(ra).toContain('func maquettePourLExport(largeur: Float) -> SCNScene?');
+    // L'écriture, qui réencode chaque image, ne fige plus l'écran.
+    expect(ra).toContain('static func ecrireEnUSDZ(_ scene: SCNScene) -> URL?');
+    expect(ra).toContain('DispatchQueue.global(qos: .userInitiated).async {');
     expect(ra).toContain(
       'scene.write(to: url, options: nil, delegate: nil, progressHandler: nil)',
     );

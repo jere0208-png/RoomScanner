@@ -155,6 +155,13 @@ export interface EnergieDuScan {
  * du graphe des murs (`detectRooms`) puis les nomme d'après le mobilier.
  */
 export interface ScanResult {
+  /**
+   * LE CHEMIN DE LA CAMÉRA au sol, tous les quinze centimètres :
+   * `[x0, z0, x1, z1…]`, dans le repère des surfaces. Ce qu'aucun de ses
+   * points ne voit sans traverser un mur — ce qu'on a vu par une porte —
+   * n'est pas relevé (voir `geometry/traversee`).
+   */
+  trajet?: number[];
   /** Durée, batterie consommée, chaleur : voir `EnergieDuScan`. */
   energie?: EnergieDuScan;
   /**

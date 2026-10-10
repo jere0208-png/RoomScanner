@@ -33,6 +33,25 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   private var maillageReleve: [String: Any]?
   private let verrouMaillage = NSLock()
   private let maillageFini = DispatchGroup()
+  /**
+   LE MAILLAGE D'UN AUTRE SCAN NE PART PAS AVEC CELUI-CI. Chaque arrêt a son
+   numéro ; un maillage bâti pour un arrêt précédent (ou jamais bâti, sans
+   session) ne se livre pas : il pointerait vers un fichier déjà effacé.
+   */
+  private var generationMaillage = 0
+  /// La session est arrêtée par une PAUSE : « Terminer » livre ce qui est assemblé.
+  private var enPause = false
+  /// Le dernier passage post-traité, pour « Terminer » pendant une pause (iOS 16).
+  private var dernierePiece: CapturedRoom?
+  /**
+   LE POST-TRAITEMENT DÉMARRE DÈS LES DONNÉES BRUTES. La vue post-traite de
+   son côté avant d'appeler `didPresent` ; notre passe (`embellir`) attendait
+   qu'elle ait fini pour commencer. Lancée dès `didEndWith`, elle tourne
+   EN MÊME TEMPS : l'assemblage ne dure plus que la plus longue des deux.
+   */
+  private var embelli: Task<CapturedRoom?, Never>?
+  /// La dernière consigne de RoomPlan envoyée au JS : on ne la redit pas.
+  private var derniereInstruction = ""
   // startRoomScan() est appelé côté JS AVANT que la vue AR soit montée :
   // on mémorise la demande et on lance la session à la création de la vue.
   private var pendingStart = false
@@ -66,6 +85,14 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    plafond de leur pièce.
    */
   private var ancresElec: [[String: Any]] = []
+  /**
+   LE CHEMIN DE LA CAMÉRA, au sol, tous les quinze centimètres :
+   `[x0, z0, x1, z1…]`. Ce qu'aucun de ses points ne voit sans traverser un
+   mur — la pièce aperçue par la porte — ne compte pas : voir `VuDuTrajet`
+   et `geometry/traversee.ts`. Un passage ajouté le prolonge ; un relevé neuf
+   repart de zéro.
+   */
+  private var trajet: [Float] = []
 
   /**
    LA DERNIÈRE PIÈCE VUE, telle que la session la connaît à l'instant.
@@ -177,6 +204,18 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   /// Une reprise après pause conserve ce qui a déjà été relevé.
   /// `additif` : ce passage S'AJOUTE au logement déjà relevé.
   func start(fresh: Bool = true, additif: Bool = false) {
+    /*
+      SUR LE FIL PRINCIPAL, TOUJOURS. Le pont appelle depuis un fil de fond ;
+      ces listes sont lues et écrites par les rappels de RoomPlan, sur le fil
+      principal — deux fils sur le même tableau, c'est un plantage en
+      attente. On s'y rend d'abord.
+    */
+    guard Thread.isMainThread else {
+      DispatchQueue.main.async { self.start(fresh: fresh, additif: additif) }
+      return
+    }
+    enPause = false
+    derniereInstruction = ""
     if fresh {
       RoomColorSampler.shared.reset()
       OrthophotosDuReleve.shared.reset()
@@ -186,6 +225,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       if !additif {
         releves.removeAll()
         ancresElec.removeAll()
+        trajet.removeAll()
         viderReperes()
         // Les photos des murs suivent le relevé : un passage ajouté les garde.
         PhotographeDesMurs.shared.reset()
@@ -195,8 +235,12 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     dernierApercu = []
     DispatchQueue.main.async {
       UIDevice.current.isBatteryMonitoringEnabled = true
-      self.debutDuScan = Date()
-      self.batterieAuDepart = UIDevice.current.batteryLevel
+      // Une reprise après pause ne remet pas le compteur à zéro : la mesure
+      // couvre tout le relevé, pas son dernier morceau.
+      if fresh || self.debutDuScan == nil {
+        self.debutDuScan = Date()
+        self.batterieAuDepart = UIDevice.current.batteryLevel
+      }
       // Une vue d'un scan précédent peut encore traîner, détachée de l'écran :
       // ne relancer la session que sur une vue réellement affichée.
       if let view = self.captureView, view.window != nil {
@@ -417,6 +461,23 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    de trois mètres et demi : c'est presque toujours le mur qui manque entre
    eux. En mètres ; zéro quand tout est fermé.
    */
+  /**
+   Un point de plus au chemin de la caméra, s'il s'est éloigné de quinze
+   centimètres du dernier. On ne garde de l'image que sa position : l'image
+   elle-même n'est pas retenue (ARKit cale quand on garde ses images).
+   */
+  private func noterLeTrajet(_ session: RoomCaptureSession) {
+    guard let c = session.arSession.currentFrame?.camera.transform.columns.3 else { return }
+    let n = trajet.count
+    if n >= 2 {
+      let dx: Float = c.x - trajet[n - 2]
+      let dz: Float = c.z - trajet[n - 1]
+      if dx * dx + dz * dz < 0.0225 { return }
+    }
+    trajet.append(c.x)
+    trajet.append(c.z)
+  }
+
   static func trouDuContour(_ murs: [CapturedRoom.Surface]) -> Float {
     let segs: [(SIMD2<Float>, SIMD2<Float>)] = murs.map { m in
       let t = m.transform
@@ -493,6 +554,11 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   private func viderReperes() { couche?.vider() }
 
   func pause() {
+    guard Thread.isMainThread else {
+      DispatchQueue.main.async { self.pause() }
+      return
+    }
+    enPause = true
     RoomColorSampler.shared.detach()
     OrthophotosDuReleve.shared.detach()
     PhotographeDesMurs.shared.detach()
@@ -518,8 +584,74 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
 
   func stop(resolve: @escaping RCTPromiseResolveBlock,
             reject: @escaping RCTPromiseRejectBlock) {
+    guard Thread.isMainThread else {
+      DispatchQueue.main.async { self.stop(resolve: resolve, reject: reject) }
+      return
+    }
+    /*
+      UN SECOND « TERMINER » ATTEND LE MÊME RÉSULTAT. Il écrasait la promesse
+      du premier, qui ne se réglait jamais ; les deux reçoivent maintenant
+      le relevé, et l'assemblage ne repart pas une seconde fois.
+    */
+    if let r0 = stopResolver, let j0 = stopRejecter {
+      stopResolver = { v in
+        r0(v)
+        resolve(v)
+      }
+      stopRejecter = { c, m, e in
+        j0(c, m, e)
+        reject(c, m, e)
+      }
+      return
+    }
+    // Sans vue de scan, rien ne s'assemblera : on le dit tout de suite.
+    guard captureView != nil else {
+      reject("NO_SCAN", "Aucun scan en cours", nil)
+      return
+    }
     stopResolver = resolve
     stopRejecter = reject
+    /*
+      « TERMINER » PENDANT UNE PAUSE. La pause a déjà arrêté la session et
+      assemblé son passage : arrêter une session arrêtée ne rappelle
+      personne, et la promesse attendait pour toujours. On livre ce qui est
+      assemblé — les passages réunis, ou le dernier. Si l'assemblage de la
+      pause tourne encore, c'est lui qui livrera, en trouvant la promesse.
+    */
+    if enPause && dernierReleve == nil && embelli == nil {
+      if #available(iOS 17.0, *), !releves.isEmpty {
+        lancerLeMaillage()
+        let pieces = releves
+        Task { [weak self] in
+          var fusion: CapturedStructure? = nil
+          if pieces.count > 1 { fusion = await Self.fusionner(pieces) }
+          await MainActor.run {
+            guard let self = self else { return }
+            if let structure = fusion {
+              self.livrer(
+                walls: structure.walls,
+                doors: structure.doors,
+                windows: structure.windows,
+                openings: structure.openings,
+                objets: structure.objects,
+                sections: Self.sectionsJSON(structure.sections),
+                exporter: { url in
+                  try structure.export(to: url, exportOptions: .parametric)
+                },
+              )
+            } else if let piece = pieces.last {
+              self.livrerPiece(piece)
+            }
+          }
+        }
+        return
+      }
+      if let piece = dernierePiece {
+        lancerLeMaillage()
+        livrerPiece(piece)
+        return
+      }
+    }
     // La session se fige : continuer à lire `currentFrame` ne ferait que
     // rejouer la dernière image et fausser les moyennes.
     RoomColorSampler.shared.detach()
@@ -533,18 +665,30 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       self.couche?.suspendre(true)
       // Le maillage se lit AVANT l'arrêt : une session arrêtée n'a plus
       // d'image courante, donc plus d'ancres.
-      if let session = self.captureView?.captureSession.arSession {
-        let ancres = RoomScanMaillage.ancresDe(session)
-        self.maillageFini.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
-          let maillage = RoomScanMaillage.construire(ancres)
-          self.verrouMaillage.lock()
-          self.maillageReleve = maillage
-          self.verrouMaillage.unlock()
-          self.maillageFini.leave()
-        }
-      }
+      self.lancerLeMaillage()
       self.captureView?.captureSession.stop()
+    }
+  }
+
+  /**
+   Le maillage LiDAR de CET arrêt, bâti sur une file de fond. Son numéro
+   empêche un maillage d'un arrêt précédent d'être livré à sa place.
+   */
+  private func lancerLeMaillage() {
+    generationMaillage &+= 1
+    let generation: Int = generationMaillage
+    verrouMaillage.lock()
+    maillageReleve = nil
+    verrouMaillage.unlock()
+    guard let session = captureView?.captureSession.arSession else { return }
+    let ancres = RoomScanMaillage.ancresDe(session)
+    maillageFini.enter()
+    DispatchQueue.global(qos: .userInitiated).async {
+      let maillage = RoomScanMaillage.construire(ancres)
+      self.verrouMaillage.lock()
+      if generation == self.generationMaillage { self.maillageReleve = maillage }
+      self.verrouMaillage.unlock()
+      self.maillageFini.leave()
     }
   }
 
@@ -580,11 +724,49 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
 
   // Le modèle final, nettoyé et paramétrique.
   func captureView(didPresent processedResult: CapturedRoom, error: Error?) {
+    /*
+      UNE PAUSE N'ASSEMBLE QUE POUR LA SUITE. Elle arrête la session, et
+      RoomPlan rappelle ici comme pour « Terminer » : on écrivait alors le
+      modèle, les photos, les orthophotos — des secondes de calcul et des
+      fichiers orphelins, pour une promesse que personne n'attendait. Le
+      passage est gardé (la fusion en a besoin) ; la livraison attend
+      qu'on la demande.
+    */
+    let attendu: Bool = stopResolver != nil
+    let tache = embelli
+    embelli = nil
     if let error = error {
+      /*
+        LA VUE A ÉCHOUÉ, MAIS LES DONNÉES BRUTES SONT LÀ : notre propre
+        passe peut encore en tirer le relevé. On ne perd un scan entier
+        qu'en dernier recours.
+      */
+      if let brut = dernierReleve {
+        Task { [weak self] in
+          var piece: CapturedRoom? = await tache?.value ?? nil
+          if piece == nil { piece = await Self.embellir(brut) }
+          await MainActor.run {
+            guard let self = self else { return }
+            self.dernierReleve = nil
+            if let piece = piece {
+              self.releves.append(piece)
+              self.dernierePiece = piece
+              if self.stopResolver != nil { self.livrerPiece(piece) }
+            } else {
+              RoomScanCompass.shared.detach()
+              self.stopRejecter?("SCAN_PROCESSING_FAILED", error.localizedDescription, error)
+              self.clearPromise()
+            }
+          }
+        }
+        return
+      }
+      RoomScanCompass.shared.detach()
       stopRejecter?("SCAN_PROCESSING_FAILED", error.localizedDescription, error)
       clearPromise()
       return
     }
+    dernierePiece = processedResult
 
     /*
      NOTRE PROPRE POST-TRAITEMENT, quand on peut faire mieux que la vue.
@@ -607,15 +789,22 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       let anciens = releves
       Task { [weak self] in
         guard let self = self else { return }
-        // Le passage qui vient de finir, post-traité par nos soins.
-        let piece = await Self.embellir(brut) ?? processedResult
+        // Le passage qui vient de finir, post-traité par nos soins — souvent
+        // déjà prêt, lancé dès les données brutes (voir `embelli`).
+        var propre: CapturedRoom? = await tache?.value ?? nil
+        if propre == nil { propre = await Self.embellir(brut) }
+        let piece: CapturedRoom = propre ?? processedResult
         // Plusieurs passages : on les aligne en une structure unique.
         let fusion =
           anciens.isEmpty ? nil : await Self.fusionner(anciens + [piece])
         await MainActor.run {
           self.releves = anciens + [piece]
           self.dernierReleve = nil
+          self.dernierePiece = piece
           self.additif = false
+          // Personne n'attend ce passage (une pause) : il est gardé, pas livré.
+          // « Terminer » arrivé entre-temps a posé sa promesse : on livre.
+          guard attendu || self.stopResolver != nil else { return }
           if let structure = fusion {
             self.livrer(
               walls: structure.walls,
@@ -635,6 +824,10 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       }
       return
     }
+    // iOS 16 : les données brutes ne servent plus ; la passe anticipée non plus.
+    dernierReleve = nil
+    tache?.cancel()
+    guard attendu else { return }
     livrerPiece(processedResult)
   }
 
@@ -763,16 +956,21 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     */
     let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     let usdzURL = docs.appendingPathComponent("scan-\(UUID().uuidString).usdz")
+    /*
+      LES SURFACES ET LES MEUBLES SE SÉRIALISENT SUR LA FILE DE FOND, eux
+      aussi : chacun interroge le releveur de couleurs (une attente sur sa
+      file par surface), et cela figeait l'écran d'assemblage au moment même
+      où l'on regarde la roue tourner. Ici ne restent que les lectures
+      instantanées.
+    */
     var payload: [String: Any] = [
         "modelPath": usdzURL.path,
-        "surfaces": Self.surfacesJSON(
-          walls: walls, doors: doors, windows: windows, openings: openings,
-          withColors: true,
-        ),
-        "objects": Self.objectsJSON(objets, withColors: true),
         // Ce qu'on a posé au viseur pendant le relevé : des points du
         // monde, que le JS rattachera aux murs et aux plafonds.
         "elec": ancresElec,
+        // Le chemin de la caméra : ce qu'on n'a vu que par une porte sera
+        // écarté (voir `geometry/traversee.ts`).
+        "trajet": trajet,
         // Combien de passages composent ce relevé : le JS s'en sert pour
         // dire « deux pièces réunies » plutôt que de laisser deviner.
         "passages": releves.count,
@@ -785,9 +983,6 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         // Le polygone exact de chaque sol (iOS 17), quand RoomPlan l'a mesuré.
         "sols": sols,
       ]
-    if let floor = RoomColorSampler.shared.floorPayload() {
-      payload["floor"] = floor
-    }
     // Cap du monde ARKit : absent si le magnétomètre n'a rien donné de
     // sûr — mieux vaut pas de rose des vents qu'une fausse.
     if let north = RoomScanCompass.shared.northOffset {
@@ -797,37 +992,50 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     RoomColorSampler.shared.detach()
     RoomScanCompass.shared.detach()
     let resolve = stopResolver
-    let reject = stopRejecter
     clearPromise()
     let pret = payload
+    let generation: Int = generationMaillage
     DispatchQueue.global(qos: .userInitiated).async {
       var sortie = pret
+      sortie["surfaces"] = Self.surfacesJSON(
+        walls: walls, doors: doors, windows: windows, openings: openings,
+        withColors: true,
+      )
+      sortie["objects"] = Self.objectsJSON(objets, withColors: true)
+      if let floor = RoomColorSampler.shared.floorPayload() {
+        sortie["floor"] = floor
+      }
+      /*
+        LE MODÈLE 3D EST UN PLUS, PAS LE RELEVÉ. Un export qui échoue
+        jetait tout — murs, meubles, appareillage posé, photos, maillage —
+        alors que le relevé était complet. Il part maintenant sans modèle.
+      */
       do {
         // .parametric = murs/portes propres (pas le maillage brut).
         try exporter(usdzURL)
         // L'USDZ RoomPlan est blanc uniforme : invisible sur le fond blanc
         // de Quick Look. On le teinte, avec les couleurs relevées si on en a.
         Self.tintModel(at: usdzURL)
-        // Chaque mur, photographié de face et redressé (voir `PhotographeDesMurs`).
-        sortie["photosMurs"] = PhotographeDesMurs.shared.livrer()
-        PhotographeDesMurs.shared.detach()
-        // Chaque face de mur et le sol, en vraie image (voir `OrthophotosDuReleve`).
-        sortie["orthos"] = OrthophotosDuReleve.shared.livrer()
-        OrthophotosDuReleve.shared.detach()
-        // Le maillage se bâtit pendant l'assemblage de RoomPlan, qui dure
-        // plusieurs secondes : il est presque toujours prêt. Au pire, on
-        // l'attend trois secondes — sans lui, le plan reste entier.
-        _ = self.maillageFini.wait(timeout: .now() + 3)
-        self.verrouMaillage.lock()
-        let maillage = self.maillageReleve
-        self.verrouMaillage.unlock()
-        if let maillage = maillage {
-          sortie["maillage"] = maillage
-        }
-        resolve?(sortie)
       } catch {
-        reject?("EXPORT_FAILED", error.localizedDescription, error)
+        sortie["modelPath"] = ""
       }
+      // Chaque mur, photographié de face et redressé (voir `PhotographeDesMurs`).
+      sortie["photosMurs"] = PhotographeDesMurs.shared.livrer()
+      PhotographeDesMurs.shared.detach()
+      // Chaque face de mur et le sol, en vraie image (voir `OrthophotosDuReleve`).
+      sortie["orthos"] = OrthophotosDuReleve.shared.livrer()
+      OrthophotosDuReleve.shared.detach()
+      // Le maillage se bâtit pendant l'assemblage de RoomPlan, qui dure
+      // plusieurs secondes : il est presque toujours prêt. Au pire, on
+      // l'attend trois secondes — sans lui, le plan reste entier.
+      _ = self.maillageFini.wait(timeout: .now() + 3)
+      self.verrouMaillage.lock()
+      let maillage = generation == self.generationMaillage ? self.maillageReleve : nil
+      self.verrouMaillage.unlock()
+      if let maillage = maillage {
+        sortie["maillage"] = maillage
+      }
+      resolve?(sortie)
     }
   }
 
@@ -841,6 +1049,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     PhotographeDesMurs.shared.update(room: room)
     // C'est elle qui nommera le mur visé à la prochaine pose.
     vueCourante = room
+    noterLeTrajet(session)
     /*
       CINQ NOMBRES, DEUX FOIS PAR SECONDE AU PLUS, ET SEULEMENT S'ILS CHANGENT.
 
@@ -852,26 +1061,34 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       la batterie pour rien.
     */
     guard Date().timeIntervalSince(lastLiveEmit) > 0.5 else { return }
+    // Le calcul qui suit ne se refait qu'une fois par demi-seconde, même
+    // quand l'aperçu ne change pas (il se refaisait à chaque rappel).
+    lastLiveEmit = Date()
+    /*
+      CE QU'ON VOIT PAR LA PORTE NE COMPTE PAS : le mur du fond de la chambre
+      aperçue ne fait pas « +1 », et ses bouts libres ne font pas croire
+      qu'un mur manque. Il faut entrer (voir `VuDuTrajet`).
+    */
+    let vus = VuDuTrajet.filtrer(room, chemin: trajet)
     // « medium » compte autant que « low » : un mur moyen est un mur qu'on
     // ferait mieux de repasser, et c'est gratuit tant qu'on est devant.
-    let douteux = room.walls.filter { s in
+    let douteux = vus.murs.filter { s in
       if case .high = s.confidence { return false }
       return true
     }.count
     // Le plus grand trou du contour, au centimètre (voir `trouDuContour`).
-    let trou = Self.trouDuContour(room.walls)
+    let trou = Self.trouDuContour(vus.murs)
     let apercu = [
-      room.walls.count, room.objects.count, room.doors.count, room.windows.count, douteux,
+      vus.murs.count, vus.objets, vus.portes, vus.fenetres, douteux,
       Int((trou * 100).rounded()),
     ]
     guard apercu != dernierApercu else { return }
     dernierApercu = apercu
-    lastLiveEmit = Date()
     RoomScanEvents.shared?.emit(name: "onScanUpdate", body: [
-      "wallCount": room.walls.count,
-      "objectCount": room.objects.count,
-      "doorCount": room.doors.count,
-      "windowCount": room.windows.count,
+      "wallCount": vus.murs.count,
+      "objectCount": vus.objets,
+      "doorCount": vus.portes,
+      "windowCount": vus.fenetres,
       "mursDouteux": douteux,
       "trouContour": trou,
     ])
@@ -879,8 +1096,11 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
 
   func captureSession(_ session: RoomCaptureSession,
                       didProvide instruction: RoomCaptureSession.Instruction) {
-    RoomScanEvents.shared?.emit(name: "onInstruction",
-                                body: ["instruction": String(describing: instruction)])
+    // La même consigne, redite à chaque image, réveillait le JS pour rien.
+    let texte: String = String(describing: instruction)
+    guard texte != derniereInstruction else { return }
+    derniereInstruction = texte
+    RoomScanEvents.shared?.emit(name: "onInstruction", body: ["instruction": texte])
   }
 
   func captureSession(_ session: RoomCaptureSession, didEndWith data: CapturedRoomData,
@@ -894,6 +1114,11 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     // `StructureBuilder` partent. La vue, elle, produira son propre résultat
     // post-traité — on ne s'en sert que comme filet de sécurité.
     dernierReleve = data
+    // Notre passe démarre tout de suite, en même temps que celle de la vue
+    // (iOS 17 : c'est là qu'elle sert, voir `didPresent`).
+    if #available(iOS 17.0, *) {
+      embelli = Task { await Self.embellir(data) }
+    }
   }
 
   // MARK: - Sérialisation JSON

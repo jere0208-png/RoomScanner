@@ -145,8 +145,12 @@ describe('4 — la visée ne bat que s’il y a quelque chose à viser', () => {
   it('rien à montrer, rien à rendre', () => {
     const s = natif('RoomScanPoseAR.swift');
     const rendre = s.slice(s.indexOf('private func rendreSiBesoin()'), s.indexOf('private func relancerHorloge()'));
-    // Et rien non plus quand le scan est figé (pause, assemblage).
-    expect(rendre).toContain('rendersContinuously = !suspendue && (!poses.isEmpty || fantome != nil)');
+    // Et rien non plus quand le scan est figé (pause, assemblage) — ni pour
+    // un fantôme CACHÉ, quand on ne vise aucun mur.
+    expect(rendre).toContain('let fantomeVu: Bool = fantome.map { !$0.isHidden } ?? false');
+    expect(rendre).toContain('let actif: Bool = !suspendue && aMontrer');
+    expect(rendre).toContain('vue.rendersContinuously = actif');
+    expect(rendre).toContain('vue.isPlaying = actif');
   });
 });
 

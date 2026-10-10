@@ -24,6 +24,16 @@ import UIKit
  */
 extension RoomScanExport {
 
+  /**
+   UN SEUL CONTEXTE CORE IMAGE, POUR TOUS LES APERÇUS.
+
+   Le créer à chaque appel coûtait sa mise en route (et ses caches GPU) à
+   chaque ouverture de l'aperçu. Un `CIContext` se partage sans risque entre
+   les files ; on lui interdit seulement de garder les images
+   intermédiaires du flou, qui ne resservent jamais d'une feuille à l'autre.
+   */
+  private static let contexteFlou = CIContext(options: [.cacheIntermediates: false])
+
   @objc func apercuPdf(_ base64: String,
                        largeur: NSNumber,
                        flou: NSNumber,
@@ -40,23 +50,32 @@ extension RoomScanExport {
       let w = max(120, CGFloat(truncating: largeur))
       let rayon = max(0, CGFloat(truncating: flou))
       let n = min(document.pageCount, max(1, maxPages.intValue))
-      let contexte = CIContext(options: nil)
+      let contexte = RoomScanExport.contexteFlou
       var sorties: [String] = []
       for i in 0..<n {
-        guard let page = document.page(at: i) else { continue }
-        let boite = page.bounds(for: .mediaBox)
-        guard boite.width > 0, boite.height > 0 else { continue }
-        let k = w / boite.width
-        let taille = CGSize(width: round(boite.width * k), height: round(boite.height * k))
-        var image = RoomScanExport.rendre(page, taille: taille)
-        if rayon > 0, let floue = RoomScanExport.flouter(image, rayon: rayon, contexte: contexte) {
-          image = floue
-        }
-        if !filigrane.isEmpty {
-          image = RoomScanExport.filigraner(image, texte: filigrane)
-        }
-        if let jpeg = image.jpegData(compressionQuality: 0.72) {
-          sorties.append(jpeg.base64EncodedString())
+        /*
+          LE PDF S'APERÇOIT SANS S'ÉTOUFFER — une feuille, quatre images
+          pleine taille (vignette, rendu, flou, filigrane) : sans réserve
+          vidée à chaque tour, elles s'empilaient jusqu'à la fin de la
+          boucle, des centaines de mégaoctets pour quarante feuilles. Seul
+          le JPEG final, en texte, survit au tour.
+        */
+        autoreleasepool { () -> Void in
+          guard let page = document.page(at: i) else { return }
+          let boite = page.bounds(for: .mediaBox)
+          guard boite.width > 0, boite.height > 0 else { return }
+          let k = w / boite.width
+          let taille = CGSize(width: round(boite.width * k), height: round(boite.height * k))
+          var image = RoomScanExport.rendre(page, taille: taille)
+          if rayon > 0, let floue = RoomScanExport.flouter(image, rayon: rayon, contexte: contexte) {
+            image = floue
+          }
+          if !filigrane.isEmpty {
+            image = RoomScanExport.filigraner(image, texte: filigrane)
+          }
+          if let jpeg = image.jpegData(compressionQuality: 0.72) {
+            sorties.append(jpeg.base64EncodedString())
+          }
         }
       }
       resolve(sorties)

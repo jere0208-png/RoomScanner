@@ -58,6 +58,8 @@ final class OrthophotosDuReleve {
   private weak var session: ARSession?
   private var room: CapturedRoom?
   private var dernierePose: (position: SIMD3<Float>, visee: SIMD3<Float>, instant: TimeInterval)?
+  /// Le compte des battements, pour lever le pied quand le téléphone chauffe.
+  private var battement = 0
 
   /// Trois regards par seconde : assez pour tout couvrir en marchant.
   private static let rate = 3.0
@@ -77,6 +79,10 @@ final class OrthophotosDuReleve {
     var longueur: Float
     var hauteur: Float
     var transform: simd_float4x4
+    /// Où la toile est posée dans le monde : son pixel (0, 0), et ses deux pas.
+    var origine: SIMD3<Float>
+    var du: SIMD3<Float>
+    var dv: SIMD3<Float>
   }
 
   private var faces: [String: Face] = [:]
@@ -89,7 +95,8 @@ final class OrthophotosDuReleve {
       self.session = session
       guard self.timer == nil else { return }
       let t = DispatchSource.makeTimerSource(queue: self.queue)
-      t.schedule(deadline: .now() + 0.6, repeating: 1.0 / Self.rate)
+      // Un peu de jeu : le système regroupe les réveils, la batterie y gagne.
+      t.schedule(deadline: .now() + 0.6, repeating: 1.0 / Self.rate, leeway: .milliseconds(40))
       t.setEventHandler { [weak self] in self?.tick() }
       t.resume()
       self.timer = t
@@ -120,6 +127,15 @@ final class OrthophotosDuReleve {
   // MARK: - Relevé
 
   private func tick() {
+    /*
+      LA CHALEUR DÉCIDE AUSSI. RoomPlan chauffe déjà le téléphone ; quand iOS
+      le dit chaud, on ne regarde plus qu'une fois sur trois ; brûlant, plus
+      du tout — mieux vaut des murs un peu moins nets qu'un scan qui coupe.
+    */
+    battement &+= 1
+    let chaleur = ProcessInfo.processInfo.thermalState
+    if chaleur == .critical { return }
+    if chaleur == .serious && battement % 3 != 0 { return }
     guard let session = session, let room = room,
           let frame = session.currentFrame else { return }
     guard case .normal = frame.camera.trackingState else { return }
@@ -186,14 +202,6 @@ final class OrthophotosDuReleve {
     let cle = "\(mur.identifier.uuidString)|\(cote)"
     let w = min(Self.maxMurL, max(8, Int((L / Self.pasMur).rounded(.up))))
     let h = min(Self.maxMurH, max(8, Int((H / Self.pasMur).rounded(.up))))
-    var face: Face
-    if var f = faces.removeValue(forKey: cle), abs(f.longueur - L) < 0.1, abs(f.hauteur - H) < 0.1, f.toile.w == w, f.toile.h == h {
-      f.transform = t
-      face = f
-    } else {
-      // Un mur que RoomPlan a redimensionné repart d'une toile neuve.
-      face = Face(toile: Toile(w: w, h: h), wallId: mur.identifier, cote: cote, longueur: L, hauteur: H, transform: t)
-    }
     /*
       LE PIXEL (i, j) DE LA FACE, DANS LE MONDE — puis dans la caméra. Le
       monde est affine dans les deux indices : on calcule l'origine et les
@@ -212,6 +220,30 @@ final class OrthophotosDuReleve {
     let dessus: SIMD3<Float> = haut * (H / 2)
     let demiPas: SIMD3<Float> = (du + dv) * 0.5
     let origine: SIMD3<Float> = centre + gauche + dessus + demiPas
+    var face: Face
+    let ancienne: Face? = faces.removeValue(forKey: cle)
+    if var f = ancienne, abs(f.longueur - L) < 0.1, abs(f.hauteur - H) < 0.1, f.toile.w == w, f.toile.h == h {
+      f.transform = t
+      face = f
+    } else {
+      /*
+        UN MUR QUI GRANDIT GARDE CE QU'ON EN A VU. RoomPlan affine ses murs
+        en marchant : un centimètre de plus changeait la taille de la toile,
+        et tout ce que les vues précédentes avaient fondu repartait de zéro
+        — chaque image ne gardait que les dernières secondes du scan. Les
+        pixels anciens sont maintenant recopiés à leur place dans le monde.
+      */
+      var neuve = Toile(w: w, h: h)
+      if let f = ancienne {
+        neuve.recopier(f.toile, origine: origine, du: du, dv: dv,
+                       ancienne: f.origine, adu: f.du, adv: f.dv, normale: normale)
+      }
+      face = Face(toile: neuve, wallId: mur.identifier, cote: cote, longueur: L, hauteur: H,
+                  transform: t, origine: origine, du: du, dv: dv)
+    }
+    face.origine = origine
+    face.du = du
+    face.dv = dv
     // La qualité à la puissance quatre : la meilleure vue l'emporte nettement.
     let q: Float = incidence / max(distance, 0.5)
     let q2: Float = q * q
@@ -299,28 +331,20 @@ final class OrthophotosDuReleve {
   func livrer() -> [String: Any] {
     queue.sync { () -> [String: Any] in
       let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-      var murs: [[String: Any]] = []
-      for f in faces.values {
-        let vus = f.toile.poids.reduce(0) { $0 + ($1 > 0 ? 1 : 0) }
-        let couverture = Float(vus) / Float(max(1, f.toile.w * f.toile.h))
-        guard couverture >= 0.12, let jpeg = Self.jpeg(f.toile) else { continue }
-        let url = docs.appendingPathComponent("ortho-mur-\(UUID().uuidString).jpg")
-        guard (try? jpeg.write(to: url, options: .atomic)) != nil else { continue }
-        let t = f.transform
-        murs.append([
-          "wallId": f.wallId.uuidString,
-          "cote": f.cote,
-          "path": url.path,
-          "cx": t.columns.3.x,
-          "cz": t.columns.3.z,
-          "dx": t.columns.0.x,
-          "dz": t.columns.0.z,
-          "longueur": f.longueur,
-          "hauteur": f.hauteur,
-          "yBas": t.columns.3.y - f.hauteur / 2,
-          "couverture": couverture,
-        ])
+      /*
+        LES FACES S'ÉCRIVENT EN PARALLÈLE. Chacune se comble et s'encode seule,
+        sans rien partager : sur les six cœurs de l'iPhone, l'assemblage
+        n'attend plus la somme des faces, mais la plus longue.
+      */
+      let liste = Array(faces.values)
+      var rendus = [[String: Any]?](repeating: nil, count: liste.count)
+      rendus.withUnsafeMutableBufferPointer { tampon in
+        let sorties = tampon
+        DispatchQueue.concurrentPerform(iterations: liste.count) { k in
+          sorties[k] = Self.livrerLaFace(liste[k], docs: docs)
+        }
       }
+      let murs: [[String: Any]] = rendus.compactMap { $0 }
       var sortie: [String: Any] = ["murs": murs]
       if let s = sol {
         let vus = s.toile.poids.reduce(0) { $0 + ($1 > 0 ? 1 : 0) }
@@ -344,6 +368,30 @@ final class OrthophotosDuReleve {
     }
   }
 
+  /// Une face de mur, en JPEG dans les Documents ; rien si elle est trop peu vue.
+  private static func livrerLaFace(_ f: Face, docs: URL) -> [String: Any]? {
+    let vus = f.toile.poids.reduce(0) { $0 + ($1 > 0 ? 1 : 0) }
+    let couverture = Float(vus) / Float(max(1, f.toile.w * f.toile.h))
+    guard couverture >= 0.12, let jpeg = Self.jpeg(f.toile) else { return nil }
+    let url = docs.appendingPathComponent("ortho-mur-\(UUID().uuidString).jpg")
+    guard (try? jpeg.write(to: url, options: .atomic)) != nil else { return nil }
+    let t = f.transform
+    let yBas: Float = t.columns.3.y - f.hauteur / 2
+    return [
+      "wallId": f.wallId.uuidString,
+      "cote": f.cote,
+      "path": url.path,
+      "cx": t.columns.3.x,
+      "cz": t.columns.3.z,
+      "dx": t.columns.0.x,
+      "dz": t.columns.0.z,
+      "longueur": f.longueur,
+      "hauteur": f.hauteur,
+      "yBas": yBas,
+      "couverture": couverture,
+    ]
+  }
+
   /// La toile en JPEG : moyenne pondérée, trous comblés, sRGB.
   private static func jpeg(_ toile: Toile) -> Data? {
     let w = toile.w
@@ -353,7 +401,8 @@ final class OrthophotosDuReleve {
     var n: Float = 0
     for k in 0..<(w * h) where toile.poids[k] > 0 {
       let o = toile.couleur[k]
-      let c = SIMD3<Float>(Float(o.x), Float(o.y), Float(o.z))
+      let brute = SIMD3<Float>(Float(o.x), Float(o.y), Float(o.z))
+      let c: SIMD3<Float> = brute * Toile.unSur256
       rgb[k] = c
       somme += c
       n += 1
@@ -370,22 +419,27 @@ final class OrthophotosDuReleve {
     */
     var vu = [Bool](repeating: false, count: w * h)
     for k in 0..<(w * h) where rgb[k].x >= 0 { vu[k] = true }
-    func voisins(_ k: Int) -> [Int] {
+    // Le voisin `d` (0 gauche, 1 droite, 2 dessus, 3 dessous) de `k`, ou −1 —
+    // sans tableau : il en naissait un par pixel visité, des centaines de mille.
+    func voisin(_ k: Int, _ d: Int) -> Int {
       let i = k % w
-      let j = k / w
-      var out: [Int] = []
-      if i > 0 { out.append(k - 1) }
-      if i < w - 1 { out.append(k + 1) }
-      if j > 0 { out.append(k - w) }
-      if j < h - 1 { out.append(k + w) }
-      return out
+      switch d {
+      case 0: return i > 0 ? k - 1 : -1
+      case 1: return i < w - 1 ? k + 1 : -1
+      case 2: return k >= w ? k - w : -1
+      default: return k + w < w * h ? k + w : -1
+      }
     }
     var marque = vu
     var front: [Int] = []
     for k in 0..<(w * h) where !vu[k] {
-      if voisins(k).contains(where: { vu[$0] }) {
-        front.append(k)
-        marque[k] = true
+      for d in 0..<4 {
+        let q = voisin(k, d)
+        if q >= 0, vu[q] {
+          front.append(k)
+          marque[k] = true
+          break
+        }
       }
     }
     var couche = 0
@@ -394,9 +448,12 @@ final class OrthophotosDuReleve {
       for (n, k) in front.enumerated() {
         var acc = SIMD3<Float>(0, 0, 0)
         var c: Float = 0
-        for q in voisins(k) where vu[q] {
-          acc += rgb[q]
-          c += 1
+        for d in 0..<4 {
+          let q = voisin(k, d)
+          if q >= 0, vu[q] {
+            acc += rgb[q]
+            c += 1
+          }
         }
         valeurs[n] = c > 0 ? acc / c : moyenne
       }
@@ -406,9 +463,12 @@ final class OrthophotosDuReleve {
       }
       var suivant: [Int] = []
       for k in front {
-        for q in voisins(k) where !marque[q] {
-          marque[q] = true
-          suivant.append(q)
+        for d in 0..<4 {
+          let q = voisin(k, d)
+          if q >= 0, !marque[q] {
+            marque[q] = true
+            suivant.append(q)
+          }
         }
       }
       front = suivant
@@ -434,21 +494,28 @@ final class OrthophotosDuReleve {
 }
 
 /**
- Une toile : pour chaque pixel, la MOYENNE pondérée des couleurs vues (trois
- octets) et le poids qu'elle porte déjà — huit octets le pixel au lieu de
- seize, ce qui paie le centimètre.
+ Une toile : pour chaque pixel, la MOYENNE pondérée des couleurs vues et le
+ poids qu'elle porte déjà.
+
+ LA MOYENNE EN SEIZE BITS (8.8, au 256ᵉ de niveau). En huit bits, chaque mise
+ à jour s'arrondissait au niveau : passé une dizaine de vues, un écart de
+ moins de cinq niveaux ne déplaçait plus rien — le grain des premières vues
+ restait figé dans l'image. Douze octets le pixel : la précision qui manquait,
+ pour un tiers de mémoire de plus.
  */
 fileprivate struct Toile {
   let w: Int
   let h: Int
-  var couleur: [SIMD4<UInt8>]
+  var couleur: [SIMD4<UInt16>]
   var poids: [Float]
   init(w: Int, h: Int) {
     self.w = w
     self.h = h
-    couleur = [SIMD4<UInt8>](repeating: SIMD4<UInt8>(0, 0, 0, 255), count: w * h)
+    couleur = [SIMD4<UInt16>](repeating: SIMD4<UInt16>(0, 0, 0, 0), count: w * h)
     poids = [Float](repeating: 0, count: w * h)
   }
+
+  static let unSur256: Float = 1.0 / 256.0
 
   /// Ajoute une vue au pixel `k` : la moyenne glisse vers elle selon son poids.
   mutating func ajouter(_ k: Int, r: Float, g: Float, b: Float, w: Float) {
@@ -457,15 +524,62 @@ fileprivate struct Toile {
     guard total > 0 else { return }
     let t: Float = w / total
     let c = couleur[k]
-    let nr: Float = Float(c.x) + (r - Float(c.x)) * t
-    let ng: Float = Float(c.y) + (g - Float(c.y)) * t
-    let nb: Float = Float(c.z) + (b - Float(c.z)) * t
-    couleur[k] = SIMD4<UInt8>(Toile.octet(nr), Toile.octet(ng), Toile.octet(nb), 255)
+    let cr: Float = Float(c.x) * Toile.unSur256
+    let cg: Float = Float(c.y) * Toile.unSur256
+    let cb: Float = Float(c.z) * Toile.unSur256
+    let nr: Float = cr + (r - cr) * t
+    let ng: Float = cg + (g - cg) * t
+    let nb: Float = cb + (b - cb) * t
+    couleur[k] = SIMD4<UInt16>(Toile.fixe(nr), Toile.fixe(ng), Toile.fixe(nb), 0)
     poids[k] = total
   }
 
-  static func octet(_ v: Float) -> UInt8 {
-    UInt8(max(0, min(255, v.rounded())))
+  static func fixe(_ v: Float) -> UInt16 {
+    let x: Float = (v * 256).rounded()
+    return UInt16(max(0, min(65280, x)))
+  }
+
+  /**
+   Recopie la toile d'avant du même mur, chaque pixel à sa place dans le
+   monde : le pixel (i, j) d'ici est le pixel (i0 + a1·i + a2·j, j0 + b1·i +
+   b2·j) de là-bas. Un mur qui a basculé ou reculé de plus de cinq
+   centimètres repart de zéro — ses anciens pixels ne sont plus à leur place.
+   */
+  mutating func recopier(
+    _ a: Toile, origine: SIMD3<Float>, du: SIMD3<Float>, dv: SIMD3<Float>,
+    ancienne: SIMD3<Float>, adu: SIMD3<Float>, adv: SIMD3<Float>, normale: SIMD3<Float>
+  ) {
+    let u2: Float = simd_length_squared(adu)
+    let v2: Float = simd_length_squared(adv)
+    guard u2 > 1e-10, v2 > 1e-10 else { return }
+    let ecart: SIMD3<Float> = origine - ancienne
+    guard abs(simd_dot(ecart, normale)) < 0.05 else { return }
+    let lu: Float = simd_length(du)
+    let lau: Float = u2.squareRoot()
+    guard lu > 1e-6 else { return }
+    let alignement: Float = simd_dot(du, adu) / (lu * lau)
+    guard alignement > 0.98 else { return }
+    let i0: Float = simd_dot(ecart, adu) / u2
+    let a1: Float = simd_dot(du, adu) / u2
+    let a2: Float = simd_dot(dv, adu) / u2
+    let j0: Float = simd_dot(ecart, adv) / v2
+    let b1: Float = simd_dot(du, adv) / v2
+    let b2: Float = simd_dot(dv, adv) / v2
+    for j in 0..<h {
+      let fj = Float(j)
+      let ri: Float = i0 + a2 * fj
+      let rj: Float = j0 + b2 * fj
+      for i in 0..<w {
+        let fi = Float(i)
+        let ii = Int((ri + a1 * fi).rounded())
+        let jj = Int((rj + b1 * fi).rounded())
+        guard ii >= 0, ii < a.w, jj >= 0, jj < a.h else { continue }
+        let k = jj * a.w + ii
+        guard a.poids[k] > 0 else { continue }
+        couleur[j * w + i] = a.couleur[k]
+        poids[j * w + i] = a.poids[k]
+      }
+    }
   }
 }
 
@@ -494,10 +608,20 @@ private struct VueDeCamera {
   let yLigne: Int
   let cBase: UnsafeMutableRawPointer
   let cLigne: Int
+  /// La confiance du LiDAR, pixel par pixel (faible, moyenne, haute), si ARKit la donne.
+  let confiance: CVPixelBuffer?
+  let confBase: UnsafeMutableRawPointer?
+  let confLigne: Int
+  /// Les bornes et les inverses qu'on recalculait à chaque pixel.
+  let uMax: Float
+  let vMax: Float
+  let unSurCx: Float
+  let unSurCy: Float
 
   init?(frame: ARFrame) {
     let b = frame.capturedImage
-    guard let d = frame.sceneDepth?.depthMap ?? frame.smoothedSceneDepth?.depthMap else { return nil }
+    let donnees = frame.sceneDepth ?? frame.smoothedSceneDepth
+    guard let d = donnees?.depthMap else { return nil }
     guard CVPixelBufferGetPlaneCount(b) >= 2 else { return nil }
     guard CVPixelBufferLockBaseAddress(b, .readOnly) == kCVReturnSuccess else { return nil }
     guard CVPixelBufferLockBaseAddress(d, .readOnly) == kCVReturnSuccess else {
@@ -526,6 +650,17 @@ private struct VueDeCamera {
     yLigne = CVPixelBufferGetBytesPerRowOfPlane(b, 0)
     cBase = cb
     cLigne = CVPixelBufferGetBytesPerRowOfPlane(b, 1)
+    if let c = donnees?.confidenceMap, CVPixelBufferLockBaseAddress(c, .readOnly) == kCVReturnSuccess {
+      confiance = c
+      confBase = CVPixelBufferGetBaseAddress(c)
+      confLigne = CVPixelBufferGetBytesPerRow(c)
+    } else {
+      confiance = nil
+      confBase = nil
+      confLigne = 0
+    }
+    uMax = Float(largeur - 9)
+    vMax = Float(hauteur - 9)
     pleineEchelle = CVPixelBufferGetPixelFormatType(b) == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
     let t = frame.camera.transform
     oeil = SIMD3<Float>(t.columns.3.x, t.columns.3.y, t.columns.3.z)
@@ -535,11 +670,14 @@ private struct VueDeCamera {
     fy = k.columns.1.y
     cx = k.columns.2.x
     cy = k.columns.2.y
+    unSurCx = 1 / max(k.columns.2.x, 1)
+    unSurCy = 1 / max(k.columns.2.y, 1)
   }
 
   func liberer() {
     CVPixelBufferUnlockBaseAddress(image, .readOnly)
     CVPixelBufferUnlockBaseAddress(profondeur, .readOnly)
+    if let c = confiance { CVPixelBufferUnlockBaseAddress(c, .readOnly) }
   }
 
   /**
@@ -630,14 +768,24 @@ private struct VueDeCamera {
     // Repère ARKit : −z devant l'objectif.
     let z = -p.z
     guard z > 0.25, z < 6 else { return }
-    let u: Float = fx * (p.x / z) + cx
-    let v: Float = fy * (-p.y / z) + cy
-    guard u >= 8, v >= 8, u < Float(largeur - 9), v < Float(hauteur - 9) else { return }
+    let unSurZ: Float = 1 / z
+    let u: Float = fx * (p.x * unSurZ) + cx
+    let v: Float = fy * (-p.y * unSurZ) + cy
+    guard u >= 8, v >= 8, u < uMax, v < vMax else { return }
     // La profondeur : le point doit être CE que la caméra voit.
     let px = min(profondeurL - 1, max(0, Int(u * echelleX)))
     let py = min(profondeurH - 1, max(0, Int(v * echelleY)))
     let mesure = dBase.advanced(by: py * dLigne).assumingMemoryBound(to: Float32.self)[px]
     guard mesure > 0.05, abs(mesure - z) < 0.08 else { return }
+    /*
+      LA PROFONDEUR DOUTEUSE NE DÉCIDE PAS. Le LiDAR doute surtout au BORD
+      des objets — exactement là où un canapé déborde sur le mur derrière
+      lui ; en confiance faible, le point n'est pas lu.
+    */
+    if let cb = confBase {
+      let fiabilite = cb.advanced(by: py * confLigne).assumingMemoryBound(to: UInt8.self)[px]
+      guard Int(fiabilite) >= ARConfidenceLevel.medium.rawValue else { return }
+    }
     var w = poids
     if let n = normale {
       // Au sol, l'incidence se juge au pixel : le regard rasant pèse peu.
@@ -653,8 +801,8 @@ private struct VueDeCamera {
       w *= c2 * c2
     }
     // Le bord de l'objectif, moins net et plus sombre, pèse moins que son centre.
-    let ex: Float = (u - cx) / cx
-    let ey: Float = (v - cy) / cy
+    let ex: Float = (u - cx) * unSurCx
+    let ey: Float = (v - cy) * unSurCy
     let bord: Float = ex * ex + ey * ey
     w *= max(0.15, 1 - 0.45 * bord)
     /*
@@ -664,25 +812,36 @@ private struct VueDeCamera {
     */
     let empreinte: Float = fx * pasTexel / z
     let e: Float = min(6, max(0.5, empreinte * 0.25))
-    let c1 = couleur(u: u - e, v: v - e)
-    let c2 = couleur(u: u + e, v: v - e)
-    let c3 = couleur(u: u - e, v: v + e)
-    let c4 = couleur(u: u + e, v: v + e)
+    // La conversion en RGB est linéaire : on moyenne les quatre lectures en
+    // Y'CbCr, et l'on ne convertit qu'une fois au lieu de quatre.
+    let c1 = ycc(u: u - e, v: v - e)
+    let c2 = ycc(u: u + e, v: v - e)
+    let c3 = ycc(u: u - e, v: v + e)
+    let c4 = ycc(u: u + e, v: v + e)
     let haut: SIMD3<Float> = c1 + c2
     let bas: SIMD3<Float> = c3 + c4
-    let m: SIMD3<Float> = (haut + bas) * 0.25
+    let moy: SIMD3<Float> = (haut + bas) * 0.25
+    let m: SIMD3<Float> = enRGB(moy)
     toile.ajouter(k, r: m.x, g: m.y, b: m.z, w: w)
   }
 
-  /// Y'CbCr → RGB, au pixel le plus proche de (u, v).
-  private func couleur(u: Float, v: Float) -> SIMD3<Float> {
+  /// Y', Cb, Cr au pixel le plus proche de (u, v), bruts (0–255).
+  private func ycc(u: Float, v: Float) -> SIMD3<Float> {
     let ix = min(largeur - 1, max(0, Int(u.rounded())))
     let iy = min(hauteur - 1, max(0, Int(v.rounded())))
-    var yy = Float(yBase.advanced(by: iy * yLigne).assumingMemoryBound(to: UInt8.self)[ix])
+    let yy = Float(yBase.advanced(by: iy * yLigne).assumingMemoryBound(to: UInt8.self)[ix])
     let cRang = cBase.advanced(by: (iy / 2) * cLigne).assumingMemoryBound(to: UInt8.self)
-    let cb = Float(cRang[(ix / 2) * 2]) - 128
-    let cr = Float(cRang[(ix / 2) * 2 + 1]) - 128
+    let cb = Float(cRang[(ix / 2) * 2])
+    let cr = Float(cRang[(ix / 2) * 2 + 1])
+    return SIMD3<Float>(yy, cb, cr)
+  }
+
+  /// Y'CbCr (BT.601) → RGB.
+  private func enRGB(_ c: SIMD3<Float>) -> SIMD3<Float> {
+    var yy: Float = c.x
     if !pleineEchelle { yy = (yy - 16) * (255.0 / 219.0) }
+    let cb: Float = c.y - 128
+    let cr: Float = c.z - 128
     let r: Float = yy + 1.402 * cr
     let g: Float = yy - 0.344136 * cb - 0.714136 * cr
     let b: Float = yy + 1.772 * cb

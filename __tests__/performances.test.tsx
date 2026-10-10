@@ -230,7 +230,9 @@ describe('côté iPhone, plus rien ne tourne pour rien', () => {
 
   it('les photos à un pixel par point', () => {
     const photo = natif('RoomScanPhoto.swift');
-    expect(photo.match(/format: RoomScanPhoto\.pixelParPoint\(\)/g)?.length).toBe(2);
+    expect(photo.match(/format: RoomScanPhoto\.pixelParPoint\(\)/g)?.length).toBe(1);
+    // La relecture pour le PDF passe par ImageIO, qui compte en pixels.
+    expect(photo).toContain('kCGImageSourceThumbnailMaxPixelSize');
   });
 
   it('la boussole du nord s’allume à l’invitation, et s’éteint après la lecture', () => {
@@ -270,7 +272,8 @@ describe('côté iPhone, plus rien ne tourne pour rien', () => {
   it('le scan : les couleurs échantillonnées sans allocation, la photo des murs sans copie', () => {
     const texture = natif('RoomScanTexture.swift');
     expect(texture).toContain('withUnsafeTemporaryAllocation(of: SIMD3<Float>.self, capacity: 9)');
-    expect(texture).toContain('floorTiles[key, default: []].append(c)');
+    // Le sol garde son lot en place (un seul accès), renouvelé comme celui des murs.
+    expect(texture).toContain('Self.garder(c, dans: &floorTiles[key, default: []])');
     const mur = natif('RoomScanPhotoMur.swift');
     expect(mur).toContain('.priorityRequestLow: true');
     expect(mur).toContain('contexte.jpegRepresentation(');
@@ -287,10 +290,26 @@ describe('côté iPhone, plus rien ne tourne pour rien', () => {
     }
   });
 
-  it('la visite ne se rebâtit que si sa géométrie a changé', () => {
+  it('la visite ne se rebâtit que si sa géométrie a changé — et seulement la famille touchée', () => {
     const visite = natif('RoomScanVisite.swift');
-    for (const p of ['maillage', 'sols', 'orientes', 'ecorche', 'meubles']) {
-      expect(visite).toContain(`didSet { if ${p} != oldValue { rebatir() } }`);
+    const familles: [string, string, string][] = [
+      ['maillage', 'fMaillage', 'bati'],
+      ['sols', 'fSols', 'sols'],
+      ['orientes', 'fOrientes', 'bati'],
+      ['ecorche', 'fEcorche', 'bati'],
+      ['meubles', 'fMeubles', 'meubles'],
+      ['texturees', 'fTexturees', 'images'],
+    ];
+    for (const [p, f, g] of familles) {
+      // Rien de gardé en nombres objets : la propriété ne fait que recevoir.
+      const prop = visite.slice(visite.indexOf(`@objc var ${p}: [NSNumber] {`));
+      expect(prop.slice(0, 60)).toContain('get { [] }');
+      expect(visite).toContain(`set { if Self.recevoir(newValue, dans: &${f}) { rebatir(.${g}) } }`);
     }
+    // Le voile change une matière, il ne rebâtit rien.
+    expect(visite).toContain('didSet { if voile != oldValue { appliquerVoile() } }');
+    // Une seule matière pour tous les liserés.
+    expect(visite).toContain('private lazy var matiereContour: SCNMaterial');
+    expect(visite).not.toContain('materiauxContour');
   });
 });

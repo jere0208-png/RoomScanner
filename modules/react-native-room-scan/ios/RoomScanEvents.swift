@@ -4,7 +4,8 @@ import React
 @objc(RoomScanEvents)
 class RoomScanEvents: RCTEventEmitter {
 
-  static var shared: RoomScanEvents?
+  // Faible : après un rechargement du JS, l'ancien émetteur ne survit pas à son pont.
+  static weak var shared: RoomScanEvents?
   private var hasListeners = false
 
   override init() {

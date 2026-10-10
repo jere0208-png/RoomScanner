@@ -105,11 +105,15 @@ describe('le natif', () => {
   });
 
   it('AVANT d’arrêter la session, et un seul fichier gardé', () => {
-    const stop = g.slice(g.indexOf('func stop(resolve:'), g.indexOf('private func clearPromise'));
+    const stop = g.slice(g.indexOf('func stop(resolve:'), g.indexOf('private func lancerLeMaillage'));
+    const lancer = g.slice(g.indexOf('private func lancerLeMaillage'), g.indexOf('private func clearPromise'));
     // Les ancres se prennent AVANT l'arrêt ; le maillage se bâtit ensuite,
     // hors du fil de l'interface (voir `performances`).
-    expect(stop.indexOf('RoomScanMaillage.ancresDe')).toBeGreaterThan(0);
-    expect(stop.indexOf('RoomScanMaillage.ancresDe')).toBeLessThan(stop.indexOf('captureSession.stop()'));
+    expect(lancer).toContain('RoomScanMaillage.ancresDe');
+    expect(stop.indexOf('self.lancerLeMaillage()')).toBeGreaterThan(0);
+    expect(stop.indexOf('self.lancerLeMaillage()')).toBeLessThan(stop.indexOf('captureSession.stop()'));
+    // Et un maillage d'un arrêt précédent ne part jamais avec celui-ci.
+    expect(lancer).toContain('if generation == self.generationMaillage { self.maillageReleve = maillage }');
     expect(m).toContain('hasPrefix("maillage-")');
     expect(m).toContain('removeItem');
     // Il voyage avec le résultat du scan (préparé hors du fil de l'interface).
