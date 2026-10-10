@@ -36,152 +36,51 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { CloseCross } from './CloseCross';
+import { SOLAIRES } from '../ui/solaires';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 
-/** Tracés des icônes de choix, en 24×24. */
 /**
- * LES ICÔNES DES CHOIX, EN 24 × 24.
+ * LES ICÔNES DES CHOIX — les silhouettes Solar de l'app, dans leur tuile.
  *
- * Même main que les pastilles d'outils : bouts ronds, trait épais, et un
- * symbole qui dit sa fonction sans qu'on lise le mot à côté. Elles sont
- * plus petites qu'une pastille — vingt points — donc encore moins
- * pardonnantes sur le détail : ce qui ne se lit pas en vingt points n'a rien
- * à faire ici.
+ * Relevé du patron : « refonte des icônes du menu "…" : trop simples, SVG IA
+ * facilement détectable ; garde une cohérence avec les icônes qu'on a déjà
+ * ailleurs ». C'étaient dix-neuf dessins au trait, tracés à la main ici,
+ * pendant que les pastilles d'outils, l'accueil, les bandeaux parlaient en
+ * silhouettes du jeu Solar Bold. Chaque choix prend maintenant la sienne,
+ * tirée du MÊME jeu (`ui/solaires`, régénéré par `tools/gen-solaires.mjs`) :
+ * la corbeille du menu est celle du bandeau, la règle celle de l'outil, la
+ * baguette celle des astuces. Posée dans une tuile teintée, comme les
+ * réglages d'iOS : on trouve le choix à l'œil avant de lire son mot.
  */
 /*
   PAS D'ANNOTATION `Record<string, …>` ICI — c'est elle qui a fait tomber
   l'app sur le chantier. Elle élargissait `keyof typeof ICONS` à `string` :
   le champ `icon` des choix, pourtant typé sur ces clés, acceptait alors
   N'IMPORTE QUELLE chaîne — et `ICONS['metre']`, qui n'a jamais existé,
-  rendait `undefined` dont le `.map` jetait toute la feuille. `satisfies`
-  vérifie la forme SANS élargir : la prochaine clé inventée ne compile pas.
+  rendait `undefined`. `satisfies` vérifie la forme SANS élargir : la
+  prochaine clé inventée ne compile pas.
 */
 const ICONS = {
-  // Le crayon sur une fiche : renommer, c'est réécrire l'étiquette.
-  renommer: [
-    'M11 4 H5.5 A1.5 1.5 0 0 0 4 5.5 v13 A1.5 1.5 0 0 0 5.5 20 h13 A1.5 1.5 0 0 0 20 18.5 V13',
-    'M18.4 2.6 l3 3 L11 16 l-4.2 1.2 1.2 -4.2 z',
-  ],
-  // La corbeille, couvercle compris.
-  supprimer: [
-    'M4 6.5 h16',
-    'M9.5 6.5 V3.8 h5 v2.7',
-    'M6 6.5 l1.1 13.7 h9.8 L18 6.5',
-    'M10 10.5 v6',
-    'M14 10.5 v6',
-  ],
-  // Deux traits qui se rejoignent en un : la fusion.
-  fusionner: [
-    'M3 7 h6 a5 5 0 0 1 5 5 h7',
-    'M3 17 h6 a5 5 0 0 0 5 -5',
-    'M17.5 8 L21.5 12 l-4 4',
-  ],
-  // Une cloison posée en travers, et ce qu'elle sépare.
-  scinder: [
-    'M12 2.5 v19',
-    'M3 6.5 h5',
-    'M3 17.5 h5',
-    'M16 6.5 h5',
-    'M16 17.5 h5',
-  ],
-  // La cote verticale : une hauteur se mesure du sol au plafond.
-  hauteur: [
-    'M12 3.5 v17',
-    'M8 7.5 L12 3.5 l4 4',
-    'M8 16.5 L12 20.5 l4 -4',
-    'M4.5 3.5 h4',
-    'M4.5 20.5 h4',
-  ],
-  // Le double-décimètre, comme dans la barre d'outils.
-  regle: [
-    'M2.5 9 h19 a1.6 1.6 0 0 1 1.6 1.6 v2.8 a1.6 1.6 0 0 1 -1.6 1.6 h-19 a1.6 1.6 0 0 1 -1.6 -1.6 v-2.8 a1.6 1.6 0 0 1 1.6 -1.6 z',
-    'M7 9 v3.4',
-    'M12 9 v4.4',
-    'M17 9 v3.4',
-  ],
-  // Sortir : la flèche qui franchit la porte.
-  sortir: ['M13 3.5 h6.5 v17 H13', 'M3 12 h9', 'M8.5 8 L12.5 12 l-4 4'],
-  // La flèche qui descend dans le bac : ranger pour de bon.
-  sauver: ['M12 3.5 v11', 'M7.5 10 L12 14.5 L16.5 10', 'M4.5 15.5 v3.5 h15 v-3.5'],
-  // Une pièce : son contour et sa porte, comme sur le plan.
-  piece: [
-    'M3.5 3.5 h17 v17 H14',
-    'M3.5 20.5 H8',
-    'M8 20.5 a6 6 0 0 0 6 -6',
-    'M8 20.5 v-5',
-  ],
-  /*
-    CINQ ENTRÉES DU MENU DU SCAN PORTAIENT LA MÊME ICÔNE — « pièce », pour
-    ajouter une pièce, en scanner une, redétecter, monter un étage,
-    descendre au sous-sol et relever un tableau. Une icône répétée
-    n'informe pas : elle décore, et elle fait lire les six lignes pour
-    trouver la bonne. Chacune a maintenant la sienne, et chacune dit son
-    geste sans qu'on lise le mot à côté.
-  */
-  // Le téléphone qui vise un mur : c'est un RELEVÉ, pas un dessin.
-  scanner: [
-    'M6.5 3.5 h11 v17 h-11 z',
-    'M9.5 3.5 h5',
-    'M3 8 V5 a1.5 1.5 0 0 1 1.5 -1.5',
-    'M21 8 V5 a1.5 1.5 0 0 0 -1.5 -1.5',
-  ],
-  // La loupe sur le plan : on cherche ce qui s'y trouve déjà.
-  redetecter: [
-    'M3.5 3.5 h17 v9',
-    'M3.5 3.5 v17 h9',
-    'M13 17.5 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0',
-    'M20 20.5 L22 22.5',
-  ],
-  // Deux dalles empilées, la flèche qui monte : l'étage du dessus.
-  etage: [
-    'M3.5 14.5 h11 v6 h-11 z',
-    'M3.5 8.5 h11',
-    'M19 20.5 V4.5',
-    'M16 7.5 L19 4.5 l3 3',
-  ],
-  // Les mêmes dalles, la flèche qui descend : ce qui se range dessous.
-  soussol: [
-    'M3.5 3.5 h11 v6 h-11 z',
-    'M3.5 15.5 h11',
-    'M19 3.5 V19.5',
-    'M16 16.5 L19 19.5 l3 -3',
-  ],
-  // Le coffret et ses rangées de modules : un tableau électrique.
-  /*
-    LE BATTANT ET SON DORMANT : de quel bord la porte pivote.
-
-    Pour qui pose l'appareillage ce n'est pas un détail de trait —
-    l'interrupteur va du côté de la poignée, jamais du côté des paumelles.
-    L'icône montre donc ce qu'on va changer : le montant, le vantail ouvert,
-    et l'arc qu'il décrit.
-  */
-  charniere: [
-    'M5 3.5 v17',
-    'M5 4 h7 v9 h-7',
-    'M12.5 4.2 a9 9 0 0 1 6.3 8.8',
-  ],
-  /*
-    LA MENUISERIE DANS SON MUR : ce qu'est cette ouverture.
-
-    Le trait plein du mur, la trouée au milieu, et le dormant qui la borde —
-    c'est le signe qu'on lit sur un plan pour dire « il y a quelque chose
-    ici ». Ce que c'est exactement, le mot de la rangée le dit.
-  */
-  menuiserie: ['M2.5 12 h5', 'M16.5 12 h5', 'M7.5 6.5 v11', 'M16.5 6.5 v11', 'M7.5 12 h9'],
-  // Le caisson du volet, posé sur sa baie : ce que le scan ne voit jamais.
-  coffre: ['M4 4 h16 v4.5 h-16 z', 'M6.5 8.5 v10', 'M17.5 8.5 v10', 'M6.5 18.5 h11'],
-  // Le mur rebouché, appareillé : fermer une ouverture, c'est retirer le trou.
-  murer: ['M3.5 5 h17 v14 h-17 z', 'M3.5 12 h17', 'M12 5 v7', 'M8 12 v7', 'M16 12 v7'],
-  // Le rouleau du peintre : les travaux, ce qu'il faut acheter.
-  rouleau: ['M4 4 h13 v5 h-13 z', 'M17 6.5 h2.5 v5 h-7.5 v3', 'M12 14.5 v6'],
-  tableau: [
-    'M3.5 3.5 h17 v17 h-17 z',
-    'M3.5 9.5 h17',
-    'M3.5 15.5 h17',
-    'M8 6.5 v0.01',
-    'M8 12.5 v0.01',
-  ],
-} satisfies Record<string, string[]>;
+  renommer: SOLAIRES.renommer,
+  supprimer: SOLAIRES.supprimer,
+  fusionner: SOLAIRES.fusionner,
+  scinder: SOLAIRES.scinder,
+  hauteur: SOLAIRES.hauteur,
+  regle: SOLAIRES.ruler,
+  sortir: SOLAIRES.sortir,
+  sauver: SOLAIRES.save,
+  piece: SOLAIRES.room,
+  scanner: SOLAIRES.scanner,
+  redetecter: SOLAIRES.baguette,
+  etage: SOLAIRES.etage,
+  soussol: SOLAIRES.soussol,
+  charniere: SOLAIRES.charniere,
+  menuiserie: SOLAIRES.ouvertures,
+  coffre: SOLAIRES.coffre,
+  murer: SOLAIRES.murer,
+  rouleau: SOLAIRES.rouleau,
+  tableau: SOLAIRES.tableau,
+} satisfies { [cle: string]: string };
 
 export interface SheetAction {
   label: string;
@@ -540,19 +439,15 @@ export function ActionSheet({
               {/* Une clé inconnue — donnée d'hier, faute de frappe — rend
                   le choix SANS pictogramme, jamais sans écran. */}
               {a.icon && ICONS[a.icon] && (
-                <Svg width={20} height={20} viewBox="0 0 24 24">
-                  {ICONS[a.icon].map((d) => (
+                <View style={[styles.tuile, a.danger && styles.tuileDanger]}>
+                  <Svg width={19} height={19} viewBox="0 0 24 24">
                     <Path
-                      key={d}
-                      d={d}
-                      stroke={a.danger ? c.danger : c.ink}
-                      strokeWidth={2.2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
+                      d={ICONS[a.icon]}
+                      fill={a.danger ? c.danger : c.blue}
+                      fillRule="evenodd"
                     />
-                  ))}
-                </Svg>
+                  </Svg>
+                </View>
               )}
               <View style={styles.rowTexts}>
                 <Text style={[styles.rowLabel, a.danger && styles.rowDanger]}>
@@ -787,6 +682,16 @@ const getStyles = themedStyles((c: Palette) =>
     },
     rowPressed: { backgroundColor: c.line },
     rowTexts: { flex: 1 },
+    // La tuile de l'icône : la silhouette Solar, teintée, dans son carré doux.
+    tuile: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      backgroundColor: c.blueSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tuileDanger: { backgroundColor: 'rgba(229, 72, 77, 0.12)' },
     rowLabel: { color: c.ink, fontSize: 15.5, fontWeight: '700' },
     rowDanger: { color: c.danger },
     rowHint: { color: c.inkFaint, fontSize: 12, marginTop: 1, lineHeight: 15 },

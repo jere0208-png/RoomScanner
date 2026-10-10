@@ -14285,6 +14285,78 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Au-dessus de la concurrence : le bilan du relevé, la maquette chez soi en réalité augmentée, Spotlight, et un menu « … » redessiné
+
+Relevés du patron : « améliore encore nativement l'application pour être au
+top de la concurrence des applications du même style ; on doit proposer
+mieux, repense la chose en modernité et ludique » — puis « refonte des
+icônes du menu "…" : trop simples, SVG IA facilement détectable ; garde une
+cohérence avec les icônes qu'on a déjà ailleurs ».
+
+**L'inventaire d'abord.** Face aux applications de relevé du marché, il
+manquait : un retour sensoriel pendant le scan (les compteurs changeaient en
+silence), une note du relevé (il s'ouvrait sans un mot, ou d'un bandeau
+« 3 pièces · 48 m² »), la maquette en réalité augmentée (QuickLook était lié
+au projet, jamais utilisé), et les plans dans la recherche de l'iPhone.
+
+**Le scan vivant** (`components/CompteurVivant`). Chaque NOUVELLE trouvaille
+fait sauter son chiffre, monter un « +1 » qui s'efface, et vibrer le
+téléphone : légère pour un mur, plus franche pour une porte ou une fenêtre.
+On ne fête que ce qui dépasse le plus haut déjà vu (RoomPlan recompte et peut
+redescendre), et les vibrations s'espacent d'un tiers de seconde.
+
+**Le bilan du relevé** (`geometry/bilan`, `components/BilanDuReleve`).
+- Le relevé est NOTÉ sur cent : pièces refermées (35), murs bien vus selon la
+  confiance de RoomPlan (25), murs en vraie image (20), sol en vraie image
+  (12), plafond mesuré (8). Trois étoiles, une mention, et pour le critère
+  le plus faible UN conseil — le geste qui le corrige au prochain passage.
+- La carte se lève à la fin du scan (neuf, étage ou passage de plus) :
+  l'anneau se remplit jusqu'à la note, les étoiles tombent une à une, les
+  chiffres montent (pièces, m², murs, portes, fenêtres, meubles), des
+  cotillons quand c'est réussi. Deux portes : « Voir en 3D » et « Chez moi,
+  en réalité augmentée ».
+
+**La maquette chez soi, en réalité augmentée** (`RoomScanRealiteAugmentee.swift`,
+`ui/realiteAugmentee`).
+- La scène de la maquette À L'ÉCRAN — murs en vraies images, meubles à leurs
+  cotes, portes et fenêtres en volume — est recopiée sans ce qui n'a de sens
+  qu'à l'écran (liserés, ombres de contact ; l'écorché redevient plein),
+  ramenée à 60 cm, posée au sol, écrite en USDZ et ouverte dans AR Quick
+  Look : on la pose sur la table du client, on tourne autour, on l'agrandit
+  jusqu'à la taille réelle.
+- Sans maquette à l'écran, le modèle que RoomPlan a écrit au scan.
+- Une pastille « RA » dans la rangée de la vue 3D, et le bouton du bilan
+  (qui bascule en 3D d'abord).
+
+**Les plans dans la recherche de l'iPhone** (`ui/spotlight`,
+`RoomScanRaccourci.indexer`, `AppDelegate`). Chaque plan enregistré entre
+dans Spotlight, sur l'appareil seulement : titre, client, adresse, pièces,
+date. On tape « Martin » ou « rue des Lilas » depuis l'écran d'accueil
+d'iOS, et le plan s'ouvre — par le chemin des raccourcis (« ouvrir-plan:<id> »),
+avec la même prudence : on ne quitte pas un relevé en cours, un plan modifié
+ne se laisse pas remplacer en silence.
+
+**Le menu « … » redessiné** (`components/Sheet`, `ui/solaires`).
+- Ses dix-neuf icônes étaient des traits tracés à la main ; chacune prend
+  maintenant sa silhouette du jeu Solar Bold de l'app, posée dans une tuile
+  teintée (rouge pour ce qui supprime). Celles qui existaient sont reprises
+  telles quelles (corbeille, disquette, ciseaux, règle, maison « + », cadre
+  de visée, baguette…) ; huit s'ajoutent : renommer, hauteur, sortir,
+  étage, sous-sol, murer, travaux, tableau.
+- `tools/gen-solaires.mjs` demande désormais tout le jeu en une requête
+  (l'API limitait le débit et l'outil concluait à tort qu'une icône
+  n'existait pas), et une icône déjà vendue garde son tracé quand le jeu
+  évolue en amont (`--rafraichir` pour tout reprendre).
+
+À vérifier sur l'iPhone : l'ouverture dans AR Quick Look (la maquette doit
+être affichée en 3D), le rendu des images de murs dans l'USDZ, la
+vibration des compteurs pendant un scan, et la recherche d'un plan dans
+Spotlight après un enregistrement.
+
+Bancs : `moderne` (19 : le bilan et sa note, la carte et ses portes, les
+compteurs vivants, la réalité augmentée et son natif, Spotlight et le
+raccourci « ouvrir-plan », le menu en silhouettes et l'outil des icônes).
+
 ## Les fenêtres et les baies en volume, vitrées du bleu du dehors
 
 Relevé du patron : « fais aussi un 3D pour les ouvrants baie et fenêtres,

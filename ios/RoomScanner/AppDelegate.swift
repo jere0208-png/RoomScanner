@@ -1,4 +1,5 @@
 import AppIntents
+import CoreSpotlight
 import UIKit
 import React
 import React_RCTAppDelegate
@@ -128,6 +129,24 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
     poserLaDemande()
     completionHandler(true)
+  }
+
+  /*
+    UN PLAN TOUCHÉ DANS LA RECHERCHE DE L'IPHONE (Spotlight). Même chemin
+    qu'un raccourci : la demande « ouvrir-plan:<id> » attend dans les
+    réglages partagés, et l'application la prend au premier plan.
+  */
+  func application(
+    _ application: UIApplication,
+    continue userActivity: NSUserActivity,
+    restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void
+  ) -> Bool {
+    guard userActivity.activityType == CSSearchableItemActionType,
+          let id = userActivity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+          id.hasPrefix("plan:")
+    else { return false }
+    UserDefaults.standard.set("ouvrir-" + id, forKey: CLE_RACCOURCI)
+    return true
   }
 }
 

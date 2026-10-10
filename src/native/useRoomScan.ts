@@ -6,6 +6,8 @@ import { astuce } from '../ui/astuce';
 import { useAccountStore } from '../store/accountStore';
 import { usePannes } from '../ui/journalPannes';
 import { phraseEnergie } from '../ui/energie';
+import { bilanDuReleve } from '../geometry/bilan';
+import { useBilanStore } from '../store/bilanStore';
 
 /** Instructions RoomPlan (enum Swift) → libellés français. */
 const INSTRUCTIONS_FR: Record<string, string> = {
@@ -139,6 +141,20 @@ function annoncerLaDepense(r: ScanResult) {
   astuce(bouts.join(' · '), { icone: 'elec' });
 }
 
+/**
+ * LE BILAN DU RELEVÉ, MIS EN SCÈNE — voir `geometry/bilan` et la carte
+ * `BilanDuReleve`. Sans rien de nommable (aucun mur), le bandeau d'avant.
+ */
+function montrerLeBilan() {
+  const st = useScanStore.getState();
+  const bilan = bilanDuReleve({ rooms: st.rooms, walls: st.walls, openings: st.openings, objects: st.objects });
+  if (bilan && bilan.pieces > 0) {
+    useBilanStore.getState().montrer(bilan);
+    return;
+  }
+  resumerLeReleve();
+}
+
 function resumerLeReleve() {
   const st = useScanStore.getState();
   const pieces = st.rooms.length;
@@ -239,7 +255,7 @@ function resumerLeReleve() {
           complémentaire — et ils convergent trois lignes plus haut. L'écran,
           lui, ne saurait pas d'où l'on vient.
         */
-        resumerLeReleve();
+        montrerLeBilan();
         annoncerLaDepense(result);
       } catch (e: any) {
         store.setProcessing(false);

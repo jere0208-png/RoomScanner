@@ -1,5 +1,7 @@
+import CoreSpotlight
 import Foundation
 import React
+import UniformTypeIdentifiers
 
 /**
  * LA DEMANDE D'UN RACCOURCI, DU SYSTÈME JUSQU'AU JAVASCRIPT.
@@ -40,5 +42,35 @@ class RoomScanRaccourci: NSObject {
       reglages.removeObject(forKey: RoomScanRaccourci.CLE)
     }
     resolve(demande)
+  }
+
+  /**
+   LES PLANS DANS LA RECHERCHE DE L'IPHONE — Spotlight, sur l'appareil
+   seulement. L'index est REMPLACÉ à chaque fois : un plan supprimé ou
+   renommé ne traîne pas dans la recherche. Un plan touché revient par
+   `AppDelegate` (« ouvrir-plan:<id> »), comme un raccourci.
+   */
+  static let DOMAINE = "echoplan.plans"
+
+  @objc func indexer(_ fiches: NSArray) {
+    var items: [CSSearchableItem] = []
+    for f in fiches {
+      guard let d = f as? NSDictionary,
+            let id = d["id"] as? String,
+            let titre = d["titre"] as? String else { continue }
+      let a = CSSearchableItemAttributeSet(contentType: UTType.content)
+      a.title = titre
+      a.contentDescription = d["description"] as? String
+      a.keywords = d["motsCles"] as? [String]
+      items.append(CSSearchableItem(
+        uniqueIdentifier: "plan:\(id)",
+        domainIdentifier: RoomScanRaccourci.DOMAINE,
+        attributeSet: a))
+    }
+    let index = CSSearchableIndex.default()
+    index.deleteSearchableItems(withDomainIdentifiers: [RoomScanRaccourci.DOMAINE]) { _ in
+      guard !items.isEmpty else { return }
+      index.indexSearchableItems(items) { _ in }
+    }
   }
 }

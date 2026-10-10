@@ -42,6 +42,7 @@ RCT_EXTERN_METHOD(poser:(NSString *)nom
 @interface RCT_EXTERN_MODULE(RoomScanRaccourci, NSObject)
 RCT_EXTERN_METHOD(prendre:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(indexer:(NSArray *)fiches)
 @end
 
 @interface RCT_EXTERN_MODULE(RoomScanAccount, NSObject)
@@ -138,6 +139,10 @@ RCT_EXTERN_METHOD(camera:(NSString *)cle valeurs:(NSArray *)valeurs)
 RCT_EXTERN_METHOD(orbite:(NSString *)cle valeurs:(NSArray *)valeurs)
 RCT_EXTERN_METHOD(levee:(NSString *)cle k:(nonnull NSNumber *)k solY:(nonnull NSNumber *)solY)
 RCT_EXTERN_METHOD(lampes:(NSString *)cle valeurs:(NSArray *)valeurs)
+RCT_EXTERN_METHOD(realiteAugmentee:(NSString *)cle
+                  secours:(NSString *)secours
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 @end
 
 /*

@@ -62,7 +62,8 @@ final class RoomScanVisite: UIView {
   private let scene = SCNScene()
   private let oeil = SCNNode()
   /// Le bâti : remplacé d'un bloc quand la scène change, jamais retouché.
-  private let bati = SCNNode()
+  /// Tout ce que la vue a bâti — lu aussi par l'export en réalité augmentée.
+  let bati = SCNNode()
   /// Les trois lumières, gardées : la maquette les règle autrement.
   private let ambiante = SCNLight()
   private let jour = SCNLight()

@@ -31,6 +31,7 @@ import { usePremieresFois } from './src/store/premieresFois';
 import { useUsage } from './src/store/usage';
 import { useScanStore } from './src/store/scanStore';
 import { prendreLaDemande, suiteDuRaccourci } from './src/ui/raccourci';
+import { indexerLesPlans } from './src/ui/spotlight';
 import { astuce } from './src/ui/astuce';
 import { useAccountStore } from './src/store/accountStore';
 
@@ -61,6 +62,7 @@ function Application() {
   const screen = useScanStore((s) => s.screen);
   const loadSaves = useScanStore((s) => s.loadSaves);
   const savesCharges = useScanStore((s) => s.savesCharges);
+  const saves = useScanStore((s) => s.saves);
   const repriseAuBesoin = useScanStore((s) => s.repriseAuBesoin);
   const compte = useAccountStore((s) => s.compte);
   const invite = useAccountStore((s) => s.invite);
@@ -175,6 +177,9 @@ function Application() {
       if (suite.faire === 'scanner') {
         if (st.screen !== 'home') st.setScreen('home');
         st.setRaccourciEnAttente(true);
+      } else if (suite.faire === 'ouvrir') {
+        if (st.saves.some((p) => p.id === suite.id)) st.openSave(suite.id);
+        else astuce('Ce plan n’est plus sur ce téléphone.', { icone: 'save' });
       } else if (suite.faire === 'dire') {
         astuce(suite.message, { icone: 'save' });
       }
@@ -183,6 +188,9 @@ function Application() {
     const abonne = AppState.addEventListener('change', (etat) => {
       if (etat === 'active') {
         traiter();
+        // Un plan touché dans Spotlight arrive parfois juste APRÈS le retour
+        // au premier plan : on regarde une seconde fois, un instant plus tard.
+        setTimeout(traiter, 700);
         // Et la boîte se relit au retour : un message publié pendant que
         // l'app dormait doit allumer la pastille sans relancer l'app.
         useNotifications.getState().rafraichir().catch(() => {});
@@ -193,6 +201,17 @@ function Application() {
       abonne.remove();
     };
   }, []);
+
+  /*
+    LES PLANS DANS LA RECHERCHE DE L'IPHONE — tenus à jour à chaque
+    enregistrement, un instant après : une rafale de sauvegardes n'indexe
+    qu'une fois. Voir `ui/spotlight`.
+  */
+  useEffect(() => {
+    if (!savesCharges) return;
+    const t = setTimeout(() => indexerLesPlans(saves), 1500);
+    return () => clearTimeout(t);
+  }, [saves, savesCharges]);
 
   /*
     LES PLANS DU COMPTE REDESCENDENT DÈS QUE LES DEUX SONT LÀ.

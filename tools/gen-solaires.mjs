@@ -12,7 +12,7 @@
  * l'API connaît gagne. Les tracés d'une icône sont concaténés en un seul
  * chemin (le rendu est en silhouette, `fill-rule evenodd`).
  */
-import { writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -231,15 +231,76 @@ const CHOIX = {
   scanner: ['scanner-bold'],
   aide: ['question-circle-bold'],
   maison: ['home-2-bold', 'home-bold'],
+  /*
+    LE MENU « … » PARLE ENFIN LA LANGUE DE L'APP — relevé du patron :
+    « refonte des icônes du menu "…" : trop simples, SVG IA facilement
+    détectable ; garde une cohérence avec les icônes qu'on a déjà
+    ailleurs ».
+
+    C'étaient dix-neuf dessins au trait tracés à la main dans la feuille
+    des choix, pendant que toute l'app parle en silhouettes Solar. Chaque
+    entrée prend maintenant la sienne — celles qui existaient déjà dans le
+    jeu sont reprises telles quelles (la corbeille, la disquette, les
+    ciseaux, la règle, la maison « + », le cadre de visée, la baguette…),
+    et celles-ci complètent :
+
+    RENOMMER, le crayon sur sa fiche ; LA HAUTEUR, la double flèche
+    verticale ; SORTIR, la porte qu'on quitte ; L'ÉTAGE et LE SOUS-SOL, les
+    chevrons qui montent ou descendent dans leur carré, comme le pavé de
+    réglage ; MURER, la gomme qui efface le
+    trou ; LES TRAVAUX, le rouleau du peintre ; LE TABLEAU, le coffret et
+    ses rangées.
+  */
+  renommer: ['pen-new-square-bold'],
+  hauteur: ['round-sort-vertical-bold', 'transfer-vertical-bold'],
+  sortir: ['logout-3-bold', 'logout-2-bold'],
+  etage: ['square-double-alt-arrow-up-bold', 'square-top-up-bold'],
+  soussol: ['square-double-alt-arrow-down-bold', 'square-bottom-down-bold'],
+  murer: ['eraser-square-bold', 'eraser-bold'],
+  rouleau: ['paint-roller-bold'],
+  tableau: ['server-square-bold', 'server-minimalistic-bold'],
 };
 
+/*
+  UNE REQUÊTE POUR TOUT LE JEU — l'API limite le débit.
+
+  L'outil demandait chaque icône à part : passé une cinquantaine d'appels
+  d'affilée, l'API répond « trop de requêtes » (429), et l'outil concluait
+  à tort que l'icône n'existait pas. Il demande désormais tous les candidats
+  d'un coup, par lots, au format JSON de l'API (`solar.json?icons=…`) ; un
+  refus du serveur se retente en attendant de plus en plus, et seule une
+  vraie absence fait passer au candidat suivant.
+*/
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+const TRACES = new Map();
+
+async function prechargerLeJeu(noms) {
+  const uniques = [...new Set(noms)];
+  for (let i = 0; i < uniques.length; i += 60) {
+    const lot = uniques.slice(i, i + 60);
+    let data = null;
+    for (let essai = 0; essai < 8 && !data; essai++) {
+      try {
+        const r = await fetch(`https://api.iconify.design/solar.json?icons=${lot.join(',')}`);
+        if (r.ok) data = await r.json();
+      } catch {
+        data = null;
+      }
+      if (!data) await pause(4000 * (essai + 1));
+    }
+    if (!data) throw new Error('API Iconify injoignable : rien n’est écrit.');
+    for (const [nom, icone] of Object.entries(data.icons ?? {})) {
+      const ds = [...String(icone.body).matchAll(/ d="([^"]+)"/g)].map((m) => m[1]);
+      if (ds.length > 0) TRACES.set(nom, ds.join(' '));
+    }
+    for (const [nom, alias] of Object.entries(data.aliases ?? {})) {
+      if (TRACES.has(alias.parent)) TRACES.set(nom, TRACES.get(alias.parent));
+    }
+  }
+}
+
 async function tracer(nom) {
-  const r = await fetch(`https://api.iconify.design/solar:${nom}.svg`);
-  if (!r.ok) return null;
-  const svg = await r.text();
-  if (!svg.includes('<svg')) return null;
-  const ds = [...svg.matchAll(/ d="([^"]+)"/g)].map((m) => m[1]);
-  return ds.length > 0 ? ds.join(' ') : null;
+  return TRACES.get(nom) ?? null;
 }
 
 /*
@@ -267,6 +328,8 @@ const MAISON = {
   },
 };
 
+await prechargerLeJeu(Object.values(CHOIX).flat());
+
 const sorties = {};
 const rates = [];
 for (const [cle, candidats] of Object.entries(CHOIX)) {
@@ -293,11 +356,29 @@ if (rates.length > 0) {
 
 Object.assign(sorties, MAISON);
 
+/*
+  UNE ICÔNE DÉJÀ VENDUE NE CHANGE PAS EN DOUCE.
+
+  Le jeu Solar évolue en amont : régénérer pour AJOUTER une icône redessinait
+  au passage treize de celles que le patron avait déjà validées — le
+  fauteuil, la loupe, le partage… Le tracé d'une clé dont le candidat n'a pas
+  changé est donc repris du fichier ; `--rafraichir` les reprend toutes à
+  l'API.
+*/
+const FICHIER = join(ROOT, 'src', 'ui', 'solaires.ts');
+if (!process.argv.includes('--rafraichir') && existsSync(FICHIER)) {
+  const avant = readFileSync(FICHIER, 'utf8').replace(/\r\n/g, '\n');
+  for (const m of avant.matchAll(/\/\*\* solar:([^*]+?) \*\/\n {2}([A-Za-z0-9]+):\n {4}'([^']+)'/g)) {
+    const [, nom, cle, d] = m;
+    if (sorties[cle] && sorties[cle].nom === nom) sorties[cle].d = d;
+  }
+}
+
 const lignes = Object.entries(sorties).map(
   ([cle, v]) => `  /** solar:${v.nom} */\n  ${cle}:\n    '${v.d}',`,
 );
 writeFileSync(
-  join(ROOT, 'src', 'ui', 'solaires.ts'),
+  FICHIER,
   `/**\n` +
     ` * Les icônes des menus — ÉCRITES PAR \`node tools/gen-solaires.mjs\`.\n` +
     ` *\n` +

@@ -96,6 +96,7 @@ import {
 } from '../geometry/electrical';
 import type { Circuit } from '../geometry/nfc15100';
 import type { CeilingFixture } from '../geometry/ceiling';
+import { annoncerLaMaquette, cleDeLaMaquette } from '../ui/realiteAugmentee';
 import { circuitColor } from '../geometry/schema';
 
 /** Paramètres de caméra de la vue 3D (contrôlables de l'extérieur). */
@@ -1311,6 +1312,17 @@ export function Iso3DView({
     `maquette-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
   ).current;
   const vueNativeMontee = natif && !!maquette && !!RoomScanVisite;
+  /*
+    LA MAQUETTE S'ANNONCE — pour qu'on puisse la poser chez soi, en réalité
+    augmentée, telle qu'elle est à l'écran (voir `ui/realiteAugmentee`).
+  */
+  useEffect(() => {
+    if (!vueNativeMontee) return;
+    annoncerLaMaquette(cleMaquette);
+    return () => {
+      if (cleDeLaMaquette() === cleMaquette) annoncerLaMaquette(null);
+    };
+  }, [vueNativeMontee, cleMaquette]);
   const orbite = cameraOrbite(view, center, radius3d, layout);
   const entreeOrbite = useRef<number[] | null>(null);
   const entreeLevee = useRef<{ k: number; solY: number } | null>(null);

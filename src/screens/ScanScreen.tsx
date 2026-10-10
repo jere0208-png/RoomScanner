@@ -15,6 +15,7 @@ import { useModeElec } from '../store/usage';
 import { useRoomScan } from '../native/useRoomScan';
 import { CloseCross } from '../components/CloseCross';
 import { haptic } from '../ui/haptic';
+import { CompteurVivant } from '../components/CompteurVivant';
 import { panne as expliquer } from '../ui/panne';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GuidePose } from './scan/GuidePose';
@@ -342,11 +343,12 @@ export function ScanScreen() {
     RoomScan.setTorch(next).catch(() => {});
   };
 
-  const stats: [string, number][] = [
-    ['Murs', wallCount],
-    ['Portes', doorCount],
-    ['Fenêtres', windowCount],
-    ['Objets', objectCount],
+  // Le dernier booléen : une ouverture, dont la trouvaille vibre plus franc.
+  const stats: [string, number, boolean][] = [
+    ['Murs', wallCount, false],
+    ['Portes', doorCount, true],
+    ['Fenêtres', windowCount, true],
+    ['Objets', objectCount, false],
   ];
 
   return (
@@ -396,11 +398,19 @@ export function ScanScreen() {
       {/* RoomPlan affiche déjà ses propres instructions : pas de doublon. */}
       <View style={styles.topHud} pointerEvents="none">
         <View style={styles.statsPill}>
-          {stats.map(([label, n], i) => (
-            <View key={label} style={[styles.stat, i > 0 && styles.statBorder]}>
-              <Text style={styles.statValue}>{n}</Text>
-              <Text style={styles.statLabel}>{label}</Text>
-            </View>
+          {/* Chaque trouvaille saute, monte en « +1 » et vibre : voir `CompteurVivant`. */}
+          {stats.map(([label, n, ouverture], i) => (
+            <CompteurVivant
+              key={label}
+              valeur={n}
+              libelle={label}
+              ouverture={ouverture}
+              actif={!paused && !processing}
+              style={[styles.stat, i > 0 && styles.statBorder]}
+              styleValeur={styles.statValue}
+              styleLibelle={styles.statLabel}
+              teinte={c.sky}
+            />
           ))}
         </View>
         {paused && (

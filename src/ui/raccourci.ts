@@ -25,11 +25,17 @@
  */
 import { NativeModules, Platform } from 'react-native';
 
-/** Le seul raccourci que cette version connaisse. */
+/** Le raccourci « Nouveau relevé ». */
 export const RACCOURCI_SCAN = 'nouveau-releve';
+/**
+ * Un plan touché dans la recherche de l'iPhone (Spotlight) : la demande
+ * porte son identifiant — voir `ui/spotlight`.
+ */
+export const PREFIXE_OUVRIR = 'ouvrir-plan:';
 
 export type SuiteDuRaccourci =
   | { faire: 'scanner' }
+  | { faire: 'ouvrir'; id: string }
   | { faire: 'rien' }
   | { faire: 'dire'; message: string };
 
@@ -45,6 +51,22 @@ export function suiteDuRaccourci(etat: {
   screen: string;
   dirty: boolean;
 }): SuiteDuRaccourci {
+  /*
+    OUVRIR UN PLAN TROUVÉ DANS SPOTLIGHT : la même prudence qu'un scan. On
+    ne quitte pas un relevé en cours, et un plan modifié ne se laisse pas
+    remplacer en silence.
+  */
+  if (etat.demande?.startsWith(PREFIXE_OUVRIR)) {
+    const id = etat.demande.slice(PREFIXE_OUVRIR.length);
+    if (!id || etat.screen === 'scan' || etat.screen === 'camera') return { faire: 'rien' };
+    if (etat.dirty && etat.screen !== 'home') {
+      return {
+        faire: 'dire',
+        message: 'Enregistrez le plan en cours avant d’en ouvrir un autre.',
+      };
+    }
+    return { faire: 'ouvrir', id };
+  }
   if (etat.demande !== RACCOURCI_SCAN) return { faire: 'rien' };
   // On est DÉJÀ en train de scanner, ou sur le point de l'être :
   // recommencer jetterait le relevé en cours, et ces écrans ne se quittent

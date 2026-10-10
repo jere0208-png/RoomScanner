@@ -40,6 +40,9 @@ import { FurnitureSheet } from './result/FurnitureSheet';
 import { PhotoSheet } from './result/PhotoSheet';
 import { PeintureSheet } from './result/PeintureSheet';
 import { Exploration } from '../components/Exploration';
+import { BilanDuReleveCarte } from '../components/BilanDuReleve';
+import { useBilanStore } from '../store/bilanStore';
+import { voirEnRealiteAugmentee } from '../ui/realiteAugmentee';
 import { RenameSheet } from './result/RenameSheet';
 import { RoomNameSheet } from './result/RoomNameSheet';
 import { Toolbar2D, Toolbar3D } from './result/ResultToolbar';
@@ -742,6 +745,22 @@ export function ResultScreen() {
     ],
   });
 
+  /**
+   * LA MAQUETTE CHEZ SOI, EN RÉALITÉ AUGMENTÉE. Depuis le plan, on bascule
+   * d'abord en 3D : c'est la maquette à l'écran qui part dans AR Quick Look,
+   * et elle doit être montée pour ça.
+   */
+  const voirChezSoi = async () => {
+    haptic('leger');
+    const depuisLePlan = tab !== '3d';
+    if (depuisLePlan) basculerVue();
+    const issue = await voirEnRealiteAugmentee({
+      secours: useScanStore.getState().modelPath,
+      attente: depuisLePlan ? 2500 : 0,
+    });
+    if (!issue.ok) astuce(issue.message, { icone: 'model' });
+  };
+
   const basculerVue = () => {
     if (releve.current) return;
     if (vue === '2d') {
@@ -1362,6 +1381,9 @@ export function ResultScreen() {
   }, [rienACocher]);
   /** L'exploration à la première personne est ouverte. */
   const [explorant, setExplorant] = useState(false);
+  /* Le bilan du relevé qui vient d'aboutir : voir `BilanDuReleve`. */
+  const bilan = useBilanStore((st) => st.bilan);
+  const fermerLeBilan = useBilanStore((st) => st.fermer);
   const canvasRef = useRef<View>(null);
   const partageEnAttente = useRef<null | (() => void)>(null);
 
@@ -4188,6 +4210,23 @@ export function ResultScreen() {
                 <Text style={styles.explorerPastilleTexte}>Explorer</Text>
               </TouchableOpacity>
             )}
+            {/*
+              CHEZ SOI, EN RÉALITÉ AUGMENTÉE — la maquette telle qu'elle est à
+              l'écran, posée sur la table du client (voir
+              `ui/realiteAugmentee`). En 3D seulement : c'est elle qu'on emporte.
+            */}
+            {walls.length > 0 && tab === '3d' && (
+              <TouchableOpacity
+                style={styles.vuePastille}
+                accessibilityLabel="Réalité augmentée"
+                accessibilityHint="Poser la maquette chez soi, à travers la caméra"
+                onPress={() => voirChezSoi()}>
+                <Svg width={16} height={16} viewBox="0 0 24 24">
+                  <Trace d={SOLAIRES.model} fill={teinte.blue} fillRule="evenodd" />
+                </Svg>
+                <Text style={styles.vuePastilleTexte}>RA</Text>
+              </TouchableOpacity>
+            )}
             {niveaux.length > 1 && (
               <TouchableOpacity
                 style={styles.vuePastille}
@@ -5798,6 +5837,18 @@ export function ResultScreen() {
       {/* ---------- Catalogue de mobilier ---------- */}
       {/* ---------- Entrer dans la pièce ---------- */}
       <Exploration visible={explorant} onClose={() => setExplorant(false)} />
+      <BilanDuReleveCarte
+        bilan={bilan}
+        onFermer={fermerLeBilan}
+        onVoir3D={() => {
+          fermerLeBilan();
+          if (tab !== '3d') basculerVue();
+        }}
+        onRealiteAugmentee={() => {
+          fermerLeBilan();
+          voirChezSoi();
+        }}
+      />
 
       {/* ---------- Peindre les murs d'une pièce ---------- */}
       <PeintureSheet
