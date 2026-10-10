@@ -161,6 +161,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     // Relevé des couleurs ET du cap : lecture seule sur la session ARKit
     // de RoomPlan, l'un comme l'autre.
     RoomColorSampler.shared.attach(to: view.captureSession.arSession)
+    OrthophotosDuReleve.shared.attach(to: view.captureSession.arSession)
     RoomScanCompass.shared.attach(to: view.captureSession.arSession)
     PhotographeDesMurs.shared.attach(to: view.captureSession.arSession)
     if pendingStart {
@@ -178,6 +179,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   func start(fresh: Bool = true, additif: Bool = false) {
     if fresh {
       RoomColorSampler.shared.reset()
+      OrthophotosDuReleve.shared.reset()
       RoomScanCompass.shared.reset()
       // Un relevé tout neuf oublie les passages précédents ; un passage
       // ajouté les garde, ce sont eux qu'on va fusionner.
@@ -199,6 +201,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       // ne relancer la session que sur une vue réellement affichée.
       if let view = self.captureView, view.window != nil {
         RoomColorSampler.shared.attach(to: view.captureSession.arSession)
+        OrthophotosDuReleve.shared.attach(to: view.captureSession.arSession)
         RoomScanCompass.shared.attach(to: view.captureSession.arSession)
         PhotographeDesMurs.shared.attach(to: view.captureSession.arSession)
         view.captureSession.run(configuration: self.configuration)
@@ -491,6 +494,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
 
   func pause() {
     RoomColorSampler.shared.detach()
+    OrthophotosDuReleve.shared.detach()
     PhotographeDesMurs.shared.detach()
     // La boussole aussi : en pause, ses capteurs tournaient pour rien. La
     // reprise la rattache (voir `start`).
@@ -519,6 +523,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     // La session se fige : continuer à lire `currentFrame` ne ferait que
     // rejouer la dernière image et fausser les moyennes.
     RoomColorSampler.shared.detach()
+    OrthophotosDuReleve.shared.detach()
     PhotographeDesMurs.shared.detach()
     // Déclenche le post-traitement RoomPlan ; le résultat final
     // arrive dans captureView(didPresent:error:).
@@ -806,6 +811,9 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         // Chaque mur, photographié de face et redressé (voir `PhotographeDesMurs`).
         sortie["photosMurs"] = PhotographeDesMurs.shared.livrer()
         PhotographeDesMurs.shared.detach()
+        // Chaque face de mur et le sol, en vraie image (voir `OrthophotosDuReleve`).
+        sortie["orthos"] = OrthophotosDuReleve.shared.livrer()
+        OrthophotosDuReleve.shared.detach()
         // Le maillage se bâtit pendant l'assemblage de RoomPlan, qui dure
         // plusieurs secondes : il est presque toujours prêt. Au pire, on
         // l'attend trois secondes — sans lui, le plan reste entier.
@@ -829,6 +837,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     // Le releveur de couleurs a besoin de la géométrie la plus fraîche
     // possible : on la lui passe à chaque mise à jour, sans throttle.
     RoomColorSampler.shared.update(room: room)
+    OrthophotosDuReleve.shared.update(room: room)
     PhotographeDesMurs.shared.update(room: room)
     // C'est elle qui nommera le mur visé à la prochaine pose.
     vueCourante = room
@@ -945,6 +954,11 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       if withColors, let color = RoomColorSampler.shared.color(for: obj) {
         out["color"] = color
       }
+      // Le dessus et les côtés, chacun sa couleur (voir `sampleObject`).
+      if withColors {
+        let couleurs = RoomColorSampler.shared.couleurs(for: obj)
+        if !couleurs.isEmpty { out["couleurs"] = couleurs }
+      }
       /*
         CE QUE ROOMPLAN PRÉCISE DU MEUBLE — canapé d'angle, table ronde,
         tabouret, étagère ouverte. Le type et la valeur, en clair :
@@ -966,9 +980,17 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   static func tintModel(at url: URL) {
     do {
       let scene = try SCNScene(url: url, options: nil)
-      let sampled = { (c: SIMD3<Float>) in
-        UIColor(red: CGFloat(c.x / 255), green: CGFloat(c.y / 255),
-                blue: CGFloat(c.z / 255), alpha: 1)
+      /*
+        LES MOYENNES SONT EN LUMIÈRE LINÉAIRE, de 0 à 1 (voir
+        `RoomColorSampler`) : les diviser par 255 rendait des murs et un sol
+        presque noirs dans le modèle exporté. On les ramène en sRGB.
+      */
+      let sampled = { (c: SIMD3<Float>) -> UIColor in
+        func srgb(_ v: Float) -> CGFloat {
+          let e = max(0, min(1, v))
+          return CGFloat(e <= 0.0031308 ? 12.92 * e : 1.055 * pow(e, 1 / 2.4) - 0.055)
+        }
+        return UIColor(red: srgb(c.x), green: srgb(c.y), blue: srgb(c.z), alpha: 1)
       }
       let wallColor = RoomColorSampler.shared.averageWallColor().map(sampled)
         ?? UIColor(red: 0.86, green: 0.88, blue: 0.92, alpha: 1)

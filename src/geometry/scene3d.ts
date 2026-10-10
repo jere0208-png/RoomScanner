@@ -5,6 +5,7 @@
  * de murs, mêmes bandes, mêmes couleurs relevées. Tout est donc calculé ici,
  * chaque rendu ne s'occupant plus que de projeter et de peindre.
  */
+import { habillerLaFace, habillerLeSol, type PieceHabillee } from './habillage';
 import type { PoseDeMeuble } from './modeles3d';
 import { posesDUnLot, postesDuLot, type PoseDAppareil } from './appareils3d';
 import type { FloorData, ObjectData, SurfaceTexture } from 'react-native-room-scan';
@@ -48,6 +49,15 @@ export interface P3 {
 export interface Face3D {
   pts: P3[];
   fill: string | null;
+  /**
+   * LA VRAIE IMAGE DE LA FACE — les morceaux de l'orthophoto qui la couvrent,
+   * avec les coordonnées d'image de chaque sommet (voir `habillage`). La
+   * carte graphique la dessine à la place de l'aplat ; le canevas et le PDF
+   * gardent l'aplat.
+   */
+  habillage?: PieceHabillee[];
+  /** Face d'une menuiserie (porte, fenêtre) : elle ne prend pas l'image du mur. */
+  menuiserie?: boolean;
   stroke: string | null;
   /** Ombrage recalculé à la projection, selon l'orientation du pan. */
   shade?: boolean;
@@ -1365,6 +1375,11 @@ export interface ScenePalette {
 
 export interface SceneOptions {
   palette: ScenePalette;
+  /**
+   * Les vraies images du relevé sur les murs et le sol (voir `habillage`).
+   * Par défaut, dès qu'il y en a ; `false` les éteint.
+   */
+  habillage?: boolean;
   /** Portes et fenêtres teintées. */
   colorOpenings?: boolean;
   /** Sol visible (surface de la pièce). */
@@ -1936,16 +1951,23 @@ export function buildScene(
         isCeiling: true,
       });
     }
-    if (surface && opts.showSurfaces) {
+    // Un sol photographié se montre en 3D : c'est la reproduction du relevé.
+    const solEnImage = !!(opts.showTextures && opts.habillage !== false && floor?.ortho);
+    if (surface && (opts.showSurfaces || solEnImage)) {
+      const pts = surface.pts.map((p) => ({ x: p.x, y: 0, z: p.z }));
+      // Le sol en vraie image, quand le relevé l'a photographié d'en haut.
+      const habillage = solEnImage ? habillerLeSol(pts, floor?.ortho) : null;
       faces.push({
-        pts: surface.pts.map((p) => ({ x: p.x, y: 0, z: p.z })),
+        pts,
         fill: floorFill,
         stroke: pal.floorStroke,
         isFloor: true,
         matiere,
         sensLattes,
+        ...(habillage ? { habillage } : {}),
       });
-      if (matiere) {
+      // L'image a ses vrais joints : on ne dessine pas ceux d'une matière devinée.
+      if (matiere && !habillage) {
         const joint = mixHex(floorFill, '#0B0D12', 0.22);
         for (const [a, b] of jointsDuSol(surface.pts, matiere, sensLattes)) {
           faces.push({
@@ -2649,6 +2671,7 @@ export function buildScene(
        * dessine, comme une vitre. Le mur, lui, garde les siens — ce sont
        * eux qui donnent la baie.
        */
+      const avantMenuiserie = faces.length;
       pushWallBlock(q, hole.t0, hole.t1, hole.y0, hole.y1, {
         fill: paint,
         top: mixHex(paint, '#FFFFFF', 0.3),
@@ -2664,6 +2687,7 @@ export function buildScene(
         // La menuiserie appartient au plan du mur : elle s'y classe avec lui.
         depthY: w.height / 2,
       });
+      for (let k = avantMenuiserie; k < faces.length; k++) faces[k].menuiserie = true;
     }
 
     // Tout ce que ce mur vient de poser — pans, chants, couronnement,
@@ -2672,6 +2696,20 @@ export function buildScene(
       faces[i].roomId = roomOf(w);
       faces[i].roomSide = versLaPiece;
       faces[i].wallId = w.id;
+      /*
+        LE MUR EN VRAIE IMAGE — ses pans reçoivent les morceaux de leurs
+        orthophotos. Un côté qu'on a repeint garde sa peinture : elle dit ce
+        qu'on projette, l'image ce qui était.
+      */
+      if (opts.showTextures && opts.habillage !== false && w.orthos?.length && !faces[i].menuiserie) {
+        const pieces = habillerLaFace(faces[i], w);
+        if (pieces) {
+          const n = faces[i].normal!;
+          const L = Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) || 1;
+          const cote = n.x * -(w.b.z - w.a.z) / L + n.z * (w.b.x - w.a.x) / L > 0 ? 1 : -1;
+          if (!(cote === 1 ? peintPlus : peintMoins)) faces[i].habillage = pieces;
+        }
+      }
     }
   }
 
@@ -3493,18 +3531,26 @@ export function buildScene(
     } else {
       for (const part of morceaux) poser(part);
     }
+    /*
+      LES VRAIES MESURES — relevé du patron : « les meubles détectés,
+      transformés dans leur forme 3D aux mesures respectées ». Le garde-fou
+      des murs peut RABOTER un meuble coincé entre deux cloisons ; la
+      position garde ce recadrage, le modèle garde les cotes relevées.
+    */
+    const relevees = toFootprint(source);
     poses.push({
       id: obj.id,
       category: obj.category ?? '',
       modele: obj.modele,
-      width: obj.width,
-      depth: obj.depth,
+      width: relevees.width,
+      depth: relevees.depth,
       height: obj.height,
       cx: obj.cx,
       cz: obj.cz,
       yaw: obj.yaw,
       yb,
       color: skin,
+      couleurs: opts.showTextures ? (source as { couleurs?: { dessus?: string; cotes?: string } }).couleurs : undefined,
       attributes: (source as { attributes?: string[] }).attributes,
     });
     for (let i = avantMeuble; i < faces.length; i++) {

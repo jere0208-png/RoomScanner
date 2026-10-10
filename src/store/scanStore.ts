@@ -11,6 +11,7 @@ import {
 } from '../net/coffrePlans';
 import { implanter, rattacher, type DepartExistant, type TableauExistant } from '../geometry/existant';
 import { plafondDeLaPiece, solReleveDe, type PlafondDeLaPiece } from '../geometry/fichePiece';
+import { habillerLesMurs } from '../geometry/habillage';
 
 export type { TableauExistant };
 import {
@@ -193,6 +194,16 @@ export interface RoomEntry {
    * son sol selon RoomPlan. Absent sur un relevé d'avant, ou dessiné.
    */
   releve?: { plafond?: PlafondDeLaPiece | null; surfaceSol?: number | null };
+}
+
+/**
+ * LE SOL EN VRAIE IMAGE — l'orthophoto du relevé rejoint ses couleurs. Un
+ * relevé sans couleurs mais photographié garde un gris neutre pour teinte.
+ */
+function avecOrthoDuSol(floor: FloorData | null, r: ScanResult): FloorData | null {
+  const ortho = r.orthos?.sol;
+  if (!ortho) return floor;
+  return { ...(floor ?? { color: '#C9C4BC' }), ortho };
 }
 
 /**
@@ -5207,7 +5218,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const fixtures = reprojectFixtures(st.walls, walls, st.fixtures);
       const photos = reprojectAnchors(st.walls, walls, st.photos);
 
-      const floor = r.floor ?? r.rooms?.[0]?.floor ?? st.rooms[0]?.floor ?? null;
+      const floor = avecOrthoDuSol(r.floor ?? r.rooms?.[0]?.floor ?? st.rooms[0]?.floor ?? null, r);
       const objects: ObjectData[] = separerLeMobilier(
         entrants.map((o) => ({
           ...o,
@@ -5273,7 +5284,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Le blanc remis d'aplomb, une fois pour toutes : voir
         // `blancsDAplomb`. Tout ce qui lit ces champs — 3D, plan, dossier,
         // export — voit désormais la même chose.
-        ...blancsDAplomb(walls, objects),
+        ...blancsDAplomb(habillerLesMurs(walls, r.orthos?.murs), objects),
         openings,
         fixtures: [...fixtures, ...viseMerge.fixtures],
         // Les photos de mur du scan sont refaites : la fusion a pu recoudre
@@ -5675,7 +5686,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const incomingObjects = r.rooms?.length
         ? r.rooms.flatMap((x) => x.objects ?? [])
         : r.objects ?? [];
-      const floor = r.floor ?? r.rooms?.[0]?.floor ?? null;
+      const floor = avecOrthoDuSol(r.floor ?? r.rooms?.[0]?.floor ?? null, r);
 
       const segments = surfaces.map((s) => toSegment(s));
       // Souder les coins, COUPER les murs là où une cloison vient buter
@@ -5794,7 +5805,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Le blanc remis d'aplomb, une fois pour toutes : voir
         // `blancsDAplomb`. Tout ce qui lit ces champs — 3D, plan, dossier,
         // export — voit désormais la même chose.
-        ...blancsDAplomb(walls, objects),
+        ...blancsDAplomb(habillerLesMurs(walls, r.orthos?.murs), objects),
         openings,
         fixtures: vise.fixtures,
         photos: photosAuto,
@@ -5814,7 +5825,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Le blanc remis d'aplomb, une fois pour toutes : voir
         // `blancsDAplomb`. Tout ce qui lit ces champs — 3D, plan, dossier,
         // export — voit désormais la même chose.
-        ...blancsDAplomb(walls, objects),
+        ...blancsDAplomb(habillerLesMurs(walls, r.orthos?.murs), objects),
         openings,
         fixtures: vise.fixtures,
         photos: photosAuto,
@@ -5825,6 +5836,12 @@ export const useScanStore = create<ScanState>((set, get) => {
         scanning: false,
         /* Un plan qui s'ouvre repose ses calques. */
         ...CALQUES_DE_BASE,
+        /*
+          LE RELEVÉ EN VRAIES IMAGES SE MONTRE D'EMBLÉE — relevé du patron :
+          « une reproduction à l'identique de ce que l'on scanne ». Un scan
+          qui a photographié ses murs et son sol ouvre ses couleurs.
+        */
+        ...(r.orthos?.murs?.length || r.orthos?.sol ? { showTextures: true } : {}),
         screen: 'result',
         /*
           Le popup de fin de scan demandera quoi intégrer — même sans
@@ -7801,6 +7818,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         resultOrigin: 'library',
         /* Un plan qui s'ouvre repose ses calques. */
         ...CALQUES_DE_BASE,
+        // Un relevé photographié se rouvre en vraies images.
+        ...((save.walls ?? []).some((w) => w.orthos?.length) ? { showTextures: true } : {}),
         screen: 'result',
       });
       clearHistory();

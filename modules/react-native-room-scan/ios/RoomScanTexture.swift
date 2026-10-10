@@ -91,9 +91,18 @@ final class RoomColorSampler {
     }
 
     mutating func add(_ i: Int, _ c: SIMD3<Float>) {
-      // On garde les premiers relevés : au-delà de vingt-quatre, la
-      // médiane ne bouge plus, et la mémoire, elle, continuerait de monter.
-      if samples[i].count < RoomColorSampler.maxSamples { samples[i].append(c) }
+      /*
+        VINGT-QUATRE RELEVÉS PAR CASE, RENOUVELÉS. On gardait les vingt-quatre
+        PREMIERS : la couleur d'un meuble était celle des deux premières vues,
+        souvent lointaines et de biais. Une fois le lot plein, une vue
+        nouvelle sur quatre remplace un relevé au hasard : le lot suit le
+        scan, et la mémoire ne monte plus.
+      */
+      if samples[i].count < RoomColorSampler.maxSamples {
+        samples[i].append(c)
+      } else if Int.random(in: 0..<4) == 0 {
+        samples[i][Int.random(in: 0..<samples[i].count)] = c
+      }
     }
 
     /// La médiane d'un lot, canal par canal.
@@ -298,9 +307,14 @@ final class RoomColorSampler {
     }
   }
 
-  /// Un meuble : quelques points sur ses faces visibles, moyennés ensemble.
+  /**
+   UN MEUBLE : SON DESSUS ET SES CÔTÉS, chacun sa couleur — case 0 le dessus,
+   case 1 les flancs. Le plateau d'une table n'a pas la couleur de son
+   piètement, le dessus d'un buffet pas celle de ses façades : une seule
+   médiane pour tout le meuble les mélangeait.
+   */
   private func sampleObject(_ o: CapturedRoom.Object, img: FrameImage) {
-    var acc = objects[o.identifier] ?? Accum(cells: 1)
+    var acc = objects[o.identifier] ?? Accum(cells: 2)
     let m = o.transform
     acc.center = SIMD3(m.columns.3.x, m.columns.3.y, m.columns.3.z)
     let d = o.dimensions
@@ -312,7 +326,7 @@ final class RoomColorSampler {
       (SIMD3(d.x / 2, 0, 0), SIMD3(0, 0, d.z / 2), SIMD3(0, d.y / 2, 0)),
       (SIMD3(-d.x / 2, 0, 0), SIMD3(0, 0, d.z / 2), SIMD3(0, d.y / 2, 0)),
     ]
-    for (center, ax1, ax2) in faces {
+    for (k, (center, ax1, ax2)) in faces.enumerated() {
       let nLocal = cross(ax1, ax2)
       guard length(nLocal) > 1e-5 else { continue }
       let n4 = m * SIMD4<Float>(nLocal.x, nLocal.y, nLocal.z, 0)
@@ -322,7 +336,7 @@ final class RoomColorSampler {
           let local = center + ax1 * su + ax2 * sv
           let w4 = m * SIMD4<Float>(local.x, local.y, local.z, 1)
           if let c = img.color(at: SIMD3(w4.x, w4.y, w4.z), normal: normal) {
-            acc.add(0, c)
+            acc.add(k == 0 ? 0 : 1, c)
           }
         }
       }
@@ -345,6 +359,17 @@ final class RoomColorSampler {
         let texels = (0..<(cols * rows)).map { Self.hex(acc.cell($0) ?? mean) }
         out["texture"] = ["cols": cols, "rows": rows, "texels": texels]
       }
+      return out
+    }
+  }
+
+  /// Le dessus et les côtés d'un meuble, chacun sa couleur, quand on les a assez vus.
+  func couleurs(for o: CapturedRoom.Object) -> [String: String] {
+    queue.sync { () -> [String: String] in
+      guard let acc = objects[o.identifier], acc.samples.count >= 2 else { return [:] }
+      var out: [String: String] = [:]
+      if let dessus = acc.cell(0) { out["dessus"] = Self.hex(dessus) }
+      if let cotes = acc.cell(1) { out["cotes"] = Self.hex(cotes) }
       return out
     }
   }

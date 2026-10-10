@@ -67,6 +67,11 @@ export interface SurfaceData {
 
 /** Objet détecté (iOS/RoomPlan uniquement). */
 export interface ObjectData {
+  /**
+   * LE DESSUS ET LES CÔTÉS, CHACUN SA COULEUR (#RRGGBB) — le plateau d'une
+   * table n'a pas la couleur de son piètement. Relevés au scan.
+   */
+  couleurs?: { dessus?: string; cotes?: string };
   id: string;
   category: string;
   width: number;
@@ -109,6 +114,11 @@ export interface ObjectData {
 export interface FloorData {
   color: string;
   texture?: FloorTexture;
+  /**
+   * L'ORTHOPHOTO DU SOL — le sol vu d'en haut, en vraie image, et le
+   * rectangle du monde qu'elle couvre (voir `RoomScanOrtho.swift`).
+   */
+  ortho?: { path: string; minX: number; minZ: number; maxX: number; maxZ: number; y?: number; couverture?: number };
 }
 
 export interface ScanUpdate {
@@ -171,6 +181,26 @@ export interface ScanResult {
    * à plat (`[x0, z0, x1, z1…]`), et sa hauteur.
    */
   sols?: { id: string; coins: number[]; y: number }[];
+  /**
+   * LES ORTHOPHOTOS DU RELEVÉ : chaque face de mur vue de face, et le sol vu
+   * d'en haut, en vraies images (voir `RoomScanOrtho.swift`).
+   */
+  orthos?: {
+    murs?: {
+      wallId: string;
+      cote: number;
+      path: string;
+      cx: number;
+      cz: number;
+      dx: number;
+      dz: number;
+      longueur: number;
+      hauteur: number;
+      yBas: number;
+      couverture?: number;
+    }[];
+    sol?: { path: string; minX: number; minZ: number; maxX: number; maxZ: number; y?: number; couverture?: number };
+  };
   /**
    * Ce qu'on a posé au viseur pendant le relevé : des points du monde,
    * que le JS rattache aux murs et aux plafonds (`ancrerElec`).
@@ -300,6 +330,12 @@ export const RoomScanVisite = UIManager.getViewManagerConfig?.(
           physiques, groupés par matière (voir `geometry/modeles3d`).
         */
         meubles?: number[];
+        /*
+          LES VRAIES IMAGES DU RELEVÉ — leurs chemins, et les faces qu'elles
+          habillent : seize nombres par triangle (voir `geometry/habillage`).
+        */
+        textures?: string[];
+        texturees?: number[];
         /* La clé par laquelle `poserCameraDeVisite` retrouve la vue. */
         cle?: string;
       }

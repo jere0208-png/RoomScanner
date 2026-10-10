@@ -30,9 +30,11 @@ import {
   MATIERE,
   composantes,
   normaleDuContour,
+  orienterVers,
   sensDesLames,
   triangulerContour,
 } from './visite3d';
+import { Habilleur } from './habillage';
 
 export interface MaillageDeMaquette {
   /** Faces sans orientation connue : dessinées des deux côtés. */
@@ -43,6 +45,9 @@ export interface MaillageDeMaquette {
   ecorche: number[];
   /** Les sols, avec leur matière (voir `visite3d`). */
   sols: number[];
+  /** Les vraies images du relevé, et les faces qu'elles habillent (voir `visite3d`). */
+  textures: string[];
+  texturees: number[];
 }
 
 /** Les triangles d'une face, tournés vers sa normale quand elle en a une. */
@@ -71,12 +76,29 @@ export function maillageDeLaMaquette(
   faces: Face3D[],
   o: { sansMeubles?: boolean } = {},
 ): MaillageDeMaquette {
-  const out: MaillageDeMaquette = { maillage: [], orientes: [], ecorche: [], sols: [] };
+  const out: MaillageDeMaquette = {
+    maillage: [],
+    orientes: [],
+    ecorche: [],
+    sols: [],
+    textures: [],
+    texturees: [],
+  };
+  const habilleur = new Habilleur();
   for (const face of faces) {
     if (face.pts.length < 3 || !face.fill || face.ombre || face.isCeiling) continue;
     // Les meubles et l'appareillage en caisses restent au canevas : la carte
     // graphique a les vrais.
     if (o.sansMeubles && (face.meuble || face.appareil)) continue;
+    /*
+      LA VRAIE IMAGE, SAUF SUR L'ÉCORCHÉ : une face qui se voile pour laisser
+      voir la pièce ne doit pas boucher la vue d'une photo opaque.
+    */
+    if (face.habillage?.length && !(face.cutaway && face.normal)) {
+      const voulue = face.isFloor ? { x: 0, y: 1, z: 0 } : face.normal ?? null;
+      habilleur.ajouter(face.habillage, triangulerContour, orienterVers(voulue));
+      continue;
+    }
     const { tris, oriente } = triangles(face);
     if (tris.length === 0) continue;
     const [r, g, b] = composantes(face.fill);
@@ -98,6 +120,8 @@ export function maillageDeLaMaquette(
       cible.push(r, g, b);
     }
   }
+  out.textures = habilleur.textures;
+  out.texturees = habilleur.texturees;
   return out;
 }
 

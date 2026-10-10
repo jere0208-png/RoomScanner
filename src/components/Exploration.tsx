@@ -827,6 +827,8 @@ export function Exploration({
               style={StyleSheet.absoluteFill}
               maillage={maille.maillage}
               sols={maille.sols}
+              textures={maille.textures}
+              texturees={maille.texturees}
               meubles={maille.meubles}
               camera={cameraPlate}
               cle={cle}

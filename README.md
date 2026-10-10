@@ -14285,6 +14285,83 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## La 3D à l'identique du relevé : vraies images des murs et du sol, meubles à leurs cotes et à leurs couleurs
+
+Relevé du patron : « améliore considérablement la récupération des textures
+et couleurs des sols et murs scannés ; on veut une reproduction à l'identique,
+sur le modèle 3D, de ce que l'on scanne. Fais aussi un système qui recopie les
+meubles détectés et les transforme dans leur forme 3D aux mesures
+respectées. »
+
+**Ce qu'il y avait.** La 3D montrait UNE couleur par face de mur (la moyenne
+d'une grille de 6 × 4 cases) et UNE teinte de sol, qui colorait un parquet ou
+un carrelage dessiné par l'app. Aucune image réelle n'atteignait la 3D ; les
+photos redressées des murs ne servaient qu'à l'élévation. Les meubles avaient
+leur forme paramétrique aux cotes de RoomPlan, mais une seule couleur (prise
+aux deux premières vues), des tables toujours en chêne, et un meuble coincé
+entre deux murs était raboté.
+
+**Les orthophotos du relevé** (`RoomScanOrtho.swift`, `OrthophotosDuReleve`).
+Pendant le scan, trois fois par seconde, chaque face de mur vue est
+reconstruite en IMAGE — vue de face, 2 cm le pixel (512 × 256 au plus) — et le
+sol vu d'en haut, 2,5 cm le pixel (800 × 800 au plus, la toile grandit avec la
+pièce) :
+- chaque pixel est un point du monde, projeté dans l'image de la caméra
+  (origine et pas calculés une fois : deux additions par pixel) ;
+- **la profondeur LiDAR décide** : un point que la caméra ne voit pas (canapé
+  devant le mur, meuble sur le sol) n'est pas lu — l'image du mur ne garde
+  pas le mobilier plaqué contre lui ;
+- les vues se fondent, pesées par leur qualité (de face et de près pèse
+  plus) : le grain s'efface, la matière reste ;
+- à la livraison, les trous se comblent par leurs voisins (20 passes), le
+  reste prend la couleur de la face ; une face vue à moins de 12 % n'est pas
+  livrée. Chaque face est rendue DEPUIS SON CÔTÉ (sa gauche est celle de qui
+  la regarde). Résultat : `orthos { murs[], sol }` avec chemins et géométrie.
+
+**L'habillage** (`geometry/habillage.ts`).
+- `habillerLesMurs` rattache chaque orthophoto aux murs du plan par sa place
+  (RoomPlan renumérote et réunit des murs), avec le côté qu'elle habille ; un
+  passage de plus AJOUTE ses images.
+- `habillerLaFace` : le pan d'un mur reçoit les morceaux de ses images, en
+  TRANCHES DISJOINTES coupées au milieu des recouvrements (jamais deux images
+  au même endroit), avec les coordonnées d'image de chaque sommet ; pas les
+  menuiseries, pas un côté repeint (la peinture choisie passe devant).
+- `habillerLeSol` : le sol par les bornes de son image.
+- Les flux natifs (`maillageDeLaVisite`, `maillageDeLaMaquette`) sortent les
+  faces habillées à part : `textures` (chemins) et `texturees` (16 nombres par
+  triangle : image, puis x, y, z, u, v ×3) ; la maquette n'habille pas
+  l'écorché, qui se voile.
+- `RoomScanVisite.swift` : un nœud par image, `SCNGeometrySource(texture-
+  Coordinates:)`, l'image en diffus (lue une fois, retrouvée par son nom
+  après réinstallation) et un tiers en émission — elle porte déjà la lumière
+  de la pièce.
+- Les images suivent le calque « Couleurs », allumé d'office après un scan
+  qui a photographié ses murs et son sol, et à l'ouverture d'un tel plan ; un
+  sol photographié se montre même sans le calque « Surfaces ».
+
+**Les meubles.**
+- Le natif relève le DESSUS et les CÔTÉS de chaque meuble, chacun sa couleur
+  (`couleurs { dessus, cotes }`), et ses lots de relevés se RENOUVELLENT au
+  fil du scan (une vue nouvelle sur quatre remplace un relevé) au lieu de
+  garder les 24 premiers.
+- `modeles3d` : le plateau d'une table prend la couleur de son dessus (plus
+  de chêne pour tout le monde) ; buffets, commodes, chevets, meubles TV,
+  rangements : dessus et montants relevés.
+- Les VRAIES COTES : le garde-fou des murs peut raboter un meuble coincé ; la
+  position garde ce recadrage, le modèle garde les cotes relevées.
+
+**Au passage** : le modèle USDZ exporté sortait presque noir dès que des
+couleurs avaient été relevées (des valeurs linéaires 0–1 divisées par 255) —
+ramenées en sRGB.
+
+À vérifier sur l'iPhone : le sens des images (SceneKit place l'origine des
+coordonnées d'image en haut à gauche ; une image à l'envers se corrige d'une
+ligne dans `habillage.ts`).
+
+Bancs : `reproduction` (13 : le natif, le rattachement, les coordonnées
+d'image, les tranches, le sol, la scène et ses flux, le côté repeint,
+l'écorché, la fin du scan, le plateau relevé, les vraies cotes).
+
 ## Le scan en dit plus sur chaque pièce : plafond mesuré, surface habitable, exposition, circuits des appareils
 
 Relevé du patron : « cherche des améliorations à apporter au scan, qu'il peut

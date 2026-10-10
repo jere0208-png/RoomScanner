@@ -1,3 +1,4 @@
+import type { OrthoDeFace } from './habillage';
 import type { ObjectData, SurfaceData, SurfaceTexture } from 'react-native-room-scan';
 
 /** Épaisseur d'un mur dont personne n'a dit l'épaisseur (m). */
@@ -47,6 +48,11 @@ export interface WallSeg {
   color?: string;
   /** Grille de couleurs relevée sur la face intérieure, si captée. */
   texture?: SurfaceTexture;
+  /**
+   * LES VRAIES IMAGES DE SES FACES — les orthophotos du relevé qui les
+   * couvrent (voir `habillage`). La 3D les pose sur le mur.
+   */
+  orthos?: OrthoDeFace[];
   /** Pièce à laquelle ce mur appartient (scan multi-pièces). */
   roomId?: string;
   /**

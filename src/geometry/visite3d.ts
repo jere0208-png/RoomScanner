@@ -33,6 +33,7 @@
  *                sens celui des lames.
  *   `camera`   : [x, y, z, lacet, tangage, ouverture verticale en degrés].
  */
+import { Habilleur } from './habillage';
 import type { Face3D, P3, PovCamera } from './scene3d';
 
 /** La matière d'un sol, telle que le natif la lit. */
@@ -47,6 +48,22 @@ export const ENTETE_SOL = 6;
 export interface MaillageDeVisite {
   maillage: number[];
   sols: number[];
+  /** Les vraies images du relevé (chemins), dans l'ordre de leur rang. */
+  textures: string[];
+  /** Les faces habillées : seize nombres par triangle (voir `Habilleur`). */
+  texturees: number[];
+}
+
+/**
+ * LES TRIANGLES D'UN CONTOUR, TOURNÉS VERS LA NORMALE VOULUE — leur dos n'est
+ * jamais dessiné : un triangle à l'envers serait invisible du bon côté.
+ */
+export function orienterVers(voulue: P3 | null) {
+  return (pts: P3[], tris: [number, number, number][]): [number, number, number][] => {
+    if (!voulue) return tris;
+    const n = normaleDuContour(pts);
+    return n.x * voulue.x + n.y * voulue.y + n.z * voulue.z < 0 ? tris.map(([a, b, c]) => [c, b, a]) : tris;
+  };
 }
 
 /** « #RRGGBB » → trois composantes 0–1. L'illisible rend un gris moyen. */
@@ -187,6 +204,8 @@ export function sensDesLames(pts: P3[], sens?: 'x' | 'z'): 0 | 1 {
 export function maillageDeLaVisite(faces: Face3D[], o: { sansMeubles?: boolean } = {}): MaillageDeVisite {
   const maillage: number[] = [];
   const sols: number[] = [];
+  // Les murs et les sols en vraies images (voir `habillage`).
+  const habilleur = new Habilleur();
   const pousser = (cible: number[], pts: P3[], tri: [number, number, number]) => {
     for (const i of tri) {
       const p = pts[i];
@@ -202,6 +221,10 @@ export function maillageDeLaVisite(faces: Face3D[], o: { sansMeubles?: boolean }
       : face.isCeiling
       ? { x: 0, y: -1, z: 0 }
       : face.normal ?? null;
+    if (face.habillage?.length) {
+      habilleur.ajouter(face.habillage, triangulerContour, orienterVers(voulue));
+      continue;
+    }
     let tris = triangulerContour(face.pts);
     if (voulue) {
       const n = normaleDuContour(face.pts);
@@ -232,7 +255,7 @@ export function maillageDeLaVisite(faces: Face3D[], o: { sansMeubles?: boolean }
       }
     }
   }
-  return { maillage, sols };
+  return { maillage, sols, textures: habilleur.textures, texturees: habilleur.texturees };
 }
 
 /** La caméra, à plat : position, lacet, tangage, ouverture verticale (°). */

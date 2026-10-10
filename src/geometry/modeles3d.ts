@@ -651,6 +651,12 @@ export interface Commande {
   modele: string;
   /** La teinte relevée au scan : elle habille le tissu, ou le corps. */
   teinte?: string;
+  /**
+   * LE DESSUS ET LES CÔTÉS RELEVÉS, chacun sa couleur : le plateau d'une
+   * table, le dessus d'un buffet ont la leur ; façades et montants l'autre.
+   */
+  dessus?: string;
+  cotes?: string;
   /** Les précisions de RoomPlan (iOS 17) : « SofaType:lShaped »… */
   attributs: string[];
   hasard: () => number;
@@ -1033,7 +1039,8 @@ function table(a: Atelier, g: Gabarit, c: Commande) {
   const basse = m.startsWith('tablebasse') || m.startsWith('boutcanape') || attribut(c, 'TableType') === 'coffee' || H < 0.56;
   const bureau = m.startsWith('bureau') || c.categorie.includes('desk');
   const ep = basse ? 0.03 : 0.035;
-  const bois = TEINTES.chene;
+  // Le plateau relevé au scan : une table n'est pas toujours en chêne.
+  const bois = c.dessus ?? c.teinte ?? TEINTES.chene;
   if (ronde) {
     const R = W / 2;
     a.tour(
@@ -1169,11 +1176,11 @@ function rangement(a: Atelier, g: Gabarit, c: Commande) {
   if (m.startsWith('colonnesdb')) return armoire(a, g, c, 1);
   if (m.startsWith('armoire') || m.startsWith('dressing') || m.startsWith('pax') || H >= 1.5) return armoire(a, g, c);
   if (m.startsWith('meublebas') || m.startsWith('ilot') || (!m && H >= 0.78 && H <= 1.0 && D >= 0.5)) return cuisineBas(a, g, c);
-  if (m.startsWith('meubletv')) return meubleTv(a, g);
-  if (m.startsWith('chevet') || (!m && W <= 0.6 && H <= 0.72)) return chevet(a, g);
+  if (m.startsWith('meubletv')) return meubleTv(a, g, c);
+  if (m.startsWith('chevet') || (!m && W <= 0.6 && H <= 0.72)) return chevet(a, g, c);
   if (m.startsWith('caisson')) return caisson(a, g);
-  if (m.startsWith('meublechaussures')) return meubleChaussures(a, g);
-  if (m.startsWith('commode') || (!m && W <= 1.1 && H > 0.7)) return commode(a, g);
+  if (m.startsWith('meublechaussures')) return meubleChaussures(a, g, c);
+  if (m.startsWith('commode') || (!m && W <= 1.1 && H > 0.7)) return commode(a, g, c);
   return buffet(a, g, c);
 }
 
@@ -1227,7 +1234,7 @@ function cuisineBas(a: Atelier, { W, D, H }: Gabarit, c: Commande, sansPlan = fa
   const zF = -D / 2 + SAILLIE_POIGNEE;
   a.boite(-W / 2, W / 2, 0, hPlinthe, zF + 0.05, D / 2 - 0.01, 'noir', TEINTES.anthracite);
   a.boite(-W / 2, W / 2, hPlinthe, H - ePlan, zF + 0.019, D / 2, 'laque', corps, { sans: ['bas', 'haut'] });
-  if (!sansPlan) a.boite(-W / 2, W / 2, H - ePlan, H, -D / 2, D / 2, 'bois', TEINTES.chene, { r: 0.003 });
+  if (!sansPlan) a.boite(-W / 2, W / 2, H - ePlan, H, -D / 2, D / 2, 'bois', c.dessus ?? TEINTES.chene, { r: 0.003 });
   // Les façades, par modules de soixante : tiroirs à gauche, portes ensuite.
   const nCol = Math.max(1, Math.round(W / 0.6));
   const lc = W / nCol;
@@ -1272,26 +1279,26 @@ function hotte(a: Atelier, { W, D, H }: Gabarit) {
   a.boite(-W / 2 + 0.03, W / 2 - 0.03, 0.0, 0.0001, -D / 2 + 0.03, D / 2 - 0.03, 'noir', TEINTES.anthracite, { sans: ['haut'] });
 }
 
-function commode(a: Atelier, { W, D, H }: Gabarit) {
+function commode(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   const hPied = Math.min(0.14, H * 0.15);
-  pieds(a, [-W / 2 + 0.04, W / 2 - 0.04], [-D / 2 + 0.05, D / 2 - 0.05], 0, hPied, 0.018, 0.012, 'bois', TEINTES.chene);
+  pieds(a, [-W / 2 + 0.04, W / 2 - 0.04], [-D / 2 + 0.05, D / 2 - 0.05], 0, hPied, 0.018, 0.012, 'bois', c.cotes ?? TEINTES.chene);
   const zF = -D / 2 + SAILLIE_BOUTON;
-  a.boite(-W / 2, W / 2, hPied, H, zF + 0.019, D / 2, 'bois', TEINTES.chene, { r: 0.004 });
+  a.boite(-W / 2, W / 2, hPied, H, zF + 0.019, D / 2, 'bois', c.cotes ?? TEINTES.chene, { r: 0.004 });
   const n = Math.max(2, Math.round((H - hPied) / 0.22));
   tiroirs(a, -W / 2 + 0.015, W / 2 - 0.015, hPied + 0.015, H - 0.025, zF, new Array(n).fill(1), TEINTES.laque, 'laque', true);
 }
 
-function chevet(a: Atelier, { W, D, H }: Gabarit) {
+function chevet(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   const hPied = Math.min(0.16, H * 0.28);
-  pieds(a, [-W / 2 + 0.03, W / 2 - 0.03], [-D / 2 + 0.03, D / 2 - 0.03], 0, hPied, 0.015, 0.01, 'bois', TEINTES.chene);
+  pieds(a, [-W / 2 + 0.03, W / 2 - 0.03], [-D / 2 + 0.03, D / 2 - 0.03], 0, hPied, 0.015, 0.01, 'bois', c.cotes ?? TEINTES.chene);
   const e = 0.016;
   const zF = -D / 2 + SAILLIE_BOUTON;
   // La caisse ouverte : dessus, dessous, flancs, fond — et la niche se voit.
-  a.boite(-W / 2, W / 2, H - e, H, -D / 2, D / 2, 'bois', TEINTES.chene, { r: 0.004 });
-  a.boite(-W / 2, W / 2, hPied, hPied + e, zF, D / 2, 'bois', TEINTES.chene);
-  a.boite(-W / 2, -W / 2 + e, hPied, H - e, zF, D / 2, 'bois', TEINTES.chene);
-  a.boite(W / 2 - e, W / 2, hPied, H - e, zF, D / 2, 'bois', TEINTES.chene);
-  a.boite(-W / 2 + e, W / 2 - e, hPied, H - e, D / 2 - 0.008, D / 2, 'bois', TEINTES.chene);
+  a.boite(-W / 2, W / 2, H - e, H, -D / 2, D / 2, 'bois', c.dessus ?? c.cotes ?? TEINTES.chene, { r: 0.004 });
+  a.boite(-W / 2, W / 2, hPied, hPied + e, zF, D / 2, 'bois', c.cotes ?? TEINTES.chene);
+  a.boite(-W / 2, -W / 2 + e, hPied, H - e, zF, D / 2, 'bois', c.cotes ?? TEINTES.chene);
+  a.boite(W / 2 - e, W / 2, hPied, H - e, zF, D / 2, 'bois', c.cotes ?? TEINTES.chene);
+  a.boite(-W / 2 + e, W / 2 - e, hPied, H - e, D / 2 - 0.008, D / 2, 'bois', c.cotes ?? TEINTES.chene);
   const hT = Math.min(0.15, (H - hPied) * 0.4);
   a.boite(-W / 2 + e, W / 2 - e, H - e - hT, H - e, zF, D / 2 - 0.01, 'laque', TEINTES.laque, { sans: ['arriere'] });
   bouton(a, 0, H - e - hT / 2, zF);
@@ -1306,35 +1313,35 @@ function caisson(a: Atelier, { W, D, H }: Gabarit) {
   tiroirs(a, -W / 2, W / 2, 0.045, H, zF, [1, 1, 1.8], TEINTES.laque);
 }
 
-function meubleChaussures(a: Atelier, { W, D, H }: Gabarit) {
+function meubleChaussures(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   const zF = -D / 2 + SAILLIE_POIGNEE;
   a.boite(-W / 2, W / 2, 0, 0.05, zF + 0.04, D / 2, 'noir', TEINTES.anthracite);
   a.boite(-W / 2, W / 2, 0.05, H, zF + 0.019, D / 2, 'laque', TEINTES.laque, { r: 0.003 });
-  a.boite(-W / 2, W / 2, H - 0.022, H, -D / 2, D / 2, 'bois', TEINTES.chene, { r: 0.003 });
+  a.boite(-W / 2, W / 2, H - 0.022, H, -D / 2, D / 2, 'bois', c.dessus ?? c.cotes ?? TEINTES.chene, { r: 0.003 });
   tiroirs(a, -W / 2, W / 2, 0.05, H - 0.022, zF, [1, 1, 1].slice(0, Math.max(2, Math.round((H - 0.07) / 0.38))), TEINTES.laque);
 }
 
-function meubleTv(a: Atelier, { W, D, H }: Gabarit) {
+function meubleTv(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   const hPied = Math.min(0.12, H * 0.3);
-  pieds(a, [-W / 2 + 0.05, W / 2 - 0.05], [-D / 2 + 0.05, D / 2 - 0.05], 0, hPied, 0.017, 0.012, 'bois', TEINTES.chene);
+  pieds(a, [-W / 2 + 0.05, W / 2 - 0.05], [-D / 2 + 0.05, D / 2 - 0.05], 0, hPied, 0.017, 0.012, 'bois', c.cotes ?? TEINTES.chene);
   const zF = -D / 2 + SAILLIE_BOUTON;
   const e = 0.018;
-  a.boite(-W / 2, W / 2, H - e, H, -D / 2, D / 2, 'bois', TEINTES.chene, { r: 0.004 });
-  a.boite(-W / 2, W / 2, hPied, hPied + e, zF, D / 2, 'bois', TEINTES.chene);
-  a.boite(-W / 2, -W / 2 + e, hPied, H - e, zF, D / 2, 'bois', TEINTES.chene);
-  a.boite(W / 2 - e, W / 2, hPied, H - e, zF, D / 2, 'bois', TEINTES.chene);
-  a.boite(-W / 2 + e, W / 2 - e, hPied, H - e, D / 2 - 0.008, D / 2, 'bois', TEINTES.chene);
+  a.boite(-W / 2, W / 2, H - e, H, -D / 2, D / 2, 'bois', c.dessus ?? c.cotes ?? TEINTES.chene, { r: 0.004 });
+  a.boite(-W / 2, W / 2, hPied, hPied + e, zF, D / 2, 'bois', c.cotes ?? TEINTES.chene);
+  a.boite(-W / 2, -W / 2 + e, hPied, H - e, zF, D / 2, 'bois', c.cotes ?? TEINTES.chene);
+  a.boite(W / 2 - e, W / 2, hPied, H - e, zF, D / 2, 'bois', c.cotes ?? TEINTES.chene);
+  a.boite(-W / 2 + e, W / 2 - e, hPied, H - e, D / 2 - 0.008, D / 2, 'bois', c.cotes ?? TEINTES.chene);
   // Deux tiroirs, une niche ouverte au milieu.
   const tiers = (W - 2 * e) / 3;
   tiroirs(a, -W / 2 + e, -W / 2 + e + tiers, hPied + e, H - e, zF, [1], TEINTES.laque, 'laque', true);
   tiroirs(a, W / 2 - e - tiers, W / 2 - e, hPied + e, H - e, zF, [1], TEINTES.laque, 'laque', true);
-  a.boite(-W / 2 + e + tiers, -W / 2 + e + tiers + e, hPied + e, H - e, zF, D / 2 - 0.008, 'bois', TEINTES.chene);
-  a.boite(W / 2 - e - tiers - e, W / 2 - e - tiers, hPied + e, H - e, zF, D / 2 - 0.008, 'bois', TEINTES.chene);
+  a.boite(-W / 2 + e + tiers, -W / 2 + e + tiers + e, hPied + e, H - e, zF, D / 2 - 0.008, 'bois', c.cotes ?? TEINTES.chene);
+  a.boite(W / 2 - e - tiers - e, W / 2 - e - tiers, hPied + e, H - e, zF, D / 2 - 0.008, 'bois', c.cotes ?? TEINTES.chene);
 }
 
 function buffet(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   const hPied = Math.min(0.16, H * 0.2);
-  pieds(a, [-W / 2 + 0.05, W / 2 - 0.05], [-D / 2 + 0.05, D / 2 - 0.05], 0, hPied, 0.018, 0.012, 'bois', TEINTES.chene);
+  pieds(a, [-W / 2 + 0.05, W / 2 - 0.05], [-D / 2 + 0.05, D / 2 - 0.05], 0, hPied, 0.018, 0.012, 'bois', c.cotes ?? TEINTES.chene);
   const zF = -D / 2 + SAILLIE_POIGNEE;
   a.boite(-W / 2, W / 2, hPied, H, zF + 0.019, D / 2, 'bois', c.teinte ?? TEINTES.chene, { r: 0.004 });
   const n = Math.max(1, Math.round(W / 0.45));
@@ -2017,6 +2024,8 @@ export interface PoseDeMeuble {
   yb: number;
   /** Teinte relevée au scan, quand on la demande. */
   color?: string;
+  /** Le dessus et les côtés relevés, chacun sa couleur. */
+  couleurs?: { dessus?: string; cotes?: string };
   attributes?: string[];
 }
 
@@ -2033,6 +2042,8 @@ export function modeleDe(p: PoseDeMeuble): ModeleLocal {
     p.depth.toFixed(3),
     p.height.toFixed(3),
     p.color ?? '',
+    p.couleurs?.dessus ?? '',
+    p.couleurs?.cotes ?? '',
     (p.attributes ?? []).join(','),
   ].join('|');
   const deja = ATELIER_CACHE.get(cle);
@@ -2040,7 +2051,14 @@ export function modeleDe(p: PoseDeMeuble): ModeleLocal {
   const modele = fabriquer(
     p.category,
     { W: p.width, D: p.depth, H: p.height },
-    { modele: p.modele ?? '', teinte: p.color, attributs: p.attributes ?? [], hasard: graineDe(p.id || cle) },
+    {
+      modele: p.modele ?? '',
+      teinte: p.color,
+      dessus: p.couleurs?.dessus,
+      cotes: p.couleurs?.cotes,
+      attributs: p.attributes ?? [],
+      hasard: graineDe(p.id || cle),
+    },
   );
   if (ATELIER_CACHE.size >= CACHE_MAX) {
     const premiere = ATELIER_CACHE.keys().next().value;

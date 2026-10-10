@@ -2601,6 +2601,8 @@ export function Iso3DView({
               orientes={maquette.orientes}
               ecorche={maquette.ecorche}
               sols={maquette.sols}
+              textures={maquette.textures}
+              texturees={maquette.texturees}
               meubles={meublesNatifs ?? undefined}
               voile={!solidWalls}
               orbite={orbiteDeLaVue}

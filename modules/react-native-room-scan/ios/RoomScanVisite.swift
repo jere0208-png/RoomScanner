@@ -2,6 +2,7 @@ import Foundation
 import React
 import SceneKit
 import UIKit
+import simd
 
 /**
  * LA VISITE À LA PREMIÈRE PERSONNE — sur SceneKit, le moteur 3D d'iOS.
@@ -123,6 +124,16 @@ final class RoomScanVisite: UIView {
 
   @objc var meubles: [NSNumber] = [] {
     didSet { if meubles != oldValue { rebatir() } }
+  }
+
+  /// Les vraies images du relevé (chemins des orthophotos), dans l'ordre.
+  @objc var textures: [NSString] = [] {
+    didSet { if textures != oldValue { rebatir() } }
+  }
+
+  /// Les faces habillées d'une vraie image : 16 nombres par triangle.
+  @objc var texturees: [NSNumber] = [] {
+    didSet { if texturees != oldValue { rebatir() } }
   }
 
   /*
@@ -671,7 +682,94 @@ final class RoomScanVisite: UIView {
       bati.addChildNode(n)
     }
     for n in noeudsDesSols() { bati.addChildNode(n) }
+    for n in noeudsTextures() { bati.addChildNode(n) }
     for n in noeudsDesMeubles() { bati.addChildNode(n) }
+  }
+
+  // ------------------------------------------------------------- vraies images
+
+  /**
+   LES MURS ET LES SOLS EN VRAIES IMAGES — relevé du patron : « une
+   reproduction à l'identique, sur le modèle 3D, de ce que l'on scanne ».
+
+   Chaque face qu'une orthophoto couvre arrive ici plutôt que dans le
+   maillage teinté : seize nombres par triangle — le rang de son image dans
+   `textures`, puis trois sommets (x, y, z, u, v). Un nœud par image, une
+   matière qui porte l'image ; l'image est lue une fois et gardée.
+
+   L'image a déjà sa lumière — celle de la pièce au moment du scan : une
+   part de son éclat lui revient en émission, pour qu'elle ne s'assombrisse
+   pas une seconde fois sous l'éclairage de la scène.
+   */
+  private func noeudsTextures() -> [SCNNode] {
+    let n = texturees.count / 16
+    guard n > 0, !textures.isEmpty else { return [] }
+    var parImage: [Int: [Int]] = [:]
+    for t in 0..<n {
+      parImage[texturees[t * 16].intValue, default: []].append(t)
+    }
+    var noeuds: [SCNNode] = []
+    for (k, liste) in parImage {
+      guard k >= 0, k < textures.count, let image = Self.image(textures[k] as String) else { continue }
+      var sommets: [SCNVector3] = []
+      var normales: [SCNVector3] = []
+      var uvs: [CGPoint] = []
+      sommets.reserveCapacity(liste.count * 3)
+      normales.reserveCapacity(liste.count * 3)
+      uvs.reserveCapacity(liste.count * 3)
+      for t in liste {
+        let b = t * 16 + 1
+        var p: [SIMD3<Float>] = []
+        var q: [CGPoint] = []
+        for s in 0..<3 {
+          let o = b + s * 5
+          p.append(SIMD3<Float>(texturees[o].floatValue, texturees[o + 1].floatValue, texturees[o + 2].floatValue))
+          q.append(CGPoint(x: CGFloat(texturees[o + 3].floatValue), y: CGFloat(texturees[o + 4].floatValue)))
+        }
+        let c = simd_cross(p[1] - p[0], p[2] - p[0])
+        let l = simd_length(c)
+        guard l > 1e-9 else { continue }
+        let nrm = c / l
+        for s in 0..<3 {
+          sommets.append(SCNVector3(p[s].x, p[s].y, p[s].z))
+          normales.append(SCNVector3(nrm.x, nrm.y, nrm.z))
+          uvs.append(q[s])
+        }
+      }
+      guard !sommets.isEmpty else { continue }
+      let indices = (0..<Int32(sommets.count)).map { $0 }
+      let geometrie = SCNGeometry(
+        sources: [
+          SCNGeometrySource(vertices: sommets),
+          SCNGeometrySource(normals: normales),
+          SCNGeometrySource(textureCoordinates: uvs),
+        ],
+        elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)])
+      let m = SCNMaterial()
+      m.lightingModel = .lambert
+      m.diffuse.contents = image
+      m.diffuse.wrapS = .clamp
+      m.diffuse.wrapT = .clamp
+      m.diffuse.mipFilter = .linear
+      m.emission.contents = image
+      m.emission.intensity = 0.35
+      m.isDoubleSided = false
+      geometrie.materials = [m]
+      noeuds.append(SCNNode(geometry: geometrie))
+    }
+    return noeuds
+  }
+
+  /// Les images déjà lues : un passage de la caméra ne relit pas le disque.
+  private static let imagesLues = NSCache<NSString, UIImage>()
+
+  /// L'image d'un chemin — retrouvée par son nom si l'app a été réinstallée.
+  static func image(_ chemin: String) -> UIImage? {
+    if let deja = imagesLues.object(forKey: chemin as NSString) { return deja }
+    guard let url = RoomScanExport.resolveFile(chemin),
+          let image = UIImage(contentsOfFile: url.path) else { return nil }
+    imagesLues.setObject(image, forKey: chemin as NSString)
+    return image
   }
 
   // ------------------------------------------------------------- meubles
