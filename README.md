@@ -14285,6 +14285,30 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Visite : lâcher le regard ne coupe plus la marche
+
+Relevé du patron : « un déplacement se coupe lorsqu'on tourne en même temps
+puis qu'on lâche que la partie du regard ; ils doivent fonctionner
+indépendamment ».
+
+La cause : sur le téléphone, React Native peut déclarer le geste entier fini
+(`onResponderRelease`) dès qu'un doigt sur deux se lève. `Exploration`
+remettait alors tout à zéro — manette au centre, doigts oubliés — et, au
+mouvement suivant, le pouce de la marche était réaccueilli comme un doigt
+neuf, sa manette repartant de là où il se trouvait : la marche tombait à
+zéro (0,07 m parcourus en 0,3 s au banc, au lieu d'un demi-mètre).
+
+Désormais `toutLacher` ne lâche que les doigts que l'événement ne compte plus
+parmi les posés : celui qui reste garde son rôle et son point de départ, son
+prochain mouvement redonne la main à la vue sans rien perdre de sa force, et
+sa levée se lit par `onTouchEnd` — qui arrive même quand la vue n'a plus la
+main. Lâcher deux fois le même doigt ne fait rien.
+
+Bancs (`visitenative`) : le scénario exact rejoué — marcher, tourner, lever le
+regard avec le geste déclaré fini : la marche continue à pleine vitesse, puis
+s'arrête à la levée de son pouce ; et l'inverse, la marche levée la première,
+laisse le regard tourner. Le premier échoue sur l'ancien code.
+
 ## Le plan 2D ne se déforme plus sous le doigt ; le verre est retiré ; l'accueil parle une seule langue
 
 **La sélection sur le plan 2D.** Relevé du patron : « la sélection est

@@ -323,6 +323,92 @@ describe('marcher et tourner en même temps', () => {
     act(() => jest.advanceTimersByTime(100));
   });
 
+  /*
+    LE GESTE DÉCLARÉ FINI, UN POUCE ENCORE POSÉ — relevé du patron : « un
+    déplacement se coupe lorsqu'on tourne en même temps puis qu'on lâche que
+    la partie du regard ». Sur le téléphone, React Native peut envoyer
+    `onResponderRelease` dès qu'un doigt sur deux se lève. Le banc le rejoue
+    tel quel : le regard se lève, la vue perd la main, la marche continue ;
+    son prochain mouvement redonne la main sans rien perdre de sa force, et
+    sa levée — vue n'ayant plus la main — l'arrête.
+  */
+  it('lâcher le regard ne coupe pas la marche, même si le geste est déclaré fini', () => {
+    const t = monter();
+    presser(t, 'Explorer');
+    const z = pouces(t);
+    const marche = touche(0, 120, 850);
+    act(() => {
+      z.props.onResponderGrant(ev([touche(0, 120, 900)], [touche(0, 120, 900)]));
+      z.props.onResponderMove(ev([marche], [marche]));
+      z.props.onResponderStart(ev([touche(1, 300, 500)], [marche, touche(1, 300, 500)]));
+    });
+    for (let i = 1; i <= 5; i++) {
+      act(() => {
+        z.props.onResponderMove(ev([touche(1, 300 + i * 8, 500)], [marche, touche(1, 300 + i * 8, 500)]));
+        jest.advanceTimersByTime(40);
+      });
+    }
+    // Le regard se lève — et React Native déclare le geste entier fini.
+    const leve = ev([touche(1, 340, 500)], [marche]);
+    act(() => {
+      z.props.onResponderEnd(leve);
+      z.props.onResponderRelease(leve);
+      z.props.onTouchEnd(leve);
+    });
+    const parcours = (ms: number) => {
+      const a = vueNative(t);
+      act(() => jest.advanceTimersByTime(ms));
+      const b = vueNative(t);
+      return Math.hypot(b[0] - a[0], b[2] - a[2]);
+    };
+    // Le pouce de la marche, immobile, pousse toujours : on avance à fond.
+    expect(parcours(300)).toBeGreaterThan(0.3);
+    // Il bouge d'un point : la vue reprend la main, la manette garde sa force.
+    const bouge = touche(0, 121, 849);
+    act(() => {
+      z.props.onResponderGrant(ev([bouge], [bouge]));
+      z.props.onResponderMove(ev([bouge], [bouge]));
+    });
+    expect(parcours(300)).toBeGreaterThan(0.3);
+    // Il se lève alors que la vue n'a plus la main : on s'arrête quand même.
+    act(() => {
+      z.props.onResponderRelease(ev([bouge], []));
+      z.props.onTouchEnd(ev([bouge], []));
+    });
+    act(() => jest.advanceTimersByTime(250));
+    expect(parcours(300)).toBeLessThan(1e-6);
+  });
+
+  it('et la marche levée la première laisse le regard tourner', () => {
+    const t = monter();
+    presser(t, 'Explorer');
+    const z = pouces(t);
+    const marche = touche(0, 120, 850);
+    act(() => {
+      z.props.onResponderGrant(ev([touche(0, 120, 900)], [touche(0, 120, 900)]));
+      z.props.onResponderMove(ev([marche], [marche]));
+      z.props.onResponderStart(ev([touche(1, 460, 500)], [marche, touche(1, 460, 500)]));
+    });
+    // La marche se lève, geste déclaré fini : le regard, lui, continue.
+    const leve = ev([marche], [touche(1, 460, 500)]);
+    act(() => {
+      z.props.onResponderEnd(leve);
+      z.props.onResponderRelease(leve);
+    });
+    const avant = vueNative(t)[3];
+    for (let i = 1; i <= 5; i++) {
+      act(() => {
+        const r = touche(1, 460 + i * 10, 500);
+        z.props.onResponderGrant(ev([r], [r]));
+        z.props.onResponderMove(ev([r], [r]));
+        jest.advanceTimersByTime(30);
+      });
+    }
+    expect(Math.abs(vueNative(t)[3] - avant)).toBeGreaterThan(0.3);
+    act(() => z.props.onTouchEnd(ev([touche(1, 510, 500)], [])));
+    act(() => jest.advanceTimersByTime(300));
+  });
+
   it('lever le pouce du regard laisse marcher ; lever celui de la marche arrête', () => {
     const t = monter();
     presser(t, 'Explorer');

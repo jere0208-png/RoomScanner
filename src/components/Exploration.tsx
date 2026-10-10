@@ -738,7 +738,36 @@ export function Exploration({
       appuiFini(d);
     }
   };
-  const toutLacher = () => {
+  /*
+    LA FIN DU GESTE N'EST PAS LA FIN DES DOIGTS — relevé du patron : « un
+    déplacement se coupe lorsqu'on tourne en même temps puis qu'on lâche que
+    la partie du regard ; ils doivent fonctionner indépendamment ».
+
+    React Native peut déclarer le geste fini (`onResponderRelease`, ou un
+    `Terminate`) alors qu'un pouce est encore posé : avec la nouvelle
+    architecture, lever un doigt sur deux suffit parfois. On remettait alors
+    TOUT à zéro — la manette au centre, les doigts oubliés —, et au mouvement
+    suivant le pouce de la marche était réaccueilli comme un doigt neuf, sa
+    manette repartant de là où il se trouvait : la marche tombait à zéro.
+
+    On ne lâche donc que les doigts que l'événement ne compte plus parmi les
+    posés. Ceux qui restent gardent leur rôle et leur point de départ ; leur
+    prochain mouvement redonne la main à la vue, et leur levée se lit par
+    `onTouchEnd`, qui arrive même quand la vue n'a plus la main.
+  */
+  const toutLacher = (e?: GestureResponderEvent) => {
+    const poses = new Set(e ? touchesDe(e).map((t) => Number(t.identifier)) : []);
+    if ([...doigts.current.keys()].some((id) => poses.has(id))) {
+      for (const id of [...doigts.current.keys()]) {
+        if (poses.has(id)) continue;
+        const d = doigts.current.get(id)!;
+        doigts.current.delete(id);
+        if (d.role === 'marche') manette.current = { x: 0, y: 0 };
+        appuiFini(d);
+      }
+      demarrer();
+      return;
+    }
     // Plus aucun doigt : ce qu'on regarde se montre tout de suite ; l'élan
     // retombe, et la boucle s'arrête d'elle-même.
     for (const d of doigts.current.values()) appuiFini(d);
@@ -824,6 +853,11 @@ export function Exploration({
           onResponderEnd={lacher}
           onResponderRelease={toutLacher}
           onResponderTerminate={toutLacher}
+          /* Un pouce levé alors que la vue n'a plus la main (voir
+             `toutLacher`) : ces événements-là arrivent toujours. Lâcher deux
+             fois le même doigt ne fait rien : il n'est plus suivi. */
+          onTouchEnd={lacher}
+          onTouchCancel={lacher}
         />
 
         {/*
