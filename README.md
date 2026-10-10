@@ -14285,6 +14285,44 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le plan électrique et le plafond, épurés eux aussi ; plus de nom de meuble
+
+Relevé du patron : « fais pareil pour le plan électrique et le plan du
+plafond, et enlève le nom des meubles ».
+
+**Le plafond décide ses traits avant le premier mot** (`planPage`). Les cotes
+de pose partaient de chaque appareil vers le mur de gauche et celui du haut,
+quoi qu'il y ait sur le chemin, et se traçaient en dernier : leur tireté
+barrait les « SP », les « DCL » et les repères de circuit posés avant elles.
+Désormais, avant toute étiquette :
+
+- les disques des appareils de plafond sont encrés et réservés (les repères
+  de circuit des prises ne tombent plus dessus) ;
+- chaque cote de pose choisit, dans chacun de ses deux axes, le mur dont le
+  chemin est le plus blanc (gauche ou droite, haut ou bas) ;
+- une rangée de spots alignés ne se cote qu'une fois en travers ; la chaîne
+  de la rangée garde ses écarts ;
+- tous ces traits sont encrés : sigles, repères et cartouches les évitent.
+
+Au dessin, tous les traits du plafond passent d'abord, toutes les valeurs
+ensuite (une plaque n'est plus barrée par la cote du spot voisin), chacune à
+la place la plus blanche le long de son trait. Les sigles d'appareils et les
+repères glissent d'abord d'un cran sur leur ligne (les sigles d'une rangée
+restent alignés), puis cherchent tout autour quand leurs places habituelles
+sont toutes barrées. La place préférée d'un sigle de plafond est à un point
+et demi de sa pastille : elle n'était jamais « libre » à un point trois.
+
+**Plus de nom de meuble**, ni sur le plan imprimé, ni sur le plan à l'écran :
+la silhouette dit ce qu'est un lit ou une table. Le meuble tenu garde son nom
+dans sa barre (`ObjectBar`).
+
+Bancs : `planepure.test.ts` étendu au plan électrique (appareil tous les 0,6,
+0,9 et 1,4 m, repères de circuit, zooms 1 et 1,3) avec et sans plafond (seize
+appareils en quatre rangées), sigles et cotes du plafond présents, aucun nom
+de meuble ; `plafond.test.ts` (chaque appareil coté dans ses deux axes, depuis
+l'un des deux murs) ; `auditexport` reconnaît le mobilier à son trait ;
+planches de référence régénérées.
+
 ## Le plan coté épuré : une carte d'encre, et les cotes rangées comme chez l'architecte
 
 Relevé du patron : « trop d'éléments se chevauchent sur le plan coté ;

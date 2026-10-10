@@ -34,6 +34,7 @@ import {
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
 import { segLength, type WallSeg } from '../src/geometry/floorplan';
+import type { Fixture, FixtureKind } from '../src/geometry/electrical';
 
 // ------------------------------------------------------------------ lecture
 
@@ -333,6 +334,68 @@ const reference = (zoom = 1) =>
     ),
   );
 
+/*
+  LE PLAN ÉLECTRIQUE ET LE PLAFOND — relevé du patron : « fais pareil pour le
+  plan électrique et le plan du plafond ». Le plan de référence, équipé mur
+  par mur à trois densités, avec ses repères de circuit, et quatre lignes de
+  plafond en travers : spots en chaîne, points lumineux, détecteurs.
+*/
+const KINDS: FixtureKind[] = ['prise', 'inter', 'prise20', 'rj45', 'tv', 'prise32', 'va', 'poussoir'];
+const MURS_REF = SNAPSHOT_WALLS as WallSeg[];
+const appareillage = (pas: number): Fixture[] => {
+  const out: Fixture[] = [];
+  MURS_REF.forEach((w, iw) => {
+    const L = segLength(w);
+    for (let a = pas, i = 0; a < L - 0.3; a += pas, i++) {
+      out.push({ id: `f${iw}_${i}`, kind: KINDS[(iw + i) % KINDS.length], wallId: w.id, along: a, height: 0.25, side: 1 });
+    }
+  });
+  return out;
+};
+const BORNES = (() => {
+  const xs = MURS_REF.flatMap((w) => [w.a.x, w.b.x]);
+  const zs = MURS_REF.flatMap((w) => [w.a.z, w.b.z]);
+  return { x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs) };
+})();
+const PLAFOND = [0, 1, 2, 3].flatMap((r) =>
+  [0, 1, 2, 3].map((i) => ({
+    id: `s${r}${i}`,
+    kind: (['spot', 'spot', 'dcl', 'daaf'] as const)[r % 4],
+    roomId: SNAPSHOT_ROOMS[r % SNAPSHOT_ROOMS.length].id,
+    at: {
+      x: BORNES.x0 + (BORNES.x1 - BORNES.x0) * (0.2 + i * 0.2),
+      z: BORNES.z0 + (BORNES.z1 - BORNES.z0) * (0.18 + r * 0.22),
+    },
+    row: `ln${r}`,
+  })),
+);
+const electrique = (pas: number, zoom: number, plafond: boolean) => {
+  const fx = appareillage(pas);
+  return pagePlan(
+    latin1(
+      buildScanPdf(
+        {
+          name: 'Reference',
+          walls: SNAPSHOT_WALLS,
+          openings: SNAPSHOT_OPENINGS,
+          objects: SNAPSHOT_OBJECTS,
+          rooms: SNAPSHOT_ROOMS as never,
+          roomNames: Object.fromEntries(SNAPSHOT_ROOMS.map((r, i) => [r.id, NOMS[i] ?? `Pièce ${i + 1}`])),
+          fixtures: fx,
+        } as never,
+        false,
+        {
+          metre: false,
+          surfaces: true,
+          plan: { zoom },
+          ceiling: plafond ? PLAFOND : undefined,
+          marks: new Map(fx.map((f, i) => [f.id, String((i % 9) + 1)])),
+        } as never,
+      ),
+    ),
+  );
+};
+
 const frLen = (v: number) => v.toFixed(2).replace('.', ',');
 
 // ------------------------------------------------------------------ épreuves
@@ -345,6 +408,16 @@ describe('chaque mot se lit sur du blanc', () => {
     it(`le plan de référence équipé, zoom ${zoom}`, () => {
       expect(barres(reference(zoom))).toEqual([]);
     });
+  }
+  for (const pas of [0.6, 0.9, 1.4]) {
+    for (const zoom of [1, 1.3]) {
+      it(`le plan électrique, un appareil tous les ${pas} m, zoom ${zoom}`, () => {
+        expect(barres(electrique(pas, zoom, false))).toEqual([]);
+      });
+      it(`le plan électrique et son plafond, un appareil tous les ${pas} m, zoom ${zoom}`, () => {
+        expect(barres(electrique(pas, zoom, true))).toEqual([]);
+      });
+    }
   }
   it('et « surface au sol » ne se fait plus barrer', () => {
     expect(barres(exempleSansNoms())).toEqual([]);
@@ -368,6 +441,27 @@ describe('rien ne s’achète en effaçant', () => {
 
   it('chaque note garde son mot', () => {
     expect(ecrits(exemple())).toContain('Colonne montante ici');
+  });
+
+  it('le plafond garde ses sigles et ses cotes', () => {
+    const vus = ecrits(electrique(0.9, 1, true));
+    expect(vus).toContain('DCL');
+    expect(vus).toContain('DAAF');
+    // Les cotes de pose des appareils de plafond : des centimètres.
+    expect(vus.filter((t) => /^\d{2,3}$/.test(t)).length).toBeGreaterThan(10);
+  });
+});
+
+/*
+  PLUS DE NOM DE MEUBLE — relevé du patron : « enlève le nom des meubles ».
+  La silhouette dit ce qu'est un lit ou une table.
+*/
+describe('les meubles se dessinent sans leur nom', () => {
+  it('sur le plan coté', () => {
+    const vus = ecrits(exemple());
+    for (const nom of ['Table', 'Lit', 'Canapé', 'Chaise', 'Évier', 'tapis', 'Rangement']) {
+      expect(vus).not.toContain(nom);
+    }
   });
 });
 

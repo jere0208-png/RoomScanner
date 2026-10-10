@@ -115,31 +115,6 @@ const VIDE_MEUBLES: ObjectData[] = [];
 export const WALL_MENU = { w: 186, h: 44 };
 
 /**
- * LE NOM D'UN MEUBLE : petit DEDANS, grandi par le zoom, absent s'il ne
- * tient pas — un mot ne raye jamais son meuble (relevé du patron :
- * « Rangement » débordait de l'armoire, barré par ses traits). Le texte
- * reste horizontal à l'écran : la place disponible est l'emprise du
- * meuble PROJETÉE à l'écran, rotation comprise. C'est en zoomant qu'on
- * lève le doute — la règle de toute l'app.
- */
-export function nomDeMeuble(
-  texte: string,
-  wPx: number,
-  dPx: number,
-  angleEcran: number,
-  scale: number,
-): { taille: number } | null {
-  const taille = Math.max(7, Math.min(12, 0.13 * scale));
-  const cos = Math.abs(Math.cos(angleEcran));
-  const sin = Math.abs(Math.sin(angleEcran));
-  const dispoW = wPx * cos + dPx * sin - 8;
-  const dispoH = wPx * sin + dPx * cos - 6;
-  if (texte.length * taille * 0.62 > dispoW) return null;
-  if (taille + 2 > dispoH) return null;
-  return { taille };
-}
-
-/**
  * LE CARTOUCHE GÊNE-T-IL EN CE POINT ? Obstacles : les meubles de la
  * pièce, et les appareils du plafond — relevé du patron, capture à
  * l'appui : après l'ajout d'une ligne de spots, le nom de la pièce se
@@ -2255,31 +2230,13 @@ export function FloorplanEditor({
                         fill="none"
                       />
                     ))}
-                  {/* Nom du meuble : petit dedans, grandi par le zoom,
-                      absent s'il ne tient pas (`nomDeMeuble`). */}
-                  {
-                    (() => {
-                      const pose = nomDeMeuble(
-                        frCategory(f.category),
-                        w,
-                        d,
-                        f.yaw + view.rot,
-                        mapping.scale,
-                      );
-                      if (!pose) return null;
-                      return (
-                        <SvgText
-                          transform={`rotate(${(-(f.yaw + view.rot) * 180) / Math.PI})`}
-                          x={0}
-                          y={pose.taille * 0.35}
-                          fill={c.inkSoft}
-                          fontSize={pose.taille}
-                          fontWeight="600"
-                          textAnchor="middle">
-                          {frCategory(f.category)}
-                        </SvgText>
-                      );
-                    })()}
+                  {/*
+                    PLUS DE NOM DE MEUBLE SUR LE PLAN — relevé du patron :
+                    « enlève le nom des meubles ». La silhouette dit déjà ce
+                    qu'est un lit ou une table ; le nom ajoutait un mot de
+                    plus là où le plan se lit déjà mal. Le meuble tenu, lui,
+                    garde son nom dans sa barre (`ObjectBar`).
+                  */}
                   {/*
                     LA CIBLE DU DOIGT EST PLUS LARGE QUE LE DESSIN.
 

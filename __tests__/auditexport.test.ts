@@ -195,13 +195,11 @@ describe('le dossier PDF, sous tous les angles', () => {
         ] },
       ),
     );
-    // Les désignations d'appareils, les noms de meubles et une cote : trois
-    // familles d'information qui doivent survivre à l'export.
-    for (const attendu of ['Canap', 'Lit', 'Rangement', 'm²']) {
-      expect(`${attendu} ${pdf.includes(attendu) ? 'présent' : 'ABSENT'}`).toBe(
-        `${attendu} présent`,
-      );
-    }
+    // Le mobilier et une surface doivent survivre à l'export. Le mobilier
+    // se reconnaît à son trait (le gris-bleu des meubles) : il ne porte plus
+    // son nom — relevé du patron, « enlève le nom des meubles ».
+    expect(pdf.includes('0.62 0.67 0.75 RG')).toBe(true);
+    expect(pdf.includes('m²')).toBe(true);
   });
 });
 

@@ -40,7 +40,7 @@ import {
   echelleNormalisee,
   graduationsRegle,
 } from './echelle';
-import { ecarterDe, type Boite } from '../ui/ecarter';
+import { type Boite } from '../ui/ecarter';
 import { mixHex } from '../geometry/appearance';
 import { wallLabel, type DeviceName } from '../geometry/naming';
 import {
@@ -1928,6 +1928,31 @@ function planPage(
         (a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y),
       );
     };
+    /**
+     * LES PLACES HABITUELLES D'ABORD, ET TOUT AUTOUR SI ELLES SONT TOUTES
+     * ENCRÉES. Un spot en tête de colonne a, dessous comme dessus, la cote
+     * qui le pose ; à gauche comme à droite, la chaîne de sa ligne : ses
+     * quatre places habituelles sont barrées. Un cran en diagonale, le
+     * papier est blanc.
+     */
+    const placeAutour = (places: Pt[], boiteDe: (v: Pt) => Boite): Pt | undefined => {
+      /*
+        D'ABORD UN GLISSEMENT SUR SA LIGNE : les sigles d'une rangée de spots
+        se lisent alignés, comme leurs spots. Un trait de cote sous le
+        premier ne doit pas l'envoyer au-dessus — un cran de côté suffit.
+      */
+      const [premiere, ...autres] = places;
+      const glisses = [3, -3, 6, -6, 9, -9, 12, -12].map((dx) => ({
+        x: premiere.x + dx,
+        y: premiere.y,
+      }));
+      const p1 = laPlusBlanche([premiere, ...glisses, ...autres], boiteDe);
+      if (p1 && encre.sous(boiteDe(p1)) === 0) return p1;
+      const p2 = laPlusBlanche(autourDe(places[0]), boiteDe);
+      if (!p1) return p2;
+      if (!p2) return p1;
+      return encre.sous(boiteDe(p2)) < encre.sous(boiteDe(p1)) ? p2 : p1;
+    };
     /** Réserve une place : plus aucun mot ni aucun trait ne s'y pose. */
     const reserver = (b: { x: number; y: number; w: number; h: number }) => {
       posees.push(b);
@@ -2246,6 +2271,204 @@ function planPage(
         encre.trait(linkCurve({ x: depart.x, z: depart.z }, arrivee).map(px), 0.8);
       }
     }
+    /**
+     * LE PLAFOND ANNONCE SES PASTILLES ET SES SIGLES, LUI AUSSI AVANT LES
+     * COTES.
+     *
+     * Le sigle d'un plafonnier — « SP », « DCL », « DAAF » — n'a aucune
+     * liberté : il tient sous SON symbole, sinon il ne nomme plus rien.
+     * C'était écrit dans le code, et pourtant il passait EN DERNIER : il ne
+     * s'écartait que de ses semblables et des disques, jamais du reste de la
+     * feuille. Sur la mesure : « DAAF » sur un repère de circuit, « SP » sur
+     * le cartouche « 9,0 m² ».
+     *
+     * Il s'inscrit donc ici, avec les mots de l'appareillage, dans le même
+     * ordre des libertés — et ce sont les cotes qui s'écartent.
+     */
+    const plafondPose = ctx.ceiling ?? [];
+    /**
+     * LE DISQUE DU SYMBOLE se retient avant tout le reste.
+     *
+     * Un symbole de plafond ne pose plus de fond blanc, mais sa place reste
+     * réservée : une cote écrite dessous se lisait à moitié — sur la
+     * capture, « 243 » se lisait « 24 », le dernier chiffre mangé par le
+     * spot qu'il servait justement à poser.
+     */
+    const pastillesPlafond: Boite[] = [];
+    for (const cl of plafondPose) {
+      const q = px(cl.at);
+      if (!dansLeCadre(q)) continue;
+      const r =
+        Math.max(
+          RAYON_PLAFOND_MIN,
+          Math.min(RAYON_PLAFOND_MAX, (CEILINGS[cl.kind].d / 2) * scale),
+        ) + 2;
+      pastillesPlafond.push({ x: q.x - r, y: q.y - r, w: r * 2, h: r * 2 });
+      encre.disque(q, r - 2);
+    }
+    posees.push(...pastillesPlafond);
+
+    /*
+      LES TRAITS DU PLAFOND SE DÉCIDENT ICI, AVANT LE PREMIER MOT — relevé du
+      patron : « fais pareil pour le plan électrique et le plan du plafond ».
+
+      Les cotes de pose partaient de chaque appareil vers le mur de gauche et
+      celui du haut, quoi qu'il y ait sur le chemin, et elles se traçaient en
+      dernier : leur tireté barrait les « SP », les « DCL », les repères de
+      circuit posés avant elles. Elles se décident donc ici, et s'encrent :
+      ce qui s'écrit ensuite les évite.
+
+        — chaque cote choisit SON MUR : à gauche ou à droite, en haut ou en
+          bas — le chemin le plus blanc, le plus court à égalité. L'une ou
+          l'autre pose l'appareil : on tend le mètre depuis le mur qu'on veut ;
+        — une LIGNE de spots alignés ne se cote qu'une fois en travers : dix
+          spots à 1,20 m du même mur, c'est une mesure, pas dix ;
+        — la CHAÎNE d'une ligne (du mur au premier, entre chacun, du dernier
+          au mur) s'encre elle aussi.
+    */
+    const cosP = Math.cos(trame);
+    const sinP = Math.sin(trame);
+    const rayonPlafond = (cl: CeilingFixture) =>
+      Math.max(RAYON_PLAFOND_MIN, Math.min(RAYON_PLAFOND_MAX, (CEILINGS[cl.kind].d / 2) * scale));
+    /*
+      UNE LIGNE DE SPOTS SE COTE UNE FOIS, PAS DEUX.
+
+      Relevé du patron, capture à l'appui : « les 3 spots au centre de la
+      pièce sont recouverts de chiffres sur leur droite, on ne comprend pas
+      si c'est la distance entre les spots ou autre ». La chaîne gagne dans
+      l'axe de la ligne : c'est elle qu'on suit sur le chantier, cordeau
+      tendu. Un spot en ligne ne porte donc plus de cote de pose DANS l'axe
+      de sa ligne.
+    */
+    const axeDeLigne = new Map<string, { x: number; z: number }>();
+    for (const row of new Set(plafondPose.map((cl) => cl.row).filter((r): r is string => !!r))) {
+      const lot = plafondPose.filter((cl) => cl.row === row);
+      if (lot.length < 2) continue;
+      let a = lot[0];
+      let b = lot[0];
+      let max = -1;
+      for (const u of lot) {
+        for (const v of lot) {
+          const dd = Math.hypot(u.at.x - v.at.x, u.at.z - v.at.z);
+          if (dd > max) {
+            max = dd;
+            a = u;
+            b = v;
+          }
+        }
+      }
+      if (max < 1e-6) continue;
+      axeDeLigne.set(row, { x: (b.at.x - a.at.x) / max, z: (b.at.z - a.at.z) / max });
+    }
+    /** Les chaînes des lignes, segment par segment, telles qu'elles se traceront. */
+    const chainesPlafond: { a: Pt; b: Pt; val: number }[] = [];
+    for (const row of new Set(plafondPose.map((cl) => cl.row).filter(Boolean))) {
+      const lot = plafondPose.filter((cl) => cl.row === row);
+      const chaine = ceilingChain(lot, walls, trame);
+      if (!chaine) continue;
+      const jalons: ({ x: number; z: number } | null)[] = [
+        chaine.bouts[0],
+        ...chaine.points,
+        chaine.bouts[1],
+      ];
+      chaine.cotes.forEach((val, i) => {
+        const A = jalons[i];
+        const B = jalons[i + 1];
+        if (val === null || !A || !B) return;
+        const a = px(A);
+        const b = px(B);
+        if (!dansLeCadre(a) || !dansLeCadre(b)) return;
+        if (Math.hypot(b.x - a.x, b.y - a.y) < 14) return;
+        chainesPlafond.push({ a, b, val });
+        encre.segment(a, b, 0.8);
+      });
+    }
+    /** Les cotes de pose, chacune vers le mur au chemin le plus blanc. */
+    const cotesDePlafond: { a: Pt; b: Pt; dist: number }[] = [];
+    {
+      const dejaEnTravers = new Map<string, number[]>();
+      for (const cl of extra?.hideCotesPose ? [] : plafondPose) {
+        const q0 = px(cl.at);
+        if (!dansLeCadre(q0)) continue;
+        const r = rayonPlafond(cl);
+        for (const axe of [
+          { x: -cosP, z: -sinP },
+          { x: sinP, z: -cosP },
+        ]) {
+          // Dans l'axe de sa propre ligne, la chaîne dit déjà tout.
+          const sien = cl.row ? axeDeLigne.get(cl.row) : undefined;
+          if (sien && Math.abs(sien.x * axe.x + sien.z * axe.z) > 0.9) continue;
+          let mieux: { a: Pt; b: Pt; dist: number; cout: number } | null = null;
+          for (const sens of [1, -1]) {
+            const dir = { x: axe.x * sens, z: axe.z * sens };
+            const dist = castToWall(cl.at, dir, walls);
+            if (dist === null || dist < 0.02) continue;
+            const b = px({ x: cl.at.x + dir.x * dist, z: cl.at.z + dir.z * dist });
+            if (!dansLeCadre(b)) continue;
+            const L = Math.hypot(b.x - q0.x, b.y - q0.y) || 1;
+            const depart = {
+              x: q0.x + ((b.x - q0.x) / L) * (r + 1.5),
+              y: q0.y + ((b.y - q0.y) / L) * (r + 1.5),
+            };
+            const cout = encre.leLong(depart, b) + L * 0.04;
+            if (!mieux || cout < mieux.cout) mieux = { a: q0, b, dist, cout };
+          }
+          if (!mieux) continue;
+          // Une ligne alignée se cote une fois en travers.
+          if (sien) {
+            const cle = `${cl.row}|${axe.x.toFixed(3)}`;
+            const vus = dejaEnTravers.get(cle) ?? [];
+            if (vus.some((v) => Math.abs(v - mieux!.dist) < 0.01)) continue;
+            dejaEnTravers.set(cle, [...vus, mieux.dist]);
+          }
+          cotesDePlafond.push({ a: mieux.a, b: mieux.b, dist: mieux.dist });
+          encre.segment(mieux.a, mieux.b, 0.8);
+        }
+      }
+    }
+
+    /**
+     * PUIS LE SIGLE, sous son symbole — et sinon tout autour.
+     *
+     * Le cas qui a tout déclenché : le DAAF posé à dix centimètres du point
+     * lumineux, comme la norme le veut dans la circulation. Deux sigles pour
+     * un même point : le second passe de l'autre côté, et le plan cesse de
+     * porter « DCAF ».
+     */
+    const siglesPose = new Map<string, Boite>();
+    const TAILLE_SIGLE_PLAFOND = 6.5;
+    for (const cl of plafondPose) {
+      const q = px(cl.at);
+      if (!dansLeCadre(q)) continue;
+      const spec = CEILINGS[cl.kind];
+      const r = Math.max(
+        RAYON_PLAFOND_MIN,
+        Math.min(RAYON_PLAFOND_MAX, (spec.d / 2) * scale),
+      );
+      const larg = latin1(spec.short).length * TAILLE_SIGLE_PLAFOND * 0.5;
+      const E = ECART_SIGLE_PLAFOND;
+      /*
+        Sous le symbole, puis dessus — À UN POINT ET DEMI DE SA PASTILLE, le
+        jour que la réserve exige entre deux choses posées : à un point trois,
+        la place préférée n'était jamais « libre », et le sigle partait
+        chercher ailleurs ce qu'il avait juste sous son spot.
+      */
+      const places = [
+        { x: q.x - larg / 2, y: q.y - r - 8.5 },
+        { x: q.x - larg / 2, y: q.y + r + 3.6 },
+        { x: q.x + r + 3, y: q.y - 3 },
+        { x: q.x - r - 3 - larg, y: q.y - 3 },
+        { x: q.x - larg / 2, y: q.y - r - E },
+        { x: q.x - larg / 2, y: q.y + r + E - 6 },
+      ];
+      const c =
+        placeAutour(places, (v) => boiteEcrite(spec.short, v.x, v.y, TAILLE_SIGLE_PLAFOND)) ??
+        places[0];
+      const b = boiteEcrite(spec.short, c.x, c.y, TAILLE_SIGLE_PLAFOND);
+      reserver(b);
+      siglesPose.set(cl.id, b);
+    }
+
     for (const { f, face, along, postes, membres } of unites) {
       const x = Math.max(0, Math.min(face.len, along));
       const q = px(facePoint(face, x, sortieDuMur(f.id)));
@@ -2283,9 +2506,7 @@ function planPage(
           { x: q.x - larg / 2, y: q.y + rayon + 11 },
         ];
         const p =
-          laPlusBlanche(places, (c) => boiteEcrite(tags, c.x, c.y, TAILLE_SIGLE)) ??
-          laPlusBlanche(autourDe(places[0]), (c) => boiteEcrite(tags, c.x, c.y, TAILLE_SIGLE)) ??
-          places[0];
+          placeAutour(places, (c) => boiteEcrite(tags, c.x, c.y, TAILLE_SIGLE)) ?? places[0];
         reserver(boiteEcrite(tags, p.x, p.y, TAILLE_SIGLE));
         motsAppareil.push({
           texte: tags,
@@ -2318,9 +2539,7 @@ function planPage(
           { x: q.x - larg / 2, y: q.y - rayon - 20 },
         ];
         const p =
-          laPlusBlanche(places, (c) => boiteEcrite(mark, c.x, c.y, TAILLE_SIGLE)) ??
-          laPlusBlanche(autourDe(places[0]), (c) => boiteEcrite(mark, c.x, c.y, TAILLE_SIGLE)) ??
-          places[0];
+          placeAutour(places, (c) => boiteEcrite(mark, c.x, c.y, TAILLE_SIGLE)) ?? places[0];
         reserver(boiteEcrite(mark, p.x, p.y, TAILLE_SIGLE));
         motsAppareil.push({
           texte: mark,
@@ -2330,81 +2549,6 @@ function planPage(
           bold: true,
         });
       }
-    }
-
-    /**
-     * LE PLAFOND ANNONCE SES PASTILLES ET SES SIGLES, LUI AUSSI AVANT LES
-     * COTES.
-     *
-     * Le sigle d'un plafonnier — « SP », « DCL », « DAAF » — n'a aucune
-     * liberté : il tient sous SON symbole, sinon il ne nomme plus rien.
-     * C'était écrit dans le code, et pourtant il passait EN DERNIER : il ne
-     * s'écartait que de ses semblables et des disques, jamais du reste de la
-     * feuille. Sur la mesure : « DAAF » sur un repère de circuit, « SP » sur
-     * le cartouche « 9,0 m² ».
-     *
-     * Il s'inscrit donc ici, avec les mots de l'appareillage, dans le même
-     * ordre des libertés — et ce sont les cotes qui s'écartent.
-     */
-    const plafondPose = ctx.ceiling ?? [];
-    /**
-     * LE DISQUE DU SYMBOLE se retient avant tout le reste.
-     *
-     * Un symbole de plafond ne pose plus de fond blanc, mais sa place reste
-     * réservée : une cote écrite dessous se lisait à moitié — sur la
-     * capture, « 243 » se lisait « 24 », le dernier chiffre mangé par le
-     * spot qu'il servait justement à poser.
-     */
-    const pastillesPlafond: Boite[] = [];
-    for (const cl of plafondPose) {
-      const q = px(cl.at);
-      if (!dansLeCadre(q)) continue;
-      const r =
-        Math.max(
-          RAYON_PLAFOND_MIN,
-          Math.min(RAYON_PLAFOND_MAX, (CEILINGS[cl.kind].d / 2) * scale),
-        ) + 2;
-      pastillesPlafond.push({ x: q.x - r, y: q.y - r, w: r * 2, h: r * 2 });
-      encre.disque(q, r - 2);
-    }
-    posees.push(...pastillesPlafond);
-    /**
-     * PUIS LE SIGLE, sous son symbole — et sinon tout autour.
-     *
-     * Le cas qui a tout déclenché : le DAAF posé à dix centimètres du point
-     * lumineux, comme la norme le veut dans la circulation. Deux sigles pour
-     * un même point : le second passe de l'autre côté, et le plan cesse de
-     * porter « DCAF ».
-     */
-    const siglesPose = new Map<string, Boite>();
-    const TAILLE_SIGLE_PLAFOND = 6.5;
-    for (const cl of plafondPose) {
-      const q = px(cl.at);
-      if (!dansLeCadre(q)) continue;
-      const spec = CEILINGS[cl.kind];
-      const r = Math.max(
-        RAYON_PLAFOND_MIN,
-        Math.min(RAYON_PLAFOND_MAX, (spec.d / 2) * scale),
-      );
-      const larg = latin1(spec.short).length * TAILLE_SIGLE_PLAFOND * 0.5;
-      const E = ECART_SIGLE_PLAFOND;
-      const places = [
-        { x: q.x - larg / 2, y: q.y - r - 8 },
-        { x: q.x - larg / 2, y: q.y + r + 2 },
-        { x: q.x + r + 3, y: q.y - 3 },
-        { x: q.x - r - 3 - larg, y: q.y - 3 },
-        { x: q.x - larg / 2, y: q.y - r - E },
-        { x: q.x - larg / 2, y: q.y + r + E - 6 },
-      ];
-      const c =
-        laPlusBlanche(places, (v) => boiteEcrite(spec.short, v.x, v.y, TAILLE_SIGLE_PLAFOND)) ??
-        laPlusBlanche(autourDe(places[0]), (v) =>
-          boiteEcrite(spec.short, v.x, v.y, TAILLE_SIGLE_PLAFOND),
-        ) ??
-        places[0];
-      const b = boiteEcrite(spec.short, c.x, c.y, TAILLE_SIGLE_PLAFOND);
-      reserver(b);
-      siglesPose.set(cl.id, b);
     }
 
     /**
@@ -2629,8 +2773,9 @@ function planPage(
     }
 
     // Meubles : contour + symbole d'architecte, tels qu'encrés plus haut.
-    // Leur NOM s'écrit bien plus bas, quand tous les traits sont posés :
-    // dessiné ici, il se faisait recouvrir par le meuble suivant.
+    // SANS LEUR NOM — relevé du patron : « enlève le nom des meubles ». La
+    // silhouette dit ce qu'est un lit ou une table ; le mot ajoutait de
+    // l'écriture là où le plan coté doit d'abord laisser lire ses cotes.
     for (const m of meublesDuPlan) {
       d.poly(m.contour, '#FFFFFF', '#9FACBF', 0.8);
       for (const t of m.traits) d.path(t, 0.7, '#9FACBF');
@@ -3063,72 +3208,6 @@ function planPage(
 
     }
 
-    /*
-      LE NOM DES MEUBLES, QUAND TOUS LES TRAITS SONT POSÉS — et seulement
-      sur le blanc du meuble.
-
-      Il s'écrivait au centre quoi qu'il arrive, et deux choses le
-      barraient : les traits du meuble lui-même (les coussins d'un canapé,
-      les portes d'un rangement), et le meuble SUIVANT, dessiné après lui,
-      qui le recouvrait de son fond blanc — « s » était tout ce qui restait
-      de « Table basse ». Le nom cherche donc, dans le meuble, une place sans
-      un trait : au milieu d'abord, puis vers les bords, puis un cran plus
-      petit. Sans place blanche, il se tait : la silhouette le dit déjà,
-      et un nom barré ne dit plus rien.
-    */
-    {
-      const dansPolyPage = (poly: Pt[], q: Pt) => {
-        let dedans = false;
-        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-          const a = poly[i];
-          const b = poly[j];
-          if (a.y > q.y !== b.y > q.y && q.x < ((b.x - a.x) * (q.y - a.y)) / (b.y - a.y) + a.x) {
-            dedans = !dedans;
-          }
-        }
-        return dedans;
-      };
-      const ESSAIS: [number, number][] = [
-        [0, 0],
-        [0, -0.22],
-        [0, 0.22],
-        [-0.22, 0],
-        [0.22, 0],
-        [-0.22, -0.22],
-        [0.22, -0.22],
-        [-0.22, 0.22],
-        [0.22, 0.22],
-        [0, -0.34],
-        [0, 0.34],
-      ];
-      for (const m of meublesDuPlan) {
-        const { o, loc, contour } = m;
-        if (o.width * scale < 30 || o.depth * scale < 11) continue;
-        const mot = frCategory(o.category);
-        let pose: { base: Pt; boite: Boite; taille: number } | null = null;
-        chercher: for (const taille of [7, 6]) {
-          for (const [fu, fv] of ESSAIS) {
-            const c = loc(fu * o.width, fv * o.depth);
-            const q = boiteDuMot(mot, c.x, c.y, taille, 0);
-            const b = q.boite;
-            const coins = [
-              { x: b.x, y: b.y },
-              { x: b.x + b.w, y: b.y },
-              { x: b.x + b.w, y: b.y + b.h },
-              { x: b.x, y: b.y + b.h },
-            ];
-            if (!coins.every((k) => dansPolyPage(contour, k))) continue;
-            if (!libre(b) || encre.sous(b) > 0) continue;
-            pose = { ...q, taille };
-            break chercher;
-          }
-        }
-        if (!pose) continue;
-        reserver(pose.boite);
-        d.text(mot, pose.base.x, pose.base.y, pose.taille, GREY);
-      }
-    }
-
     // ------------------------------------------------- plan des gaines
     // Le cheminement passe SOUS les symboles : c'est un tracé de chantier,
     // pas une annotation. En tireté fin, il se lit sans manger le plan, et
@@ -3298,35 +3377,12 @@ function planPage(
          * pointillés bleus quand on le déplace. Les deux cotes partent
          * d'équerre AVEC LA TRAME du logement, comme le dessin lui-même.
          */
-        const cosP = Math.cos(trame);
-        const sinP = Math.sin(trame);
-        /**
-         * TOUT CE QUI EST DÉJÀ ÉCRIT SUR LE PLAFOND.
-         *
-         * Une seule réserve pour les trois sortes d'étiquettes — la cote
-         * d'un appareil, l'écart d'une chaîne, le sigle sous le symbole.
-         * Elles se tenaient chacune leur liste, et ne se voyaient donc pas
-         * entre elles : sur la capture du dossier, le sigle du DAAF tombait
-         * en plein sur la cote « 293 » du point lumineux voisin.
-         */
         /*
           LE PLAFOND ÉCRIT DANS LA RÉSERVE DE LA FEUILLE, pas dans la
-          sienne. Il tenait sa propre liste, et ses cotes tombaient sur la
-          largeur d'une menuiserie ou sur le nom d'un meuble — deux
-          familles qui ne se voyaient pas.
+          sienne. Pastilles et sigles y sont retenus depuis le début ; les
+          traits de ses cotes, décidés plus haut, sont déjà encrés.
         */
         const etiquettes = posees;
-        /**
-         * ET LES PASTILLES DES APPAREILS, qui se peignent EN DERNIER.
-         *
-         * Chaque symbole réserve son disque blanc avant de se dessiner : une
-         * cote posée dessous disparaît sous ce blanc. Sur la capture,
-         * « 243 » se lisait « 24 » — le dernier chiffre mangé par le spot
-         * qu'il servait justement à poser.
-         */
-        // Pastilles et sigles ont été retenus plus haut, AVANT les cotes :
-        // voir « le plafond annonce ses pastilles et ses sigles ». Ils sont
-        // déjà dans la réserve ; on les relit, on ne les recalcule pas.
         const pastilles = pastillesPlafond;
         const sigles = siglesPose;
         // Et le cartouche, lui, n'aura que les sigles à éviter.
@@ -3337,14 +3393,9 @@ function planPage(
           !etiquettes.some((o) => seTouchent(b, o)) &&
           !pastilles.some((o) => seTouchent(b, o));
         /**
-         * CE QUI EST DEJA COTE NE SE RECOTE PAS.
-         *
-         * La chaine d'une ligne de spots commence par « du mur au premier »
-         * — exactement ce que la cote d'appareil venait de mesurer, meme
-         * mur, meme spot. Les deux nombres tombaient au meme point de la
-         * page : « 139 » frappe deux fois se lit « 139 / 139 », ou une
-         * bouillie d'encre. On retient donc le SEGMENT cote, pas le nombre :
-         * deux appareils peuvent legitimement etre a 139 du meme mur.
+         * CE QUI EST DEJA COTE NE SE RECOTE PAS : la chaîne d'une ligne
+         * commence par « du mur au premier », exactement ce que la cote de
+         * pose vient de mesurer — même mur, même spot. On retient le SEGMENT.
          */
         const cotesPosees = new Set<string>();
         const cleCote = (a: Pt, b: Pt) => {
@@ -3353,18 +3404,8 @@ function planPage(
           return u < v ? `${u}|${v}` : `${v}|${u}`;
         };
         /**
-         * L'emprise de la plaque d'une cote, centrée sur son point.
-         *
-         * ELLE SE TAILLE SUR LE TEXTE — relevé du patron : « le bloc blanc
-         * arrière pas si gros, il doit dépasser de 2px les chiffres sur les
-         * côtés ». Elle valait 22 × 10 en dur, quel que soit le nombre : une
-         * cote à deux chiffres portait la plaque d'une cote à quatre, et
-         * réservait donc contre ses voisines une place qu'elle n'occupait
-         * pas — c'est le défaut « vérifier la boîte qu'on dessine, pas celle
-         * qu'on a demandée », mais pris à l'envers.
-         *
-         * La même fonction sert à RÉSERVER et à DESSINER : deux tailles pour
-         * une plaque finiraient par diverger.
+         * L'emprise de la plaque d'une cote, centrée sur son point — taillée
+         * sur le texte ; la même pour réserver et pour dessiner.
          */
         const TAILLE_COTE = 6.5;
         const boiteCote = (p: Pt, texte: string): Boite => {
@@ -3372,204 +3413,64 @@ function planPage(
           return { x: p.x - q.w / 2, y: p.y - q.h / 2, w: q.w, h: q.h };
         };
         /*
-          UNE LIGNE DE SPOTS SE COTE UNE FOIS, PAS DEUX.
-
-          Relevé du patron, capture à l'appui : « les 3 spots au centre de la
-          pièce sont recouverts de chiffres sur leur droite, on ne comprend
-          pas si c'est la distance entre les spots ou autre ».
-
-          Deux mesures se superposaient sur le MÊME axe. La chaîne
-          d'implantation — « du mur au premier, entre chacun, du dernier au
-          mur », 117 · 117 · 50 — et la cote de pose de chaque spot vers le
-          même mur — 51 · 168 · 285, c'est-à-dire les mêmes écarts cumulés.
-          Les deux disent la vérité, elles se lisent en alternance le long
-          d'un seul trait, et on ne sait plus laquelle on lit.
-
-          La chaîne gagne : c'est elle qu'on suit sur le chantier, cordeau
-          tendu. Un spot en ligne ne porte donc plus de cote de pose DANS
-          l'axe de sa ligne. Il garde l'autre, perpendiculaire : elle dit à
-          quelle distance du mur la ligne est tendue, et rien ne la double.
+          TOUS LES TRAITS D'ABORD, TOUTES LES VALEURS ENSUITE. Chaque cote
+          traçait son tireté puis posait sa plaque, et le tireté de la cote
+          SUIVANTE passait par-dessus la plaque d'avant : « 113 » barré par la
+          cote du spot voisin. Les plaques se posent quand plus aucun trait ne
+          viendra.
         */
-        const axeDeLigne = new Map<string, { x: number; z: number }>();
-        for (const row of new Set(
-          plafond.map((cl) => cl.row).filter((r): r is string => !!r),
-        )) {
-          const lot = plafond.filter((cl) => cl.row === row);
-          if (lot.length < 2) continue;
-          let a = lot[0];
-          let b = lot[0];
-          let max = -1;
-          for (const u of lot) {
-            for (const v of lot) {
-              const dd = Math.hypot(u.at.x - v.at.x, u.at.z - v.at.z);
-              if (dd > max) {
-                max = dd;
-                a = u;
-                b = v;
+        for (const c of cotesDePlafond) {
+          cotesPosees.add(cleCote(c.a, c.b));
+          d.dashedPath([c.a, c.b], 0.6, SKY, [2, 3]);
+          const l = Math.hypot(c.b.x - c.a.x, c.b.y - c.a.y) || 1;
+          const nx = (c.b.y - c.a.y) / l;
+          const ny = -(c.b.x - c.a.x) / l;
+          d.line(c.b.x - nx * 3, c.b.y - ny * 3, c.b.x + nx * 3, c.b.y + ny * 3, 0.8, SKY);
+        }
+        const chainesTracees = chainesPlafond.filter((c) => !cotesPosees.has(cleCote(c.a, c.b)));
+        for (const c of chainesTracees) d.dashedPath([c.a, c.b], 0.6, GREY, [2, 2]);
+        /*
+          L'ÉTIQUETTE GLISSE LE LONG DE SA COTE, sans jamais la quitter — de
+          part et d'autre du milieu, puis de part et d'autre du trait ; et si
+          RIEN n'est libre, la valeur cède : la ligne de cote et son repère
+          restent. Entre deux places libres, la plus blanche.
+        */
+        const poserValeur = (a: Pt, b: Pt, texte: string, couleur: string, plafond: boolean) => {
+          const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+          const sur = (t: number) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+          const decale = (q: Pt, k: number) => ({
+            x: q.x + ((b.y - a.y) / l) * k,
+            y: q.y - ((b.x - a.x) / l) * k,
+          });
+          let p: Pt | null = null;
+          let tache = Infinity;
+          for (const k of [0, 9, -9, 18, -18]) {
+            for (const t of [0.5, 0.34, 0.66, 0.22, 0.78, 0.14, 0.86]) {
+              const q = decale(sur(t), k);
+              const bx = boiteCote(q, texte);
+              if (!auLarge(bx)) continue;
+              // Sur son propre trait, la plaque le couvre : on ne compte que
+              // ce qui dépasse de lui.
+              const v = encre.sous(bx) - (k === 0 ? bx.w * 4 : 0) + Math.abs(k) * 0.5;
+              if (v < tache) {
+                tache = v;
+                p = q;
               }
             }
           }
-          if (max < 1e-6) continue;
-          axeDeLigne.set(row, {
-            x: (b.at.x - a.at.x) / max,
-            z: (b.at.z - a.at.z) / max,
-          });
+          if (!p) return;
+          const boite = boiteCote(p, texte);
+          etiquettes.push(boite);
+          if (plafond) cotesPlafond.push(boite);
+          encre.boite(boite);
+          d.rect(boite.x, boite.y, boite.w, boite.h, '#FFFFFF', null, 0);
+          d.text(texte, p.x, p.y - 2.5, TAILLE_COTE, couleur, { bold: true });
+        };
+        for (const c of cotesDePlafond) {
+          poserValeur(c.a, c.b, `${Math.round(c.dist * 100)}`, SKY, true);
         }
-
-        for (const cl of extra?.hideCotesPose ? [] : plafond) {
-          for (const axe of [
-            { x: -cosP, z: -sinP },
-            { x: sinP, z: -cosP },
-          ]) {
-            // Dans l'axe de sa propre ligne, la chaîne dit déjà tout.
-            const sien = cl.row ? axeDeLigne.get(cl.row) : undefined;
-            if (sien && Math.abs(sien.x * axe.x + sien.z * axe.z) > 0.9) continue;
-            const dist = castToWall(cl.at, axe, walls);
-            if (dist === null || dist < 0.02) continue;
-            const a = px(cl.at);
-            const b = px({
-              x: cl.at.x + axe.x * dist,
-              z: cl.at.z + axe.z * dist,
-            });
-            if (!dansLeCadre(a) || !dansLeCadre(b)) continue;
-            cotesPosees.add(cleCote(a, b));
-            d.dashedPath([a, b], 0.6, SKY, [2, 3]);
-            const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-            const nx = (b.y - a.y) / l;
-            const ny = -(b.x - a.x) / l;
-            d.line(b.x - nx * 3, b.y - ny * 3, b.x + nx * 3, b.y + ny * 3, 0.8, SKY);
-            /*
-              L'ÉTIQUETTE GLISSE LE LONG DE SA COTE, sans jamais la quitter.
-
-              Elle ne cherchait qu'en s'éloignant de l'appareil, et de
-              proche en proche elle sortait par le mur : sur la capture,
-              « 343 » se retrouvait dans la marge, hors du plan, à côté d'un
-              trait qui, lui, s'arrêtait à la cloison. On essaie donc de part
-              et d'autre du milieu, sans jamais atteindre les bouts — un
-              nombre collé au mur ou au symbole ne se lit pas mieux.
-            */
-            const sur = (t: number) => ({
-              x: a.x + (b.x - a.x) * t,
-              y: a.y + (b.y - a.y) * t,
-            });
-            /*
-              ET SI RIEN N'EST LIBRE, LA VALEUR CÈDE LA PLACE.
-
-              Deux appareils voisins — un DAAF à quinze centimètres d'un
-              point lumineux — tirent deux cotes vers le MÊME mur : leurs
-              traits sont parallèles à six points l'un de l'autre, et aucun
-              glissement le long du trait ne sépare les nombres. On essaie
-              donc aussi de part et d'autre du trait, puis on renonce : la
-              ligne de cote et son repère restent, le nombre s'efface. C'est
-              la règle des cotes de mur, et c'est la bonne — un chiffre
-              imprimé sur un autre ne se lit pas, et fait douter des deux.
-            */
-            const decale = (q: Pt, k: number) => ({
-              x: q.x + ((b.y - a.y) / l) * k,
-              y: q.y - ((b.x - a.x) / l) * k,
-            });
-            const texteCote = `${Math.round(dist * 100)}`;
-            let p: Pt | null = null;
-            chercher: for (const k of [0, 9, -9, 18, -18]) {
-              for (const t of [0.5, 0.34, 0.66, 0.22, 0.78, 0.14, 0.86]) {
-                const q = decale(sur(t), k);
-                if (auLarge(boiteCote(q, texteCote))) {
-                  p = q;
-                  break chercher;
-                }
-              }
-            }
-            if (!p) continue;
-            etiquettes.push(boiteCote(p, texteCote));
-            cotesPlafond.push(boiteCote(p, texteCote));
-            const plaque = boiteCote(p, texteCote);
-            d.rect(plaque.x, plaque.y, plaque.w, plaque.h, '#FFFFFF', null);
-            d.text(texteCote, p.x, p.y - 2.5, TAILLE_COTE, SKY, {
-              bold: true,
-            });
-          }
-        }
-
-        /**
-         * ET LES ÉCARTS D'UNE LIGNE, en chaîne.
-         *
-         * Deux cotes par spot suffisent à le POSER ; elles ne suffisent pas
-         * à poser une LIGNE. Sur le chantier, on tend un cordeau et on
-         * perçea intervalles : ce qu'on lit alors, c'est « 68, 150, 150,
-         * 150, 68 » — du mur au premier, entre chacun, du dernier au mur.
-         * Sans cette chaîne, l'électricien refait la soustraction sous le
-         * plafond, le mètre à bout de bras.
-         */
-        for (const row of new Set(
-          plafond.map((cl) => cl.row).filter(Boolean),
-        )) {
-          const lot = plafond.filter((cl) => cl.row === row);
-          const chaine = ceilingChain(lot, walls, trame);
-          if (!chaine) continue;
-          // Le « Pt » de ce fichier est un point de PAGE (x, y) ; celui de la
-          // géométrie est un point du MONDE (x, z). On nomme donc ce qu'on
-          // manipule, plutôt que d'emprunter le mauvais type.
-          const jalons: ({ x: number; z: number } | null)[] = [
-            chaine.bouts[0],
-            ...chaine.points,
-            chaine.bouts[1],
-          ];
-          chaine.cotes.forEach((val, i) => {
-            const A = jalons[i];
-            const B = jalons[i + 1];
-            if (val === null || !A || !B) return;
-            const a = px(A);
-            const b = px(B);
-            if (!dansLeCadre(a) || !dansLeCadre(b)) return;
-            if (Math.hypot(b.x - a.x, b.y - a.y) < 14) return;
-            if (cotesPosees.has(cleCote(a, b))) return;
-            d.dashedPath([a, b], 0.6, GREY, [2, 2]);
-            const mil = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-            // Elle se pose au milieu de l'écart ; si la place est prise,
-            // elle monte ou descend de quelques points — la chaîne se lit
-            // toujours, c'est le trait qui porte la mesure.
-            const texteEcart = `${Math.round(val * 100)}`;
-            const q = plaqueDeCote(texteEcart, 6.5);
-            const pose = ecarterDe(
-              { x: mil.x - q.w / 2, y: mil.y - q.h / 2, w: q.w, h: q.h },
-              [...etiquettes, ...pastilles],
-              22,
-            );
-            /*
-              ON VÉRIFIE LA BOÎTE QU'ON DESSINE, ET NON CELLE QU'ON A DEMANDÉE.
-
-              `ecarterDe` cherche une place libre et rend une boîte — mais le
-              nombre se pose ensuite à l'abscisse D'ORIGINE, en ne gardant que
-              l'ordonnée trouvée. La place vérifiée n'était donc pas la place
-              occupée : sur la capture du dossier, un écart de chaîne tombait
-              en plein milieu du cartouche « Séjour », alors même que la
-              recherche avait dit « libre ».
-
-              ET SI RIEN N'EST LIBRE, LA VALEUR CÈDE LA PLACE. C'est la règle
-              des cotes de mur et des cotes d'appareil : le trait tireté reste,
-              il porte la mesure, et le chiffre s'efface plutôt que de rendre
-              deux informations illisibles au lieu d'une.
-            */
-            const m = { x: mil.x, y: pose.y + q.h / 2 };
-            const boite = { x: m.x - q.w / 2, y: m.y - q.h / 2, w: q.w, h: q.h };
-            if (!auLarge(boite)) return;
-            etiquettes.push(boite);
-            cotesPlafond.push(boite);
-            /*
-              OPAQUE, ET PAS `#FFFFFFDD` — relevé du patron : « les pointillés
-              gênent la lecture de la cote entre spots ».
-
-              La plaque laissait passer treize pour cent de ce qu'elle
-              couvrait, et la chaîne des spots court sur un trait TIRETÉ
-              qu'elle est censée interrompre : on lisait « 150 » barré. Une
-              plaque de cote est opaque en dessin technique — c'est sa raison
-              d'être.
-            */
-            d.rect(boite.x, boite.y, boite.w, boite.h, '#FFFFFF', null, 0);
-            d.text(texteEcart, m.x, m.y - 2.5, 6.5, INK, {
-              bold: true,
-            });
-          });
+        for (const c of chainesTracees) {
+          poserValeur(c.a, c.b, `${Math.round(c.val * 100)}`, INK, true);
         }
 
         // Puis les appareils, à leur diamètre réel, jamais plus petits

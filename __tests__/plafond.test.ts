@@ -200,7 +200,15 @@ describe('le plafond sur le plan', () => {
    * murs, et c'est justement ce que l'écran montre en pointillés bleus
    * quand on le déplace. Ce sont ces valeurs-là, au centimètre près.
    */
-  it('cote chaque appareil depuis les murs, comme à l’écran', () => {
+  /*
+    CHAQUE APPAREIL EST COTÉ DANS SES DEUX AXES — depuis le mur de son choix.
+    Relevé du patron : « fais pareil pour le plan électrique et le plan du
+    plafond ». La cote partait toujours vers le mur de gauche et celui du
+    haut, quoi qu'il y ait sur le chemin ; elle prend maintenant, dans
+    chaque axe, le mur dont le chemin est le plus blanc. L'une ou l'autre
+    pose l'appareil : on tend le mètre depuis le mur qu'on veut.
+  */
+  it('cote chaque appareil dans ses deux axes, depuis l’un des deux murs', () => {
     const vu = texte(doc(PLAFOND));
     const trame = planFrameAngle(W);
     const cos = Math.cos(trame);
@@ -210,9 +218,12 @@ describe('le plafond sur le plan', () => {
         { x: -cos, z: -sin },
         { x: sin, z: -cos },
       ]) {
-        const d = castToWall(cl.at, axe, W);
-        expect(d).not.toBeNull();
-        expect(vu).toContain(String(Math.round(d! * 100)));
+        const valeurs = [1, -1]
+          .map((s) => castToWall(cl.at, { x: axe.x * s, z: axe.z * s }, W))
+          .filter((d): d is number => d !== null)
+          .map((d) => String(Math.round(d * 100)));
+        expect(valeurs.length).toBeGreaterThan(0);
+        expect(valeurs.some((v) => vu.includes(v))).toBe(true);
       }
     }
   });
