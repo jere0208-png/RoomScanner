@@ -31,6 +31,7 @@ import { Text, TouchableOpacity } from 'react-native';
 import { Rect } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import {
+  chargeEnPosant,
   diagnosticExistant,
   dimensionsDuCoffret,
   grilleDuTableau,
@@ -142,7 +143,9 @@ describe('les normes qui bloquent', () => {
 
   it('la grille coche ce qui va, met son cadenas à ce qui bloque', () => {
     const grille = grilleDuTableau(sain(), diagnosticExistant(sain(), { rangees: 2, parRangee: 13 }), true);
-    expect(grille.every((g) => g.ok === true)).toBe(true);
+    expect(grille.filter((g) => g.id !== 'specialises').every((g) => g.ok === true)).toBe(true);
+    // Ni cuisson ni lave-linge notés : la règle du type A attend qu'on les relève.
+    expect(grille.find((g) => g.id === 'specialises')!.ok).toBeNull();
     const une = grilleDuTableau(sain(), diagnosticExistant(sain(), { rangees: 1, parRangee: 13 }), true);
     expect(une.find((g) => g.id === 'rangees')!.ok).toBe(false);
     // Des rangées qu'on n'a pas relevées ne se jugent pas : « à relever ».
@@ -326,7 +329,7 @@ describe('la feuille : on touche, on choisit, ça se clipse', () => {
     for (let i = 0; i < 12; i++) appuyer(t, 'Disjoncteur 16 ampères');
     // Reste une place en rangée 1 : on la vise.
     appuyer(t, 'Clipser un organe en rangée 1 — 1 place libre');
-    appuyer(t, 'Clipser : Différentiel 30 mA');
+    appuyer(t, 'Clipser : Différentiel 30 mA type A');
     expect(useScanStore.getState().existant!.departs.some((d) => d.organe === 'differentiel')).toBe(false);
     expect(textes(t)).toMatch(/2 places, il n’en reste 1/);
     act(() => t.unmount());
@@ -343,7 +346,7 @@ describe('la feuille : on touche, on choisit, ça se clipse', () => {
 
   it('une rangée de moins : deux minimum, c’est un point bloquant — et une rangée garnie ne se retire pas', () => {
     const t = monter();
-    appuyer(t, 'Clipser : Différentiel 30 mA');
+    appuyer(t, 'Clipser : Différentiel 30 mA type A');
     appuyer(t, 'Une rangée de moins');
     expect(useScanStore.getState().existant!.rangees).toBe(1);
     expect(textes(t)).toMatch(/la norme en demande deux/);
@@ -362,10 +365,10 @@ describe('la feuille : on touche, on choisit, ça se clipse', () => {
 
   it('le verdict passe au vert quand tout ce qui se voit est conforme', () => {
     const t = monter();
-    appuyer(t, 'Clipser : Différentiel 30 mA');
+    appuyer(t, 'Clipser : Différentiel 30 mA type A');
     appuyer(t, 'Disjoncteur 16 ampères');
     appuyer(t, 'Clipser un organe en rangée 2 — 13 places libres');
-    appuyer(t, 'Clipser : Différentiel 30 mA');
+    appuyer(t, 'Clipser : Différentiel 30 mA type A');
     appuyer(t, 'Disjoncteur 20 ampères');
     appuyer(t, 'Une rangée de plus');
     appuyer(t, 'Une rangée de moins');
@@ -391,5 +394,94 @@ describe('la feuille : on touche, on choisit, ça se clipse', () => {
     act(() => jest.advanceTimersByTime(600));
     expect(onPlacer).toHaveBeenCalledTimes(1);
     act(() => t.unmount());
+  });
+});
+
+describe('le tableau existant, revu — huit circuits, le type AC, le défilement', () => {
+  const tableau = (departs: DepartExistant[]) => rattacher(departs, implanter({ departs, rangees: 2, parRangee: 13 }));
+
+  it('le neuvième circuit sous un même 30 mA se refuse avant d’être clipsé', () => {
+    const huit = [diff('d1', 'A', 0), ...Array.from({ length: 8 }, (_, i) => dj(`c${i}`, 16, 0))];
+    const charge = chargeEnPosant(huit, { rangees: 2, parRangee: 13 }, { organe: 'disjoncteur', calibre: 16, rangee: 0 });
+    expect(charge).toEqual({ differentiel: 'd1', circuits: 9 });
+    // En rangée 2, sous son propre différentiel : rien ne s'y oppose.
+    const ailleurs = chargeEnPosant(
+      [...huit, diff('d2', 'A', 1)],
+      { rangees: 2, parRangee: 13 },
+      { organe: 'disjoncteur', calibre: 16, rangee: 1 },
+    );
+    expect(ailleurs).toEqual({ differentiel: 'd2', circuits: 1 });
+    // Un parafoudre ne se range sous aucun différentiel.
+    expect(chargeEnPosant(huit, { rangees: 2, parRangee: 13 }, { organe: 'parafoudre', calibre: null, rangee: 0 })).toBeNull();
+  });
+
+  it('dans la feuille : le neuvième disjoncteur est refusé, et l’on dit pourquoi', () => {
+    useScanStore.setState({ existant: null });
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      t = TestRenderer.create(
+        <ExistantSheet
+          visible
+          existant={null}
+          onClose={() => {}}
+          onAjouter={(d) => useScanStore.getState().ajouterDepart(d)}
+          onModifier={() => {}}
+          onRetirer={() => {}}
+          onDecrire={(x) => useScanStore.getState().decrireTableau?.(x)}
+        />,
+      );
+    });
+    const rendre = () =>
+      act(() =>
+        t.update(
+          <ExistantSheet
+            visible
+            existant={useScanStore.getState().existant}
+            onClose={() => {}}
+            onAjouter={(d) => useScanStore.getState().ajouterDepart(d)}
+            onModifier={() => {}}
+            onRetirer={() => {}}
+            onDecrire={() => {}}
+          />,
+        ),
+      );
+    const appuie = (label: string) => {
+      const b = t.root.findAll((n) => n.props.accessibilityLabel === label && typeof n.props.onPress === 'function', { deep: false })[0];
+      expect([label, !!b]).toEqual([label, true]);
+      act(() => b.props.onPress());
+      rendre();
+    };
+    appuie('Clipser : Différentiel 30 mA type AC');
+    for (let i = 0; i < 9; i++) appuie('Disjoncteur 16 ampères');
+    const departs = useScanStore.getState().existant!.departs;
+    expect(departs.filter((d) => d.organe === 'disjoncteur')).toHaveLength(8);
+    expect(departs.find((d) => d.organe === 'differentiel')!.typeDiff).toBe('AC');
+    const mots = t.root.findAllByType(Text).map((n) => [].concat(n.props.children).join('')).join(' ');
+    expect(mots).toMatch(/protège déjà 8 circuits/);
+    act(() => t.unmount());
+  });
+
+  it('le type AC se clipse d’emblée, et reste admis sur les circuits ordinaires', () => {
+    const ordinaire = tableau([diff('d1', 'A', 0), dj('c1', 16, 0), diff('d2', 'AC', 1), dj('c2', 16, 1, 'Éclairage')]);
+    expect(diagnosticExistant(ordinaire).some((c) => c.id.startsWith('ac-'))).toBe(false);
+  });
+
+  it('cuisson ou lave-linge sous un type AC : bloquant, et les deux sont montrés du doigt', () => {
+    const departs = tableau([diff('d1', 'A', 0), dj('c1', 16, 0), diff('d2', 'AC', 1), dj('pl', 32, 1, 'Plaque de cuisson')]);
+    const k = diagnosticExistant(departs).find((c) => c.id === 'ac-d2');
+    expect(k?.gravite).toBe('ecart');
+    expect(k?.bloquant).toBe(true);
+    expect(k?.cibles).toEqual(['d2', 'pl']);
+    const grille = grilleDuTableau(departs, diagnosticExistant(departs), true);
+    expect(grille.find((g) => g.id === 'specialises')!.ok).toBe(false);
+    // Sous le type A, tout va.
+    const bien = tableau([diff('d2', 'AC', 0), dj('c1', 16, 0), diff('d1', 'A', 1), dj('pl', 32, 1, 'Plaque de cuisson')]);
+    expect(grilleDuTableau(bien, diagnosticExistant(bien), true).find((g) => g.id === 'specialises')!.ok).toBe(true);
+  });
+
+  it('la carte n’est plus un bouton : le défilement ne se dispute pas', () => {
+    const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'src/screens/result/ExistantSheet.tsx'), 'utf8');
+    expect(src).toContain('<Pressable style={StyleSheet.absoluteFill} accessibilityLabel="Fermer le tableau" onPress={onClose} />');
+    expect(src).not.toContain('<Pressable style={styles.carte}');
   });
 });

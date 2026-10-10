@@ -1,5 +1,6 @@
 import Foundation
 import ARKit
+import AVFoundation
 import RoomPlan
 import SceneKit
 import simd
@@ -93,6 +94,19 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    repart de zéro.
    */
   private var trajet: [Float] = []
+
+  /*
+    LA TORCHE S'ALLUME TOUTE SEULE QUAND IL FAIT SOMBRE — relevé du patron :
+    « lorsque lors d'un scan il n'y a pas assez de lumière, active
+    automatiquement le flash ». Deux signaux : RoomPlan qui le demande lui-même
+    (« plus de lumière »), et la lumière qu'ARKit mesure à chaque image,
+    restée trop faible une seconde et demie. Une fois. Et si on l'éteint à
+    la main, elle ne se rallume plus d'elle-même de tout le scan : c'est un
+    choix, pas un oubli.
+  */
+  private var torcheAuto = false
+  private var torcheRefusee = false
+  private var sombreDepuis: Date?
 
   /**
    LA DERNIÈRE PIÈCE VUE, telle que la session la connaît à l'instant.
@@ -226,6 +240,9 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         releves.removeAll()
         ancresElec.removeAll()
         trajet.removeAll()
+        torcheAuto = false
+        torcheRefusee = false
+        sombreDepuis = nil
         viderReperes()
         // Les photos des murs suivent le relevé : un passage ajouté les garde.
         PhotographeDesMurs.shared.reset()
@@ -476,6 +493,45 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     }
     trajet.append(c.x)
     trajet.append(c.z)
+  }
+
+  /// Sous cent cinquante lumens (mille : une pièce bien éclairée), une
+  /// seconde et demie durant, l'image se brouille : la torche s'allume.
+  private func surveillerLaLumiere(_ session: RoomCaptureSession) {
+    guard !torcheAuto, !torcheRefusee,
+          let lumiere = session.arSession.currentFrame?.lightEstimate?.ambientIntensity else { return }
+    guard lumiere < 150 else {
+      sombreDepuis = nil
+      return
+    }
+    guard let debut = sombreDepuis else {
+      sombreDepuis = Date()
+      return
+    }
+    if Date().timeIntervalSince(debut) > 1.5 { allumerLaTorche() }
+  }
+
+  private func allumerLaTorche() {
+    guard !torcheAuto, !torcheRefusee else { return }
+    guard let device = AVCaptureDevice.default(for: .video), device.hasTorch,
+          device.torchMode != .on else { return }
+    do {
+      try device.lockForConfiguration()
+      device.torchMode = .on
+      device.unlockForConfiguration()
+    } catch {
+      return
+    }
+    torcheAuto = true
+    RoomScanEvents.shared?.emit(name: "onTorche", body: ["on": true, "auto": true])
+  }
+
+  /// Le geste sur la torche : éteinte à la main, elle ne se rallume plus d'elle-même.
+  func torcheManuelle(_ on: Bool) {
+    DispatchQueue.main.async {
+      if !on && self.torcheAuto { self.torcheRefusee = true }
+      if !on { self.torcheAuto = false }
+    }
   }
 
   static func trouDuContour(_ murs: [CapturedRoom.Surface]) -> Float {
@@ -1050,6 +1106,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     // C'est elle qui nommera le mur visé à la prochaine pose.
     vueCourante = room
     noterLeTrajet(session)
+    surveillerLaLumiere(session)
     /*
       CINQ NOMBRES, DEUX FOIS PAR SECONDE AU PLUS, ET SEULEMENT S'ILS CHANGENT.
 
@@ -1098,6 +1155,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
                       didProvide instruction: RoomCaptureSession.Instruction) {
     // La même consigne, redite à chaque image, réveillait le JS pour rien.
     let texte: String = String(describing: instruction)
+    // RoomPlan réclame de la lumière : on la lui donne.
+    if case .turnOnLight = instruction { allumerLaTorche() }
     guard texte != derniereInstruction else { return }
     derniereInstruction = texte
     RoomScanEvents.shared?.emit(name: "onInstruction", body: ["instruction": texte])

@@ -32,6 +32,9 @@ class RoomScanModule: NSObject {
       resolve(false)
       return
     }
+    // La torche allumée d'elle-même (il faisait sombre) qu'on éteint à la
+    // main ne se rallume plus seule : voir `allumerLaTorche`.
+    if #available(iOS 16.0, *) { RoomScanManager.shared.torcheManuelle(on) }
     do {
       try device.lockForConfiguration()
       device.torchMode = on ? .on : .off

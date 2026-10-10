@@ -281,6 +281,29 @@ export function ScanScreen() {
       RoomScan.setTorch(false).catch(() => {});
     };
   }, []);
+  /*
+    LA TORCHE QUI S'ALLUME TOUTE SEULE, QUAND IL FAIT SOMBRE — le natif la
+    décide (RoomPlan réclame de la lumière, ou l'image reste trop sombre) ;
+    l'écran le montre : le bouton passe allumé, un mot le dit trois
+    secondes. L'éteindre à la main, c'est l'éteindre pour de bon.
+  */
+  const [torcheAuto, setTorcheAuto] = useState(false);
+  useEffect(() => {
+    let minuteur: ReturnType<typeof setTimeout> | null = null;
+    const abo = scanEvents.addListener('onTorche', (e: { on?: boolean; auto?: boolean }) => {
+      setTorch(!!e.on);
+      if (e.on && e.auto) {
+        haptic('leger');
+        setTorcheAuto(true);
+        if (minuteur) clearTimeout(minuteur);
+        minuteur = setTimeout(() => setTorcheAuto(false), 3000);
+      }
+    });
+    return () => {
+      abo.remove();
+      if (minuteur) clearTimeout(minuteur);
+    };
+  }, []);
   /**
    * LA CROIX DEMANDE, quand il y a quelque chose à perdre.
    *
@@ -416,6 +439,11 @@ export function ScanScreen() {
         {paused && (
           <View style={[styles.instructionPill, styles.pausedPill]}>
             <Text style={styles.instructionText}>Scan en pause</Text>
+          </View>
+        )}
+        {!paused && torcheAuto && (
+          <View style={[styles.instructionPill, styles.torchePill]} accessibilityLiveRegion="polite">
+            <Text style={styles.instructionText}>Peu de lumière — torche allumée</Text>
           </View>
         )}
         {/*
@@ -933,6 +961,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   pausedPill: { backgroundColor: 'rgba(232,161,59,0.85)' },
   /* Ambre comme la pause : c'est un avertissement, pas une faute. */
   douteuxPill: { backgroundColor: 'rgba(232,161,59,0.9)' },
+  torchePill: { backgroundColor: 'rgba(31,91,255,0.9)' },
   instructionDot: {
     width: 7,
     height: 7,

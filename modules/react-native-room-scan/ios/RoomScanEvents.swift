@@ -16,7 +16,7 @@ class RoomScanEvents: RCTEventEmitter {
   override static func requiresMainQueueSetup() -> Bool { false }
 
   override func supportedEvents() -> [String]! {
-    ["onScanUpdate", "onInstruction", "onScanError", "onVisee"]
+    ["onScanUpdate", "onInstruction", "onScanError", "onVisee", "onTorche"]
   }
 
   override func startObserving() { hasListeners = true }

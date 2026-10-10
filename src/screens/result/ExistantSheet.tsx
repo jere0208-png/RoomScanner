@@ -43,6 +43,8 @@ import { radius, shadowCard, useTheme, type Palette } from '../../theme';
 import {
   bilanExistant,
   calibreMaxDe,
+  chargeEnPosant,
+  MAX_CIRCUITS_PAR_DIFF,
   diagnosticExistant,
   grilleDuTableau,
   implanter,
@@ -79,18 +81,32 @@ const MOT: Record<GraviteConstat, string> = {
 };
 
 /** Ce qu'on peut clipser, dans l'ordre où on le rencontre en lisant un tableau. */
-const ORGANES: { organe: Organe; nom: string; note: string; modele: Omit<DepartExistant, 'id'> }[] = [
+/*
+  LE TYPE AC SE CLIPSE D'EMBLÉE — relevé du patron : « pas de type AC pour le
+  différentiel ? ». Il n'existait qu'en réglage, après coup ; or c'est celui
+  qu'on trouve le plus souvent dans un tableau d'avant. Les deux se posent
+  directement, chacun sous son nom.
+*/
+const ORGANES: { cle: string; organe: Organe; nom: string; note: string; modele: Omit<DepartExistant, 'id'> }[] = [
   {
+    cle: 'diff-a',
     organe: 'differentiel',
     nom: 'Différentiel 30 mA',
     note: 'type A · 2 places',
     modele: { organe: 'differentiel', calibre: 40, sensibilite: 30, typeDiff: 'A' },
   },
-  { organe: 'fusible', nom: 'Porte-fusible', note: 'ancien tableau', modele: { organe: 'fusible', calibre: 10 } },
-  { organe: 'parafoudre', nom: 'Parafoudre', note: '2 places', modele: { organe: 'parafoudre', calibre: null } },
-  { organe: 'contacteur', nom: 'Contacteur HC', note: 'chauffe-eau', modele: { organe: 'contacteur', calibre: 20, usage: 'Chauffe-eau' } },
-  { organe: 'telerupteur', nom: 'Télérupteur', note: 'éclairage', modele: { organe: 'telerupteur', calibre: 16, usage: 'Éclairage' } },
-  { organe: 'agcp', nom: 'Disjoncteur d’abonné', note: '2 places', modele: { organe: 'agcp', calibre: 45 } },
+  {
+    cle: 'diff-ac',
+    organe: 'differentiel',
+    nom: 'Différentiel 30 mA',
+    note: 'type AC · 2 places',
+    modele: { organe: 'differentiel', calibre: 40, sensibilite: 30, typeDiff: 'AC' },
+  },
+  { cle: 'fusible', organe: 'fusible', nom: 'Porte-fusible', note: 'ancien tableau', modele: { organe: 'fusible', calibre: 10 } },
+  { cle: 'parafoudre', organe: 'parafoudre', nom: 'Parafoudre', note: '2 places', modele: { organe: 'parafoudre', calibre: null } },
+  { cle: 'contacteur', organe: 'contacteur', nom: 'Contacteur HC', note: 'chauffe-eau', modele: { organe: 'contacteur', calibre: 20, usage: 'Chauffe-eau' } },
+  { cle: 'telerupteur', organe: 'telerupteur', nom: 'Télérupteur', note: 'éclairage', modele: { organe: 'telerupteur', calibre: 16, usage: 'Éclairage' } },
+  { cle: 'agcp', organe: 'agcp', nom: 'Disjoncteur d’abonné', note: '2 places', modele: { organe: 'agcp', calibre: 45 } },
 ];
 
 const CHECK = 'M9.5 16.2 5.8 12.5l-1.4 1.4 5.1 5.1 10.6-10.6-1.4-1.4z';
@@ -203,6 +219,18 @@ export function ExistantSheet({
       );
       return;
     }
+    /*
+      HUIT CIRCUITS AU PLUS SOUS UN DIFFÉRENTIEL — et c'est un geste refusé,
+      pas un constat lu après coup (voir `chargeEnPosant`).
+    */
+    const charge = chargeEnPosant(departsBruts, { rangees: impl.rangees, parRangee: impl.parRangee }, { ...modele, rangee: r });
+    if (charge && charge.circuits > MAX_CIRCUITS_PAR_DIFF) {
+      refuser(
+        `Le différentiel ${numeroDuDiff(impl, charge.differentiel)} protège déjà ${MAX_CIRCUITS_PAR_DIFF} circuits, ` +
+          'le maximum : clipsez un nouveau différentiel 30 mA pour les suivants.',
+      );
+      return;
+    }
     onAjouter({ ...modele, rangee: r });
     setRefus(null);
     haptic('accroche');
@@ -264,8 +292,17 @@ export function ExistantSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} onDismiss={lancerEnsuite}>
-      <Pressable style={styles.fond} onPress={onClose}>
-        <Pressable style={styles.carte} onPress={() => {}}>
+      {/*
+        LE DÉFILEMENT NE SE DISPUTE PLUS — relevé du patron : « dans le menu
+        du tableau existant, le scroll est bug ». La carte était un bouton
+        (pour que toucher dedans ne ferme pas la feuille) : il réclamait
+        chaque geste au défilement, qui hésitait, sautait ou ne partait pas.
+        Le fond qui ferme est maintenant posé À CÔTÉ de la carte, derrière
+        elle — la carte est une simple vue, et le défilement est seul maître.
+      */}
+      <View style={styles.fond}>
+        <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="Fermer le tableau" onPress={onClose} />
+        <View style={styles.carte}>
           <View style={styles.tete}>
             <View style={styles.teteTexte}>
               <Text style={styles.titre}>Tableau existant</Text>
@@ -411,8 +448,8 @@ export function ExistantSheet({
                     const manque = (impl.libres[visee] ?? 0) < largeurDe(o.modele);
                     return (
                       <TouchableOpacity
-                        key={o.organe}
-                        accessibilityLabel={`Clipser : ${o.nom}`}
+                        key={o.cle}
+                        accessibilityLabel={`Clipser : ${o.nom}${o.modele.typeDiff ? ` type ${o.modele.typeDiff}` : ''}`}
                         accessibilityState={{ disabled: manque }}
                         style={[
                           styles.tuile,
@@ -625,8 +662,8 @@ export function ExistantSheet({
               </View>
             )}
           </ScrollView>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 

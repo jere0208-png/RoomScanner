@@ -362,6 +362,41 @@ export function calibreMaxDe(usage: string | undefined): number | null {
 /** Au-delà, le différentiel ne protège plus rien correctement. */
 export const MAX_CIRCUITS_PAR_DIFF = 8;
 
+/**
+ * LE DIFFÉRENTIEL QUI RECEVRAIT CET ORGANE, ET CE QU'IL PORTERAIT ALORS.
+ *
+ * Relevé du patron : « on n'empêche pas de mettre plus de huit disjoncteurs
+ * si on essaye ». Le diagnostic le disait APRÈS coup ; le geste se refuse
+ * maintenant AVANT : on pose l'organe pour de faux, au bout de sa rangée,
+ * on le rattache comme le tableau le montrera, et l'on compte ce que son
+ * différentiel 30 mA porterait — exactement comme le diagnostic compte.
+ * `null` : l'organe ne se range sous aucun 30 mA.
+ */
+export function chargeEnPosant(
+  departs: DepartExistant[],
+  tableau: { rangees?: number; parRangee?: number },
+  modele: Omit<DepartExistant, 'id'>,
+): { differentiel: string; circuits: number } | null {
+  if (!PROTEGEABLE.has(modele.organe)) return null;
+  const ESSAI = '__essai__';
+  const essai: DepartExistant[] = [...departs, { ...modele, id: ESSAI }];
+  const rattaches = rattacher(essai, implanter({ departs: essai, ...tableau }));
+  const sous = rattaches.find((d) => d.id === ESSAI)?.sousDifferentiel;
+  const diff = sous ? rattaches.find((d) => d.id === sous) : undefined;
+  if (!diff || !protegeLesPersonnes(diff)) return null;
+  return {
+    differentiel: diff.id,
+    circuits: rattaches.filter((d) => d.sousDifferentiel === diff.id).length,
+  };
+}
+
+/**
+ * CE QUI EXIGE UN TYPE A — la plaque de cuisson, le lave-linge, la recharge
+ * d'un véhicule : leurs défauts ont une composante continue qu'un type AC
+ * ne voit pas. Le reste peut rester sous un type AC.
+ */
+const EXIGE_TYPE_A = /plaque|cuisson|lave-linge|lave linge|recharge|borne|irve/i;
+
 /** La norme demande de garder de quoi ajouter : un cinquième du tableau. */
 export const RESERVE_MINIMALE = 0.2;
 
@@ -498,6 +533,29 @@ export function diagnosticExistant(
     });
   }
 
+  /*
+    LE TYPE AC N'EST PAS INTERDIT — sur les circuits ordinaires. Il l'est sous
+    une plaque de cuisson, un lave-linge, une borne de recharge : c'est
+    exactement ce qu'on trouve dans les tableaux d'avant, et ce qu'il faut
+    reprendre.
+  */
+  for (const d of differentiels.filter((x) => x.typeDiff === 'AC')) {
+    const exposes = departs.filter((x) => x.sousDifferentiel === d.id && EXIGE_TYPE_A.test(x.usage ?? ''));
+    if (exposes.length > 0) {
+      dire({
+        id: `ac-${d.id}`,
+        gravite: 'ecart',
+        titre: `${exposes.map((x) => x.usage).join(', ')} sous un différentiel de type AC`,
+        detail:
+          'Plaque de cuisson, lave-linge et recharge de véhicule produisent des ' +
+          'défauts à composante continue qu’un type AC ne voit pas : ces ' +
+          'circuits se raccordent sous un type A.',
+        remede: 'Les raccorder sous le différentiel de type A, ou remplacer celui-ci par un type A.',
+        cibles: [d.id, ...exposes.map((x) => x.id)],
+      });
+    }
+  }
+
   for (const d of trenteMA) {
     const portes = departs.filter((x) => x.sousDifferentiel === d.id);
     if (portes.length > MAX_CIRCUITS_PAR_DIFF) {
@@ -612,6 +670,12 @@ export function grilleDuTableau(
     { id: 'trente', titre: 'Un différentiel 30 mA protège les personnes', ok: juger(a('sans-30ma')) },
     { id: 'deux', titre: 'Deux différentiels 30 mA au moins', ok: juger(a('sans-30ma') || a('un-seul-diff')) },
     { id: 'type-a', titre: 'Un différentiel de type A', ok: juger(a('sans-30ma') || a('sans-type-a')) },
+    {
+      id: 'specialises',
+      titre: 'Cuisson, lave-linge et recharge sous un type A',
+      // Rien de tel noté sur le tableau : la règle attend qu'on le relève.
+      ok: departs.some((d) => EXIGE_TYPE_A.test(d.usage ?? '')) ? !a('ac') : null,
+    },
     { id: 'proteges', titre: 'Chaque circuit sous un 30 mA', ok: juger(a('sans-30ma') || a('hors-30ma')) },
     { id: 'huit', titre: 'Huit circuits au plus par différentiel', ok: juger(a('charge')) },
     { id: 'calibres', titre: 'Des calibres faits pour leurs fils', ok: juger(a('calibre')) },

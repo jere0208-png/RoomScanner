@@ -14285,6 +14285,46 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le tableau existant qui défile, huit circuits au plus, le type AC ; la torche qui s'allume seule
+
+Relevés du patron : « dans le menu du tableau existant, le scroll est bug. De
+plus, on n'empêche pas de mettre plus de huit disjoncteurs si on essaye ; si
+tu trouves ça anormal, corrige ça. Pas de type AC pour le différentiel ? » —
+puis « lorsque lors d'un scan il n'y a pas assez de lumière, active
+automatiquement le flash ».
+
+**Le défilement** (`ExistantSheet`). La carte de la feuille était un bouton
+(pour qu'un appui dedans ne la ferme pas) : il réclamait chaque geste au
+défilement, qui hésitait ou ne partait pas. Le fond qui ferme est maintenant
+posé derrière la carte, à côté d'elle ; la carte est une simple vue.
+
+**Huit circuits au plus sous un différentiel 30 mA** (`chargeEnPosant`). Le
+diagnostic le disait après coup ; le geste se refuse maintenant avant : on
+pose l'organe pour de faux au bout de sa rangée, on le rattache comme le
+tableau le montrera, et l'on compte ce que son différentiel porterait. Le
+neuvième est refusé, et la feuille dit lequel et quoi faire : « Le
+différentiel D1 protège déjà 8 circuits, le maximum : clipsez un nouveau
+différentiel 30 mA pour les suivants. »
+
+**Le type AC.** Il n'existait qu'en réglage, après coup ; c'est pourtant celui
+qu'on trouve le plus souvent dans un tableau d'avant. La palette propose
+maintenant les deux, type A et type AC. La règle suit la norme : l'AC reste
+admis sur les circuits ordinaires, mais pas sous une plaque de cuisson, un
+lave-linge ou une recharge de véhicule (défauts à composante continue) —
+constat bloquant `ac-…`, les circuits montrés du doigt, et une ligne de plus
+au contrôle : « Cuisson, lave-linge et recharge sous un type A ».
+
+**La torche automatique** (`RoomScanManager.swift`, `ScanScreen`). Quand
+RoomPlan réclame de la lumière, ou que la lumière mesurée par ARKit reste sous
+150 lumens une seconde et demie, la torche s'allume ; le bouton passe allumé
+et un mot le dit trois secondes (« Peu de lumière — torche allumée »). Une
+fois par scan, et jamais contre l'utilisateur : éteinte à la main, elle ne se
+rallume plus d'elle-même.
+
+Bancs : `tableauvivant` (+5 : le neuvième refusé, dans la feuille aussi ; le
+type AC admis sur l'ordinaire, bloquant sous la cuisson ; la carte qui n'est
+plus un bouton), `torcheauto` (4).
+
 ## Le natif, plus sobre et plus net : la passe d'audit
 
 Relevé du patron : « améliore sans ajout le côté natif de l'app dans tout ce
