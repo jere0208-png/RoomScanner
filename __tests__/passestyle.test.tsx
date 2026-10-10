@@ -154,6 +154,31 @@ describe('2 — du blanc net sur les pages claires', () => {
     expect(lire('.github/workflows/build-ios-unsigned.yml')).toMatch(/xcode-select -s \/Applications\/Xcode_26/);
   });
 
+  it('le verre se lit par sa lumière, même sur une page unie', () => {
+    /*
+      Relevé du patron, capture à l'appui : « je ne vois pas l'effet ». Le
+      Liquid Glass d'iOS réfracte ce qu'il y a derrière ; sur l'accueil uni,
+      il n'a rien à déformer. Le verre de la référence se lit par SA LUMIÈRE :
+      un liseré clair en haut à gauche qui se rallume en bas à droite, un
+      reflet dans le haut, un creux dans le bas, une ombre de sa couleur.
+      Elle est dessinée par la couche native, sur TOUTES les versions d'iOS —
+      jamais dans une branche réservée à la réplique.
+    */
+    const natif = lire('modules/react-native-room-scan/ios/RoomScanVerre.swift');
+    const init = natif.slice(natif.indexOf('override init(frame'), natif.indexOf('required init?'));
+    for (const couche of ['reflet', 'creux', 'lisere']) {
+      // Au premier niveau de l'initialiseur : hors de tout `if`.
+      expect([couche, init.includes(`\n    layer.addSublayer(${couche})`)]).toEqual([couche, true]);
+    }
+    // Le liseré : clair au départ, éteint au milieu, rallumé à l'arrivée.
+    expect(natif).toContain('lisere.locations = [0, 0.3, 0.7, 1]');
+    expect(natif).toMatch(/UIColor\(white: 1, alpha: 1\)\.cgColor, UIColor\(white: 1, alpha: 0\.45\)/);
+    // L'ombre d'une tuile est sa couleur, assombrie — une lueur, pas un gris.
+    expect(natif).toContain('layer.shadowColor = couleurDOmbre().cgColor');
+    // La lumière ne se redessine que si la forme a changé.
+    expect(natif).toContain('if bounds.size == tailleLumiere && r == rayonLumiere { return }');
+  });
+
   it('« Terminer » porte lui-même sa pilule : ce qu’on voit est ce qu’on touche', () => {
     const visite = lire('src/components/Exploration.tsx');
     const a = visite.indexOf('    terminer: {');

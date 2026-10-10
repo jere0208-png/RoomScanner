@@ -14285,6 +14285,48 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le verre prend sa lumière ; la visite répond plus vite ; l'exemple ne s'accuse plus
+
+**Le verre.** Capture du patron : les tuiles de l'accueil ont leur couleur,
+mais « je ne vois pas l'effet ». Le Liquid Glass d'iOS RÉFRACTE ce qu'il y a
+derrière : sur une page unie, il n'a rien à déformer et ne se voit pas. Le
+verre de la référence (Dribbble, « Liquid Glass ») se lit par sa LUMIÈRE.
+`RoomScanVerre.swift` la dessine désormais sur toutes les versions d'iOS,
+au-dessus de la matière :
+- un **liseré spéculaire** d'un point et demi, blanc franc en haut à gauche,
+  éteint au milieu, rallumé en bas à droite — le bord épais d'une dalle ;
+- un **reflet** dans le haut (retenu sur une tuile teintée : c'est sa couleur
+  qu'on reconnaît) et un **creux** plus sombre dans le bas, l'épaisseur ;
+- une **ombre douce de la couleur** de l'élément, assombrie — une lueur, pas
+  un gris ; neutre pour les verres sans teinte.
+Rien ne se redessine si la forme n'a pas changé ; le liseré reste rasterisé.
+
+**La visite.** Relevé : « augmente la sensibilité des mouvements de la
+visite ». Le regard passe de 0,0065 à 0,0095 rad par point : cent points de
+pouce font 54° au lieu de 37°, on se retourne en deux gestes. La manette
+passe de 58 à 44 points de rayon (zone morte 9 %) : la pleine marche sous un
+pouce qui glisse à peine — la vitesse de pointe, elle, ne change pas.
+
+**L'appartement d'exemple.** Capture du patron : 17 points à corriger, dont
+huit « Une baie s'arrête à 204 cm, les autres à 230 ». Le contrôle des volets
+(`linteauxRabotes`) comparait les portes de chambre — 2,04 m, l'huisserie
+normalisée — à la plus haute fenêtre du logement. Deux gardes :
+- **seule une baie de façade a un volet** : une fenêtre compte, une porte
+  seulement quand un de ses côtés donne hors de toute pièce (porte-fenêtre,
+  entrée), un passage jamais ; une baie de pièce à pièce sort du compte ;
+- **la référence est partagée** : le plus haut niveau où s'accordent au moins
+  deux baies, à 5 cm près. Une grande baie vitrée seule ne fait plus
+  « remonter » toutes les autres ; deux baies en désaccord, on se tait.
+Et l'exemple a ses linteaux de façade alignés à 2,15 m, comme tout logement.
+Les autres lignes du panneau sont celles de la norme électrique : l'exemple
+n'a encore aucun appareil, la baguette les pose.
+
+Bancs : `passestyle` (la lumière hors de toute branche, liseré, ombre
+teintée, pas de redessin inutile) ; `visitenative` (cent points de regard
+> 50°, la pleine marche à 44 points) ; `floorplan` (porte de chambre ignorée,
+porte-fenêtre rabotée vue, baie vitrée seule sans effet) ; `exemple` (le
+contrôle n'y trouve rien, linteaux à 2,15 m).
+
 ## Le menu « Poser » du scan commence rangé
 
 Relevé du patron : « lors du scan, réduis le menu Poser par défaut ». Un scan

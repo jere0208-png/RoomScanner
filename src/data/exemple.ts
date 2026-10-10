@@ -97,12 +97,14 @@ const OPENINGS: WallSeg[] = [
   baie('porte-chambre', 'door', 5, 2.5, 5, 3.33, 2.04),
   baie('porte-sde', 'door', 5, 4.6, 5, 5.33, 2.04),
   // La lumière : deux fenêtres au séjour, une à la chambre, une au bureau,
-  // et le petit châssis haut de la salle d'eau.
-  baie('fenetre-sejour', 'window', 0.8, 0, 2.2, 0, 1.35, 0.95),
+  // et le petit châssis haut de la salle d'eau. TOUS LES LINTEAUX À 2,15 M,
+  // comme dans tout logement : le contrôle des volets s'y fie (voir
+  // `linteauxRabotes`), et la vitrine ne doit pas s'accuser elle-même.
+  baie('fenetre-sejour', 'window', 0.8, 0, 2.2, 0, 1.2, 0.95),
   baie('porte-fenetre', 'window', 3.1, 0, 4.5, 0, 2.15, 0),
-  baie('fenetre-chambre', 'window', 6, 0, 7.2, 0, 1.15, 0.95),
-  baie('fenetre-bureau', 'window', 0, 4.6, 0, 5.6, 1.15, 0.95),
-  baie('fenetre-sde', 'window', 8, 4.5, 8, 5.1, 0.6, 1.5),
+  baie('fenetre-chambre', 'window', 6, 0, 7.2, 0, 1.2, 0.95),
+  baie('fenetre-bureau', 'window', 0, 4.6, 0, 5.6, 1.2, 0.95),
+  baie('fenetre-sde', 'window', 8, 4.5, 8, 5.1, 0.6, 1.55),
 ];
 
 /** Le nom et la nature de chaque pièce, retrouvée par un point qui y est. */

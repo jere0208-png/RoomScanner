@@ -111,10 +111,26 @@ const ouvertureVerticale = (w: number, h: number) => {
 const TANGAGE_DEPART = -0.12;
 /** Ce que le regard peut lever ou baisser : ni le plafond, ni les pieds. */
 const TANGAGE_MAX = 0.6;
-/** Un balayage de l'écran entier fait un peu plus d'un demi-tour. */
-const SENSIBILITE = 0.0065;
-/** Le rayon de la manette, en points : un pouce y tient sans viser. */
-const RAYON_MANETTE = 58;
+/**
+ * LE REGARD — un demi-écran de pouce tourne la tête d'un quart de tour.
+ *
+ * Relevé du patron : « augmente la sensibilité des mouvements de la
+ * visite ». À 0,0065 rad par point, se retourner demandait trois balayages
+ * : la moitié droite de l'écran, celle du regard, ne faisait que 37° par
+ * passage. À 0,0095, cent points font 54°, la demi-largeur d'un iPhone un
+ * peu plus d'un quart de tour — on regarde derrière soi en deux gestes, et
+ * un petit mouvement reste un petit regard.
+ */
+export const SENSIBILITE = 0.0095;
+/**
+ * LE RAYON DE LA MANETTE — 44 points : la pleine marche sous un pouce qui
+ * glisse à peine.
+ *
+ * À 58 points il fallait étirer le pouce d'un centimètre et demi pour
+ * marcher d'un bon pas ; la plupart des pouces s'arrêtaient avant et
+ * traînaient à mi-vitesse. La vitesse de pointe, elle, ne change pas.
+ */
+export const RAYON_MANETTE = 44;
 /**
  * L'ÉLAN ET L'ARRÊT — un dixième de seconde pour prendre sa vitesse, un
  * vingtième pour la perdre.
@@ -131,8 +147,9 @@ const ARRET = 0.05;
 const VITESSE_NULLE = 0.05;
 /** La mini-carte suit à dix images par seconde : c'est un repère, pas un film. */
 const PERIODE_CARTE = 100;
-/** Au centre, la manette ne fait rien : le pouce posé tremble toujours. */
-const ZONE_MORTE = 0.12;
+/** Au centre, la manette ne fait rien : le pouce posé tremble toujours —
+ *  quatre points, pas davantage, sur une manette plus courte. */
+const ZONE_MORTE = 0.09;
 /** Une image toutes les trente-trois millisecondes, pas davantage. */
 const PERIODE = 33;
 /**

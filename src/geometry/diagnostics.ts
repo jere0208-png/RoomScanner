@@ -130,7 +130,10 @@ export function checkPlan(
     logement les linteaux s'alignent — celui qui tombe quinze centimètres
     plus bas que les autres n'est pas une menuiserie particulière.
   */
-  for (const r of linteauxRabotes(openings)) {
+  const contours = parts
+    .map((p) => p.surface?.pts)
+    .filter((c): c is NonNullable<typeof c> => !!c && c.length >= 3);
+  for (const r of linteauxRabotes(openings, undefined, contours)) {
     issues.push({
       kind: 'linteau',
       severity: 'alerte',

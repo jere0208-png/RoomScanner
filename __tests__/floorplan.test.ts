@@ -2066,6 +2066,60 @@ describe('les linteaux rabotés', () => {
     ];
     expect(linteauxRabotes(baies)).toHaveLength(0);
   });
+
+  /*
+    LE PLAN D'EXEMPLE S'ACCUSAIT LUI-MÊME — capture du patron : « il y a
+    beaucoup d'erreurs de ce type, est-ce normal ? ». Huit « Une baie
+    s'arrête à 204 cm, les autres à 230 » : les portes de chambre comparées
+    à la plus haute fenêtre du logement.
+  */
+  const porte = (id: string, ax: number, az: number, bx: number, bz: number, haut = 2.04): WallSeg => ({
+    id,
+    type: 'door',
+    a: { x: ax, z: az },
+    b: { x: bx, z: bz },
+    height: haut,
+    yCenter: haut / 2,
+  });
+  // Deux pièces côte à côte, de 0 à 4 et de 4 à 8 ; la façade au nord (z = 0).
+  const CONTOURS = [
+    [{ x: 0, z: 0 }, { x: 4, z: 0 }, { x: 4, z: 4 }, { x: 0, z: 4 }],
+    [{ x: 4, z: 0 }, { x: 8, z: 0 }, { x: 8, z: 4 }, { x: 4, z: 4 }],
+  ];
+
+  it('une porte de chambre n’a pas de volet : elle ne se compare pas aux fenêtres', () => {
+    const baies = [
+      baie('a', 2.3, 0.9),
+      baie('b', 2.3, 0.9),
+      // La porte entre les deux pièces, sur le refend x = 4.
+      porte('chambre', 4, 1, 4, 1.83),
+      { ...baie('passage', 2.1, 0), type: 'opening' as const },
+    ];
+    expect(linteauxRabotes(baies, 0.15, CONTOURS)).toHaveLength(0);
+    // Sans contours, une porte ne compte pas davantage.
+    expect(linteauxRabotes(baies)).toHaveLength(0);
+  });
+
+  it('mais une porte-fenêtre en façade, rabotée par son volet, se voit', () => {
+    const baies = [
+      baie('a', 2.15, 0.9),
+      baie('b', 2.15, 0.9),
+      // Sur la façade nord : un côté donne dehors.
+      porte('porte-fenetre', 5, 0, 6.4, 0, 1.8),
+      porte('chambre', 4, 1, 4, 1.83),
+    ];
+    const r = linteauxRabotes(baies, 0.15, CONTOURS);
+    expect(r.map((x) => x.id)).toEqual(['porte-fenetre']);
+    expect(r[0].linteau).toBeCloseTo(2.15, 2);
+  });
+
+  it('une seule grande baie vitrée ne fait pas la référence', () => {
+    // Une baie à 2,30 m, trois fenêtres à 2,15 : rien n'est raboté.
+    const baies = [baie('vitree', 2.3, 0), baie('a', 2.15, 0.9), baie('b', 2.15, 0.9), baie('c', 2.15, 0.9)];
+    expect(linteauxRabotes(baies)).toHaveLength(0);
+    // Et deux baies qui ne s'accordent pas ne disent pas laquelle croire.
+    expect(linteauxRabotes([baie('a', 2.15, 0.9), baie('b', 1.8, 0.9)])).toHaveLength(0);
+  });
 });
 
 /**

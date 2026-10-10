@@ -2124,22 +2124,63 @@ export function faceIntoRoom(
  * SONT AU MÊME NIVEAU. Trois baies à 2,15 m et une à 1,80 m, ce n'est pas
  * une menuiserie particulière — c'est un volet qui pendait.
  *
- * On prend donc le linteau LE PLUS HAUT comme référence (un volet ne peut
- * que rabaisser une baie, jamais la grandir), et l'on signale celles qui
+ * On prend donc pour référence le linteau le plus haut — un volet ne peut
+ * que rabaisser une baie, jamais la grandir — et l'on signale celles qui
  * tombent nettement dessous. Le seuil est large — quinze centimètres —
  * parce qu'un châssis de salle de bains ou une imposte peuvent
  * légitimement s'arrêter plus bas de quelques centimètres.
+ *
+ * DEUX GARDES, apprises sur le plan d'exemple — huit fausses alertes, toutes
+ * les portes et presque toutes les fenêtres « à remonter » :
+ * — SEULE UNE BAIE DE FAÇADE A UN VOLET. Une porte de chambre à 2,04 m (la
+ *   huisserie normalisée) n'a rien à voir avec une fenêtre à 2,15 m, et un
+ *   passage ouvert n'a pas de menuiserie du tout. Une fenêtre compte
+ *   toujours ; une porte, seulement quand l'un de ses côtés donne hors de
+ *   toute pièce (une porte-fenêtre, l'entrée) ; et quand les contours
+ *   disent qu'une baie va de pièce à pièce, elle sort du compte ;
+ * — LE NIVEAU DE RÉFÉRENCE EST PARTAGÉ. « Les autres à 2,30 » ne se dit pas
+ *   d'une seule grande baie vitrée : la référence est le plus haut niveau
+ *   où s'accordent AU MOINS DEUX baies, à cinq centimètres près. Deux baies
+ *   qui ne s'accordent pas ne disent pas laquelle croire : on se tait.
  */
 export function linteauxRabotes(
   openings: WallSeg[],
   ecartMin = 0.15,
+  /**
+   * Les contours des pièces, quand l'appelant les a : ils disent quelle
+   * baie donne dehors. Sans eux, seules les fenêtres comptent.
+   */
+  contours: Pt[][] = [],
 ): { id: string; linteau: number; actuel: number }[] {
-  const baies = openings.filter((o) => o.type !== 'wall');
+  const dedans = (p: Pt) => contours.some((c) => c.length >= 3 && insidePoly(p, c));
+  /** Un côté de la baie est-il hors de toute pièce ? */
+  const enFacade = (o: WallSeg): boolean | null => {
+    if (contours.length === 0) return null;
+    const l = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z);
+    if (l < 1e-6) return null;
+    const n = { x: -(o.b.z - o.a.z) / l, z: (o.b.x - o.a.x) / l };
+    const m = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+    const d = WALL_T / 2 + 0.25;
+    return (
+      !dedans({ x: m.x + n.x * d, z: m.z + n.z * d }) ||
+      !dedans({ x: m.x - n.x * d, z: m.z - n.z * d })
+    );
+  };
+  const baies = openings.filter((o) => {
+    if (o.type === 'window') return enFacade(o) !== false;
+    if (o.type === 'door') return enFacade(o) === true;
+    return false;
+  });
   if (baies.length < 2) return [];
   const hautDe = (o: WallSeg) => o.yCenter + o.height / 2;
-  const reference = Math.max(...baies.map(hautDe));
+  const hauts = baies.map(hautDe).sort((a, b) => b - a);
+  const ACCORD = 0.05;
+  const reference = hauts.find(
+    (h) => hauts.filter((x) => x <= h + 1e-9 && h - x <= ACCORD + 1e-9).length >= 2,
+  );
+  if (reference === undefined) return [];
   return baies
-    .filter((o) => reference - hautDe(o) >= ecartMin)
+    .filter((o) => reference - hautDe(o) >= ecartMin - 1e-9)
     .map((o) => ({ id: o.id, linteau: reference, actuel: hautDe(o) }));
 }
 

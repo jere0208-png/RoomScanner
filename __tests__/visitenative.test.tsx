@@ -61,7 +61,12 @@ import { Iso3DView } from '../src/components/Iso3DView';
 import { useScanStore } from '../src/store/scanStore';
 import { HAUTEUR_OEIL } from '../src/geometry/exploration';
 import { PAR_TRIANGLE } from '../src/geometry/visite3d';
-import { PERIODE_NATIF, cadenceDeMarche } from '../src/components/Exploration';
+import {
+  PERIODE_NATIF,
+  RAYON_MANETTE,
+  SENSIBILITE,
+  cadenceDeMarche,
+} from '../src/components/Exploration';
 import {
   SNAPSHOT_OBJECTS,
   SNAPSHOT_OPENINGS,
@@ -342,6 +347,68 @@ describe('marcher et tourner en même temps', () => {
     act(() => jest.advanceTimersByTime(300));
     const d = vueNative(t);
     expect(Math.hypot(d[0] - c[0], d[2] - c[2])).toBeLessThan(1e-6);
+  });
+});
+
+/*
+  LA SENSIBILITÉ — relevé du patron : « augmente la sensibilité des
+  mouvements de la visite ». Se retourner demandait trois balayages, et la
+  pleine marche un pouce étiré d'un centimètre et demi.
+*/
+describe('la visite répond au moindre geste', () => {
+  const ev = (changes: ReturnType<typeof touche>[], toutes: ReturnType<typeof touche>[]) => ({
+    nativeEvent: { touches: toutes, changedTouches: changes, pageX: 0, pageY: 0, timestamp: Date.now() },
+  });
+
+  it('cent points de pouce droit tournent la tête de plus de cinquante degrés', () => {
+    const t = monter();
+    presser(t, 'Explorer');
+    const z = pouces(t);
+    const avant = vueNative(t);
+    act(() => {
+      z.props.onStartShouldSetResponder(ev([touche(1, 460, 500)], [touche(1, 460, 500)]));
+      z.props.onResponderGrant(ev([touche(1, 460, 500)], [touche(1, 460, 500)]));
+    });
+    for (let i = 1; i <= 10; i++) {
+      act(() => {
+        z.props.onResponderMove(ev([touche(1, 460 + i * 10, 500)], [touche(1, 460 + i * 10, 500)]));
+        jest.advanceTimersByTime(20);
+      });
+    }
+    act(() => z.props.onResponderRelease(ev([touche(1, 560, 500)], [])));
+    act(() => jest.advanceTimersByTime(100));
+    const apres = vueNative(t);
+    expect(Math.abs(apres[3] - avant[3])).toBeGreaterThan((50 * Math.PI) / 180);
+    // Et un petit geste reste un petit regard : jamais plus d'un demi-tour
+    // pour cent points.
+    expect(Math.abs(apres[3] - avant[3])).toBeLessThan(Math.PI / 2);
+  });
+
+  it('la pleine marche sous un pouce qui glisse de quarante-quatre points', () => {
+    const parcouru = (pousse: number) => {
+      const t = monter();
+      presser(t, 'Explorer');
+      const z = pouces(t);
+      const a = vueNative(t);
+      act(() => {
+        z.props.onStartShouldSetResponder(ev([touche(0, 120, 900)], [touche(0, 120, 900)]));
+        z.props.onResponderGrant(ev([touche(0, 120, 900)], [touche(0, 120, 900)]));
+        z.props.onResponderMove(ev([touche(0, 120, 900 - pousse)], [touche(0, 120, 900 - pousse)]));
+      });
+      act(() => jest.advanceTimersByTime(600));
+      const b = vueNative(t);
+      act(() => z.props.onResponderRelease(ev([touche(0, 120, 900 - pousse)], [])));
+      act(() => jest.advanceTimersByTime(100));
+      act(() => arbre?.unmount());
+      arbre = null;
+      return Math.hypot(b[0] - a[0], b[2] - a[2]);
+    };
+    const court = parcouru(RAYON_MANETTE);
+    const etire = parcouru(90);
+    expect(court).toBeGreaterThan(0.2);
+    expect(court).toBeCloseTo(etire, 2);
+    expect(RAYON_MANETTE).toBeLessThanOrEqual(44);
+    expect(SENSIBILITE).toBeGreaterThanOrEqual(0.009);
   });
 });
 

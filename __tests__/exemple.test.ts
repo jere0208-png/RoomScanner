@@ -7,6 +7,7 @@
 import { appartementExemple, NOM_EXEMPLE } from '../src/data/exemple';
 import { murDeLOuverture, roomParts, totalArea } from '../src/geometry/floorplan';
 import { poserLibre } from '../src/geometry/poser';
+import { checkPlan } from '../src/geometry/diagnostics';
 
 const ex = appartementExemple();
 const parts = roomParts(ex.walls, ex.rooms);
@@ -42,5 +43,22 @@ describe('l’appartement d’exemple', () => {
     // Une porte d'entrée, une pièce de jour éclairée : c'est un logement.
     expect(ex.openings.filter((o) => o.type === 'window').length).toBeGreaterThanOrEqual(4);
     expect(ex.openings.some((o) => o.id === 'porte-entree')).toBe(true);
+  });
+
+  /*
+    LA VITRINE NE S'ACCUSE PAS ELLE-MÊME — capture du patron : dix-sept
+    « points à corriger » sur l'exemple, dont huit « Une baie s'arrête à
+    204 cm, les autres à 230 ». Un plan d'exemple qui se dit faux apprend à
+    ignorer le contrôle.
+  */
+  it('le contrôle du plan n’y trouve rien à redire', () => {
+    expect(checkPlan(ex.walls, ex.rooms, ex.openings).map((i) => i.message)).toEqual([]);
+  });
+
+  it('et ses linteaux de façade s’alignent, comme dans tout logement', () => {
+    const hauts = ex.openings
+      .filter((o) => o.type === 'window')
+      .map((o) => Math.round((o.yCenter + o.height / 2) * 100));
+    expect(new Set(hauts)).toEqual(new Set([215]));
   });
 });

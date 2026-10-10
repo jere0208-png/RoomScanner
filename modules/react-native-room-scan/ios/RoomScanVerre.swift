@@ -3,56 +3,48 @@ import React
 import UIKit
 
 /**
- LE VERRE DE L'APP — le Liquid Glass d'Apple, et sa réplique avant iOS 26.
+ LE VERRE DE L'APP — une matière, et SA LUMIÈRE.
 
  Relevés du patron : « le menu doit s'ouvrir telle une bulle Apple, en
  verre », « mets ce léger effet transparent glass là où tu le juges
- nécessaire », puis, l'IPA en main : « l'effet de verre est raté ; sur
- l'accueil la forme des cards a été modifiée, pas de transparence + flou type
- Apple glass ; pareil pour les autres, il ne se voit pas. Tu dois répliquer le
- liquid glass » — référence à l'appui (Dribbble, « Liquid Glass – Apple's
- Modern UI Trend »).
+ nécessaire », « tu dois répliquer le liquid glass » (Dribbble, « Liquid
+ Glass – Apple's Modern UI Trend »), puis, captures à l'appui : « il n'y a
+ plus aucune couleur sur les cards de l'accueil » et « je ne vois pas
+ l'effet ».
 
- IL AVAIT RAISON, POUR TROIS RAISONS :
- — un voile blanc à 70 % rendait le verre OPAQUE : on ne voyait ni à travers,
-   ni le flou ;
- — React Native posait PAR-DESSUS le verre une teinte et un reflet, à coins
-   circulaires, sur un verre à coins continus : deux formes l'une sur
-   l'autre, et la carte n'avait plus son dessin ;
- — iOS ignore DÉFINITIVEMENT un verre posé pendant qu'un parent est
-   transparent — et nos cartes entrent en fondu depuis zéro.
+ CE QUE LES DEUX CAPTURES ONT APPRIS :
+ — le Liquid Glass d'iOS est une matière qui RÉFRACTE ce qu'il y a derrière.
+   Sur une page unie, il n'a rien à déformer : il devient invisible. Le
+   verre de la référence se lit autrement — par sa LUMIÈRE : un liseré
+   spéculaire clair en haut à gauche qui se rallume en bas à droite (le bord
+   épais d'une dalle de verre), un reflet dans le haut, un creux plus sombre
+   dans le bas qui donne l'épaisseur, et une ombre douce teintée de sa
+   couleur. Cette lumière est DESSINÉE ici, sur toutes les versions d'iOS :
+   elle ne dépend plus de ce qu'il y a derrière ;
+ — iOS abandonne en silence un Liquid Glass posé pendant que l'élément est
+   encore presque transparent, et nos cartes entrent en fondu : il se pose à
+   pleine opacité ;
+ — sous lui, un fond porte la couleur de l'élément (la teinte d'une tuile, un
+   voile clair ailleurs) : le verre la reprend, et sans lui la carte garde sa
+   couleur.
 
- LA MATIÈRE, MAINTENANT :
- — iOS 26 et suivants : LE VRAI LIQUID GLASS (`UIGlassEffect`) — lentille,
-   reflets spéculaires, luminance qui s'adapte à ce qu'il y a dessous, teinte
-   éventuelle (les tuiles de l'accueil). Il se pose quand la vue est réellement
-   visible (comme le fait `expo-glass-effect`) ; React Native ne peint plus
-   rien dessus.
- — avant iOS 26 : sa réplique, tout en natif — flou système, voile LÉGER, un
-   liseré lumineux en dégradé (clair en haut à gauche, qui s'éteint au milieu
-   et se rallume en bas à droite : le bord épais d'un verre), un reflet en haut
-   qui s'éteint avant le milieu, et l'ombre de l'élément sur sa forme. Coins
-   CIRCULAIRES, ceux de React Native : la carte garde exactement son dessin.
+ LA MATIÈRE : iOS 26 et suivants, le vrai `UIGlassEffect` (lentille sur ce qui
+ passe dessous — le plan, la caméra, la visite) ; avant, un flou système au
+ voile léger. Coins circulaires pour la réplique, ceux de React Native.
 
  Il ne prend jamais le doigt et ne porte aucun enfant : il se pose derrière
  le contenu, qui reste en JavaScript.
  */
 final class VueDeVerre: UIView {
-  /*
-    LE FOND DE SECOURS, SOUS LE VERRE — relevé du patron, capture à l'appui :
-    « il n'y a plus aucune couleur sur les cards de l'accueil depuis le liquid
-    glass ». Le verre ne s'était pas posé : iOS l'abandonne EN SILENCE s'il
-    arrive pendant que l'élément est encore presque transparent, et toutes
-    ces cartes entrent en fondu. Il se pose maintenant à pleine opacité ; et
-    sous lui, ce fond porte la couleur de l'élément (la teinte d'une tuile, un
-    voile clair ailleurs) : le verre la reprend en la floutant, et si un jour
-    il manque encore, la carte garde sa couleur et sa forme.
-  */
+  /// La couleur de l'élément, sous le verre (iOS 26).
   private let secours = UIView()
+  /// Le verre (iOS 26) ou le flou (avant).
   private let effet = UIVisualEffectView()
-  // La réplique (avant iOS 26).
+  /// Le voile de la réplique (avant iOS 26).
   private let voileVue = UIView()
+  // LA LUMIÈRE DU VERRE — dessinée, sur toutes les versions.
   private let reflet = CAGradientLayer()
+  private let creux = CAGradientLayer()
   private let lisere = CAGradientLayer()
   private let traitDuLisere = CAShapeLayer()
 
@@ -60,8 +52,8 @@ final class VueDeVerre: UIView {
   private var pose = false
   /// Ce que la forme a déjà reçu : on ne refait rien qui n'a pas changé.
   private var rayonForme: CGFloat = -1
-  private var tailleReplique: CGSize = .zero
-  private var rayonReplique: CGFloat = -1
+  private var tailleLumiere: CGSize = .zero
+  private var rayonLumiere: CGFloat = -1
 
   /// Le rayon des coins, en points.
   @objc var rayon: NSNumber = 20 {
@@ -72,7 +64,7 @@ final class VueDeVerre: UIView {
     CHAQUE PROPRIÉTÉ NE REFAIT QUE SI ELLE A CHANGÉ. La couche d'interopérabilité
     de React Native réaffecte TOUTES les propriétés d'une vue dès que l'une
     bouge : sans ces gardes, chaque nouveau rendu d'une pastille reposait un
-    Liquid Glass neuf. Et le voile comme l'ombre ne servent qu'à la réplique.
+    verre neuf.
   */
 
   /// Le thème de l'app, qui n'est pas forcément celui du téléphone.
@@ -95,45 +87,53 @@ final class VueDeVerre: UIView {
     didSet { if oldValue != force { rafraichir() } }
   }
 
-  /// L'ombre de l'élément (réplique seulement) : [opacité, rayon, décalage].
+  /// L'ombre de l'élément : [opacité, rayon, décalage]. Zéro : celle du verre.
   @objc var ombre: NSArray = [0, 0, 0] {
-    didSet { if !verreSysteme && !oldValue.isEqual(ombre) { rafraichir() } }
+    didSet { if !oldValue.isEqual(ombre) { rafraichir() } }
   }
 
   override init(frame: CGRect) {
     super.init(frame: frame)
     isUserInteractionEnabled = false
     backgroundColor = .clear
-    effet.isUserInteractionEnabled = false
-    effet.clipsToBounds = true
     verreSysteme = VueDeVerre.verreDisponible
     if verreSysteme {
       secours.isUserInteractionEnabled = false
       addSubview(secours)
     }
+    effet.isUserInteractionEnabled = false
+    effet.clipsToBounds = true
     addSubview(effet)
     if !verreSysteme {
       effet.effect = UIBlurEffect(style: .systemUltraThinMaterial)
       voileVue.isUserInteractionEnabled = false
       effet.contentView.addSubview(voileVue)
-      reflet.startPoint = CGPoint(x: 0.5, y: 0)
-      reflet.endPoint = CGPoint(x: 0.5, y: 1)
-      reflet.locations = [0, 0.55]
-      reflet.masksToBounds = true
-      layer.addSublayer(reflet)
-      lisere.startPoint = CGPoint(x: 0, y: 0)
-      lisere.endPoint = CGPoint(x: 1, y: 1)
-      lisere.locations = [0, 0.5, 1]
-      traitDuLisere.fillColor = nil
-      traitDuLisere.strokeColor = UIColor.black.cgColor
-      lisere.mask = traitDuLisere
-      // Un dégradé masqué se recalcule hors écran à chaque image animée :
-      // rasterisé, il se dessine une fois et se recolle ensuite.
-      lisere.shouldRasterize = true
-      lisere.rasterizationScale = UIScreen.main.scale
-      layer.addSublayer(lisere)
-      layer.shadowColor = UIColor(red: 0.043, green: 0.051, blue: 0.071, alpha: 1).cgColor
     }
+    // Le reflet du haut : il s'éteint avant le milieu.
+    reflet.startPoint = CGPoint(x: 0.5, y: 0)
+    reflet.endPoint = CGPoint(x: 0.5, y: 1)
+    reflet.locations = [0, 0.3, 0.6]
+    reflet.masksToBounds = true
+    layer.addSublayer(reflet)
+    // Le creux du bas : l'épaisseur de la dalle.
+    creux.startPoint = CGPoint(x: 0.5, y: 0)
+    creux.endPoint = CGPoint(x: 0.5, y: 1)
+    creux.locations = [0.55, 1]
+    creux.masksToBounds = true
+    layer.addSublayer(creux)
+    // Le liseré : clair en haut à gauche, éteint au milieu, rallumé en bas à
+    // droite — le bord épais d'un verre qui prend la lumière.
+    lisere.startPoint = CGPoint(x: 0, y: 0)
+    lisere.endPoint = CGPoint(x: 1, y: 1)
+    lisere.locations = [0, 0.3, 0.7, 1]
+    traitDuLisere.fillColor = nil
+    traitDuLisere.strokeColor = UIColor.black.cgColor
+    lisere.mask = traitDuLisere
+    // Un dégradé masqué se recalcule hors écran à chaque image animée :
+    // rasterisé, il se dessine une fois et se recolle ensuite.
+    lisere.shouldRasterize = true
+    lisere.rasterizationScale = UIScreen.main.scale
+    layer.addSublayer(lisere)
     rafraichir()
   }
 
@@ -163,8 +163,18 @@ final class VueDeVerre: UIView {
     )
   }
 
-  /// La vue est-elle vraiment à l'écran ? Un verre posé à opacité nulle ne
-  /// revient jamais : iOS l'abandonne en silence.
+  /// L'ombre d'un verre teinté : sa couleur, assombrie — une lueur, pas un gris.
+  private func couleurDOmbre() -> UIColor {
+    guard let t = couleurDeTeinte() else {
+      return UIColor(red: 0.043, green: 0.051, blue: 0.071, alpha: 1)
+    }
+    var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+    t.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
+    return UIColor(hue: h, saturation: min(1, s + 0.35), brightness: b * 0.55, alpha: 1)
+  }
+
+  /// La vue est-elle vraiment à l'écran ? Un verre posé sous un fondu qui
+  /// commence est abandonné par iOS, et ne revient jamais.
   private var visible: Bool {
     guard window != nil else { return false }
     var opacite: CGFloat = 1
@@ -174,8 +184,7 @@ final class VueDeVerre: UIView {
       opacite *= courante.alpha
       v = courante.superview
     }
-    // PLEINEMENT visible : posé sous un fondu qui commence, le verre est
-    // abandonné et ne revient jamais.
+    // PLEINEMENT visible.
     return opacite > 0.98
   }
 
@@ -234,36 +243,57 @@ final class VueDeVerre: UIView {
     }
   }
 
-  // ------------------------------------------------------------ la réplique
+  // ------------------------------------------------------------ la lumière
 
   private var rayonEffectif: CGFloat {
     min(CGFloat(truncating: rayon), bounds.width / 2, bounds.height / 2)
   }
 
   private func rafraichir() {
+    let fume = sombre
+    // LE FOND : la couleur de l'élément, sous le verre ou dans le flou.
     if verreSysteme {
       secours.backgroundColor = couleurDeTeinte()
-        ?? (sombre ? UIColor(red: 0.08, green: 0.09, blue: 0.11, alpha: 0.32) : UIColor(white: 1, alpha: 0.34))
+        ?? (fume ? UIColor(red: 0.08, green: 0.09, blue: 0.11, alpha: 0.32) : UIColor(white: 1, alpha: 0.34))
       // Seul le thème change la matière du verre lui-même.
-      if pose && effet.overrideUserInterfaceStyle != (sombre ? .dark : .light) { poserLeVerre() }
-      return
+      if pose && effet.overrideUserInterfaceStyle != (fume ? .dark : .light) { poserLeVerre() }
+    } else {
+      overrideUserInterfaceStyle = fume ? .dark : .light
+      let v = CGFloat(truncating: voile)
+      voileVue.backgroundColor = couleurDeTeinte()
+        ?? (fume ? UIColor(red: 0.08, green: 0.09, blue: 0.11, alpha: v) : UIColor(white: 1, alpha: v))
     }
-    overrideUserInterfaceStyle = sombre ? .dark : .light
-    let v = CGFloat(truncating: voile)
-    voileVue.backgroundColor = couleurDeTeinte()
-      ?? (sombre ? UIColor(red: 0.08, green: 0.09, blue: 0.11, alpha: v) : UIColor(white: 1, alpha: v))
+    // LA LUMIÈRE : reflet en haut, creux en bas, liseré au bord. Sur un verre
+    // teinté, le reflet se retient : c'est la couleur qu'on reconnaît.
+    let teintee = couleurDeTeinte() != nil
+    let haut: CGFloat = fume ? 0.20 : (teintee ? 0.36 : 0.55)
     reflet.colors = [
-      UIColor(white: 1, alpha: sombre ? 0.10 : 0.38).cgColor,
+      UIColor(white: 1, alpha: haut).cgColor,
+      UIColor(white: 1, alpha: haut * 0.25).cgColor,
       UIColor(white: 1, alpha: 0).cgColor,
     ]
-    lisere.colors = sombre
-      ? [UIColor(white: 1, alpha: 0.45).cgColor, UIColor(white: 1, alpha: 0.06).cgColor, UIColor(white: 1, alpha: 0.22).cgColor]
-      : [UIColor(white: 1, alpha: 0.95).cgColor, UIColor(white: 1, alpha: 0.25).cgColor, UIColor(white: 1, alpha: 0.6).cgColor]
+    creux.colors = [
+      UIColor(white: 0, alpha: 0).cgColor,
+      UIColor(white: 0, alpha: fume ? 0.20 : (teintee ? 0.10 : 0.07)).cgColor,
+    ]
+    lisere.colors = fume
+      ? [UIColor(white: 1, alpha: 0.55).cgColor, UIColor(white: 1, alpha: 0.12).cgColor,
+         UIColor(white: 1, alpha: 0.04).cgColor, UIColor(white: 1, alpha: 0.30).cgColor]
+      : [UIColor(white: 1, alpha: 1).cgColor, UIColor(white: 1, alpha: 0.45).cgColor,
+         UIColor(white: 1, alpha: 0.18).cgColor, UIColor(white: 1, alpha: 0.75).cgColor]
+    // L'OMBRE : celle de l'élément, ou celle d'une dalle de verre posée.
     let n = ombre.compactMap { ($0 as? NSNumber).map { CGFloat(truncating: $0) } }
-    // Sans ombre demandée, celle d'un verre posé : douce, large, à peine là.
-    layer.shadowOpacity = Float(n.first.map { $0 > 0 ? $0 : 0.10 } ?? 0.10)
-    layer.shadowRadius = n.count > 1 && n[1] > 0 ? n[1] : 16
-    layer.shadowOffset = CGSize(width: 0, height: n.count > 2 && n[2] > 0 ? n[2] : 6)
+    let demandee = (n.first ?? 0) > 0
+    layer.shadowColor = couleurDOmbre().cgColor
+    if demandee {
+      layer.shadowOpacity = Float(n[0])
+      layer.shadowRadius = n.count > 1 ? n[1] : 8
+      layer.shadowOffset = CGSize(width: 0, height: n.count > 2 ? n[2] : 2)
+    } else {
+      layer.shadowOpacity = teintee ? (fume ? 0.45 : 0.30) : (fume ? 0.35 : 0.12)
+      layer.shadowRadius = 18
+      layer.shadowOffset = CGSize(width: 0, height: 8)
+    }
   }
 
   override func layoutSubviews() {
@@ -279,23 +309,26 @@ final class VueDeVerre: UIView {
       } else if r != rayonForme {
         formerLeVerre()
       }
-      return
+    } else {
+      // Les coins de React Native : circulaires. La carte garde son dessin.
+      effet.layer.cornerRadius = r
+      effet.layer.cornerCurve = .circular
+      voileVue.frame = effet.contentView.bounds
     }
-    // Rien n'a bougé : les tracés sont déjà les bons.
-    if bounds.size == tailleReplique && r == rayonReplique { return }
-    tailleReplique = bounds.size
-    rayonReplique = r
-    // Les coins de React Native : circulaires. La carte garde son dessin.
-    effet.layer.cornerRadius = r
-    effet.layer.cornerCurve = .circular
-    voileVue.frame = effet.contentView.bounds
+    // Rien n'a bougé : la lumière est déjà la bonne.
+    if bounds.size == tailleLumiere && r == rayonLumiere { return }
+    tailleLumiere = bounds.size
+    rayonLumiere = r
+    let courbe: CALayerCornerCurve = verreSysteme ? .continuous : .circular
     CATransaction.begin()
     CATransaction.setDisableActions(true)
-    reflet.frame = bounds
-    reflet.cornerRadius = r
-    reflet.cornerCurve = .circular
+    for l in [reflet, creux] {
+      l.frame = bounds
+      l.cornerRadius = r
+      l.cornerCurve = courbe
+    }
     lisere.frame = bounds
-    let largeur: CGFloat = 1.2
+    let largeur: CGFloat = 1.5
     traitDuLisere.lineWidth = largeur
     traitDuLisere.path = UIBezierPath(
       roundedRect: bounds.insetBy(dx: largeur / 2, dy: largeur / 2),
