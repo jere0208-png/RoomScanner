@@ -44,7 +44,14 @@ jest.mock('react-native-room-scan', () => ({
   RoomScanView: 'RoomScanView',
   // Le doublet de la vue SceneKit : un élément hôte, qui garde ses props.
   RoomScanVisite: 'RoomScanVisite',
+  // La régie : elle reçoit la caméra à chaque image (voir `poserCameraDeVisite`).
+  poserCameraDeVisite: (cle: string, camera: number[]) => {
+    mockRegie.push({ cle, camera });
+    return true;
+  },
 }));
+/** Ce que la régie native a reçu, dans l'ordre. */
+const mockRegie: { cle: string; camera: number[] }[] = [];
 
 import React from 'react';
 import { TouchableOpacity, View } from 'react-native';
@@ -72,6 +79,7 @@ afterEach(() => {
 });
 
 function monter() {
+  mockRegie.length = 0;
   let t!: TestRenderer.ReactTestRenderer;
   act(() => {
     useScanStore.getState().reset();
@@ -117,6 +125,12 @@ const presser = (t: TestRenderer.ReactTestRenderer, label: string) => {
 /** La vue SceneKit, telle que le natif la recevrait. */
 const natif = (t: TestRenderer.ReactTestRenderer) =>
   t.root.findAll((n) => (n.type as unknown) === 'RoomScanVisite')[0];
+/**
+ * LA CAMÉRA QUE LE TÉLÉPHONE MONTRE : la dernière posée par la régie, ou, tant
+ * qu'on n'a pas bougé, celle d'entrée.
+ */
+const vueNative = (t: TestRenderer.ReactTestRenderer): number[] =>
+  mockRegie.length ? mockRegie[mockRegie.length - 1].camera : (natif(t).props.camera as number[]);
 
 const touche = (id: number, x: number, y: number) => ({
   identifier: id,
@@ -184,9 +198,9 @@ describe('la scène part vers SceneKit', () => {
   it('la manette fait avancer la caméra native, dans le sens du regard', () => {
     const t = monter();
     presser(t, 'Explorer');
-    const avant = natif(t).props.camera as number[];
+    const avant = vueNative(t);
     marcher(t, 600);
-    const apres = natif(t).props.camera as number[];
+    const apres = vueNative(t);
     const dx = apres[0] - avant[0];
     const dz = apres[2] - avant[2];
     expect(Math.hypot(dx, dz)).toBeGreaterThan(0.1);
@@ -202,6 +216,54 @@ describe('la scène part vers SceneKit', () => {
     const maille = natif(t).props.maillage;
     marcher(t, 300);
     expect(natif(t).props.maillage).toBe(maille);
+  });
+
+  /*
+    LA CAMÉRA NE PASSE PLUS PAR LES PROPRIÉTÉS — relevé du patron : « la visite
+    est bug encore plus qu'avant pour le déplacement ». Chaque propriété
+    changée faisait reconvertir le maillage entier par la couche de
+    compatibilité, soixante fois par seconde. La caméra part par la régie,
+    à la clé de la vue ; les propriétés ne bougent plus de toute la marche.
+  */
+  it('la caméra part par la régie : les propriétés ne bougent plus en marchant', () => {
+    const t = monter();
+    presser(t, 'Explorer');
+    const props = natif(t).props;
+    const entree = props.camera;
+    marcher(t, 600);
+    expect(mockRegie.length).toBeGreaterThan(10);
+    expect(typeof natif(t).props.cle).toBe('string');
+    expect(mockRegie.every((r) => r.cle === natif(t).props.cle)).toBe(true);
+    // Ni la caméra d'entrée, ni la scène n'ont été renvoyées.
+    expect(natif(t).props.camera).toBe(entree);
+    expect(natif(t).props.maillage).toBe(props.maillage);
+    expect(natif(t).props.meubles).toBe(props.meubles);
+  });
+
+  it('et la marche prend son élan, puis s’arrête net au lever du pouce', () => {
+    const t = monter();
+    presser(t, 'Explorer');
+    const z = pouces(t);
+    act(() => {
+      z.props.onStartShouldSetResponder(evenement([touche(0, 120, 900)]));
+      z.props.onResponderGrant(evenement([touche(0, 120, 900)]));
+      z.props.onResponderMove(evenement([touche(0, 120, 842)]));
+    });
+    // Les premiers pas sont plus courts que ceux d'après : l'élan.
+    const pas = (ms: number) => {
+      const a = vueNative(t);
+      act(() => jest.advanceTimersByTime(ms));
+      const b = vueNative(t);
+      return Math.hypot(b[0] - a[0], b[2] - a[2]);
+    };
+    const debut = pas(30);
+    pas(200);
+    const lance = pas(30);
+    expect(debut).toBeLessThan(lance);
+    // Au lever, on s'arrête en moins de deux dixièmes de seconde.
+    act(() => z.props.onResponderRelease(evenement([])));
+    act(() => jest.advanceTimersByTime(200));
+    expect(pas(500)).toBeLessThan(1e-6);
   });
 });
 
@@ -224,7 +286,7 @@ describe('marcher et tourner en même temps', () => {
     const t = monter();
     presser(t, 'Explorer');
     const z = pouces(t);
-    const depart = natif(t).props.camera as number[];
+    const depart = vueNative(t);
     // Le pouce gauche se pose et pousse vers le haut : on avance.
     act(() => {
       z.props.onStartShouldSetResponder(ev([touche(0, 120, 900)], [touche(0, 120, 900)]));
@@ -232,7 +294,7 @@ describe('marcher et tourner en même temps', () => {
       z.props.onResponderMove(ev([touche(0, 120, 850)], [touche(0, 120, 850)]));
     });
     act(() => jest.advanceTimersByTime(300));
-    const enMarche = natif(t).props.camera as number[];
+    const enMarche = vueNative(t);
     // Le pouce droit se pose, puis tourne — et iOS redonne le gauche à sa
     // position d'arrivée dans la liste complète.
     const gaucheFige = touche(0, 120, 900);
@@ -245,7 +307,7 @@ describe('marcher et tourner en même temps', () => {
         jest.advanceTimersByTime(30);
       });
     }
-    const apres = natif(t).props.camera as number[];
+    const apres = vueNative(t);
     // On a tourné…
     expect(apres[3]).not.toBeCloseTo(enMarche[3], 3);
     // …et l'on a CONTINUÉ d'avancer pendant ce temps.
@@ -268,16 +330,17 @@ describe('marcher et tourner en même temps', () => {
     act(() => jest.advanceTimersByTime(200));
     // Le regard se lève : la marche continue.
     act(() => z.props.onResponderEnd(ev([touche(1, 300, 500)], [touche(0, 120, 850)])));
-    const a = natif(t).props.camera as number[];
+    const a = vueNative(t);
     act(() => jest.advanceTimersByTime(300));
-    const b = natif(t).props.camera as number[];
+    const b = vueNative(t);
     expect(Math.hypot(b[0] - a[0], b[2] - a[2])).toBeGreaterThan(0.05);
-    // La marche se lève : on s'arrête.
+    // La marche se lève : on s'arrête — l'élan retombe en moins de deux
+    // dixièmes de seconde.
     act(() => z.props.onResponderEnd(ev([touche(0, 120, 850)], [])));
-    act(() => jest.advanceTimersByTime(100));
-    const c = natif(t).props.camera as number[];
+    act(() => jest.advanceTimersByTime(250));
+    const c = vueNative(t);
     act(() => jest.advanceTimersByTime(300));
-    const d = natif(t).props.camera as number[];
+    const d = vueNative(t);
     expect(Math.hypot(d[0] - c[0], d[2] - c[2])).toBeLessThan(1e-6);
   });
 });

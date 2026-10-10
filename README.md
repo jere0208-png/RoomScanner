@@ -14285,6 +14285,56 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## La visite 3D : la caméra hors des propriétés, une boucle par image, plus de manette affichée
+
+Relevé du patron : « la visite est bug encore plus qu'avant pour le
+déplacement. Règle ça et rends-moi un système de visite 3D parfait, sans
+erreur. Enlève l'affichage des joysticks au clic. »
+
+**La cause, trouvée dans React Native lui-même.** La vue SceneKit est un
+composant de l'ancienne architecture, monté par la couche de compatibilité
+(`RCTLegacyViewManagerInteropCoordinatorAdapter`). À chaque propriété
+changée, cette couche reconvertit TOUTES les propriétés de la vue
+(`convertFollyDynamicToId`) puis les compare une à une (`_diffProps`) — le
+maillage du logement, ses sols, et depuis les meubles réalistes, leurs
+modèles entiers : des dizaines de milliers de nombres. La caméra changeait
+soixante fois par seconde : la marche payait soixante fois par seconde le
+poids de tout le logement, sur le fil principal, celui-là même qui dessine.
+D'où « encore plus qu'avant » : les meubles réalistes ont multiplié ce poids.
+S'y ajoutait un rendu React de tout l'écran (mini-carte, manette, vue) à
+chaque pas et à chaque mouvement de pouce.
+
+**La caméra passe par une régie** (`RoomScanVisiteRegie`, `RoomScanVisite.cle`,
+`poserCameraDeVisite`). La vue native porte une clé ; la régie la retrouve et
+lui pose six nombres, rien d'autre. Les propriétés de la vue ne changent plus
+de toute la marche — la caméra d'entrée seulement, à l'ouverture. Sans régie
+(ancien binaire), la caméra repasse par la propriété, comme avant. Le liseré
+des meubles ne réécrit plus sa valeur dans chaque matériau quand elle n'a pas
+changé.
+
+**Une boucle par image, hors de React** (`Exploration.tsx`) : elle lit les
+pouces, fait le pas (`deplacer`, collisions inchangées), et pose la caméra.
+La marche prend un élan d'un dixième de seconde et s'arrête en moins de deux
+dixièmes au lever du pouce — plus de démarrage ni d'arrêt par secousse. Le
+regard s'applique sur-le-champ et se montre à l'image suivante. React ne
+redessine plus que la mini-carte, dix fois par seconde ; la boucle se tait
+quand plus rien ne bouge.
+
+**Plus de manette à l'écran.** Elle part toujours de là où le pouce gauche se
+pose, mais ne se dessine plus ; un léger choc dit qu'elle a pris. Les deux
+repères et la consigne s'effacent au premier mouvement : ensuite, la vue est
+toute à la visite.
+
+Bancs : `visitenative.test.tsx` — la caméra part par la régie, à la clé de la
+vue, et ni la caméra d'entrée, ni le maillage, ni les meubles ne sont renvoyés
+en marchant ; la marche prend son élan et s'arrête net ; marcher en tournant ;
+`explorationecran.test.tsx` — aucune manette dessinée, et elle marche quand
+même ; repères et consigne effacés au premier pas ; pouce levé, plus rien ne
+bouge.
+
+Ce qui ne se mesure pas ici : la sensation sur le téléphone. La cause est
+établie dans le code de React Native et supprimée ; l'effet se juge à la main.
+
 ## Le plan électrique et le plafond, épurés eux aussi ; plus de nom de meuble
 
 Relevé du patron : « fais pareil pour le plan électrique et le plan du

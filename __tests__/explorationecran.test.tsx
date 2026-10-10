@@ -18,7 +18,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { Iso3DView } from '../src/components/Iso3DView';
@@ -191,20 +191,40 @@ describe('les deux pouces', () => {
     expect((dx * f.x + dz * f.z) / Math.hypot(dx, dz)).toBeGreaterThan(0.8);
   });
 
-  it('la manette naît sous le pouce, en verre, et s’efface quand il se lève', () => {
+  /*
+    PLUS DE MANETTE À L'ÉCRAN — relevé du patron : « enlève l'affichage des
+    joysticks au clic ». Elle part toujours de là où le pouce se pose ; elle
+    ne se dessine plus.
+  */
+  it('aucune manette ne se dessine sous le pouce — et elle marche quand même', () => {
     const t = monter();
     presser(t, 'Explorer');
     const baton = () => t.root.findAll((n) => n.props?.accessibilityLabel === 'Manette');
-    expect(baton()).toHaveLength(0);
+    const avant = camera(t);
     const z = pouces(t);
     poser(z, [touche(0, GAUCHE.x, GAUCHE.y)]);
-    expect(baton().length).toBeGreaterThan(0);
-    // Elle est LÀ où le pouce s'est posé, pas dans un coin.
-    const style = StyleSheet.flatten(baton()[0].props.style) as { left: number; top: number };
-    expect(style.left).toBeCloseTo(GAUCHE.x - 58, 0);
-    expect(style.top).toBeCloseTo(GAUCHE.y - 58, 0);
-    lever(z);
     expect(baton()).toHaveLength(0);
+    bouger(z, [touche(0, GAUCHE.x, GAUCHE.y - 50)]);
+    expect(baton()).toHaveLength(0);
+    act(() => jest.advanceTimersByTime(400));
+    lever(z);
+    act(() => jest.advanceTimersByTime(300));
+    const apres = camera(t);
+    expect(Math.hypot(apres.at.x - avant.at.x, apres.at.z - avant.at.z)).toBeGreaterThan(0.1);
+  });
+
+  it('les repères et la consigne s’effacent au premier pas', () => {
+    const t = monter();
+    presser(t, 'Explorer');
+    const lus = () => t.root.findAllByType(Text).map((n) => String(n.props.children));
+    expect(lus().some((m) => /pouce gauche/i.test(m))).toBe(true);
+    const z = pouces(t);
+    poser(z, [touche(0, GAUCHE.x, GAUCHE.y)]);
+    bouger(z, [touche(0, GAUCHE.x, GAUCHE.y - 50)]);
+    act(() => jest.advanceTimersByTime(50));
+    expect(lus().some((m) => /pouce gauche/i.test(m))).toBe(false);
+    lever(z);
+    act(() => jest.advanceTimersByTime(300));
   });
 
   it('pouce levé, plus rien ne bouge', () => {
@@ -215,7 +235,8 @@ describe('les deux pouces', () => {
     bouger(z, [touche(0, GAUCHE.x, GAUCHE.y - 50)]);
     act(() => jest.advanceTimersByTime(300));
     lever(z);
-    act(() => jest.advanceTimersByTime(100));
+    // L'élan retombe en moins de deux dixièmes de seconde, puis plus rien.
+    act(() => jest.advanceTimersByTime(250));
     const pose = camera(t).at;
     act(() => jest.advanceTimersByTime(800));
     expect(camera(t).at).toEqual(pose);

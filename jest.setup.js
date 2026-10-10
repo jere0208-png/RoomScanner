@@ -58,6 +58,9 @@ jest.mock('react-native-room-scan', () => ({
     removeAllListeners: jest.fn(),
   },
   RoomScanView: 'RoomScanView',
+  // La régie de la visite : absente du banc, la caméra repasse par la
+  // propriété de la vue (voir `poserCameraDeVisite`).
+  poserCameraDeVisite: jest.fn(() => false),
 }));
 
 /**

@@ -37,7 +37,7 @@ import {
 } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RoomScanVisite } from 'react-native-room-scan';
+import { RoomScanVisite, poserCameraDeVisite } from 'react-native-room-scan';
 import { Iso3DView } from './Iso3DView';
 import { SOLAIRES } from '../ui/solaires';
 import { floorsOf, useScanStore } from '../store/scanStore';
@@ -95,6 +95,22 @@ const TANGAGE_MAX = 0.6;
 const SENSIBILITE = 0.0065;
 /** Le rayon de la manette, en points : un pouce y tient sans viser. */
 const RAYON_MANETTE = 58;
+/**
+ * L'ÉLAN ET L'ARRÊT — un dixième de seconde pour prendre sa vitesse, un
+ * vingtième pour la perdre.
+ *
+ * La vitesse sautait de zéro à 1,4 m/s au premier millimètre de pouce, et
+ * retombait à zéro d'un coup : la caméra démarrait et s'arrêtait par
+ * secousses, ce qui se lit comme un défaut. Un jeu donne à la marche un
+ * élan à peine perceptible ; on l'imite, sans qu'il devienne une glissade :
+ * pouce levé, on est arrêté en moins de deux dixièmes de seconde.
+ */
+const ELAN = 0.09;
+const ARRET = 0.05;
+/** En dessous, on est arrêté : pas de glissade de quelques millimètres sans fin. */
+const VITESSE_NULLE = 0.05;
+/** La mini-carte suit à dix images par seconde : c'est un repère, pas un film. */
+const PERIODE_CARTE = 100;
 /** Au centre, la manette ne fait rien : le pouce posé tremble toujours. */
 const ZONE_MORTE = 0.12;
 /** Une image toutes les trente-trois millisecondes, pas davantage. */
@@ -327,43 +343,56 @@ export function Exploration({
   const fond = useMemo(() => mixHex(teinte.sky, '#FFFFFF', 0.55), [teinte.sky]);
 
   /*
-    LA POSE VIT DANS UNE RÉFÉRENCE, ET L'ÉCRAN EN PREND UNE COPIE.
+    LA POSE VIT DANS UNE RÉFÉRENCE — ET PLUS AUCUN RENDU PAR IMAGE.
 
-    La boucle de marche et le pouce du regard l'écrivent à chaque instant ;
-    l'écran, lui, ne la relit qu'au rythme d'une image toutes les
-    trente-trois millisecondes. Sans cette séparation, chaque millimètre de
-    pouce redessinerait le logement entier.
+    Relevé du patron : « la visite est bug encore plus qu'avant pour le
+    déplacement ; rends-moi un système de visite 3D parfait ». Chaque pas
+    réécrivait l'état de cet écran : React redessinait tout — la mini-carte,
+    le bâton, la vue native —, et la caméra arrivait à la vue par ses
+    PROPRIÉTÉS, ce qui faisait reconvertir le maillage entier du logement à
+    chaque image (voir `RoomScanVisite.cle`). Plus le logement avait de
+    meubles, plus la marche saccadait.
+
+    Désormais une seule boucle, par image d'écran, hors de React : elle lit
+    les pouces, fait le pas, et pose la caméra directement sur la vue native
+    (`poserCameraDeVisite`). React ne redessine plus que la mini-carte, dix
+    fois par seconde. Sans le natif (banc d'essai), la vue en JavaScript reçoit
+    sa caméra comme avant, au rythme de ce qu'elle coûte.
   */
   const pose = useRef<Pose>({ x: 0, z: 0, lacet: 0, tangage: 0 });
-  /*
-    `geste` : l'image est prise EN MOUVEMENT. La 3D s'y accorde un ordre de
-    peinture approché (voir `enMarche`) ; l'image où l'on s'arrête, elle,
-    est forcée sans ce drapeau, et retrouve l'ordre exact.
-  */
-  const [vue, setVue] = useState<Pose & { geste?: boolean }>(pose.current);
+  /** La vitesse, dans le repère du regard (m/s) : elle prend son élan. */
+  const vitesse = useRef({ avant: 0, droite: 0 });
   const manette = useRef({ x: 0, y: 0 });
+  /** La vue en JavaScript (sans natif) : sa caméra vit dans l'état. */
+  const [vue, setVue] = useState<Pose & { geste?: boolean }>(pose.current);
+  /** La mini-carte : la pose, dix fois par seconde. */
+  const [carte, setCarte] = useState<Pose>(pose.current);
+  /** La caméra d'ENTRÉE de la vue native — elle ne change qu'en entrant. */
+  const [entree, setEntree] = useState<Pose>(pose.current);
+  /** Sans régie native (ancien binaire), la caméra repasse par la propriété. */
+  const [secours, setSecours] = useState<number[] | null>(null);
   const [aBouge, setABouge] = useState(false);
   const dernierRendu = useRef(0);
+  const derniereCarte = useRef(0);
+  /** La clé de la vue native : c'est par elle que la caméra lui parvient. */
+  const cle = useRef(
+    `visite-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+  ).current;
+  const natifPret = natif && !!maille;
 
-  // À chaque entrée : au cœur de la plus grande pièce, face à sa profondeur.
-  useEffect(() => {
-    if (!visible) return;
-    const d = pointDeDepart(walls, rooms, obstacles);
-    if (!d) return;
-    // `yaw` est un angle du plan (0 = x croissants) ; la 3D compte depuis
-    // les z croissants. La conversion se fait ici, une fois.
-    pose.current = { x: d.at.x, z: d.at.z, lacet: Math.PI / 2 - d.yaw, tangage: TANGAGE_DEPART };
-    setVue({ ...pose.current });
-    setABouge(false);
-    manette.current = { x: 0, y: 0 };
-    // On n'y revient qu'en rouvrant : un plan modifié pendant la visite ne
-    // doit pas téléporter le visiteur.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+  const { width: largeur, height: hauteur } = useWindowDimensions();
+  const ouverture = ouvertureVerticale(largeur, hauteur);
+  const cameraDe = (p: Pose) => ({
+    at: { x: p.x, y: HAUTEUR_OEIL, z: p.z },
+    yaw: p.lacet,
+    pitch: p.tangage,
+    fov: ouverture,
+  });
 
   const plancher = natif ? PERIODE_NATIF : PERIODE;
   const cadence = useRef(plancher);
   const demande = useRef(0);
+  /** La vue en JavaScript : une image au rythme de ce qu'elle coûte. */
   const montrer = (force = false) => {
     const t = Date.now();
     if (!force && t - dernierRendu.current < cadence.current) return;
@@ -378,35 +407,60 @@ export function Exploration({
     demande.current = 0;
   }, [vue, plancher]);
 
-  /*
-    LA BOUCLE DE MARCHE — elle ne tourne que pendant qu'on marche.
+  /** Pose la caméra là où elle doit aller — vue native, ou vue JavaScript. */
+  const publier = (arret: boolean) => {
+    if (natifPret) {
+      const cam = cameraNative(cameraDe(pose.current));
+      if (!poserCameraDeVisite(cle, cam)) setSecours(cam);
+    } else {
+      montrer(arret);
+    }
+  };
 
-    Pouce levé, rien ne bouge, et rien ne se redessine : une exploration
-    posée sur une table ne doit pas vider la batterie à recalculer cinquante
-    fois par seconde une image qui ne change pas.
+  /*
+    LA BOUCLE — une par image d'écran, tant qu'un pouce est posé ou que
+    l'élan n'est pas retombé. Pouce levé et pas fini, rien ne tourne : une
+    visite posée sur une table ne vide pas la batterie.
   */
-  const enMarche = useRef(false);
-  const boucle = useRef<() => void>(() => {});
-  boucle.current = () => {
-    let avant = Date.now();
-    const pas = () => {
-      const j = manette.current;
-      if (j.x === 0 && j.y === 0) {
-        enMarche.current = false;
-        releaseHaptic('butee');
-        montrer(true);
-        return;
-      }
-      const t = Date.now();
-      const dt = Math.min(0.1, (t - avant) / 1000);
-      avant = t;
+  interface Doigt {
+    role: 'marche' | 'regard';
+    x0: number;
+    y0: number;
+    x: number;
+    y: number;
+  }
+  const doigts = useRef(new Map<number, Doigt>());
+  const enCours = useRef(false);
+  const dernierTic = useRef(-1);
+  const regardBouge = useRef(false);
+  const tic = useRef<(ts: number) => void>(() => {});
+  tic.current = (ts: number) => {
+    if (!enCours.current) return;
+    const dt =
+      dernierTic.current < 0 ? 1 / 60 : Math.min(0.05, Math.max(0, (ts - dernierTic.current) / 1000));
+    dernierTic.current = ts;
+
+    // La vitesse voulue, et l'élan pour y aller.
+    const j = manette.current;
+    const voulue = { avant: -j.y * VITESSE_MARCHE, droite: j.x * VITESSE_MARCHE };
+    const v = vitesse.current;
+    const accelere = Math.hypot(voulue.avant, voulue.droite) >= Math.hypot(v.avant, v.droite);
+    const k = 1 - Math.exp(-dt / (accelere ? ELAN : ARRET));
+    v.avant += (voulue.avant - v.avant) * k;
+    v.droite += (voulue.droite - v.droite) * k;
+    if (voulue.avant === 0 && voulue.droite === 0 && Math.hypot(v.avant, v.droite) < VITESSE_NULLE) {
+      v.avant = 0;
+      v.droite = 0;
+    }
+
+    let bouge = regardBouge.current;
+    regardBouge.current = false;
+    if (v.avant !== 0 || v.droite !== 0) {
       const p = pose.current;
       const { avant: f, droite: r } = reperes(p.lacet);
-      // Pousser vers le haut, c'est avancer : l'axe y de l'écran est inversé.
-      const v = VITESSE_MARCHE * dt;
       const vise = {
-        x: p.x + (f.x * -j.y + r.x * j.x) * v,
-        z: p.z + (f.z * -j.y + r.z * j.x) * v,
+        x: p.x + (f.x * v.avant + r.x * v.droite) * dt,
+        z: p.z + (f.z * v.avant + r.z * v.droite) * dt,
       };
       const arrive = deplacer({ x: p.x, z: p.z }, vise, obstacles);
       /*
@@ -420,66 +474,86 @@ export function Exploration({
       if (voulu > 1e-4 && fait < voulu * 0.25) haptic('butee', true);
       else if (fait > voulu * 0.6) releaseHaptic('butee');
       pose.current = { ...p, x: arrive.x, z: arrive.z };
-      montrer();
-      requestAnimationFrame(pas);
-    };
-    requestAnimationFrame(pas);
+      bouge = true;
+    }
+    if (bouge) publier(false);
+    if (bouge && ts - derniereCarte.current >= PERIODE_CARTE) {
+      derniereCarte.current = ts;
+      setCarte({ ...pose.current });
+    }
+
+    const actif = doigts.current.size > 0 || v.avant !== 0 || v.droite !== 0;
+    if (!actif) {
+      // Arrêté : l'image exacte, la carte à jour, et la boucle se tait.
+      enCours.current = false;
+      releaseHaptic('butee');
+      publier(true);
+      setCarte({ ...pose.current });
+      return;
+    }
+    requestAnimationFrame((t) => tic.current(t));
+  };
+  const demarrer = () => {
+    if (enCours.current) return;
+    enCours.current = true;
+    dernierTic.current = -1;
+    requestAnimationFrame((t) => tic.current(t));
+  };
+  const arreterTout = () => {
+    enCours.current = false;
+    doigts.current.clear();
+    manette.current = { x: 0, y: 0 };
+    vitesse.current = { avant: 0, droite: 0 };
+    regardBouge.current = false;
   };
 
-  const surVecteur = useMemo(
-    () => (v: { x: number; y: number }) => {
-      manette.current = v;
-      if ((v.x !== 0 || v.y !== 0) && !enMarche.current) {
-        enMarche.current = true;
-        setABouge(true);
-        boucle.current();
-      }
-    },
-    [],
-  );
-
-  const { width: largeur, height: hauteur } = useWindowDimensions();
+  // À chaque entrée : au cœur de la plus grande pièce, face à sa profondeur.
+  useEffect(() => {
+    if (!visible) {
+      arreterTout();
+      return;
+    }
+    const d = pointDeDepart(walls, rooms, obstacles);
+    if (!d) return;
+    arreterTout();
+    // `yaw` est un angle du plan (0 = x croissants) ; la 3D compte depuis
+    // les z croissants. La conversion se fait ici, une fois.
+    pose.current = { x: d.at.x, z: d.at.z, lacet: Math.PI / 2 - d.yaw, tangage: TANGAGE_DEPART };
+    setVue({ ...pose.current });
+    setCarte({ ...pose.current });
+    setEntree({ ...pose.current });
+    setSecours(null);
+    setABouge(false);
+    // On n'y revient qu'en rouvrant : un plan modifié pendant la visite ne
+    // doit pas téléporter le visiteur.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+  // Démonté en pleine marche : la boucle s'arrête avec l'écran.
+  useEffect(() => () => arreterTout(), []);
 
   /*
     UN SEUL GESTE POUR LES DEUX POUCES.
 
     Relevé du patron : « on ne peut pas se déplacer et tourner en même
-    temps ». La manette et le regard étaient deux responders, et React
-    Native n'en accorde qu'UN à la fois à toute l'application : le second
-    pouce frappait une porte fermée. Ici une seule vue reçoit tout, et c'est
-    elle qui départage les doigts — par leur identifiant, et par la moitié
-    de l'écran où ils se posent : à gauche on marche, à droite on regarde.
-    Deux doigts, deux rôles, un seul geste.
+    temps ». Une seule vue reçoit tous les doigts et les départage — par
+    leur identifiant, et par la moitié de l'écran où ils se posent : à
+    gauche on marche, à droite on regarde. Deux doigts, deux rôles.
 
-    ET LA MANETTE NAÎT SOUS LE POUCE. Elle n'est plus un disque posé en bas
-    à gauche qui mange la vue : elle apparaît là où le pouce se pose, en
-    verre, et disparaît quand il se lève. Ce qui reste à l'écran au repos,
-    ce sont deux repères de verre, discrets, qui disent qu'on peut marcher
-    et tourner — pas où.
+    ET PLUS DE MANETTE À L'ÉCRAN — relevé du patron : « enlève l'affichage
+    des joysticks au clic ». Elle naissait sous le pouce, un anneau et un
+    bouton par-dessus la vue ; le pouce posé sait déjà où il est. La manette
+    est toujours là — elle part de là où le pouce se pose —, elle ne se
+    dessine plus. Un léger choc à la pose dit qu'elle a pris.
   */
-  interface Doigt {
-    role: 'marche' | 'regard';
-    x0: number;
-    y0: number;
-    x: number;
-    y: number;
-  }
-  const doigts = useRef(new Map<number, Doigt>());
-  const [baton, setBaton] = useState<{ x: number; y: number; dx: number; dy: number } | null>(null);
   type Touche = { identifier: number | string; pageX: number; pageY: number };
   const touchesDe = (e: GestureResponderEvent) =>
     (e.nativeEvent.touches ?? []) as Touche[];
   /*
     SEULS LES DOIGTS QUI ONT BOUGÉ — relevé du patron : « le déplacement se
-    coupe lorsqu'on change en même temps la vue dans la visite ».
-
-    Chaque mouvement relisait la position de TOUS les doigts posés
-    (`touches`). Quand seul le pouce du regard bouge, iOS peut redonner
-    celle du pouce de la marche telle qu'elle était à son arrivée : la
-    manette le croyait revenu au centre, dans la zone morte, et la marche
-    s'arrêtait net. Un doigt ne se met plus à jour que par les événements
-    qui le concernent (`changedTouches`) ; les autres gardent ce qu'on
-    savait d'eux.
+    coupe lorsqu'on change en même temps la vue dans la visite ». Quand seul
+    le pouce du regard bouge, iOS peut redonner celui de la marche à sa
+    position d'arrivée dans la liste complète (`touches`) : un doigt ne se met
+    à jour que par les événements qui le concernent (`changedTouches`).
   */
   const changesDe = (e: GestureResponderEvent) =>
     ((e.nativeEvent.changedTouches as Touche[] | undefined) ?? touchesDe(e)) as Touche[];
@@ -495,14 +569,11 @@ export function Exploration({
       const role = !roles.has(voulu) ? voulu : !roles.has(autre) ? autre : null;
       if (!role) continue;
       doigts.current.set(id, { role, x0: t.pageX, y0: t.pageY, x: t.pageX, y: t.pageY });
-      if (role === 'marche') {
-        setBaton({ x: t.pageX, y: t.pageY, dx: 0, dy: 0 });
-        haptic('leger');
-      }
+      if (role === 'marche') haptic('leger');
+      demarrer();
     }
   };
   const suivre = (e: GestureResponderEvent) => {
-    let regardBouge = false;
     for (const t of changesDe(e)) {
       const d = doigts.current.get(Number(t.identifier));
       if (!d) continue;
@@ -514,14 +585,14 @@ export function Exploration({
           dx = (dx / dist) * RAYON_MANETTE;
           dy = (dy / dist) * RAYON_MANETTE;
         }
-        setBaton({ x: d.x0, y: d.y0, dx, dy });
         const vx = dx / RAYON_MANETTE;
         const vy = dy / RAYON_MANETTE;
         const force = Math.hypot(vx, vy);
-        if (force < ZONE_MORTE) surVecteur({ x: 0, y: 0 });
+        if (force < ZONE_MORTE) manette.current = { x: 0, y: 0 };
         else {
           const k = (force - ZONE_MORTE) / (1 - ZONE_MORTE) / force;
-          surVecteur({ x: vx * k, y: vy * k });
+          manette.current = { x: vx * k, y: vy * k };
+          if (!aBouge) setABouge(true);
         }
       } else {
         const ddx = t.pageX - d.x;
@@ -529,22 +600,22 @@ export function Exploration({
         if (ddx !== 0 || ddy !== 0) {
           // Glisser vers la droite tourne vers la droite — c'est-à-dire
           // vers −x quand on regarde +z : le lacet DÉCROÎT (voir `povBase`).
+          // Le regard s'applique tout de suite ; la boucle le montre à
+          // l'image suivante.
           const p = pose.current;
           pose.current = {
             ...p,
             lacet: p.lacet - ddx * SENSIBILITE,
             tangage: Math.max(-TANGAGE_MAX, Math.min(TANGAGE_MAX, p.tangage - ddy * SENSIBILITE)),
           };
-          regardBouge = true;
+          regardBouge.current = true;
+          if (!aBouge) setABouge(true);
         }
       }
       d.x = t.pageX;
       d.y = t.pageY;
     }
-    if (regardBouge) {
-      setABouge(true);
-      montrer();
-    }
+    demarrer();
   };
   const lacher = (e: GestureResponderEvent) => {
     // Les doigts LEVÉS sont ceux de l'événement ; à défaut, ceux qui ne sont
@@ -558,31 +629,25 @@ export function Exploration({
       if (!leves.has(id)) continue;
       const d = doigts.current.get(id)!;
       doigts.current.delete(id);
-      if (d.role === 'marche') {
-        setBaton(null);
-        surVecteur({ x: 0, y: 0 });
-      } else {
-        montrer(true);
-      }
+      if (d.role === 'marche') manette.current = { x: 0, y: 0 };
     }
   };
   const toutLacher = () => {
+    // Plus aucun doigt : ce qu'on regarde se montre tout de suite ; l'élan
+    // retombe, et la boucle s'arrête d'elle-même.
     doigts.current.clear();
-    setBaton(null);
-    surVecteur({ x: 0, y: 0 });
-    montrer(true);
+    manette.current = { x: 0, y: 0 };
+    publier(true);
+    demarrer();
   };
 
-  const camera = useMemo(
-    () => ({
-      at: { x: vue.x, y: HAUTEUR_OEIL, z: vue.z },
-      yaw: vue.lacet,
-      pitch: vue.tangage,
-      fov: ouvertureVerticale(largeur, hauteur),
-    }),
-    [vue, largeur, hauteur],
+  // La vue en JavaScript (sans natif) : sa caméra suit l'état.
+  const camera = useMemo(() => cameraDe(vue), [vue, ouverture]); // eslint-disable-line react-hooks/exhaustive-deps
+  // La vue native : la caméra d'entrée, puis la régie à chaque image.
+  const cameraPlate = useMemo(
+    () => secours ?? cameraNative(cameraDe(entree)),
+    [secours, entree, ouverture], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const cameraPlate = useMemo(() => cameraNative(camera), [camera]);
 
   return (
     <Modal
@@ -601,6 +666,7 @@ export function Exploration({
               sols={maille.sols}
               meubles={maille.meubles}
               camera={cameraPlate}
+              cle={cle}
               fond={fond}
             />
           )}
@@ -635,53 +701,37 @@ export function Exploration({
         />
 
         {/*
-          AU REPOS : DEUX REPÈRES, NETS — qui disent qu'on peut marcher et
-          tourner, sans prendre la vue. Ils ont été en verre ; relevé du
-          patron : « les boutons toujours grisés ». Le verre d'iOS rend gris
-          ce qu'il ne sait pas flouter, et un repère gris se lit éteint. Ils
-          sont blancs, l'icône à l'encre de la maison.
+          AVANT LE PREMIER PAS : DEUX REPÈRES, NETS — qui disent qu'on peut
+          marcher et tourner. Ils s'effacent avec la consigne, au premier
+          mouvement : ensuite, la vue est toute à la visite.
         */}
-        {!baton && (
-          <View
-            style={[styles.repere, styles.repereGauche, { bottom: marges.bottom + 34 }]}
-            pointerEvents="none">
-            <View style={styles.repereRond}>
-              <Svg width={22} height={22} viewBox="0 0 24 24">
-                <Path d={SOLAIRES.marcher} fill={teinte.blue} fillRule="evenodd" />
-              </Svg>
-            </View>
-          </View>
-        )}
-        <View
-          style={[styles.repere, styles.repereDroit, { bottom: marges.bottom + 34 }]}
-          pointerEvents="none">
-          <View style={styles.repereRond}>
-            <Svg width={22} height={22} viewBox="0 0 24 24">
-              <Path d={SOLAIRES.pivoter} fill={teinte.blue} fillRule="evenodd" />
-            </Svg>
-          </View>
-        </View>
-
-        {/* Le bâton, né sous le pouce. */}
-        {baton && (
-          <View
-            pointerEvents="none"
-            accessibilityLabel="Manette"
-            style={[styles.baton, { left: baton.x - RAYON_MANETTE, top: baton.y - RAYON_MANETTE }]}>
-            <View style={styles.batonAnneau} />
+        {!aBouge && (
+          <>
             <View
-              style={[
-                styles.batonBouton,
-                { transform: [{ translateX: baton.dx }, { translateY: baton.dy }] },
-              ]}
-            />
-          </View>
+              style={[styles.repere, styles.repereGauche, { bottom: marges.bottom + 34 }]}
+              pointerEvents="none">
+              <View style={styles.repereRond}>
+                <Svg width={22} height={22} viewBox="0 0 24 24">
+                  <Path d={SOLAIRES.marcher} fill={teinte.blue} fillRule="evenodd" />
+                </Svg>
+              </View>
+            </View>
+            <View
+              style={[styles.repere, styles.repereDroit, { bottom: marges.bottom + 34 }]}
+              pointerEvents="none">
+              <View style={styles.repereRond}>
+                <Svg width={22} height={22} viewBox="0 0 24 24">
+                  <Path d={SOLAIRES.pivoter} fill={teinte.blue} fillRule="evenodd" />
+                </Svg>
+              </View>
+            </View>
+          </>
         )}
 
         <View style={[styles.haut, { top: marges.top + 8 }]} pointerEvents="box-none">
           <MiniCarte
             murs={walls}
-            pose={vue}
+            pose={carte}
             styles={styles}
             teinte={teinte}
           />
@@ -699,7 +749,7 @@ export function Exploration({
             style={({ pressed }) => [styles.terminer, pressed && styles.enfonce]}
             hitSlop={10}
             onPress={() => {
-              manette.current = { x: 0, y: 0 };
+              arreterTout();
               onClose();
             }}>
             <Text style={styles.terminerTexte} numberOfLines={1}>
@@ -784,36 +834,6 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
       ...ombreBouton,
-    },
-    /* Le bâton : un anneau blanc franc sous le pouce, un bouton plein dedans. */
-    baton: {
-      position: 'absolute',
-      width: RAYON_MANETTE * 2,
-      height: RAYON_MANETTE * 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    batonAnneau: {
-      position: 'absolute',
-      left: 0,
-      top: 0,
-      right: 0,
-      bottom: 0,
-      borderRadius: RAYON_MANETTE,
-      borderWidth: 2,
-      borderColor: 'rgba(255,255,255,0.95)',
-      backgroundColor: 'rgba(255,255,255,0.22)',
-    },
-    batonBouton: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: '#FFFFFF',
-      opacity: 0.92,
-      shadowColor: '#0B0D12',
-      shadowOpacity: 0.18,
-      shadowRadius: 8,
-      shadowOffset: { width: 0, height: 2 },
     },
   }),
 );

@@ -248,9 +248,27 @@ export const RoomScanVisite = UIManager.getViewManagerConfig?.(
           physiques, groupés par matière (voir `geometry/modeles3d`).
         */
         meubles?: number[];
+        /* La clé par laquelle `poserCameraDeVisite` retrouve la vue. */
+        cle?: string;
       }
     >('RoomScanVisite')
   : undefined;
+
+/**
+ * LA CAMÉRA DE LA VISITE, POSÉE DIRECTEMENT — six nombres, à chaque image.
+ *
+ * Passée en propriété, elle faisait reconvertir à la couche de compatibilité
+ * TOUTES les propriétés de la vue (le maillage entier) soixante fois par
+ * seconde : voir `RoomScanVisite.cle` côté natif. Rend `false` quand la régie
+ * n'est pas là (ancien binaire, banc d'essai) : l'appelant repasse alors par
+ * la propriété `camera`.
+ */
+export function poserCameraDeVisite(cle: string, camera: number[]): boolean {
+  const regie = Platform.OS === 'ios' ? NativeModules.RoomScanVisiteRegie : undefined;
+  if (!regie?.camera) return false;
+  regie.camera(cle, camera);
+  return true;
+}
 
 /**
  * Émetteur d'événements du scan : 'onScanUpdate', 'onInstruction', 'onScanError'.

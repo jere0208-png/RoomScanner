@@ -111,6 +111,40 @@ final class RoomScanVisite: UIView {
     didSet { rebatir() }
   }
 
+  /*
+    LA CLÉ DE LA VUE — pour que la caméra lui parvienne SANS PASSER PAR LES
+    PROPRIÉTÉS. Relevé du patron : « la visite est bug encore plus qu'avant
+    pour le déplacement ».
+
+    La vue est un composant de l'ancienne architecture, monté par la couche
+    de compatibilité de React Native : à CHAQUE propriété changée, elle
+    reconvertit et recompare TOUTES les autres — maillage, sols, meubles,
+    des dizaines de milliers de nombres — sur le fil principal, celui-là
+    même qui dessine. La caméra changeant soixante fois par seconde, la marche
+    payait soixante fois par seconde le poids de tout le logement ; et depuis
+    que les meubles sont de vrais modèles, ce poids a décuplé.
+
+    La caméra passe donc par `RoomScanVisiteRegie`, qui retrouve la vue par
+    cette clé et lui pose ses six nombres, rien d'autre.
+  */
+  private static let registre = NSMapTable<NSString, RoomScanVisite>.strongToWeakObjects()
+
+  @objc var cle: String = "" {
+    didSet {
+      if !oldValue.isEmpty { RoomScanVisite.registre.removeObject(forKey: oldValue as NSString) }
+      if !cle.isEmpty { RoomScanVisite.registre.setObject(self, forKey: cle as NSString) }
+    }
+  }
+
+  static func parCle(_ cle: String) -> RoomScanVisite? {
+    registre.object(forKey: cle as NSString)
+  }
+
+  /** La caméra de la visite, posée directement : voir `cle`. */
+  func poserCamera(_ valeurs: [NSNumber]) {
+    camera = valeurs
+  }
+
   /// Le fil du bois et la trame des tissus, dessinés une fois par teinte.
   private var texturesDesMeubles: [String: UIImage] = [:]
 
@@ -512,7 +546,11 @@ final class RoomScanVisite: UIView {
   /** L'épaisseur du liseré, en mètres — un point d'écran, au zoom du moment. */
   private func regleLeContour(_ metres: Float) {
     guard metres.isFinite, metres > 0 else { return }
-    epaisseurContour = min(0.05, max(0.002, metres))
+    let voulue = min(0.05, max(0.002, metres))
+    // Rien à reposer : en visite, l'épaisseur est fixe, et chaque image
+    // réécrivait la même valeur dans chaque matériau.
+    if voulue == epaisseurContour { return }
+    epaisseurContour = voulue
     for m in materiauxContour {
       m.setValue(NSNumber(value: epaisseurContour), forKey: "epaisseur")
     }
@@ -878,6 +916,21 @@ final class RoomScanVisite: UIView {
 }
 
 /** Le gestionnaire qui expose la vue à React Native. */
+/**
+ * LA RÉGIE DE LA VISITE — la caméra, posée sans passer par les propriétés.
+ * Voir `RoomScanVisite.cle`.
+ */
+@objc(RoomScanVisiteRegie)
+final class RoomScanVisiteRegie: NSObject {
+  @objc static func requiresMainQueueSetup() -> Bool { false }
+
+  @objc func camera(_ cle: String, valeurs: [NSNumber]) {
+    DispatchQueue.main.async {
+      RoomScanVisite.parCle(cle)?.poserCamera(valeurs)
+    }
+  }
+}
+
 @objc(RoomScanVisiteManager)
 final class RoomScanVisiteManager: RCTViewManager {
   override static func requiresMainQueueSetup() -> Bool { true }
