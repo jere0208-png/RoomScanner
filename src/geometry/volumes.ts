@@ -59,6 +59,13 @@ export function wetZones(
     height: number;
     transform: number[];
   }[],
+  /**
+   * Le niveau du sol dans le repère du relevé (`solDesMurs`) : le bord de la
+   * baignoire se compte AU-DESSUS DE LUI. Il se comptait depuis le zéro de
+   * la session — sur un vrai relevé, sous le sol, et le bord retombait à dix
+   * centimètres.
+   */
+  floorY = 0,
 ): WetZone[] {
   const out: WetZone[] = [];
   for (const o of objects) {
@@ -81,7 +88,7 @@ export function wetZones(
     });
     out.push({
       pts,
-      rim: Math.max(0.1, o.transform[13] + o.height / 2),
+      rim: Math.max(0.1, o.transform[13] + o.height / 2 - floorY),
       kind: /shower/i.test(cat) ? 'shower' : 'bathtub',
     });
   }

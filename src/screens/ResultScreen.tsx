@@ -29,6 +29,9 @@ import { fr } from './result/format';
 import { AddRoomSheet } from './result/AddRoomSheet';
 import { ElecSheet } from './result/ElecSheet';
 import { ExistantSheet } from './result/ExistantSheet';
+import { FichePieceSheet } from './result/FichePieceSheet';
+import { ficheDeLaPiece, type CircuitConseille } from '../geometry/fichePiece';
+import { ancrerElec } from '../geometry/viseur';
 import { TravauxSheet } from '../components/TravauxSheet';
 import { travauxDesPieces } from '../geometry/travaux';
 import { LaserSheet } from './result/LaserSheet';
@@ -107,6 +110,7 @@ import {
   segLength,
   totalArea,
   type RoomPart,
+  solDesMurs,
 } from '../geometry/floorplan';
 import { hasCapturedColors, pointInPolygon } from '../geometry/appearance';
 import { planRoutes } from '../geometry/elecplan';
@@ -1913,6 +1917,31 @@ export function ResultScreen() {
   const targetRoomId =
     selectedRoomId ?? (rooms.length === 1 ? rooms[0].id : null);
   const targetRoom = rooms.find((r) => r.id === targetRoomId) ?? null;
+  /*
+    LA FICHE DE LA PIÈCE CHOISIE — ce que le scan en a appris (voir
+    `fichePiece`). Calculée seulement quand on l'ouvre.
+  */
+  const [ficheOuverte, setFicheOuverte] = useState(false);
+  /* Le nord relevé au scan : il nomme l'exposition des fenêtres. */
+  const nordReleve = useScanStore((st) => st.north);
+  const ficheDeLaCible = useMemo(() => {
+    if (!ficheOuverte || !targetRoom) return null;
+    const part = parts.find((p) => p.roomId === targetRoom.id);
+    if (!part) return null;
+    return ficheDeLaPiece({
+      contour: part.surface?.pts ?? [],
+      surface: part.surface?.area ?? 0,
+      surfaceExacte: !!part.surface?.exact,
+      centre: part.labelAt,
+      murs: part.walls,
+      tousLesMurs: walls,
+      ouvertures: openings,
+      objets: objects.filter((o) => o.roomId === targetRoom.id),
+      fixtures,
+      north: nordReleve,
+      releve: targetRoom.releve,
+    });
+  }, [ficheOuverte, targetRoom, parts, walls, openings, objects, fixtures, nordReleve]);
   const targetPart = parts.find((p) => p.roomId === targetRoomId) ?? null;
   const targetExtent = targetPart?.surface
     ? roomExtent(targetPart.surface.pts)
@@ -1949,7 +1978,7 @@ export function ResultScreen() {
       const cuisine = roomUse(piece?.name ?? '', piece?.kind) === 'cuisine';
       for (const side of [1, -1] as const) {
         const face = wallFace(w, quads.get(w.id), side);
-        const plans = worktopsOnWall(face, objects, cuisine);
+        const plans = worktopsOnWall(face, objects, cuisine, solDesMurs(walls));
         if (plans.length === 0) continue;
         m.set(w.id, { x: (f: Fixture) => faceX(face, f.along), plans });
         break;
@@ -2077,10 +2106,10 @@ export function ResultScreen() {
    * rassurer.
    */
   /** Combien de zones humides le relevé porte : le calque en dépend. */
-  const zonesHumides = useMemo(() => wetZones(objects).length, [objects]);
+  const zonesHumides = useMemo(() => wetZones(objects, solDesMurs(walls)).length, [objects, walls]);
 
   const volumes = useMemo(() => {
-    const zones = wetZones(fige.objects);
+    const zones = wetZones(fige.objects, solDesMurs(fige.walls));
     const out = new Map<string, VolumeVerdict>();
     if (zones.length === 0) return out;
     const quads = wallQuadsOf(fige.walls);
@@ -3013,6 +3042,37 @@ export function ResultScreen() {
       haptic('succes');
       voirAuMur(pose);
     }
+  };
+
+  /*
+    LES CIRCUITS DES APPAREILS, POSÉS D'UN APPUI — derrière chaque appareil,
+    sur son mur, à sa hauteur : `ancrerElec` les rattache comme une pose au
+    viseur, et ils entrent au plan comme ceux de « Normes auto ».
+  */
+  const poserLesCircuits = (cs: CircuitConseille[]) => {
+    const ancres = cs
+      .filter((k) => k.pose && !k.deja)
+      .map((k) => {
+        const w = walls.find((x) => x.id === k.pose!.wallId)!;
+        const l = segLength(w) || 1;
+        return {
+          kind: k.kind,
+          wallId: k.pose!.wallId,
+          along: k.pose!.along,
+          height: k.pose!.height,
+          x: w.a.x + ((w.b.x - w.a.x) * k.pose!.along) / l,
+          y: 0,
+          z: w.a.z + ((w.b.z - w.a.z) * k.pose!.along) / l,
+        };
+      });
+    if (ancres.length === 0) return;
+    const res = ancrerElec(
+      ancres,
+      walls,
+      rooms.map((r) => ({ id: r.id, outline: parts.find((p) => p.roomId === r.id)?.surface?.pts })),
+      (prefixe, n) => `${prefixe}-app-${Date.now().toString(36)}-${n}`,
+    );
+    useScanStore.getState().poserDAuto(res.fixtures, []);
   };
 
   const menuDuScan = () =>
@@ -4667,6 +4727,7 @@ export function ResultScreen() {
               onHeight={promptRoomHeight}
               /* Peindre ses murs : le nuancier de douze teintes. */
               onPeindre={() => setPeignant(true)}
+              onFiche={() => setFicheOuverte(true)}
               onCotes={
                 estRectangle(targetPart?.walls ?? []) ? promptRoomCotes : undefined
               }
@@ -5535,6 +5596,14 @@ export function ResultScreen() {
         onClose={() => setTravauxOuvert(false)}
         pieces={piecesTravaux}
       />
+      <FichePieceSheet
+        visible={ficheOuverte && !!targetRoom}
+        nom={targetRoom?.name ?? ''}
+        fiche={ficheDeLaCible}
+        onClose={() => setFicheOuverte(false)}
+        onPoser={poserLesCircuits}
+      />
+
       <ExistantSheet
         visible={existantOuvert}
         existant={existant}

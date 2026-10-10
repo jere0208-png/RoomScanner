@@ -96,6 +96,7 @@ export function RoomBar({
   onScinder,
   onRetirer,
   onPeindre,
+  onFiche,
   onFermer,
 }: {
   room: { id: string; name: string; neuve?: boolean };
@@ -133,6 +134,8 @@ export function RoomBar({
    * et non avec ceux qui changent le plan (scinder, fusionner) : une
    * peinture ne touche pas à la géométrie, elle habille.
    */
+  /** La fiche de la pièce : ce que le scan en a appris. */
+  onFiche?: () => void;
   onPeindre: () => void;
   /** La croix : désélectionne la pièce. */
   onFermer?: () => void;
@@ -198,6 +201,19 @@ export function RoomBar({
           styles={styles}
           onPress={onName}
         />
+        {/*
+          LA FICHE : surface habitable, hauteur mesurée, volume, ouvertures,
+          exposition, équipements reconnus et circuits qu'ils appellent.
+        */}
+        {!!onFiche && (
+          <Geste
+            nom="Fiche de la pièce"
+            mot="Fiche"
+            d={SOLAIRES.check}
+            styles={styles}
+            onPress={onFiche}
+          />
+        )}
         {/*
           LES COTES S'ÉDITENT — quand la pièce est un rectangle.
 

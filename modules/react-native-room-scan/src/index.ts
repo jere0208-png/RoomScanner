@@ -12,6 +12,18 @@ import {
  * `texels` est ordonné ligne par ligne : ligne 0 = HAUT du mur,
  * colonne 0 = extrémité A. Couleurs au format `#RRGGBB`.
  */
+/** Le volume relevé au LiDAR : le sol, et la hauteur sous plafond par carreau. */
+export interface VolumeReleve {
+  sol: number;
+  pas: number;
+  minX: number;
+  minZ: number;
+  cols: number;
+  rows: number;
+  /** Centimètres au-dessus du sol ; 0 : pas vu. */
+  plafond: number[];
+}
+
 export interface SurfaceTexture {
   cols: number;
   rows: number;
@@ -146,7 +158,19 @@ export interface ScanResult {
     classe: boolean;
     fichier?: string;
     octets?: number;
+    /**
+     * LE VOLUME LU DANS LE MAILLAGE : la hauteur du sol (repère de la
+     * session) et, carreau par carreau (`pas` m), la hauteur sous plafond en
+     * centimètres au-dessus de ce sol — 0 là où le plafond n'a pas été vu.
+     * Cases rangées par lignes de `cols`, à partir de (`minX`, `minZ`).
+     */
+    volume?: VolumeReleve;
   };
+  /**
+   * LES SOLS QUE ROOMPLAN A MESURÉS (iOS 17) : le polygone exact de chacun,
+   * à plat (`[x0, z0, x1, z1…]`), et sa hauteur.
+   */
+  sols?: { id: string; coins: number[]; y: number }[];
   /**
    * Ce qu'on a posé au viseur pendant le relevé : des points du monde,
    * que le JS rattache aux murs et aux plafonds (`ancrerElec`).
@@ -181,7 +205,18 @@ export interface ScanResult {
    * par mur RoomPlan, au rapport exact du mur, et le côté d'où on la voyait
    * (+1 : celui de l'axe z de sa transformation).
    */
-  photosMurs?: { wallId: string; path: string; cote: number; at: number }[];
+  photosMurs?: {
+    wallId: string;
+    path: string;
+    cote: number;
+    at: number;
+    /** Le mur tel qu'il était à la prise : milieu, axe, longueur. */
+    cx?: number;
+    cz?: number;
+    dx?: number;
+    dz?: number;
+    longueur?: number;
+  }[];
   /** Chemin local du modèle 3D (.usdz sur iOS, .obj sur Android). */
   modelPath: string;
   surfaces?: SurfaceData[];

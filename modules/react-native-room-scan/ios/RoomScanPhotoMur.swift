@@ -56,6 +56,12 @@ final class PhotographeDesMurs {
     /// De quel côté du mur on se tenait : +1 du côté de son axe z, −1 de l'autre.
     var cote: Int
     var at: Date
+    /// Le mur tel qu'il était à la prise : son milieu, son axe, sa longueur.
+    /// RoomPlan renumérote ou fusionne des murs à l'assemblage : sans eux,
+    /// la photo d'un mur renuméroté se perdait.
+    var milieu: SIMD3<Float>
+    var axe: SIMD3<Float>
+    var longueur: Float
   }
   private var meilleures: [UUID: Meilleure] = [:]
 
@@ -128,7 +134,12 @@ final class PhotographeDesMurs {
     }
     guard let c = choix,
           let jpeg = redresser(c.mur, cote: c.cote, frame: frame, taille: taille) else { return }
-    meilleures[c.mur.identifier] = Meilleure(score: c.score, jpeg: jpeg, cote: c.cote, at: Date())
+    let t = c.mur.transform
+    meilleures[c.mur.identifier] = Meilleure(
+      score: c.score, jpeg: jpeg, cote: c.cote, at: Date(),
+      milieu: SIMD3<Float>(t.columns.3.x, t.columns.3.y, t.columns.3.z),
+      axe: SIMD3<Float>(t.columns.0.x, t.columns.0.y, t.columns.0.z),
+      longueur: c.mur.dimensions.x)
   }
 
   /**
@@ -275,6 +286,11 @@ final class PhotographeDesMurs {
             "path": url.path,
             "cote": m.cote,
             "at": m.at.timeIntervalSince1970 * 1000,
+            "cx": m.milieu.x,
+            "cz": m.milieu.z,
+            "dx": m.axe.x,
+            "dz": m.axe.z,
+            "longueur": m.longueur,
           ])
         } catch {
           continue

@@ -37,6 +37,7 @@ import {
   wallQuads,
   type Pt,
   type WallSeg,
+  solDesMurs,
 } from '../geometry/floorplan';
 
 /** Milieu d'une ouverture, au sol. */
@@ -2338,7 +2339,7 @@ export function Iso3DView({
     const volumes: { id: string; niveau: 1 | 2; pts: { sx: number; sy: number }[] }[] = [];
     const interdits: { id: string; cx: number; cy: number }[] = [];
     if (showVolumes) {
-      const zones: WetZone[] = wetZones(keptObjects as never);
+      const zones: WetZone[] = wetZones(keptObjects as never, solDesMurs(keptWalls));
       for (const [i, z] of zones.entries()) {
         // Le contour de la zone, et son débord : deux anneaux concentriques.
         for (const [niveau, marge] of [

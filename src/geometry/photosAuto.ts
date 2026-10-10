@@ -26,6 +26,16 @@ export interface PhotoDeMurBrute {
   /** +1 : prise du côté de l'axe z du mur RoomPlan ; −1 : de l'autre. */
   cote: number;
   at: number;
+  /**
+   * LE MUR TEL QU'IL ÉTAIT À LA PRISE — son milieu, son axe, sa longueur.
+   * RoomPlan renumérote ou fusionne des murs à l'assemblage : la photo d'un
+   * mur dont l'identifiant a disparu se rattache alors par sa géométrie.
+   */
+  cx?: number;
+  cz?: number;
+  dx?: number;
+  dz?: number;
+  longueur?: number;
 }
 
 /** Une photo de mur rattachée au plan (le format de `ScanPhoto`). */
@@ -60,15 +70,40 @@ export function photosDesMurs(
   const dx = o.decalage?.dx ?? 0;
   const dz = o.decalage?.dz ?? 0;
   for (const b of brutes) {
+    if (!b.path) continue;
     const s = surfaces.find((x) => x.id === b.wallId && x.type === 'wall');
-    if (!s?.transform || !b.path) continue;
-    const seg = toSegment(s);
+    let seg: { a: { x: number; z: number }; b: { x: number; z: number } };
+    /** L'axe z du mur RoomPlan, à plat. */
+    let nz: { x: number; z: number };
+    if (s?.transform) {
+      seg = toSegment(s);
+      const m = s.transform;
+      const nl = Math.hypot(m[8], m[10]) || 1;
+      nz = { x: m[8] / nl, z: m[10] / nl };
+    } else if (
+      typeof b.cx === 'number' &&
+      typeof b.cz === 'number' &&
+      typeof b.dx === 'number' &&
+      typeof b.dz === 'number' &&
+      (b.longueur ?? 0) > 0.2
+    ) {
+      /*
+        LE MUR A CHANGÉ DE NOM À L'ASSEMBLAGE — on le retrouve par sa place :
+        le milieu et l'axe gardés à la prise, l'axe z en est le quart de tour.
+      */
+      const l = Math.hypot(b.dx, b.dz) || 1;
+      const u = { x: b.dx / l, z: b.dz / l };
+      const demi = (b.longueur as number) / 2;
+      seg = {
+        a: { x: b.cx - u.x * demi, z: b.cz - u.z * demi },
+        b: { x: b.cx + u.x * demi, z: b.cz + u.z * demi },
+      };
+      nz = { x: -u.z, z: u.x };
+    } else continue;
     const a = { x: seg.a.x + dx, z: seg.a.z + dz };
     const e = { x: seg.b.x + dx, z: seg.b.z + dz };
     // La normale du mur RoomPlan (son axe z), tournée vers celui qui photographiait.
-    const m = s.transform;
-    const nl = Math.hypot(m[8], m[10]) || 1;
-    const vers = { x: (m[8] / nl) * (b.cote >= 0 ? 1 : -1), z: (m[10] / nl) * (b.cote >= 0 ? 1 : -1) };
+    const vers = { x: nz.x * (b.cote >= 0 ? 1 : -1), z: nz.z * (b.cote >= 0 ? 1 : -1) };
     for (const w of walls) {
       if (w.type !== 'wall') continue;
       const L = segLength(w);

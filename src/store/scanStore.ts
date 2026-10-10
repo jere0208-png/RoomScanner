@@ -10,6 +10,7 @@ import {
   type Identite,
 } from '../net/coffrePlans';
 import { implanter, rattacher, type DepartExistant, type TableauExistant } from '../geometry/existant';
+import { plafondDeLaPiece, solReleveDe, type PlafondDeLaPiece } from '../geometry/fichePiece';
 
 export type { TableauExistant };
 import {
@@ -186,6 +187,26 @@ export interface RoomEntry {
    * Ne pas confondre avec `floor`, qui est la couleur du SOL.
    */
   niveau?: number;
+  /**
+   * CE QUE LE SCAN A MESURÉ DE LA PIÈCE, au-delà de ses murs : son plafond
+   * relevé au LiDAR (hauteurs, rampant, surface habitable) et la surface de
+   * son sol selon RoomPlan. Absent sur un relevé d'avant, ou dessiné.
+   */
+  releve?: { plafond?: PlafondDeLaPiece | null; surfaceSol?: number | null };
+}
+
+/**
+ * LE RELEVÉ D'UNE PIÈCE, TIRÉ DU SCAN — le plafond dans son contour, le sol
+ * que RoomPlan y a mesuré. `undefined` quand le scan n'en dit rien.
+ */
+function releveDeLaPiece(
+  r: ScanResult,
+  contour: { x: number; z: number }[],
+  aire: number,
+): RoomEntry['releve'] | undefined {
+  const plafond = plafondDeLaPiece(r.maillage?.volume, contour, aire);
+  const surfaceSol = solReleveDe(r.sols, contour);
+  return plafond || surfaceSol ? { plafond, surfaceSol } : undefined;
 }
 
 /** Un dossier de la bibliothèque. Il ne porte qu'un nom : ce sont les scans
@@ -5218,12 +5239,15 @@ export const useScanStore = create<ScanState>((set, get) => {
         const garde = avant
           ? st.rooms.find((x) => x.id === avant.roomId)
           : undefined;
+        // Le plafond relevé par ce passage, ou celui du passage d'avant.
+        const releve = releveDeLaPiece(r, sh.outline, sh.area) ?? garde?.releve;
         return {
           id: `room-${i + 1}`,
           name: garde?.name || auto[i],
           wallIds: sh.wallIds,
           kind: kinds[i] ?? undefined,
           floor,
+          ...(releve ? { releve } : {}),
         };
       });
       /*
@@ -5700,13 +5724,17 @@ export const useScanStore = create<ScanState>((set, get) => {
       /* Chaque mur, photographié et redressé pendant le scan. */
       const photosAuto = photosDesMurs(r.photosMurs ?? [], surfaces, walls);
       const names = nameRooms(kinds);
-      const kept: RoomEntry[] = shapes.map((s, i) => ({
-        id: `room-${i + 1}`,
-        name: names[i],
-        wallIds: s.wallIds,
-        kind: kinds[i] ?? undefined,
-        floor,
-      }));
+      const kept: RoomEntry[] = shapes.map((s, i) => {
+        const releve = releveDeLaPiece(r, s.outline, s.area);
+        return {
+          id: `room-${i + 1}`,
+          name: names[i],
+          wallIds: s.wallIds,
+          kind: kinds[i] ?? undefined,
+          floor,
+          ...(releve ? { releve } : {}),
+        };
+      });
 
       if (walls.length === 0) {
         // Rien d'exploitable : on montre l'état vide, sans polluer la bibliothèque.

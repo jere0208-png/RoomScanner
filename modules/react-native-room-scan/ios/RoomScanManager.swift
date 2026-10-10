@@ -642,8 +642,37 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       openings: room.openings,
       objets: room.objects,
       sections: Self.sectionsDe(room),
+      sols: Self.solsDe(room),
       exporter: { url in try room.export(to: url, exportOptions: .parametric) },
     )
+  }
+
+  /**
+   LES SOLS QUE ROOMPLAN A MESURÉS (iOS 17) — le polygone exact de chaque sol,
+   dans le monde. Le JavaScript reconstruit le contour des pièces à partir des
+   murs ; quand une boucle ne se referme pas, la surface n'est qu'approchée.
+   Le sol relevé, lui, a sa vraie forme : c'est la surface qu'on annoncera.
+   */
+  static func solsDe(_ room: CapturedRoom) -> [[String: Any]] {
+    guard #available(iOS 17.0, *) else { return [] }
+    return room.floors.compactMap { sol -> [String: Any]? in
+      let coins = sol.polygonCorners
+      guard coins.count >= 3 else { return nil }
+      let t = sol.transform
+      var plat: [Float] = []
+      var y: Float = 0
+      for c in coins {
+        let w = t * SIMD4<Float>(c.x, c.y, c.z, 1)
+        plat.append(w.x)
+        plat.append(w.z)
+        y += w.y
+      }
+      return [
+        "id": sol.identifier.uuidString,
+        "coins": plat,
+        "y": y / Float(coins.count),
+      ]
+    }
   }
 
   /// Les sections d'une pièce (iOS 17) : son type, et un point dedans.
@@ -716,6 +745,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     openings: [CapturedRoom.Surface],
     objets: [CapturedRoom.Object],
     sections: [[String: Any]] = [],
+    sols: [[String: Any]] = [],
     exporter: @escaping (URL) throws -> Void,
   ) {
     /*
@@ -747,6 +777,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
           JS ne nommait les pièces que d'après leurs meubles.
         */
         "sections": sections,
+        // Le polygone exact de chaque sol (iOS 17), quand RoomPlan l'a mesuré.
+        "sols": sols,
       ]
     if let floor = RoomColorSampler.shared.floorPayload() {
       payload["floor"] = floor

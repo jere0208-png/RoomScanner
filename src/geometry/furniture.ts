@@ -274,6 +274,13 @@ export function hiddenByBox(
 
 export function frCategory(category: string): string {
   const kind = furnKind(category);
+  /* L'électroménager se distingue : un lave-vaisselle n'est pas un
+     lave-linge, et c'est lui qu'on cherche dans la liste. */
+  if (kind === 'appliance') {
+    if (/dishwasher/i.test(category)) return 'Lave-vaisselle';
+    if (/dryer/i.test(category) && !/washer/i.test(category)) return 'Sèche-linge';
+  }
+  if (/oven/i.test(category)) return 'Four';
   return kind === 'other' ? category : FR[kind];
 }
 

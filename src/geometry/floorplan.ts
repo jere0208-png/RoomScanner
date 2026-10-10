@@ -1527,6 +1527,20 @@ export function roomParts(walls: WallSeg[], rooms?: RoomShape[]): RoomPart[] {
   return groupByRoom(walls).map(({ roomId, items }) => makePart(roomId, items));
 }
 
+/**
+ * LE NIVEAU DU SOL, DANS LE REPÈRE DU RELEVÉ — le pied le plus bas des murs.
+ *
+ * RoomPlan travaille dans le repère de sa session : le sol n'y est pas à
+ * zéro (il est à hauteur de main sous le téléphone qui a lancé le scan). Les
+ * murs portent leur pied ; les meubles, eux, n'ont qu'un centre — tout ce qui
+ * compare la hauteur d'un meuble à celle d'un appareil doit l'en retrancher.
+ * Le PDF le faisait déjà ; on l'écrit une fois, ici.
+ */
+export function solDesMurs(walls: readonly { yCenter: number; height: number; type?: string }[]): number {
+  const pieds = walls.filter((w) => !w.type || w.type === 'wall').map((w) => w.yCenter - w.height / 2);
+  return pieds.length > 0 ? Math.min(...pieds) : 0;
+}
+
 /** Aire cumulée des pièces ; `exact` tombe dès qu'un contour est reconstitué. */
 export function totalArea(
   parts: RoomPart[],

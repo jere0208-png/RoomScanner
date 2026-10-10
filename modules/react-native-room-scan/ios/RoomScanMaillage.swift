@@ -57,6 +57,10 @@ enum RoomScanMaillage {
     var nSommets = 0
     var nFaces = 0
     var classe = false
+    // LE VOLUME : où est le sol, et à quelle hauteur est le plafond, carreau
+    // par carreau (voir `volume`).
+    var hauteursDuSol = [Float]()
+    var plafond: [SIMD2<Int32>: SIMD2<Float>] = [:]
 
     for ancre in ancres {
       let g = ancre.geometry
@@ -109,6 +113,8 @@ enum RoomScanMaillage {
         }
         data.append(contentsOf: classes)
         classe = true
+        accumuler(sommets: flottants, indices: indices, classes: classes,
+                  sol: &hauteursDuSol, plafond: &plafond)
       }
       nSommets += n
       nFaces += m
@@ -121,6 +127,9 @@ enum RoomScanMaillage {
       "classe": classe,
       "octets": data.count,
     ]
+    if let v = volume(sol: hauteursDuSol, plafond: plafond) {
+      out["volume"] = v
+    }
     let fm = FileManager.default
     guard let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first else {
       return out
@@ -137,5 +146,83 @@ enum RoomScanMaillage {
       out["fichier"] = url.path
     }
     return out
+  }
+
+  /**
+   LE VOLUME DE LA PIÈCE, LU DANS LE MAILLAGE.
+
+   RoomPlan rend des murs droits d'une hauteur chacun : un plafond rampant,
+   une sous-pente, un plafond qui descend au-dessus d'un placard n'y existent
+   pas. Le LiDAR, lui, les a vus : ARKit classe chaque triangle (sol,
+   plafond…). On en tire deux choses, sans rien deviner :
+
+   - LE SOL : la hauteur médiane des triangles classés sol. C'est le zéro de
+     toutes les hauteurs — RoomPlan, lui, travaille dans le repère de la
+     session, où le sol n'est pas à zéro ;
+   - LE PLAFOND, CARREAU PAR CARREAU : un quadrillage de 25 cm où chaque
+     case porte la hauteur moyenne des triangles de plafond qui la couvrent,
+     en centimètres au-dessus du sol (0 : pas vu).
+
+   Le JavaScript en déduit, pièce par pièce, la hauteur sous plafond (la plus
+   basse, la plus haute, la moyenne), le volume, et la surface où l'on tient
+   debout — la loi Carrez ne compte pas ce qui est sous 1,80 m.
+   */
+  static let pasDuPlafond: Float = 0.25
+
+  /// Classe ARKit d'un triangle : 2 sol, 3 plafond (`ARMeshClassification`).
+  static func accumuler(
+    sommets: [Float], indices: [UInt32], classes: [UInt8],
+    sol: inout [Float], plafond: inout [SIMD2<Int32>: SIMD2<Float>]
+  ) {
+    let n = sommets.count / 3
+    for i in 0..<classes.count {
+      let k = classes[i]
+      guard k == 2 || k == 3, i * 3 + 2 < indices.count else { continue }
+      let a = Int(indices[i * 3])
+      let b = Int(indices[i * 3 + 1])
+      let c = Int(indices[i * 3 + 2])
+      guard a < n, b < n, c < n else { continue }
+      let x = (sommets[a * 3] + sommets[b * 3] + sommets[c * 3]) / 3
+      let y = (sommets[a * 3 + 1] + sommets[b * 3 + 1] + sommets[c * 3 + 1]) / 3
+      let z = (sommets[a * 3 + 2] + sommets[b * 3 + 2] + sommets[c * 3 + 2]) / 3
+      // Une coordonnée non finie ferait planter la conversion en entier.
+      guard x.isFinite, y.isFinite, z.isFinite else { continue }
+      if k == 2 {
+        // Cent mille hauteurs suffisent à une médiane juste.
+        if sol.count < 100_000 { sol.append(y) }
+      } else {
+        let cle = SIMD2<Int32>(Int32((x / pasDuPlafond).rounded(.down)), Int32((z / pasDuPlafond).rounded(.down)))
+        plafond[cle, default: SIMD2<Float>(0, 0)] += SIMD2<Float>(y, 1)
+      }
+    }
+  }
+
+  static func volume(sol: [Float], plafond: [SIMD2<Int32>: SIMD2<Float>]) -> [String: Any]? {
+    guard sol.count >= 20, !plafond.isEmpty else { return nil }
+    let tries = sol.sorted()
+    let solY = tries[tries.count / 2]
+    let xs = plafond.keys.map { $0.x }
+    let zs = plafond.keys.map { $0.y }
+    guard let x0 = xs.min(), let x1 = xs.max(), let z0 = zs.min(), let z1 = zs.max() else { return nil }
+    let cols = Int(x1 - x0) + 1
+    let rangees = Int(z1 - z0) + 1
+    // Un logement tient dans soixante mètres de côté : au-delà, c'est du bruit.
+    guard cols > 0, rangees > 0, cols * rangees <= 60_000 else { return nil }
+    var hauteurs = [Int](repeating: 0, count: cols * rangees)
+    for (cle, v) in plafond where v.y >= 2 {
+      let cm = Int(((v.x / v.y - solY) * 100).rounded())
+      // Sous 60 cm ou au-dessus de six mètres, ce n'est pas un plafond.
+      guard cm >= 60, cm <= 600 else { continue }
+      hauteurs[Int(cle.y - z0) * cols + Int(cle.x - x0)] = cm
+    }
+    return [
+      "sol": solY,
+      "pas": pasDuPlafond,
+      "minX": Float(x0) * pasDuPlafond,
+      "minZ": Float(z0) * pasDuPlafond,
+      "cols": cols,
+      "rows": rangees,
+      "plafond": hauteurs,
+    ]
   }
 }

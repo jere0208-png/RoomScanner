@@ -52,6 +52,7 @@ import {
   segLength,
   wallQuadsOf,
   wallRuns,
+  solDesMurs,
 } from '../geometry/floorplan';
 import {
   BOITE_D,
@@ -774,8 +775,8 @@ export function WallElevation({
    * parce qu'à quatre meubles le mur ne se voit plus.
    */
   const meublesDuMur = useMemo(
-    () => (face ? wallFurniture(face, objects) : []),
-    [face, objects],
+    () => (face ? wallFurniture(face, objects, solDesMurs(walls)) : []),
+    [face, objects, walls],
   );
 
   /** Les plans de travail que ce mur longe : ils changent la règle. */
@@ -786,8 +787,9 @@ export function WallElevation({
       face,
       objects,
       roomUse(piece?.name ?? '', piece?.kind) === 'cuisine',
+      solDesMurs(walls),
     );
-  }, [face, wall, rooms, objects]);
+  }, [face, wall, rooms, objects, walls]);
 
   if (!wall || !face) {
     return (

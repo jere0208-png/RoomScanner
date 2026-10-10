@@ -14285,6 +14285,57 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le scan en dit plus sur chaque pièce : plafond mesuré, surface habitable, exposition, circuits des appareils
+
+Relevé du patron : « cherche des améliorations à apporter au scan, qu'il peut
+apporter ensuite à notre app en termes d'informations sur les pièces
+scannées ; améliore au maximum le natif ».
+
+**Ce que le scan voyait sans le livrer** (audit du pipeline) : le maillage
+LiDAR, classé triangle par triangle (sol, plafond…), était écrit sur le disque
+et jamais lu ; les sols de RoomPlan (iOS 17) servaient au seul relevé des
+couleurs ; les photos des murs se perdaient quand RoomPlan renumérotait un mur
+à l'assemblage ; le sol n'était jamais ramené à zéro — le bord d'une baignoire
+retombait à 10 cm dans le calcul des volumes de la salle d'eau ; et les
+appareils reconnus (four, lave-vaisselle, lave-linge, plaque) ne demandaient
+aucun circuit.
+
+**Le natif.**
+- `RoomScanMaillage` mesure le VOLUME en construisant le maillage : la hauteur
+  médiane des triangles « sol » (le zéro des hauteurs), et un quadrillage de
+  25 cm où chaque case porte la hauteur moyenne des triangles « plafond » au-
+  dessus de ce sol (`maillage.volume`).
+- `RoomScanManager` livre les SOLS de RoomPlan (iOS 17), polygone exact dans
+  le monde (`sols`).
+- `PhotographeDesMurs` garde, avec chaque photo, le milieu, l'axe et la
+  longueur du mur à la prise : renuméroté, le mur se retrouve par sa place.
+
+**Dans l'application.**
+- `geometry/fichePiece.ts` : le plafond de chaque pièce (`plafondDeLaPiece` :
+  plus bas et plus haut sans les extrêmes isolés, moyenne, part vue, RAMPANT
+  au-delà de 30 cm d'écart, SURFACE HABITABLE — sous 1,80 m exclu, loi
+  Carrez — dès qu'un tiers du plafond a été vu), le sol de RoomPlan
+  (`solReleveDe`), les CIRCUITS DES APPAREILS (`circuitsDesAppareils` : four,
+  lave-vaisselle, lave-linge, sèche-linge → prise 20 A ; plaque → sortie
+  32 A, derrière l'appareil, « déjà posée » à moins d'1,50 m), et la fiche
+  entière (`ficheDeLaPiece`) : surfaces, hauteur, volume, périmètre, murs à
+  peindre, portes, fenêtres, surface vitrée, EXPOSITION de chaque fenêtre
+  d'après le nord relevé, équipements reconnus.
+- La fin du scan (et un passage de plus) enregistre ce relevé sur chaque
+  pièce (`RoomEntry.releve`) : il voyage avec le dossier.
+- **La fiche de la pièce** (`FichePieceSheet`), au bouton « Fiche » de la barre
+  de la pièce : tuiles de mesures, bandeau « Plafond rampant », ouvertures et
+  exposition, ce que le scan a reconnu, et les circuits à prévoir — « Poser »
+  un à un ou « Tout poser », à la place exacte (`ancrerElec`).
+- `solDesMurs` : le niveau du sol dans le repère du relevé, écrit une fois et
+  passé aux volumes de la salle d'eau, aux plans de travail (plan, élévation)
+  et à la 3D.
+- Le lave-vaisselle n'est plus appelé « Lave-linge », le four se nomme.
+
+Bancs : `fichepiece` (15 : le natif, le plafond plat / rampant / peu vu, le sol
+de RoomPlan, la photo retrouvée par sa place, la baignoire au-dessus du vrai
+sol, les circuits des appareils, l'exposition, la fin du scan, la feuille).
+
 ## L'export PDF refait : on voit son dossier — flouté tant qu'on n'est pas Pro
 
 Relevé du patron : « refais la page export PDF ; tous ces boutons ne sont pas
