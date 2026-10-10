@@ -38,6 +38,17 @@ import UIKit
  le contenu, qui reste en JavaScript.
  */
 final class VueDeVerre: UIView {
+  /*
+    LE FOND DE SECOURS, SOUS LE VERRE — relevé du patron, capture à l'appui :
+    « il n'y a plus aucune couleur sur les cards de l'accueil depuis le liquid
+    glass ». Le verre ne s'était pas posé : iOS l'abandonne EN SILENCE s'il
+    arrive pendant que l'élément est encore presque transparent, et toutes
+    ces cartes entrent en fondu. Il se pose maintenant à pleine opacité ; et
+    sous lui, ce fond porte la couleur de l'élément (la teinte d'une tuile, un
+    voile clair ailleurs) : le verre la reprend en la floutant, et si un jour
+    il manque encore, la carte garde sa couleur et sa forme.
+  */
+  private let secours = UIView()
   private let effet = UIVisualEffectView()
   // La réplique (avant iOS 26).
   private let voileVue = UIView()
@@ -95,8 +106,12 @@ final class VueDeVerre: UIView {
     backgroundColor = .clear
     effet.isUserInteractionEnabled = false
     effet.clipsToBounds = true
-    addSubview(effet)
     verreSysteme = VueDeVerre.verreDisponible
+    if verreSysteme {
+      secours.isUserInteractionEnabled = false
+      addSubview(secours)
+    }
+    addSubview(effet)
     if !verreSysteme {
       effet.effect = UIBlurEffect(style: .systemUltraThinMaterial)
       voileVue.isUserInteractionEnabled = false
@@ -159,7 +174,9 @@ final class VueDeVerre: UIView {
       opacite *= courante.alpha
       v = courante.superview
     }
-    return opacite > 0.02
+    // PLEINEMENT visible : posé sous un fondu qui commence, le verre est
+    // abandonné et ne revient jamais.
+    return opacite > 0.98
   }
 
   private func poserLeVerre() {
@@ -170,7 +187,7 @@ final class VueDeVerre: UIView {
       // On vide d'abord : réaffecter un verre sur un verre ne le repeint pas.
       effet.effect = UIVisualEffect()
       let verre = UIGlassEffect(style: .regular)
-      verre.tintColor = couleurDeTeinte()
+      // La couleur vient du fond de secours, dessous : le verre la reprend.
       verre.isInteractive = false
       effet.overrideUserInterfaceStyle = sombre ? .dark : .light
       effet.effect = verre
@@ -225,7 +242,10 @@ final class VueDeVerre: UIView {
 
   private func rafraichir() {
     if verreSysteme {
-      if pose { poserLeVerre() }
+      secours.backgroundColor = couleurDeTeinte()
+        ?? (sombre ? UIColor(red: 0.08, green: 0.09, blue: 0.11, alpha: 0.32) : UIColor(white: 1, alpha: 0.34))
+      // Seul le thème change la matière du verre lui-même.
+      if pose && effet.overrideUserInterfaceStyle != (sombre ? .dark : .light) { poserLeVerre() }
       return
     }
     overrideUserInterfaceStyle = sombre ? .dark : .light
@@ -251,6 +271,9 @@ final class VueDeVerre: UIView {
     effet.frame = bounds
     let r = rayonEffectif
     if verreSysteme {
+      secours.frame = bounds
+      secours.layer.cornerRadius = r
+      secours.layer.cornerCurve = .continuous
       if !pose {
         if visible { poserLeVerre() } else { guetter() }
       } else if r != rayonForme {

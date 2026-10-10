@@ -286,9 +286,10 @@ final class RoomColorSampler {
             (Float(i) + 0.5) * cell, p.y, (Float(j) + 0.5) * cell)
           if let c = img.color(at: world, normal: up) {
             let key = (Int64(i) << 32) | Int64(UInt32(bitPattern: Int32(j)))
-            var lot = floorTiles[key] ?? []
-            if lot.count < Self.maxSamples { lot.append(c) }
-            floorTiles[key] = lot
+            // En place : le lot n'est plus recopié à chaque échantillon.
+            if floorTiles[key, default: []].count < Self.maxSamples {
+              floorTiles[key, default: []].append(c)
+            }
           }
           j += 1
         }
@@ -599,16 +600,40 @@ private struct FrameImage {
      ces accidents par construction : il faudrait que la moitié des pixels
      soient faux pour la tromper.
      */
-    var lus: [SIMD3<Float>] = []
-    lus.reserveCapacity(9)
-    for dy in -2...2 where dy % 2 == 0 {
-      for dx in -2...2 where dx % 2 == 0 {
-        lus.append(yuv(x: ix + dx, y: iy + dy))
+    /*
+      NEUF LECTURES DANS UN TAMPON FIXE, SANS TABLEAU. Cette fonction tourne
+      des milliers de fois par passage (chaque case de chaque mur, la grille
+      du sol) : trois tableaux alloués et un tri par appel pesaient plus que
+      la lecture des pixels elle-même. La médiane se prend par un tri par
+      insertion de neuf luminances, sur la pile.
+    */
+    return withUnsafeTemporaryAllocation(of: SIMD3<Float>.self, capacity: 9) { lus in
+      withUnsafeTemporaryAllocation(of: Float.self, capacity: 9) { lum in
+        var n = 0
+        for dy in stride(from: -2, through: 2, by: 2) {
+          for dx in stride(from: -2, through: 2, by: 2) {
+            let c = yuv(x: ix + dx, y: iy + dy)
+            lus[n] = c
+            lum[n] = 0.2126 * c.x + 0.7152 * c.y + 0.0722 * c.z
+            n += 1
+          }
+        }
+        // Tri par insertion, couleurs et luminances ensemble.
+        for i in 1..<n {
+          let l = lum[i]
+          let c = lus[i]
+          var j = i - 1
+          while j >= 0 && lum[j] > l {
+            lum[j + 1] = lum[j]
+            lus[j + 1] = lus[j]
+            j -= 1
+          }
+          lum[j + 1] = l
+          lus[j + 1] = c
+        }
+        return lineaire(lus[n / 2])
       }
     }
-    let lum = lus.map { 0.2126 * $0.x + 0.7152 * $0.y + 0.0722 * $0.z }
-    let ordre = lum.enumerated().sorted { $0.element < $1.element }
-    return lineaire(lus[ordre[ordre.count / 2].offset])
   }
 
   /// sRGB 0…255 → lumière linéaire 0…1 : c'est ainsi qu'on moyenne.

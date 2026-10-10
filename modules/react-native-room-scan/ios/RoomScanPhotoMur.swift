@@ -2,6 +2,7 @@ import Foundation
 import ARKit
 import CoreImage
 import CoreImage.CIFilterBuiltins
+import ImageIO
 import RoomPlan
 import UIKit
 
@@ -42,7 +43,12 @@ final class PhotographeDesMurs {
   private weak var session: ARSession?
   private var room: CapturedRoom?
   private var dernierePose: (position: SIMD3<Float>, visee: SIMD3<Float>)?
-  private let contexte = CIContext()
+  /*
+    UN CONTEXTE DISCRET. Le redressement tourne pendant le scan, à côté de
+    RoomPlan qui tient la carte graphique : basse priorité, et sans garder en
+    mémoire les étapes intermédiaires d'images qu'on ne refera pas.
+  */
+  private let contexte = CIContext(options: [.cacheIntermediates: false, .priorityRequestLow: true])
 
   private struct Meilleure {
     var score: Float
@@ -239,8 +245,14 @@ final class PhotographeDesMurs {
       .transformed(by: CGAffineTransform(translationX: -e.minX, y: -e.minY))
       .transformed(by: CGAffineTransform(scaleX: largeur / e.width, y: hauteur / e.height))
     let fond = CIImage(color: CIColor(red: 0.86, green: 0.86, blue: 0.85)).cropped(to: cadre)
-    guard let cg = contexte.createCGImage(mis.composited(over: fond), from: cadre) else { return nil }
-    return UIImage(cgImage: cg).jpegData(compressionQuality: 0.8)
+    // Le JPEG directement depuis l'image Core Image : sans passer par une
+    // image bitmap puis une UIImage, deux copies de moins par photo.
+    let espace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+    let qualite = CIImageRepresentationOption(rawValue: kCGImageDestinationLossyCompressionQuality as String)
+    return contexte.jpegRepresentation(
+      of: mis.composited(over: fond).cropped(to: cadre),
+      colorSpace: espace,
+      options: [qualite: 0.8])
   }
 
   // MARK: - Livrer

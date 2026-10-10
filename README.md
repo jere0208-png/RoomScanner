@@ -14285,6 +14285,66 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le verre se pose enfin — et la couleur des tuiles revient
+
+Relevé du patron, capture à l'appui : « il n'y a plus aucune couleur sur les
+cards de l'accueil depuis le liquid glass ». Les tuiles, les cartes de plans,
+la bulle, les pastilles n'avaient plus de fond DU TOUT : ce n'était pas un
+verre trop discret, c'était un verre absent.
+
+**La cause.** iOS abandonne en silence un Liquid Glass posé pendant que
+l'élément est encore presque transparent — et toutes ces cartes entrent en
+fondu depuis zéro. Le verre se posait dès 2 % d'opacité (le seuil
+d'`expo-glass-effect`) : trop tôt. Il se pose maintenant à PLEINE opacité
+(`> 0,98`), le guet partagé attendant la fin du fondu.
+
+**Le filet de sécurité.** Sous le verre, un fond porte la couleur de
+l'élément : la teinte de la tuile (à 85 %, celle qu'on reconnaît), un voile
+clair ailleurs. Le verre la reprend en la floutant ; et si un jour il manque
+encore, la carte garde sa couleur et sa forme au lieu de disparaître.
+
+Banc : `performances.test.tsx` (pose à pleine opacité, fond de secours
+coloré, tuiles à 85 %).
+
+## Le scan et la visite 3D, encore allégés
+
+Relevé du patron : « continue d'optimiser le scan et la visite 3D ». La suite
+de l'audit natif, sur les deux écrans qui chauffent le téléphone.
+
+**La visite 3D** (`RoomScanVisite.swift`)
+- Deux pixels par point au lieu de trois (`contentScaleFactor`), anticrénelage
+  4× gardé : 2,25 fois moins de pixels rendus en plein écran, soixante fois
+  par seconde, sans différence visible dans une scène lissée.
+- Les deux matières d'un diffuseur (allumé, éteint) sont créées une fois :
+  chaque interrupteur en fabriquait de neuves pour chaque lampe, et SceneKit
+  devait les préparer au moment même où la lumière s'allume.
+- La construction de la scène sans petit tableau par triangle (des dizaines de
+  milliers d'allocations de moins à l'ouverture), et la coque des meubles
+  soude ses normales sur une clé ENTIÈRE par sommet au lieu d'une chaîne de
+  caractères fabriquée pour chacun.
+
+**Le scan** (`RoomScanManager`, `RoomScanPoseAR`, `RoomScanTexture`,
+`RoomScanPhotoMur`)
+- La couche 3D des poses à deux pixels par point, elle aussi.
+- Le viseur garde sa dernière visée tant que l'œil ne bouge pas (moins de
+  5 mm et d'un demi-degré, une demi-seconde au plus) : plus de lancers de
+  rayon vingt fois par seconde, téléphone posé contre le mur.
+- L'échantillonnage des couleurs (des milliers d'appels par passage) lit ses
+  neuf pixels dans un tampon fixe et prend la médiane par un tri sur la pile :
+  plus trois tableaux alloués et un tri par appel. Les échantillons du sol
+  s'ajoutent en place, sans recopier leur lot.
+- La photo des murs : un contexte Core Image en basse priorité, sans cache
+  intermédiaire (RoomPlan tient la carte graphique), et le JPEG tiré
+  directement de l'image Core Image — deux copies de moins par photo.
+- La fin du scan : l'export du modèle, sa teinte (relu puis réécrit), les
+  photos des murs et l'attente du maillage partent sur une file de fond ; ce
+  qui lit le relevé reste sur le fil principal, instantané. La roue
+  d'assemblage ne se fige plus.
+
+Banc : `performances.test.tsx` (la visite à 2×, les diffuseurs réutilisés, la
+coque sans chaînes ; la couche du scan à 2×, la visée gardée ; l'échantillonnage
+sans allocation, la photo sans copie ; la fin du scan hors du fil principal).
+
 ## Les performances : ce qui suit le doigt ne paie plus pour le reste
 
 Relevé du patron : « dans la continuité, cherche à améliorer les performances

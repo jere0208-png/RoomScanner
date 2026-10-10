@@ -90,6 +90,9 @@ final class ScenePoseAR: UIView, SCNSceneRendererDelegate {
     // laisse au scan la carte graphique qu'il réclame.
     vue.antialiasingMode = .multisampling2X
     vue.preferredFramesPerSecond = 60
+    // Deux pixels par point : des appareils de quelques centimètres n'en
+    // demandent pas trois, et la caméra du scan passe dessous.
+    vue.contentScaleFactor = min(2, UIScreen.main.scale)
     vue.autoenablesDefaultLighting = false
     vue.scene = scene
     vue.delegate = self

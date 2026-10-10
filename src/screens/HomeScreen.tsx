@@ -622,7 +622,8 @@ function Tuile({
           et sa couleur, et prend la matière. C'est la couleur, plus que le
           mot, qu'on retrouve d'une visite à l'autre.
         */}
-        <FondDeVerre rayon={26} teinte={fond} force={0.55} />
+        {/* À 85 % : la couleur de la tuile d'abord — c'est elle qu'on reconnaît. */}
+        <FondDeVerre rayon={26} teinte={fond} force={0.85} />
         {/*
           LE ROND DE L'ICÔNE SE RESSERRE, PAS L'ICÔNE ; LA FLÈCHE SE FAIT
           DISCRÈTE — relevé du patron : « réduis les flèches et leur bloc

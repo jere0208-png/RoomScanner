@@ -112,7 +112,8 @@ describe('le natif', () => {
     expect(stop.indexOf('RoomScanMaillage.ancresDe')).toBeLessThan(stop.indexOf('captureSession.stop()'));
     expect(m).toContain('hasPrefix("maillage-")');
     expect(m).toContain('removeItem');
-    expect(g).toContain('payload["maillage"]');
+    // Il voyage avec le résultat du scan (préparé hors du fil de l'interface).
+    expect(g).toContain('sortie["maillage"]');
   });
 });
 

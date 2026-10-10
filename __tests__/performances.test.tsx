@@ -234,6 +234,20 @@ describe('côté iPhone, plus rien ne tourne pour rien', () => {
     expect(verre).not.toContain('Relais(self)');
   });
 
+  it('le verre ne se pose qu’à pleine opacité, sur un fond qui porte la couleur', () => {
+    /*
+      Relevé du patron, capture à l'appui : « il n'y a plus aucune couleur sur
+      les cards de l'accueil depuis le liquid glass ». Posé pendant le fondu
+      d'entrée (dès 2 % d'opacité), le verre était abandonné par iOS, et la
+      carte n'avait plus de fond du tout.
+    */
+    const verre = natif('RoomScanVerre.swift');
+    expect(verre).toContain('return opacite > 0.98');
+    expect(verre).toContain('private let secours = UIView()');
+    expect(verre).toMatch(/secours\.backgroundColor = couleurDeTeinte\(\)/);
+    expect(lire('src/screens/HomeScreen.tsx')).toContain('<FondDeVerre rayon={26} teinte={fond} force={0.85} />');
+  });
+
   it('les photos à un pixel par point', () => {
     const photo = natif('RoomScanPhoto.swift');
     expect(photo.match(/format: RoomScanPhoto\.pixelParPoint\(\)/g)?.length).toBe(2);
@@ -253,6 +267,44 @@ describe('côté iPhone, plus rien ne tourne pour rien', () => {
     expect(debut).toBeGreaterThan(0);
     expect(lecture).toBeGreaterThan(debut);
     expect(fin).toBeGreaterThan(lecture);
+  });
+
+  it('la visite : deux pixels par point, des diffuseurs réutilisés, une coque sans chaînes', () => {
+    const visite = natif('RoomScanVisite.swift');
+    expect(visite).toContain('vue.contentScaleFactor = min(2, UIScreen.main.scale)');
+    // Deux matières de diffuseur, créées une fois — plus de matériau neuf par interrupteur.
+    expect(visite).toContain('private lazy var diffuseurAllume: SCNMaterial');
+    expect(visite).not.toMatch(/private func materiauDeDiffuseur\(allume: Bool\) -> SCNMaterial \{\s*let m = SCNMaterial\(\)/);
+    // La coque des meubles soude ses normales sur une clé entière, pas une chaîne.
+    expect(visite).toContain('var cumul: [SIMD3<Int32>: SCNVector3] = [:]');
+    expect(visite).not.toMatch(/for p in \[p0, p1, p2\]/);
+  });
+
+  it('le scan : la couche 3D à deux pixels par point, une visée gardée tant que l’œil ne bouge pas', () => {
+    expect(natif('RoomScanPoseAR.swift')).toContain('vue.contentScaleFactor = min(2, UIScreen.main.scale)');
+    const manager = natif('RoomScanManager.swift');
+    expect(manager).toContain('private var viseeGardee');
+    expect(manager).toMatch(/maintenant - g\.quand < 0\.5, Self\.memeOeil\(g\.oeil, oeil\)/);
+  });
+
+  it('le scan : les couleurs échantillonnées sans allocation, la photo des murs sans copie', () => {
+    const texture = natif('RoomScanTexture.swift');
+    expect(texture).toContain('withUnsafeTemporaryAllocation(of: SIMD3<Float>.self, capacity: 9)');
+    expect(texture).toContain('floorTiles[key, default: []].append(c)');
+    const mur = natif('RoomScanPhotoMur.swift');
+    expect(mur).toContain('.priorityRequestLow: true');
+    expect(mur).toContain('contexte.jpegRepresentation(');
+  });
+
+  it('la fin du scan écrit sur le disque hors du fil de l’interface', () => {
+    const manager = natif('RoomScanManager.swift');
+    const livrer = manager.slice(manager.indexOf('private func livrer('), manager.indexOf('// MARK: - RoomCaptureSessionDelegate'));
+    const fond = livrer.indexOf('DispatchQueue.global(qos: .userInitiated).async {');
+    expect(fond).toBeGreaterThan(0);
+    // L'export, la teinte, les photos et l'attente du maillage sont DANS la file de fond.
+    for (const geste of ['try exporter(usdzURL)', 'Self.tintModel(at: usdzURL)', 'PhotographeDesMurs.shared.livrer()', 'self.maillageFini.wait']) {
+      expect([geste, livrer.indexOf(geste) > fond]).toEqual([geste, true]);
+    }
   });
 
   it('la visite ne se rebâtit que si sa géométrie a changé', () => {

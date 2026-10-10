@@ -292,7 +292,36 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    modèle se plaque au nu, tourné vers la caméra — c'est-à-dire vers la
    pièce d'où l'on vise.
    */
+  /*
+    LA DERNIÈRE VISÉE, GARDÉE TANT QUE L'ŒIL NE BOUGE PAS. Le viseur vise vingt
+    fois par seconde, jusqu'à deux lancers de rayon chacun, sur le fil de
+    l'interface — y compris quand le téléphone est posé contre le mur, le
+    temps de choisir. Moins de cinq millimètres et d'un demi-degré depuis la
+    dernière fois, et moins d'une demi-seconde : c'est la même visée.
+  */
+  private var viseeGardee: (oeil: simd_float4x4, kind: String, quand: CFTimeInterval, visee: Visee?)?
+
+  private static func memeOeil(_ a: simd_float4x4, _ b: simd_float4x4) -> Bool {
+    let d = a.columns.3 - b.columns.3
+    let ecart = SIMD3<Float>(d.x, d.y, d.z)
+    let va = SIMD3<Float>(a.columns.2.x, a.columns.2.y, a.columns.2.z)
+    let vb = SIMD3<Float>(b.columns.2.x, b.columns.2.y, b.columns.2.z)
+    return simd_length(ecart) < 0.005 && simd_dot(simd_normalize(va), simd_normalize(vb)) > 0.99996
+  }
+
   func viser(kind: String) -> Visee? {
+    guard let frame = captureView?.captureSession.arSession.currentFrame else { return nil }
+    let oeil = frame.camera.transform
+    let maintenant = CACurrentMediaTime()
+    if let g = viseeGardee, g.kind == kind, maintenant - g.quand < 0.5, Self.memeOeil(g.oeil, oeil) {
+      return g.visee
+    }
+    let v = viserSansMemoire(kind: kind)
+    viseeGardee = (oeil, kind, maintenant, v)
+    return v
+  }
+
+  private func viserSansMemoire(kind: String) -> Visee? {
     guard let session = captureView?.captureSession.arSession,
           let frame = session.currentFrame else { return nil }
     let centre = CGPoint(x: 0.5, y: 0.5)
@@ -687,18 +716,19 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     openings: [CapturedRoom.Surface],
     objets: [CapturedRoom.Object],
     sections: [[String: Any]] = [],
-    exporter: (URL) throws -> Void,
+    exporter: @escaping (URL) throws -> Void,
   ) {
-    do {
-      let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-      let usdzURL = docs.appendingPathComponent("scan-\(UUID().uuidString).usdz")
-      // .parametric = murs/portes propres (pas le maillage brut).
-      try exporter(usdzURL)
-      // L'USDZ RoomPlan est blanc uniforme : invisible sur le fond blanc
-      // de Quick Look. On le teinte, avec les couleurs relevées si on en a.
-      Self.tintModel(at: usdzURL)
-
-      var payload: [String: Any] = [
+    /*
+      CE QUI LIT LE RELEVÉ RESTE ICI, SUR LE FIL PRINCIPAL — c'est instantané.
+      CE QUI ÉCRIT SUR LE DISQUE PART SUR UNE FILE DE FOND : l'export du
+      modèle, sa teinte (relu puis réécrit), les photos des murs, l'attente du
+      maillage. Fait ici, tout cela figeait l'écran d'assemblage — la roue
+      cessait de tourner au moment exact où l'on attend. La promesse se
+      résout de la file de fond : React Native le permet.
+    */
+    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    let usdzURL = docs.appendingPathComponent("scan-\(UUID().uuidString).usdz")
+    var payload: [String: Any] = [
         "modelPath": usdzURL.path,
         "surfaces": Self.surfacesJSON(
           walls: walls, doors: doors, windows: windows, openings: openings,
@@ -717,36 +747,48 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
           JS ne nommait les pièces que d'après leurs meubles.
         */
         "sections": sections,
-        // Chaque mur, photographié de face et redressé (voir `PhotographeDesMurs`).
-        "photosMurs": PhotographeDesMurs.shared.livrer(),
       ]
-      if let floor = RoomColorSampler.shared.floorPayload() {
-        payload["floor"] = floor
-      }
-      // Cap du monde ARKit : absent si le magnétomètre n'a rien donné de
-      // sûr — mieux vaut pas de rose des vents qu'une fausse.
-      if let north = RoomScanCompass.shared.northOffset {
-        payload["north"] = north
-      }
-      payload["energie"] = energieDuScan()
-      // Le maillage se bâtit pendant l'assemblage de RoomPlan, qui dure
-      // plusieurs secondes : il est presque toujours prêt. Au pire, on
-      // l'attend trois secondes — sans lui, le plan reste entier.
-      _ = maillageFini.wait(timeout: .now() + 3)
-      verrouMaillage.lock()
-      let maillage = maillageReleve
-      verrouMaillage.unlock()
-      if let maillage = maillage {
-        payload["maillage"] = maillage
-      }
-      RoomColorSampler.shared.detach()
-    PhotographeDesMurs.shared.detach()
-      RoomScanCompass.shared.detach()
-      stopResolver?(payload)
-    } catch {
-      stopRejecter?("EXPORT_FAILED", error.localizedDescription, error)
+    if let floor = RoomColorSampler.shared.floorPayload() {
+      payload["floor"] = floor
     }
+    // Cap du monde ARKit : absent si le magnétomètre n'a rien donné de
+    // sûr — mieux vaut pas de rose des vents qu'une fausse.
+    if let north = RoomScanCompass.shared.northOffset {
+      payload["north"] = north
+    }
+    payload["energie"] = energieDuScan()
+    RoomColorSampler.shared.detach()
+    RoomScanCompass.shared.detach()
+    let resolve = stopResolver
+    let reject = stopRejecter
     clearPromise()
+    let pret = payload
+    DispatchQueue.global(qos: .userInitiated).async {
+      var sortie = pret
+      do {
+        // .parametric = murs/portes propres (pas le maillage brut).
+        try exporter(usdzURL)
+        // L'USDZ RoomPlan est blanc uniforme : invisible sur le fond blanc
+        // de Quick Look. On le teinte, avec les couleurs relevées si on en a.
+        Self.tintModel(at: usdzURL)
+        // Chaque mur, photographié de face et redressé (voir `PhotographeDesMurs`).
+        sortie["photosMurs"] = PhotographeDesMurs.shared.livrer()
+        PhotographeDesMurs.shared.detach()
+        // Le maillage se bâtit pendant l'assemblage de RoomPlan, qui dure
+        // plusieurs secondes : il est presque toujours prêt. Au pire, on
+        // l'attend trois secondes — sans lui, le plan reste entier.
+        _ = self.maillageFini.wait(timeout: .now() + 3)
+        self.verrouMaillage.lock()
+        let maillage = self.maillageReleve
+        self.verrouMaillage.unlock()
+        if let maillage = maillage {
+          sortie["maillage"] = maillage
+        }
+        resolve?(sortie)
+      } catch {
+        reject?("EXPORT_FAILED", error.localizedDescription, error)
+      }
+    }
   }
 
   // MARK: - RoomCaptureSessionDelegate (temps réel)

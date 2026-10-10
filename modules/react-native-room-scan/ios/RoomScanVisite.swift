@@ -232,8 +232,21 @@ final class RoomScanVisite: UIView {
     return false
   }
 
-  /** Éteint : un blanc opalin. Allumé : il rayonne, de sa teinte chaude. */
+  /*
+    LES DEUX MATIÈRES D'UN DIFFUSEUR, CRÉÉES UNE FOIS. Chaque interrupteur en
+    fabriquait de neuves pour chaque diffuseur : autant de matériaux que
+    SceneKit devait préparer à nouveau, et l'image sautait au moment même où
+    la lumière s'allume.
+  */
+  private lazy var diffuseurAllume: SCNMaterial = Self.fabriquerDiffuseur(allume: true)
+  private lazy var diffuseurEteint: SCNMaterial = Self.fabriquerDiffuseur(allume: false)
+
   private func materiauDeDiffuseur(allume: Bool) -> SCNMaterial {
+    allume ? diffuseurAllume : diffuseurEteint
+  }
+
+  /** Éteint : un blanc opalin. Allumé : il rayonne, de sa teinte chaude. */
+  private static func fabriquerDiffuseur(allume: Bool) -> SCNMaterial {
     let m = SCNMaterial()
     m.isDoubleSided = false
     m.cullMode = .back
@@ -260,8 +273,9 @@ final class RoomScanVisite: UIView {
       let allume = v[i + 2] > 0.5
       let source = v[i + 3] > 0.5
       if allume { nuit = true }
-      for n in diffuseurs[rang] ?? [] {
-        n.geometry?.materials = [materiauDeDiffuseur(allume: allume)]
+      let matiere = materiauDeDiffuseur(allume: allume)
+      for n in diffuseurs[rang] ?? [] where n.geometry?.firstMaterial !== matiere {
+        n.geometry?.materials = [matiere]
       }
       if allume && source {
         let p = SCNVector3(x: v[i + 4], y: v[i + 5], z: v[i + 6])
@@ -394,6 +408,14 @@ final class RoomScanVisite: UIView {
     vue.backgroundColor = couleur(fond) ?? .white
     vue.antialiasingMode = .multisampling4X
     vue.preferredFramesPerSecond = 60
+    /*
+      DEUX PIXELS PAR POINT, PAS TROIS. Sur un écran « 3× », la visite
+      rendait 2,25 fois plus de pixels qu'à 2× — en plein écran, soixante
+      fois par seconde, anticrénelage 4× compris. Dans une scène 3D lissée,
+      la différence ne se voit pas ; la carte graphique, la batterie et la
+      chaleur, si.
+    */
+    vue.contentScaleFactor = min(2, UIScreen.main.scale)
     vue.autoenablesDefaultLighting = false
     vue.allowsCameraControl = false
     addSubview(vue)
@@ -726,8 +748,10 @@ final class RoomScanVisite: UIView {
    */
   private func noeudDeContour(_ sommets: [SCNVector3], _ indices: [UInt32]) -> SCNNode? {
     guard !sommets.isEmpty, !indices.isEmpty else { return nil }
-    var cumul: [String: SCNVector3] = [:]
-    var cles: [String] = []
+    // La position, arrondie au demi-millimètre, en clé ENTIÈRE : une chaîne
+    // fabriquée par sommet coûtait plus que tout le reste de la coque.
+    var cumul: [SIMD3<Int32>: SCNVector3] = [:]
+    var cles: [SIMD3<Int32>] = []
     cles.reserveCapacity(sommets.count)
     // Les normales géométriques, par triangle, cumulées sur leurs sommets.
     var parSommet = [SCNVector3](repeating: SCNVector3(x: 0, y: 0, z: 0), count: sommets.count)
@@ -737,13 +761,13 @@ final class RoomScanVisite: UIView {
       t += 3
       guard a < sommets.count, b < sommets.count, c < sommets.count else { continue }
       let n = normale(sommets[a], sommets[b], sommets[c])
-      for k in [a, b, c] {
-        parSommet[k] = SCNVector3(
-          x: parSommet[k].x + n.x, y: parSommet[k].y + n.y, z: parSommet[k].z + n.z)
-      }
+      parSommet[a] = SCNVector3(x: parSommet[a].x + n.x, y: parSommet[a].y + n.y, z: parSommet[a].z + n.z)
+      parSommet[b] = SCNVector3(x: parSommet[b].x + n.x, y: parSommet[b].y + n.y, z: parSommet[b].z + n.z)
+      parSommet[c] = SCNVector3(x: parSommet[c].x + n.x, y: parSommet[c].y + n.y, z: parSommet[c].z + n.z)
     }
     for (k, p) in sommets.enumerated() {
-      let cle = "\(Int((p.x * 2000).rounded())),\(Int((p.y * 2000).rounded())),\(Int((p.z * 2000).rounded()))"
+      let cle = SIMD3<Int32>(
+        Int32((p.x * 2000).rounded()), Int32((p.y * 2000).rounded()), Int32((p.z * 2000).rounded()))
       cles.append(cle)
       let deja = cumul[cle] ?? SCNVector3(x: 0, y: 0, z: 0)
       cumul[cle] = SCNVector3(
@@ -1006,13 +1030,25 @@ final class RoomScanVisite: UIView {
       let p1 = SCNVector3(x: v[b + 3], y: v[b + 4], z: v[b + 5])
       let p2 = SCNVector3(x: v[b + 6], y: v[b + 7], z: v[b + 8])
       let nrm = normale(p0, p1, p2)
-      for p in [p0, p1, p2] {
-        sommets.append(p)
-        normales.append(nrm)
-        couleurs.append(contentsOf: [v[b + 9], v[b + 10], v[b + 11], 1])
+      // Sans petit tableau par triangle : des dizaines de milliers
+      // d'allocations de moins à l'ouverture de la visite.
+      sommets.append(p0)
+      sommets.append(p1)
+      sommets.append(p2)
+      normales.append(nrm)
+      normales.append(nrm)
+      normales.append(nrm)
+      let r = v[b + 9], g = v[b + 10], bl = v[b + 11]
+      for _ in 0..<3 {
+        couleurs.append(r)
+        couleurs.append(g)
+        couleurs.append(bl)
+        couleurs.append(1)
       }
       let i = Int32(t * 3)
-      indices.append(contentsOf: [i, i + 1, i + 2])
+      indices.append(i)
+      indices.append(i + 1)
+      indices.append(i + 2)
     }
     let sourceSommets = SCNGeometrySource(vertices: sommets)
     let sourceNormales = SCNGeometrySource(normals: normales)
