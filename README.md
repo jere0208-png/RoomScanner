@@ -14285,6 +14285,55 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le plan 2D ne se déforme plus sous le doigt ; le verre est retiré ; l'accueil parle une seule langue
+
+**La sélection sur le plan 2D.** Relevé du patron : « la sélection est
+capricieuse, et le mur se déforme parfois sans faire exprès en essayant de
+cliquer sur un élément d'une pièce proche du mur ; enlève le glissement de mur
+au doigt ». Deux vues invisibles, posées PAR-DESSUS le dessin, prenaient le
+doigt avant tout le reste :
+- la **bande de prise du mur choisi** (34 points) avalait l'appui destiné à la
+  prise ou à l'interrupteur collé contre lui, et dix points de tremblement
+  poussaient la cloison. Elle est **supprimée** ;
+- une **poignée de coin invisible de 44 points sur CHAQUE angle** du plan, en
+  permanence en mode édition : viser une prise près d'un angle, c'était tirer
+  l'angle. Les poignées ne viennent plus **qu'avec le mur choisi** (ses deux
+  bouts), elles se **voient** (un point blanc cerclé de bleu), et un simple
+  appui dessus **relâche le mur** ;
+- le **meuble choisi** prenait lui aussi l'appui sans rien en faire : un
+  appui sans glisser le relâche maintenant, et ce qu'il cachait redevient
+  touchable.
+
+Le geste de métier reste, au chiffre : **« Décaler »** dans la barre du mur —
+vers l'extérieur ou l'intérieur de la pièce, en centimètres ; le mur reste
+parallèle, ses voisins s'étirent, et il arrive exactement là (`moveWall` sans
+aimant, `normaleSortante` pour le sens). La rotation garde sa poignée, posée
+à l'écart du mur.
+
+**Le verre est retiré.** Relevé du patron : « annule l'effet liquid glass
+partout et remets comme c'était, pour tout ce qui était touché par cela ».
+`Verre.tsx` et la vue native `RoomScanVerre` n'existent plus ; chaque élément
+reprend son dessin d'avant : les tuiles de l'accueil leur aplat de couleur,
+les cartes de plans et les lignes de Mes plans leur blanc plein et leur ombre,
+les pastilles du plan, de la visite et de l'attente leur fond, les commandes
+du scan leur fond fumé, la consigne de la visite sa pilule. Restent, parce
+qu'ils ne sont pas du verre : l'ouverture du menu en bulle et son écho de
+goutte, et la correction du glissé de suppression (plus de bande rouge sous
+les plans).
+
+**Les icônes de l'accueil.** « Un cadre de scan pour le scan, un “?” pour le
+tutoriel vidéo, une maison pour l'exemple ; le crayon reste bon. » Quatre
+pleins du même jeu Solar Bold, chacun creusé de son geste : `scanner-bold`
+(le cadre de visée et sa ligne, le motif de la référence Flaticon),
+`question-circle-bold`, `home-2-bold`, et `pen-bold`. Déclarés dans
+`tools/gen-solaires.mjs` : la prochaine génération ne les perdra pas.
+
+Bancs : `prisedumur` (réécrit : aucune bande, coins du seul mur choisi, appui
+qui relâche, tirer qui déplace, « Décaler » exact et dans le bon sens) ;
+`poignees` (plus de poussée au doigt ; le meuble relâché d'un appui) ;
+`passestyle` (le verre absent partout, les quatre icônes) ; `bulleecho` (la
+bulle garde son fond plein) ; `verreapp` supprimé avec le verre.
+
 ## Le verre prend sa lumière ; la visite répond plus vite ; l'exemple ne s'accuse plus
 
 **Le verre.** Capture du patron : les tuiles de l'accueil ont leur couleur,

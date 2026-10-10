@@ -80,6 +80,7 @@ import {
   fitsInRoom,
   posesDeMur,
   posesEnT,
+  normaleSortante,
   murNeufCote,
   coupeDePiece,
   ecartsAuxMurs,
@@ -182,7 +183,6 @@ import { celebrerSiAuxNormes, resetCelebration } from '../ui/auxNormes';
 import { useModeElec, useUsage } from '../store/usage';
 import { usePremieresFois } from '../store/premieresFois';
 import { useFigePendantLeGeste } from '../store/geste';
-import { FondDeVerre, SUR_VERRE } from '../components/Verre';
 
 type Tab = '2d' | '3d';
 
@@ -3981,14 +3981,13 @@ export function ResultScreen() {
             */}
             {!modeElec && piecesTravaux.length > 0 && (
               <TouchableOpacity
-                style={[styles.vuePastille, SUR_VERRE]}
+                style={styles.vuePastille}
                 accessibilityLabel="Travaux"
                 accessibilityHint="Ce qu’il faut acheter : peinture, sol, plinthes"
                 onPress={() => {
                   haptic('leger');
                   setTravauxOuvert(true);
                 }}>
-                <FondDeVerre rayon={17} ombre={styles.vuePastille} />
                 <Svg width={16} height={16} viewBox="0 0 24 24">
                   {['M4 4 h13 v5 h-13 z', 'M17 6.5 h2.5 v5 h-7.5 v3', 'M12 14.5 v6'].map((d) => (
                     <Trace
@@ -4085,10 +4084,9 @@ export function ResultScreen() {
             )}
             {niveaux.length > 1 && (
               <TouchableOpacity
-                style={[styles.vuePastille, SUR_VERRE]}
+                style={styles.vuePastille}
                 accessibilityLabel="Changer d’étage"
                 onPress={() => setMenu(menuDesEtages())}>
-                <FondDeVerre rayon={17} ombre={styles.vuePastille} />
                 <Text style={styles.vuePastilleTexte}>
                   {abregerNiveau(niveauCourant)}
                 </Text>
@@ -4100,10 +4098,9 @@ export function ResultScreen() {
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={[styles.vuePastille, SUR_VERRE]}
+              style={styles.vuePastille}
               accessibilityLabel={vue === '2d' ? 'Passer en 3D' : 'Passer en 2D'}
               onPress={basculerVue}>
-              <FondDeVerre rayon={17} ombre={styles.vuePastille} />
               <Text style={styles.vuePastilleTexte}>
                 {vue === '2d' ? '2D' : '3D'}
               </Text>
@@ -5076,6 +5073,55 @@ export function ResultScreen() {
                         haptic('succes');
                       },
                     })),
+                  });
+                },
+              },
+              /*
+                DÉCALER — le mur se pousse au chiffre, plus au doigt.
+
+                Relevé du patron : « le mur se déforme parfois sans faire
+                exprès en essayant de cliquer sur un élément proche du mur ;
+                enlève le glissement de mur au doigt ». Le geste de métier
+                reste — pousser une cloison parallèlement à elle-même, ses
+                voisins s'étirent — mais il se DIT : un sens, des
+                centimètres, et le mur arrive exactement là, sans aimant pour
+                le rattraper.
+              */
+              {
+                label: 'Décaler',
+                icone: SOLAIRES.flecheDroite,
+                sansMot: true,
+                onPress: () => {
+                  const id = selectedWall.id;
+                  const sens = normaleSortante(selectedWall, walls);
+                  const demander = (signe: 1 | -1, titre: string) =>
+                    setPrompt({
+                      title: titre,
+                      subtitle: 'En centimètres. Le mur reste parallèle, ses voisins s’étirent.',
+                      value: '',
+                      unit: 'cm',
+                      numeric: true,
+                      onSubmit: (t) => {
+                        const v = parseFloat(t.replace(',', '.'));
+                        if (!(v > 0)) return;
+                        const d = (signe * v) / 100;
+                        useScanStore.getState().moveWall(id, sens.x * d, sens.z * d, false);
+                        haptic('succes');
+                      },
+                    });
+                  setMenu({
+                    title: 'Décaler le mur',
+                    subtitle: 'Il garde sa longueur et son angle ; les murs qui le tiennent suivent.',
+                    actions: [
+                      {
+                        label: 'Vers l’extérieur de la pièce',
+                        onPress: () => demander(1, 'Décaler vers l’extérieur'),
+                      },
+                      {
+                        label: 'Vers l’intérieur de la pièce',
+                        onPress: () => demander(-1, 'Décaler vers l’intérieur'),
+                      },
+                    ],
                   });
                 },
               },

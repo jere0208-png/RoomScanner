@@ -1832,8 +1832,11 @@ interface ScanState {
    * cloison de dix centimètres, il fallait viser deux fois le même
    * déplacement au doigt — ce qui ne donne jamais deux fois le même, et le
    * mur arrivait de travers.
+   *
+   * `aimant` à faux : le décalage tapé au chiffre se pose tel quel, sans
+   * être rattrapé par la cloison voisine.
    */
-  moveWall: (id: string, dx: number, dz: number) => void;
+  moveWall: (id: string, dx: number, dz: number, aimant?: boolean) => void;
   /**
    * DESSOUDE UN MUR DE SES VOISINS.
    *
@@ -5924,7 +5927,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
     },
 
-    moveWall: (id, dx, dz) => {
+    moveWall: (id, dx, dz, aimant = true) => {
       if (!sontFinis(dx, dz)) return;
       const st = get();
       const wall = st.walls.find((w) => w.id === id);
@@ -5942,7 +5945,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         nôtre : deux murs alignés bout à bout ne s'aimantent pas, ils se
         suivent déjà.
       */
-      const AIMANT = 0.12;
+      const AIMANT = aimant ? 0.12 : 0;
       const A = { x: wall.a.x + dx, z: wall.a.z + dz };
       const B = { x: wall.b.x + dx, z: wall.b.z + dz };
       const lm = Math.hypot(B.x - A.x, B.z - A.z) || 1;

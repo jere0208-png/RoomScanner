@@ -42,7 +42,6 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoomScan } from 'react-native-room-scan';
 import { dark, ombreBouton as ombreBoutonDouce, radius, themedStyles, useTheme, type Palette } from '../theme';
-import { FondDeVerre, SUR_VERRE } from '../components/Verre';
 import { DUREE_DU_FILM } from '../data/film';
 import { GlisserPourSupprimer } from '../components/GlisserPourSupprimer';
 import { BandeauAnnuler, useSuppressionDifferee } from '../components/BandeauAnnuler';
@@ -337,7 +336,7 @@ export function HomeScreen() {
                       c={c}
                       fond={teintes.scan}
                       hauteur={HAUTE}
-                      icone={SOLAIRES.model}
+                      icone={SOLAIRES.scanner}
                       titre={'Scanner\nune pièce'}
                       sous="Demande un iPhone Pro"
                       label="Scan indisponible sur cet appareil"
@@ -354,7 +353,7 @@ export function HomeScreen() {
                       c={c}
                       fond={teintes.scan}
                       hauteur={HAUTE}
-                      icone={SOLAIRES.model}
+                      icone={SOLAIRES.scanner}
                       titre={'Scanner\nune pièce'}
                       sous={supported === null ? 'Vérification…' : 'LiDAR · 2 minutes'}
                       label="Commencer le scan"
@@ -368,7 +367,7 @@ export function HomeScreen() {
                     c={c}
                     fond={teintes.exemple}
                     hauteur={BASSE}
-                    icone={SOLAIRES.marcher}
+                    icone={SOLAIRES.maison}
                     titre={'Voir un\nexemple'}
                     sous="Un T2 de 48 m² à visiter"
                     label="Voir un exemple"
@@ -394,7 +393,7 @@ export function HomeScreen() {
                     c={c}
                     fond={teintes.guide}
                     hauteur={HAUTE}
-                    icone={SOLAIRES.etoile}
+                    icone={SOLAIRES.aide}
                     titre={'Comment\nça marche'}
                     sous={`Le film, en ${Math.round(DUREE_DU_FILM / 1000)} secondes`}
                     label="Comment ça marche"
@@ -456,8 +455,7 @@ export function HomeScreen() {
               c'est du travail qu'on peut encore perdre.
             */}
             {brouillon && !cherche && (
-              <View style={[styles.carte, styles.carteSeule, SUR_VERRE]}>
-                <FondDeVerre rayon={20} ombre={styles.carte} />
+              <View style={[styles.carte, styles.carteSeule]}>
                 <View style={[styles.vignette, styles.vignetteBrouillon]}>
                   <Svg width={24} height={24} viewBox="0 0 24 24">
                     <Circle cx={12} cy={12} r={9} stroke={c.amber} strokeWidth={2} fill="none" />
@@ -613,17 +611,8 @@ function Tuile({
         style={[
           styles.tuile,
           { backgroundColor: fond, height: hauteur, transform: [{ scale: appui }] },
-          SUR_VERRE,
           (desactivee || eteinte) && styles.tuileEteinte,
         ]}>
-        {/*
-          DU VERRE TEINTÉ DE SA COULEUR — le Liquid Glass d'iOS (voir
-          `Verre.tsx`), teinté par le verre lui-même : la tuile garde sa forme
-          et sa couleur, et prend la matière. C'est la couleur, plus que le
-          mot, qu'on retrouve d'une visite à l'autre.
-        */}
-        {/* À 85 % : la couleur de la tuile d'abord — c'est elle qu'on reconnaît. */}
-        <FondDeVerre rayon={26} teinte={fond} force={0.85} />
         {/*
           LE ROND DE L'ICÔNE SE RESSERRE, PAS L'ICÔNE ; LA FLÈCHE SE FAIT
           DISCRÈTE — relevé du patron : « réduis les flèches et leur bloc
@@ -671,10 +660,8 @@ function CartePlan({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Ouvrir ${scan.name}`}
-      style={({ pressed }) => [styles.carte, SUR_VERRE, pressed && styles.cartePressee]}
+      style={({ pressed }) => [styles.carte, pressed && styles.cartePressee]}
       onPress={onPress}>
-      {/* Le cadre prend le verre ; il garde sa forme, son ombre, son contenu. */}
-      <FondDeVerre rayon={20} ombre={styles.carte} />
       <View style={styles.vignette}>
         <PlanThumb scan={scan} c={c} />
       </View>

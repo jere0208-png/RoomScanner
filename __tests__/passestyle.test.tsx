@@ -33,7 +33,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { StyleSheet, TouchableOpacity } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import * as theme from '../src/theme';
 import { ToolPill } from '../src/components/ToolPill';
@@ -122,61 +122,47 @@ describe('2 — du blanc net sur les pages claires', () => {
     expect(theme.ombreBouton.shadowOpacity).toBeLessThanOrEqual(0.1);
   });
 
-  it('le verre revient, sans ce qui l’avait fait retirer', () => {
+  it('le verre est retiré partout : chaque élément a retrouvé son dessin', () => {
     /*
-      Relevé du patron, après la visite : « le bouton quitter est mal fait,
-      le bouton plus petit que le texte, et les boutons toujours grisés ».
-      Le verre était parti de l'app. Il revient À SA DEMANDE — « le menu doit
-      s'ouvrir telle une bulle Apple, en verre », « mets ce léger effet glass
-      là où tu le juges nécessaire, pour la cohérence » —, et ce banc tient
-      les causes de son départ :
-
-      — UN SEUL VERRE. Un seul composant parle au natif (`Verre.tsx`) : pas
-        d'imitation par écran, qui reviendrait grise à la première retouche.
-      — LE VRAI. Sur iOS 26, le Liquid Glass d'Apple (`UIGlassEffect`) — qui
-        adapte sa luminance à ce qu'il couvre ; avant, sa réplique native.
-      — AUCUN FILET NI AUCUN APLAT DESSINÉ PAR REACT NATIVE sur le verre : le
-        liseré est celui de la couche native, vectoriel, et rien ne recouvre
-        le verre (relevé suivant : « la forme des cards a été modifiée »).
+      Relevé du patron : « annule l'effet liquid glass partout et remets comme
+      c'était, pour tout ce qui était touché par cela ». Plus de composant de
+      verre, plus de vue native de verre : les tuiles de l'accueil reprennent
+      leur aplat de couleur, les cartes et les pastilles leur blanc plein et
+      leur ombre, les commandes du scan leur fond fumé.
     */
     for (const p of [...sources('src'), 'App.tsx']) {
-      if (p === 'src/components/Verre.tsx') continue;
-      expect([p, /RoomScanVerre/.test(lire(p))]).toEqual([p, false]);
+      expect([p, /FondDeVerre|SUR_VERRE|RoomScanVerre|components\/Verre/.test(lire(p))]).toEqual([p, false]);
     }
-    const verre = lire('src/components/Verre.tsx');
-    expect(verre).not.toMatch(/borderWidth|hairlineWidth|<View|<Svg/);
-    const natif = lire('modules/react-native-room-scan/ios/RoomScanVerre.swift');
-    expect(natif).toContain('UIGlassEffect(style: .regular)');
-    // Le verre n'est posé que VISIBLE : iOS abandonne en silence un verre posé
-    // sous un parent transparent (nos fondus d'entrée partent de zéro).
-    expect(natif).toMatch(/if visible \{ poserLeVerre\(\) \} else \{ guetter\(\) \}/);
-    // Et la compilation se fait avec le SDK d'iOS 26.
-    expect(lire('.github/workflows/build-ios-unsigned.yml')).toMatch(/xcode-select -s \/Applications\/Xcode_26/);
+    expect(existsSync(join(__dirname, '..', 'src/components/Verre.tsx'))).toBe(false);
+    expect(existsSync(join(__dirname, '..', 'modules/react-native-room-scan/ios/RoomScanVerre.swift'))).toBe(false);
+    expect(lire('modules/react-native-room-scan/ios/RoomScan.m')).not.toContain('RoomScanVerre');
+    expect(lire('modules/react-native-room-scan/src/index.ts')).not.toContain('RoomScanVerre');
+    // La tuile porte sa couleur elle-même.
+    expect(lire('src/screens/HomeScreen.tsx')).toContain(
+      '{ backgroundColor: fond, height: hauteur, transform: [{ scale: appui }] },',
+    );
   });
 
-  it('le verre se lit par sa lumière, même sur une page unie', () => {
+  it('les quatre tuiles de l’accueil parlent la même langue', () => {
     /*
-      Relevé du patron, capture à l'appui : « je ne vois pas l'effet ». Le
-      Liquid Glass d'iOS réfracte ce qu'il y a derrière ; sur l'accueil uni,
-      il n'a rien à déformer. Le verre de la référence se lit par SA LUMIÈRE :
-      un liseré clair en haut à gauche qui se rallume en bas à droite, un
-      reflet dans le haut, un creux dans le bas, une ombre de sa couleur.
-      Elle est dessinée par la couche native, sur TOUTES les versions d'iOS —
-      jamais dans une branche réservée à la réplique.
+      Relevé du patron : « les icônes des quatre cadres ne sont pas très
+      cohérentes ; un cadre de scan pour le scan, un “?” pour le tutoriel
+      vidéo, une maison pour l'exemple ; le crayon reste bon ». Quatre pleins
+      du même jeu (Solar Bold), chacun creusé de son geste.
     */
-    const natif = lire('modules/react-native-room-scan/ios/RoomScanVerre.swift');
-    const init = natif.slice(natif.indexOf('override init(frame'), natif.indexOf('required init?'));
-    for (const couche of ['reflet', 'creux', 'lisere']) {
-      // Au premier niveau de l'initialiseur : hors de tout `if`.
-      expect([couche, init.includes(`\n    layer.addSublayer(${couche})`)]).toEqual([couche, true]);
+    const accueil = lire('src/screens/HomeScreen.tsx');
+    const icones = [...accueil.matchAll(/icone=\{SOLAIRES\.(\w+)\}/g)].map((m) => m[1]);
+    expect(new Set(icones)).toEqual(new Set(['scanner', 'maison', 'crayon', 'aide']));
+    const jeu = lire('src/ui/solaires.ts');
+    for (const [cle, nom] of [
+      ['scanner', 'scanner-bold'],
+      ['aide', 'question-circle-bold'],
+      ['maison', 'home-2-bold'],
+    ]) {
+      expect(jeu).toContain(`/** solar:${nom} */\n  ${cle}:`);
     }
-    // Le liseré : clair au départ, éteint au milieu, rallumé à l'arrivée.
-    expect(natif).toContain('lisere.locations = [0, 0.3, 0.7, 1]');
-    expect(natif).toMatch(/UIColor\(white: 1, alpha: 1\)\.cgColor, UIColor\(white: 1, alpha: 0\.45\)/);
-    // L'ombre d'une tuile est sa couleur, assombrie — une lueur, pas un gris.
-    expect(natif).toContain('layer.shadowColor = couleurDOmbre().cgColor');
-    // La lumière ne se redessine que si la forme a changé.
-    expect(natif).toContain('if bounds.size == tailleLumiere && r == rayonLumiere { return }');
+    // Et le générateur les connaît : la prochaine génération ne les perdra pas.
+    expect(lire('tools/gen-solaires.mjs')).toContain("scanner: ['scanner-bold'],");
   });
 
   it('« Terminer » porte lui-même sa pilule : ce qu’on voit est ce qu’on touche', () => {
@@ -186,12 +172,9 @@ describe('2 — du blanc net sur les pages claires', () => {
     expect(corps).toContain('backgroundColor: c.surface');
     expect(corps).toMatch(/height: 4\d/);
     expect(corps).toContain('paddingHorizontal');
-    // Le verre, s'il est là, se pose DANS le bouton et le remplit : c'est
-    // toujours le bouton qui fait sa taille.
     expect(visite).toMatch(
-      /style=\{\(\{ pressed \}\) => \[styles\.terminer, SUR_VERRE, pressed && styles\.enfonce\]\}/,
+      /style=\{\(\{ pressed \}\) => \[styles\.terminer, pressed && styles\.enfonce\]\}/,
     );
-    expect(lire('src/components/Verre.tsx')).toMatch(/style=\{\[StyleSheet\.absoluteFill, \{ borderRadius: rayon \}\]\}/);
   });
 });
 

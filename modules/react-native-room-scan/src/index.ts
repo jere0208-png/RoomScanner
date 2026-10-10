@@ -233,25 +233,6 @@ export const RoomScanCanvas = UIManager.getViewManagerConfig?.(
   : undefined;
 
 /**
- * LE VERRE DES MENUS — la matière des bulles d'iOS (`systemUltraThinMaterial`),
- * coins continus, ombre sur la forme. Il se pose DERRIÈRE le contenu d'une
- * carte et ne prend pas le doigt. `undefined` sans le natif : la carte garde
- * alors son fond plein.
- */
-export const RoomScanVerre = UIManager.getViewManagerConfig?.('RoomScanVerre')
-  ? requireNativeComponent<
-      ViewProps & {
-        rayon?: number;
-        sombre?: boolean;
-        voile?: number;
-        ombre?: number[];
-        teinte?: string;
-        force?: number;
-      }
-    >('RoomScanVerre')
-  : undefined;
-
-/**
  * LA VISITE À LA PREMIÈRE PERSONNE — SceneKit, pas un canevas.
  *
  * Le canevas reçoit un dessin DÉJÀ PROJETÉ, trente fois par seconde : c'est

@@ -9,7 +9,8 @@
  * Ce banc tient ce qui se vérifie sans iPhone : la bulle naît, deux anneaux
  * partent de son bord puis quittent l'arbre (rien ne reste à peindre), ils
  * repartent à chaque nouvel élément choisi, et le mouvement réduit les tait.
- * Sans le verre natif (Android, banc d'essai), la carte garde son fond plein.
+ * Le verre, lui, a été retiré à la demande du patron (« annule l'effet
+ * liquid glass partout ») : la bulle garde le fond plein de sa carte.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -21,7 +22,6 @@ import React from 'react';
 import { AccessibilityInfo, StyleSheet, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { CarteDuMenu, ECHO_PX } from '../src/components/StripBar';
-import { FondDeVerre, SUR_VERRE, VERRE } from '../src/components/Verre';
 
 const CARTE = { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 12 };
 
@@ -115,17 +115,9 @@ describe('la bulle du menu', () => {
     expect(echos(t)).toHaveLength(0);
   });
 
-  it('sans verre natif, la carte garde son fond plein', async () => {
-    expect(VERRE).toBe(false);
-    expect(SUR_VERRE).toBeNull();
+  it('la carte garde son fond plein : plus de verre derrière', async () => {
     const t = await monter();
     const st = StyleSheet.flatten(bulle(t).props.style) as { backgroundColor: string };
     expect(st.backgroundColor).toBe('#FFFFFF');
-    let vide!: TestRenderer.ReactTestRenderer;
-    act(() => {
-      vide = TestRenderer.create(<FondDeVerre rayon={20} />);
-    });
-    expect(vide.toJSON()).toBeNull();
-    act(() => vide.unmount());
   });
 });

@@ -193,7 +193,8 @@ describe('le reste de l’écran du plan', () => {
 
   it('une poignée de coin garde sa clé — et son geste — pendant qu’on la tire', () => {
     const editeur = lire('src/components/FloorplanEditor.tsx');
-    expect(editeur).toContain('key: `${v.wallId}:${v.end}`');
+    // La clé dit le mur et le bout, jamais la position (voir `prisedumur`).
+    expect(editeur).toContain('key={`${w.id}:${end}`}');
     expect(editeur).not.toMatch(/\[corner\.wallId, corner\.end, corner\.x, corner\.z, mapping, seuil\]/);
   });
 
@@ -225,27 +226,6 @@ describe('côté iPhone, plus rien ne tourne pour rien', () => {
   it('le maillage se bâtit hors du fil de l’interface', () => {
     expect(natif('RoomScanManager.swift')).toContain('DispatchQueue.global(qos: .userInitiated).async {');
     expect(natif('RoomScanMaillage.swift')).toContain('static func construire(_ ancres: [ARMeshAnchor])');
-  });
-
-  it('un seul guet pour les verres, à dix battements par seconde', () => {
-    const verre = natif('RoomScanVerre.swift');
-    expect(verre).toContain('private final class GuetDesVerres');
-    expect(verre).toContain('CAFrameRateRange(minimum: 4, maximum: 10, preferred: 10)');
-    expect(verre).not.toContain('Relais(self)');
-  });
-
-  it('le verre ne se pose qu’à pleine opacité, sur un fond qui porte la couleur', () => {
-    /*
-      Relevé du patron, capture à l'appui : « il n'y a plus aucune couleur sur
-      les cards de l'accueil depuis le liquid glass ». Posé pendant le fondu
-      d'entrée (dès 2 % d'opacité), le verre était abandonné par iOS, et la
-      carte n'avait plus de fond du tout.
-    */
-    const verre = natif('RoomScanVerre.swift');
-    expect(verre).toContain('return opacite > 0.98');
-    expect(verre).toContain('private let secours = UIView()');
-    expect(verre).toMatch(/secours\.backgroundColor = couleurDeTeinte\(\)/);
-    expect(lire('src/screens/HomeScreen.tsx')).toContain('<FondDeVerre rayon={26} teinte={fond} force={0.85} />');
   });
 
   it('les photos à un pixel par point', () => {

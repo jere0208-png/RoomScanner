@@ -195,10 +195,8 @@ export const shadowLift = {
  * éteint ; et son filet d'un demi-point, dessiné par React Native en image
  * redimensionnée, sortait crénelé. Les boutons des barres et les pastilles
  * du plan reviennent donc au BLANC PLEIN — net, vectoriel — avec cette
- * ombre-ci : grise, courte, très légère. Quand le verre est revenu, à la
- * demande du patron (voir `components/Verre.tsx`), il a gardé cette ombre :
- * c'est le natif qui la dessine, sur la forme, et un voile blanc dense le
- * garde blanc — jamais le gris d'un bouton éteint.
+ * ombre-ci : grise, courte, très légère. Le verre ne reste que là où il a
+ * une image à flouter : la visite à la première personne.
  */
 export const ombreBouton = {
   shadowColor: '#0B0D12',

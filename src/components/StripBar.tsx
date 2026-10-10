@@ -34,7 +34,6 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { CloseCross } from './CloseCross';
-import { FondDeVerre, SUR_VERRE } from './Verre';
 import { useTheme } from '../theme';
 import { SOLAIRES } from '../ui/solaires';
 import { DEBORD_DOIGT } from '../ui/bandeau';
@@ -131,16 +130,15 @@ export function IconeBandeau({
 export const ECHO_PX = 18;
 
 /**
- * LA BULLE DU MENU — du verre, et l'écho d'une goutte d'eau.
+ * LA BULLE DU MENU — et l'écho d'une goutte d'eau.
  *
  * Relevé du patron : « à la sélection d'un élément du plan 2D, le menu doit
  * s'ouvrir telle une bulle Apple, en verre, proposant les choix ; on augmente
  * la modernité. Donne quand même une touche unique, comme une animation qui
  * fait un écho de goutte d'eau rapide autour du menu à l'ouverture. »
  *
- * — LE VERRE : celui de toute l'app (`Verre.tsx`), qui laisse voir le plan
- *   flouté derrière le menu au lieu de le cacher sous une carte blanche.
- *   Sans le natif, la carte garde son fond plein.
+ * — LE VERRE A ÉTÉ RETIRÉ, à la demande du patron : la bulle garde le fond
+ *   plein de la carte qu'elle a toujours eu.
  * — LA BULLE : elle naît un rien plus petite et un rien plus bas, et se pose
  *   d'un ressort court — elle arrive, elle ne surgit pas.
  * — L'ÉCHO : deux anneaux partent de son bord et s'éloignent en s'effaçant,
@@ -235,7 +233,6 @@ export function CarteDuMenu({
       }}
       style={[
         style,
-        SUR_VERRE,
         {
           opacity: entree.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
           transform: [
@@ -244,8 +241,6 @@ export function CarteDuMenu({
           ],
         },
       ]}>
-      {/* Le verre de la bulle : le plan se devine dessous, flouté. */}
-      <FondDeVerre rayon={rayon} ombre={plat} />
       {anneau(0)}
       {anneau(0.18)}
       {children}

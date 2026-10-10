@@ -1756,27 +1756,6 @@ export function FloorplanEditor({
     return { size: 16, x: 0, y: 0 };
   }, [mapping]);
 
-  // Coins uniques (les extrémités soudées partagent les mêmes coordonnées).
-  // La clé porte la pièce : deux pièces qui se touchent gardent chacune sa
-  // poignée, sinon déplacer un coin en emporterait deux.
-  const corners = useMemo(() => {
-    const seen = new Map<string, { x: number; z: number; wallId: string; end: 'a' | 'b' }>();
-    for (const w of walls) {
-      for (const end of ['a', 'b'] as const) {
-        const p = w[end];
-        const key = `${roomOf(w)}|${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
-        if (!seen.has(key)) seen.set(key, { x: p.x, z: p.z, wallId: w.id, end });
-      }
-    }
-    /*
-      LA CLÉ DE RENDU NE DÉPEND PAS DE LA POSITION. Elle en dépendait : tirer un
-      coin démontait et remontait sa poignée à chaque image — et avec elle son
-      geste. La position sert seulement à fondre en une les extrémités
-      jointes ; la poignée, elle, garde le nom du premier mur qui la porte.
-    */
-    return [...seen.values()].map((v) => ({ key: `${v.wallId}:${v.end}`, ...v }));
-  }, [walls]);
-
   /**
    * OÙ EN EST CHAQUE PIÈCE — l'anneau du cartouche.
    *
@@ -3510,6 +3489,7 @@ export function FloorplanEditor({
                     mapping={mapping}
                     raw={o}
                     onRefus={setPoseRefusee}
+                    onTap={onSelectObject ? () => onSelectObject(null) : undefined}
                   />
                   {showObjectDims &&
                     cotesTirables.map((b) => {
@@ -3762,19 +3742,44 @@ export function FloorplanEditor({
             du bas. Tout passe dans le menu fixe de l'écran (voir
             `carteOuverte`, `ResultScreen`) — gestes, mesures et consigne.
           */}
-          {/* Poignées de coin, uniquement en mode édition */}
+          {/*
+            LES COINS QU'ON TIRE : CEUX DU MUR CHOISI, ET EUX SEULS.
+
+            Chaque coin du plan portait une poignée INVISIBLE de quarante-
+            quatre points, en permanence en mode édition. Elle prenait le
+            doigt dès qu'il se posait : viser une prise près d'un angle,
+            c'était tirer l'angle — le mur « se déformait tout seul ». Les
+            poignées ne viennent plus qu'avec le mur qu'on a choisi, elles se
+            VOIENT, et un simple appui dessus relâche le mur comme le ferait
+            un appui sur lui.
+          */}
           {editable &&
-            corners.map((pt) => (
-              <CornerHandle key={pt.key} corner={pt} mapping={mapping} />
-            ))}
+            selectedWallId &&
+            (() => {
+              const w = walls.find((x) => x.id === selectedWallId);
+              if (!w) return null;
+              return (['a', 'b'] as const).map((end) => (
+                <CornerHandle
+                  key={`${w.id}:${end}`}
+                  corner={{ x: w[end].x, z: w[end].z, wallId: w.id, end }}
+                  mapping={mapping}
+                  onTap={() => onSelectWall(null)}
+                />
+              ));
+            })()}
 
           {/*
-            LE MUR CHOISI SE POUSSE ET SE TOURNE.
+            LE MUR CHOISI SE TOURNE — IL NE SE POUSSE PLUS AU DOIGT.
 
-            Les deux gestes du métier : on POUSSE une cloison — elle reste
-            parallèle à elle-même, ses voisins s'étirent — et on la PIVOTE,
-            elle garde sa longueur. Ils n'apparaissent que sur le mur
-            sélectionné : partout ailleurs, le doigt appartient au plan.
+            Relevé du patron : « la sélection d'éléments sur le plan 2D est
+            capricieuse, et le mur se déforme parfois sans faire exprès en
+            essayant de cliquer sur un élément d'une pièce proche du mur ».
+            La bande de prise du mur choisi — trente-quatre points, posée
+            PAR-DESSUS le dessin — avalait l'appui destiné à la prise ou à
+            l'interrupteur collé contre lui, et dix points de tremblement
+            poussaient la cloison. Le décalage se dit maintenant au chiffre,
+            dans la barre du mur (« Décaler ») ; la rotation garde sa
+            poignée, posée à l'écart du mur.
           */}
           {editable &&
             selectedWallId &&
@@ -3819,7 +3824,6 @@ export function FloorplanEditor({
               const sens: 1 | -1 = versPiece;
               return (
                 <React.Fragment key={`mur-${w.id}`}>
-                  <WallMoveHandle wall={w} mapping={mapping} />
                   <WallRotateHandle
                     wall={w}
                     mapping={mapping}
@@ -4148,7 +4152,14 @@ export function ObjectDragHandle({
   mapping,
   raw,
   onRefus,
+  onTap,
 }: {
+  /**
+   * Un appui sans glisser. Il tombait dans le vide : la poignée prend le
+   * doigt au poser, et rien sous elle ne le recevait — ni la prise posée
+   * derrière le meuble, ni le meuble lui-même pour le relâcher.
+   */
+  onTap?: () => void;
   objectId: string;
   center: { x: number; y: number };
   /** Demi-largeur et demi-hauteur de l'emprise à l'écran. */
@@ -4196,14 +4207,14 @@ export function ObjectDragHandle({
    * « il revient tout seul ». Le responder est maintenant créé une fois pour
    * la vie de la poignée.
    */
-  const live = useRef({ mapping, raw, onRefus });
+  const live = useRef({ mapping, raw, onRefus, onTap });
   /*
     LE RAPPORT DE REFUS PASSE PAR LA RÉFÉRENCE, comme tout ce qui change à
     chaque image : mis dans les dépendances du geste, il refabriquerait le
     `PanResponder` à chaque rendu du parent — et le déplacement en cours
     perdrait son point de départ.
   */
-  live.current = { mapping, raw, onRefus };
+  live.current = { mapping, raw, onRefus, onTap };
   /* Le verrou du slop : un tap sur la poignée ne déplace plus rien. */
   const seuil = useRef(creerSeuil()).current;
   const pan = useMemo(
@@ -4306,6 +4317,11 @@ export function ObjectDragHandle({
           if (vise) {
             useScanStore.getState().rangerMeuble(objectId, vise.x, vise.z);
             if (refuseAvant.current) haptic('accroche');
+          } else {
+            // Rien de visé : c'était un appui. Il relâche le meuble, comme
+            // un appui sur un meuble déjà choisi — et ce qu'il cachait
+            // redevient touchable.
+            live.current.onTap?.();
           }
         },
         /*
@@ -4642,111 +4658,6 @@ export function SideHandle({
 }
 
 /**
- * LE MUR CHOISI SE POUSSE AU DOIGT.
- *
- * On ne pouvait le retoucher que par ses COINS, un par un : décaler une
- * cloison de dix centimètres demandait de viser deux fois le même
- * déplacement, ce qui ne donne jamais deux fois le même — le mur arrivait
- * de travers, et on recommençait.
- *
- * La zone de prise est le mur lui-même, élargie à trente points : c'est ce
- * qu'on voit, donc ce qu'on attrape. Le geste ne se rend pas au plan, sans
- * quoi les premiers pixels pousseraient le mur et le plan reprendrait tout.
- *
- * ET « LE MUR LUI-MÊME » N'ÉTAIT PAS LE MUR : C'ÉTAIT SA BOÎTE.
- *
- * Relevé du patron : « on doit pouvoir étirer la pièce mais en restant sur le
- * mur et en le glissant — là je peux le faire à distance s'il est sélectionné.
- * Je pense qu'il y a un rapport avec la désélection qui ne se fait pas. »
- *
- * Il avait raison sur le rapport, et c'est la même ligne. La zone était la
- * BOÎTE ENGLOBANTE du segment, élargie de quinze points. Sur un mur droit,
- * c'est exactement la bande qu'on voulait — d'où le fait que le défaut a vécu
- * si longtemps. Sur un mur EN BIAIS, c'est un grand rectangle qui couvre tout
- * ce que le segment traverse, et ce rectangle est POSÉ PAR-DESSUS le dessin.
- *
- * D'où les deux symptômes à la fois : on étire le mur en glissant loin de lui,
- * et l'appui dans ce vide n'atteint jamais le fond qui lâche la sélection.
- *
- * La zone est maintenant une BANDE TOURNÉE — longue comme le mur, épaisse
- * comme la tolérance. Ce qu'on attrape est ce qu'on voit, et le reste de
- * l'écran redevient du fond.
- */
-function WallMoveHandle({
-  wall,
-  mapping,
-}: {
-  wall: WallSeg;
-  mapping: EffMapping;
-}) {
-  const styles = getStyles(useTheme());
-  const depart = useRef({ x: 0, z: 0 });
-  const pan = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => false,
-        /*
-          CELUI-CI N'A PAS BESOIN DE VERROU : il ne prend la main qu'au
-          MOUVEMENT, et son seuil est déjà celui de toute l'app. Sans lui, un
-          simple appui pour désélectionner déplacerait le mur d'un cheveu.
-        */
-        onMoveShouldSetPanResponder: (_e, g) => estUnGlissement(g.dx, g.dy),
-        onPanResponderTerminationRequest: () => false,
-        onShouldBlockNativeResponder: () => true,
-        onPanResponderGrant: () => {
-          depart.current = { x: 0, z: 0 };
-        },
-        onPanResponderMove: (_e, g) => {
-          // Le magasin reçoit des PAS, pas une position : on lui envoie donc
-          // ce qui s'est ajouté depuis la dernière image. Sans quoi l'aimant,
-          // qui corrige le pas, se rajouterait à lui-même à chaque frame.
-          const d = mapping.deltaToMeters(g.dx, g.dy);
-          const dx = d.x - depart.current.x;
-          const dz = d.z - depart.current.z;
-          depart.current = d;
-          useScanStore.getState().moveWall(wall.id, dx, dz);
-        },
-      }),
-    [wall.id, mapping],
-  );
-  const a = mapping.toPx(wall.a);
-  const b = mapping.toPx(wall.b);
-  /*
-    LA BANDE SE POSE À PLAT PUIS TOURNE, et l'ordre n'a rien d'arbitraire :
-    une vue tourne autour de SON centre. On la construit donc centrée sur le
-    milieu du mur, longue de sa longueur, épaisse de la tolérance — et la
-    rotation la couche sur le trait.
-
-    TRENTE-QUATRE POINTS D'ÉPAISSEUR : les trente d'avant, plus le trait. Un
-    mur fait quelques points de large à l'écran et l'on vise avec un doigt —
-    rétrécir la bande au trait la rendrait inattrapable, ce qui serait le
-    défaut inverse.
-  */
-  const EPAISSEUR = 34;
-  const cx = (a.x + b.x) / 2;
-  const cy = (a.y + b.y) / 2;
-  const len = Math.max(1, Math.hypot(b.x - a.x, b.y - a.y));
-  const angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
-  return (
-    <View
-      {...pan.panHandlers}
-      // Rien à dessiner : le mur est déjà là, sous le doigt. Seule la bande
-      // se calcule, et elle change à chaque image du geste.
-      style={[
-        styles.wallGrab,
-        {
-          left: cx - len / 2,
-          top: cy - EPAISSEUR / 2,
-          width: len,
-          height: EPAISSEUR,
-          transform: [{ rotate: `${angle}deg` }],
-        },
-      ]}
-    />
-  );
-}
-
-/**
  * LA POIGNÉE DE ROTATION D'UN MUR.
  *
  * PREMIÈRE VERSION, ET SON DÉFAUT — relevé sur vidéo : « ça part dans tous
@@ -4965,9 +4876,12 @@ function poigneeAt(
 function CornerHandle({
   corner,
   mapping,
+  onTap,
 }: {
   corner: { x: number; z: number; wallId: string; end: 'a' | 'b' };
   mapping: EffMapping;
+  /** Un appui sans glisser : le mur se relâche. */
+  onTap?: () => void;
 }) {
   const styles = getStyles(useTheme());
   const startRef = useRef({ x: corner.x, z: corner.z });
@@ -4978,9 +4892,10 @@ function CornerHandle({
     une référence : recréé à chaque image (le coin bouge sous le doigt), il
     coûtait un `PanResponder` neuf par image pendant tout le glisser.
   */
-  const live = useRef({ corner, mapping });
-  live.current = { corner, mapping };
+  const live = useRef({ corner, mapping, onTap });
+  live.current = { corner, mapping, onTap };
   const cible = useRef({ wallId: corner.wallId, end: corner.end });
+  const tire = useRef(false);
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -4994,12 +4909,18 @@ function CornerHandle({
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
           seuil.reprendre();
+          tire.current = false;
           const c = live.current.corner;
           startRef.current = { x: c.x, z: c.z };
           cible.current = { wallId: c.wallId, end: c.end };
         },
+        // Un appui n'a rien tiré : c'est un appui sur le mur, il le relâche.
+        onPanResponderRelease: () => {
+          if (!tire.current) live.current.onTap?.();
+        },
         onPanResponderMove: (_e, g) => {
           if (!seuil.franchi(g.dx, g.dy)) return;
+          tire.current = true;
           const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
           useScanStore.getState().moveWallPoint(cible.current.wallId, cible.current.end, {
             x: startRef.current.x + d.x,
@@ -5012,7 +4933,8 @@ function CornerHandle({
 
   const px = mapping.toPx(corner);
   /*
-    Zone de saisie invisible : le coin se déplace au doigt, sans marqueur.
+    UN POINT QU'ON VOIT : ce qu'on peut tirer se montre. Invisible, la
+    poignée prenait le doigt sans prévenir.
 
     TRENTE-DEUX POINTS DESSINÉS, QUARANTE-QUATRE SOUS LE DOIGT. La règle est
     celle de toute l'app, et cette poignée-ci l'avait ratée : elle offrait
@@ -5022,9 +4944,11 @@ function CornerHandle({
   return (
     <View
       {...pan.panHandlers}
+      accessibilityLabel="Tirer le coin du mur"
       hitSlop={DEBORD_DOIGT}
-      style={[styles.handle, { left: px.x - 16, top: px.y - 16 }]}
-    />
+      style={[styles.handle, { left: px.x - 16, top: px.y - 16 }]}>
+      <View pointerEvents="none" style={styles.coinPoint} />
+    </View>
   );
 }
 
@@ -5035,8 +4959,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
   },
-  /** La prise du mur : invisible, elle ne fait qu'attraper le doigt. */
-  wallGrab: { position: 'absolute', backgroundColor: 'transparent' },
   /** La poignée de rotation d'un mur : un rond bleu clair, comme au meuble. */
   wallRotate: {
     position: 'absolute',
@@ -5071,6 +4993,15 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
   },
   objDrag: { position: 'absolute' },
+  /** Le coin tirable du mur choisi : un point blanc cerclé de bleu. */
+  coinPoint: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: c.surface,
+    borderWidth: 2,
+    borderColor: c.blue,
+  },
   /**
    * LES VOIES DU PLAN — où chaque bloc flottant a le droit de se poser.
    *

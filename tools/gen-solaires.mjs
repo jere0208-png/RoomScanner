@@ -215,6 +215,22 @@ const CHOIX = {
     (on n'est plus devant la maquette, on est dedans).
   */
   marcher: ['walking-bold'],
+  /*
+    LES QUATRE TUILES DE L'ACCUEIL PARLENT LA MÊME LANGUE — relevé du patron :
+    « les icônes des quatre cadres ne sont pas très cohérentes ; un cadre de
+    scan pour le scan, un “?” pour le tutoriel vidéo, une maison pour
+    l'exemple ; le crayon reste bon ».
+
+    Un cube, un marcheur, un crayon, une étoile : quatre objets sans
+    rapport, dont deux ne disaient pas ce qu'ils ouvraient. Ce sont
+    maintenant quatre PLEINS de même famille, chacun creusé de son geste :
+    le cadre de visée et sa ligne de balayage (le motif de la référence
+    Flaticon, dans le jeu Solar de l'app), la bulle « ? », la maison, et le
+    crayon qui reste.
+  */
+  scanner: ['scanner-bold'],
+  aide: ['question-circle-bold'],
+  maison: ['home-2-bold', 'home-bold'],
 };
 
 async function tracer(nom) {

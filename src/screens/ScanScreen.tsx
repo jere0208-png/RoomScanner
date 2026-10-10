@@ -21,7 +21,6 @@ import { GuidePose } from './scan/GuidePose';
 import { aimanterHauteur, apercuDeHauteur, natureAuMur } from '../geometry/viseur';
 import { PRODUITS_DU_SCAN, configurationDeLaPose, produitDuScan } from '../geometry/poseAR';
 import { VignetteProduit } from '../components/VignetteProduit';
-import { FondDeVerre, SUR_VERRE } from '../components/Verre';
 import { alerte } from '../ui/alerte';
 
 /** Le guide de pose a été lu : on ne le remontre plus de lui-même. */
@@ -367,10 +366,9 @@ export function ScanScreen() {
       */}
       {!processing && (
         <TouchableOpacity
-          style={[styles.cancelButton, SUR_VERRE]}
+          style={styles.cancelButton}
           accessibilityLabel="Arrêter le scan"
           onPress={abandonner}>
-          <FondDeVerre rayon={20} sombre voile={0.55} />
           <CloseCross size={20} color={c.scanInk} weight={3} />
         </TouchableOpacity>
       )}
@@ -379,12 +377,11 @@ export function ScanScreen() {
       <TouchableOpacity
         style={[
           styles.torchButton,
-          torch ? styles.torchButtonOn : SUR_VERRE,
+          torch && styles.torchButtonOn,
           processing && styles.cacheEnAssemblage,
         ]}
         accessibilityLabel={torch ? 'Éteindre la torche' : 'Allumer la torche'}
         onPress={toggleTorch}>
-        {!torch && <FondDeVerre rayon={20} sombre voile={0.55} />}
         <Svg width={18} height={18} viewBox="0 0 24 24">
           <Path
             d="M13 2 L5 13.5 h5 L8 22 l8.5 -11.5 h-5 z"
@@ -398,8 +395,7 @@ export function ScanScreen() {
 
       {/* RoomPlan affiche déjà ses propres instructions : pas de doublon. */}
       <View style={styles.topHud} pointerEvents="none">
-        <View style={[styles.statsPill, SUR_VERRE]}>
-          <FondDeVerre rayon={16} sombre voile={0.55} />
+        <View style={styles.statsPill}>
           {stats.map(([label, n], i) => (
             <View key={label} style={[styles.stat, i > 0 && styles.statBorder]}>
               <Text style={styles.statValue}>{n}</Text>
@@ -468,8 +464,7 @@ export function ScanScreen() {
               />
             ))}
           </View>
-          <View style={[styles.phraseViseur, SUR_VERRE]} pointerEvents="none">
-            <FondDeVerre rayon={14} sombre voile={0.55} />
+          <View style={styles.phraseViseur} pointerEvents="none">
             <Text style={styles.phraseViseurTexte} numberOfLines={1}>
               {/* Le refus passe avant tout : c'est le seul cas où le geste
                   n'a rien produit. Puis la cote qu'on vient de poser, tant
@@ -478,8 +473,7 @@ export function ScanScreen() {
             </Text>
           </View>
 
-          <View style={[styles.rail, SUR_VERRE]}>
-            <FondDeVerre rayon={18} sombre voile={0.55} />
+          <View style={styles.rail}>
             <View style={styles.railTete}>
               <TouchableOpacity
                 style={styles.railBouton}
@@ -539,8 +533,7 @@ export function ScanScreen() {
           </TouchableOpacity>
 
           {poses > 0 && (
-            <View style={[styles.posees, SUR_VERRE]}>
-              <FondDeVerre rayon={18} sombre voile={0.55} />
+            <View style={styles.posees}>
               <TouchableOpacity
                 style={styles.poseesRetirer}
                 accessibilityLabel="Retirer le dernier appareil posé"
@@ -565,10 +558,9 @@ export function ScanScreen() {
       {/* Rail rangé : une pastille pour le rouvrir, et rien d'autre sur la vue. */}
       {modeElec && !paused && !processing && !railOuvert && (
         <TouchableOpacity
-          style={[styles.railFerme, SUR_VERRE]}
+          style={styles.railFerme}
           accessibilityLabel="Afficher la pose"
           onPress={ouvrirLeRail}>
-          <FondDeVerre rayon={18} sombre voile={0.55} />
           <VignetteProduit code={produit.photo} libelle={produit.mot} taille={24} />
           <Text style={styles.railFermeTexte}>Poser</Text>
         </TouchableOpacity>
@@ -578,10 +570,9 @@ export function ScanScreen() {
           miniature 3D live de RoomPlan. */}
       <View style={styles.bottomHud} pointerEvents="box-none">
         <TouchableOpacity
-          style={[styles.pauseButton, SUR_VERRE]}
+          style={styles.pauseButton}
           accessibilityLabel={paused ? 'Reprendre le scan' : 'Mettre en pause'}
           onPress={paused ? resume : pause}>
-          <FondDeVerre rayon={27} sombre voile={0.55} />
           {/* Icône dessinée : même hauteur (18) que l'éclair et la croix. */}
           <Svg width={18} height={18} viewBox="0 0 24 24">
             {paused ? (

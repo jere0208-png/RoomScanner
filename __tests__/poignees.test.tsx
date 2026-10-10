@@ -74,6 +74,57 @@ describe('la poignée de déplacement', () => {
     expect(apres.onStartShouldSetResponder).toBe(avant.onStartShouldSetResponder);
   });
 
+  it('un appui sans glisser relâche le meuble ; un glisser, non', () => {
+    /*
+      L'appui tombait dans le vide : la poignée prend le doigt au poser, et
+      rien sous elle ne le recevait — ni la prise posée derrière le meuble,
+      ni le meuble pour le relâcher.
+    */
+    const onTap = jest.fn();
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(
+        <ObjectDragHandle
+          objectId="o1"
+          center={{ x: 175, y: 122 }}
+          half={{ x: 70, y: 95 }}
+          mapping={mapping}
+          raw={{ transform: tf(1.75, 1.22), width: 1.4 }}
+          onTap={onTap}
+        />,
+      );
+    });
+    const h = handlersOf(tree);
+    const appui = (x: number, y: number, x0 = x, y0 = y) => ({
+      nativeEvent: { touches: [{ pageX: x, pageY: y }], locationX: x, locationY: y },
+      touchHistory: {
+        numberActiveTouches: 1,
+        indexOfSingleActiveTouch: 0,
+        mostRecentTimeStamp: 100,
+        touchBank: [
+          {
+            touchActive: true,
+            startPageX: x0,
+            startPageY: y0,
+            startTimeStamp: 0,
+            currentPageX: x,
+            currentPageY: y,
+            currentTimeStamp: 100,
+            previousPageX: x0,
+            previousPageY: y0,
+            previousTimeStamp: 0,
+          },
+        ],
+      },
+    });
+    act(() => {
+      h.onResponderGrant(appui(175, 122));
+      h.onResponderRelease(appui(176, 123, 175, 122));
+    });
+    expect(onTap).toHaveBeenCalledTimes(1);
+    act(() => tree.unmount());
+  });
+
   it('ne rend jamais le geste au plan', () => {
     let tree!: TestRenderer.ReactTestRenderer;
     act(() => {
@@ -389,11 +440,16 @@ describe('le mur choisi', () => {
     act(() => pris.unmount());
   });
 
-  it('se pousse au doigt, et ses voisins suivent', () => {
+  it('ne se pousse plus au doigt : aucune bande ne le recouvre', () => {
+    /*
+      Relevé du patron : « le mur se déforme parfois sans faire exprès en
+      essayant de cliquer sur un élément d'une pièce proche du mur ; enlève
+      le glissement de mur au doigt ». La bande de prise — qui ne répondait
+      qu'au mouvement et ne rendait jamais la main — n'existe plus : le
+      décalage se dit au chiffre (« Décaler », voir `prisedumur`).
+    */
     const tree = monterMur('n');
-    // La zone de prise du mur : elle ne répond qu'au MOUVEMENT, jamais à
-    // l'appui — sinon désélectionner déplacerait le mur d'un cheveu.
-    const prise = tree.root
+    const bande = tree.root
       .findAllByType(View)
       .find(
         (n) =>
@@ -401,20 +457,8 @@ describe('le mur choisi', () => {
           n.props.onStartShouldSetResponder?.() === false &&
           n.props.onResponderTerminationRequest?.() === false,
       );
-    expect(prise).toBeDefined();
-    act(() => {
-      prise!.props.onMoveShouldSetResponder(doigt(200, 320, 200, 300));
-      prise!.props.onResponderGrant(doigt(200, 300, 200, 300));
-      prise!.props.onResponderMove(doigt(200, 340, 200, 300));
-    });
-    const murs = useScanStore.getState().walls;
-    const n = murs.find((w) => w.id === 'n')!;
-    // Il a bougé, il est resté horizontal, et le mur d'en face n'a pas suivi.
-    expect(n.a.z).not.toBeCloseTo(0, 3);
-    expect(n.a.z).toBeCloseTo(n.b.z, 9);
-    expect(murs.find((w) => w.id === 's')!.a.z).toBeCloseTo(4, 6);
-    // Et les murs qui le tiennent sont restés soudés.
-    expect(murs.find((w) => w.id === 'e')!.a.z).toBeCloseTo(n.b.z, 6);
+    expect(bande).toBeUndefined();
+    void doigt;
     act(() => tree.unmount());
   });
 

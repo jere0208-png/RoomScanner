@@ -2629,6 +2629,32 @@ export function posesDeMur(
 }
 
 /**
+ * LE CÔTÉ DEHORS D'UN MUR — la normale qui s'éloigne de sa pièce.
+ *
+ * « Décaler vers l'extérieur » doit vouloir dire la même chose quel que soit
+ * le sens dans lequel le scan a tracé le mur : on prend la perpendiculaire
+ * qui s'éloigne du centre des murs de SA pièce (de tout le plan, si le mur
+ * n'a pas de pièce).
+ */
+export function normaleSortante(w: WallSeg, walls: WallSeg[]): Pt {
+  const l = segLength(w) || 1;
+  const n = { x: -(w.b.z - w.a.z) / l, z: (w.b.x - w.a.x) / l };
+  const siens = walls.filter((x) => x.type === 'wall' && roomOf(x) === roomOf(w));
+  const tous = siens.length > 0 ? siens : walls;
+  let cx = 0;
+  let cz = 0;
+  for (const x of tous) {
+    cx += (x.a.x + x.b.x) / 2;
+    cz += (x.a.z + x.b.z) / 2;
+  }
+  cx /= tous.length || 1;
+  cz /= tous.length || 1;
+  const mx = (w.a.x + w.b.x) / 2;
+  const mz = (w.a.z + w.b.z) / 2;
+  return n.x * (mx - cx) + n.z * (mz - cz) >= 0 ? n : { x: -n.x, z: -n.z };
+}
+
+/**
  * LA CLOISON EN T — les deux poses au flanc d'un mur choisi.
  *
  * Les poses au bout libre ne savent pas recouper une pièce : un placard,

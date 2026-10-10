@@ -192,13 +192,3 @@ RCT_EXTERN_METHOD(pickImage:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(choisirUnTarif:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 @end
-
-// Le verre des menus : la matière des bulles d'iOS, derrière nos cartes.
-@interface RCT_EXTERN_MODULE(RoomScanVerreManager, RCTViewManager)
-RCT_EXPORT_VIEW_PROPERTY(rayon, NSNumber)
-RCT_EXPORT_VIEW_PROPERTY(sombre, BOOL)
-RCT_EXPORT_VIEW_PROPERTY(voile, NSNumber)
-RCT_EXPORT_VIEW_PROPERTY(ombre, NSArray)
-RCT_EXPORT_VIEW_PROPERTY(teinte, NSString)
-RCT_EXPORT_VIEW_PROPERTY(force, NSNumber)
-@end
