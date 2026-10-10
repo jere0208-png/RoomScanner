@@ -147,6 +147,27 @@ describe('abandonner un scan neuf', () => {
     expect(st().screen).toBe('home');
   });
 
+  /*
+    LE PLAN QU'ON REGARDAIT AVANT N'EST PAS UNE DESTINATION. Relevé du
+    patron : « lorsqu'on commence un scan et qu'on le quitte, ça mène
+    directement au plan témoin, ça devrait afficher le menu ». Les murs de
+    l'appartement témoin restaient dans le magasin, et la garde y voyait un
+    plan d'où le scan serait parti.
+  */
+  it('un scan neuf lancé après l’appartement témoin ramène à l’accueil', () => {
+    useAlerte.setState({ courante: null, file: [] });
+    act(() => {
+      st().ouvrirExemple();
+      st().setScreen('home');
+      useScanStore.setState({ screen: 'scan', scanning: true, wallCount: 0 });
+    });
+    expect(st().walls.length).toBeGreaterThan(0);
+    const t = monter();
+    act(() => croix(t).props.onPress());
+    expect(st().screen).toBe('home');
+    expect(st().scanning).toBe(false);
+  });
+
   it('mais se confirme des que des murs sont releves', () => {
     useAlerte.setState({ courante: null, file: [] });
     act(() => {

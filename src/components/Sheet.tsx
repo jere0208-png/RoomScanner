@@ -99,6 +99,8 @@ const ICONS = {
   ],
   // Sortir : la flèche qui franchit la porte.
   sortir: ['M13 3.5 h6.5 v17 H13', 'M3 12 h9', 'M8.5 8 L12.5 12 l-4 4'],
+  // La flèche qui descend dans le bac : ranger pour de bon.
+  sauver: ['M12 3.5 v11', 'M7.5 10 L12 14.5 L16.5 10', 'M4.5 15.5 v3.5 h15 v-3.5'],
   // Une pièce : son contour et sa porte, comme sur le plan.
   piece: [
     'M3.5 3.5 h17 v17 H14',

@@ -99,6 +99,7 @@ import {
 } from '../geometry/electrical';
 import { RoomScan } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
+import { useModeElec } from '../store/usage';
 import { haptic } from '../ui/haptic';
 import { CalquePhotoFond, CalquePhotoPoignee } from './CalquePhoto';
 import { SOLAIRES } from '../ui/solaires';
@@ -422,7 +423,15 @@ export function WallElevation({
   // Poser une prise sans savoir combien la pièce en exige, c'est compter
   // dans sa tête. L'app le fait : elle annonce l'objectif, montre où on en
   // est, et rappelle la règle en une ligne.
+  /*
+    LA NORME NE PARLE QU'À L'ÉLECTRICIEN — relevé du patron : « les normes
+    qui concernent l'électricité ne doivent pas être comptées » hors du mode
+    Électricité. Le plan les taisait déjà ; la page du mur, elle, comptait
+    encore ses socles et ses « points à revoir ».
+  */
+  const modeElec = useModeElec();
   const objectif = useMemo(() => {
+    if (!modeElec) return null;
     const inputs = roomInputsOf(rooms, roomParts(walls, rooms));
     const w2r = wallToRooms(inputs);
     const mien = inputs.find(r => (w2r.get(wallId) ?? []).includes(r.id));
@@ -463,7 +472,7 @@ export function WallElevation({
       */
       inconnu: !usageConnu(mien.name, mien.kind),
     };
-  }, [rooms, walls, fixtures, wallId]);
+  }, [modeElec, rooms, walls, fixtures, wallId]);
 
   /**
    * Les autres constats de la pièce — ceux que le bandeau d'objectif et
@@ -472,6 +481,7 @@ export function WallElevation({
    * absurde de renvoyer ailleurs pour savoir lequel.
    */
   const constats = useMemo(() => {
+    if (!modeElec) return [];
     const inputs = roomInputsOf(rooms, roomParts(walls, rooms));
     const w2r = wallToRooms(inputs);
     const miens = w2r.get(wallId) ?? [];
@@ -488,7 +498,7 @@ export function WallElevation({
         !!i.roomId &&
         miens.includes(i.roomId),
     );
-  }, [rooms, walls, fixtures, wallId]);
+  }, [modeElec, rooms, walls, fixtures, wallId]);
 
   // ------------------------------------------------------------- échelle
   const H = wall?.height ?? 2.5;

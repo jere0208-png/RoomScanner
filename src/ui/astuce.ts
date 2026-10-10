@@ -35,6 +35,15 @@ export interface DonneesAstuce {
    * ferait d'un conseil une récompense, et l'inverse.
    */
   fete?: boolean;
+  /**
+   * LE GESTE QUI VA AVEC, quand il y en a un — et un seul.
+   *
+   * Relevé du patron : faire comprendre « qu'il faut sauvegarder son plan
+   * pour ne pas risquer de le perdre », d'une façon « peu gênante ». La
+   * pastille le dit, et porte de quoi le faire sur-le-champ : un appui, et
+   * c'est enregistré. Sans appui, elle passe comme les autres.
+   */
+  action?: { label: string; faire: () => void };
 }
 
 interface EtatAstuce {
@@ -72,7 +81,11 @@ export const useAstuce = create<EtatAstuce>((set, get) => ({
 /** Pose une astuce, de n'importe où. */
 export function astuce(
   texte: string,
-  options?: { icone?: keyof typeof SOLAIRES; fete?: boolean },
+  options?: {
+    icone?: keyof typeof SOLAIRES;
+    fete?: boolean;
+    action?: DonneesAstuce['action'];
+  },
 ) {
   useAstuce.getState().poser({ texte, ...options });
 }

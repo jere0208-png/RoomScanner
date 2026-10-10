@@ -216,6 +216,65 @@ describe('la suppression du compte', () => {
   });
 });
 
+/*
+  L'INVITÉ N'EST JAMAIS PRO — relevé du patron : « le mode invité est en Pro,
+  et donc pas d'intérêt de faire un compte ». L'App Store répondait pour
+  l'identifiant Apple du téléphone, et la réponse passait l'application en
+  Pro sans regarder qui était connecté ; la déconnexion laissait le Pro en
+  place. Le Pro appartient au compte.
+*/
+describe('sans compte, pas de Pro', () => {
+  const ABONNE = { produit: 'echoplan.pro.mensuel', expiration: Date.now() + 86400000 * 30, reconduit: true };
+
+  it('un abonnement sur l’identifiant Apple ne fait pas de l’invité un abonné', async () => {
+    mockEcheance = ABONNE;
+    useAccountStore.setState({ compte: null, invite: true });
+    await useAccountStore.getState().rafraichirEcheance();
+    expect(useAccountStore.getState().pro).toBe(false);
+    expect(useAccountStore.getState().proEcheance).toBeNull();
+  });
+
+  it('l’invité qu’une ancienne version avait écrit « Pro » ne l’est plus au démarrage', async () => {
+    const AsyncStorage = jest.requireMock('@react-native-async-storage/async-storage');
+    AsyncStorage.getItem.mockImplementationOnce(async () =>
+      JSON.stringify({ compte: null, invite: true, pro: true, proVia: 'abonnement' }),
+    );
+    mockEcheance = ABONNE;
+    await useAccountStore.getState().charger();
+    expect(useAccountStore.getState().invite).toBe(true);
+    expect(useAccountStore.getState().pro).toBe(false);
+    expect(useAccountStore.getState().proVia).toBeNull();
+  });
+
+  it('se déconnecter emporte le Pro avec le compte', () => {
+    useAccountStore.setState({ compte: MARTIN, pro: true, proVia: 'abonnement' });
+    useAccountStore.getState().deconnecter();
+    expect(useAccountStore.getState().pro).toBe(false);
+    expect(useAccountStore.getState().proVia).toBeNull();
+  });
+
+  it('et se reconnecter le lui rend, si l’App Store le connaît', async () => {
+    mockEcheance = ABONNE;
+    await useAccountStore.getState().connecter(MARTIN);
+    await tick();
+    expect(useAccountStore.getState().pro).toBe(true);
+  });
+
+  it('l’invité qui veut le Pro est mené au compte, pas à la caisse', async () => {
+    const native = jest.requireMock('../src/native/account');
+    native.acheterAbonnement.mockClear();
+    useAccountStore.setState({ compte: null, invite: true });
+    useAccountStore.getState().ouvrirPaywall();
+    expect(useAccountStore.getState().paywallVisible).toBe(false);
+    useAccountStore.getState().ouvrirSurprise();
+    expect(useAccountStore.getState().surpriseVisible).toBeFalsy();
+    expect(useAccountStore.getState().paywallVisible).toBe(false);
+    await useAccountStore.getState().acheterPro();
+    expect(native.acheterAbonnement).not.toHaveBeenCalled();
+    expect(useAccountStore.getState().pro).toBe(false);
+  });
+});
+
 describe('le code promo et l’achat', () => {
   /*
     PLUS DE CODE MAISON. « CARIDI12 » donnait le Pro sans passer par l'App
@@ -229,7 +288,7 @@ describe('le code promo et l’achat', () => {
 
   it('un code d’offre Apple : la feuille d’Apple, puis l’abonnement relu à l’App Store', async () => {
     mockEcheance = { produit: 'echoplan.pro.mensuel', expiration: Date.now() + 86400000 * 30, reconduit: true };
-    useAccountStore.setState({ paywallVisible: true });
+    useAccountStore.setState({ compte: MARTIN, paywallVisible: true });
     await useAccountStore.getState().codeOffre();
     expect(useAccountStore.getState().pro).toBe(true);
     expect(useAccountStore.getState().proVia).toBe('abonnement');
@@ -243,7 +302,7 @@ describe('le code promo et l’achat', () => {
     rien, et le Pro d'un ancien code n'en dépend pas.
   */
   it('l’App Store dit « aucun abonnement » : le Pro d’abonnement s’en va', async () => {
-    useAccountStore.setState({ pro: true, proVia: 'abonnement' });
+    useAccountStore.setState({ compte: MARTIN, pro: true, proVia: 'abonnement' });
     mockEcheance = { aucun: true };
     await useAccountStore.getState().rafraichirEcheance();
     expect(useAccountStore.getState().pro).toBe(false);
@@ -262,7 +321,7 @@ describe('le code promo et l’achat', () => {
   });
 
   it('l’achat StoreKit passe le compte en Pro et ferme la page', async () => {
-    useAccountStore.setState({ paywallVisible: true });
+    useAccountStore.setState({ compte: MARTIN, paywallVisible: true });
     await useAccountStore.getState().acheterPro();
     expect(useAccountStore.getState().pro).toBe(true);
     expect(useAccountStore.getState().proVia).toBe('abonnement');

@@ -88,7 +88,7 @@ import {
 } from '../geometry/ceiling';
 import { planFrameAngle } from '../geometry/floorplan';
 import { assignOpenings } from '../geometry/scene3d';
-import { wallRuns } from '../geometry/floorplan';
+import { epaisseurDe, wallRuns } from '../geometry/floorplan';
 import {
   ajusterBlocs,
   masquesDeScene,
@@ -1599,14 +1599,15 @@ function planPage(
       */
       texte: 'Repère de mur — élévation',
       /*
-        UN ROND, ET RIEN DEDANS. La première version dessinait le cercle en un
-        seul arc presque refermé et lui ajoutait un « 1 » au trait : regardé en
-        image, cela donnait un petit haricot noir illisible. Un cercle se trace
-        en DEUX demi-arcs, et le chiffre n'a rien à faire là — la légende dit
-        à quoi sert le rond, pas quel numéro il porte.
+        UN BOUT DE MUR, ET SON CHIFFRE EN RÉSERVE — comme sur le plan. Le
+        « 1 » est le blanc laissé entre deux blocs de poché : le dessin des
+        symboles remplit chaque tracé à part, un trou n'y survivrait pas.
       */
       symbole: {
-        paths: [{ d: 'M-3.2 0 a3.2 3.2 0 1 0 6.4 0 a3.2 3.2 0 1 0 -6.4 0' }],
+        paths: [
+          { d: 'M-12 -4.6 H-1.5 V4.6 H-12 Z', fill: true },
+          { d: 'M1.5 -4.6 H12 V4.6 H1.5 Z', fill: true },
+        ],
         color: INK,
       },
     });
@@ -1938,10 +1939,11 @@ function planPage(
     */
     {
       const numeros = wallNumbers(ctx);
+      const centre = centreDesMurs(walls);
       for (const w of walls) {
-        if (!numeros.get(w.id)) continue;
-        const p2 = px(wallTagAt(w, openings));
-        posees.push({ x: p2.x - 7.1, y: p2.y - 7.1, w: 14.2, h: 14.2 });
+        const n = numeros.get(w.id);
+        if (!n) continue;
+        posees.push(placeDuNumero(w, openings, n, scale, px, centre).boite);
       }
     }
 
@@ -3270,25 +3272,22 @@ function planPage(
     /*
       LE NUMÉRO DE CHAQUE MUR, DANS SON ÉPAISSEUR.
 
-      Une pastille blanche cerclée d'encre, posée sur le poché : elle se
-      détache du noir du mur, et son cercle la garde lisible quand le mur
-      est trop fin pour la contenir. C'est le repère qui renvoie aux
-      feuilles d'élévation — sans lui, une feuille « Séjour, nord » ne
-      désigne rien de sûr sur un plan qui compte quatre pans au nord.
+      C'est le repère qui renvoie aux feuilles d'élévation — sans lui, une
+      feuille « Séjour, nord » ne désigne rien de sûr sur un plan qui compte
+      quatre pans au nord. Il s'écrit petit et maigre, à même le mur : voir
+      `placeDuNumero`.
 
-      Elle se dessine APRÈS le mobilier et les cotes, AVANT la surcouche de
+      Il se dessine APRÈS le mobilier et les cotes, AVANT la surcouche de
       schéma : c'est une annotation du plan, pas du schéma.
     */
     {
       const numeros = wallNumbers(ctx);
+      const centre = centreDesMurs(walls);
       for (const w of walls) {
         const n = numeros.get(w.id);
         if (!n) continue;
-        const p = px(wallTagAt(w, openings));
-        const r = 6.2;
-        d.circle(p.x, p.y, r + 0.9, INK);
-        d.circle(p.x, p.y, r, '#FFFFFF');
-        d.text(String(n), p.x, p.y - 2.4, 7, INK, { bold: true });
+        const q = placeDuNumero(w, openings, n, scale, px, centre);
+        d.text(String(n), q.x, q.y - 0.36 * q.taille, q.taille, q.couleur);
       }
     }
 
@@ -4871,6 +4870,87 @@ function wallNumbers(ctx: SheetContext): Map<string, number> {
  * baie est centrée — c'est-à-dire souvent. Le plus long tronçon plein est
  * toujours du mur, et c'est là qu'il y a la place.
  */
+/**
+ * LE NUMÉRO D'UN MUR, ÉCRIT DANS SA MAÇONNERIE.
+ *
+ * Relevé du patron : « les numéros de mur sur le plan PDF sont trop
+ * imposants ; il faut placer un petit numéro sur le mur, sans contour rond.
+ * Il doit être léger mais visible. » C'était une pastille blanche cerclée
+ * d'encre, de quatorze points de large : sur un T3, une dizaine de ronds
+ * blancs posés sur le poché, plus visibles que les cotes.
+ *
+ * Il s'écrit maintenant EN RÉSERVE dans le poché — blanc, maigre, à la
+ * taille que l'épaisseur du mur permet, jamais plus de six points. Rien
+ * autour : le noir du mur suffit à le détacher.
+ *
+ * Et quand le mur, à l'échelle de la feuille, est trop mince pour le loger
+ * (un grand logement sur un A4), le chiffre ne déborde pas en blanc sur du
+ * blanc : il se pose juste à côté du mur, côté logement, en gris.
+ */
+const NUMERO_MAX = 6;
+const NUMERO_MIN = 4.4;
+const NUMERO_A_COTE = 5.5;
+const GRIS_NUMERO = '#6B7380';
+
+/** Le milieu du logement : c'est de ce côté qu'un numéro sorti du mur se pose. */
+function centreDesMurs(walls: WallSeg[]): { x: number; z: number } {
+  if (walls.length === 0) return { x: 0, z: 0 };
+  let x = 0;
+  let z = 0;
+  for (const w of walls) {
+    x += (w.a.x + w.b.x) / 2;
+    z += (w.a.z + w.b.z) / 2;
+  }
+  return { x: x / walls.length, z: z / walls.length };
+}
+
+export function placeDuNumero(
+  w: WallSeg,
+  openings: WallSeg[],
+  n: number,
+  scale: number,
+  px: (p: { x: number; z: number }) => Pt,
+  centre: { x: number; z: number },
+): { x: number; y: number; taille: number; couleur: string; boite: Boite } {
+  const tag = wallTagAt(w, openings);
+  const chiffres = String(n).length;
+  // Helvetica : un chiffre fait 0,556 em de large, 0,72 em de haut.
+  const large = (t: number) => 0.556 * chiffres * t;
+  const haut = (t: number) => 0.72 * t;
+  const pa = px(w.a);
+  const pb = px(w.b);
+  const debout = Math.abs(pb.y - pa.y) > Math.abs(pb.x - pa.x);
+  // Ce que le chiffre occupe EN TRAVERS du mur : sa largeur sur un mur
+  // debout, sa hauteur sur un mur couché.
+  const travers = (t: number) => (debout ? large(t) : haut(t));
+  const epaisseur = epaisseurDe(w) * scale;
+  const tient = (epaisseur - 1.6) / travers(1);
+  const boite = (x: number, y: number, t: number): Boite => ({
+    x: x - large(t) / 2 - 0.8,
+    y: y - haut(t) / 2 - 0.8,
+    w: large(t) + 1.6,
+    h: haut(t) + 1.6,
+  });
+  if (tient >= NUMERO_MIN) {
+    const taille = Math.min(NUMERO_MAX, tient);
+    const p = px(tag);
+    return { x: p.x, y: p.y, taille, couleur: '#FFFFFF', boite: boite(p.x, p.y, taille) };
+  }
+  const dx = w.b.x - w.a.x;
+  const dz = w.b.z - w.a.z;
+  const len = Math.hypot(dx, dz) || 1;
+  let nx = -dz / len;
+  let nz = dx / len;
+  if ((centre.x - tag.x) * nx + (centre.z - tag.z) * nz < 0) {
+    nx = -nx;
+    nz = -nz;
+  }
+  const taille = NUMERO_A_COTE;
+  const ecart = epaisseurDe(w) / 2 + (1.5 + travers(taille) / 2) / scale;
+  const p = px({ x: tag.x + nx * ecart, z: tag.z + nz * ecart });
+  return { x: p.x, y: p.y, taille, couleur: GRIS_NUMERO, boite: boite(p.x, p.y, taille) };
+}
+
 function wallTagAt(w: WallSeg, openings: WallSeg[]): { x: number; z: number } {
   const pleins = wallRuns(w, openings)
     .filter((r) => r.kind === 'mur')

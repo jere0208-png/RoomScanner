@@ -55,6 +55,7 @@ import { haptic } from '../ui/haptic';
 import { alerte } from '../ui/alerte';
 import { pourChercher } from '../ui/mots';
 import { PlanThumb, detailsDuScan } from './LibraryScreen';
+import { etatDAttente, useMaintenant } from '../ui/miseDeCote';
 
 /**
  * « il y a un quart d'heure » plutôt qu'une date.
@@ -205,6 +206,8 @@ export function HomeScreen() {
 
   /* Les plans : les derniers touchés, ou ceux que la recherche retient. */
   const [cherche, setCherche] = useState('');
+  // Les comptes à rebours des plans non enregistrés avancent ici aussi.
+  const maintenant = useMaintenant();
   const recents = useMemo(
     () => [...saves].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)),
     [saves],
@@ -475,7 +478,7 @@ export function HomeScreen() {
             )}
 
             {montres.map((s) => (
-              <CartePlan key={s.id} scan={s} c={c} styles={styles} onPress={() => openSave(s.id)} />
+              <CartePlan key={s.id} scan={s} maintenant={maintenant} c={c} styles={styles} onPress={() => openSave(s.id)} />
             ))}
             {cherche && montres.length === 0 && (
               <Text style={styles.rien}>Aucun plan ne porte ce nom.</Text>
@@ -597,15 +600,18 @@ function Tuile({
 /** Un plan de l'accueil : sa vignette, son nom, ce qu'il contient, quand. */
 function CartePlan({
   scan,
+  maintenant,
   c,
   styles,
   onPress,
 }: {
   scan: SavedScan;
+  maintenant: number;
   c: Palette;
   styles: ReturnType<typeof getStyles>;
   onPress: () => void;
 }) {
+  const attente = etatDAttente(scan, maintenant);
   return (
     <Pressable
       accessibilityRole="button"
@@ -617,9 +623,16 @@ function CartePlan({
       </View>
       <View style={styles.carteTextes}>
         <Text style={styles.carteNom} numberOfLines={1}>{scan.name}</Text>
-        <Text style={styles.carteMeta} numberOfLines={1}>
-          {`${detailsDuScan(scan)} · ${quand(scan.updatedAt ?? scan.createdAt ?? Date.now())}`}
-        </Text>
+        {/* Ce qui attend d'être enregistré le dit, comme dans « Mes plans ». */}
+        {attente ? (
+          <Text style={[styles.carteMeta, styles.carteMetaAttente]} numberOfLines={1}>
+            {attente.texte}
+          </Text>
+        ) : (
+          <Text style={styles.carteMeta} numberOfLines={1}>
+            {`${detailsDuScan(scan)} · ${quand(scan.updatedAt ?? scan.createdAt ?? Date.now())}`}
+          </Text>
+        )}
       </View>
       <Svg width={14} height={14} viewBox="0 0 24 24">
         <Path d="m9 6 6 6-6 6" stroke={c.inkFaint} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
@@ -786,6 +799,8 @@ const getStyles = themedStyles((c: Palette) => {
     carteTextes: { flex: 1, minWidth: 0 },
     carteNom: { color: c.ink, fontSize: 16, fontWeight: '600', letterSpacing: -0.2 },
     carteMeta: { color: c.inkSoft, fontSize: 12.5, marginTop: 3, lineHeight: 17 },
+    // Ce qui attend d'être enregistré, en ambre : voir `ui/miseDeCote`.
+    carteMetaAttente: { color: c.amber, fontWeight: '600' },
     brouillonGestes: { alignItems: 'center', gap: 6 },
     reprendre: {
       backgroundColor: c.blue,

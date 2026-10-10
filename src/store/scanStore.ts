@@ -317,11 +317,71 @@ export interface DevisEnregistre {
   ajouts: { code: string; quantite: number }[];
 }
 
+/**
+ * LE TRAVAIL NON ENREGISTRÉ NE DEMANDE PLUS RIEN EN PARTANT — il se range.
+ *
+ * Relevé du patron : « lorsqu'on quitte un plan pas enregistré, on ne doit
+ * plus voir le message pop-up qui embête ; on doit juste afficher dans la
+ * liste des plans ce plan non enregistré, avec un "autosuppression dans", et
+ * il s'autosupprime dans les 12 h, si c'est un plan qui n'a jamais été créé
+ * avant. Si c'est une modification apportée à un plan existant, trouve un
+ * moyen peu gênant de faire comprendre qu'il faut sauvegarder son plan pour
+ * ne pas risquer de le perdre. »
+ *
+ * Douze heures : la journée de chantier, et la soirée où l'on reprend ses
+ * relevés au calme. Au-delà, ce qu'on n'a pas voulu garder s'en va seul.
+ */
+export const GARDE_NON_ENREGISTRE_MS = 12 * 3600 * 1000;
+
+/** Ce qu'un plan contient — ce qu'une retouche remplace en entier. */
+export type ContenuDuPlan = Pick<
+  SavedScan,
+  | 'name'
+  | 'client'
+  | 'address'
+  | 'rooms'
+  | 'walls'
+  | 'openings'
+  | 'objects'
+  | 'fixtures'
+  | 'photos'
+  | 'ceiling'
+  | 'notes'
+  | 'north'
+  | 'modelPath'
+  | 'devis'
+  | 'existant'
+>;
+
+/**
+ * LES MODIFICATIONS D'UN PLAN ENREGISTRÉ, GARDÉES À CÔTÉ DE LUI.
+ *
+ * On ne les écrit PAS dans le plan : il reste tel qu'on l'a enregistré, et
+ * c'est ce qu'un export, une copie ou le compte en ligne en voient. Elles
+ * attendent ici qu'on les enregistre — d'un appui sur la pastille qui le
+ * propose en sortant, sur le « … » de la ligne, ou en rouvrant le plan, qui
+ * les reprend telles quelles. Sinon elles s'en vont à `jusqua`.
+ */
+export interface RetoucheEnAttente {
+  /** Quand on les a laissées. */
+  at: number;
+  /** Quand elles s'en iront, si personne ne les enregistre. */
+  jusqua: number;
+  plan: ContenuDuPlan;
+}
+
 export interface SavedScan {
   id: string;
   name: string;
   createdAt: number;
   updatedAt: number;
+  /**
+   * UN PLAN JAMAIS ENREGISTRÉ, rangé en partant : il s'efface seul à cette
+   * date. Absent = un plan enregistré, qui ne s'efface jamais seul.
+   */
+  supprimeLe?: number;
+  /** Des modifications laissées sans être enregistrées. */
+  retouche?: RetoucheEnAttente;
   modelPath: string | null;
   rooms: RoomEntry[];
   walls: WallSeg[];
@@ -1718,6 +1778,21 @@ interface ScanState {
   /** Enregistre les modifications du plan dans la bibliothèque. */
   commitCurrent: () => void;
   /**
+   * RANGE LE TRAVAIL NON ENREGISTRÉ, sans rien demander — voir
+   * `GARDE_NON_ENREGISTRE_MS`. Un plan neuf entre dans la bibliothèque pour
+   * douze heures (`nouveau`) ; les modifications d'un plan enregistré sont
+   * gardées à côté de lui (`retouche`). Rien à perdre : `rien`.
+   */
+  mettreDeCote: () => 'rien' | 'nouveau' | 'retouche';
+  /** Écrit dans le plan les modifications qui l'attendaient. */
+  enregistrerRetouche: (id: string) => void;
+  /** Laisse le plan tel qu'il a été enregistré. */
+  jeterRetouche: (id: string) => void;
+  /** Un plan gardé douze heures devient un plan enregistré. */
+  garderLePlan: (id: string) => void;
+  /** Efface ce dont l'échéance est passée. Rend le nombre de plans partis. */
+  purgerLesEchus: (maintenant?: number) => number;
+  /**
    * Pose une menuiserie au milieu d'un mur, aux cotes de sa nature
    * (`COTES_MENUISERIE`). Sans nature dite, c'est une baie libre.
    */
@@ -2179,6 +2254,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         // La sauvegarde en ligne est Pro : sans abonnement, le plan reste
         // dans le téléphone (il y est déjà écrit), et rien ne monte.
         if (!useAccountStore.getState().pro) return;
+        // Un plan gardé douze heures n'est pas enregistré : il ne monte pas.
+        if (get().saves.find((x) => x.id === id)?.supprimeLe) return;
         get()
           .deposerAuCompte(id, identiteDuCompte())
           .catch(() => {
@@ -2190,29 +2267,45 @@ export const useScanStore = create<ScanState>((set, get) => {
     );
   };
 
+  /** Ce que le plan à l'écran contient — tel qu'une entrée le garderait. */
+  const contenuCourant = (): ContenuDuPlan => {
+    const st = get();
+    return {
+      name: st.scanName,
+      client: st.client || undefined,
+      address: st.address || undefined,
+      rooms: st.rooms,
+      walls: st.walls,
+      openings: st.openings,
+      objects: st.objects,
+      fixtures: st.fixtures,
+      photos: st.photos,
+      ceiling: st.ceiling,
+      notes: st.notes,
+      north: st.north ?? undefined,
+      modelPath: st.modelPath,
+      // Le chiffrage suit le plan : voir `DevisEnregistre`.
+      devis: devisDuPlan(st),
+    };
+  };
+
   /** Recopie le scan courant dans son entrée de bibliothèque et persiste. */
   const syncCurrent = () => {
     const st = get();
     if (!st.currentSaveId) return;
+    const contenu = contenuCourant();
     const saves = st.saves.map((s) =>
       s.id === st.currentSaveId
         ? {
             ...s,
-            name: st.scanName,
-            client: st.client || undefined,
-            address: st.address || undefined,
-            rooms: st.rooms,
-            walls: st.walls,
-            openings: st.openings,
-            objects: st.objects,
-            fixtures: st.fixtures,
-            photos: st.photos,
-            ceiling: st.ceiling,
-        notes: st.notes,
-            north: st.north ?? undefined,
-            modelPath: st.modelPath,
-            // Le chiffrage suit le plan : voir `DevisEnregistre`.
-            devis: devisDuPlan(st),
+            ...contenu,
+            /*
+              ENREGISTRER, C'EST GARDER POUR DE BON : le plan rangé pour
+              douze heures ne s'efface plus, et les modifications qui
+              attendaient sont celles qu'on vient d'écrire.
+            */
+            supprimeLe: undefined,
+            retouche: undefined,
             updatedAt: Date.now(),
           }
         : s,
@@ -4272,6 +4365,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         name: `${source.name} (copie)`,
         createdAt: now,
         updatedAt: now,
+        // Copier, c'est vouloir garder : la copie est enregistrée, et
+        // reprend ce qui l'a été — pas les modifications en attente.
+        supprimeLe: undefined,
+        retouche: undefined,
       };
       const i = st.saves.findIndex((x) => x.id === id);
       const saves = [...st.saves];
@@ -4322,12 +4419,14 @@ export const useScanStore = create<ScanState>((set, get) => {
     deposerAuCompte: async (id, qui) => {
       if (!qui) return;
       const save = get().saves.find((s) => s.id === id);
-      if (!save) return;
+      // Ce que le compte garde, c'est ce qu'on a ENREGISTRÉ : ni le plan
+      // rangé pour douze heures, ni les modifications qui attendent.
+      if (!save || save.supprimeLe) return;
       await deposerPlan(qui, {
         scan: save.id,
         nom: save.name,
         maj: save.updatedAt,
-        contenu: JSON.stringify(save),
+        contenu: JSON.stringify({ ...save, retouche: undefined }),
       });
     },
 
@@ -5952,6 +6051,15 @@ export const useScanStore = create<ScanState>((set, get) => {
         get().ecrireBrouillon();
         return;
       }
+      // Le plan rangé pour douze heures n'avait rien coûté : c'est
+      // maintenant qu'on le garde, maintenant qu'il compte.
+      if (
+        !dejaCompte &&
+        st.saves.find((x) => x.id === st.currentSaveId)?.supprimeLe
+      ) {
+        useAccountStore.getState().noterPlanCree();
+        dejaCompte = true;
+      }
       syncCurrent();
       savedDepth = history.length;
       set({ dirty: false });
@@ -5965,6 +6073,131 @@ export const useScanStore = create<ScanState>((set, get) => {
         enregistré tel quel efface sa clé.
       */
       get().ecrireBrouillon();
+    },
+
+    mettreDeCote: () => {
+      const st = get();
+      if (!st.dirty) return 'rien';
+      const now = Date.now();
+      const jusqua = now + GARDE_NON_ENREGISTRE_MS;
+      const entree = st.currentSaveId
+        ? st.saves.find((x) => x.id === st.currentSaveId)
+        : undefined;
+      let saves: SavedScan[];
+      let sorte: 'nouveau' | 'retouche';
+      if (!entree) {
+        // Un plan vide n'est rien : il n'y a rien à garder.
+        if (st.walls.length === 0) return 'rien';
+        const neuf: SavedScan = {
+          ...contenuCourant(),
+          id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
+          name: st.scanName || defaultName(new Date(now)),
+          createdAt: now,
+          updatedAt: now,
+          existant: st.existant ?? undefined,
+          supprimeLe: jusqua,
+        };
+        saves = [neuf, ...st.saves];
+        set({ currentSaveId: neuf.id });
+        sorte = 'nouveau';
+      } else if (entree.supprimeLe) {
+        /*
+          UN PLAN DÉJÀ GARDÉ DOUZE HEURES, ROUVERT PUIS LAISSÉ : il prend ce
+          qu'on vient d'y faire, et son délai repart de maintenant — on l'a
+          touché, il n'est pas oublié.
+        */
+        saves = st.saves.map((x) =>
+          x.id === entree.id
+            ? {
+                ...x,
+                ...contenuCourant(),
+                existant: st.existant ?? undefined,
+                updatedAt: now,
+                supprimeLe: jusqua,
+              }
+            : x,
+        );
+        sorte = 'nouveau';
+      } else {
+        const plan: ContenuDuPlan = {
+          ...contenuCourant(),
+          existant: st.existant ?? undefined,
+        };
+        saves = st.saves.map((x) =>
+          x.id === entree.id ? { ...x, retouche: { at: now, jusqua, plan } } : x,
+        );
+        sorte = 'retouche';
+      }
+      set({ saves, dirty: false });
+      persistSoon(saves);
+      savedDepth = history.length;
+      // Rangé : le filet des trente secondes n'a plus rien à tenir.
+      get().ecrireBrouillon();
+      return sorte;
+    },
+
+    enregistrerRetouche: (id) => {
+      const st = get();
+      const entree = st.saves.find((x) => x.id === id);
+      if (!entree?.retouche) return;
+      const plan = entree.retouche.plan;
+      const saves = st.saves.map((x) =>
+        x.id === id
+          ? { ...x, ...plan, retouche: undefined, updatedAt: Date.now() }
+          : x,
+      );
+      set({ saves });
+      persistSoon(saves);
+      deposerPlusTard(id);
+    },
+
+    jeterRetouche: (id) => {
+      const st = get();
+      if (!st.saves.some((x) => x.id === id && x.retouche)) return;
+      const saves = st.saves.map((x) =>
+        x.id === id ? { ...x, retouche: undefined } : x,
+      );
+      set({ saves });
+      persistSoon(saves);
+    },
+
+    garderLePlan: (id) => {
+      const st = get();
+      if (!st.saves.some((x) => x.id === id && x.supprimeLe)) return;
+      // Garder un plan, c'est en créer un : il compte comme tel.
+      useAccountStore.getState().noterPlanCree();
+      if (st.currentSaveId === id) dejaCompte = true;
+      const saves = st.saves.map((x) =>
+        x.id === id ? { ...x, supprimeLe: undefined, updatedAt: Date.now() } : x,
+      );
+      set({ saves });
+      persistSoon(saves);
+      deposerPlusTard(id);
+    },
+
+    purgerLesEchus: (maintenant = Date.now()) => {
+      const st = get();
+      // Le plan qu'on a sous les yeux ne s'efface pas sous le doigt.
+      const ouvert = st.screen === 'result' ? st.currentSaveId : null;
+      const partis = st.saves.filter(
+        (x) => x.id !== ouvert && !!x.supprimeLe && x.supprimeLe <= maintenant,
+      );
+      const retouchesEchues = st.saves.some(
+        (x) =>
+          x.id !== ouvert && !!x.retouche && x.retouche.jusqua <= maintenant,
+      );
+      if (retouchesEchues) {
+        const saves = st.saves.map((x) =>
+          x.id !== ouvert && x.retouche && x.retouche.jusqua <= maintenant
+            ? { ...x, retouche: undefined }
+            : x,
+        );
+        set({ saves });
+        persistSoon(saves);
+      }
+      // `deleteSave` fait aussi le ménage des photos et du modèle 3D.
+      for (const x of partis) get().deleteSave(x.id);
+      return partis.length;
     },
 
     /*
@@ -6984,6 +7217,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       const save = st.saves.find((s) => s.id === st.currentSaveId);
       if (!save) return;
+      // Revenir au plan enregistré, c'est renoncer à ce qui l'attendait.
+      if (save.retouche) get().jeterRetouche(save.id);
       const migrated = migrateSave(save);
       set({
         walls: migrated.walls,
@@ -7231,6 +7466,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         }
         const saves = await loadLibrary();
         if (saves) set({ saves: saves.map(migrateSave) });
+        // Ce qui a passé ses douze heures pendant que l'app dormait s'en va.
+        get().purgerLesEchus();
         /*
           LE RELEVÉ INTERROMPU, retrouvé au démarrage.
 
@@ -7318,9 +7555,19 @@ export const useScanStore = create<ScanState>((set, get) => {
     openSave: (id) => {
       const found = get().saves.find((s) => s.id === id);
       if (!found) return;
-      // Ce plan existe déjà : il a été payé le jour de sa création.
-      dejaCompte = true;
-      const save = migrateSave(found);
+      // Ce plan existe déjà : il a été payé le jour de sa création — sauf
+      // s'il n'est que gardé douze heures, et qu'on ne l'a jamais enregistré.
+      dejaCompte = !found.supprimeLe;
+      /*
+        LES MODIFICATIONS QUI ATTENDAIENT REVIENNENT À L'ÉCRAN, et le plan
+        se rouvre « à enregistrer » : on reprend exactement là où on l'avait
+        laissé. Le plan enregistré, lui, n'a pas bougé — « Abandonner les
+        modifications » y ramène.
+      */
+      const enAttente = !!found.retouche || !!found.supprimeLe;
+      const save = migrateSave(
+        found.retouche ? { ...found, ...found.retouche.plan } : found,
+      );
       set({
         modelPath: save.modelPath,
         scanName: save.name,
@@ -7349,7 +7596,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Le chiffrage revient avec son plan — et un relevé d'avant s'ouvre
         // sur un ticket NEUF, surtout pas sur celui du chantier d'avant.
         ...devisRepose(save.devis),
-        dirty: false,
+        dirty: enAttente,
         resultOrigin: 'library',
         /* Un plan qui s'ouvre repose ses calques. */
         ...CALQUES_DE_BASE,

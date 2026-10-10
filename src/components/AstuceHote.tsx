@@ -39,6 +39,11 @@ import { useAstuce } from '../ui/astuce';
  * devient un élément d'interface qu'on attend de pouvoir refermer.
  */
 export const DUREE_ASTUCE = 4000;
+/**
+ * Celle qui porte un geste reste plus longtemps : on lit, PUIS on décide
+ * d'appuyer — deux temps, pas un.
+ */
+export const DUREE_ASTUCE_ACTION = 6500;
 /** L'entrée et la sortie : assez pour qu'on la voie venir, pas plus. */
 export const GLISSE_ASTUCE = 260;
 
@@ -74,7 +79,11 @@ export function AstuceHote() {
       `setTimeout` à côté survivrait à l'arrêt de la séquence et fermerait une
       astuce déjà remplacée.
     */
-    const suite = Animated.sequence([entrer, Animated.delay(DUREE_ASTUCE), sortir]);
+    const suite = Animated.sequence([
+      entrer,
+      Animated.delay(courante.action ? DUREE_ASTUCE_ACTION : DUREE_ASTUCE),
+      sortir,
+    ]);
     suite.start(({ finished }) => {
       if (finished && vivant) fermer();
     });
@@ -119,6 +128,25 @@ export function AstuceHote() {
           numberOfLines={2}>
           {courante.texte}
         </Text>
+        {courante.action ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={courante.action.label}
+            hitSlop={10}
+            style={({ pressed }) => [
+              styles.action,
+              fete && styles.actionFete,
+              pressed && styles.actionPressee,
+            ]}
+            onPress={() => {
+              courante.action?.faire();
+              fermer();
+            }}>
+            <Text style={[styles.actionTexte, fete && styles.actionTexteFete]}>
+              {courante.action.label}
+            </Text>
+          </Pressable>
+        ) : null}
         {/* Le seul endroit qui prend le doigt : pour qui a déjà lu. */}
         <Pressable
           accessibilityRole="button"
@@ -158,5 +186,15 @@ const getStyles = themedStyles((c: Palette) =>
     texte: { flex: 1, color: c.ink, fontSize: 13.5, lineHeight: 18 },
     texteFete: { color: '#FFFFFF' },
     croix: { color: c.inkFaint, fontSize: 19, lineHeight: 19, fontWeight: '700' },
+    action: {
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      borderRadius: radius.pill,
+      backgroundColor: c.blue,
+    },
+    actionFete: { backgroundColor: '#FFFFFF' },
+    actionPressee: { opacity: 0.7 },
+    actionTexte: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
+    actionTexteFete: { color: c.blue },
   }),
 );

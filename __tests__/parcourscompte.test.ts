@@ -102,6 +102,8 @@ describe('le parcours complet d’un abonne', () => {
       demander. C'est le seul moment ou l'application a une chance de ne
       pas perdre un client qui a paye.
     */
+    // Il s'est reconnecté : c'est à SON compte que l'App Store répond.
+    useAccountStore.setState({ compte: MARTIN });
     expect(ac().pro).toBe(false);
     await ac().rafraichirEcheance();
     expect(ac().pro).toBe(true);

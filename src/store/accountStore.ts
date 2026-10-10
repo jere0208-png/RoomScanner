@@ -329,6 +329,21 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     d'autre ne bouge.
   */
   rafraichirEcheance: async () => {
+    /*
+      SANS COMPTE, PAS DE PRO — relevé du patron : « le mode invité est en
+      Pro, et donc pas d'intérêt de faire un compte ». C'était ici : l'App
+      Store répondait pour l'IDENTIFIANT APPLE du téléphone, et la réponse
+      passait l'application en Pro sans regarder qui était connecté. Un
+      téléphone qui avait un jour porté un abonnement — celui du patron, en
+      premier — faisait de chaque invité un abonné.
+
+      Le Pro appartient au compte : l'abonnement se relit à la connexion
+      (voir `connecter`), pas avant.
+    */
+    if (!get().compte) {
+      set({ proEcheance: null });
+      return;
+    }
     const e = await echeanceAbonnement([PRODUIT_PRO, PRODUIT_PRO_AN]);
     if (!e) {
       set({ proEcheance: null });
@@ -384,9 +399,12 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       // Le choix « sans compte » survit au redémarrage : sans ça, l'invité
       // retombe sur le mur de connexion à chaque lancement.
       invite: !!local.invite,
-      pro: !!local.pro || !!proDuTrousseau,
-      proVia:
-        (local.proVia as AccountState['proVia']) ?? proDuTrousseau ?? null,
+      // Sans compte, pas de Pro : voir `rafraichirEcheance`. Un invité que
+      // l'ancienne version avait écrit « Pro » en est quitte ici.
+      pro: !!compteLocal && (!!local.pro || !!proDuTrousseau),
+      proVia: compteLocal
+        ? (local.proVia as AccountState['proVia']) ?? proDuTrousseau ?? null
+        : null,
       plansUtilises: Math.max(
         Number(local.plansUtilises) || 0,
         marqueur?.plans ?? 0,
@@ -501,6 +519,8 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     }
     // Plus d'« essai épuisé » à l'entrée : le scan ne s'épuise plus.
     persister(get());
+    // Le compte est là : l'abonnement que l'App Store connaît lui revient.
+    get().rafraichirEcheance().catch(() => {});
     return { ok: true };
   },
 
@@ -532,7 +552,15 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     // Le marqueur d'appareil RESTE : c'est tout son sens. Et l'on retombe
     // sur l'écran de connexion, pas en invité : se déconnecter est un
     // geste de compte, il en appelle un autre.
-    set({ compte: null, invite: false });
+    // Le Pro part avec le compte : sans quoi l'invité qui suit en hériterait.
+    // Le serveur et l'App Store le rendront au compte qui se reconnecte.
+    set({
+      compte: null,
+      invite: false,
+      pro: false,
+      proVia: null,
+      proEcheance: null,
+    });
     persister(get());
   },
 
@@ -569,6 +597,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 
   acheterPro: async (offre = 'mensuel') => {
+    if (demanderUnCompte()) return;
     const ok = await acheterAbonnement(
       offre === 'annuel' ? PRODUIT_PRO_AN : PRODUIT_PRO,
     );
@@ -675,7 +704,10 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       .catch(() => {});
   },
 
-  ouvrirPaywall: () => set({ paywallVisible: true }),
+  ouvrirPaywall: () => {
+    if (demanderUnCompte()) return;
+    set({ paywallVisible: true });
+  },
   fermerPaywall: () => set({ paywallVisible: false }),
   fermerEssaiEpuise: () => set({ essaiEpuiseVisible: false }),
   /*
@@ -684,6 +716,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     l'App Store ne fera pas, c'est le défaut qu'on vient de retirer.
   */
   ouvrirSurprise: () => {
+    if (demanderUnCompte()) return;
     if (offreDeBienvenue(get().offres)) set({ surpriseVisible: true });
     else set({ paywallVisible: true });
   },
@@ -696,6 +729,31 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   // En profiter, c'est ouvrir la page Pro : l'App Store applique l'offre.
   profiterSurprise: () => set({ surpriseVisible: false, paywallVisible: true }),
 }));
+
+/*
+  LE PRO SE PREND AVEC UN COMPTE.
+
+  L'invité découvre tout — scanner, tracer, coter, visiter —, et le compte
+  est ce qui ouvre le reste : l'export, la sauvegarde en ligne, le Pro. Un
+  invité qui veut passer Pro n'a donc pas de page de paiement sous les yeux,
+  mais la porte du compte : son Pro lui appartiendra, et le suivra.
+
+  Rend vrai quand il a fallu demander (l'appelant n'a plus rien à faire).
+*/
+function demanderUnCompte(): boolean {
+  const s = useAccountStore.getState();
+  if (s.compte) return false;
+  alerte(
+    'Créez un compte pour passer en Pro',
+    'Le Pro appartient à votre compte : il vous suit sur un autre ' +
+      'téléphone et garde vos plans en ligne. La création est gratuite.',
+    [
+      { label: 'Plus tard' },
+      { label: 'Créer mon compte', onPress: () => s.quitterInvite() },
+    ],
+  );
+  return true;
+}
 
 /*
   L'IDENTITE DU COMPTE, POUR LE COFFRE.

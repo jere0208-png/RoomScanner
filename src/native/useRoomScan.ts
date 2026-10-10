@@ -266,13 +266,24 @@ function resumerLeReleve() {
      * logement déjà relevé, souvent pas encore enregistré. Un doigt qui
      * frotte la croix, et le chantier de la matinée disparaît.
      *
-     * On revient donc au plan, intact, dès qu'il y a un plan. Le natif, lui,
-     * reste en pause comme avant : la session suivante repart de zéro.
+     * On revient donc au plan, intact, quand le scan partait D'UN PLAN. Le
+     * natif, lui, reste en pause comme avant : la session suivante repart
+     * de zéro.
+     *
+     * « PARTAIT D'UN PLAN » SE SAIT, IL NE SE DEVINE PAS. La garde regardait
+     * aussi s'il restait des murs dans le magasin — et il en reste presque
+     * toujours : le plan qu'on vient de regarder, l'appartement témoin, un
+     * relevé de la veille. Relevé du patron : « lorsqu'on commence un scan
+     * et qu'on le quitte, ça mène directement au plan témoin, ça devrait
+     * afficher le menu ». Seuls « Scanner une pièce » et « Scanner un
+     * étage » partent d'un plan, et tous deux le disent
+     * (`complementEnCours`, `etageEnCours`) ; tout autre scan est un relevé
+     * neuf, lancé de l'accueil, et l'abandonner y ramène.
      */
     cancel: () => {
       RoomScan.pause();
       const s = useScanStore.getState();
-      if (s.complementEnCours || s.etageEnCours !== null || s.walls.length > 0) {
+      if (s.complementEnCours || s.etageEnCours !== null) {
         s.setComplement(false);
         // Sans ça, le scan SUIVANT atterrirait à l'étage qu'on vient
         // d'abandonner : c'est la même précaution que sur l'échec du

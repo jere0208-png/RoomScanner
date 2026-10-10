@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
-import { garderLeTravail } from '../ui/gardeTravail';
-import { AlerteSortie } from '../components/AlerteSortie';
+import { etatDAttente, rangerLeTravail, useMaintenant } from '../ui/miseDeCote';
 import {
   Animated,
   Easing,
@@ -560,6 +559,8 @@ function FolderTile({
 
 interface RowProps {
   item: SavedScan;
+  /** L'heure des comptes à rebours : voir `ui/miseDeCote`. */
+  maintenant: number;
   pris: boolean;
   fige: boolean;
   lift: Animated.Value;
@@ -586,6 +587,7 @@ interface RowProps {
  */
 function ScanRow({
   item,
+  maintenant,
   pris,
   fige,
   lift,
@@ -606,6 +608,7 @@ function ScanRow({
     l'écran (voir plus bas) ; la ligne, elle, reste où elle est et s'efface,
     comme le trou laissé par ce qu'on a pris.
   */
+  const attente = etatDAttente(item, maintenant);
   const anim = pris
     ? {
         opacity: lift.interpolate({ inputRange: [0, 1], outputRange: [1, 0.28] }),
@@ -657,7 +660,21 @@ function ScanRow({
               {[item.client, item.address].filter(Boolean).join(' · ')}
             </Text>
           ) : null}
-          <Text style={styles.rowSub}>{formatDate(item.updatedAt)}</Text>
+          {attente ? (
+            <View style={styles.attente}>
+              <View
+                style={[
+                  styles.attentePoint,
+                  attente.sorte === 'nouveau' && styles.attentePointNeuf,
+                ]}
+              />
+              <Text style={styles.attenteTexte} numberOfLines={1}>
+                {attente.texte}
+              </Text>
+            </View>
+          ) : (
+            <Text style={styles.rowSub}>{formatDate(item.updatedAt)}</Text>
+          )}
           <Text style={styles.rowDetails}>{decoupageDe(item).details}</Text>
         </View>
       </TouchableOpacity>
@@ -679,49 +696,24 @@ export function LibraryScreen() {
   const folders = useScanStore((s) => s.folders);
   const setScreen = useScanStore((s) => s.setScreen);
   const openSave = useScanStore((s) => s.openSave);
-  const dirty = useScanStore((s) => s.dirty);
-  const currentSaveId = useScanStore((s) => s.currentSaveId);
-  const commitCurrent = useScanStore((s) => s.commitCurrent);
 
   /*
-    OUVRIR UN AUTRE PLAN NE JETTE PAS CELUI QU'ON TIENT.
+    OUVRIR UN AUTRE PLAN NE JETTE PAS CELUI QU'ON TIENT — et ne demande rien.
 
-    Trouvé en enchaînant les écrans comme on le fait sur un chantier : on
-    rouvre un relevé, on ajoute un WC, on revient ici prendre un autre
-    dossier — et le WC n'a jamais existé.
-
-    C'est le défaut de la flèche de retour, corrigé ailleurs, qui revenait
-    par ce chemin-ci : une garde à un seul endroit ne suffit pas quand deux
-    gestes mènent dehors. La question est donc la même, avec les mêmes
-    issues et dans le même ordre — enregistrer d'abord, jeter ensuite,
-    rester enfin.
-
-    Elle ne se pose pas quand il n'y a rien à perdre, ni quand on rouvre le
-    plan qu'on tient déjà : une confirmation inutile est une confirmation
-    qu'on apprend à balayer sans lire.
+    Ce qui n'était pas enregistré se range (voir `ui/miseDeCote`) : rouvrir
+    le même plan reprend ce qu'on y avait laissé, en ouvrir un autre laisse
+    le premier dans la liste, avec son attente.
   */
-  const ouvrirLeScan = (id: string) =>
-    garderLeTravail({
-      /*
-        LA QUESTION SE POSE AU MILIEU, dans sa propre page.
+  const ouvrirLeScan = (id: string) => {
+    rangerLeTravail();
+    openSave(id);
+  };
 
-        Elle vivait dans la feuille commune, qui monte du bas : c'est ce
-        qu'on veut d'un menu, qu'on ouvre par curiosité et qu'on referme
-        sans conséquence. Ici, l'appui suivant décide du sort du travail —
-        relevé du patron : « le pop-up doit être centré et doit afficher une
-        belle page ». Elle garde le MÊME contenu (`garderLeTravail` décide
-        de tout), seul son écrin change.
-      */
-      demander: setAlerteSortie,
-      // Rouvrir le plan qu'on tient déjà ne perd rien : on est dessus.
-      dirty: dirty && id !== currentSaveId,
-      message:
-        'Le plan ouvert a été modifié. Ce que vous venez d’y faire sera ' +
-        'perdu si vous en ouvrez un autre.',
-      jeter: 'Ouvrir sans enregistrer',
-      enregistrer: commitCurrent,
-      partir: () => openSave(id),
-    });
+  const enregistrerRetouche = useScanStore((s) => s.enregistrerRetouche);
+  const jeterRetouche = useScanStore((s) => s.jeterRetouche);
+  const garderLePlan = useScanStore((s) => s.garderLePlan);
+  // Les comptes à rebours avancent, et ce qui a passé son heure s'en va.
+  const maintenant = useMaintenant();
 
   const deleteSave = useScanStore((s) => s.deleteSave);
   const addFolder = useScanStore((s) => s.addFolder);
@@ -934,15 +926,6 @@ export function LibraryScreen() {
   // Nos fenêtres, pas celles du système : même typographie, mêmes rayons,
   // même bleu — et une icône par choix, qui se lit plus vite qu'un mot.
   const [menu, setMenu] = useState<ActionData | null>(null);
-  /**
-   * L'ALERTE DE SORTIE — la seule fenêtre de l'app posée au MILIEU.
-   *
-   * Elle porte la même donnée qu'une feuille (`garderLeTravail` décide du
-   * titre, de la phrase et de l'ordre des deux issues) ; c'est son écrin
-   * qui diffère, parce que ce qui se décide là ne se balaie pas d'un revers
-   * de pouce.
-   */
-  const [alerteSortie, setAlerteSortie] = useState<ActionData | null>(null);
   const [prompt, setPrompt] = useState<PromptData | null>(null);
 
   /*
@@ -1002,6 +985,33 @@ export function LibraryScreen() {
       subtitle: [item.client, item.address].filter(Boolean).join(' · ') ||
         undefined,
       actions: [
+        ...(item.supprimeLe
+          ? [
+              {
+                label: 'Enregistrer le plan',
+                hint: 'Il reste dans vos plans, sans autosuppression.',
+                icon: 'sauver' as const,
+                onPress: () => garderLePlan(item.id),
+              },
+            ]
+          : []),
+        ...(item.retouche
+          ? [
+              {
+                label: 'Enregistrer les modifications',
+                hint: 'Elles remplacent la version enregistrée.',
+                icon: 'sauver' as const,
+                onPress: () => enregistrerRetouche(item.id),
+              },
+              {
+                label: 'Jeter les modifications',
+                hint: 'Le plan reste tel qu’il a été enregistré.',
+                icon: 'supprimer' as const,
+                danger: true,
+                onPress: () => jeterRetouche(item.id),
+              },
+            ]
+          : []),
         {
           label: 'Renommer',
           icon: 'renommer',
@@ -1311,6 +1321,7 @@ export function LibraryScreen() {
             <ScanRow
               key={s.id}
               item={s}
+              maintenant={maintenant}
               pris={dragId === s.id}
               fige={dragId !== null}
               lift={lift}
@@ -1336,10 +1347,6 @@ export function LibraryScreen() {
       )}
 
       <ActionSheet data={menu} onClose={() => setMenu(null)} />
-      <AlerteSortie
-        data={alerteSortie}
-        onClose={() => setAlerteSortie(null)}
-      />
       <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
 
     </View>
@@ -1552,6 +1559,21 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   rowTexts: { flex: 1, marginRight: 10 },
   rowName: { color: c.ink, fontSize: 16, fontWeight: '700' },
   rowSub: { color: c.inkFaint, fontSize: 12, marginTop: 2 },
+  /*
+    CE QUI ATTEND D'ÊTRE ENREGISTRÉ se dit à la place de la date, en ambre :
+    assez pour qu'on le voie en parcourant la liste, pas assez pour faire
+    croire à une erreur. Le point est creux pour un plan qui n'a jamais été
+    enregistré — il n'existe encore qu'à moitié —, plein pour des
+    modifications qui attendent.
+  */
+  attente: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
+  attentePoint: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: c.amber },
+  attentePointNeuf: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.6,
+    borderColor: c.amber,
+  },
+  attenteTexte: { flexShrink: 1, color: c.amber, fontSize: 12, fontWeight: '600' },
   rowDetails: { color: c.inkSoft, fontSize: 13, marginTop: 4, fontWeight: '600' },
   headerRowOver: {
     backgroundColor: c.surfaceSunken,

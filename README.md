@@ -14285,6 +14285,79 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le travail non enregistré se range, l'invité n'est plus Pro
+
+Relevés du patron : « le mode invité est en Pro, et donc pas d'intérêt de
+faire un compte » ; « lorsqu'on quitte un plan pas enregistré, on ne doit
+plus voir le message pop-up qui embête » ; « lorsqu'on commence un scan et
+qu'on le quitte, ça mène directement au plan témoin » ; « le bouton devis ne
+doit pas être visible en mode non électricien, idem pour les normes » ;
+« les numéros de mur sur le plan PDF sont trop imposants ».
+
+**Sans compte, pas de Pro** (`store/accountStore.ts`). L'App Store répond
+pour l'identifiant Apple du téléphone, et `rafraichirEcheance` passait
+l'application en Pro sans regarder qui était connecté ; la déconnexion
+laissait le Pro en place. Désormais : l'échéance ne se lit que pour un
+compte, le démarrage remet un invité à « gratuit » (même si une ancienne
+version l'avait écrit Pro), la déconnexion emporte le Pro, la connexion relit
+l'abonnement. Un invité qui veut le Pro (page Pro, surprise, achat) est mené
+à la création du compte : « Le Pro appartient à votre compte ».
+
+**Plus de fenêtre en quittant un plan** (`ui/miseDeCote.ts`, `scanStore` :
+`mettreDeCote`, `purgerLesEchus`, `enregistrerRetouche`, `jeterRetouche`,
+`garderLePlan`). La garde « Modifications non enregistrées » et sa fenêtre
+centrée sont retirées ; les trois sorties (retour, « Nouveau scan », un autre
+plan ouvert depuis la bibliothèque) rangent le travail :
+
+- un **plan neuf**, jamais enregistré, entre dans « Mes plans » avec
+  `supprimeLe` = maintenant + 12 h. Sa ligne dit « Non enregistré ·
+  autosuppression dans 11 h 52 » (point ambré creux) ; il se rouvre « à
+  enregistrer », s'enregistre d'un appui (« … » → Enregistrer le plan), et
+  s'efface seul à l'échéance — jamais sous les yeux de qui l'a ouvert. Il ne
+  compte comme plan créé, et ne monte au compte en ligne, qu'une fois
+  enregistré ;
+- les **modifications d'un plan enregistré** attendent à côté de lui
+  (`retouche`), le plan enregistré ne bouge pas. Une pastille passe en bas de
+  l'écran — « Modifications gardées 12 h : enregistrez-les pour ne pas les
+  perdre » — avec un bouton **Enregistrer** ; la ligne du plan porte
+  « Modifications non enregistrées · perdues dans 11 h » (point ambré plein),
+  et son « … » propose de les enregistrer ou de les jeter. Rouvrir le plan les
+  reprend ; « Abandonner les modifications » les oublie ;
+- l'accueil montre les mêmes comptes à rebours ; ils avancent à la minute,
+  et le ménage se fait au même rythme et au démarrage.
+
+La pastille d'astuce (`AstuceHote`) sait porter un geste (`action`) : elle
+reste alors 6,5 s au lieu de 4.
+
+**Abandonner un scan ramène à l'accueil** (`native/useRoomScan.ts`). La
+sortie revenait au plan « dès qu'il restait des murs dans le magasin » — et
+il en reste presque toujours : l'appartement témoin, le plan regardé avant.
+Seuls « Scanner une pièce » et « Scanner un étage » partent d'un plan, et ils
+le disent (`complementEnCours`, `etageEnCours`) ; tout autre scan abandonné
+revient au menu.
+
+**Normes électriques hors du mode Électricité.** La pastille Devis et le
+Contrôle étaient déjà retirés du plan sans le mode ; la page d'un mur, elle,
+comptait encore ses socles et ses « points à revoir ». Elle se tait
+désormais sans le mode (`WallElevation`, `useModeElec`).
+
+**Le numéro des murs au PDF** (`export/pdf.ts`, `placeDuNumero`). Plus de
+pastille blanche cerclée : un chiffre maigre, blanc, écrit en réserve dans le
+poché, à la taille que l'épaisseur du mur permet (6 pt au plus). Quand le mur
+est trop mince à l'échelle de la feuille, il se pose juste à côté, côté
+logement, en gris. La légende montre un bout de mur et son chiffre en
+réserve.
+
+Bancs : `misedecote.test.tsx` (plan neuf gardé 12 h sans compter, rouvert,
+enregistré, purgé à l'échéance mais jamais à l'écran, absent du compte en
+ligne ; retouche gardée à côté, reprise, enregistrée, jetée, échue ; pastille
+et libellés de la liste), `compte.test.ts` (« sans compte, pas de Pro »),
+`abandonscan.test.tsx` (scan neuf après l'appartement témoin → accueil),
+`normesparticulier.test.tsx` (contrôle sans constat électrique, page du mur
+muette sans le mode), `gardemaison`, `quitterplan`, `ouvrirplan` (plus de
+fenêtre, travail rangé) ; `alertesortie` et `gardetravail` retirés avec ce
+qu'ils tenaient.
+
 ## Le plan électrique en plan d'architecte, le film plus vif, les meubles cernés
 
 Relevés du patron : « fais pareil pour le plan électrique, comme le plan

@@ -97,28 +97,15 @@ describe('quitter un plan modifié', () => {
     return t;
   }
 
-  it('demande dans NOTRE feuille, pas dans celle d’iOS', () => {
+  /*
+    PLUS DE FENÊTRE EN PARTANT — relevé du patron : « on ne doit plus voir
+    le message pop-up qui embête ». Le plan neuf se range dans la liste,
+    pour douze heures (voir `ui/miseDeCote`).
+  */
+  it('ne demande plus rien : le plan neuf se range dans la liste', () => {
     const alerte = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const t = ecran();
-    const retour = t.root
-      .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Retour')!;
-    act(() => retour.props.onPress());
-    act(() => jest.advanceTimersByTime(400));
-    expect(alerte).not.toHaveBeenCalled();
-    const vu = mots(t);
-    expect(vu).toMatch(/Modifications non enregistrées/);
-    // Les trois issues, dans l'ordre : enregistrer d'abord.
-    expect(vu).toMatch(/Enregistrer/);
-    expect(vu).toMatch(/Quitter sans enregistrer/);
-  });
-
-  it('et n’ouvre rien quand il n’y a rien à perdre', () => {
-    const alerte = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-    const t = ecran();
-    act(() => {
-      useScanStore.setState({ dirty: false });
-    });
+    const avant = useScanStore.getState().saves.length;
     const retour = t.root
       .findAllByType(TouchableOpacity)
       .find((n) => n.props.accessibilityLabel === 'Retour')!;
@@ -126,6 +113,27 @@ describe('quitter un plan modifié', () => {
     act(() => jest.advanceTimersByTime(400));
     expect(alerte).not.toHaveBeenCalled();
     expect(mots(t)).not.toMatch(/Quitter sans enregistrer/);
+    const st = useScanStore.getState();
+    expect(st.screen).not.toBe('result');
+    expect(st.saves.length).toBe(avant + 1);
+    expect(st.saves[0].name).toBe('Chantier');
+    expect(st.saves[0].supprimeLe).toBeGreaterThan(Date.now());
+  });
+
+  it('et ne range rien quand il n’y a rien à perdre', () => {
+    const alerte = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const t = ecran();
+    act(() => {
+      useScanStore.setState({ dirty: false });
+    });
+    const avant = useScanStore.getState().saves.length;
+    const retour = t.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Retour')!;
+    act(() => retour.props.onPress());
+    act(() => jest.advanceTimersByTime(400));
+    expect(alerte).not.toHaveBeenCalled();
+    expect(useScanStore.getState().saves.length).toBe(avant);
   });
 });
 

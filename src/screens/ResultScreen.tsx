@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
-import { garderLeTravail } from '../ui/gardeTravail';
-import { AlerteSortie } from '../components/AlerteSortie';
+import { rangerLeTravail } from '../ui/miseDeCote';
 import { ChoixOuverture } from '../components/ChoixOuverture';
 import {
   ALLEGES_COURANTES,
@@ -1261,15 +1260,6 @@ export function ResultScreen() {
   const [pendingKind, setPendingKind] = useState<FixtureKind | null>(null);
   // Nos fenêtres : une pour les choix, une pour les valeurs à saisir.
   const [menu, setMenu] = useState<ActionData | null>(null);
-  /**
-   * L'ALERTE DE SORTIE — la seule fenêtre de l'app posée au MILIEU.
-   *
-   * Elle porte la même donnée qu'une feuille (`garderLeTravail` décide du
-   * titre, de la phrase et de l'ordre des deux issues) ; c'est son écrin
-   * qui diffère, parce que ce qui se décide là ne se balaie pas d'un revers
-   * de pouce.
-   */
-  const [alerteSortie, setAlerteSortie] = useState<ActionData | null>(null);
   const [prompt, setPrompt] = useState<PromptData | null>(null);
   // Catalogue de mobilier : ouvert par le « + » posé à côté du calque meubles.
   const [catalogue, setCatalogue] = useState(false);
@@ -1741,8 +1731,14 @@ export function ResultScreen() {
    * moment-là. Aujourd'hui et hier se nomment, au-delà on date.
    */
   const majTexte = (() => {
-    if (dirty) return 'Modifications non enregistrées';
     const save = saves.find((s) => s.id === currentSaveId);
+    // Un plan qui n'a jamais été enregistré n'a pas de « modifications » :
+    // c'est lui tout entier qui attend.
+    if (dirty) {
+      return !save || save.supprimeLe
+        ? 'Plan non enregistré'
+        : 'Modifications non enregistrées';
+    }
     if (!save) return null;
     const d = new Date(save.updatedAt);
     const heure = `${String(d.getHours()).padStart(2, '0')}h${String(
@@ -2166,78 +2162,28 @@ export function ResultScreen() {
   );
 
   /*
-    ON NE QUITTE PAS UN PLAN MODIFIÉ SANS LE SAVOIR.
+    ON QUITTE UN PLAN SANS QU'IL NOUS RETIENNE — et sans rien perdre.
 
-    Trouvé en simulant un utilisateur : on ouvre un plan enregistré, on
-    ajoute une chambre, on touche la flèche de retour — et tout est perdu,
-    sans un mot. L'en-tête affiche bien « Modifications non enregistrées »,
-    mais personne ne relit l'en-tête au moment de sortir : on regarde le
-    bouton qu'on touche.
-
-    Le brouillon des trente secondes ne rattrape pas ce cas : il ne se relit
-    qu'au REDÉMARRAGE de l'application, et l'on vient seulement de revenir à
-    la bibliothèque.
-
-    La sortie propose donc d'abord ce que l'utilisateur veut neuf fois sur
-    dix — enregistrer — et garde « Quitter sans enregistrer », parce qu'on
-    peut vouloir jeter un essai. Quand il n'y a rien à perdre, elle ne
-    demande rien : une confirmation inutile est une confirmation qu'on
-    apprend à balayer sans lire.
+    Il y a eu une fenêtre « Modifications non enregistrées » à chaque sortie,
+    avec ses trois issues. Relevé du patron : « on ne doit plus voir le
+    message pop-up qui embête ». Le travail se RANGE à la place : un plan
+    neuf entre dans la liste pour douze heures, les modifications d'un plan
+    enregistré attendent à côté de lui — voir `ui/miseDeCote`.
   */
-  const sortirDuPlan = () =>
-    garderLeTravail({
-      /*
-        LA QUESTION SE POSE AU MILIEU, dans sa propre page.
-
-        Elle vivait dans la feuille commune, qui monte du bas : c'est ce
-        qu'on veut d'un menu, qu'on ouvre par curiosité et qu'on referme
-        sans conséquence. Ici, l'appui suivant décide du sort du travail —
-        relevé du patron : « le pop-up doit être centré et doit afficher une
-        belle page ». Elle garde le MÊME contenu (`garderLeTravail` décide
-        de tout), seul son écrin change.
-      */
-      demander: setAlerteSortie,
-      dirty,
-      message:
-        'Ce que vous venez de faire sur ce plan sera perdu si vous partez.',
-      jeter: 'Quitter sans enregistrer',
-      enregistrer: commitCurrent,
-      partir: () => setScreen(resultOrigin === 'library' ? 'library' : 'home'),
-    });
+  const sortirDuPlan = () => {
+    rangerLeTravail();
+    setScreen(resultOrigin === 'library' ? 'library' : 'home');
+  };
 
   /*
-    REPARTIR DE ZÉRO EST LE PLUS DESTRUCTEUR DES TROIS CHEMINS.
-
-    Après la flèche de retour et l'ouverture d'un plan depuis la
-    bibliothèque, voici le troisième geste qui mène dehors — et le pire :
-    « Nouveau scan » efface AUSSI le brouillon des trente secondes, qui
-    rattrape d'ordinaire une application tuée. Sans garde ici, le travail
-    ne se retrouve nulle part.
-
-    Même question, mêmes issues, même ordre : trois gestes mènent dehors,
-    trois gardes les couvrent.
+    REPARTIR DE ZÉRO range aussi ce qu'on quitte : « Nouveau scan » efface
+    le brouillon des trente secondes, et sans ce rangement le travail ne se
+    retrouverait nulle part.
   */
-  const repartirDeZero = () =>
-    garderLeTravail({
-      /*
-        LA QUESTION SE POSE AU MILIEU, dans sa propre page.
-
-        Elle vivait dans la feuille commune, qui monte du bas : c'est ce
-        qu'on veut d'un menu, qu'on ouvre par curiosité et qu'on referme
-        sans conséquence. Ici, l'appui suivant décide du sort du travail —
-        relevé du patron : « le pop-up doit être centré et doit afficher une
-        belle page ». Elle garde le MÊME contenu (`garderLeTravail` décide
-        de tout), seul son écrin change.
-      */
-      demander: setAlerteSortie,
-      dirty,
-      message:
-        'Repartir de zéro efface le plan à l’écran, et ce qui n’a pas été ' +
-        'enregistré ne se retrouvera nulle part.',
-      jeter: 'Repartir sans enregistrer',
-      enregistrer: commitCurrent,
-      partir: reset,
-    });
+  const repartirDeZero = () => {
+    rangerLeTravail();
+    reset();
+  };
 
   /** Amène sous les yeux l'élément visé par un constat. */
   const goToIssue = (issue: Constat) => {
@@ -5468,10 +5414,6 @@ export function ResultScreen() {
           setSelectedWallId(id);
           haptic('succes');
         }}
-      />
-      <AlerteSortie
-        data={alerteSortie}
-        onClose={() => setAlerteSortie(null)}
       />
       <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
 

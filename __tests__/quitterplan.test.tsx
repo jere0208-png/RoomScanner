@@ -23,7 +23,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { useScanStore } from '../src/store/scanStore';
@@ -69,15 +69,13 @@ const retour = (t: TestRenderer.ReactTestRenderer) =>
   )[0];
 
 describe('quitter un plan modifié', () => {
-  it('demande confirmation, et ne quitte pas tout seul', () => {
+  it('ne demande plus rien, et garde les modifications à côté du plan', () => {
     /*
-      LA QUESTION SE POSE DANS NOTRE FEUILLE, plus dans l'alerte du système.
-
-      Relevé du patron, capture à l'appui : « la popup des modifications non
-      enregistrées est trop basique, donne-lui notre identité ». Ce qui
-      change est le SUPPORT, pas la règle — mêmes issues, même ordre, même
-      silence quand il n'y a rien à perdre. Le banc lit donc les mots de la
-      feuille au lieu des boutons de l'alerte.
+      PLUS DE FENÊTRE EN PARTANT — relevé du patron : « on ne doit plus voir
+      le message pop-up qui embête ». Les modifications d'un plan enregistré
+      sont gardées à côté de lui (voir `ui/miseDeCote`) : le plan enregistré
+      ne bouge pas, une pastille propose d'enregistrer, et rouvrir le plan
+      les reprend.
     */
     const alerte = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const t = planModifie();
@@ -87,24 +85,15 @@ describe('quitter un plan modifié', () => {
       jest.advanceTimersByTime(400);
     });
     expect(alerte).not.toHaveBeenCalled();
-    // L'écran n'a pas bougé : c'est la réponse qui décidera.
-    expect(st().screen).toBe('result');
-    const bouton = (mot: string) =>
-      t.root
-        .findAll(
-          (n) =>
-            typeof n.props?.onPress === 'function' &&
-            n.findAllByType(Text).some((x) => String(x.props.children) === mot),
-        )
-        .pop();
-    // Le premier choix ENREGISTRE : c'est ce qu'on veut neuf fois sur dix.
-    expect(bouton('Enregistrer')).toBeDefined();
-    act(() => bouton('Enregistrer')!.props.onPress());
-    act(() => {
-      jest.advanceTimersByTime(400);
-    });
-    expect(st().dirty).toBe(false);
-    expect(st().saves[0].rooms).toHaveLength(2);
+    // On est parti, sans qu'on nous retienne.
+    expect(st().screen).not.toBe('result');
+    // Le plan enregistré n'a qu'une pièce ; la seconde attend à côté.
+    expect(st().saves[0].rooms).toHaveLength(1);
+    expect(st().saves[0].retouche?.plan.rooms).toHaveLength(2);
+    // Et rouvrir le plan la reprend.
+    act(() => st().openSave(st().saves[0].id));
+    expect(st().rooms).toHaveLength(2);
+    expect(st().dirty).toBe(true);
     alerte.mockRestore();
   });
 

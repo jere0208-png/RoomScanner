@@ -95,10 +95,10 @@ describe('la légende explique le plan, pas seulement l’appareillage', () => {
     expect(lus).toContain('Fenêtre');
   });
 
-  it('et elle dit à quoi sert le rond numéroté d’un mur', () => {
+  it('et elle dit à quoi sert le numéro d’un mur', () => {
     /*
       C'est le renvoi vers la feuille d'élévation. Sans un mot d'explication,
-      ce sont des chiffres dans des ronds au milieu de la maçonnerie.
+      ce sont des chiffres au milieu de la maçonnerie.
     */
     const lus = dossier().join(' | ');
     expect(lus).toMatch(/Rep[èe]re de mur/);
