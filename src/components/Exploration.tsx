@@ -69,6 +69,7 @@ import {
 } from '../geometry/exploration';
 import { haptic, releaseHaptic } from '../ui/haptic';
 import { ombreBouton, radius, themedStyles, useTheme, type Palette } from '../theme';
+import { FondDeVerre, SUR_VERRE } from './Verre';
 
 /**
  * LE PAS — 1,65 m/s à fond de manette : celui de quelqu'un qui visite d'un
@@ -219,7 +220,8 @@ function MiniCarte({
   const g = cone(-1);
   const d = cone(1);
   return (
-    <View style={styles.carte} pointerEvents="none" accessibilityLabel="Plan">
+    <View style={[styles.carte, SUR_VERRE]} pointerEvents="none" accessibilityLabel="Plan">
+      <FondDeVerre rayon={radius.lg} ombre={styles.carte} />
       <Svg width={T} height={T}>
         {murs.map((m, i) => {
           const a = px(m.a);
@@ -813,7 +815,8 @@ export function Exploration({
             <View
               style={[styles.repere, styles.repereGauche, { bottom: marges.bottom + 34 }]}
               pointerEvents="none">
-              <View style={styles.repereRond}>
+              <View style={[styles.repereRond, SUR_VERRE]}>
+                <FondDeVerre rayon={26} ombre={styles.repereRond} />
                 <Svg width={22} height={22} viewBox="0 0 24 24">
                   <Path d={SOLAIRES.marcher} fill={teinte.blue} fillRule="evenodd" />
                 </Svg>
@@ -822,7 +825,8 @@ export function Exploration({
             <View
               style={[styles.repere, styles.repereDroit, { bottom: marges.bottom + 34 }]}
               pointerEvents="none">
-              <View style={styles.repereRond}>
+              <View style={[styles.repereRond, SUR_VERRE]}>
+                <FondDeVerre rayon={26} ombre={styles.repereRond} />
                 <Svg width={22} height={22} viewBox="0 0 24 24">
                   <Path d={SOLAIRES.pivoter} fill={teinte.blue} fillRule="evenodd" />
                 </Svg>
@@ -849,12 +853,13 @@ export function Exploration({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Terminer l’exploration"
-            style={({ pressed }) => [styles.terminer, pressed && styles.enfonce]}
+            style={({ pressed }) => [styles.terminer, SUR_VERRE, pressed && styles.enfonce]}
             hitSlop={10}
             onPress={() => {
               arreterTout();
               onClose();
             }}>
+            <FondDeVerre rayon={20} ombre={styles.terminer} />
             <Text style={styles.terminerTexte} numberOfLines={1}>
               Terminer
             </Text>
@@ -868,11 +873,14 @@ export function Exploration({
         */}
         {!aBouge && (
           <View style={[styles.consigne, { bottom: marges.bottom + 118 }]} pointerEvents="none">
-            <Text style={styles.consigneTexte}>
-              {inters.length > 0 && lampes.length > 0
-                ? 'Pouce gauche pour marcher · glissez à droite pour regarder · touchez un interrupteur pour allumer'
-                : 'Pouce gauche pour marcher · glissez à droite pour regarder'}
-            </Text>
+            <View style={[styles.consigneBulle, SUR_VERRE]}>
+              <FondDeVerre rayon={999} />
+              <Text style={styles.consigneTexte}>
+                {inters.length > 0 && lampes.length > 0
+                  ? 'Pouce gauche pour marcher · glissez à droite pour regarder · touchez un interrupteur pour allumer'
+                  : 'Pouce gauche pour marcher · glissez à droite pour regarder'}
+              </Text>
+            </View>
           </View>
         )}
 
@@ -916,16 +924,18 @@ const getStyles = themedStyles((c: Palette) =>
       right: 24,
       alignItems: 'center',
     },
+    /* La bulle porte le fond : le texte ne peint plus que ses lettres. */
+    consigneBulle: {
+      backgroundColor: c.surfaceVoile,
+      borderRadius: radius.pill,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
     consigneTexte: {
       color: c.ink,
       fontSize: 14,
       fontWeight: '600',
       textAlign: 'center',
-      backgroundColor: c.surfaceVoile,
-      overflow: 'hidden',
-      borderRadius: radius.pill,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
     },
     /* Les repères de verre au repos : petits, dans les coins, translucides. */
     repere: { position: 'absolute' },

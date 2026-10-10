@@ -43,7 +43,12 @@ export const CALAGE_NEUTRE: Calage = { dx: 0, dy: 0, k: 1 };
  * mur : elle n'est plus nulle part, et rien à l'écran ne dit comment la
  * ramener. On la garde donc à portée de doigt, toujours.
  */
-export const ECHELLE_MIN = 0.5;
+/*
+  JUSQU'AU CINQUIÈME — une photo redressée par le scan peut ne couvrir
+  qu'une PART du mur du plan, quand celui-ci réunit plusieurs pans relevés
+  (voir `geometry/photosAuto`) : elle se réduit alors à sa part exacte.
+*/
+export const ECHELLE_MIN = 0.2;
 export const ECHELLE_MAX = 4;
 /** Un mur et demi de débattement de chaque côté : de quoi caler, pas fuir. */
 export const DECALAGE_MAX = 1.5;

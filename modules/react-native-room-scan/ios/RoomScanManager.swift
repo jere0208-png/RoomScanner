@@ -159,6 +159,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     // de RoomPlan, l'un comme l'autre.
     RoomColorSampler.shared.attach(to: view.captureSession.arSession)
     RoomScanCompass.shared.attach(to: view.captureSession.arSession)
+    PhotographeDesMurs.shared.attach(to: view.captureSession.arSession)
     if pendingStart {
       pendingStart = false
       view.captureSession.run(configuration: configuration)
@@ -181,6 +182,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         releves.removeAll()
         ancresElec.removeAll()
         viderReperes()
+        // Les photos des murs suivent le relevé : un passage ajouté les garde.
+        PhotographeDesMurs.shared.reset()
       }
     }
     if additif { self.additif = true }
@@ -194,6 +197,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       if let view = self.captureView, view.window != nil {
         RoomColorSampler.shared.attach(to: view.captureSession.arSession)
         RoomScanCompass.shared.attach(to: view.captureSession.arSession)
+        PhotographeDesMurs.shared.attach(to: view.captureSession.arSession)
         view.captureSession.run(configuration: self.configuration)
       } else {
         self.pendingStart = true
@@ -368,6 +372,53 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   }
 
   /**
+   LE PLUS GRAND TROU DU CONTOUR — un mur qui manque, pendant qu'on peut
+   encore aller le balayer.
+
+   Proposé comme amélioration du scan : une pièce dont un pan n'a pas été vu
+   ressort OUVERTE — le plan doit la refermer à la main, en ligne droite, et
+   l'on ne sait plus ce qu'il y avait là (une porte ? un retour ?). Deux bouts
+   de mur LIBRES (rien à moins de trente centimètres) qui se font face à moins
+   de trois mètres et demi : c'est presque toujours le mur qui manque entre
+   eux. En mètres ; zéro quand tout est fermé.
+   */
+  static func trouDuContour(_ murs: [CapturedRoom.Surface]) -> Float {
+    let segs: [(SIMD2<Float>, SIMD2<Float>)] = murs.map { m in
+      let t = m.transform
+      let c = SIMD2<Float>(t.columns.3.x, t.columns.3.z)
+      var u = SIMD2<Float>(t.columns.0.x, t.columns.0.z)
+      u = simd_length(u) > 1e-5 ? simd_normalize(u) : SIMD2<Float>(1, 0)
+      let h = m.dimensions.x / 2
+      return (c - u * h, c + u * h)
+    }
+    func distance(_ p: SIMD2<Float>, _ s: (SIMD2<Float>, SIMD2<Float>)) -> Float {
+      let ab = s.1 - s.0
+      let l2 = simd_dot(ab, ab)
+      let t = l2 > 1e-6 ? max(0, min(1, simd_dot(p - s.0, ab) / l2)) : 0
+      return simd_distance(p, s.0 + ab * t)
+    }
+    var libres: [SIMD2<Float>] = []
+    for (i, s) in segs.enumerated() {
+      for p in [s.0, s.1] {
+        var touche = false
+        for (j, o) in segs.enumerated() where j != i && distance(p, o) < 0.3 {
+          touche = true
+          break
+        }
+        if !touche { libres.append(p) }
+      }
+    }
+    var pire: Float = 0
+    for i in 0..<libres.count {
+      for j in (i + 1)..<libres.count {
+        let d = simd_distance(libres[i], libres[j])
+        if d >= 0.3, d < 3.5 { pire = max(pire, d) }
+      }
+    }
+    return pire
+  }
+
+  /**
    LE MUR LE PLUS PROCHE d'un point, dans la pièce vue à l'instant.
 
    On mesure à la SURFACE, pas à son centre : un mur de quatre mètres a son
@@ -408,6 +459,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
 
   func pause() {
     RoomColorSampler.shared.detach()
+    PhotographeDesMurs.shared.detach()
     DispatchQueue.main.async {
       if #available(iOS 17.0, *) {
         // Garde la session ARKit chaude : la reprise relocalise
@@ -428,6 +480,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     // La session se fige : continuer à lire `currentFrame` ne ferait que
     // rejouer la dernière image et fausser les moyennes.
     RoomColorSampler.shared.detach()
+    PhotographeDesMurs.shared.detach()
     // Déclenche le post-traitement RoomPlan ; le résultat final
     // arrive dans captureView(didPresent:error:).
     DispatchQueue.main.async {
@@ -515,6 +568,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
               windows: structure.windows,
               openings: structure.openings,
               objets: structure.objects,
+              sections: Self.sectionsJSON(structure.sections),
               exporter: { url in
                 try structure.export(to: url, exportOptions: .parametric)
               },
@@ -537,8 +591,27 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       windows: room.windows,
       openings: room.openings,
       objets: room.objects,
+      sections: Self.sectionsDe(room),
       exporter: { url in try room.export(to: url, exportOptions: .parametric) },
     )
+  }
+
+  /// Les sections d'une pièce (iOS 17) : son type, et un point dedans.
+  static func sectionsDe(_ room: CapturedRoom) -> [[String: Any]] {
+    guard #available(iOS 17.0, *) else { return [] }
+    return sectionsJSON(room.sections)
+  }
+
+  @available(iOS 17.0, *)
+  static func sectionsJSON(_ sections: [CapturedRoom.Section]) -> [[String: Any]] {
+    sections.map { s in
+      [
+        "label": String(describing: s.label),
+        "x": s.center.x,
+        "y": s.center.y,
+        "z": s.center.z,
+      ]
+    }
   }
 
   /**
@@ -592,6 +665,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     windows: [CapturedRoom.Surface],
     openings: [CapturedRoom.Surface],
     objets: [CapturedRoom.Object],
+    sections: [[String: Any]] = [],
     exporter: (URL) throws -> Void,
   ) {
     do {
@@ -616,6 +690,14 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         // Combien de passages composent ce relevé : le JS s'en sert pour
         // dire « deux pièces réunies » plutôt que de laisser deviner.
         "passages": releves.count,
+        /*
+          CE QUE ROOMPLAN DIT DE CHAQUE PIÈCE (iOS 17) — cuisine, salle de
+          bains, chambre, séjour, salle à manger —, avec un point dedans. Le
+          JS ne nommait les pièces que d'après leurs meubles.
+        */
+        "sections": sections,
+        // Chaque mur, photographié de face et redressé (voir `PhotographeDesMurs`).
+        "photosMurs": PhotographeDesMurs.shared.livrer(),
       ]
       if let floor = RoomColorSampler.shared.floorPayload() {
         payload["floor"] = floor
@@ -630,6 +712,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         payload["maillage"] = maillage
       }
       RoomColorSampler.shared.detach()
+    PhotographeDesMurs.shared.detach()
       RoomScanCompass.shared.detach()
       stopResolver?(payload)
     } catch {
@@ -644,6 +727,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     // Le releveur de couleurs a besoin de la géométrie la plus fraîche
     // possible : on la lui passe à chaque mise à jour, sans throttle.
     RoomColorSampler.shared.update(room: room)
+    PhotographeDesMurs.shared.update(room: room)
     // C'est elle qui nommera le mur visé à la prochaine pose.
     vueCourante = room
     /*
@@ -663,7 +747,12 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       if case .high = s.confidence { return false }
       return true
     }.count
-    let apercu = [room.walls.count, room.objects.count, room.doors.count, room.windows.count, douteux]
+    // Le plus grand trou du contour, au centimètre (voir `trouDuContour`).
+    let trou = Self.trouDuContour(room.walls)
+    let apercu = [
+      room.walls.count, room.objects.count, room.doors.count, room.windows.count, douteux,
+      Int((trou * 100).rounded()),
+    ]
     guard apercu != dernierApercu else { return }
     dernierApercu = apercu
     lastLiveEmit = Date()
@@ -673,6 +762,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       "doorCount": room.doors.count,
       "windowCount": room.windows.count,
       "mursDouteux": douteux,
+      "trouContour": trou,
     ])
   }
 

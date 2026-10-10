@@ -23,6 +23,7 @@ import {
 import Svg, { Path, Rect } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
 import { ombreBouton, themedStyles, useTheme, type Palette } from '../theme';
+import { FondDeVerre, SUR_VERRE } from './Verre';
 
 export type ToolIcon =
   /* La nuit de la maquette : on éteint pour voir les lumières s'allumer. */
@@ -240,7 +241,9 @@ export function ToolPill({
   return (
     <View style={styles.toolCell}>
       <TouchableOpacity
-        style={[styles.toolPill, plein && styles.toolPillActive]}
+        /* Au repos, du verre : la pastille flotte sur le plan, on le devine
+           dessous. Allumée, elle reste d'un bleu plein — c'est un état. */
+        style={[styles.toolPill, plein ? styles.toolPillActive : SUR_VERRE]}
         accessibilityLabel={label}
         /*
           ET CE QUI EST ALLUMÉ SE DIT.
@@ -264,6 +267,7 @@ export function ToolPill({
          */
         hitSlop={{ top: 4, bottom: 4, left: 6, right: 6 }}
         onPress={onPress}>
+        {!plein && <FondDeVerre rayon={14} ombre={styles.toolPill} />}
         {halo && active && (
           <View pointerEvents="none" style={styles.toolHalo}>
             {/* Le contour épouse exactement la pastille : un anneau posé

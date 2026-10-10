@@ -18,6 +18,7 @@ import { useRepetition } from './ObjectBar';
 import { SOLAIRES } from '../ui/solaires';
 import { DEBORD_DOIGT } from '../ui/bandeau';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
+import { FondDeVerre, SUR_VERRE } from './Verre';
 
 /** Un pas de rotation : un demi-degré, en radians. */
 export const PAS_ROTATION = (0.5 * Math.PI) / 180;
@@ -77,7 +78,8 @@ export function RecalageBar({
     <Bouton key={nom} nom={nom} d={d} couleur={c.ink} miroir={miroir} style={s.btn} onPas={f} />
   );
   return (
-    <View style={s.barre}>
+    <View style={[s.barre, SUR_VERRE]}>
+      <FondDeVerre rayon={radius.md} ombre={s.barre} />
       <View style={s.entete}>
         <Text style={s.texte} numberOfLines={2}>
           {texte}

@@ -14285,6 +14285,127 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le scan voit mieux ; le menu s'ouvre en bulle de verre ; le verre dans toute l'app
+
+Relevés du patron : « trouve encore des améliorations natives, en améliorant
+le scan en premier temps et ce qu'il détecte ; on ne veut pas surcharger
+l'app d'éléments mais la rendre très qualitative, qui justifiera un
+abonnement » ; puis « à la sélection d'un élément du plan 2D, le menu doit
+s'ouvrir telle une bulle Apple, en verre ; donne quand même une touche unique,
+comme un écho de goutte d'eau rapide autour du menu à l'ouverture » ; enfin
+« pour la cohérence, mets ce léger effet transparent glass là où tu le juges
+nécessaire, comme sur les quatre cartes de l'accueil — agis comme un
+professionnel investi, pour ne pas perturber l'utilisateur ».
+
+**Le scan voit mieux — trois choses, et pas un bouton de plus.**
+
+- **Le type de chaque pièce vient de RoomPlan** (`furniture.ts` :
+  `kindFromRoomPlan`, `deduireLaPiece` ; natif : `sectionsDe`,
+  `structure.sections` sous iOS 17). RoomPlan classe lui-même cuisine, salle
+  de bains, chambre, séjour, salle à manger d'après tout ce qu'il a vu, pas
+  seulement les meubles détourés : une cuisine sans réfrigérateur relevé reste
+  une cuisine. Il passe avant le mobilier ; les WC, que RoomPlan ne connaît
+  pas, restent des WC quand le mobilier ne montre qu'une cuvette. Le type
+  décide du nom ET des règles NF C 15-100 appliquées, et il survit aux
+  recalculs du plan.
+- **Chaque mur est photographié de face et redressé** pendant le scan
+  (`RoomScanPhotoMur.swift`, `geometry/photosAuto.ts`). Deux fois par seconde,
+  sur une file à part, le natif note la vue de chaque mur (de face, entier,
+  pas masqué, assez près) et garde la meilleure ; à la fin, il la redresse
+  (`CIPerspectiveCorrection`) au rapport exact du mur. Le plan la rattache à
+  son mur et à sa face, calée au centimètre : l'élévation du mur s'ouvre
+  sur sa vraie photo (« Photo du scan, redressée à l'échelle du mur »), sans
+  punaise sur le plan. Recadrée à la main, l'élévation ne la dit plus « à
+  l'échelle » ; un scan complémentaire refait les photos automatiques (la
+  fusion a pu recoudre les murs), un étage ajoute les siennes.
+- **« Il manque un mur »** (`trouDuContour` natif, `ScanScreen.terminer`).
+  Deux bouts de mur libres qui se font face, entre 30 cm et 3,5 m : au moment
+  de terminer — pas pendant qu'on balaie —, une alerte dit la taille du trou
+  et propose « Continuer le scan » ou « Terminer quand même ». Contour fermé,
+  ou moins de trois murs : on termine sans rien demander.
+
+**La bulle du menu** (`StripBar.CarteDuMenu`). Le menu d'un élément choisi
+sur le plan 2D — mur, menuiserie, note, ligne de spots, pièce, meuble,
+appareil de plafond — est maintenant une bulle de verre : le plan reste
+visible, flouté, derrière elle. Elle naît un rien plus petite et plus bas, et
+se pose d'un ressort court. **L'écho** : deux anneaux bleus partent de son
+bord et s'éloignent de `ECHO_PX` (18 points) en s'effaçant, l'un après
+l'autre, comme les ronds d'une goutte — une demi-seconde, puis ils quittent
+l'arbre. Chaque élément a sa bulle (une clé par sélection dans
+`ResultScreen`) : l'écho repart à chaque nouveau choix. Mouvement réduit :
+ni ressort ni écho.
+
+**Le verre dans toute l'app — une seule matière, une seule règle**
+(`components/Verre.tsx`, natif `RoomScanVerre.swift`).
+
+Le verre avait été retiré deux fois (voir « La passe de style » et « Plus rien
+de gris ») : « les boutons grisés », « le contour de faible qualité qui
+présente des pixels », « le bouton plus petit que le texte ». Il revient à la
+demande du patron, avec ces trois causes réglées à la source :
+
+- **Jamais gris.** Le matériau seul prend la couleur de ce qu'il couvre : sur
+  la page gris clair, un bouton devenait gris clair, la couleur d'un bouton
+  éteint. Le voile est maintenant dense — blanc à 70 % (`VOILE`) pour les
+  boutons, 55 % pour la bulle du menu, qu'on regarde : le verre reste un
+  blanc net, qui laisse passer un soupçon de ce qu'il couvre.
+- **Aucun filet dessiné par React Native.** Le liseré est celui de la couche
+  native, vectoriel, d'un pixel physique.
+- **La forme est celle de l'élément.** `FondDeVerre` se pose en premier
+  enfant et remplit l'élément, quelle que soit sa taille : c'est le bouton
+  qui fait sa taille, son mot ne peut plus en sortir. Il garde SON ombre
+  (`ombre` : le style de l'élément, que `SUR_VERRE` lui a retirée), dessinée
+  par le natif sur la forme — la même que quand il était plein. Une pilule
+  (rayon 999) se borne à sa demi-hauteur.
+
+La matière est celle d'iOS (`systemUltraThinMaterial`, qui devient opaque
+d'elle-même si l'utilisateur réduit la transparence), avec un reflet en haut
+qui s'éteint avant le milieu.
+
+- **La règle : le verre est pour ce qui FLOTTE** sur un contenu qu'on continue
+  de regarder. Donc en verre : la bulle du menu ; les pastilles d'outils au
+  repos (allumées, elles restent d'un bleu plein — c'est un état) ; dans la
+  rangée du coin, travaux, étage et 2D/3D (« Explorer » reste bleu plein,
+  c'est l'invitation) ; la pastille d'attente de pose ; la barre de recalage
+  d'un étage ; dans la visite, la mini-carte, « Terminer », les repères et la
+  consigne ; sur la caméra du scan, en **verre fumé** dans les deux thèmes,
+  les compteurs, la phrase du viseur, le rail des produits, « posés »,
+  « Poser », la croix, la torche (éteinte) et la pause.
+- **Restent pleins, exprès** : le prix et le contrôle, dont l'anneau de
+  couleur EST le message ; les pastilles d'avertissement (ambre) et
+  « Terminer » du scan (bleu) — ce sont des signaux.
+- **Les quatre tuiles de l'accueil** : du verre TEINTÉ de leur couleur (à
+  75 % : on les reconnaît comme avant), posé sur la lumière du moulinet
+  (`HALOS_TUILES`) — sous chaque tuile, une tache de sa couleur, plus
+  franche, vers son coin extérieur, que le verre adoucit en dégradé. Un verre
+  sur un fond uni ne montrerait rien. Les taches s'éteignent avant les bords.
+- **Restent pleins** : ce qui se LIT longtemps — les feuilles, les listes de
+  plans, le devis, les fiches. Le verre derrière un paragraphe se paie en
+  lisibilité.
+- **Sans le natif** (Android, bancs d'essai) : rien ne change, chaque élément
+  garde son fond plein ; pas de halo sous les tuiles.
+
+Bancs : `scanvoitmieux.test.ts` (types RoomPlan, WC, photos rattachées et
+calées, face, remplacement au scan complémentaire, décalage d'étage) ;
+`murmanquant.test.tsx` (l'alerte, sa taille, continuer / terminer quand même,
+contour fermé) ; `bulleecho.test.tsx` (la bulle, les deux anneaux qui partent
+puis s'en vont, l'écho à chaque sélection, mouvement réduit, repli sans
+natif) ; `verreapp.test.tsx` (natif présent : une seule matière, voile blanc
+dense, pilule bornée, verre fumé à la demande, la bulle et son ombre,
+pastille au repos / allumée avec l'ombre d'un bouton, prix et contrôle
+pleins, les quatre tuiles teintées sur leur halo, tout le verre du scan
+fumé) ; `passestyle.test.tsx` (la règle « plus de verre » devient « le verre
+revient sans ce qui l'avait fait retirer » : un seul composant parle au
+natif, voile ≥ 0,65, aucun filet React Native, « Terminer » fait toujours sa
+taille).
+
+**À vérifier sur l'iPhone** : que rien ne paraisse gris — pastilles et
+bulle doivent rester d'un blanc net sur la page claire ; la lisibilité des
+tuiles et des pastilles en clair comme en sombre ; le verre fumé du scan sur une pièce très claire ; la
+fluidité du plan avec les pastilles en verre ; le type des pièces après un
+scan de cuisine ou de salle de bains ; l'élévation d'un mur juste après le
+scan (photo redressée) ; l'alerte « Il manque un mur » en terminant devant un
+pan non balayé.
+
 ## La pose au scan en 3D, la lumière dans la visite, la pose et la chute de tension au devis
 
 Relevés du patron : « améliore considérablement l'app avec des idées que tu

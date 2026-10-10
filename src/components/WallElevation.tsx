@@ -854,7 +854,11 @@ export function WallElevation({
     Un simple filtre, pas un `useMemo` : nous sommes ici après le retour
     anticipé du mur introuvable, et un hook ne se place pas là.
   */
-  const mesPhotos = photos.filter(p => p.wallId === wallId);
+  /* Une photo redressée par le scan ne montre qu'UNE face : celle qu'on
+     regarde, ou rien. */
+  const mesPhotos = photos.filter(
+    p => p.wallId === wallId && (p.side === undefined || p.side === side),
+  );
   /*
     LA PHOTO DU CALQUE : LA DERNIÈRE PRISE SUR CE MUR.
 
@@ -2133,7 +2137,9 @@ export function WallElevation({
             <Text style={styles.calqueNote} pointerEvents="none">
               {calant
                 ? 'Poussez et pincez la photo pour la caler sur le mur'
-                : 'Repère visuel — la photo n’est pas à l’échelle'}
+                : photoDuCalque?.auto && !photoDuCalque.calageManuel
+                  ? 'Photo du scan, redressée à l’échelle du mur'
+                  : 'Repère visuel — la photo n’est pas à l’échelle'}
             </Text>
           )}
           {/* LA POIGNÉE DU RIDEAU — au-dessus du dessin, sinon on ne

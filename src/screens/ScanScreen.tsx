@@ -21,6 +21,7 @@ import { GuidePose } from './scan/GuidePose';
 import { aimanterHauteur, apercuDeHauteur, natureAuMur } from '../geometry/viseur';
 import { PRODUITS_DU_SCAN, configurationDeLaPose, produitDuScan } from '../geometry/poseAR';
 import { VignetteProduit } from '../components/VignetteProduit';
+import { FondDeVerre, SUR_VERRE } from '../components/Verre';
 import { alerte } from '../ui/alerte';
 
 /** Le guide de pose a été lu : on ne le remontre plus de lui-même. */
@@ -66,6 +67,8 @@ export function ScanScreen() {
   const paused = useScanStore((s) => s.paused);
   /* Ce que RoomPlan voit mal, tant qu'on peut encore y retourner. */
   const mursDouteux = useScanStore((s) => s.mursDouteux);
+  /* Le mur qui manque : on le dit en terminant, pas pendant qu'on balaie. */
+  const trouContour = useScanStore((s) => s.trouContour);
   const processing = useScanStore((s) => s.processing);
   /* Ce que le post-traitement a refusé de faire : il faut bien le dire. */
   const error = useScanStore((s) => s.error);
@@ -287,6 +290,36 @@ export function ScanScreen() {
       ],
     );
   };
+  /*
+    TERMINER, SAUF SI UN MUR MANQUE — et on le dit à ce moment-là, pas
+    pendant qu'on balaie : un voyant qui s'allume au milieu d'un relevé en
+    cours se lit comme une faute, alors que les murs arrivent un par un.
+
+    Une pièce dont un pan n'a pas été vu ressort OUVERTE : le plan la
+    referme ensuite en ligne droite, à la main, et l'on ne sait plus ce
+    qu'il y avait là. Le natif repère deux bouts de mur libres qui se font
+    face (`trouDuContour`) ; dix secondes devant ce pan valent mieux qu'une
+    retouche au bureau.
+  */
+  const terminer = () => {
+    if (wallCount < 3 || !(trouContour >= 0.3)) {
+      stop();
+      return;
+    }
+    const m =
+      trouContour < 1
+        ? `${Math.round(trouContour * 100)} cm`
+        : `${trouContour.toFixed(1).replace('.', ',')} m`;
+    alerte(
+      'Il manque un mur',
+      `Le contour n’est pas fermé : un pan d’environ ${m} n’a pas été vu. ` +
+        'Balayez-le avant de terminer — sinon il faudra le refermer à la main sur le plan.',
+      [
+        { label: 'Continuer le scan' },
+        { label: 'Terminer quand même', onPress: stop },
+      ],
+    );
+  };
   const toggleTorch = () => {
     const next = !torch;
     setTorch(next);
@@ -317,9 +350,10 @@ export function ScanScreen() {
       */}
       {!processing && (
         <TouchableOpacity
-          style={styles.cancelButton}
+          style={[styles.cancelButton, SUR_VERRE]}
           accessibilityLabel="Arrêter le scan"
           onPress={abandonner}>
+          <FondDeVerre rayon={20} sombre voile={0.55} />
           <CloseCross size={20} color={c.scanInk} weight={3} />
         </TouchableOpacity>
       )}
@@ -328,11 +362,12 @@ export function ScanScreen() {
       <TouchableOpacity
         style={[
           styles.torchButton,
-          torch && styles.torchButtonOn,
+          torch ? styles.torchButtonOn : SUR_VERRE,
           processing && styles.cacheEnAssemblage,
         ]}
         accessibilityLabel={torch ? 'Éteindre la torche' : 'Allumer la torche'}
         onPress={toggleTorch}>
+        {!torch && <FondDeVerre rayon={20} sombre voile={0.55} />}
         <Svg width={18} height={18} viewBox="0 0 24 24">
           <Path
             d="M13 2 L5 13.5 h5 L8 22 l8.5 -11.5 h-5 z"
@@ -346,7 +381,8 @@ export function ScanScreen() {
 
       {/* RoomPlan affiche déjà ses propres instructions : pas de doublon. */}
       <View style={styles.topHud} pointerEvents="none">
-        <View style={styles.statsPill}>
+        <View style={[styles.statsPill, SUR_VERRE]}>
+          <FondDeVerre rayon={16} sombre voile={0.55} />
           {stats.map(([label, n], i) => (
             <View key={label} style={[styles.stat, i > 0 && styles.statBorder]}>
               <Text style={styles.statValue}>{n}</Text>
@@ -415,7 +451,8 @@ export function ScanScreen() {
               />
             ))}
           </View>
-          <View style={styles.phraseViseur} pointerEvents="none">
+          <View style={[styles.phraseViseur, SUR_VERRE]} pointerEvents="none">
+            <FondDeVerre rayon={14} sombre voile={0.55} />
             <Text style={styles.phraseViseurTexte} numberOfLines={1}>
               {/* Le refus passe avant tout : c'est le seul cas où le geste
                   n'a rien produit. Puis la cote qu'on vient de poser, tant
@@ -424,7 +461,8 @@ export function ScanScreen() {
             </Text>
           </View>
 
-          <View style={styles.rail}>
+          <View style={[styles.rail, SUR_VERRE]}>
+            <FondDeVerre rayon={18} sombre voile={0.55} />
             <View style={styles.railTete}>
               <TouchableOpacity
                 style={styles.railBouton}
@@ -484,7 +522,8 @@ export function ScanScreen() {
           </TouchableOpacity>
 
           {poses > 0 && (
-            <View style={styles.posees}>
+            <View style={[styles.posees, SUR_VERRE]}>
+              <FondDeVerre rayon={18} sombre voile={0.55} />
               <TouchableOpacity
                 style={styles.poseesRetirer}
                 accessibilityLabel="Retirer le dernier appareil posé"
@@ -509,9 +548,10 @@ export function ScanScreen() {
       {/* Rail rangé : une pastille pour le rouvrir, et rien d'autre sur la vue. */}
       {modeElec && !paused && !processing && !railOuvert && (
         <TouchableOpacity
-          style={styles.railFerme}
+          style={[styles.railFerme, SUR_VERRE]}
           accessibilityLabel="Afficher la pose"
           onPress={() => setRailOuvert(true)}>
+          <FondDeVerre rayon={18} sombre voile={0.55} />
           <VignetteProduit code={produit.photo} libelle={produit.mot} taille={24} />
           <Text style={styles.railFermeTexte}>Poser</Text>
         </TouchableOpacity>
@@ -521,9 +561,10 @@ export function ScanScreen() {
           miniature 3D live de RoomPlan. */}
       <View style={styles.bottomHud} pointerEvents="box-none">
         <TouchableOpacity
-          style={styles.pauseButton}
+          style={[styles.pauseButton, SUR_VERRE]}
           accessibilityLabel={paused ? 'Reprendre le scan' : 'Mettre en pause'}
           onPress={paused ? resume : pause}>
+          <FondDeVerre rayon={27} sombre voile={0.55} />
           {/* Icône dessinée : même hauteur (18) que l'éclair et la croix. */}
           <Svg width={18} height={18} viewBox="0 0 24 24">
             {paused ? (
@@ -552,7 +593,7 @@ export function ScanScreen() {
             )}
           </Svg>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.stopButton} onPress={stop}>
+        <TouchableOpacity style={styles.stopButton} onPress={terminer}>
           <Text style={styles.stopText}>Terminer</Text>
         </TouchableOpacity>
       </View>

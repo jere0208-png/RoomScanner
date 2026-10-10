@@ -24,6 +24,7 @@ import {
 } from '../geometry/electrical';
 import { CEILINGS, CEILING_SYMBOL, type CeilingKind } from '../geometry/ceiling';
 import { CloseCross } from './CloseCross';
+import { FondDeVerre, SUR_VERRE } from './Verre';
 
 /**
  * « On attend que vous désigniez un mur. »
@@ -117,7 +118,8 @@ export function EnAttente({
     return () => boucle.stop();
   }, [souffle]);
   return (
-    <View style={styles.attente} pointerEvents="box-none">
+    <View style={[styles.attente, SUR_VERRE]} pointerEvents="box-none">
+      <FondDeVerre rayon={999} ombre={styles.attente} />
       {/* L'auréole qui bat : elle dit « en attente » sans écrire le mot. */}
       <Animated.View
         pointerEvents="none"

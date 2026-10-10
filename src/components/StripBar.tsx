@@ -20,7 +20,7 @@
  * boutons ont la taille d'un doigt, et la rangée passe à la ligne plutôt que
  * de serrer.
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -30,9 +30,12 @@ import {
   Text,
   TouchableOpacity,
   View,
+  type ViewStyle,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { CloseCross } from './CloseCross';
+import { FondDeVerre, SUR_VERRE } from './Verre';
+import { useTheme } from '../theme';
 import { SOLAIRES } from '../ui/solaires';
 import { DEBORD_DOIGT } from '../ui/bandeau';
 
@@ -124,11 +127,29 @@ export function IconeBandeau({
   );
 }
 
+/** Jusqu'où l'écho s'éloigne du bord de la bulle, en points. */
+export const ECHO_PX = 18;
+
 /**
- * LA CARTE DU MENU FIXE ARRIVE, ELLE NE SURGIT PAS — un fondu et deux
- * centimètres de montée, en moins de deux dixièmes de seconde : on voit d'où
- * elle vient, la place qu'elle prend, et que les outils lui cèdent la leur.
- * Mouvement réduit demandé : elle est là, tout simplement.
+ * LA BULLE DU MENU — du verre, et l'écho d'une goutte d'eau.
+ *
+ * Relevé du patron : « à la sélection d'un élément du plan 2D, le menu doit
+ * s'ouvrir telle une bulle Apple, en verre, proposant les choix ; on augmente
+ * la modernité. Donne quand même une touche unique, comme une animation qui
+ * fait un écho de goutte d'eau rapide autour du menu à l'ouverture. »
+ *
+ * — LE VERRE : celui de toute l'app (`Verre.tsx`), qui laisse voir le plan
+ *   flouté derrière le menu au lieu de le cacher sous une carte blanche.
+ *   Sans le natif, la carte garde son fond plein.
+ * — LA BULLE : elle naît un rien plus petite et un rien plus bas, et se pose
+ *   d'un ressort court — elle arrive, elle ne surgit pas.
+ * — L'ÉCHO : deux anneaux partent de son bord et s'éloignent en s'effaçant,
+ *   l'un après l'autre, comme les ronds d'une goutte qui touche l'eau. Une
+ *   demi-seconde, et la bulle reste seule. Chaque élément choisi a SA bulle
+ *   (une clé par sélection, dans `ResultScreen`) : l'écho part à chaque
+ *   nouveau choix, pas seulement au premier.
+ *
+ * Mouvement réduit demandé : elle est là, sans ressort ni écho.
  */
 export function CarteDuMenu({
   style,
@@ -137,21 +158,39 @@ export function CarteDuMenu({
   style: object;
   children: React.ReactNode;
 }) {
+  const c = useTheme();
   const entree = useRef(new Animated.Value(0)).current;
+  const echo = useRef(new Animated.Value(0)).current;
+  const [taille, setTaille] = useState<{ w: number; h: number } | null>(null);
+  const [anime, setAnime] = useState(true);
   useEffect(() => {
     let vivant = true;
     const jouer = (reduit: boolean) => {
       if (!vivant) return;
       if (reduit) {
+        setAnime(false);
         entree.setValue(1);
+        echo.setValue(1);
         return;
       }
-      Animated.timing(entree, {
-        toValue: 1,
-        duration: 180,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
+      Animated.parallel([
+        Animated.spring(entree, {
+          toValue: 1,
+          stiffness: 340,
+          damping: 22,
+          mass: 0.8,
+          useNativeDriver: true,
+        }),
+        Animated.timing(echo, {
+          toValue: 1,
+          duration: 560,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start(({ finished }) => {
+        // L'écho fini, ses anneaux quittent l'arbre : rien ne reste à peindre.
+        if (finished && vivant) setAnime(false);
+      });
     };
     Promise.resolve(AccessibilityInfo.isReduceMotionEnabled?.())
       .then((r) => jouer(!!r))
@@ -159,20 +198,73 @@ export function CarteDuMenu({
     return () => {
       vivant = false;
     };
-  }, [entree]);
+  }, [entree, echo]);
+  const plat = (StyleSheet.flatten(style) ?? {}) as ViewStyle;
+  const rayon = typeof plat.borderRadius === 'number' ? plat.borderRadius : 20;
+  /** Un rond de l'écho : il part du bord, s'éloigne de `ECHO_PX`, et s'efface. */
+  const anneau = (debut: number) => {
+    if (!taille || !anime || taille.w < 1 || taille.h < 1) return null;
+    const p = echo.interpolate({ inputRange: [debut, 1], outputRange: [0, 1], extrapolate: 'clamp' });
+    return (
+      <Animated.View
+        testID="echo-de-la-bulle"
+        pointerEvents="none"
+        style={[
+          bulle.echo,
+          {
+            borderRadius: rayon,
+            borderColor: c.blue,
+            opacity: p.interpolate({ inputRange: [0, 0.12, 1], outputRange: [0, 0.55, 0] }),
+            transform: [
+              { scaleX: p.interpolate({ inputRange: [0, 1], outputRange: [1, 1 + (2 * ECHO_PX) / taille.w] }) },
+              { scaleY: p.interpolate({ inputRange: [0, 1], outputRange: [1, 1 + (2 * ECHO_PX) / taille.h] }) },
+            ],
+          },
+        ]}
+      />
+    );
+  };
   return (
     <Animated.View
+      testID="bulle-du-menu"
+      onLayout={(e) => {
+        const { width, height } = e.nativeEvent.layout;
+        if (!taille || Math.abs(taille.w - width) > 1 || Math.abs(taille.h - height) > 1) {
+          setTaille({ w: width, h: height });
+        }
+      }}
       style={[
         style,
+        SUR_VERRE,
         {
-          opacity: entree,
-          transform: [{ translateY: entree.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+          opacity: entree.interpolate({ inputRange: [0, 1], outputRange: [0, 1], extrapolate: 'clamp' }),
+          transform: [
+            { translateY: entree.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
+            { scale: entree.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) },
+          ],
         },
       ]}>
+      {/* Un voile plus léger que celui des boutons : c'est la bulle qu'on
+          regarde, et le plan doit se deviner dessous. Son ombre est celle
+          de la carte. */}
+      <FondDeVerre rayon={rayon} voile={0.55} ombre={plat} />
+      {anneau(0)}
+      {anneau(0.18)}
       {children}
     </Animated.View>
   );
 }
+
+const bulle = StyleSheet.create({
+  echo: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderWidth: 1.5,
+  },
+});
 
 /**
  * LA RANGÉE DES GESTES, D'UNE SEULE LIGNE — elle défile au lieu de s'empiler.

@@ -15,8 +15,10 @@
  *      en verre, ils revenaient GRIS et cernés d'un filet crénelé — relevé
  *      du patron : « je t'ai demandé une modernisation pas un déclin ». Le
  *      verre n'a rien à flouter sur une page unie. Ils sont blancs pleins,
- *      avec une ombre neutre à peine posée (`ombreBouton`) ; le verre ne
- *      reste que dans la visite, au-dessus d'une image.
+ *      avec une ombre neutre à peine posée (`ombreBouton`). Le verre est
+ *      revenu depuis, à la demande du patron (voir `Verre.tsx`) : un voile
+ *      blanc dense, aucun filet de React Native, l'ombre de l'élément — et
+ *      sans le natif, comme ici, tout reste blanc plein.
  *   3. DES GRAISSES D'APPLE. 800 et 900 partout, c'était crier : 700 pour
  *      les grands titres, 600 pour le reste.
  *
@@ -120,16 +122,32 @@ describe('2 — du blanc net sur les pages claires', () => {
     expect(theme.ombreBouton.shadowOpacity).toBeLessThanOrEqual(0.1);
   });
 
-  it('plus de verre du tout, visite comprise : il rendait gris ce qu’il ne floutait pas', () => {
+  it('le verre revient, sans ce qui l’avait fait retirer', () => {
     /*
       Relevé du patron, après la visite : « le bouton quitter est mal fait,
       le bouton plus petit que le texte, et les boutons toujours grisés ».
-      Le verre s'en va de l'app : composant, vue native et pont.
+      Le verre était parti de l'app. Il revient À SA DEMANDE — « le menu doit
+      s'ouvrir telle une bulle Apple, en verre », « mets ce léger effet glass
+      là où tu le juges nécessaire, pour la cohérence » —, et ce banc tient
+      les causes de son départ :
+
+      — UN SEUL VERRE. Un seul composant parle au natif (`Verre.tsx`) : pas
+        d'imitation par écran, qui reviendrait grise à la première retouche.
+      — JAMAIS GRIS. Son voile par défaut est un blanc dense.
+      — AUCUN FILET DESSINÉ PAR REACT NATIVE sur le verre : le liseré est
+        celui de la couche native, vectoriel.
     */
-    for (const p of [...sources('src'), 'App.tsx', 'modules/react-native-room-scan/src/index.ts']) {
-      expect([p, /\bVerre\b|RoomScanVerre/.test(lire(p))]).toEqual([p, false]);
+    for (const p of [...sources('src'), 'App.tsx']) {
+      if (p === 'src/components/Verre.tsx') continue;
+      expect([p, /RoomScanVerre/.test(lire(p))]).toEqual([p, false]);
     }
-    expect(lire('modules/react-native-room-scan/ios/RoomScan.m')).not.toContain('RoomScanVerre');
+    const verre = lire('src/components/Verre.tsx');
+    const voile = Number(/export const VOILE = ([\d.]+)/.exec(verre)?.[1]);
+    expect(voile).toBeGreaterThanOrEqual(0.65);
+    expect(verre).not.toMatch(/borderWidth|hairlineWidth/);
+    expect(lire('modules/react-native-room-scan/ios/RoomScanVerre.swift')).toContain(
+      'effet.layer.borderWidth = 1 / UIScreen.main.scale',
+    );
   });
 
   it('« Terminer » porte lui-même sa pilule : ce qu’on voit est ce qu’on touche', () => {
@@ -139,7 +157,12 @@ describe('2 — du blanc net sur les pages claires', () => {
     expect(corps).toContain('backgroundColor: c.surface');
     expect(corps).toMatch(/height: 4\d/);
     expect(corps).toContain('paddingHorizontal');
-    expect(visite).toMatch(/style=\{\(\{ pressed \}\) => \[styles\.terminer, pressed && styles\.enfonce\]\}/);
+    // Le verre, s'il est là, se pose DANS le bouton et le remplit : c'est
+    // toujours le bouton qui fait sa taille.
+    expect(visite).toMatch(
+      /style=\{\(\{ pressed \}\) => \[styles\.terminer, SUR_VERRE, pressed && styles\.enfonce\]\}/,
+    );
+    expect(lire('src/components/Verre.tsx')).toMatch(/style=\{\[StyleSheet\.absoluteFill, \{ borderRadius: r \}\]\}/);
   });
 });
 

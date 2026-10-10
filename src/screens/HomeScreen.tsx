@@ -38,10 +38,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, Defs, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoomScan } from 'react-native-room-scan';
 import { dark, ombreBouton as ombreBoutonDouce, radius, themedStyles, useTheme, type Palette } from '../theme';
+import { FondDeVerre, SUR_VERRE, VERRE } from '../components/Verre';
 import { DUREE_DU_FILM } from '../data/film';
 import { GlisserPourSupprimer } from '../components/GlisserPourSupprimer';
 import { BandeauAnnuler, useSuppressionDifferee } from '../components/BandeauAnnuler';
@@ -109,6 +110,57 @@ export const TEINTES_TUILES = {
   sombre: { scan: '#123A40', dessin: '#3B311F', exemple: '#2B2847', guide: '#20342C' },
 } as const;
 
+/**
+ * LA LUMIÈRE SOUS LES TUILES — ce que leur verre laisse deviner.
+ *
+ * Relevé du patron : « mets ce léger effet transparent glass là où tu le
+ * juges nécessaire, comme sur les quatre cartes de l'accueil ». Un verre posé
+ * sur un fond uni ne montre rien : il lui faut quelque chose à flouter. Sous
+ * chaque tuile, une tache de sa propre couleur, plus franche, vers son coin
+ * extérieur — le verre l'adoucit en un dégradé de lumière, et c'est ce
+ * dégradé qui dit « verre » au premier regard. Les taches s'éteignent avant
+ * les bords : rien ne bave entre les tuiles ni autour du moulinet.
+ */
+export const HALOS_TUILES = {
+  clair: { scan: '#4FC8DA', dessin: '#EDB65A', exemple: '#9C8CF0', guide: '#7CC2A0' },
+  sombre: { scan: '#1F8C99', dessin: '#9C7630', exemple: '#6A5CC8', guide: '#358463' },
+} as const;
+
+/** Où chaque tache se pose dans le moulinet, en fractions de sa boîte. */
+const TACHES = [
+  { id: 'scan', cx: 0.2, cy: 0.22 },
+  { id: 'dessin', cx: 0.82, cy: 0.16 },
+  { id: 'exemple', cx: 0.18, cy: 0.86 },
+  { id: 'guide', cx: 0.8, cy: 0.8 },
+] as const;
+
+function HaloDuMoulinet({ halos }: { halos: Record<(typeof TACHES)[number]['id'], string> }) {
+  return (
+    <Svg pointerEvents="none" style={StyleSheet.absoluteFill} width="100%" height="100%" testID="halo-du-moulinet">
+      <Defs>
+        {TACHES.map((t) => (
+          <RadialGradient
+            key={t.id}
+            id={`halo-${t.id}`}
+            gradientUnits="objectBoundingBox"
+            cx={t.cx}
+            cy={t.cy}
+            fx={t.cx}
+            fy={t.cy}
+            rx={0.34}
+            ry={0.3}>
+            <Stop offset="0" stopColor={halos[t.id]} stopOpacity={0.9} />
+            <Stop offset="1" stopColor={halos[t.id]} stopOpacity={0} />
+          </RadialGradient>
+        ))}
+      </Defs>
+      {TACHES.map((t) => (
+        <Rect key={t.id} x="0" y="0" width="100%" height="100%" fill={`url(#halo-${t.id})`} />
+      ))}
+    </Svg>
+  );
+}
+
 /** Le nombre de plans à partir duquel on cherche plutôt qu'on ne parcourt. */
 export const RECHERCHE_DES = 6;
 /** Les plans montrés sur l'accueil : les derniers touchés. */
@@ -145,6 +197,7 @@ export function HomeScreen() {
   const styles = getStyles(c);
   const insets = useSafeAreaInsets();
   const teintes = sombre ? TEINTES_TUILES.sombre : TEINTES_TUILES.clair;
+  const halos = sombre ? HALOS_TUILES.sombre : HALOS_TUILES.clair;
 
   useEffect(() => {
     RoomScan.isSupported().then(setSupported);
@@ -329,6 +382,8 @@ export function HomeScreen() {
               intérieurs, comme un rivet.
             */}
             <View style={styles.moulinet}>
+              {/* Sans verre, les tuiles restent pleines : rien à deviner dessous. */}
+              {VERRE && <HaloDuMoulinet halos={halos} />}
               <View style={styles.colonne}>
                 <Animated.View style={fadeIn(3, true)}>
                   {scanIndisponible ? (
@@ -611,8 +666,16 @@ function Tuile({
         style={[
           styles.tuile,
           { backgroundColor: fond, height: hauteur, transform: [{ scale: appui }] },
+          SUR_VERRE,
           (desactivee || eteinte) && styles.tuileEteinte,
         ]}>
+        {/*
+          DU VERRE TEINTÉ DE SA COULEUR — la matière des commandes de l'app
+          (voir `Verre.tsx`), et la lumière du moulinet devinée dessous. La
+          teinte garde la tuile reconnaissable d'un coup d'œil : c'est elle,
+          plus que le mot, qu'on retrouve d'une visite à l'autre.
+        */}
+        <FondDeVerre rayon={26} voile={0.3} teinte={fond} force={0.75} />
         {/*
           LE ROND DE L'ICÔNE SE RESSERRE, PAS L'ICÔNE ; LA FLÈCHE SE FAIT
           DISCRÈTE — relevé du patron : « réduis les flèches et leur bloc

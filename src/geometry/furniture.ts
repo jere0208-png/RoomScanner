@@ -153,6 +153,47 @@ export function deduceRoomKind(categories: string[]): RoomKind | null {
   return best;
 }
 
+/**
+ * CE QUE ROOMPLAN DIT D'UNE PIÈCE (iOS 17) — traduit dans nos types.
+ *
+ * Proposé comme amélioration du scan (le patron : « améliore le scan en
+ * premier temps, et ce qu'il détecte »). RoomPlan classe lui-même chaque
+ * partie du logement — cuisine, salle de bains, chambre, séjour, salle à
+ * manger — d'après TOUT ce qu'il a vu, pas seulement les meubles qu'il a su
+ * détourer : une cuisine sans réfrigérateur relevé reste une cuisine, une
+ * chambre dont le lit est sous une couette froissée aussi. Le type compte
+ * double ici : il donne le nom de la pièce, et il décide des règles de la
+ * NF C 15-100 qu'on lui applique (prises de la cuisine, volumes de la salle
+ * d'eau…).
+ */
+export function kindFromRoomPlan(label: string): RoomKind | null {
+  const l = label.toLowerCase();
+  if (l.includes('kitchen')) return 'kitchen';
+  if (l.includes('bath')) return 'bathroom';
+  if (l.includes('bed')) return 'bedroom';
+  if (l.includes('living')) return 'living';
+  if (l.includes('dining')) return 'dining';
+  return null;
+}
+
+/**
+ * LE TYPE D'UNE PIÈCE, des deux témoins réunis : ce que RoomPlan en dit
+ * d'abord, le mobilier ensuite.
+ *
+ * RoomPlan ne connaît pas les WC : une pièce qu'il range en « salle de bains »
+ * et dont le mobilier ne montre qu'une cuvette reste des WC. Plusieurs
+ * sections dans une même pièce (un séjour ouvert sur sa cuisine) : la plus
+ * caractéristique l'emporte, comme pour le mobilier.
+ */
+export function deduireLaPiece(labels: string[], categories: string[]): RoomKind | null {
+  const meubles = deduceRoomKind(categories);
+  const vus = labels.map(kindFromRoomPlan).filter((k): k is RoomKind => !!k);
+  if (vus.length === 0) return meubles;
+  const roomplan = PRIORITY.find((k) => vus.includes(k)) ?? vus[0];
+  if (roomplan === 'bathroom' && meubles === 'wc') return 'wc';
+  return roomplan;
+}
+
 /** Nom français d'un type de pièce. */
 export function roomKindLabel(kind: RoomKind): string {
   return ROOM_FR[kind];

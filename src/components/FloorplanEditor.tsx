@@ -379,7 +379,7 @@ interface Props {
    */
   recalage?: (dx: number, dz: number) => void;
   /** Photos de repérage punaisées sur les murs. */
-  photos?: { id: string; wallId: string; along: number }[];
+  photos?: { id: string; wallId: string; along: number; auto?: boolean }[];
   onSelectPhoto?: (id: string) => void;
   /** Meuble sélectionné : surligné, déplaçable, supprimable. */
   selectedObjectId?: string | null;
@@ -2571,7 +2571,9 @@ export function FloorplanEditor({
                 pièce. Une vignette serait illisible à cette échelle et
                 cacherait le plan ; le repère dit qu'il y a une photo, le
                 toucher l'ouvre. */}
-            {photos?.map((ph) => {
+            {/* Les photos prises et redressées par le scan n'ont pas de
+                punaise : chaque mur en a une, elles ne désignent rien. */}
+            {photos?.filter((ph) => !ph.auto).map((ph) => {
               const w = wallById.get(ph.wallId);
               if (!w) return null;
               const face = wallFace(w, quads.get(w.id), interiorSide(w, walls));

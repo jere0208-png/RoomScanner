@@ -1,4 +1,5 @@
 import { NOM_EXEMPLE, appartementExemple } from '../data/exemple';
+import { photosDesMurs } from '../geometry/photosAuto';
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -109,7 +110,7 @@ import { ancrerElec } from '../geometry/viseur';
 import { poserLibre } from '../geometry/poser';
 import type { SurfaceTexture } from 'react-native-room-scan';
 import {
-  deduceRoomKind,
+  deduceRoomKind, deduireLaPiece,
   roomKindLabel,
   type RoomKind,
 } from '../geometry/furniture';
@@ -232,6 +233,20 @@ export interface ScanPhoto {
    * rotation. Voir `ui/calage`.
    */
   calage?: Calage;
+  /**
+   * La FACE du mur qu'elle montre, quand on la connaît : une photo prise et
+   * redressée par le scan regarde un côté précis du mur, et ne se pose que
+   * derrière l'élévation de ce côté-là.
+   */
+  side?: 1 | -1;
+  /**
+   * PRISE ET REDRESSÉE PAR LE SCAN (voir `geometry/photosAuto`) : cadrée au
+   * centimètre, elle couvre son mur ; elle n'a pas de punaise sur le plan —
+   * chaque mur en a une.
+   */
+  auto?: boolean;
+  /** Une photo du scan qu'on a recalée à la main : elle n'est plus garantie à l'échelle. */
+  calageManuel?: boolean;
 }
 
 /** Ce qu'un brouillon retient : de quoi reprendre là où l'on s'est arrêté. */
@@ -1110,6 +1125,12 @@ interface ScanState {
    * pièces qui ne se referment pas).
    */
   mursDouteux: number;
+  /**
+   * LE MUR QUI MANQUE, en direct — le plus grand trou du contour (m), zéro
+   * quand la pièce est fermée. On le dit au moment de terminer, pendant
+   * qu'on peut encore aller le balayer (voir `ScanScreen`).
+   */
+  trouContour: number;
   /**
    * Le scan en cours COMPLÈTE le relevé au lieu de le remplacer : c'est
    * une pièce de plus, et l'appareillage déjà posé doit survivre.
@@ -2525,6 +2546,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     error: null,
     instruction: '',
     mursDouteux: 0,
+    trouContour: 0,
     complementEnCours: false,
     wallCount: 0,
     objectCount: 0,
@@ -2772,6 +2794,9 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({
         photos: st.photos.map((p) => {
           if (p.id !== photoId) return p;
+          // Une photo du scan recalée à la main n'est plus « à l'échelle » :
+          // c'est l'œil qui l'a posée, et l'établi le dira.
+          if (p.auto) return { ...p, calage: sain ?? CALAGE_NEUTRE, calageManuel: true };
           // Le champ s'EFFACE au neutre : une photo jamais calée et une
           // photo remise à neuf se relisent pareil.
           if (neutre) {
@@ -3253,7 +3278,9 @@ export const useScanStore = create<ScanState>((set, get) => {
           id: `room-${i + 1}`,
           name: kept?.name || auto[i],
           wallIds: s.wallIds,
-          kind: kinds[i] ?? undefined,
+          // Le type relevé par RoomPlan au scan survit au recalcul : les
+          // meubles seuls en savent moins que lui.
+          kind: kept?.kind ?? kinds[i] ?? undefined,
           floor,
         };
       });
@@ -5006,6 +5033,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Le compte vient du natif (cinq nombres au lieu des surfaces
         // entières, deux fois par seconde) ; un natif ancien les envoie
         // encore, et l'on sait toujours compter.
+        trouContour: typeof u.trouContour === 'number' ? u.trouContour : 0,
         mursDouteux:
           typeof u.mursDouteux === 'number'
             ? u.mursDouteux
@@ -5077,8 +5105,12 @@ export const useScanStore = create<ScanState>((set, get) => {
           ) + 1}`,
         })),
       );
-      const kinds = shapes.map((_, i) =>
-        deduceRoomKind(
+      // Ce que RoomPlan dit de chaque pièce d'abord, le mobilier ensuite.
+      const kinds = shapes.map((sh, i) =>
+        deduireLaPiece(
+          (r.sections ?? [])
+            .filter((x) => sh.outline.length >= 3 && pointInPolygon({ x: x.x, z: x.z }, sh.outline))
+            .map((x) => x.label),
           objects
             .filter((o) => o.roomId === `room-${i + 1}`)
             .map((o) => o.category),
@@ -5129,7 +5161,12 @@ export const useScanStore = create<ScanState>((set, get) => {
         ...blancsDAplomb(walls, objects),
         openings,
         fixtures: [...fixtures, ...viseMerge.fixtures],
-        photos,
+        // Les photos de mur du scan sont refaites : la fusion a pu recoudre
+        // les murs, et le natif les a gardées toutes, passage après passage.
+        photos: [
+          ...photos.filter((ph) => !ph.auto),
+          ...photosDesMurs(r.photosMurs ?? [], surfaces, walls),
+        ],
         ceiling: [...ceiling, ...viseMerge.ceiling],
         north: typeof r.north === 'number' ? r.north : st.north,
         processing: false,
@@ -5433,8 +5470,14 @@ export const useScanStore = create<ScanState>((set, get) => {
           };
         }),
       );
-      const kinds = shapes.map((_, i) =>
-        deduceRoomKind(
+      const kinds = shapes.map((sh, i) =>
+        deduireLaPiece(
+          // Les sections arrivent brutes : elles se décalent comme les murs.
+          (r.sections ?? [])
+            .filter(
+              (x) => sh.outline.length >= 3 && pointInPolygon({ x: x.x + dx, z: x.z + dz }, sh.outline),
+            )
+            .map((x) => x.label),
           objects
             .filter((o) => o.roomId === idPiece(i))
             .map((o) => o.category),
@@ -5466,6 +5509,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         objects: [...st.objects, ...objects],
         fixtures: [...st.fixtures, ...vise.fixtures],
         ceiling: [...st.ceiling, ...vise.ceiling],
+        photos: [
+          ...st.photos,
+          ...photosDesMurs(r.photosMurs ?? [], surfaces, walls, { decalage: { dx, dz } }),
+        ],
         // On travaille à l'étage qu'on vient de scanner, pas au
         // rez-de-chaussée qu'on a quitté.
         niveauCourant: n,
@@ -5520,12 +5567,21 @@ export const useScanStore = create<ScanState>((set, get) => {
         })),
       );
 
-      const kinds = shapes.map((_, i) => {
+      /*
+        LE TYPE DE CHAQUE PIÈCE : ce que RoomPlan en dit (iOS 17), puis le
+        mobilier — voir `deduireLaPiece`.
+      */
+      const kinds = shapes.map((sh, i) => {
         const id = `room-${i + 1}`;
-        return deduceRoomKind(
+        return deduireLaPiece(
+          (r.sections ?? [])
+            .filter((x) => sh.outline.length >= 3 && pointInPolygon({ x: x.x, z: x.z }, sh.outline))
+            .map((x) => x.label),
           objects.filter((o) => o.roomId === id).map((o) => o.category),
         );
       });
+      /* Chaque mur, photographié et redressé pendant le scan. */
+      const photosAuto = photosDesMurs(r.photosMurs ?? [], surfaces, walls);
       const names = nameRooms(kinds);
       const kept: RoomEntry[] = shapes.map((s, i) => ({
         id: `room-${i + 1}`,
@@ -5596,7 +5652,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         ...blancsDAplomb(walls, objects),
         openings,
         fixtures: vise.fixtures,
-        photos: [],
+        photos: photosAuto,
         ceiling: vise.ceiling,
         north: typeof r.north === 'number' ? r.north : undefined,
       };
@@ -5616,7 +5672,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         ...blancsDAplomb(walls, objects),
         openings,
         fixtures: vise.fixtures,
-        photos: [],
+        photos: photosAuto,
         ceiling: vise.ceiling,
         north: typeof r.north === 'number' ? r.north : null,
         saves,
@@ -7732,6 +7788,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         error: null,
         instruction: '',
         mursDouteux: 0,
+        trouContour: 0,
         complementEnCours: false,
         wallCount: 0,
         objectCount: 0,

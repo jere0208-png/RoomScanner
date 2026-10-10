@@ -106,6 +106,11 @@ export interface ScanUpdate {
   windowCount: number;
   /** Les murs que RoomPlan voit mal (confiance basse ou moyenne), comptés en natif. */
   mursDouteux?: number;
+  /**
+   * Le plus grand trou du contour (m) : deux bouts de mur libres qui se font
+   * face — presque toujours un mur qui n'a pas été balayé. Zéro : fermé.
+   */
+  trouContour?: number;
   /** Un natif ancien envoyait les surfaces entières : on sait encore les lire. */
   surfaces?: SurfaceData[];
 }
@@ -165,6 +170,18 @@ export interface ScanResult {
    * été scanné pièce par pièce, et les passages ont été alignés.
    */
   passages?: number;
+  /**
+   * CE QUE ROOMPLAN DIT DE CHAQUE PIÈCE (iOS 17) : son type
+   * (`kitchen`, `bathroom`, `bedroom`, `livingRoom`, `diningRoom`,
+   * `unidentified`) et un point qui lui appartient.
+   */
+  sections?: { label: string; x: number; y: number; z: number }[];
+  /**
+   * CHAQUE MUR, PHOTOGRAPHIÉ DE FACE ET REDRESSÉ pendant le scan — une photo
+   * par mur RoomPlan, au rapport exact du mur, et le côté d'où on la voyait
+   * (+1 : celui de l'axe z de sa transformation).
+   */
+  photosMurs?: { wallId: string; path: string; cote: number; at: number }[];
   /** Chemin local du modèle 3D (.usdz sur iOS, .obj sur Android). */
   modelPath: string;
   surfaces?: SurfaceData[];
@@ -213,6 +230,18 @@ export const RoomScanCanvas = UIManager.getViewManagerConfig?.(
   ? requireNativeComponent<
       ViewProps & { formes: number[]; styles: string[] }
     >('RoomScanCanvas')
+  : undefined;
+
+/**
+ * LE VERRE DES MENUS — la matière des bulles d'iOS (`systemUltraThinMaterial`),
+ * coins continus, ombre sur la forme. Il se pose DERRIÈRE le contenu d'une
+ * carte et ne prend pas le doigt. `undefined` sans le natif : la carte garde
+ * alors son fond plein.
+ */
+export const RoomScanVerre = UIManager.getViewManagerConfig?.('RoomScanVerre')
+  ? requireNativeComponent<
+      ViewProps & { rayon?: number; sombre?: boolean; voile?: number; ombre?: number[] }
+    >('RoomScanVerre')
   : undefined;
 
 /**

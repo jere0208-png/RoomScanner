@@ -179,6 +179,7 @@ import { astuce } from '../ui/astuce';
 import { celebrerSiAuxNormes, resetCelebration } from '../ui/auxNormes';
 import { useModeElec, useUsage } from '../store/usage';
 import { usePremieresFois } from '../store/premieresFois';
+import { FondDeVerre, SUR_VERRE } from '../components/Verre';
 
 type Tab = '2d' | '3d';
 
@@ -3945,13 +3946,14 @@ export function ResultScreen() {
             */}
             {!modeElec && piecesTravaux.length > 0 && (
               <TouchableOpacity
-                style={styles.vuePastille}
+                style={[styles.vuePastille, SUR_VERRE]}
                 accessibilityLabel="Travaux"
                 accessibilityHint="Ce qu’il faut acheter : peinture, sol, plinthes"
                 onPress={() => {
                   haptic('leger');
                   setTravauxOuvert(true);
                 }}>
+                <FondDeVerre rayon={17} ombre={styles.vuePastille} />
                 <Svg width={16} height={16} viewBox="0 0 24 24">
                   {['M4 4 h13 v5 h-13 z', 'M17 6.5 h2.5 v5 h-7.5 v3', 'M12 14.5 v6'].map((d) => (
                     <Trace
@@ -4038,9 +4040,10 @@ export function ResultScreen() {
             )}
             {niveaux.length > 1 && (
               <TouchableOpacity
-                style={styles.vuePastille}
+                style={[styles.vuePastille, SUR_VERRE]}
                 accessibilityLabel="Changer d’étage"
                 onPress={() => setMenu(menuDesEtages())}>
+                <FondDeVerre rayon={17} ombre={styles.vuePastille} />
                 <Text style={styles.vuePastilleTexte}>
                   {abregerNiveau(niveauCourant)}
                 </Text>
@@ -4052,9 +4055,10 @@ export function ResultScreen() {
               </TouchableOpacity>
             )}
             <TouchableOpacity
-              style={styles.vuePastille}
+              style={[styles.vuePastille, SUR_VERRE]}
               accessibilityLabel={vue === '2d' ? 'Passer en 3D' : 'Passer en 2D'}
               onPress={basculerVue}>
+              <FondDeVerre rayon={17} ombre={styles.vuePastille} />
               <Text style={styles.vuePastilleTexte}>
                 {vue === '2d' ? '2D' : '3D'}
               </Text>
@@ -4156,6 +4160,7 @@ export function ResultScreen() {
         */}
         {vue === '2d' && selectedObject && showFurniture && objDims && !capturing && (
           <ObjectBar
+            key={selectedObject.id}
             object={selectedObject}
             styles={stylesBarres}
             palette={teinte}
@@ -4287,6 +4292,7 @@ export function ResultScreen() {
           const part = parts.find((p2) => p2.roomId === cl.roomId);
           return (
             <CeilingBar
+              key={cl.id}
               fixture={cl}
               walls={part?.walls ?? walls}
               trame={trame}
@@ -4366,6 +4372,7 @@ export function ResultScreen() {
           if (!note) return null;
           return (
             <StripBar
+              key={note.id}
               styles={stylesBarres}
             onFermer={fermerLaCarte}
               icone={SOLAIRES.note}
@@ -4480,6 +4487,7 @@ export function ResultScreen() {
           };
           return (
             <StripBar
+              key={selRow}
               styles={stylesBarres}
             onFermer={fermerLaCarte}
               icone={SOLAIRES.plafond}
@@ -4560,6 +4568,7 @@ export function ResultScreen() {
         {vue === '2d' && editMode && !capturing && !selectedObject && !selectedWall &&
           selectedRoomId && targetRoom && (
             <RoomBar
+              key={targetRoom.id}
               room={targetRoom}
               surface={targetPart?.surface ?? null}
               extent={targetExtent}
@@ -4701,6 +4710,7 @@ export function ResultScreen() {
             regarder quand on a touché quelque chose. */}
         {vue === '2d' && editMode && selectedOpening && !capturing && (
           <StripBar
+            key={selectedOpening.id}
             styles={stylesBarres}
             onFermer={fermerLaCarte}
             icone={SOLAIRES.ouvertures}
@@ -4906,6 +4916,7 @@ export function ResultScreen() {
             bandeau mangeait le dessin qu'on est en train de regarder. */}
         {vue === '2d' && !selectedObject && !selectedOpening && editMode && selectedWall && !capturing && (
           <StripBar
+            key={selectedWall.id}
             styles={stylesBarres}
             icone={SOLAIRES.murs}
             /*
@@ -5116,6 +5127,7 @@ export function ResultScreen() {
             const L = segLength(mur);
             return (
               <StripBar
+                key={`trumeau-${pier.wallId}`}
                 styles={stylesBarres}
                 icone={SOLAIRES.murs}
                 strong={`${fr((pier.t1 - pier.t0) * L, 2)} m`}
