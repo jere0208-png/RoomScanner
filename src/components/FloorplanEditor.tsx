@@ -1,10 +1,4 @@
-import React, {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   PanResponder,
@@ -69,6 +63,7 @@ import {
 } from '../geometry/electrical';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 import { markColor } from '../geometry/schema';
+import { cheminDuPoche, pocheDesMurs } from '../geometry/poche';
 import { CeilingLayer } from './CeilingLayer';
 import { FixtureLayer } from './FixtureLayer';
 import { OndeePose, useNaissances } from './Vivant';
@@ -1370,7 +1365,8 @@ export function FloorplanEditor({
     if (selectedWallId || !editable) setPier(null);
   }, [selectedWallId, editable]);
 
-  // Corps des murs : onglets calculés une fois pour tout le rendu.
+  // Corps des murs : onglets calculés une fois pour tout le rendu. Ils ne se
+  // dessinent plus (voir le poché) : ils donnent les faces, et le toucher.
   const quads = useMemo(() => wallQuads(walls), [walls]);
 
   /**
@@ -1496,6 +1492,33 @@ export function FloorplanEditor({
   }, [editable, selectedRoomId, mapping, parts]);
 
   const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
+
+  /*
+    LE POCHÉ — relevé du patron, plans d'architecte à l'appui : « pas de
+    triangle de jonction, tout est clean ; un mur en continu avec celui qu'il
+    rencontre ; les murs extérieurs plus épais ». La maçonnerie se dessine
+    d'UN seul tenant (voir `pocheDesMurs`) : les murs se fondent à leurs
+    jonctions, les façades prennent leur épaisseur vers le dehors, les baies
+    sont de vrais vides. Les murs d'une pièce qu'on vient de poser n'y
+    entrent pas : leur trait reste ouvert, en tirets, jusqu'au lâcher.
+  */
+  const mursPoses = useMemo(
+    () => walls.filter((w) => !roomById.get(roomOf(w) ?? '')?.neuve),
+    [walls, roomById],
+  );
+  /*
+    Le poché se refait quand un mur bouge — à chaque image d'un glissé. Il se
+    calcule donc sur une valeur DIFFÉRÉE : le doigt n'attend pas l'union, le
+    mur tenu se dessine en bleu en temps réel, et la maçonnerie se recale dès
+    que le geste lui en laisse le temps.
+  */
+  const mursDifferes = useDeferredValue(mursPoses);
+  const baiesDifferees = useDeferredValue(openings);
+  const poche = useMemo(
+    () => pocheDesMurs(mursDifferes, baiesDifferees, rooms),
+    [mursDifferes, baiesDifferees, rooms],
+  );
+  const baieDuPoche = useMemo(() => new Map(poche.baies.map((b) => [b.id, b])), [poche]);
   // Le sol garde sa teinte neutre. Les couleurs relevées au scan ne servent
   // qu'à la vue 3D : sur un plan vu de dessus, sous le poché des murs et le
   // semis des points, elles ne se lisaient pas.
@@ -2441,14 +2464,25 @@ export function FloorplanEditor({
               );
             })}
 
-            {/* Murs : corps poché aux jonctions d'onglet. Leur tolérance de
-                toucher, elle, est passée plus bas, sous les meubles. */}
+            {/* La maçonnerie, d'un seul tenant : voir `pocheDesMurs`. */}
+            <Path
+              testID="poche-des-murs"
+              d={cheminDuPoche(poche.contours, mapping.toPx)}
+              fill={c.ink}
+              fillRule="evenodd"
+            />
+
+            {/* Murs : leur corps ne se dessine plus (le poché le fait) ; il
+                garde le toucher, la cote, et le bleu de la sélection. Leur
+                tolérance de toucher, elle, est passée plus bas, sous les
+                meubles. */}
             {walls.map((w) => (
               <WallBody
                 key={w.id}
                 wall={w}
                 quad={quads.get(w.id)}
                 mapping={mapping}
+                sansCorps
                 /* Une piece qu'on vient de poser et qu'on n'a pas encore
                    lachee : son trait reste ouvert. Voir `WallBody`. */
                 neuve={!!roomById.get(roomOf(w) ?? '')?.neuve}
@@ -2796,29 +2830,28 @@ export function FloorplanEditor({
 
             {/* Portes / fenêtres : trouée dans le mur, puis trait de repérage */}
             {openings.map((o) => {
-              const dx = o.b.x - o.a.x;
-              const dz = o.b.z - o.a.z;
-              const len = Math.hypot(dx, dz) || 1;
               /*
-                LA TROUÉE FAIT L'ÉPAISSEUR DU MUR, À UN CHEVEU PRÈS.
-
-                Elle en faisait trois centimètres de plus DE CHAQUE CÔTÉ —
-                seize pour un mur de dix. Ce débord, rempli d'une couleur
-                pleine pour effacer le poché, formait un liseré clair tout
-                autour de chaque porte et de chaque fenêtre : sur le plan, ça
-                se lit comme un fond blanc collé à la menuiserie.
-
-                Le cheveu, lui, reste nécessaire : sans lui, l'anticrénelage
-                laisse un trait de poché résiduel en travers de la baie.
+                LA BAIE EST UN VIDE DANS LE POCHÉ — plus un aplat posé sur le
+                noir pour l'effacer (voir `pocheDesMurs`). La menuiserie se
+                dessine DANS l'épaisseur réelle du mur, façade comprise : ses
+                deux faces, en traits fins, comme sur un plan d'architecte.
               */
-              const nx = (-dz / len) * (WALL_T / 2 + 0.004);
-              const nz = (dx / len) * (WALL_T / 2 + 0.004);
-              const slot = [
-                { x: o.a.x + nx, z: o.a.z + nz },
-                { x: o.b.x + nx, z: o.b.z + nz },
-                { x: o.b.x - nx, z: o.b.z - nz },
-                { x: o.a.x - nx, z: o.a.z - nz },
-              ].map((p) => mapping.toPx(p));
+              const baie = baieDuPoche.get(o.id);
+              const face = (cote: 1 | -1) =>
+                baie
+                  ? [baie.a, baie.b].map((p) =>
+                      mapping.toPx({
+                        x: p.x + baie.n.x * cote * (cote > 0 ? baie.plus : baie.moins),
+                        z: p.z + baie.n.z * cote * (cote > 0 ? baie.plus : baie.moins),
+                      }),
+                    )
+                  : null;
+              const vitre = (decalage: number) =>
+                baie
+                  ? [baie.a, baie.b].map((p) =>
+                      mapping.toPx({ x: p.x + baie.n.x * decalage, z: p.z + baie.n.z * decalage }),
+                    )
+                  : null;
               const a = mapping.toPx(o.a);
               const b = mapping.toPx(o.b);
               const color = colorOpenings
@@ -2890,20 +2923,58 @@ export function FloorplanEditor({
                     stroke="transparent"
                     strokeWidth={26}
                   />
-                  <Polygon
-                    points={slot.map((p) => `${p.x},${p.y}`).join(' ')}
-                    fill={showSurfaces ? fillOf(roomOf(o)) : c.surface}
-                    stroke="none"
-                  />
-                  <Line
-                    x1={a.x}
-                    y1={a.y}
-                    x2={b.x}
-                    y2={b.y}
-                    stroke={choisie ? c.blue : color}
-                    strokeWidth={choisie ? 5 : 3}
-                    strokeLinecap="butt"
-                  />
+                  {/* Les deux faces du tableau : le dormant, en traits fins. */}
+                  {o.type === 'window' &&
+                    [face(1), face(-1)].map((f, i) =>
+                      f ? (
+                        <Line
+                          key={`f${i}`}
+                          x1={f[0].x}
+                          y1={f[0].y}
+                          x2={f[1].x}
+                          y2={f[1].y}
+                          stroke={c.ink}
+                          strokeWidth={1}
+                        />
+                      ) : null,
+                    )}
+                  {/* Le vitrage : deux traits serrés au cœur du mur. */}
+                  {o.type === 'window' &&
+                    [0.015, -0.015].map((d, i) => {
+                      const v = vitre(d) ?? [a, b];
+                      return (
+                        <Line
+                          key={`v${i}`}
+                          x1={v[0].x}
+                          y1={v[0].y}
+                          x2={v[1].x}
+                          y2={v[1].y}
+                          stroke={choisie ? c.blue : color}
+                          strokeWidth={choisie ? 2 : 1.1}
+                        />
+                      );
+                    })}
+                  {/* Un passage sans porte : son linteau, en tireté. */}
+                  {o.type !== 'window' &&
+                    o.type !== 'door' &&
+                    [face(1), face(-1)].map((f, i) =>
+                      f ? (
+                        <Line
+                          key={`p${i}`}
+                          x1={f[0].x}
+                          y1={f[0].y}
+                          x2={f[1].x}
+                          y2={f[1].y}
+                          stroke={c.inkFaint}
+                          strokeWidth={1}
+                          strokeDasharray="4,3"
+                        />
+                      ) : null,
+                    )}
+                  {/* La baie choisie : soulignée, quel que soit son genre. */}
+                  {choisie && o.type !== 'window' && (
+                    <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={c.blue} strokeWidth={4} strokeLinecap="butt" />
+                  )}
                   {/*
                     LE VANTAIL ET SON ARC.
 
@@ -4055,6 +4126,7 @@ function WallBody({
   measureOpacity = 1,
   selected,
   neuve,
+  sansCorps,
   couche = 'trait',
   onPress,
 }: {
@@ -4083,6 +4155,12 @@ function WallBody({
    * Il se referme au lâcher (`arreterPiece`).
    */
   neuve?: boolean;
+  /**
+   * Le corps ne se peint pas : le POCHÉ dessine la maçonnerie d'un seul
+   * tenant (voir `pocheDesMurs`). Il reste pour le toucher — et se peint en
+   * bleu quand le mur est choisi.
+   */
+  sansCorps?: boolean;
   /**
    * LES DEUX ZONES D'UN MUR N'ONT PAS LE MÊME DROIT.
    *
@@ -4219,7 +4297,7 @@ function WallBody({
           strokeDasharray="7,5"
         />
       ) : body ? (
-        <Polygon points={body} fill={teinte} stroke="none" />
+        <Polygon points={body} fill={sansCorps && !selected ? 'transparent' : teinte} stroke="none" />
       ) : (
         <Line
           x1={a.x}

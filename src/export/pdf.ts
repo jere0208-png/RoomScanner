@@ -6,11 +6,11 @@
  * de vues 3D avec les mesures portées sur les murs.
  * PDF 1.4 non compressé, A4, polices Helvetica (WinAnsi).
  */
+import { pocheDesMurs } from '../geometry/poche';
 import type { FloorData, ObjectData } from 'react-native-room-scan';
 import {
   castToWall,
   clampFootprint,
-  quadPoints,
   roomExtent,
   roomHeight,
   roomOf,
@@ -541,6 +541,23 @@ class Draw {
       `q [${dash[0]} ${dash[1]}] 0 d ${n2(r)} ${n2(g)} ${n2(b)} RG ${n2(w)} w 1 J 1 j ` +
         pts.map((p, i) => `${n2(p.x)} ${n2(p.y)} ${i === 0 ? 'm' : 'l'}`).join(' ') +
         ' S Q',
+    );
+  }
+
+  /**
+   * UN REMPLISSAGE À TROUS — les contours en pair-impair : le poché des murs,
+   * où chaque pièce est un trou dans la maçonnerie.
+   */
+  contoursPleins(contours: Pt[][], fillHex: string) {
+    const valides = contours.filter((c) => c.length >= 3);
+    if (valides.length === 0) return;
+    const [r, g, b] = hexRgb(fillHex);
+    this.ops.push(
+      `[] 0 d ${n2(r)} ${n2(g)} ${n2(b)} rg ` +
+        valides
+          .map((c) => c.map((p, i) => `${n2(p.x)} ${n2(p.y)} ${i === 0 ? 'm' : 'l'}`).join(' ') + ' h')
+          .join(' ') +
+        ' f*',
     );
   }
 
@@ -1456,8 +1473,6 @@ function planPage(
     objects,
     colorOpenings,
     showSurfaces,
-    showTextures,
-    floors,
     roomNames,
   } = ctx;
   const d = new Draw();
@@ -1534,10 +1549,6 @@ function planPage(
    */
   const cotesPlafond: Boite[] = [];
   const cartouchesPiece: Boite[] = [];
-  const fillOf = (roomId: string) => {
-    const captured = showTextures ? floors[roomId]?.color : undefined;
-    return captured ? mixHex(captured, '#FFFFFF', 0.42) : '#F5F7FA';
-  };
   const partOf = new Map(parts.map((p) => [p.roomId, p]));
   // Le « dedans » d'une pièce : le point au large, pas le barycentre des
   // extrémités de murs — celui-ci sort de la pièce dès qu'elle est en L.
@@ -2398,12 +2409,14 @@ function planPage(
       }
     }
 
-    // Murs pochés (noir plein, jonctions d'onglet partagées)
-    const quads = wallQuads(walls);
-    for (const w of walls) {
-      const q = quads.get(w.id);
-      if (q) d.poly(quadPoints(q).map(px), INK, null);
-    }
+    /*
+      LA MAÇONNERIE, D'UN SEUL TENANT — comme à l'écran (voir
+      `pocheDesMurs`) : les murs se fondent à leurs jonctions, les façades
+      prennent leur épaisseur vers le dehors, les baies sont des vides.
+    */
+    const poche = pocheDesMurs(walls, openings, ctx.rooms);
+    d.contoursPleins(poche.contours.map((c) => c.map(px)), INK);
+    const baieDuPoche = new Map(poche.baies.map((b) => [b.id, b]));
 
     /*
       LES RECOINS TECHNIQUES, POCHÉS COMME LA MAÇONNERIE — la même encre
@@ -2434,18 +2447,8 @@ function planPage(
       const dx = o.b.x - o.a.x;
       const dz = o.b.z - o.a.z;
       const len = Math.hypot(dx, dz) || 1;
-      const nx = (-dz / len) * (WALL_T / 2 + 0.02);
-      const nz = (dx / len) * (WALL_T / 2 + 0.02);
-      d.poly(
-        [
-          { x: o.a.x + nx, z: o.a.z + nz },
-          { x: o.b.x + nx, z: o.b.z + nz },
-          { x: o.b.x - nx, z: o.b.z - nz },
-          { x: o.a.x - nx, z: o.a.z - nz },
-        ].map(px),
-        showSurfaces && partOf.get(room)?.surface ? fillOf(room) : '#FFFFFF',
-        null,
-      );
+      // La baie est un VIDE dans le poché : plus d'aplat pour effacer le noir.
+      const baie = baieDuPoche.get(o.id);
 
       // Côté intérieur de la pièce
       const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
@@ -2484,8 +2487,20 @@ function planPage(
           0.8,
           GREY,
         );
+      } else if (o.type === 'window' && baie) {
+        // Le dormant aux deux faces du tableau, le vitrage au cœur du mur.
+        const ligne = (decalage: number, w: number, hex: string) => {
+          const p1 = px({ x: baie.a.x + baie.n.x * decalage, z: baie.a.z + baie.n.z * decalage });
+          const p2 = px({ x: baie.b.x + baie.n.x * decalage, z: baie.b.z + baie.n.z * decalage });
+          d.line(p1.x, p1.y, p2.x, p2.y, w, hex);
+        };
+        ligne(baie.plus, 0.6, INK);
+        ligne(-baie.moins, 0.6, INK);
+        const vitre = colorOpenings ? SKY : GREY;
+        ligne(0.015, 0.8, vitre);
+        ligne(-0.015, 0.8, vitre);
       } else {
-        // Fenêtre / ouverture : double trait dans la trouée
+        // Ouverture sans menuiserie : double trait dans la trouée
         const wx = (-dz / len) * (WALL_T / 4);
         const wz = (dx / len) * (WALL_T / 4);
         const color = colorOpenings && o.type === 'window' ? SKY : GREY;

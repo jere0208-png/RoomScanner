@@ -41,7 +41,8 @@ import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../the
 import { haptic } from '../ui/haptic';
 import { ARETES_DU_SCAN, CHAPITRES } from '../data/film';
 import { appartementExemple, NOM_EXEMPLE } from '../data/exemple';
-import { roomParts, toFootprint, wallQuadsOf, type WallSeg } from '../geometry/floorplan';
+import { roomParts, toFootprint, type WallSeg } from '../geometry/floorplan';
+import { cheminDuPoche, pocheDesMurs, type Poche } from '../geometry/poche';
 import { furnKind, furnitureStrokes } from '../geometry/furniture';
 import { LogoEcho } from './LogoMark';
 
@@ -95,11 +96,9 @@ interface PlanDuFilm {
   z0: number;
   lx: number;
   lz: number;
-  murs: { x: number; z: number }[][];
-  /** L'axe de chaque mur : un trait épais referme les jonctions. */
-  axes: { a: { x: number; z: number }; b: { x: number; z: number } }[];
+  /** La maçonnerie d'un seul tenant, et ses baies (voir `pocheDesMurs`). */
+  poche: Poche;
   pieces: { id: string; nom: string; aire: number; pts: { x: number; z: number }[]; label: { x: number; z: number }; humide: boolean }[];
-  baies: { type: string; a: { x: number; z: number }; b: { x: number; z: number } }[];
   meubles: { id: string; modele: string; cx: number; cz: number; yaw: number; w: number; d: number; kind: ReturnType<typeof furnKind> }[];
   total: number;
 }
@@ -111,12 +110,8 @@ export function planDuFilm(): PlanDuFilm {
   if (planMemo) return planMemo;
   const ex = appartementExemple();
   const walls = ex.walls as WallSeg[];
-  const quads = wallQuadsOf(walls);
-  const murs = walls.map((w) => {
-    const q = quads.get(w.id);
-    return q ? [q.a1, q.b1, q.b2, q.a2] : [w.a, w.b, w.b, w.a];
-  });
-  const tous = murs.flat();
+  const poche = pocheDesMurs(walls, ex.openings as WallSeg[], ex.rooms as never);
+  const tous = poche.contours.flat();
   const x0 = Math.min(...tous.map((p) => p.x));
   const z0 = Math.min(...tous.map((p) => p.z));
   const lx = Math.max(...tous.map((p) => p.x)) - x0;
@@ -136,13 +131,11 @@ export function planDuFilm(): PlanDuFilm {
         humide: /(^|[^a-zà-ÿ])(eau|bains?|wc|douche)([^a-zà-ÿ]|$)/i.test(nom),
       };
     });
-  const baies = (ex.openings as WallSeg[]).map((o) => ({ type: o.type, a: o.a, b: o.b }));
   const meubles = (ex.objects as never as Parameters<typeof toFootprint>[0][]).map((o) => {
     const f = toFootprint(o);
     return { id: f.id, modele: f.modele ?? '', cx: f.cx, cz: f.cz, yaw: f.yaw, w: f.width, d: f.depth, kind: furnKind(f.category) };
   });
-  const axes = walls.map((w) => ({ a: w.a, b: w.b }));
-  planMemo = { x0, z0, lx, lz, murs, axes, pieces, baies, meubles, total: pieces.reduce((s, p) => s + p.aire, 0) };
+  planMemo = { x0, z0, lx, lz, poche, pieces, meubles, total: pieces.reduce((s, p) => s + p.aire, 0) };
   return planMemo;
 }
 
@@ -182,56 +175,48 @@ function Sols({ plan, k, c }: { plan: PlanDuFilm; k: ReturnType<typeof cadrage>;
   );
 }
 
-/** Les murs à leur épaisseur, et ce qui les perce : baies et portes. */
+/**
+ * LA MAÇONNERIE, D'UN SEUL TENANT — comme le plan de l'app (voir
+ * `pocheDesMurs`) : façades épaisses, cloisons fines, jonctions fondues, et
+ * des baies qui sont de vrais vides, leur menuiserie en traits fins.
+ */
 function Murs({ plan, k, c }: { plan: PlanDuFilm; k: ReturnType<typeof cadrage>; c: Palette }) {
-  const ep = 0.14 * k.s;
+  const ligne = (b: Poche['baies'][number], d: number) =>
+    `M${k.px(b.a.x + b.n.x * d)} ${k.py(b.a.z + b.n.z * d)} L${k.px(b.b.x + b.n.x * d)} ${k.py(b.b.z + b.n.z * d)}`;
   return (
     <>
-      {plan.murs.map((q, i) => (
-        <Polygon key={i} points={q.map((p) => `${k.px(p.x)},${k.py(p.z)}`).join(' ')} fill={c.ink} />
-      ))}
-      {/* Les jonctions : le trait d'axe, à l'épaisseur du mur, bouche les jours. */}
-      {plan.axes.map((m, i) => (
-        <Path
-          key={`a${i}`}
-          d={`M${k.px(m.a.x)} ${k.py(m.a.z)} L${k.px(m.b.x)} ${k.py(m.b.z)}`}
-          stroke={c.ink}
-          strokeWidth={ep}
-          strokeLinecap="square"
-        />
-      ))}
-      {plan.baies.map((b, i) => {
-        const ax = k.px(b.a.x);
-        const ay = k.py(b.a.z);
-        const bx = k.px(b.b.x);
-        const by = k.py(b.b.z);
-        const L = Math.hypot(bx - ax, by - ay);
-        // La baie efface le mur ; une fenêtre y pose sa vitre.
-        const trou = (
-          <Path key={`t${i}`} d={`M${ax} ${ay} L${bx} ${by}`} stroke={c.surface} strokeWidth={ep + 1.2} />
-        );
+      <Path
+        d={cheminDuPoche(plan.poche.contours, (p) => ({ x: k.px(p.x), y: k.py(p.z) }))}
+        fill={c.ink}
+        fillRule="evenodd"
+      />
+      {plan.poche.baies.map((b, i) => {
         if (b.type === 'window') {
           return (
             <G key={i}>
-              {trou}
-              <Path d={`M${ax} ${ay} L${bx} ${by}`} stroke={c.sky} strokeWidth={Math.max(1.2, ep * 0.28)} />
+              <Path d={ligne(b, b.plus)} stroke={c.ink} strokeWidth={1} />
+              <Path d={ligne(b, -b.moins)} stroke={c.ink} strokeWidth={1} />
+              <Path d={ligne(b, 0.015)} stroke={c.sky} strokeWidth={1.1} />
+              <Path d={ligne(b, -0.015)} stroke={c.sky} strokeWidth={1.1} />
             </G>
           );
         }
         if (b.type === 'door') {
           // Le vantail, ouvert à angle droit vers l'intérieur du logement, et son arc.
+          const ax = k.px(b.a.x);
+          const ay = k.py(b.a.z);
+          const bx = k.px(b.b.x);
+          const by = k.py(b.b.z);
+          const L = Math.hypot(bx - ax, by - ay);
           const ux = (bx - ax) / L;
           const uy = (by - ay) / L;
           const cx = k.px(plan.x0 + plan.lx / 2) - (ax + bx) / 2;
           const cy = k.py(plan.z0 + plan.lz / 2) - (ay + by) / 2;
           const sens = -uy * cx + ux * cy >= 0 ? 1 : -1;
-          const nx = -uy * sens;
-          const ny = ux * sens;
-          const vx = ax + nx * L;
-          const vy = ay + ny * L;
+          const vx = ax - uy * sens * L;
+          const vy = ay + ux * sens * L;
           return (
             <G key={i}>
-              {trou}
               <Path d={`M${ax} ${ay} L${vx} ${vy}`} stroke={c.inkSoft} strokeWidth={1.4} />
               <Path
                 d={`M${vx} ${vy} A${L} ${L} 0 0 ${sens > 0 ? 0 : 1} ${bx} ${by}`}
@@ -243,7 +228,13 @@ function Murs({ plan, k, c }: { plan: PlanDuFilm; k: ReturnType<typeof cadrage>;
             </G>
           );
         }
-        return trou;
+        // Un passage : son linteau, en tireté.
+        return (
+          <G key={i}>
+            <Path d={ligne(b, b.plus)} stroke={c.inkFaint} strokeWidth={1} strokeDasharray="4 3" />
+            <Path d={ligne(b, -b.moins)} stroke={c.inkFaint} strokeWidth={1} strokeDasharray="4 3" />
+          </G>
+        );
       })}
     </>
   );

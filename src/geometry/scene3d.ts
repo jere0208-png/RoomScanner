@@ -16,6 +16,8 @@ import {
   roomParts,
   toFootprint,
   wallQuads,
+  jonctionsDeMurs,
+  epaisseurDe,
   wallsCentroid,
   WALL_T,
   type RoomShape,
@@ -1989,6 +1991,8 @@ export function buildScene(
   /** `at` = centre du pan bordé : c'est lui qui donne sa place à l'arête. */
   /** Numéro du pan en cours : ses arêtes le porteront. */
   let panCourant = 0;
+  /** La teinte de l'arase de chaque mur : le cœur des jonctions la reprend. */
+  const araseDe = new Map<string, string>();
   const pushEdge = (p: P3, q: P3, stroke: string, normal?: P3, at?: P3) => {
     faces.push({
       pts: [p, q],
@@ -2186,7 +2190,14 @@ export function buildScene(
     facing: 1 | -1 = 1,
     /** D'un seul tenant : un dessus de meuble ne se découpe pas. */
     whole = false,
+    /**
+     * Les bouts à cerner. Là où des murs se rejoignent, la coupe d'onglet
+     * est INTERNE à la maçonnerie : la tracer dessinait, à une jonction de
+     * trois murs, le contour d'un triangle au milieu de l'arase.
+     */
+    bouts: { debut: boolean; fin: boolean } = { debut: true, fin: true },
   ) => {
+    const tousLesBouts = bouts.debut && bouts.fin;
     const n = whole
       ? 1
       : Math.max(1, Math.ceil(Math.hypot(e1b.x - e1a.x, e1b.z - e1a.z) / step));
@@ -2206,11 +2217,11 @@ export function buildScene(
         fill,
         // Même raison qu'au-dessus : d'un seul tenant, le dessus d'un meuble
         // porte son propre contour.
-        stroke: whole ? outline ?? null : null,
+        stroke: whole && tousLesBouts ? outline ?? null : null,
         normal,
       });
-      if (!outline || whole) continue;
-      if (n === 1) {
+      if (!outline || (whole && tousLesBouts)) continue;
+      if (n === 1 && tousLesBouts) {
         pushOutline([c1, c2, c3, c4].map(at), outline, normal);
         continue;
       }
@@ -2219,10 +2230,28 @@ export function buildScene(
         y,
         z: (c1.z + c2.z + c3.z + c4.z) / 4,
       };
-      pushEdge(at(c1), at(c2), outline, normal, mid);
-      pushEdge(at(c4), at(c3), outline, normal, mid);
-      if (i === 0) pushEdge(at(c1), at(c4), outline, normal, mid);
-      if (i === n - 1) pushEdge(at(c2), at(c3), outline, normal, mid);
+      /*
+        Les longs côtés, par BANDES : un dessus d'un seul tenant dont on ne
+        cerne pas les bouts trace ses côtés lui-même, et un trait de quatre
+        mètres se trierait à une profondeur moyenne — à travers les meubles.
+      */
+      const bandes = whole ? Math.max(1, Math.ceil(Math.hypot(c2.x - c1.x, c2.z - c1.z) / step)) : 1;
+      for (let b = 0; b < bandes; b++) {
+        const u0 = b / bandes;
+        const u1 = (b + 1) / bandes;
+        const h1 = lerp2(c1, c2, u0);
+        const h2 = lerp2(c1, c2, u1);
+        const k1 = lerp2(c4, c3, u0);
+        const k2 = lerp2(c4, c3, u1);
+        const milieu: P3 =
+          bandes === 1
+            ? mid
+            : { x: (h1.x + h2.x + k1.x + k2.x) / 4, y, z: (h1.z + h2.z + k1.z + k2.z) / 4 };
+        pushEdge(at(h1), at(h2), outline, normal, milieu);
+        pushEdge(at(k1), at(k2), outline, normal, milieu);
+      }
+      if (i === 0 && bouts.debut) pushEdge(at(c1), at(c4), outline, normal, mid);
+      if (i === n - 1 && bouts.fin) pushEdge(at(c2), at(c3), outline, normal, mid);
     }
   };
 
@@ -2281,6 +2310,8 @@ export function buildScene(
        * l'épaisseur du mur peinte en bleu vitrage, selon l'angle.
        */
       facesSeules?: boolean;
+      /** Les extrémités du mur qui rejoignent d'autres murs (voir `pushTopStrips`). */
+      joints?: { a: boolean; b: boolean };
     },
   ) => {
     if (t1 - t0 < 1e-4 || yt - yb < 1e-4) return;
@@ -2326,7 +2357,10 @@ export function buildScene(
     // Tableaux (chants) : trop étroits pour mériter un découpage.
     face(p2, p1);
     face(r1, r2);
-    pushTopStrips(p1, r1, p2, r2, yt, o.top, o.topStroke, 1, o.whole);
+    pushTopStrips(p1, r1, p2, r2, yt, o.top, o.topStroke, 1, o.whole, {
+      debut: !(o.joints?.a && t0 < 1e-6),
+      fin: !(o.joints?.b && t1 > 1 - 1e-6),
+    });
     if (o.closeBottom) {
       pushTopStrips(r1, p1, r2, p2, yb, o.top, o.topStroke, -1, o.whole);
     }
@@ -2472,15 +2506,24 @@ export function buildScene(
     */
     const fondDedans = plusIsInner ? fondPlus : fondMoins;
     const teinteMur = peintPlus ?? peintMoins ?? avg;
+    /** Une extrémité est jointe si un autre mur y aboutit, ou la porte. */
+    const jointe = (p: Pt) =>
+      walls.some(
+        (v) =>
+          v.id !== w.id &&
+          ([v.a, v.b].some((q) => Math.hypot(q.x - p.x, q.z - p.z) < 1e-3) ||
+            pointOnSeg(p, v.a, v.b).dist < epaisseurDe(v) / 2 + 1e-3),
+      );
+    const arase =
+      fondDedans === pal.wall ? pal.wallTop : mixHex(fondDedans, '#FFFFFF', 0.45);
+    araseDe.set(w.id, arase);
     const skin = {
+      joints: { a: jointe(w.a), b: jointe(w.b) },
       // Marque les deux faces : `pushWallBlock` saura laquelle est dehors.
       cutaway: true,
       fill: fondPlus,
       fillMoins: fondMoins,
-      top:
-        fondDedans === pal.wall
-          ? pal.wallTop
-          : mixHex(fondDedans, '#FFFFFF', 0.45),
+      top: arase,
       stroke: pal.wallStroke,
       topStroke: pal.wallTopStroke,
       captured: !!teinteMur,
@@ -3117,6 +3160,35 @@ export function buildScene(
         (part.surface?.pts.length ?? 0) >= 3 &&
         pointInPolygon(p, part.surface!.pts),
     )?.roomId;
+
+  // ------------------------------------------------------------ jonctions
+  /*
+    LE CŒUR DES NŒUDS DE TROIS MURS — relevé du patron : « des triangles
+    visibles dans les murs lors de jonctions ». Les chants des murs bordent
+    ce cœur (voir `jonctionsDeMurs`), mais personne ne le couvrait : vu d'en
+    haut, un puits dans l'arase. On lui pose son dessus, à la hauteur des
+    murs qui s'y rejoignent et de la couleur de leur arase.
+  */
+  for (const j of jonctionsDeMurs(walls)) {
+    const cx = j.reduce((a, p) => a + p.x, 0) / j.length;
+    const cz = j.reduce((a, p) => a + p.z, 0) / j.length;
+    const autour = walls.filter((w) =>
+      [w.a, w.b].some((p) => Math.hypot(p.x - cx, p.z - cz) < 0.3),
+    );
+    if (autour.length === 0) continue;
+    const y = Math.max(...autour.map((w) => w.height));
+    panCourant += 1;
+    faces.push({
+      panId: panCourant,
+      pts: j.map((p) => ({ x: p.x, y, z: p.z })),
+      fill: araseDe.get(autour[0].id) ?? pal.wallTop,
+      stroke: null,
+      normal: { x: 0, y: 1, z: 0 },
+      // Peint AVANT les traits des faces : son liseré, de sa propre couleur,
+      // ne doit pas entamer le trait de la face extérieure qu'il touche.
+      bias: -EDGE_BIAS,
+    });
+  }
 
   // ------------------------------------------------------------ meubles
   // Un meuble n'est recalé que contre les murs de SA pièce : sinon la

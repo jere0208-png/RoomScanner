@@ -217,11 +217,11 @@ describe('un film réaliste', () => {
     expect(humide('Séjour')).toBe(false);
   });
 
-  it('chaque porte s’ouvre vers l’intérieur du logement', () => {
+  it('le plan du film est le poché de l’app, portes comprises', () => {
     const plan = planDuFilm();
-    expect(plan.baies.some((b) => b.type === 'door')).toBe(true);
-    // Les murs, à leur épaisseur, ET leurs axes qui bouchent les jonctions.
-    expect(plan.axes).toHaveLength(plan.murs.length);
+    expect(plan.poche.baies.some((b) => b.type === 'door')).toBe(true);
+    // La maçonnerie d'un seul tenant, comme le plan de l'app.
+    expect(plan.poche.contours.length).toBeGreaterThan(0);
   });
 
   it('l’aménagement pose CHAQUE meuble de l’exemple', () => {

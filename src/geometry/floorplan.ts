@@ -570,6 +570,61 @@ export function wallQuadsOf(
 }
 
 /**
+ * LES JONCTIONS — la maçonnerie au cœur d'un nœud de trois murs ou plus.
+ *
+ * Relevé du patron : « il y a des triangles visibles dans les murs lors de
+ * jonctions ». À un nœud où trois murs se rejoignent (une cloison qui tombe
+ * sur un mur coupé à cet endroit — toute jonction en T d'un plan relevé), les
+ * onglets de `wallQuads` se partagent leurs coins deux à deux, mais leurs
+ * bouts bordent au centre un polygone que personne ne remplit : le triangle
+ * blanc du plan, le puits de la maquette, le trou du PDF.
+ *
+ * On ne rallonge PAS les murs pour le boucher : leur contour donne aussi
+ * leurs FACES (`wallFace`), c'est-à-dire les cotes « depuis la gauche,
+ * depuis la droite » de l'établi — elles doivent rester où elles sont. La
+ * jonction a donc SON polygone : les coins d'onglet du nœud, dans l'ordre
+ * angulaire autour de lui. Chaque rendu le peint avec les murs.
+ */
+export function jonctionsDeMurs(walls: WallSeg[], t?: number): Pt[][] {
+  const quads = wallQuadsOf(walls, t);
+  const noeuds = new Map<string, { p: Pt; coins: Pt[]; bras: number }>();
+  for (const w of walls) {
+    if (Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) < 1e-6) continue;
+    const q = quads.get(w.id);
+    if (!q) continue;
+    for (const end of ['a', 'b'] as const) {
+      const k = `${roomOf(w)}|${nodeKey(w[end])}`;
+      const n = noeuds.get(k) ?? { p: w[end], coins: [], bras: 0 };
+      n.bras++;
+      n.coins.push(...(end === 'a' ? [q.a1, q.a2] : [q.b1, q.b2]));
+      noeuds.set(k, n);
+    }
+  }
+  const out: Pt[][] = [];
+  for (const n of noeuds.values()) {
+    if (n.bras < 3) continue;
+    const tries = n.coins
+      .map((c) => ({ c, ang: Math.atan2(c.z - n.p.z, c.x - n.p.x) }))
+      .sort((u, v) => u.ang - v.ang);
+    const poly: Pt[] = [];
+    for (const { c } of tries) {
+      if (!poly.some((d) => Math.hypot(d.x - c.x, d.z - c.z) < 1e-6)) poly.push(c);
+    }
+    if (poly.length >= 3) out.push(poly);
+  }
+  return out;
+}
+
+let jonctionsMemo: { walls: WallSeg[]; t: number | undefined; liste: Pt[][] } | null = null;
+/** `jonctionsDeMurs` mémoïsé, comme `wallQuadsOf`, sur l'identité des murs. */
+export function jonctionsDeMursOf(walls: WallSeg[], t?: number): Pt[][] {
+  if (jonctionsMemo && jonctionsMemo.walls === walls && jonctionsMemo.t === t) return jonctionsMemo.liste;
+  const liste = jonctionsDeMurs(walls, t);
+  jonctionsMemo = { walls, t, liste };
+  return liste;
+}
+
+/**
  * Où pointe le nord à l'écran, en radians (0 = vers la droite, sens horaire
  * — la convention des rotations SVG).
  *

@@ -35,7 +35,7 @@ npx jest
 
 echo "── Commit et push"
 git add -A
-git commit -q -m "$MESSAGE"$'\n\n'"Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
+git commit -q -m "$MESSAGE"$'\n\n'"Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push -q origin main
 SHA=$(git rev-parse HEAD)
 echo "   $SHA"

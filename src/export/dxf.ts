@@ -21,6 +21,7 @@
  * conventions du dessin de bâtiment, et les deux erreurs qui ne se voient
  * qu'une fois le mobilier commandé.
  */
+import { pocheDesMurs } from '../geometry/poche';
 import {
   arcDuBattant,
   pivotsDesBattants,
@@ -247,11 +248,17 @@ export function buildDxf(plan: PlanPourDxf): string {
     calculé pour le plan — le même que celui du PDF, jonctions d'onglet
     comprises.
   */
+  /*
+    ET D'UN SEUL TENANT — le contour de la maçonnerie (voir `pocheDesMurs`),
+    pas un rectangle par mur : l'architecte reçoit des murs qui se fondent à
+    leurs jonctions, des façades à leur épaisseur, des baies ouvertes. Un mur
+    sans corps (longueur nulle) garde son trait.
+  */
+  const poche = pocheDesMurs(plan.walls, plan.openings, plan.rooms);
+  for (const contour of poche.contours) out += polyligne(CALQUE.murs, contour);
   const quads = wallQuadsOf(plan.walls);
   for (const w of plan.walls) {
-    const q = quads.get(w.id);
-    if (q) out += polyligne(CALQUE.murs, [q.a1, q.b1, q.b2, q.a2]);
-    else out += ligne(CALQUE.murs, w.a, w.b);
+    if (!quads.get(w.id)) out += ligne(CALQUE.murs, w.a, w.b);
   }
 
   /*

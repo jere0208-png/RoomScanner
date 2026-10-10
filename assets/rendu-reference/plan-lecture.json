@@ -996,6 +996,23 @@
          ]
         },
         {
+         "type": "RNSVGPath",
+         "props": {
+          "fill": {
+           "type": 0,
+           "payload": 4278914322
+          },
+          "fillRule": 0,
+          "propList": [
+           "fill",
+           "fillRule"
+          ],
+          "testID": "poche-des-murs",
+          "d": "M473.65 231.35 L261.35 231.35 L261.35 282.50 L248.15 282.50 L248.15 218.15 L532.50 218.15 L532.50 231.35 L481.35 231.35 L481.35 282.50 L473.65 282.50 Z M638.65 231.35 L598.50 231.35 L598.50 218.15 L651.85 218.15 L651.85 282.50 L638.65 282.50 Z M638.65 388.65 L638.65 348.50 L651.85 348.50 L651.85 401.85 L248.15 401.85 L248.15 332.00 L261.35 332.00 L261.35 388.65 L473.65 388.65 L473.65 332.00 L481.35 332.00 L481.35 388.65 Z"
+         },
+         "children": null
+        },
+        {
          "type": "RNSVGGroup",
          "props": {
           "fill": {
@@ -1009,7 +1026,7 @@
            "props": {
             "fill": {
              "type": 0,
-             "payload": 4278914322
+             "payload": 0
             },
             "stroke": null,
             "propList": [
@@ -1091,7 +1108,7 @@
            "props": {
             "fill": {
              "type": 0,
-             "payload": 4278914322
+             "payload": 0
             },
             "stroke": null,
             "propList": [
@@ -1173,7 +1190,7 @@
            "props": {
             "fill": {
              "type": 0,
-             "payload": 4278914322
+             "payload": 0
             },
             "stroke": null,
             "propList": [
@@ -1255,7 +1272,7 @@
            "props": {
             "fill": {
              "type": 0,
-             "payload": 4278914322
+             "payload": 0
             },
             "stroke": null,
             "propList": [
@@ -1337,7 +1354,7 @@
            "props": {
             "fill": {
              "type": 0,
-             "payload": 4278914322
+             "payload": 0
             },
             "stroke": null,
             "propList": [
@@ -1419,7 +1436,7 @@
            "props": {
             "fill": {
              "type": 0,
-             "payload": 4278914322
+             "payload": 0
             },
             "stroke": null,
             "propList": [
@@ -1501,7 +1518,7 @@
            "props": {
             "fill": {
              "type": 0,
-             "payload": 4278914322
+             "payload": 0
             },
             "stroke": null,
             "propList": [
@@ -1604,47 +1621,6 @@
           {
            "type": "RNSVGPath",
            "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4293915125
-            },
-            "stroke": null,
-            "propList": [
-             "fill",
-             "stroke"
-            ],
-            "d": "M253.43 282.5 253.43 332 261.57 332 261.57 282.5z"
-           },
-           "children": null
-          },
-          {
-           "type": "RNSVGLine",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278190080
-            },
-            "stroke": {
-             "type": 0,
-             "payload": 4293435707
-            },
-            "strokeWidth": 3,
-            "strokeLinecap": 0,
-            "propList": [
-             "stroke",
-             "strokeWidth",
-             "strokeLinecap"
-            ],
-            "x1": 257.5,
-            "y1": 282.5,
-            "x2": 257.5,
-            "y2": 332
-           },
-           "children": null
-          },
-          {
-           "type": "RNSVGPath",
-           "props": {
             "fill": null,
             "stroke": {
              "type": 0,
@@ -1689,47 +1665,6 @@
             "propList": [
              "stroke",
              "strokeWidth"
-            ],
-            "x1": 477.5,
-            "y1": 282.5,
-            "x2": 477.5,
-            "y2": 332
-           },
-           "children": null
-          },
-          {
-           "type": "RNSVGPath",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4293915125
-            },
-            "stroke": null,
-            "propList": [
-             "fill",
-             "stroke"
-            ],
-            "d": "M473.43 282.5 473.43 332 481.57 332 481.57 282.5z"
-           },
-           "children": null
-          },
-          {
-           "type": "RNSVGLine",
-           "props": {
-            "fill": {
-             "type": 0,
-             "payload": 4278190080
-            },
-            "stroke": {
-             "type": 0,
-             "payload": 4293435707
-            },
-            "strokeWidth": 3,
-            "strokeLinecap": 0,
-            "propList": [
-             "stroke",
-             "strokeWidth",
-             "strokeLinecap"
             ],
             "x1": 477.5,
             "y1": 282.5,
@@ -1794,18 +1729,30 @@
            "children": null
           },
           {
-           "type": "RNSVGPath",
+           "type": "RNSVGLine",
            "props": {
             "fill": {
              "type": 0,
-             "payload": 4293915125
+             "payload": 4278190080
             },
-            "stroke": null,
-            "propList": [
-             "fill",
-             "stroke"
+            "stroke": {
+             "type": 0,
+             "payload": 4288192942
+            },
+            "strokeWidth": 1,
+            "strokeDasharray": [
+             "4",
+             "3"
             ],
-            "d": "M532.5 231.57 598.5 231.57 598.5 223.43 532.5 223.43z"
+            "propList": [
+             "stroke",
+             "strokeWidth",
+             "strokeDasharray"
+            ],
+            "x1": 532.5,
+            "y1": 231.35,
+            "x2": 598.5,
+            "y2": 231.35
            },
            "children": null
           },
@@ -1818,19 +1765,22 @@
             },
             "stroke": {
              "type": 0,
-             "payload": 4282300645
+             "payload": 4288192942
             },
-            "strokeWidth": 3,
-            "strokeLinecap": 0,
+            "strokeWidth": 1,
+            "strokeDasharray": [
+             "4",
+             "3"
+            ],
             "propList": [
              "stroke",
              "strokeWidth",
-             "strokeLinecap"
+             "strokeDasharray"
             ],
             "x1": 532.5,
-            "y1": 227.5,
+            "y1": 218.15,
             "x2": 598.5,
-            "y2": 227.5
+            "y2": 218.15
            },
            "children": null
           }
@@ -1869,18 +1819,48 @@
            "children": null
           },
           {
-           "type": "RNSVGPath",
+           "type": "RNSVGLine",
            "props": {
             "fill": {
              "type": 0,
-             "payload": 4293915125
+             "payload": 4278190080
             },
-            "stroke": null,
+            "stroke": {
+             "type": 0,
+             "payload": 4278914322
+            },
+            "strokeWidth": 1,
             "propList": [
-             "fill",
-             "stroke"
+             "stroke",
+             "strokeWidth"
             ],
-            "d": "M638.4300000000001 282.5 638.4300000000001 348.5 646.5699999999999 348.5 646.5699999999999 282.5z"
+            "x1": 638.65,
+            "y1": 282.5,
+            "x2": 638.65,
+            "y2": 348.5
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGLine",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "stroke": {
+             "type": 0,
+             "payload": 4278914322
+            },
+            "strokeWidth": 1,
+            "propList": [
+             "stroke",
+             "strokeWidth"
+            ],
+            "x1": 651.85,
+            "y1": 282.5,
+            "x2": 651.85,
+            "y2": 348.5
            },
            "children": null
           },
@@ -1895,16 +1875,37 @@
              "type": 0,
              "payload": 4282300645
             },
-            "strokeWidth": 3,
-            "strokeLinecap": 0,
+            "strokeWidth": 1.1,
             "propList": [
              "stroke",
-             "strokeWidth",
-             "strokeLinecap"
+             "strokeWidth"
             ],
-            "x1": 642.5,
+            "x1": 641.675,
             "y1": 282.5,
-            "x2": 642.5,
+            "x2": 641.675,
+            "y2": 348.5
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGLine",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 4278190080
+            },
+            "stroke": {
+             "type": 0,
+             "payload": 4282300645
+            },
+            "strokeWidth": 1.1,
+            "propList": [
+             "stroke",
+             "strokeWidth"
+            ],
+            "x1": 643.325,
+            "y1": 282.5,
+            "x2": 643.325,
             "y2": 348.5
            },
            "children": null

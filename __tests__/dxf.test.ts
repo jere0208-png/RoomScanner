@@ -226,19 +226,30 @@ describe('le fichier relu comme le fera AutoCAD', () => {
     return entites;
   };
 
-  it('reconstruit des murs a la bonne cote', () => {
+  /*
+    LA MAÇONNERIE D'UN SEUL TENANT — relevé du patron, plans d'architecte à
+    l'appui : « un mur en continu avec celui qu'il rencontre ». L'architecte
+    reçoit le contour de la maçonnerie (voir `pocheDesMurs`), pas un
+    rectangle par mur : pour une pièce, la face de façade et la face du
+    dedans, deux contours fermés, sans un trait de jonction entre eux.
+  */
+  it('reconstruit la maçonnerie a la bonne cote, d un seul tenant', () => {
     const dxf = buildDxf(PLAN);
     const murs = relire(dxf).filter(
       (e) => e.type === 'POLYLINE' && e.calque === 'ECHOPLAN-MURS',
     );
-    expect(murs).toHaveLength(4);
-    // Le contour du mur nord fait 4 m de long : on mesure son etendue.
-    const nord = murs[0];
-    const xs = nord.pts.map((q) => q.x);
-    const large = Math.max(...xs) - Math.min(...xs);
-    // Quatre metres, aux jonctions d onglet pres.
-    expect(large).toBeGreaterThan(3800);
-    expect(large).toBeLessThan(4300);
+    expect(murs).toHaveLength(2);
+    // Le premier sommet relu est l en-tete de la polyligne : on l ecarte.
+    const larges = murs
+      .map((m) => {
+        const xs = m.pts.slice(1).map((q) => q.x);
+        return Math.max(...xs) - Math.min(...xs);
+      })
+      .sort((a, b) => a - b);
+    // Le dedans : 4 m d axe, moins une demi-epaisseur de chaque cote.
+    expect(larges[0]).toBeCloseTo(4000 - 140, 0);
+    // La facade : plus une demi-epaisseur et la surepaisseur, de chaque cote.
+    expect(larges[1]).toBeCloseTo(4000 + 140 + 2 * 100, 0);
   });
 
   it('ne laisse aucune entite sans calque', () => {

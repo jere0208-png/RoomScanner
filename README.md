@@ -14285,6 +14285,66 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Un plan d'architecte : la maçonnerie d'un seul tenant
+
+Relevés du patron : « il y a des triangles visibles dans les murs lors de
+jonctions », puis, plans d'architecte à l'appui : « pas de triangle de
+jonction, tout est clean. On ne doit pas peindre mais revoir le système de
+jonction lui-même pour qu'il s'adapte et fasse un mur en continu avec celui
+qu'il rencontre. Les murs extérieurs (périphériques à la construction) sont
+plus épais. »
+
+LA CAUSE. Le plan dessinait chaque mur pour lui-même, taillé en onglet contre
+ses voisins (`wallQuads`). À deux murs, les onglets se rejoignaient — avec une
+couture d'anticrénelage ; à trois (toute jonction en T d'un plan relevé), ils
+ne se touchaient qu'en un point et laissaient au cœur du nœud un triangle que
+personne ne remplissait (364 points vides mesurés dans une jonction en T, 676
+dans une croix).
+
+LE SYSTÈME. Un plan d'architecte ne dessine pas des murs, il dessine LA
+MAÇONNERIE : une seule forme. `geometry/poche.ts` la calcule :
+
+- **l'union exacte** des corps de murs et du cœur de chaque nœud de trois
+  murs (`jonctionsDeMurs`, le polygone que bordent leurs coupes, qui fait
+  partie du mur) : tous les bords sont découpés à leurs croisements (un
+  balayage trié), un morceau n'est gardé que s'il sépare la maçonnerie du
+  vide, les morceaux se chaînent en contours et les points alignés
+  s'effacent. Le mur rencontré CONTINUE : sa face opposée est un seul trait
+  droit d'un angle à l'autre ; les pièces sont des trous de la forme,
+  remplie en pair-impair ;
+- **les façades** — les bords qui donnent sur le dehors — reçoivent une bande
+  de 10 cm vers l'extérieur, angles saillants pleins : un mur de façade de
+  14 cm en fait 24, les cloisons gardent leur épaisseur, et l'intérieur
+  (pièces, surfaces, faces où l'on pose les appareils) ne bouge pas ;
+- **les baies** sont retranchées à travers toute l'épaisseur : de vrais vides.
+  La menuiserie s'y dessine en traits fins — dormant aux deux faces du
+  tableau, vitrage double au cœur — ; un passage sans porte a son linteau en
+  tireté ; la porte garde son vantail et son arc.
+
+Les corps de murs restent : ils donnent les FACES (`wallFace`), donc les cotes
+de l'établi, le toucher sur le plan, et le bleu du mur choisi ; ils ne sont
+simplement plus peints. Le plan (`FloorplanEditor`), le PDF (remplissage
+pair-impair, plus d'aplat sur les baies), le DXF (le contour de la maçonnerie
+au lieu d'un rectangle par mur) et le plan du film suivent la même forme. Le
+poché se calcule sur une valeur différée : le doigt qui fait glisser un mur
+n'attend jamais l'union.
+
+En 3D, les murs restent des volumes : le cœur des nœuds de trois murs reçoit
+son dessus à la teinte de l'arase, et les coupes d'onglet internes ne sont
+plus tracées sur les dessus.
+
+Bancs : `poche.test.ts` — une seule forme pleine au cœur d'une jonction en T,
+sa face opposée un seul trait droit, la croix, l'anneau d'une pièce (le
+dedans est un trou), dans l'appartement d'exemple : façades épaissies vers le
+dehors seulement, angle saillant plein, cloisons à leur épaisseur, baies
+vides de part en part (et la menuiserie sait l'épaisseur où elle se loge),
+aucun nœud lacunaire, calcul mémoïsé ; `jonctions.test.ts` — la géométrie du
+cœur des nœuds et des faces inchangées ; `jonctionsrendu.test.tsx` — le plan
+dessine un seul chemin de maçonnerie, plus aucun corps peint sauf le mur
+choisi, la 3D pose le dessus des jonctions ; `renderplan` — plus aucune
+trouée peinte ; `dxf` — la maçonnerie relue d'un seul tenant, à la bonne
+cote ; les planches de référence ont été régénérées.
+
 ## « Comment ça marche » devient un film
 
 Relevé du patron : « les tutos de comment ça marche sont mal faits ; fais un
