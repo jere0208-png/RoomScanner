@@ -37,16 +37,27 @@ import {
 } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RoomScanVisite, poserCameraDeVisite } from 'react-native-room-scan';
+import { RoomScanVisite, poserCameraDeVisite, poserLampesDeVisite } from 'react-native-room-scan';
 import { Iso3DView } from './Iso3DView';
 import { SOLAIRES } from '../ui/solaires';
 import { floorsOf, useScanStore } from '../store/scanStore';
 import { useModeElec } from '../store/usage';
-import { filtrerAuNiveau, type Pt } from '../geometry/floorplan';
+import { filtrerAuNiveau, roomParts, type Pt } from '../geometry/floorplan';
 import { buildScene, type ScenePalette } from '../geometry/scene3d';
 import { cameraNative, maillageDeLaVisite } from '../geometry/visite3d';
 import { maillageDesMeubles } from '../geometry/modeles3d';
 import { groupesDesAppareils } from '../geometry/appareils3d';
+import {
+  basculer,
+  interrupteurSousLeDoigt,
+  interrupteursDeLaVisite,
+  lampesDeLaScene,
+  lampesDeLInterrupteur,
+  lampesPourLeNatif,
+  rangsDesLampes,
+  type Lampe,
+} from '../geometry/lumieres';
+import { fixturePlacement, roomInputsOf } from '../geometry/nfc15100';
 import { mixHex } from '../geometry/appearance';
 import { MAQUETTE, matieresDesSols } from '../ui/maquette';
 import { hexDePeinture } from '../ui/peintures';
@@ -60,12 +71,18 @@ import { haptic, releaseHaptic } from '../ui/haptic';
 import { ombreBouton, radius, themedStyles, useTheme, type Palette } from '../theme';
 
 /**
- * LE PAS — 1,4 m/s à fond de manette : celui de quelqu'un qui visite.
+ * LE PAS — 1,65 m/s à fond de manette : celui de quelqu'un qui visite d'un
+ * bon pas.
  *
- * Plus vite, on traverse un séjour en deux secondes et l'on ne voit rien ;
- * plus lentement, on s'impatiente devant un couloir.
+ * Relevé du patron : « accélère légèrement la marche ». À 1,4 m/s, on
+ * s'impatientait dans un couloir ; plus vite encore, on traverse un séjour
+ * en deux secondes et l'on ne voit rien. L'élan, lui, ne bouge pas : on
+ * part et on s'arrête aussi net qu'avant.
  */
-export const VITESSE_MARCHE = 1.4;
+export const VITESSE_MARCHE = 1.65;
+/** Un appui, pas un geste : moins de trois dixièmes de seconde, à peine bougé. */
+const APPUI_MS = 300;
+const APPUI_PX = 12;
 /**
  * L'OUVERTURE DU REGARD — 68° EN LARGEUR, quelle que soit la forme de l'écran.
  *
@@ -327,9 +344,15 @@ export function Exploration({
     });
     // Les caisses restent au canevas : la visite a les vrais meubles, et la
     // vraie prise au mur (voir `appareils3d`).
+    /*
+      CHAQUE LAMPE A SON DIFFUSEUR À ELLE — il s'allume avec elle (voir
+      `lumieres`). Les autres matières se partagent leurs groupes, comme avant.
+    */
+    const lampes = lampesDeLaScene(appareils ?? []);
     return {
       ...maillageDeLaVisite(faces, { sansMeubles: true }),
-      meubles: maillageDesMeubles(meubles ?? [], groupesDesAppareils(appareils ?? [])),
+      meubles: maillageDesMeubles(meubles ?? [], groupesDesAppareils(appareils ?? [], rangsDesLampes(lampes))),
+      lampes,
     };
   }, [
     natif,
@@ -344,6 +367,27 @@ export function Exploration({
     ceiling,
     peintures,
   ]);
+  /*
+    LES INTERRUPTEURS DE LA VISITE, et ce que chacun allume — relevé du
+    patron : « donne la possibilité d'allumer les lumières depuis un
+    interrupteur ». Les liens du plan d'abord ; sans lien, la pièce où il est.
+  */
+  const inters = useMemo(() => interrupteursDeLaVisite(fixtures, walls), [fixtures, walls]);
+  const pieceDe = useMemo(() => {
+    const entrees = roomInputsOf(
+      rooms.map((r) => ({ ...r, name: r.name ?? '' })),
+      roomParts(walls, rooms),
+    );
+    const placement = fixturePlacement(fixtures, walls, entrees);
+    return (f: { id: string }) => placement.get(f.id);
+  }, [fixtures, walls, rooms]);
+  const [allumees, setAllumees] = useState<ReadonlySet<string>>(() => new Set());
+  // On entre de jour : les lampes s'allument à la main, une visite à la fois.
+  useEffect(() => {
+    if (!visible) setAllumees(new Set());
+  }, [visible]);
+  const lampes: Lampe[] = useMemo(() => maille?.lampes ?? [], [maille]);
+
   // Derrière les baies : un ciel clair, dans la teinte du thème.
   const fond = useMemo(() => mixHex(teinte.sky, '#FFFFFF', 0.55), [teinte.sky]);
 
@@ -412,6 +456,36 @@ export function Exploration({
     demande.current = 0;
   }, [vue, plancher]);
 
+  /*
+    UN APPUI BREF SUR UN INTERRUPTEUR L'ACTIONNE — et rien d'autre ne change :
+    la marche et le regard gardent leurs pouces. Moins de trois dixièmes de
+    seconde, à peine bougé : c'est un appui, pas un pas ni un regard. La cible
+    est plus large que le mécanisme, et un interrupteur derrière une cloison
+    ne répond pas (voir `interrupteurSousLeDoigt`).
+  */
+  const appuiFini = (d: Doigt) => {
+    if (Date.now() - d.t0 > APPUI_MS) return;
+    if (Math.hypot(d.x - d.x0, d.y - d.y0) > APPUI_PX) return;
+    if (inters.length === 0 || lampes.length === 0) return;
+    const p = pose.current;
+    const id = interrupteurSousLeDoigt(
+      { x: d.x, y: d.y },
+      { x: p.x, y: HAUTEUR_OEIL, z: p.z, lacet: p.lacet, tangage: p.tangage, fov: ouverture },
+      { w: largeur, h: hauteur },
+      inters,
+      obstacles,
+    );
+    if (!id) return;
+    const inter = fixtures.find((f) => f.id === id);
+    if (!inter) return;
+    const siennes = lampesDeLInterrupteur(inter, fixtures, ceiling, pieceDe).filter((l) =>
+      lampes.some((x) => x.id === l),
+    );
+    if (siennes.length === 0) return;
+    haptic('accroche');
+    setAllumees((avant) => basculer(avant, siennes));
+  };
+
   /** Pose la caméra là où elle doit aller — vue native, ou vue JavaScript. */
   const publier = (arret: boolean) => {
     if (natifPret) {
@@ -434,6 +508,8 @@ export function Exploration({
     y0: number;
     x: number;
     y: number;
+    /** Quand il s'est posé : un appui bref sur un interrupteur allume. */
+    t0: number;
   }
   const doigts = useRef(new Map<number, Doigt>());
   const enCours = useRef(false);
@@ -574,7 +650,7 @@ export function Exploration({
       // Le rôle de sa moitié d'écran, sinon l'autre s'il est libre.
       const role = !roles.has(voulu) ? voulu : !roles.has(autre) ? autre : null;
       if (!role) continue;
-      doigts.current.set(id, { role, x0: t.pageX, y0: t.pageY, x: t.pageX, y: t.pageY });
+      doigts.current.set(id, { role, x0: t.pageX, y0: t.pageY, x: t.pageX, y: t.pageY, t0: Date.now() });
       if (role === 'marche') haptic('leger');
       demarrer();
     }
@@ -636,16 +712,37 @@ export function Exploration({
       const d = doigts.current.get(id)!;
       doigts.current.delete(id);
       if (d.role === 'marche') manette.current = { x: 0, y: 0 };
+      appuiFini(d);
     }
   };
   const toutLacher = () => {
     // Plus aucun doigt : ce qu'on regarde se montre tout de suite ; l'élan
     // retombe, et la boucle s'arrête d'elle-même.
+    for (const d of doigts.current.values()) appuiFini(d);
     doigts.current.clear();
     manette.current = { x: 0, y: 0 };
     publier(true);
     demarrer();
   };
+
+  /*
+    LES LAMPES PARTENT PAR LA RÉGIE, comme la caméra : allumer ne reconvertit
+    pas le logement. Le choix des lampes qui ont droit à une vraie source suit
+    le visiteur (les plus proches) ; on ne renvoie que ce qui a changé.
+  */
+  const dernieresLampes = useRef('');
+  useEffect(() => {
+    if (!natifPret || lampes.length === 0) return;
+    const valeurs = lampesPourLeNatif(lampes, allumees, { x: carte.x, z: carte.z });
+    const cleValeurs = valeurs.join(',');
+    if (cleValeurs === dernieresLampes.current) return;
+    dernieresLampes.current = cleValeurs;
+    if (typeof poserLampesDeVisite === 'function') poserLampesDeVisite(cle, valeurs);
+  }, [natifPret, lampes, allumees, carte, cle]);
+  // Une vue native neuve repart de zéro : ce qui a été envoyé à l'ancienne ne compte plus.
+  useEffect(() => {
+    dernieresLampes.current = '';
+  }, [maille]);
 
   // La vue en JavaScript (sans natif) : sa caméra suit l'état.
   const camera = useMemo(() => cameraDe(vue), [vue, ouverture]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -772,7 +869,9 @@ export function Exploration({
         {!aBouge && (
           <View style={[styles.consigne, { bottom: marges.bottom + 118 }]} pointerEvents="none">
             <Text style={styles.consigneTexte}>
-              Pouce gauche pour marcher · glissez à droite pour regarder
+              {inters.length > 0 && lampes.length > 0
+                ? 'Pouce gauche pour marcher · glissez à droite pour regarder · touchez un interrupteur pour allumer'
+                : 'Pouce gauche pour marcher · glissez à droite pour regarder'}
             </Text>
           </View>
         )}

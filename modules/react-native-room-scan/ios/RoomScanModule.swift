@@ -121,6 +121,34 @@ class RoomScanModule: NSObject {
     }
   }
 
+  /**
+   LES MODÈLES ET LES RÈGLES DE LA POSE — envoyés une fois, au début du
+   scan : la prise, l'interrupteur, l'applique en 3D (fabriqués par
+   `appareils3d`), et les cotes du métier qui disent où ils se posent.
+   */
+  @objc func configurerPose(_ config: NSDictionary,
+                            resolve: @escaping RCTPromiseResolveBlock,
+                            reject: RCTPromiseRejectBlock) {
+    guard #available(iOS 16.0, *) else {
+      resolve(false)
+      return
+    }
+    let d = config as? [String: Any] ?? [:]
+    DispatchQueue.main.async {
+      RoomScanManager.shared.configurerPose(d)
+      resolve(true)
+    }
+  }
+
+  /// Le produit choisi au rail : il flotte au viseur, là où il se poserait. `nil` le range.
+  @objc func choisirAuViseur(_ kind: NSString?) {
+    guard #available(iOS 16.0, *) else { return }
+    let k = kind as String?
+    DispatchQueue.main.async {
+      RoomScanManager.shared.choisirAuViseur(k)
+    }
+  }
+
   @objc func retirerDerniereAncre(_ resolve: @escaping RCTPromiseResolveBlock,
                                   reject: RCTPromiseRejectBlock) {
     guard #available(iOS 16.0, *) else {

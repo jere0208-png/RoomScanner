@@ -535,7 +535,9 @@ export type ElecCode =
   | 'daaf'
   | 'specialises'
   | 'alignement'
-  | 'pose';
+  | 'pose'
+  /** La chute de tension d'un circuit trop long pour sa section (voir `chute`). */
+  | 'chute';
 
 export interface ElecIssue {
   code: ElecCode;

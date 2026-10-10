@@ -6,6 +6,7 @@
  * venir de la MÊME source, sinon le document dit une chose et l'écran une
  * autre.
  */
+import { chuteDuCircuit, type ChuteDeTension } from './chute';
 import {
   faceX,
   facePoint,
@@ -91,6 +92,11 @@ export interface ElecPlan {
   approx: Set<string>;
   /** Tracés au sol, un par appareil desservi. */
   traces: { id: string; path: Pt[] }[];
+  /**
+   * LA CHUTE DE TENSION DE CHAQUE CIRCUIT, au point le plus éloigné du
+   * tableau en suivant le câble — pontages compris (voir `chute.ts`).
+   */
+  chutes: ChuteDeTension[];
 }
 
 /**
@@ -157,6 +163,7 @@ export function planRoutes(
   >();
   const traces: { id: string; path: Pt[] }[] = [];
   const approx = new Set<string>();
+  const chutes: ChuteDeTension[] = [];
 
   /*
     LE PONTAGE DES PRISES — la seule exception à l'étoile.
@@ -369,6 +376,27 @@ export function planRoutes(
       });
     }
     if (runs.length === 0) continue;
+    /*
+      LE POINT LE PLUS ÉLOIGNÉ, EN SUIVANT LE CÂBLE. Un départ direct vaut
+      son parcours ; une prise pontée vaut l'écart à sa voisine PLUS le
+      chemin de celle-ci jusqu'au tableau ; un spot ponté, de même. C'est
+      cette longueur-là que le courant parcourt.
+    */
+    const runParId = new Map(runs.map((r) => [r.fixtureId, r]));
+    const distances = new Map<string, number>();
+    const distanceDe = (id: string, garde = 0): number => {
+      const deja = distances.get(id);
+      if (deja !== undefined) return deja;
+      const r = runParId.get(id);
+      if (!r) return 0;
+      const amont = pontees.get(id)?.[0] ?? ligneDe.get(id);
+      const d = r.conduit + (amont && garde < 64 ? distanceDe(amont, garde + 1) : 0);
+      distances.set(id, d);
+      return d;
+    };
+    const plusLong = Math.max(0, ...runs.map((r) => distanceDe(r.fixtureId)));
+    const chute = chuteDuCircuit(c, plusLong);
+    if (chute) chutes.push(chute);
     parCircuit.set(c.id, circuitLength(runs));
     metre.set(c.id, {
       conduit: runs.reduce((t, r) => t + r.conduit, 0),
@@ -397,5 +425,5 @@ export function planRoutes(
     });
     for (const r of runs) traces.push({ id: r.fixtureId, path: r.path });
   }
-  return { parCircuit, metre, traces, exact: approx.size === 0, approx };
+  return { parCircuit, metre, traces, exact: approx.size === 0, approx, chutes };
 }

@@ -45,6 +45,9 @@
  * l'animation, fais un simple listing avec les icônes en légende du plan ».
  * Il avait raison sur le fond — on ne lit pas un prix en attendant son tour.
  */
+import { PoseEstimee } from '../components/PoseEstimee';
+import { estimerLaPose, protectionsDuDevis } from '../geometry/mainDOeuvre';
+import { useReglagesPose } from '../store/reglagesPose';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ScrollView,
@@ -442,6 +445,14 @@ export function DevisScreen() {
       { walls, openings },
     ).length;
   }, [walls, rooms, fixtures, ceiling, openings]);
+  /* Le taux de l'artisan et la nature du chantier : voir `reglagesPose`. */
+  const taux = useReglagesPose((r) => r.taux);
+  const chantier = useReglagesPose((r) => r.chantier);
+  const reglerTaux = useReglagesPose((r) => r.reglerTaux);
+  const choisirChantier = useReglagesPose((r) => r.choisirChantier);
+  useEffect(() => {
+    useReglagesPose.getState().charger().catch(() => {});
+  }, []);
   const devis: Devis = useMemo(
     () =>
       chiffrerLePlan(walls, rooms, fixtures, ceiling, gamme, horsJeu, openings, {
@@ -472,6 +483,14 @@ export function DevisScreen() {
       ajouts,
       versionTarifs,
     ],
+  );
+  const pose = useMemo(
+    () =>
+      estimerLaPose(fixtures, ceiling, protectionsDuDevis(devis.lignes), {
+        taux,
+        chantier,
+      }),
+    [fixtures, ceiling, devis.lignes, taux, chantier],
   );
 
   /*
@@ -1035,6 +1054,19 @@ export function DevisScreen() {
               Les luminaires ne sont pas comptés. Prix publics indicatifs, à
               confirmer en magasin.
             </Text>
+
+            {/*
+              LA POSE, ESTIMÉE — le devis compte enfin ce qu'il excluait (voir
+              `geometry/mainDOeuvre`) : chaque point du plan, à son temps de
+              pose, au taux de l'artisan, avec la TVA de son chantier.
+            */}
+            <PoseEstimee
+              pose={pose}
+              materiel={devis.total}
+              chantier={chantier}
+              onChantier={choisirChantier}
+              onTaux={reglerTaux}
+            />
 
             {/*
               LE PLAN EN PIED DE TICKET — d'où sortent ces quantités.

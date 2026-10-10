@@ -42,6 +42,9 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoomScan } from 'react-native-room-scan';
 import { dark, ombreBouton as ombreBoutonDouce, radius, themedStyles, useTheme, type Palette } from '../theme';
+import { DUREE_DU_FILM } from '../data/film';
+import { GlisserPourSupprimer } from '../components/GlisserPourSupprimer';
+import { BandeauAnnuler, useSuppressionDifferee } from '../components/BandeauAnnuler';
 import { Avatar } from '../components/Avatar';
 import { LogoEcho } from '../components/LogoMark';
 import { useScanStore, type SavedScan } from '../store/scanStore';
@@ -212,11 +215,20 @@ export function HomeScreen() {
     () => [...saves].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)),
     [saves],
   );
+  /*
+    UN PLAN SE JETTE D'UN GLISSÉ — relevé du patron : « on doit pouvoir
+    supprimer un plan en slidant comme les notifications, sur la gauche ».
+    La ligne part tout de suite ; le plan, lui, attend quelques secondes
+    qu'on se ravise (voir `BandeauAnnuler`).
+  */
+  const deleteSave = useScanStore((s) => s.deleteSave);
+  const suppression = useSuppressionDifferee(deleteSave);
   const montres = useMemo(() => {
     const q = pourChercher(cherche.trim());
-    if (!q) return recents.slice(0, PLANS_A_LACCUEIL);
-    return recents.filter((s) => pourChercher(s.name ?? '').includes(q)).slice(0, 8);
-  }, [recents, cherche]);
+    const vivants = recents.filter((s) => s.id !== suppression.masque);
+    if (!q) return vivants.slice(0, PLANS_A_LACCUEIL);
+    return vivants.filter((s) => pourChercher(s.name ?? '').includes(q)).slice(0, 8);
+  }, [recents, cherche, suppression.masque]);
 
   const prenom = compte?.prenom?.trim().split(/\s+/)[0];
   const question = questionDuJour({ brouillon: !!brouillon, plans: saves.length });
@@ -383,7 +395,7 @@ export function HomeScreen() {
                     hauteur={HAUTE}
                     icone={SOLAIRES.etoile}
                     titre={'Comment\nça marche'}
-                    sous="Le film, en 17 secondes"
+                    sous={`Le film, en ${Math.round(DUREE_DU_FILM / 1000)} secondes`}
                     label="Comment ça marche"
                     onPress={() => revoir('accueil')}
                   />
@@ -478,7 +490,25 @@ export function HomeScreen() {
             )}
 
             {montres.map((s) => (
-              <CartePlan key={s.id} scan={s} maintenant={maintenant} c={c} styles={styles} onPress={() => openSave(s.id)} />
+              <GlisserPourSupprimer
+                key={s.id}
+                libelle={s.name}
+                rayon={20}
+                style={styles.carteGlissante}
+                onSupprimer={() => suppression.jeter(s.id, s.name)}>
+                {(refermer) => (
+                  <CartePlan
+                    scan={s}
+                    maintenant={maintenant}
+                    c={c}
+                    styles={styles}
+                    onPress={() => {
+                      if (refermer()) return;
+                      openSave(s.id);
+                    }}
+                  />
+                )}
+              </GlisserPourSupprimer>
             ))}
             {cherche && montres.length === 0 && (
               <Text style={styles.rien}>Aucun plan ne porte ce nom.</Text>
@@ -520,6 +550,13 @@ export function HomeScreen() {
           Votre logement en 3D et en plan coté, en quelques minutes.
         </Animated.Text>
       </ScrollView>
+      {suppression.enAttente && (
+        <BandeauAnnuler
+          texte={`« ${suppression.enAttente.nom} » supprimé`}
+          bas={insets.bottom + 18}
+          onAnnuler={suppression.annuler}
+        />
+      )}
     </View>
   );
 }
@@ -632,9 +669,18 @@ function CartePlan({
         <Text style={styles.carteNom} numberOfLines={1}>{scan.name}</Text>
         {/* Ce qui attend d'être enregistré le dit, comme dans « Mes plans ». */}
         {attente ? (
-          <Text style={[styles.carteMeta, styles.carteMetaAttente]} numberOfLines={1}>
-            {attente.texte}
-          </Text>
+          <>
+            <Text
+              style={[styles.carteMeta, styles.carteMetaAttente]}
+              numberOfLines={1}
+              accessibilityLabel={attente.texte}>
+              {attente.titre}
+            </Text>
+            {/* Le compte à rebours, petit et gris, sous l'état : il ne se coupe plus. */}
+            <Text style={styles.carteDelai} numberOfLines={1}>
+              {attente.delai}
+            </Text>
+          </>
         ) : (
           <Text style={styles.carteMeta} numberOfLines={1}>
             {`${detailsDuScan(scan)} · ${quand(scan.updatedAt ?? scan.createdAt ?? Date.now())}`}
@@ -815,6 +861,9 @@ const getStyles = themedStyles((c: Palette) => {
     carteMeta: { color: c.inkSoft, fontSize: 12.5, marginTop: 3, lineHeight: 17 },
     // Ce qui attend d'être enregistré, en ambre : voir `ui/miseDeCote`.
     carteMetaAttente: { color: c.amber, fontWeight: '600' },
+    carteDelai: { color: c.inkFaint, fontSize: 11, marginTop: 1, lineHeight: 14 },
+    /* La carte glissante porte l'écart entre deux cartes : la corbeille s'y arrête. */
+    carteGlissante: { marginBottom: 10 },
     brouillonGestes: { alignItems: 'center', gap: 6 },
     reprendre: {
       backgroundColor: c.blue,

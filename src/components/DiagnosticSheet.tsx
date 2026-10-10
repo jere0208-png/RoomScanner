@@ -49,6 +49,7 @@ const ICONE_DU_CODE: Record<string, string> = {
   socles: SOLAIRES.elec,
   surPlan: SOLAIRES.elec,
   specialises: SOLAIRES.elec,
+  chute: SOLAIRES.elec,
   circuits: SOLAIRES.elec,
   cuisson: SOLAIRES.elec,
   rj45: SOLAIRES.appareil,

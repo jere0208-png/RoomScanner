@@ -10,6 +10,10 @@ RCT_EXTERN_METHOD(stopRoomScan:(RCTPromiseResolveBlock)resolve reject:(RCTPromis
 RCT_EXTERN_METHOD(poserAuViseur:(NSString *)kind
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(configurerPose:(NSDictionary *)config
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(choisirAuViseur:(NSString *)kind)
 RCT_EXTERN_METHOD(retirerDerniereAncre:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(pauseRoomScan)
@@ -125,6 +129,7 @@ RCT_EXPORT_VIEW_PROPERTY(styles, NSArray)
 RCT_EXTERN_METHOD(camera:(NSString *)cle valeurs:(NSArray *)valeurs)
 RCT_EXTERN_METHOD(orbite:(NSString *)cle valeurs:(NSArray *)valeurs)
 RCT_EXTERN_METHOD(levee:(NSString *)cle k:(nonnull NSNumber *)k solY:(nonnull NSNumber *)solY)
+RCT_EXTERN_METHOD(lampes:(NSString *)cle valeurs:(NSArray *)valeurs)
 @end
 
 /*

@@ -164,11 +164,41 @@ describe('l’écran de scan', () => {
     celui qu'on retrouvera sur le dossier imprimé : une seule langue, du
     viseur à la feuille.
   */
-  it('offre prise, inter et lumière à portée de pouce, en clair', () => {
+  /*
+    ET LE RAIL MONTRE LES PRODUITS EN PHOTO — relevé du patron : « revois
+    complètement l'interface du scan pour le placement des produits
+    électriques, et revois aussi les icônes pour du réaliste ». Trois
+    boutons au symbole de plan sont devenus un rail de produits, chacun avec
+    la photo du catalogue ; un seul déclencheur pose celui qu'on a choisi.
+  */
+  it('offre les produits en photo, et un seul déclencheur pour le choisi', () => {
     const tree = monter();
+    const { PRODUITS_DU_SCAN } = require('../src/geometry/poseAR');
+    for (const p of PRODUITS_DU_SCAN) {
+      expect(bouton(tree, `Choisir ${p.mot}`)).toBeDefined();
+      // Une PHOTO, pas un symbole : la vignette du catalogue.
+      expect(tree.root.findAll((n: any) => n.props?.testID === `vignette-${p.photo}`).length).toBeGreaterThan(0);
+    }
     expect(bouton(tree, 'Poser Prise')).toBeDefined();
-    expect(bouton(tree, 'Poser Inter')).toBeDefined();
-    expect(bouton(tree, 'Poser Lumière')).toBeDefined();
+    const TestRenderer = require('react-test-renderer');
+    TestRenderer.act(() => bouton(tree, 'Choisir Interrupteur').props.onPress());
+    expect(bouton(tree, 'Poser Interrupteur')).toBeDefined();
+    expect(bouton(tree, 'Poser Prise')).toBeUndefined();
+  });
+
+  it('confie au natif les modèles 3D, et le produit qui flotte au viseur', () => {
+    const { RoomScan } = require('react-native-room-scan');
+    (RoomScan.choisirAuViseur as jest.Mock).mockClear();
+    const tree = monter();
+    // Le produit choisi flotte au viseur…
+    expect(RoomScan.choisirAuViseur).toHaveBeenLastCalledWith('prise');
+    const TestRenderer = require('react-test-renderer');
+    TestRenderer.act(() => bouton(tree, 'Choisir Applique').props.onPress());
+    expect(RoomScan.choisirAuViseur).toHaveBeenLastCalledWith('applique');
+    // … et se range avec le rail.
+    TestRenderer.act(() => bouton(tree, 'Ranger la pose').props.onPress());
+    expect(RoomScan.choisirAuViseur).toHaveBeenLastCalledWith(null);
+    expect(bouton(tree, 'Afficher la pose')).toBeDefined();
   });
 
   it('explique le geste avant qu’on le cherche', () => {
@@ -227,8 +257,9 @@ describe('l’écran de scan', () => {
     RoomScan.poserAuViseur = jest.fn(async () => false);
     const TestRenderer = require('react-test-renderer');
     const tree = monter();
+    TestRenderer.act(() => bouton(tree, 'Choisir Point lumineux').props.onPress());
     await TestRenderer.act(async () => {
-      await bouton(tree, 'Poser Lumière').props.onPress();
+      await bouton(tree, 'Poser Point lumineux').props.onPress();
     });
     const dits = tree.root
       .findAll((n: any) => typeof n.props?.children === 'string')

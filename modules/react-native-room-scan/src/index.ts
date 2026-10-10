@@ -292,7 +292,43 @@ export function poserLeveeDeMaquette(cle: string, levee: number, solY: number): 
 }
 
 /**
- * Émetteur d'événements du scan : 'onScanUpdate', 'onInstruction', 'onScanError'.
+ * LES LAMPES DE LA VISITE, posées directement — neuf nombres par lampe :
+ * `[rang, genre, allumée, source, x, y, z, nx, nz]` (voir `geometry/lumieres`).
+ * Par la régie, comme la caméra : allumer ne reconvertit pas le logement.
+ */
+export function poserLampesDeVisite(cle: string, valeurs: number[]): boolean {
+  const regie = Platform.OS === 'ios' ? NativeModules.RoomScanVisiteRegie : undefined;
+  if (!regie?.lampes) return false;
+  regie.lampes(cle, valeurs);
+  return true;
+}
+
+/**
+ * Ce que le natif dit de la visée, dix fois par seconde au plus et seulement
+ * quand elle change : le produit trouve-t-il où se poser, au plafond ou au
+ * mur, et à quelle cote (aimantée, au-dessus du pied du mur).
+ */
+export interface EtatDeVisee {
+  kind: string;
+  ok: boolean;
+  plafond: boolean;
+  hauteur: number;
+}
+
+/** Les modèles et les règles de la pose au viseur (voir `configurerPose`). */
+export interface ConfigurationDePose {
+  modeles: Record<string, number[]>;
+  paliers: Record<string, number[]>;
+  std: Record<string, number>;
+  portee: number;
+  plafond: string[];
+  plafondSeul: string[];
+  auMur: Record<string, string>;
+}
+
+/**
+ * Émetteur d'événements du scan : 'onScanUpdate', 'onInstruction',
+ * 'onScanError', et 'onVisee' (voir `EtatDeVisee`).
  * iOS émet via le module RoomScanEvents, Android via le DeviceEventEmitter.
  */
 export const scanEvents = new NativeEventEmitter(
@@ -374,6 +410,29 @@ export const RoomScan = {
     RoomScanModule?.poserAuViseur
       ? RoomScanModule.poserAuViseur(kind)
       : Promise.resolve(false),
+
+  /**
+   * LES PRODUITS EN 3D AU VISEUR — leurs modèles, et les règles de pose.
+   *
+   * Envoyés une fois au début du scan : chaque produit du rail en flux de
+   * groupes (le format des meubles de la maquette, en mètres, dans le repère
+   * de l'appareil), les paliers de hauteur, les cotes uniques, la portée de
+   * l'aimant, et ce qui va au plafond. Le natif pose alors le VRAI modèle,
+   * là où l'ancrage du plan le posera.
+   */
+  configurerPose: (config: ConfigurationDePose): Promise<boolean> =>
+    RoomScanModule?.configurerPose
+      ? RoomScanModule.configurerPose(config)
+      : Promise.resolve(false),
+
+  /**
+   * Le produit choisi au rail : il flotte, transparent, au viseur — à
+   * l'abscisse visée et à la cote du métier. `null` le range (pause, fin,
+   * tiroir fermé). Le natif annonce ce qu'il vise par `onVisee`.
+   */
+  choisirAuViseur: (kind: string | null): void => {
+    RoomScanModule?.choisirAuViseur?.(kind);
+  },
 
   /** Retire le dernier appareil posé : on vise mal une fois sur dix. */
   retirerDerniereAncre: (): Promise<boolean> =>

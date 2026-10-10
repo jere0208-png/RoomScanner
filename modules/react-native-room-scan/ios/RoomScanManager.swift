@@ -93,12 +93,21 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    « on ne voit plus du tout ce qu'on scanne », écran noir, les repères
    flottant seuls dans le vide. Une session ARKit ne se rend qu'une fois.
 
-   La couche ne dessine donc plus en 3D : elle PROJETTE. À chaque image,
-   chaque repère est ramené du monde vers l'écran par la caméra elle-même
-   (`ARCamera.projectPoint`), et une étiquette se pose à cet endroit. Rien
+   La couche a d'abord PROJETÉ des étiquettes. Elle pose maintenant les
+   VRAIS MODÈLES, dans une scène SceneKit sans session, dont la caméra est
+   recopiée à chaque image sur celle d'ARKit (voir `ScenePoseAR`). Rien
    n'est disputé à RoomPlan — on ne fait que lire sa session.
    */
-  private var couche: RepereLayerView?
+  private var couche: ScenePoseAR?
+
+  /**
+   CE QUE LE JAVASCRIPT A CONFIÉ POUR LA POSE : les modèles des produits et
+   les règles de hauteur. Gardés ici, car la vue de scan peut naître APRÈS
+   l'envoi — React monte l'écran, puis envoie, sans attendre le natif.
+   */
+  private var modelesPose: [String: [Float]] = [:]
+  private var reglages = ReglagesPose()
+  private var kindChoisi: String?
 
   override init() { super.init() }
 
@@ -130,13 +139,14 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     scan.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     boite.addSubview(scan)
 
-    let calque = RepereLayerView(frame: .zero)
+    let calque = ScenePoseAR(frame: .zero)
     calque.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     calque.session = scan.captureSession.arSession
-    calque.backgroundColor = .clear
-    calque.isUserInteractionEnabled = false
+    calque.manager = self
     boite.addSubview(calque)
     couche = calque
+    if !modelesPose.isEmpty { calque.definirModeles(modelesPose) }
+    calque.choisir(kindChoisi)
     return boite
   }
 
@@ -220,67 +230,141 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    changer chez les appelants qui ne veulent que le oui/non.
    */
   func poserAuViseur(kind: String) -> Any {
+    /*
+      LA POSE EST LA VISÉE — celle que le fantôme montrait à l'instant.
+
+      Le produit transparent qui flotte au viseur et celui qui se pose sont
+      calculés par la même fonction (`viser`) : à l'abscisse visée, à la cote
+      du métier, plaqué au mur et tourné vers la pièce. Ce qu'on voit est ce
+      qu'on pose.
+    */
+    guard let v = viser(kind: kind) else { return false }
+    var ancre: [String: Any] = [
+      "kind": kind,
+      "x": v.point.x,
+      "y": v.point.y,
+      "z": v.point.z,
+    ]
+    /*
+      ON NOMME LE MUR VISÉ, et l'on relève la cote SUR LUI.
+
+      Un identifiant ne se déplace pas : c'est la seule information qui
+      survive au recalage du modèle. La cote se lit dans le repère du mur
+      — abscisse depuis son bord, hauteur au-dessus de son pied — les
+      deux mesures que l'établi et le plan emploient déjà.
+    */
+    if let mur = v.mur {
+      ancre["wallId"] = mur.identifier.uuidString
+      ancre["along"] = v.along
+      ancre["height"] = v.hauteur
+    }
+    // Au plafond, on le DIT : le JavaScript ne le devinerait qu'à la
+    // distance des murs, et un point lumineux visé près d'une cloison
+    // devenait une applique.
+    if v.plafond { ancre["plafond"] = true }
+    ancresElec.append(ancre)
+    couche?.poser(kind: kind, monde: v.monde)
+    return [
+      "ok": true,
+      "height": v.hauteur,
+      "plafond": v.plafond,
+    ]
+  }
+
+  /**
+   CE QUE VISE LE CENTRE DE L'ÉCRAN, pour ce produit-là.
+
+   Un rayon part du milieu de l'image et s'arrête sur la première surface
+   qu'ARKit connaît. SUR UN MUR RELEVÉ — relevé du chantier : « les éléments
+   doivent pouvoir se mettre sur les murs uniquement » —, sauf pour ce qui
+   va au plafond, que RoomPlan ne modélise pas : là, on reconnaît le plafond
+   à sa hauteur au-dessus du sol (ou au regard levé vers lui).
+
+   AU MUR, LA COTE DU MÉTIER : la hauteur visée choisit le palier (plinthe
+   ou plan de travail), un interrupteur va à 1,10 m quoi qu'on vise. Le
+   modèle se plaque au nu, tourné vers la caméra — c'est-à-dire vers la
+   pièce d'où l'on vise.
+   */
+  func viser(kind: String) -> Visee? {
     guard let session = captureView?.captureSession.arSession,
-          let frame = session.currentFrame else { return false }
-    // Le centre de l'image, en coordonnées normalisées : c'est là qu'est le
-    // viseur, et c'est ce que l'œil aligne sur la boîte.
+          let frame = session.currentFrame else { return nil }
     let centre = CGPoint(x: 0.5, y: 0.5)
+    let cam = frame.camera.transform.columns.3
+    let regard = -frame.camera.transform.columns.2
+    let auPlafondPossible = reglages.plafond.contains(kind)
+    let plafondSeul = reglages.plafondSeul.contains(kind)
     let cibles: [ARRaycastQuery.Target] = [.existingPlaneGeometry, .estimatedPlane]
     for cible in cibles {
       // `ARFrame.raycastQuery` rend toujours une requête (à la différence
       // de celle d'`ARView`, qui peut échouer à cadrer le point).
-      let query = frame.raycastQuery(
-        from: centre, allowing: cible, alignment: .any,
-      )
+      let query = frame.raycastQuery(from: centre, allowing: cible, alignment: .any)
       guard let hit = session.raycast(query).first else { continue }
-      let p = hit.worldTransform.columns.3
-      /*
-        SUR UN MUR, ET NULLE PART AILLEURS — relevé du chantier : « les
-        éléments doivent pouvoir se mettre sur les murs uniquement ».
-
-        Le rayon s'arrête sur la première surface qu'ARKit connaît : le
-        sol, une table, un plan estimé en l'air. On en tirait des appareils
-        posés dans le vide, que le plan jetait ensuite sans rien dire. On
-        exige donc un mur RELEVÉ, sauf pour l'éclairage, qui a le droit
-        d'être au plafond — là où RoomPlan ne modélise aucune surface.
-      */
-      let mur = Self.murLePlusProche(de: p, dans: vueCourante)
-      let auPlafond = ["dcl", "spot"].contains(kind) && p.y > 1.9
-      if mur == nil && !auPlafond { continue }
-      var ancre: [String: Any] = [
-        "kind": kind,
-        "x": p.x,
-        "y": p.y,
-        "z": p.z,
-      ]
-      /*
-        ON NOMME LE MUR VISÉ, et l'on relève la cote SUR LUI.
-
-        Un identifiant ne se déplace pas : c'est la seule information qui
-        survive au recalage du modèle. La cote se lit dans le repère du mur
-        — abscisse depuis son bord, hauteur au-dessus de son pied — les
-        deux mesures que l'établi et le plan emploient déjà.
-      */
-      if let mur = mur {
+      let p4 = hit.worldTransform.columns.3
+      let p = SIMD3<Float>(p4.x, p4.y, p4.z)
+      if !plafondSeul, let mur = Self.murLePlusProche(de: p4, dans: vueCourante) {
         let inv = simd_inverse(mur.transform)
         let local = inv * SIMD4<Float>(p.x, p.y, p.z, 1)
         let basMur = mur.transform.columns.3.y - mur.dimensions.y / 2
-        ancre["wallId"] = mur.identifier.uuidString
-        ancre["along"] = local.x + mur.dimensions.x / 2
-        ancre["height"] = p.y - basMur
+        let vise = p.y - basMur
+        let nature = reglages.auMur[kind] ?? kind
+        let h = min(max(reglages.aimanter(nature, vise), 0.05), max(0.06, mur.dimensions.y - 0.05))
+        var n = SIMD3<Float>(mur.transform.columns.2.x, 0, mur.transform.columns.2.z)
+        n = simd_length(n) > 1e-4 ? simd_normalize(n) : SIMD3<Float>(0, 0, 1)
+        if simd_dot(n, SIMD3<Float>(cam.x - p.x, 0, cam.z - p.z)) < 0 { n = -n }
+        let x = SIMD3<Float>(n.z, 0, -n.x)
+        // Deux millimètres devant le nu : à fleur, le modèle et le mur se
+        // disputeraient la profondeur.
+        let pos = SIMD3<Float>(p.x, basMur + h, p.z) + n * 0.002
+        let monde = simd_float4x4(columns: (
+          SIMD4<Float>(x, 0),
+          SIMD4<Float>(0, 1, 0, 0),
+          SIMD4<Float>(n, 0),
+          SIMD4<Float>(pos, 1)
+        ))
+        return Visee(
+          monde: monde, point: p, mur: mur,
+          along: local.x + mur.dimensions.x / 2, hauteur: h, plafond: false)
       }
-      ancresElec.append(ancre)
-      // Et le repère se plante dans la pièce, à l'aplomb de ce qu'on vise.
-      planterRepere(kind: kind, sur: hit.worldTransform)
-      return [
-        "ok": true,
-        // La cote au-dessus du PIED DU MUR quand on en a un ; sinon la
-        // hauteur dans le monde, qui vaut celle du sol du scan.
-        "height": (ancre["height"] as? Float) ?? p.y,
-        "plafond": mur == nil && auPlafond,
-      ]
+      guard auPlafondPossible else { continue }
+      let sol = solEstime()
+      let assezHaut = sol.map { p.y - $0 > 1.8 } ?? false
+      let leve = regard.y > 0.35 && p.y > cam.y + 0.3
+      if assezHaut || leve {
+        var monde = matrix_identity_float4x4
+        monde.columns.3 = SIMD4<Float>(p.x, p.y - 0.002, p.z, 1)
+        return Visee(
+          monde: monde, point: p, mur: nil, along: 0,
+          hauteur: sol.map { p.y - $0 } ?? 0, plafond: true)
+      }
     }
-    return false
+    return nil
+  }
+
+  /**
+   LE SOL DE LA PIÈCE, dans le monde d'ARKit.
+
+   L'origine du monde est là où le téléphone a démarré, à hauteur de main :
+   le plafond n'est donc pas « au-dessus de 1,90 m » mais à 1,90 m au-dessus
+   du SOL. Le pied le plus bas des murs relevés le donne.
+   */
+  private func solEstime() -> Float? {
+    guard let murs = vueCourante?.walls, !murs.isEmpty else { return nil }
+    return murs.map { $0.transform.columns.3.y - $0.dimensions.y / 2 }.min()
+  }
+
+  /// Les modèles et les règles de la pose, venus du JavaScript.
+  func configurerPose(_ d: [String: Any]) {
+    if let m = d["modeles"] as? [String: [NSNumber]] {
+      modelesPose = m.mapValues { $0.map { $0.floatValue } }
+      couche?.definirModeles(modelesPose)
+    }
+    reglages = ReglagesPose(d)
+  }
+
+  /// Le produit choisi au rail : c'est lui qui flotte au viseur.
+  func choisirAuViseur(_ kind: String?) {
+    kindChoisi = kind
+    couche?.choisir(kind)
   }
 
   /**
@@ -317,21 +401,6 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     // sait plus lequel croire.
     couche?.retirerDernier()
     return true
-  }
-
-  /**
-   PLANTE UN REPÈRE SUR LE MUR VISÉ.
-
-   Un carré plat, plaqué à la surface, de la couleur du métier : ambre pour
-   les prises, bleu pour les commandes, doré pour l'éclairage. Il porte son
-   sigle — c'est ce qu'on relit de loin, exactement comme sur le plan.
-
-   Deux centimètres devant le nu : à fleur, le rendu clignote (les deux
-   surfaces se disputent la profondeur), et le repère semble grésiller.
-   */
-  private func planterRepere(kind: String, sur transform: simd_float4x4) {
-    let p = transform.columns.3
-    couche?.ajouter(kind: kind, at: SIMD3<Float>(p.x, p.y, p.z))
   }
 
   /// Un relevé tout neuf repart d'une pièce vide de repères.

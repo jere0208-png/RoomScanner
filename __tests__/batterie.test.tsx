@@ -125,15 +125,27 @@ describe('3 — la boussole s’arrête d’elle-même', () => {
   });
 });
 
-describe('4 — l’horloge des repères ne bat que s’il y a des repères', () => {
-  it('démarre à la pose, s’arrête quand la liste se vide', () => {
-    const s = natif('RepereLayerView.swift');
-    const demarrer = s.slice(s.indexOf('private func demarrerHorloge()'), s.indexOf('func ajouter('));
-    expect(demarrer).toContain('reperes.isEmpty');
-    const ajouter = s.slice(s.indexOf('func ajouter('), s.indexOf('func retirerDernier()'));
-    expect(ajouter).toContain('demarrerHorloge()');
-    const vider = s.slice(s.indexOf('func vider()'), s.indexOf('private static func habit'));
-    expect(vider).toMatch(/horloge\?\.invalidate\(\)/);
+describe('4 — la visée ne bat que s’il y a quelque chose à viser', () => {
+  /*
+    LES REPÈRES SONT DEVENUS DES MODÈLES 3D (voir `ScenePoseAR`) — relevé
+    du patron : « intègre directement les éléments en 3D ». La règle de
+    sobriété, elle, reste : l'horloge de la visée ne bat que lorsqu'un
+    produit est choisi et que la vue est à l'écran, et la scène ne se rend
+    en continu que si elle a quelque chose à montrer.
+  */
+  it('l’horloge part avec un produit choisi, s’arrête avec la vue', () => {
+    const s = natif('RoomScanPoseAR.swift');
+    const relancer = s.slice(s.indexOf('private func relancerHorloge()'), s.indexOf('func viserMaintenant()'));
+    expect(relancer).toContain('kindChoisi != nil');
+    expect(relancer).toMatch(/horloge\?\.invalidate\(\)/);
+    const quitter = s.slice(s.indexOf('override func willMove(toWindow'), s.indexOf('// MARK: - Les modèles'));
+    expect(quitter).toMatch(/horloge\?\.invalidate\(\)/);
+  });
+
+  it('rien à montrer, rien à rendre', () => {
+    const s = natif('RoomScanPoseAR.swift');
+    const rendre = s.slice(s.indexOf('private func rendreSiBesoin()'), s.indexOf('private func relancerHorloge()'));
+    expect(rendre).toContain('rendersContinuously = !poses.isEmpty || fantome != nil');
   });
 });
 

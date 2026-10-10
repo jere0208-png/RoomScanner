@@ -222,12 +222,15 @@ describe('le refus du viseur', () => {
     await act(async () => {
       await bouton.props.onPress();
     });
-    expect(mots(t)).toMatch(/Visez un mur/);
-    // Trois secondes plus tard, l'ecran est rendu au releve.
+    expect(mots(t)).toMatch(/Visez un mur déjà relevé — balayez-le/);
+    // Trois secondes plus tard, l'ecran est rendu au releve : le reproche
+    // s'en va, et la phrase du viseur reprend — elle dit ce qu'on vise en
+    // direct, ce n'est plus un refus.
     act(() => {
       jest.advanceTimersByTime(4000);
     });
-    expect(mots(t)).not.toMatch(/Visez un mur/);
+    expect(mots(t)).not.toMatch(/balayez-le/);
+    expect(mots(t)).toMatch(/Visez un mur relevé/);
   });
 });
 

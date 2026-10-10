@@ -127,12 +127,15 @@ describe('1 — le scan : un scanner, pas un outil de pose', () => {
     expect(textesDe(t)).toContain('Terminer');
   });
 
-  it('électricien : le bloc de pose est là, ses trois boutons et son « ? »', () => {
+  it('électricien : le rail de pose est là, son déclencheur et son « ? »', () => {
     enMode(true);
     scanEnCours();
     const t = monter(<ScanScreen />);
+    // Un seul déclencheur, celui du produit choisi au rail…
     const poser = libelles(t).filter((l) => l.startsWith('Poser '));
-    expect(poser).toHaveLength(3);
+    expect(poser).toHaveLength(1);
+    // … et les produits du rail, chacun choisissable.
+    expect(libelles(t).filter((l) => l.startsWith('Choisir ')).length).toBeGreaterThanOrEqual(8);
     expect(libelles(t)).toContain('À quoi servent ces boutons');
   });
 });

@@ -28,6 +28,8 @@ jest.mock('react-native-room-scan', () => ({
     requestCamera: jest.fn(async () => true),
     poserAuViseur: jest.fn(async () => null),
     retirerDerniereAncre: jest.fn(async () => false),
+    configurerPose: jest.fn(async () => false),
+    choisirAuViseur: jest.fn(() => undefined),
     takePhoto: jest.fn(async () => null),
     readPhoto: jest.fn(async () => null),
     deletePhotos: jest.fn(async () => 0),
@@ -63,6 +65,7 @@ jest.mock('react-native-room-scan', () => ({
   poserCameraDeVisite: jest.fn(() => false),
   poserOrbiteDeMaquette: jest.fn(() => false),
   poserLeveeDeMaquette: jest.fn(() => false),
+  poserLampesDeVisite: jest.fn(() => false),
 }));
 
 /**

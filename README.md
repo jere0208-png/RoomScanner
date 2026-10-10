@@ -14285,6 +14285,115 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## La pose au scan en 3D, la lumière dans la visite, la pose et la chute de tension au devis
+
+Relevés du patron : « améliore considérablement l'app avec des idées que tu
+trouveras intéressantes et productives ; augmente encore la vitesse du
+tutoriel vidéo ; revois complètement l'interface du scan pour le placement des
+produits électriques, intègre directement les éléments en 3D et revois les
+icônes pour du réaliste » ; puis « dans la visite 3D, il y a des ombres
+bizarres au-dessus et en dessous de chaque mur ; revois la stabilité et la
+fluidité, accélère légèrement la marche ; donne la possibilité d'allumer les
+lumières depuis un interrupteur, avec une lumière réaliste pour chaque
+luminaire (par exemple diffuse en haut et en bas de l'applique murale) ; sur le
+menu, "autosuppression…" est coupé : mets-le en petit et gris sous le "non
+enregistré" ; on doit pouvoir supprimer un plan en glissant, comme les
+notifications ».
+
+**La pose au scan, refaite** (`ScanScreen`, `geometry/poseAR`,
+`RoomScanPoseAR.swift`). Trois boutons au symbole de plan et une étiquette
+« PC » plantée sur le mur deviennent :
+
+- un **rail de onze produits en photo**, contre le bord droit (prise, prise
+  double, interrupteur, va-et-vient, volet roulant, RJ45, prise TV, applique,
+  puis au plafond point lumineux, spot, détecteur de fumée) — les photos du
+  catalogue et du devis ; il se range pour balayer la pièce en grand ;
+- le **produit choisi flotte en 3D au viseur**, transparent, plaqué au mur
+  visé et tourné vers la pièce, **déjà à la cote du métier** (25 cm, 1,10 m,
+  1,90 m…) ; le viseur passe au vert quand il s'accroche, la main le sent, et
+  la phrase dessous dit ce qui se posera : « Prise plinthe · 25 cm » ;
+- un **déclencheur** sous le pouce, à la photo du produit : un appui, et le
+  **vrai modèle** se pose et reste au mur, d'un léger rebond ;
+- à gauche, **ce qu'on a posé** : le compte, le dernier en photo, la flèche
+  qui le retire.
+
+Comment, sans refaire l'écran noir de la première tentative : la scène est une
+`SCNView` **sans session**, au fond transparent, dont la caméra est recopiée à
+chaque image sur celle d'ARKit (`viewMatrix`, `projectionMatrix`) ; elle ne
+fait que lire `currentFrame`. Les modèles sont ceux de la maquette
+(`appareils3d`), envoyés une fois avec les règles de hauteur
+(`configurerPose`) ; le fantôme et la pose passent par la même visée
+(`RoomScanManager.viser`). La visée s'annonce au JavaScript (`onVisee`, dix
+fois par seconde au plus, seulement quand elle change) ; l'horloge de visée ne
+bat que si un produit est choisi, et la scène ne se rend en continu que si
+elle a quelque chose à montrer. **Corrigé au passage** : le plafond se
+reconnaissait à « plus de 1,90 m » dans le repère d'ARKit, dont l'origine est
+à hauteur de main — il fallait viser à plus de trois mètres du sol ; il se
+reconnaît maintenant à 1,80 m au-dessus du pied des murs relevés (ou au regard
+levé), et l'ancre le DIT au plan (`plafond`), qui ne le confond plus avec une
+applique. Le guide de pose montre les trois temps avec les mêmes photos :
+choisir, viser, poser.
+
+**Le film en 11 secondes** (`data/film`), au lieu de 17 : chaque animation suit
+l'horloge de son chapitre, tout accélère d'un même pas ; l'accueil calcule la
+durée qu'il annonce.
+
+**La visite** (`RoomScanVisite.swift`, `Exploration`, `geometry/lumieres`) :
+
+- **plus d'occlusion ambiante** : c'était elle, les bandes sombres au pied et
+  à la tête de chaque mur, qui bougeaient avec la caméra — et une passe de
+  rendu de moins à chaque image ;
+- la marche passe de 1,4 à **1,65 m/s**, l'élan et l'arrêt inchangés ;
+- **un appui sur un interrupteur allume** : la cible est plus large que le
+  mécanisme, l'interrupteur doit être visible (pas à travers une cloison), et
+  il allume ce que le plan lui a lié — à défaut, sa pièce ; un second appui
+  éteint, tout le groupe ensemble ;
+- **de vraies lumières, par luminaire** : l'applique murale lance deux
+  faisceaux larges, vers le plafond et vers le sol ; le spot, un cône net ;
+  l'ampoule de la DCL rayonne tout autour ; le plafonnier verse une nappe large
+  ; le ventilateur éclaire sous son moteur. Teinte chaude, portée d'une pièce.
+  Le diffuseur s'allume avec sa lampe (opalin éteint), et le jour baisse quand
+  on allume. La carte graphique ne tient que huit lumières : les sources vont
+  aux lampes allumées les plus proches (cinq, une applique en comptant deux),
+  choisies à nouveau quand on change de pièce. L'état passe par la régie,
+  comme la caméra : allumer ne reconvertit pas le logement.
+
+**Les plans** : le compte à rebours ne se coupe plus — « Non enregistré » en
+ambre, « Autosuppression dans 11 h 52 » dessous, petit et gris, à l'accueil
+comme dans « Mes plans » (`etatDAttente` rend `titre` et `delai`). Et **un plan
+se jette d'un glissé vers la gauche**, comme une notification
+(`GlisserPourSupprimer`, sorti de l'écran des notifications pour servir
+partout) : la ligne part tout de suite, un bandeau propose « Annuler », et le
+plan ne s'en va pour de bon qu'à son départ ou en quittant l'écran
+(`useSuppressionDifferee`). Le « Supprimer » du menu passe par la même attente.
+
+**Deux améliorations « productives »** :
+
+- **la pose, estimée, au devis** (`geometry/mainDOeuvre`, `PoseEstimee`,
+  `store/reglagesPose`) : le devis disait « la pose n'est pas comprise » ; il
+  l'estime point par point (boîte, saignée, tirage, raccordement), le tableau à
+  ses protections, au **taux horaire** de l'artisan (réglé une fois, gardé sur
+  le téléphone), selon la **nature du chantier** — rénovation (TVA 10 %) ou neuf
+  (TVA 20 %, un tiers du temps en moins) — et finit par « Matériel + pose » ;
+- **la chute de tension de chaque circuit** (`geometry/chute`, `planRoutes`) :
+  au point le plus éloigné du tableau en suivant le câble (pontages compris),
+  formule UTE C 15-105, limites 3 % en éclairage et 5 % ailleurs ; un circuit
+  trop long pour sa section le dit au contrôle et au dossier, avec la section
+  suivante à poser. Une information, pas une alerte : le cheminement est tracé,
+  pas mesuré.
+
+Bancs : `poseau3d.test.ts` (photos du rail, modèles plaqués au mur ou pendus
+au plafond, règles de hauteur identiques à celles du plan, phrase du viseur,
+drapeau du plafond) ; `viseur`, `abandonscan`, `grandpublicpartout`,
+`guidepose`, `batterie` (rail, déclencheur, fantôme confié au natif, sobriété
+de l'horloge) ; `lumieresvisite.test.tsx` (lampes et façon d'éclairer,
+diffuseur par lampe, ce qu'un interrupteur allume, cible et cloison, budget de
+sources, appui qui allume puis éteint dans la visite) ;
+`glisserplan.test.tsx` (corbeille, annulation, suppression au départ du
+bandeau et en quittant l'écran) ; `misedecote.test.tsx` (deux lignes) ;
+`poseetchute.test.tsx` (pose par point, tableau, neuf et rénovation, réglages ;
+formule, courant d'emploi, constat, calcul sur un plan).
+
 ## Le vrai appareillage, en 3D comme face au mur ; des photos pour tout le catalogue ; plus de pointillés en 3D ; un meuble ne se prend qu'en édition
 
 Relevés du patron : « le clic sur les meubles ne doit pas être possible sans

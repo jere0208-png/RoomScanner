@@ -1,13 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
-import { RoomScan, RoomScanView } from 'react-native-room-scan';
+import { RoomScan, RoomScanView, scanEvents, type EtatDeVisee } from 'react-native-room-scan';
 import { themedStyles, useTheme, type Palette } from '../theme';
 import { useScanStore } from '../store/scanStore';
 import { useModeElec } from '../store/usage';
@@ -17,32 +18,40 @@ import { haptic } from '../ui/haptic';
 import { panne as expliquer } from '../ui/panne';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GuidePose } from './scan/GuidePose';
-import { FIXTURE_SYMBOL } from '../geometry/electrical';
-import { aimanterHauteur, natureAuMur } from '../geometry/viseur';
-import { CEILING_SYMBOL } from '../geometry/ceiling';
+import { aimanterHauteur, apercuDeHauteur, natureAuMur } from '../geometry/viseur';
+import { PRODUITS_DU_SCAN, configurationDeLaPose, produitDuScan } from '../geometry/poseAR';
+import { VignetteProduit } from '../components/VignetteProduit';
 import { alerte } from '../ui/alerte';
 
 /** Le guide de pose a été lu : on ne le remontre plus de lui-même. */
 const GUIDE_POSE_KEY = 'echoplan.guide-pose';
 
+/*
+  CE QU'ON PEUT POSER AU VISEUR — en PHOTOS, et plus en symboles.
+
+  Relevé du patron : « revois complètement l'interface du scan pour le
+  placement des produits électriques, intègre directement les éléments en
+  3D, et revois aussi les icônes pour du réaliste ». Trois boutons au
+  symbole de plan (« Prise · Inter · Lumière ») sont devenus un rail de onze
+  produits, chacun avec la photo du catalogue et du devis (voir
+  `PRODUITS_DU_SCAN`) : on choisit ce qu'on achètera, pas un trait de plan.
+*/
+
 /**
- * CE QU'ON PEUT POSER AU VISEUR, et comment ça se dit.
+ * LA PHRASE DU VISEUR, au présent : ce qui se posera si l'on appuie.
  *
- * Le symbole est celui du PLAN — le même trait qu'on retrouvera sur le
- * dossier imprimé. Un bouton qui montre autre chose que ce qu'il produit
- * fait apprendre deux langages pour un seul geste.
- *
- * Le mot est en clair, pas en jargon : « Prise » et non « PC ». Le sigle
- * était l'abréviation d'un métier, et l'application sert aussi à la
- * montrer au client.
+ * Le produit flotte déjà en 3D à cet endroit ; la phrase dit sa cote, celle
+ * du métier (« Prise plinthe · 25 cm »), ou ce qu'il faut viser.
  */
-const POSABLES = [
-  { kind: 'prise', mot: 'Prise', symbole: FIXTURE_SYMBOL.prise },
-  { kind: 'inter', mot: 'Inter', symbole: FIXTURE_SYMBOL.inter },
-  // Le point lumineux n'est pas un appareil MURAL : sa croix normalisée
-  // vit avec le plafond, et c'est celle que le plan dessinera.
-  { kind: 'dcl', mot: 'Lumière', symbole: CEILING_SYMBOL.dcl },
-] as const;
+function phraseDeVisee(kind: string, visee: EtatDeVisee | null): string {
+  const produit = produitDuScan(kind);
+  if (!visee || visee.kind !== kind || !visee.ok) {
+    if (produit?.ou !== 'plafond') return 'Visez un mur relevé';
+    return natureAuMur(kind) !== kind ? 'Visez le plafond ou un mur' : 'Visez le plafond';
+  }
+  if (visee.plafond) return `${produit?.mot ?? kind} · au plafond`;
+  return apercuDeHauteur(natureAuMur(kind), visee.hauteur);
+}
 
 /**
  * Écran de scan. RoomPlan dessine lui-même ses guides ET la miniature 3D
@@ -85,8 +94,23 @@ export function ScanScreen() {
    * dit franchement quand le rayon ne rencontre rien — poser au jugé
    * mettrait un appareil au hasard dans le plan.
    */
-  const [poses, setPoses] = useState(0);
-  const [refus, setRefus] = useState(false);
+  /*
+    CE QU'ON A POSÉ, DANS L'ORDRE — pour compter, et pour retirer le dernier.
+    Le compte seul ne disait pas QUOI : la pile garde le produit de chaque
+    pose, et le dernier se montre en photo à côté du compte.
+  */
+  const [posees, setPosees] = useState<string[]>([]);
+  const poses = posees.length;
+  const [refus, setRefus] = useState<string | null>(null);
+  /*
+    LE PRODUIT CHOISI AU RAIL — celui qui flotte au viseur, en 3D, à la cote
+    où il se posera. Une prise d'abord : c'est ce qu'on pose le plus.
+  */
+  const [choisi, setChoisi] = useState<string>('prise');
+  /* Ce que le natif dit viser, dix fois par seconde au plus. */
+  const [visee, setVisee] = useState<EtatDeVisee | null>(null);
+  /* Le rail se range, pour voir la pièce en grand le temps d'un balayage. */
+  const [railOuvert, setRailOuvert] = useState(true);
   /*
     CE QU'ON VIENT DE POSER, ET À QUELLE COTE.
 
@@ -132,11 +156,53 @@ export function ScanScreen() {
     setGuide(false);
     AsyncStorage.setItem(GUIDE_POSE_KEY, '1').catch(() => {});
   };
+  /*
+    LES MODÈLES PARTENT UNE FOIS, au premier scan en mode Électricité : la
+    prise, l'interrupteur, l'applique en 3D, et les règles de hauteur. Le
+    natif les garde, même si sa vue naît après l'envoi.
+  */
+  const configure = useRef(false);
+  useEffect(() => {
+    if (!modeElec || configure.current) return;
+    configure.current = true;
+    RoomScan.configurerPose(configurationDeLaPose()).catch(() => {});
+  }, [modeElec]);
+  /*
+    LE PRODUIT FLOTTE QUAND ON PEUT LE POSER, et seulement alors : en pause,
+    pendant l'assemblage, rail rangé, il n'y a rien à viser — et une visée
+    à vingt images par seconde pour rien, c'est de la batterie.
+  */
+  const viseurActif = modeElec && railOuvert && !paused && !processing;
+  useEffect(() => {
+    RoomScan.choisirAuViseur(viseurActif ? choisi : null);
+  }, [viseurActif, choisi]);
+  useEffect(() => () => RoomScan.choisirAuViseur(null), []);
+  /*
+    LE VISEUR DIT S'IL A TROUVÉ OÙ POSER — et la main le sent : un petit
+    déclic quand le produit s'accroche au mur. On ne regarde pas l'écran en
+    permanence en balayant une pièce.
+  */
+  const accroche = useRef(false);
+  useEffect(() => {
+    const abo = scanEvents.addListener('onVisee', (e: EtatDeVisee) => {
+      setVisee(e);
+      if (e.ok && !accroche.current) haptic('accroche');
+      accroche.current = !!e.ok;
+    });
+    return () => abo.remove();
+  }, []);
+  const produit = produitDuScan(choisi) ?? PRODUITS_DU_SCAN[0];
+  const pret = !!visee && visee.kind === choisi && visee.ok;
+  const derniere = useMemo(
+    () => (posees.length > 0 ? produitDuScan(posees[posees.length - 1]) : undefined),
+    [posees],
+  );
+
   const poser = async (kind: string) => {
     const pose = await RoomScan.poserAuViseur(kind);
     if (pose) {
-      setPoses((n) => n + 1);
-      setRefus(false);
+      setPosees((l) => [...l, kind]);
+      setRefus(null);
       haptic('succes');
       /*
         AU PLAFOND, LA POSITION SE DÉCIDE APRÈS.
@@ -155,7 +221,9 @@ export function ScanScreen() {
         contredire.
       */
       const mot = pose.plafond
-        ? 'Point lumineux — il sera centré dans la pièce'
+        ? kind === 'dcl'
+          ? 'Point lumineux — il sera centré dans la pièce'
+          : `${produitDuScan(kind)?.mot ?? 'Appareil'} posé au plafond`
         : aimanterHauteur(natureAuMur(kind), pose.height).mot;
       if (mot) {
         setAnnonce(mot);
@@ -163,7 +231,18 @@ export function ScanScreen() {
         minuteurAnnonce.current = setTimeout(() => setAnnonce(null), 3200);
       }
     } else {
-      setRefus(true);
+      /*
+        LE REFUS DIT QUOI VISER. Un produit de plafond ne se pose pas sur
+        un mur, et l'inverse : la phrase le dit au lieu d'un « non » sec.
+      */
+      const ou = produitDuScan(kind)?.ou;
+      setRefus(
+        ou !== 'plafond'
+          ? 'Visez un mur déjà relevé — balayez-le d’abord'
+          : natureAuMur(kind) !== kind
+          ? 'Visez un mur relevé ou le plafond de la pièce'
+          : 'Visez le plafond de la pièce',
+      );
       haptic('alerte');
       /*
         ET LE REFUS S'EFFACE, COMME L'ANNONCE.
@@ -174,7 +253,7 @@ export function ScanScreen() {
         appartient au relevé.
       */
       if (minuteurAnnonce.current) clearTimeout(minuteurAnnonce.current);
-      minuteurAnnonce.current = setTimeout(() => setRefus(false), 3200);
+      minuteurAnnonce.current = setTimeout(() => setRefus(null), 3200);
     }
   };
   useEffect(() => {
@@ -307,98 +386,135 @@ export function ScanScreen() {
       </View>
 
       {/*
-        LE VISEUR, ET CE QU'ON Y POSE.
+        LE VISEUR, ET CE QU'ON Y POSE — refait de fond en comble.
 
-        Un carré au centre : on l'aligne sur la boîte, on appuie sur le
-        bouton du bon appareil. Les boutons vivent SUR LE CÔTÉ — relevé du
-        patron —, hors du chemin du pouce qui tient le téléphone et loin de
-        la miniature 3D de RoomPlan, qui occupe le centre-bas.
+        Relevé du patron : « revois complètement l'interface du scan pour le
+        placement des produits électriques, intègre directement les éléments
+        en 3D, et revois aussi les icônes pour du réaliste ».
+
+        — AU CENTRE, le viseur, et le PRODUIT EN 3D qui y flotte (le natif le
+          dessine : voir `ScenePoseAR`), plaqué au mur visé, à la cote où il
+          se posera. Le viseur passe au vert quand le produit a trouvé où
+          s'accrocher, et la phrase dessous dit ce qui se posera :
+          « Prise plinthe · 25 cm ».
+        — À DROITE, le rail des produits, en photos : on choisit ce qu'on
+          achètera, pas un symbole. Il se range pour balayer la pièce en
+          grand.
+        — SOUS LE POUCE, le déclencheur, à la photo du produit choisi : un
+          appui, le produit se pose et reste au mur, en vrai.
+        — À GAUCHE, ce qu'on a posé : le compte, le dernier en photo, et la
+          flèche qui le retire — on vise mal une fois sur dix.
       */}
-      {modeElec && !paused && !processing && (
+      {modeElec && !paused && !processing && railOuvert && (
         <>
           <View style={styles.viseur} pointerEvents="none">
-            <View style={[styles.viseurCoin, styles.viseurHG]} />
-            <View style={[styles.viseurCoin, styles.viseurHD]} />
-            <View style={[styles.viseurCoin, styles.viseurBG]} />
-            <View style={[styles.viseurCoin, styles.viseurBD]} />
-          </View>
-          {/*
-            LE BLOC DE POSE — un tiroir d'outils, pas trois pastilles éparses.
-
-            Relevé du chantier : « les 3 boutons de placement d'éléments élec
-            ne sont pas forcément compréhensibles de tous ». Trois ronds
-            portant PC, INT et LUM ne disent rien à qui n'a pas le jargon —
-            et même à qui l'a, ils ne disent pas qu'on POSE quelque chose sur
-            le mur qu'on filme.
-
-            Trois réponses dans le même bloc : le SYMBOLE du plan — celui
-            qu'on retrouvera sur le dossier, donc la même langue d'un bout à
-            l'autre —, le MOT en clair dessous, et un « ? » qui rouvre
-            l'explication. Réunis sur un fond commun, ils se lisent comme un
-            outil, pas comme trois boutons qui traînent.
-          */}
-          <View style={styles.poseBloc}>
-            {POSABLES.map(({ kind, mot, symbole }) => (
-              <TouchableOpacity
-                key={kind}
-                style={styles.poseBouton}
-                accessibilityLabel={`Poser ${mot} à l’endroit visé`}
-                onPress={() => poser(kind)}>
-                <Svg width={22} height={22} viewBox="-14 -14 28 28">
-                  {symbole.map((seg, i) => (
-                    <Path
-                      key={i}
-                      d={seg.d}
-                      stroke={c.scanInk}
-                      strokeWidth={1.9}
-                      strokeLinecap="round"
-                      fill="none"
-                    />
-                  ))}
-                </Svg>
-                <Text style={styles.poseTexte}>{mot}</Text>
-              </TouchableOpacity>
+            {(['viseurHG', 'viseurHD', 'viseurBG', 'viseurBD'] as const).map((coin) => (
+              <View
+                key={coin}
+                style={[styles.viseurCoin, styles[coin], pret ? styles.viseurPret : styles.viseurAttente]}
+              />
             ))}
-            <View style={styles.poseSeparateur} />
-            <View style={styles.poseRangeeBasse}>
+          </View>
+          <View style={styles.phraseViseur} pointerEvents="none">
+            <Text style={styles.phraseViseurTexte} numberOfLines={1}>
+              {/* Le refus passe avant tout : c'est le seul cas où le geste
+                  n'a rien produit. Puis la cote qu'on vient de poser, tant
+                  qu'elle est fraîche ; la visée en direct reprend ensuite. */}
+              {refus ?? annonce ?? phraseDeVisee(choisi, visee)}
+            </Text>
+          </View>
+
+          <View style={styles.rail}>
+            <View style={styles.railTete}>
               <TouchableOpacity
-                style={styles.poseSecondaire}
+                style={styles.railBouton}
                 accessibilityLabel="À quoi servent ces boutons"
                 onPress={() => setGuide(true)}>
-                <Text style={styles.poseSecondaireTexte}>?</Text>
+                <Text style={styles.railBoutonTexte}>?</Text>
               </TouchableOpacity>
-              {poses > 0 && (
-                <TouchableOpacity
-                  style={styles.poseSecondaire}
-                  accessibilityLabel="Retirer le dernier appareil posé"
-                  onPress={async () => {
-                    if (await RoomScan.retirerDerniereAncre()) {
-                      setPoses((n) => Math.max(0, n - 1));
-                      haptic('leger');
-                    }
-                  }}>
-                  <Text style={styles.poseSecondaireTexte}>↺</Text>
-                </TouchableOpacity>
-              )}
+              <TouchableOpacity
+                style={styles.railBouton}
+                accessibilityLabel="Ranger la pose"
+                onPress={() => setRailOuvert(false)}>
+                <Svg width={14} height={14} viewBox="0 0 24 24">
+                  <Path d="M9 5 L16 12 L9 19" stroke={c.scanInk} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                </Svg>
+              </TouchableOpacity>
             </View>
+            <ScrollView
+              style={styles.railDefile}
+              contentContainerStyle={styles.railContenu}
+              showsVerticalScrollIndicator={false}>
+              {PRODUITS_DU_SCAN.map((p, i) => {
+                const actif = p.kind === choisi;
+                const nouveauRayon = i > 0 && PRODUITS_DU_SCAN[i - 1].ou !== p.ou;
+                return (
+                  <View key={p.kind}>
+                    {nouveauRayon && <Text style={styles.railRayon}>Plafond</Text>}
+                    <TouchableOpacity
+                      style={[styles.tuile, actif && styles.tuileActive]}
+                      accessibilityLabel={`Choisir ${p.mot}`}
+                      accessibilityState={{ selected: actif }}
+                      onPress={() => {
+                        if (p.kind !== choisi) haptic('leger');
+                        setChoisi(p.kind);
+                      }}>
+                      <View style={styles.tuilePhoto}>
+                        <VignetteProduit code={p.photo} libelle={p.mot} taille={38} />
+                      </View>
+                      <Text style={[styles.tuileMot, actif && styles.tuileMotActif]} numberOfLines={2}>
+                        {p.mot}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </ScrollView>
           </View>
-          {(poses > 0 || refus || annonce) && (
-            <View style={styles.poseBandeau} pointerEvents="none">
-              <Text style={styles.instructionText}>
-                {/* Le refus passe avant tout : c'est le seul cas où le
-                    geste n'a rien produit. Puis la cote qu'on vient de
-                    poser, tant qu'elle est fraîche ; le compte reprend la
-                    place ensuite. */}
-                {refus
-                  ? 'Visez un mur déjà relevé — balayez-le d’abord'
-                  : annonce ??
-                    `${poses} appareil${poses > 1 ? 's' : ''} posé${
-                      poses > 1 ? 's' : ''
-                    }`}
+
+          {/* Le déclencheur : la photo du produit choisi, sous le pouce. */}
+          <TouchableOpacity
+            style={[styles.declencheur, !pret && styles.declencheurAttente]}
+            accessibilityRole="button"
+            accessibilityLabel={`Poser ${produit.mot} à l’endroit visé`}
+            onPress={() => poser(choisi)}>
+            <View style={styles.declencheurCoeur}>
+              <VignetteProduit code={produit.photo} libelle={produit.mot} taille={40} />
+            </View>
+          </TouchableOpacity>
+
+          {poses > 0 && (
+            <View style={styles.posees}>
+              <TouchableOpacity
+                style={styles.poseesRetirer}
+                accessibilityLabel="Retirer le dernier appareil posé"
+                onPress={async () => {
+                  if (await RoomScan.retirerDerniereAncre()) {
+                    setPosees((l) => l.slice(0, -1));
+                    haptic('leger');
+                  }
+                }}>
+                <Text style={styles.poseesRetirerTexte}>↺</Text>
+              </TouchableOpacity>
+              {derniere && (
+                <VignetteProduit code={derniere.photo} libelle={derniere.mot} taille={26} />
+              )}
+              <Text style={styles.poseesTexte}>
+                {`${poses} posé${poses > 1 ? 's' : ''}`}
               </Text>
             </View>
           )}
         </>
+      )}
+      {/* Rail rangé : une pastille pour le rouvrir, et rien d'autre sur la vue. */}
+      {modeElec && !paused && !processing && !railOuvert && (
+        <TouchableOpacity
+          style={styles.railFerme}
+          accessibilityLabel="Afficher la pose"
+          onPress={() => setRailOuvert(true)}>
+          <VignetteProduit code={produit.photo} libelle={produit.mot} taille={24} />
+          <Text style={styles.railFermeTexte}>Poser</Text>
+        </TouchableOpacity>
       )}
 
       {/* Coins inférieurs uniquement : le centre-bas appartient à la
@@ -581,80 +697,146 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     position: 'absolute',
     width: 20,
     height: 20,
-    borderColor: '#F4F6FA',
   },
+  /* Blanc tant qu'il cherche, vert quand le produit s'est accroché. */
+  viseurAttente: { borderColor: 'rgba(244,246,250,0.85)' },
+  viseurPret: { borderColor: '#34C759' },
   viseurHG: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3 },
   viseurHD: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3 },
   viseurBG: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 },
   viseurBD: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
-  /* Les boutons de pose : une colonne contre le bord droit, à hauteur du
-     pouce, hors du chemin de la miniature 3D. */
-  /*
-    UN SEUL BLOC, contre le bord droit, à hauteur de pouce.
-
-    Les trois boutons vivaient séparés, chacun sur sa pastille ronde : rien
-    ne disait qu'ils allaient ensemble, ni qu'ils s'adressaient au viseur du
-    centre. Réunis dans un même tiroir, ils se lisent comme la boîte à
-    outils qu'ils sont — et le « ? » y a naturellement sa place.
-  */
-  /*
-    UN CRAN PLUS PETIT — relevé du chantier.
-
-    Le bloc prenait le tiers de la hauteur de l'écran, sur une vue où l'on
-    a besoin de VOIR ce qu'on scanne : trois boutons de cinquante-quatre
-    points, plus le séparateur et la rangée du bas. Réduits, ils restent
-    largement à portée du pouce — un carré de quarante-six points est la
-    taille d'une touche de clavier — et rendent la moitié de la place au
-    relevé.
-  */
-  poseBloc: {
+  /* La phrase du viseur, juste sous lui : on la lit sans quitter la cible. */
+  phraseViseur: {
     position: 'absolute',
-    right: 12,
-    top: '32%',
-    backgroundColor: c.scanPill,
-    borderRadius: 17,
-    padding: 5,
-    gap: 3,
-    alignItems: 'center',
-  },
-  poseBouton: {
-    width: 48,
-    height: 46,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 1,
-  },
-  poseTexte: { color: c.scanInk, fontSize: 9.5, fontWeight: '700' },
-  poseSeparateur: {
-    height: 1,
-    alignSelf: 'stretch',
-    marginHorizontal: 8,
-    backgroundColor: 'rgba(255,255,255,0.16)',
-  },
-  poseRangeeBasse: { flexDirection: 'row', gap: 4 },
-  poseSecondaire: {
-    width: 27,
-    height: 34,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  poseSecondaireTexte: {
-    color: c.scanInk,
-    fontSize: 15,
-    fontWeight: '600',
-    opacity: 0.85,
-  },
-  poseBandeau: {
-    position: 'absolute',
-    bottom: 118,
+    top: '50%',
+    marginTop: 50,
     alignSelf: 'center',
+    maxWidth: '70%',
     backgroundColor: c.scanPill,
     borderRadius: 14,
-    paddingVertical: 7,
-    paddingHorizontal: 13,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
+  phraseViseurTexte: { color: c.scanInk, fontSize: 13.5, fontWeight: '600' },
+  /*
+    LE RAIL DES PRODUITS, contre le bord droit, sous la torche : une colonne
+    de photos qui défile. Soixante-six points de large — la photo, son mot
+    sur deux lignes, et rien qui morde sur la pièce qu'on scanne.
+  */
+  rail: {
+    position: 'absolute',
+    right: 10,
+    top: 108,
+    bottom: 204,
+    width: 68,
+    backgroundColor: c.scanPill,
+    borderRadius: 18,
+    paddingTop: 4,
+    overflow: 'hidden',
+  },
+  railTete: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 },
+  railBouton: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  railBoutonTexte: { color: c.scanInk, fontSize: 15, fontWeight: '700', opacity: 0.9 },
+  railDefile: { flex: 1 },
+  railContenu: { paddingHorizontal: 4, paddingBottom: 8, gap: 4 },
+  railRayon: {
+    color: 'rgba(244,246,250,0.62)',
+    fontSize: 9,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  tuile: {
+    alignItems: 'center',
+    paddingVertical: 5,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  tuileActive: { borderColor: '#34C759', backgroundColor: 'rgba(52,199,89,0.16)' },
+  /* La photo sur un rond clair : un produit blanc se lit sur la vue sombre. */
+  tuilePhoto: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(244,246,250,0.94)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tuileMot: {
+    color: 'rgba(244,246,250,0.78)',
+    fontSize: 9,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 3,
+    lineHeight: 11,
+  },
+  tuileMotActif: { color: c.scanInk, fontWeight: '800' },
+  /* Le déclencheur, comme celui d'un appareil photo : un anneau, un cœur. */
+  declencheur: {
+    position: 'absolute',
+    right: 12,
+    bottom: 118,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 4,
+    borderColor: '#F4F6FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(12,14,20,0.35)',
+  },
+  declencheurAttente: { opacity: 0.6 },
+  declencheurCoeur: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#F4F6FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /* Ce qu'on a posé : le compte, le dernier en photo, la flèche qui le retire. */
+  posees: {
+    position: 'absolute',
+    left: 12,
+    bottom: 132,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: c.scanPill,
+    borderRadius: 18,
+    paddingVertical: 4,
+    paddingLeft: 4,
+    paddingRight: 12,
+  },
+  poseesRetirer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(244,246,250,0.14)',
+  },
+  poseesRetirerTexte: { color: c.scanInk, fontSize: 16, fontWeight: '700' },
+  poseesTexte: { color: c.scanInk, fontSize: 13, fontWeight: '700' },
+  /* Le rail rangé : une pastille contre le bord, à la photo du produit choisi. */
+  railFerme: {
+    position: 'absolute',
+    right: 10,
+    top: 108,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: c.scanPill,
+    borderRadius: 18,
+    paddingVertical: 5,
+    paddingLeft: 5,
+    paddingRight: 12,
+  },
+  railFermeTexte: { color: c.scanInk, fontSize: 13, fontWeight: '700' },
   topHud: {
     position: 'absolute',
     top: 58,

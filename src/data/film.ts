@@ -65,8 +65,12 @@ export interface Chapitre {
   titre: string;
   phrase: string;
   /**
-   * La durée du chapitre, en millisecondes. Relevé du patron : « fais la
-   * vidéo tuto plus rapide » — dix-sept secondes en tout, sans précipiter.
+   * La durée du chapitre, en millisecondes. Relevés du patron : « fais la
+   * vidéo tuto plus rapide » — dix-sept secondes en tout —, puis « augmente
+   * encore la vitesse du tutoriel vidéo » : onze secondes. Chaque animation
+   * d'un chapitre suit son horloge, de 0 à 1 sur cette durée : tout le film
+   * accélère d'un même pas, rien ne se désynchronise. Le texte, lui, reste à
+   * l'écran tant qu'on n'a pas touché « Suivant ».
    */
   duree: number;
 }
@@ -76,30 +80,33 @@ export const CHAPITRES: Chapitre[] = [
     cle: 'scan',
     titre: 'Scannez la pièce',
     phrase: 'Balayez lentement avec l’iPhone : murs, ouvertures et meubles sont relevés en direct.',
-    duree: 3600,
+    duree: 2400,
   },
   {
     cle: 'plan',
     titre: 'Le plan se dessine',
     phrase: 'Coté au centimètre, pièce par pièce, avec ses surfaces.',
-    duree: 3200,
+    duree: 2100,
   },
   {
     cle: 'meubles',
     titre: 'Aménagez-le',
     phrase: 'Glissez un meuble du catalogue : il se pose à ses vraies dimensions.',
-    duree: 3400,
+    duree: 2200,
   },
   {
     cle: '3d',
     titre: 'Visitez-le en 3D',
     phrase: 'Le logement se lève, meublé — et l’on y entre à hauteur d’œil.',
-    duree: 3600,
+    duree: 2400,
   },
   {
     cle: 'partage',
     titre: 'Partagez un dossier pro',
     phrase: 'Un PDF à imprimer, un DXF pour l’architecte, la 3D pour vos proches.',
-    duree: 3200,
+    duree: 1900,
   },
 ];
+
+/** La durée du film entier, en millisecondes — ce que l'accueil annonce. */
+export const DUREE_DU_FILM = CHAPITRES.reduce((t, c) => t + c.duree, 0);

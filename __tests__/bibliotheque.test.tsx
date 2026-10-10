@@ -15,6 +15,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(async () => undefined),
 }));
 
+import { DELAI_ANNULER } from '../src/components/BandeauAnnuler';
 import React from 'react';
 import { Animated, Text, TouchableOpacity, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -275,6 +276,17 @@ describe('la bibliothèque des relevés', () => {
     // La feuille joue sa descente avant que l'action parte.
     act(() => {
       jest.advanceTimersByTime(HOLD_MS + 120);
+    });
+    /*
+      LE MENU PASSE PAR LA MÊME ATTENTE QUE LE GLISSÉ (voir
+      `BandeauAnnuler`) : la ligne part tout de suite, le plan quelques
+      secondes plus tard — le temps de toucher « Annuler ».
+    */
+    expect(
+      tree.root.findAll((n) => n.props?.accessibilityLabel === 'Annuler la suppression').length,
+    ).toBeGreaterThan(0);
+    act(() => {
+      jest.advanceTimersByTime(DELAI_ANNULER + 100);
     });
     const restants = useScanStore.getState().saves;
     expect(restants).toHaveLength(1);

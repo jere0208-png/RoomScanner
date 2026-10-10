@@ -66,6 +66,13 @@ final class RoomScanVisite: UIView {
   private let ambiante = SCNLight()
   private let jour = SCNLight()
   private let contre = SCNLight()
+  private var noeudDuContre: SCNNode?
+  /// Les lumières des lampes allumées (voir `poserLampes`).
+  private let eclairage = SCNNode()
+  /// Les diffuseurs de chaque lampe, par rang : ils s'allument avec elle.
+  private var diffuseurs: [Int: [SCNNode]] = [:]
+  /// L'état des lampes, par rang, tel que le JavaScript l'a posé.
+  private var lampesPosees: [Float] = []
 
   @objc var maillage: [NSNumber] = [] {
     didSet { rebatir() }
@@ -156,6 +163,9 @@ final class RoomScanVisite: UIView {
   private static var camerasEnAttente: [String: [NSNumber]] = [:]
   private static var orbitesEnAttente: [String: [NSNumber]] = [:]
   private static var leveesEnAttente: [String: (NSNumber, NSNumber)] = [:]
+  private static var lampesEnAttente: [String: [NSNumber]] = [:]
+
+  static func attendre(_ cle: String, lampes: [NSNumber]) { lampesEnAttente[cle] = lampes }
 
   static func attendre(_ cle: String, camera: [NSNumber]) { camerasEnAttente[cle] = camera }
   static func attendre(_ cle: String, orbite: [NSNumber]) { orbitesEnAttente[cle] = orbite }
@@ -167,6 +177,7 @@ final class RoomScanVisite: UIView {
     if let c = camerasEnAttente.removeValue(forKey: cle) { vue.poserCamera(c) }
     if let o = orbitesEnAttente.removeValue(forKey: cle) { vue.poserOrbite(o) }
     if let l = leveesEnAttente.removeValue(forKey: cle) { vue.poserLevee(l.0, solY: l.1) }
+    if let l = lampesEnAttente.removeValue(forKey: cle) { vue.poserLampes(l) }
   }
 
   /** La caméra de la visite, posée directement : voir `cle`. */
@@ -183,6 +194,167 @@ final class RoomScanVisite: UIView {
   func poserLevee(_ k: NSNumber, solY y: NSNumber) {
     solY = y
     levee = k
+  }
+
+  // ------------------------------------------------------------- lampes
+
+  /*
+    ON APPUIE SUR L'INTERRUPTEUR, LA PIÈCE S'ÉCLAIRE — relevé du patron :
+    « donne la possibilité d'allumer les lumières depuis un interrupteur, et
+    fais une lumière plus réaliste pour chaque luminaire, en fonction de leur
+    forme et de leur usage (par exemple une lumière diffuse en haut et en bas
+    de l'applique murale) ».
+
+    Le JavaScript pose neuf nombres par lampe — `[rang, genre, allumée,
+    source, x, y, z, nx, nz]` (voir `lumieres.ts`) —, par la régie, sans
+    toucher aux propriétés : allumer ne reconvertit pas le logement. Le
+    diffuseur s'allume ou s'éteint ; les lampes qui ont droit à une source
+    reçoivent une vraie lumière, à la façon de leur luminaire.
+  */
+  func poserLampes(_ valeurs: [NSNumber]) {
+    lampesPosees = valeurs.map { $0.floatValue }
+    appliquerLampes()
+  }
+
+  private func lampeAllumee(_ rang: Int) -> Bool {
+    var i = 0
+    while i + 9 <= lampesPosees.count {
+      if Int(lampesPosees[i]) == rang { return lampesPosees[i + 2] > 0.5 }
+      i += 9
+    }
+    return false
+  }
+
+  /** Éteint : un blanc opalin. Allumé : il rayonne, de sa teinte chaude. */
+  private func materiauDeDiffuseur(allume: Bool) -> SCNMaterial {
+    let m = SCNMaterial()
+    m.isDoubleSided = false
+    m.cullMode = .back
+    if allume {
+      m.lightingModel = .constant
+      m.diffuse.contents = UIColor(red: 1.0, green: 0.95, blue: 0.84, alpha: 1)
+    } else {
+      m.lightingModel = .physicallyBased
+      m.diffuse.contents = UIColor(red: 0.92, green: 0.91, blue: 0.88, alpha: 1)
+      m.roughness.contents = NSNumber(value: 0.55)
+      m.metalness.contents = NSNumber(value: 0)
+    }
+    return m
+  }
+
+  private func appliquerLampes() {
+    for enfant in eclairage.childNodes { enfant.removeFromParentNode() }
+    var nuit = false
+    var i = 0
+    let v = lampesPosees
+    while i + 9 <= v.count {
+      let rang = Int(v[i])
+      let genre = Int(v[i + 1])
+      let allume = v[i + 2] > 0.5
+      let source = v[i + 3] > 0.5
+      if allume { nuit = true }
+      for n in diffuseurs[rang] ?? [] {
+        n.geometry?.materials = [materiauDeDiffuseur(allume: allume)]
+      }
+      if allume && source {
+        let p = SCNVector3(x: v[i + 4], y: v[i + 5], z: v[i + 6])
+        for l in lumieres(genre: genre, a: p, nx: v[i + 7], nz: v[i + 8]) {
+          eclairage.addChildNode(l)
+        }
+      }
+      i += 9
+    }
+    /*
+      LE SOIR TOMBE QUAND ON ALLUME. Une lampe en plein jour ne se voit pas :
+      le jour baisse, le contre-jour se retire — il libère sa place parmi les
+      huit lumières que la carte graphique tient à la fois — et l'ambiance
+      garde de quoi lire la pièce.
+    */
+    guard orbite.count < 10 else { return }
+    if nuit {
+      ambiante.intensity = 300
+      jour.intensity = 110
+      noeudDuContre?.light = nil
+    } else {
+      ambiante.intensity = 620
+      jour.intensity = 420
+      noeudDuContre?.light = contre
+    }
+  }
+
+  /**
+   LA LUMIÈRE D'UN LUMINAIRE, selon sa forme et son usage.
+
+   1 — l'applique murale : deux faisceaux larges, l'un vers le plafond,
+       l'autre vers le sol — le mur se lave de lumière au-dessus et
+       au-dessous d'elle ;
+   2 — le spot encastré : un cône net vers le sol ;
+   3 — l'ampoule de la DCL : elle rayonne tout autour, sous sa douille ;
+   4 — le plafonnier : une nappe large et douce ;
+   5 — le ventilateur : sous son moteur.
+
+   Une teinte chaude (2 700 K) et une portée de pièce : au-delà, la lumière
+   s'éteint d'elle-même, sans éclairer la chambre d'à côté au travers.
+   */
+  private func lumieres(genre: Int, a p: SCNVector3, nx: Float, nz: Float) -> [SCNNode] {
+    let chaud = UIColor(red: 1.0, green: 0.83, blue: 0.62, alpha: 1)
+    func faisceau(
+      versLeHaut: Bool, interieur: CGFloat, exterieur: CGFloat, intensite: CGFloat,
+      portee: CGFloat, en q: SCNVector3
+    ) -> SCNNode {
+      let l = SCNLight()
+      l.type = .spot
+      l.color = chaud
+      l.intensity = intensite
+      l.spotInnerAngle = interieur
+      l.spotOuterAngle = exterieur
+      l.attenuationStartDistance = 0.15
+      l.attenuationEndDistance = portee
+      l.attenuationFalloffExponent = 2
+      l.castsShadow = false
+      let n = SCNNode()
+      n.light = l
+      n.position = q
+      // Un projecteur éclaire le long de son −z : un quart de tour autour
+      // de x le tourne vers le haut, ou vers le bas.
+      n.eulerAngles = SCNVector3(x: versLeHaut ? Float.pi / 2 : -Float.pi / 2, y: 0, z: 0)
+      return n
+    }
+    switch genre {
+    case 1:
+      let q = SCNVector3(x: p.x + nx * 0.06, y: p.y, z: p.z + nz * 0.06)
+      return [
+        faisceau(versLeHaut: true, interieur: 35, exterieur: 125, intensite: 560, portee: 3.2, en: q),
+        faisceau(versLeHaut: false, interieur: 35, exterieur: 125, intensite: 460, portee: 3.0, en: q),
+      ]
+    case 2:
+      return [faisceau(
+        versLeHaut: false, interieur: 22, exterieur: 70, intensite: 700, portee: 4.5,
+        en: SCNVector3(x: p.x, y: p.y - 0.02, z: p.z))]
+    case 3:
+      let l = SCNLight()
+      l.type = .omni
+      l.color = chaud
+      l.intensity = 640
+      l.attenuationStartDistance = 0.4
+      l.attenuationEndDistance = 6
+      l.attenuationFalloffExponent = 2
+      l.castsShadow = false
+      let n = SCNNode()
+      n.light = l
+      n.position = SCNVector3(x: p.x, y: p.y - 0.6, z: p.z)
+      return [n]
+    case 4:
+      return [faisceau(
+        versLeHaut: false, interieur: 75, exterieur: 165, intensite: 720, portee: 5.5,
+        en: SCNVector3(x: p.x, y: p.y - 0.07, z: p.z))]
+    case 5:
+      return [faisceau(
+        versLeHaut: false, interieur: 60, exterieur: 155, intensite: 620, portee: 5,
+        en: SCNVector3(x: p.x, y: p.y - 0.37, z: p.z))]
+    default:
+      return []
+    }
   }
 
   /// Le fil du bois et la trame des tissus, dessinés une fois par teinte.
@@ -228,10 +400,16 @@ final class RoomScanVisite: UIView {
     cam.fieldOfView = 60
     cam.projectionDirection = .vertical
     cam.wantsHDR = false
-    // L'occlusion ambiante creuse les angles : c'est elle qui fait lire un
-    // meuble contre un mur sans avoir à tracer une arête.
-    cam.screenSpaceAmbientOcclusionIntensity = 0.6
-    cam.screenSpaceAmbientOcclusionRadius = 0.4
+    /*
+      PLUS D'OCCLUSION AMBIANTE — relevé du patron : « dans la visite 3D, il
+      y a des ombres bizarres au-dessus et en dessous de chaque mur ».
+      L'occlusion « en espace écran » assombrit ce qui est proche en
+      profondeur à l'écran : le pied et la tête de chaque mur, contre le sol
+      et le plafond, en bandes sales qui bougeaient avec la caméra — et elle
+      coûtait une passe de rendu à chaque image. Les meubles se lisent déjà
+      par leur liseré et leur ombre de contact ; les angles, par la lumière.
+    */
+    cam.screenSpaceAmbientOcclusionIntensity = 0
     oeil.camera = cam
     scene.rootNode.addChildNode(oeil)
     vue.pointOfView = oeil
@@ -261,6 +439,8 @@ final class RoomScanVisite: UIView {
     noeudContre.light = contre
     noeudContre.eulerAngles = SCNVector3(x: -Float.pi / 3.5, y: Float.pi / 5 + Float.pi, z: 0)
     scene.rootNode.addChildNode(noeudContre)
+    noeudDuContre = noeudContre
+    scene.rootNode.addChildNode(eclairage)
 
     scene.rootNode.addChildNode(bati)
 
@@ -427,6 +607,7 @@ final class RoomScanVisite: UIView {
   private func rebatirMaintenant() {
     for enfant in bati.childNodes { enfant.removeFromParentNode() }
     materiauxContour.removeAll()
+    diffuseurs.removeAll()
     if let g = geometrie(maillage, deuxFaces: true) {
       bati.addChildNode(SCNNode(geometry: g))
     }
@@ -472,7 +653,10 @@ final class RoomScanVisite: UIView {
     var k = 0
     var out: [SCNNode] = []
     while k + 8 <= v.count {
-      let code = Int(v[k])
+      // Un DIFFUSEUR de lampe porte son rang dans son code : 5 + 100 × (rang + 1).
+      let brut = Int(v[k])
+      let lampe = brut >= 100 ? brut / 100 - 1 : -1
+      let code = brut % 100
       let teinte = UIColor(
         red: CGFloat(v[k + 1]), green: CGFloat(v[k + 2]), blue: CGFloat(v[k + 3]), alpha: 1)
       let rugosite = CGFloat(v[k + 4])
@@ -511,6 +695,10 @@ final class RoomScanVisite: UIView {
         elements: [element])
       g.materials = [materiauDuMeuble(code, teinte, rugosite, metal)]
       let n = SCNNode(geometry: g)
+      if code == 5 && lampe >= 0 {
+        diffuseurs[lampe, default: []].append(n)
+        g.materials = [materiauDeDiffuseur(allume: lampeAllumee(lampe))]
+      }
       // Ce qui se pose PAR-DESSUS le reste — l'ombre, le verre — passe après.
       if code == 9 { n.renderingOrder = 5 }
       if code == 3 { n.renderingOrder = 6 }
@@ -1010,6 +1198,17 @@ final class RoomScanVisiteRegie: NSObject {
         vue.poserLevee(k, solY: solY)
       } else {
         RoomScanVisite.attendre(cle, levee: k, solY: solY)
+      }
+    }
+  }
+
+  /// Les lampes de la visite : allumées ou non, et lesquelles ont leur lumière.
+  @objc func lampes(_ cle: String, valeurs: [NSNumber]) {
+    DispatchQueue.main.async {
+      if let vue = RoomScanVisite.parCle(cle) {
+        vue.poserLampes(valeurs)
+      } else {
+        RoomScanVisite.attendre(cle, lampes: valeurs)
       }
     }
   }

@@ -87,7 +87,38 @@ export function palierProche(paliers: number[], vise: number): number {
  * yeux. Quarante-cinq centimètres : la moitié de l'écart entre les deux
  * paliers d'une prise, moins une marge.
  */
-const PORTEE_PALIER = 0.45;
+export const PORTEE_PALIER = 0.45;
+
+/** Les paliers de hauteur d'un appareil, s'il en a plusieurs (m). */
+export function paliersDe(kind: FixtureKind): number[] | null {
+  const p = PALIERS[kind];
+  return p ? p.map((x) => x.h) : null;
+}
+
+/**
+ * CE QUE LE VISEUR VA POSER, AVANT QU'ON APPUIE — le nom et la cote.
+ *
+ * Relevé du patron : « revois complètement l'interface du scan pour le
+ * placement des produits électriques ». Le produit flotte maintenant au
+ * viseur, en 3D, à la cote où il se posera ; cette phrase l'accompagne :
+ * « Prise plinthe · 25 cm ». C'est la même règle qu'`aimanterHauteur`, dite
+ * au présent plutôt qu'au passé.
+ */
+export function apercuDeHauteur(kind: FixtureKind, vise: number): string {
+  const spec = FIXTURES[kind];
+  const paliers = PALIERS[kind];
+  if (paliers) {
+    const h = palierProche(
+      paliers.map((p) => p.h),
+      vise,
+    );
+    if (Math.abs(h - vise) <= PORTEE_PALIER) {
+      return `${paliers.find((p) => p.h === h)!.mot} · ${enCm(h)}`;
+    }
+    return `${spec?.label ?? kind} · ${enCm(vise)}`;
+  }
+  return spec ? `${spec.label} · ${enCm(spec.std)}` : enCm(vise);
+}
 
 /**
  * La hauteur à laquelle on pose vraiment, et le mot qui l'explique.
@@ -240,6 +271,12 @@ export interface AncreElec {
   along?: number;
   /** Hauteur relevée au-dessus du sol de ce mur (m). */
   height?: number;
+  /**
+   * Visé AU PLAFOND — le natif le sait (il voit le regard levé, la hauteur
+   * au-dessus du sol) ; le JavaScript ne le devinerait qu'à la distance des
+   * murs, et un point lumineux visé près d'une cloison devenait une applique.
+   */
+  plafond?: boolean;
   x: number;
   y: number;
   z: number;
@@ -396,7 +433,7 @@ export function ancrerElec(
       soit on l'a visé haut ET loin des murs — c'est alors le plafond qu'on
       regardait, pas la cloison.
     */
-    if (estDuPlafond(a.kind) && (loinDesMurs || enHaut) && piece) {
+    if (estDuPlafond(a.kind) && (a.plafond || loinDesMurs || enHaut) && piece) {
       /*
         AU CENTRE, OU SUR L'AXE DU PREMIER — voir `aimanterPlafond`.
 

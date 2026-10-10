@@ -1165,19 +1165,29 @@ export function modeleDAppareil(p: PoseDAppareil): ModeleLocal {
  * local est la normale ; le repère est direct, la carte graphique garde donc
  * le bon sens des faces. Au plafond, les axes sont ceux de la scène.
  */
-export function groupesDesAppareils(poses: PoseDAppareil[]): GroupeLocal[] {
+export function groupesDesAppareils(
+  poses: PoseDAppareil[],
+  /**
+   * Le rang de chaque LAMPE, par identifiant de pose (voir `lumieres`) : le
+   * diffuseur d'une lampe forme alors son propre groupe, qui s'allume avec
+   * elle. Sans rangs, tous les diffuseurs restent allumés — la maquette.
+   */
+  lampes?: ReadonlyMap<string, number>,
+): GroupeLocal[] {
   const groupes = new Map<string, GroupeLocal>();
   for (const p of poses) {
+    const rang = lampes?.get(p.id);
     const modele = modeleDAppareil(p);
     const auPlafond = p.genre === 'plafond';
     const X: V3 = auPlafond ? [1, 0, 0] : [p.nz, 0, -p.nx];
     const Y: V3 = [0, 1, 0];
     const Z: V3 = auPlafond ? [0, 0, 1] : [p.nx, 0, p.nz];
     for (const gl of modele.groupes) {
-      const cle = `${gl.mat}|${gl.couleur}`;
+      const diffuseur = gl.mat === 'lumiere' && rang !== undefined;
+      const cle = diffuseur ? `${gl.mat}|${gl.couleur}|L${rang}` : `${gl.mat}|${gl.couleur}`;
       let g = groupes.get(cle);
       if (!g) {
-        g = { mat: gl.mat, couleur: gl.couleur, v: [], i: [] };
+        g = { mat: gl.mat, couleur: gl.couleur, v: [], i: [], ...(diffuseur ? { lampe: rang } : null) };
         groupes.set(cle, g);
       }
       const base = g.v.length / PAR_SOMMET;

@@ -37,21 +37,36 @@ export function delaiRestant(jusqua: number, maintenant = Date.now()): string {
   return `${Math.floor(min / 60)} h ${deux(min % 60)}`;
 }
 
-/** Ce qu'une ligne de plan dit de son attente — ou rien. */
+/**
+ * Ce qu'une ligne de plan dit de son attente — ou rien.
+ *
+ * EN DEUX TEMPS — relevé du patron : « sur le menu, "autosuppression…" est
+ * coupé et on ne voit pas la suite ; mets-le en petit et gris sous le "non
+ * enregistré" ». La phrase tenait sur UNE ligne, et la largeur d'une carte
+ * coupait justement le délai, c'est-à-dire ce qu'on venait lire. `titre` dit
+ * l'état (en ambre), `delai` le compte à rebours (petit, gris, dessous) ;
+ * `texte` garde la phrase entière pour la synthèse vocale.
+ */
 export function etatDAttente(
   scan: SavedScan,
   maintenant = Date.now(),
-): { sorte: 'nouveau' | 'retouche'; texte: string } | null {
+): { sorte: 'nouveau' | 'retouche'; titre: string; delai: string; texte: string } | null {
   if (scan.supprimeLe) {
+    const d = delaiRestant(scan.supprimeLe, maintenant);
     return {
       sorte: 'nouveau',
-      texte: `Non enregistré · autosuppression dans ${delaiRestant(scan.supprimeLe, maintenant)}`,
+      titre: 'Non enregistré',
+      delai: `Autosuppression dans ${d}`,
+      texte: `Non enregistré · autosuppression dans ${d}`,
     };
   }
   if (scan.retouche) {
+    const d = delaiRestant(scan.retouche.jusqua, maintenant);
     return {
       sorte: 'retouche',
-      texte: `Modifications non enregistrées · perdues dans ${delaiRestant(scan.retouche.jusqua, maintenant)}`,
+      titre: 'Modifications non enregistrées',
+      delai: `Perdues dans ${d}`,
+      texte: `Modifications non enregistrées · perdues dans ${d}`,
     };
   }
   return null;

@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
+import { GlisserPourSupprimer } from '../components/GlisserPourSupprimer';
+import { BandeauAnnuler, useSuppressionDifferee } from '../components/BandeauAnnuler';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { etatDAttente, rangerLeTravail, useMaintenant } from '../ui/miseDeCote';
 import {
   Animated,
@@ -573,6 +576,8 @@ interface RowProps {
   /** Le doigt a bougé : au-delà d'un cheveu, il fait défiler. */
   onHoldMove: (at: { x: number; y: number }) => void;
   onRelease: (deposer: boolean) => void;
+  /** Referme la corbeille entrouverte — et dit qu'elle l'était. */
+  refermer?: () => boolean;
 }
 
 /**
@@ -598,6 +603,7 @@ function ScanRow({
   onHold,
   onHoldMove,
   onRelease,
+  refermer,
 }: RowProps) {
   /*
     LA LIGNE NE SE DÉPLACE PLUS : ELLE LAISSE SA PLACE.
@@ -616,7 +622,7 @@ function ScanRow({
     : null;
   return (
     <Animated.View
-      style={[styles.row, pris && styles.rowGhost, anim]}
+      style={[styles.row, styles.rowDansGlissante, pris && styles.rowGhost, anim]}
       onTouchStart={(e) =>
         onHold({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })
       }
@@ -646,7 +652,12 @@ function ScanRow({
         disabled={fige}
         accessibilityRole="button"
         accessibilityLabel={`Ouvrir ${item.name}`}
-        onPress={onOpen}>
+        onPress={() => {
+          // Une corbeille entrouverte se referme d'abord : on n'ouvre pas un
+          // plan par accident en voulant la ranger.
+          if (refermer?.()) return;
+          onOpen();
+        }}>
         <View style={styles.thumb}>
           <PlanThumb scan={item} c={palette} />
         </View>
@@ -668,9 +679,15 @@ function ScanRow({
                   attente.sorte === 'nouveau' && styles.attentePointNeuf,
                 ]}
               />
-              <Text style={styles.attenteTexte} numberOfLines={1}>
-                {attente.texte}
-              </Text>
+              <View style={styles.attenteTextes}>
+                <Text style={styles.attenteTexte} numberOfLines={1} accessibilityLabel={attente.texte}>
+                  {attente.titre}
+                </Text>
+                {/* Le compte à rebours, petit et gris : il ne se coupe plus. */}
+                <Text style={styles.attenteDelai} numberOfLines={1}>
+                  {attente.delai}
+                </Text>
+              </View>
             </View>
           ) : (
             <Text style={styles.rowSub}>{formatDate(item.updatedAt)}</Text>
@@ -716,6 +733,14 @@ export function LibraryScreen() {
   const maintenant = useMaintenant();
 
   const deleteSave = useScanStore((s) => s.deleteSave);
+  /*
+    UN PLAN SE JETTE D'UN GLISSÉ — relevé du patron : « on doit pouvoir
+    supprimer un plan en slidant comme les notifications, sur la gauche ».
+    Le menu « … » passe par la même attente : un seul chemin pour jeter, et
+    la même chance de se raviser.
+  */
+  const suppression = useSuppressionDifferee(deleteSave);
+  const marges = useSafeAreaInsets();
   const addFolder = useScanStore((s) => s.addFolder);
   const renameFolder = useScanStore((s) => s.renameFolder);
   const removeFolder = useScanStore((s) => s.removeFolder);
@@ -1044,7 +1069,7 @@ export function LibraryScreen() {
           label: 'Supprimer',
           icon: 'supprimer',
           danger: true,
-          onPress: () => deleteSave(item.id),
+          onPress: () => suppression.jeter(item.id, item.name),
         },
       ],
     });
@@ -1317,7 +1342,14 @@ export function LibraryScreen() {
             </View>
           )}
 
-          {liste.map((s) => (
+          {liste.filter((s) => s.id !== suppression.masque).map((s) => (
+            <GlisserPourSupprimer
+              key={s.id}
+              libelle={s.name}
+              rayon={radius.md + 2}
+              style={styles.rowGlissante}
+              onSupprimer={() => suppression.jeter(s.id, s.name)}>
+              {(refermer) => (
             <ScanRow
               key={s.id}
               item={s}
@@ -1341,13 +1373,23 @@ export function LibraryScreen() {
                 }
               }}
               onRelease={releaseRow}
+              refermer={refermer}
             />
+              )}
+            </GlisserPourSupprimer>
           ))}
         </ScrollView>
       )}
 
       <ActionSheet data={menu} onClose={() => setMenu(null)} />
       <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
+      {suppression.enAttente && (
+        <BandeauAnnuler
+          texte={`« ${suppression.enAttente.nom} » supprimé`}
+          bas={marges.bottom + 18}
+          onAnnuler={suppression.annuler}
+        />
+      )}
 
     </View>
     </RetourGlisse>
@@ -1566,14 +1608,19 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     enregistré — il n'existe encore qu'à moitié —, plein pour des
     modifications qui attendent.
   */
-  attente: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 3 },
-  attentePoint: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: c.amber },
+  attente: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 3 },
+  attentePoint: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: c.amber, marginTop: 4 },
   attentePointNeuf: {
     backgroundColor: 'transparent',
     borderWidth: 1.6,
     borderColor: c.amber,
   },
+  attenteTextes: { flexShrink: 1 },
   attenteTexte: { flexShrink: 1, color: c.amber, fontSize: 12, fontWeight: '600' },
+  attenteDelai: { color: c.inkFaint, fontSize: 11, marginTop: 1 },
+  /* La ligne glissante porte l'écart : la corbeille s'arrête à la ligne. */
+  rowGlissante: { marginBottom: 10, borderRadius: radius.md + 2 },
+  rowDansGlissante: { marginBottom: 0 },
   rowDetails: { color: c.inkSoft, fontSize: 13, marginTop: 4, fontWeight: '600' },
   headerRowOver: {
     backgroundColor: c.surfaceSunken,

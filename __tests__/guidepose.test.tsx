@@ -49,16 +49,23 @@ describe('la page qui montre le geste', () => {
     act(() => {
       t = TestRenderer.create(<GuidePose visible onFermer={() => {}} />);
     });
-    // Première étape SEULE à l'écran : viser.
-    expect(textes(t).join(' | ')).toMatch(/Visez le mur/);
+    /*
+      TROIS TEMPS, ET LE PREMIER A CHANGÉ — relevé du patron : « revois
+      complètement l'interface du scan pour le placement des produits
+      électriques ». On CHOISIT d'abord le produit, en photo au rail ; on vise
+      ensuite, le produit flottant au viseur ; on pose enfin, et il reste.
+    */
+    expect(textes(t).join(' | ')).toMatch(/Choisissez le produit/);
     expect(textes(t).join(' | ')).not.toMatch(/Appuyez/);
 
     act(() => bouton(t, 'Étape suivante')?.props.onPress());
-    expect(textes(t).join(' | ')).toMatch(/Appuyez/);
+    expect(textes(t).join(' | ')).toMatch(/Visez le mur/);
+    expect(textes(t).join(' | ')).toMatch(/en 3D/);
 
     act(() => bouton(t, 'Étape suivante')?.props.onPress());
     // Le dernier temps, celui qui manquait le plus : rien ne disait que le
-    // repère survivait au scan.
+    // produit survivait au scan.
+    expect(textes(t).join(' | ')).toMatch(/Appuyez/);
     expect(textes(t).join(' | ')).toMatch(/reste sur le mur/);
     // Et la dernière étape ne propose plus de suivante.
     expect(bouton(t, 'Étape suivante')).toBeUndefined();

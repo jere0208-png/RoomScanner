@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { constatsDeChute } from '../geometry/chute';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { rangerLeTravail } from '../ui/miseDeCote';
@@ -1456,6 +1457,8 @@ export function ResultScreen() {
       );
       // Les constats de pose rejoignent la conformité du document.
       list.issues.push(...constatsDePose(walls, openings, roomInputs, fixtures));
+      // Et la chute de tension de chaque circuit trop long.
+      list.issues.push(...constatsDeChute(cheminements?.chutes ?? []));
       // Le tirage et la commande : ce qu'un patron lit avant le reste.
       const pull = pullSchedule(
         list.circuits,
@@ -1496,6 +1499,7 @@ export function ResultScreen() {
       );
       // Le CSV chiffre AUSSI les constats : mêmes yeux que le PDF.
       list.issues.push(...constatsDePose(walls, openings, roomInputs, fixtures));
+      list.issues.push(...constatsDeChute(cheminements?.chutes ?? []));
       const metre: RoomMetre[] = parts.map((p) => {
         const nom = rooms.find((r) => r.id === p.roomId)?.name;
         // Le périmètre se prend sur le CONTOUR, pas sur la somme des murs :
@@ -2119,8 +2123,20 @@ export function ResultScreen() {
         code: i.code,
         fix: i.fix,
       })),
+      /*
+        LA CHUTE DE TENSION — le circuit trop long pour sa section, dit au
+        contrôle (voir `chute.ts`). Une information, pas une alerte : le
+        cheminement est tracé, pas mesuré.
+      */
+      ...(modeElec ? constatsDeChute(cheminements?.chutes ?? []) : []).map((i, n) => ({
+        key: `c${n}`,
+        message: i.message,
+        hint: i.regle,
+        severity: i.severity as string,
+        code: i.code,
+      })),
     ],
-    [walls, rooms, openings, elecIssues],
+    [walls, rooms, openings, elecIssues, modeElec, cheminements],
   );
   const alertes = useMemo(
     () => issues.filter((i) => i.severity === 'alerte').length,

@@ -160,6 +160,12 @@ export function tourner(axe: 'x' | 'y' | 'z', angle: number, pivot: V3 = [0, 0, 
 export interface GroupeLocal {
   mat: Matiere;
   couleur: string;
+  /**
+   * Le rang de la LAMPE dont c'est le diffuseur (voir `lumieres`) : il
+   * s'allume et s'éteint avec elle. Il voyage dans le code du groupe —
+   * `code + 100 × (rang + 1)` — pour que la vue native le retrouve.
+   */
+  lampe?: number;
   /** x, y, z, nx, ny, nz, u, v — huit nombres par sommet. */
   v: number[];
   i: number[];
@@ -2132,7 +2138,14 @@ export function maillageDesMeubles(
   for (const gl of dejaPoses) {
     if (gl.i.length === 0) continue;
     const r = RENDU[gl.mat];
-    const g = groupe(`${gl.mat}|${gl.couleur}`, r.code, gl.couleur, r.rugosite, r.metal);
+    const lampe = gl.lampe !== undefined && gl.lampe >= 0 ? gl.lampe : null;
+    const g = groupe(
+      lampe === null ? `${gl.mat}|${gl.couleur}` : `${gl.mat}|${gl.couleur}|L${lampe}`,
+      lampe === null ? r.code : r.code + 100 * (lampe + 1),
+      gl.couleur,
+      r.rugosite,
+      r.metal,
+    );
     const base = g.v.length / PAR_SOMMET;
     for (const x of gl.v) g.v.push(x);
     for (const idx of gl.i) g.i.push(base + idx);

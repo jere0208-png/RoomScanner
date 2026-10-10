@@ -301,7 +301,39 @@ describe('ce que la liste en dit', () => {
       tree = TestRenderer.create(<LibraryScreen />);
     });
     const mots = tree.root.findAllByType(Text).map((n) => String(n.props.children));
-    expect(mots).toContain('Non enregistré · autosuppression dans 2 h 30');
+    /*
+      EN DEUX LIGNES — relevé du patron : « "autosuppression…" est coupé et on
+      ne voit pas la suite ; mets-le en petit et gris sous le "non
+      enregistré" ». L'état d'abord, le compte à rebours dessous, entier.
+    */
+    expect(mots).toContain('Non enregistré');
+    expect(mots).toContain('Autosuppression dans 2 h 30');
+    // La synthèse vocale, elle, lit la phrase entière.
+    expect(
+      tree.root.findAll((n) => n.props?.accessibilityLabel === 'Non enregistré · autosuppression dans 2 h 30').length,
+    ).toBeGreaterThan(0);
+    act(() => tree.unmount());
+    jest.useRealTimers();
+  });
+
+  it('l’accueil le dit aussi en deux lignes, sans couper le délai', () => {
+    jest.useFakeTimers();
+    useScanStore.setState({
+      screen: 'home',
+      saves: [{ ...enregistre('N2'), supprimeLe: Date.now() + 11 * H + 52 * 60000 + 5000 }],
+    });
+    const { HomeScreen } = require('../src/screens/HomeScreen');
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      tree = TestRenderer.create(<HomeScreen />);
+    });
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+    const textes = tree.root.findAllByType(Text);
+    const delai = textes.find((n) => n.props.children === 'Autosuppression dans 11 h 52');
+    expect(delai).toBeDefined();
+    expect(textes.some((n) => n.props.children === 'Non enregistré')).toBe(true);
     act(() => tree.unmount());
     jest.useRealTimers();
   });
