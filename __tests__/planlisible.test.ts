@@ -32,20 +32,46 @@ const latin1 = (b: Uint8Array) => {
   return s;
 };
 
-interface Mot { texte: string; x: number; y: number; taille: number }
+interface Mot { texte: string; x: number; y: number; taille: number; cos: number; sin: number }
 
+/*
+  LE MOT TEL QU'IL EST ÉCRIT — inclinaison comprise. Ce banc posait toutes
+  les emprises à plat : une cote de mur vertical, haute et étroite, y
+  devenait une bande couchée qui « touchait » des mots qu'elle ne frôle pas.
+  C'est le défaut que `cotespdfsanschoc` a corrigé chez lui ; la mesure est
+  maintenant la même : la matrice du flux, la hauteur des chiffres.
+*/
 const motsDu = (src: string): Mot[] => {
   const page = src.split('(FEUILLE)')[0];
-  const re = /BT \/F\d ([\d.]+) Tf [^]*?([-\d.]+) ([-\d.]+) Tm \(([^)]*)\) Tj/g;
+  const re =
+    /BT \/F\d ([\d.]+) Tf [^]*?([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) Tm \(([^)]*)\) Tj/g;
   const out: Mot[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(page))) {
-    out.push({ taille: Number(m[1]), x: Number(m[2]), y: Number(m[3]), texte: m[4] });
+    out.push({
+      taille: Number(m[1]),
+      cos: Number(m[2]),
+      sin: Number(m[3]),
+      x: Number(m[6]),
+      y: Number(m[7]),
+      texte: m[8],
+    });
   }
   return out;
 };
 
-const emprise = (m: Mot) => ({ x: m.x, y: m.y, w: m.texte.length * m.taille * 0.5, h: m.taille });
+const emprise = (m: Mot) => {
+  const l = m.texte.length * m.taille * 0.5;
+  const h = m.taille * 0.72;
+  const xs = [m.x, m.x + l * m.cos, m.x - h * m.sin, m.x + l * m.cos - h * m.sin];
+  const ys = [m.y, m.y + l * m.sin, m.y + h * m.cos, m.y + l * m.sin + h * m.cos];
+  return {
+    x: Math.min(...xs),
+    y: Math.min(...ys),
+    w: Math.max(...xs) - Math.min(...xs),
+    h: Math.max(...ys) - Math.min(...ys),
+  };
+};
 const touche = (
   a: { x: number; y: number; w: number; h: number },
   b: { x: number; y: number; w: number; h: number },

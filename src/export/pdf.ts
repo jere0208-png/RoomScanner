@@ -7,7 +7,8 @@
  * PDF 1.4 non compressé, A4, polices Helvetica (WinAnsi).
  */
 import { BLEU_FENETRE, ENCRE_ELEC } from '../ui/encreElec';
-import { pocheDesMurs } from '../geometry/poche';
+import { pocheDesMurs, SUREPAISSEUR_FACADE } from '../geometry/poche';
+import { CarteDEncre, boiteDuMot } from './encre';
 import type { FloorData, ObjectData } from 'react-native-room-scan';
 import {
   castToWall,
@@ -88,7 +89,7 @@ import {
 } from '../geometry/ceiling';
 import { planFrameAngle } from '../geometry/floorplan';
 import { assignOpenings } from '../geometry/scene3d';
-import { epaisseurDe, wallRuns } from '../geometry/floorplan';
+import { epaisseurDe, pointOnSeg, wallRuns } from '../geometry/floorplan';
 import {
   ajusterBlocs,
   masquesDeScene,
@@ -1852,60 +1853,6 @@ function planPage(
       réserve — et l'ordre du dessin fait le reste.
     */
     const posees: { x: number; y: number; w: number; h: number }[] = [];
-    /** Boîte d'un texte pivoté, à la louche : Helvetica ≈ 0,5 em par signe. */
-    const boite = (txt: string, cx: number, cy: number, size: number, ang: number) => {
-      const l = txt.length * size * 0.5;
-      const r = (Math.abs(ang) * Math.PI) / 180;
-      const w2 = l * Math.cos(r) + size * Math.sin(r);
-      const h2 = l * Math.sin(r) + size * Math.cos(r);
-      return { x: cx - w2 / 2, y: cy - h2 / 2, w: w2, h: h2 };
-    };
-    /**
-     * UNE COTE PIVOTÉE : LA BOÎTE QU'ON RÉSERVE EST CELLE QU'ON DESSINE.
-     *
-     * La valeur d'une cote se centrait sur son point en descendant la ligne
-     * de base de deux points et demi — un décalage pris SUR L'AXE Y DE LA
-     * PAGE, alors que le texte, lui, est incliné. Sur un mur vertical, le
-     * chiffre partait donc de côté pendant que la réserve, elle, restait
-     * droite : la place vérifiée n'était pas la place occupée, et l'arbitre
-     * déclarait « libre » un coin où le lecteur voyait deux nombres se
-     * toucher. C'est le défaut connu de la maison, pris à l'envers.
-     *
-     * On calcule donc le point de base COMME LE FAIT `Draw.text` — décalé le
-     * long du texte pour le centrer, et le long de sa normale pour l'asseoir
-     * — et l'emprise sur les quatre coins tournés, hauteur des CHIFFRES.
-     */
-    const coteAPoser = (
-      txt: string,
-      cx: number,
-      cy: number,
-      size: number,
-      ang: number,
-    ) => {
-      const r = (ang * Math.PI) / 180;
-      const c = Math.cos(r);
-      const sn = Math.sin(r);
-      const l = latin1(txt).length * size * 0.5;
-      const h = size * 0.72;
-      // Le point que `Draw.text` recevra : il retirera lui-même la moitié
-      // de la longueur le long du texte.
-      const ax = cx + (sn * h) / 2;
-      const ay = cy - (c * h) / 2;
-      const bx = ax - (l / 2) * c;
-      const by = ay - (l / 2) * sn;
-      const xs = [bx, bx + l * c, bx + l * c - h * sn, bx - h * sn];
-      const ys = [by, by + l * sn, by + l * sn + h * c, by + h * c];
-      return {
-        x: ax,
-        y: ay,
-        boite: {
-          x: Math.min(...xs),
-          y: Math.min(...ys),
-          w: Math.max(...xs) - Math.min(...xs),
-          h: Math.max(...ys) - Math.min(...ys),
-        },
-      };
-    };
     /**
      * L'étiquette tient-elle ENTIÈREMENT dans la fenêtre de la feuille ?
      *
@@ -1929,21 +1876,225 @@ function planPage(
       );
 
     /*
+      LA CARTE D'ENCRE, AVANT LA PREMIÈRE ÉTIQUETTE — voir `export/encre`.
+
+      Relevé du patron : « trop d'éléments se chevauchent sur le plan coté ;
+      surface au sol rentre en collision avec la cote de mur… on doit innover
+      pour fournir un plan bien lisible ». La réserve `posees` savait qu'un
+      mot ne doit pas en couvrir un autre ; elle ignorait les TRAITS. Toute
+      la géométrie du plan — poché, recoins, meubles, battants, dormants,
+      gaines — est donc calculée ICI et encrée sur la carte, avant qu'une
+      seule étiquette ne cherche sa place : chacune prend ensuite, parmi ses
+      places possibles, la plus blanche. Le dessin, plus bas, relit ces
+      mêmes tracés : ce qui est encré est ce qui est dessiné.
+    */
+    const encre = new CarteDEncre(
+      FENETRE_PLAN.x,
+      FENETRE_PLAN.y,
+      FENETRE_PLAN.w,
+      FENETRE_PLAN.h,
+    );
+    /**
+     * PARMI DES PLACES POSSIBLES, LA PLUS BLANCHE — libre de mots d'abord,
+     * puis la moins encrée ; à égalité, la première, c'est-à-dire celle que
+     * l'appelant préfère. Rien de libre : rien.
+     */
+    const laPlusBlanche = <T,>(places: T[], boiteDe: (v: T) => Boite): T | undefined => {
+      let mieux: T | undefined;
+      let tache = Infinity;
+      for (const v of places) {
+        const b = boiteDe(v);
+        if (!libre(b)) continue;
+        const t = encre.sous(b);
+        if (t < tache) {
+          mieux = v;
+          tache = t;
+          if (t === 0) break;
+        }
+      }
+      return mieux;
+    };
+    /**
+     * ET SI AUCUNE N'EST LIBRE, TOUT AUTOUR DE LA PREMIÈRE — par anneaux de
+     * trois points, jusqu'à dix-huit : un sigle reste près de son symbole,
+     * mais ne s'écrit plus sur le sigle du voisin.
+     */
+    const autourDe = (p: Pt): Pt[] => {
+      const out: Pt[] = [];
+      for (let i = -6; i <= 6; i++) {
+        for (let j = -6; j <= 6; j++) out.push({ x: p.x + i * 3, y: p.y + j * 3 });
+      }
+      return out.sort(
+        (a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y),
+      );
+    };
+    /** Réserve une place : plus aucun mot ni aucun trait ne s'y pose. */
+    const reserver = (b: { x: number; y: number; w: number; h: number }) => {
+      posees.push(b);
+      encre.boite(b);
+    };
+    const poche = pocheDesMurs(walls, openings, ctx.rooms);
+    encre.aplat(poche.contours.map((c) => c.map(px)));
+    const baieDuPoche = new Map(poche.baies.map((b) => [b.id, b]));
+    const massifs = massifsTechniques(walls, openings, ctx.rooms);
+    encre.aplat(massifs.map((c) => c.map(px)));
+
+    // Les meubles : leur contour et leurs traits d'architecte, recalés
+    // devant les murs de LEUR pièce.
+    const meublesDuPlan = objects.map((ob) => {
+      const o = clampFootprint(
+        toFootprint(ob),
+        partOf.get(roomOf(ob))?.walls ?? walls,
+        centerOf(roomOf(ob)),
+      );
+      const cosY = Math.cos(o.yaw);
+      const sinY = Math.sin(o.yaw);
+      const loc = (lx: number, lz: number) =>
+        px({ x: o.cx + lx * cosY - lz * sinY, z: o.cz + lx * sinY + lz * cosY });
+      const hw = o.width / 2;
+      const hd = o.depth / 2;
+      const contour = [
+        [-hw, -hd],
+        [hw, -hd],
+        [hw, hd],
+        [-hw, hd],
+      ].map(([lx, lz]) => loc(lx, lz));
+      const traits = furnitureStrokes(furnKind(o.category), o.width, o.depth).map(
+        (line) => line.map((q) => loc(q.x, q.y)),
+      );
+      return { o, loc, contour, traits };
+    });
+    for (const m of meublesDuPlan) {
+      encre.contour(m.contour, 0.9);
+      for (const t of m.traits) encre.trait(t, 0.8);
+    }
+
+    /*
+      DE QUEL BOUT CHAQUE PORTE PIVOTE : le même calcul qu'à l'écran, pour
+      que deux battants voisins ne se croisent pas sur le papier non plus.
+    */
+    const pivotsPorte = pivotsDesBattants(
+      openings
+        .filter((o) => o.type === 'door')
+        // Le bord choisi à la main passe avant : le dossier imprime la
+        // porte telle qu'elle s'ouvre sur place, pas telle qu'elle arrange
+        // le dessin.
+        .map((o) => ({ id: o.id, a: o.a, b: o.b, pivot: o.pivot })),
+    );
+    /** Les traits des menuiseries — battant, arc, dormants — calculés une fois. */
+    const traitsMenuiserie: { pts: Pt[]; w: number; c: string }[] = [];
+    for (const o of openings) {
+      const room = roomOf(o);
+      const centroid = centerOf(room);
+      const dx = o.b.x - o.a.x;
+      const dz = o.b.z - o.a.z;
+      const len = Math.hypot(dx, dz) || 1;
+      // La baie est un VIDE dans le poché : plus d'aplat pour effacer le noir.
+      const baie = baieDuPoche.get(o.id);
+
+      // Côté intérieur de la pièce
+      const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+      let inx = -dz / len;
+      let inz = dx / len;
+      if (inx * (centroid.x - mid.x) + inz * (centroid.z - mid.z) < 0) {
+        inx = -inx;
+        inz = -inz;
+      }
+      // Une porte qui ouvre vers l'AUTRE pièce — placard, cellier, porte
+      // palière : le vantail bascule de l'autre côté du dormant.
+      if (o.versExterieur) {
+        inx = -inx;
+        inz = -inz;
+      }
+
+      if (o.type === 'door') {
+        // Battant + arc d'ouverture, sur la charnière CHOISIE : deux
+        // portes en vis-à-vis se rangent dos à dos plutôt que de croiser
+        // leurs quarts de cercle.
+        const gond = pivotsPorte.get(o.id) === 'b' ? o.b : o.a;
+        const opp = gond === o.a ? o.b : o.a;
+        const leafEnd = { x: gond.x + inx * len, z: gond.z + inz * len };
+        traitsMenuiserie.push({
+          pts: [px(gond), px(leafEnd)],
+          w: 1.4,
+          c: colorOpenings ? AMBER : GREY,
+        });
+        /*
+          L'ARC DU BATTANT — le calcul commun.
+
+          Il vivait ici recopié, et il portait le même défaut latent que
+          l'export CAO : sur certaines orientations, l'écart d'angle passait
+          la coupure à ±π et le tracé prenait le chemin long — un tour
+          complet qui traverse le mur. Un seul calcul, une seule correction.
+        */
+        traitsMenuiserie.push({
+          pts: arcDuBattant(gond, opp, { x: inx, z: inz }, len, 10).map(px),
+          w: 0.8,
+          c: GREY,
+        });
+      } else if (o.type === 'window' && baie) {
+        // Le dormant aux deux faces du tableau, le vitrage au cœur du mur.
+        const ligne = (decalage: number, w: number, hex: string) => {
+          const p1 = px({ x: baie.a.x + baie.n.x * decalage, z: baie.a.z + baie.n.z * decalage });
+          const p2 = px({ x: baie.b.x + baie.n.x * decalage, z: baie.b.z + baie.n.z * decalage });
+          traitsMenuiserie.push({ pts: [p1, p2], w, c: hex });
+        };
+        // Le bleu doux des fenêtres (voir `ui/encreElec`), dormant et vitrage.
+        ligne(baie.plus, 0.7, BLEU_FENETRE);
+        ligne(-baie.moins, 0.7, BLEU_FENETRE);
+        ligne(0.015, 0.8, BLEU_FENETRE);
+        ligne(-0.015, 0.8, BLEU_FENETRE);
+      } else {
+        // Ouverture sans menuiserie : double trait dans la trouée
+        const wx = (-dz / len) * (WALL_T / 4);
+        const wz = (dx / len) * (WALL_T / 4);
+        const color = colorOpenings && o.type === 'window' ? SKY : GREY;
+        traitsMenuiserie.push({
+          pts: [px({ x: o.a.x + wx, z: o.a.z + wz }), px({ x: o.b.x + wx, z: o.b.z + wz })],
+          w: 1,
+          c: color,
+        });
+        traitsMenuiserie.push({
+          pts: [px({ x: o.a.x - wx, z: o.a.z - wz }), px({ x: o.b.x - wx, z: o.b.z - wz })],
+          w: 1,
+          c: color,
+        });
+      }
+    }
+    for (const t of traitsMenuiserie) encre.trait(t.pts, Math.max(0.8, t.w));
+    // Les gaines, en faisceau : elles passent sous les mots comme le reste.
+    const gainesDuPlan =
+      ctx.routes && ctx.routes.length > 0 ? ecarterLesGaines(ctx.routes) : [];
+    for (const r of gainesDuPlan) {
+      if (r.path.length >= 2) encre.trait(r.path.map(px), 0.8);
+    }
+
+    /*
       LES NUMÉROS DE MUR S'INSCRIVENT LES PREMIERS.
 
       Ils se DESSINENT en dernier (ce sont des annotations posées sur le
       plan fini), mais leur place ne se discute pas : un numéro tient sur
-      son mur, à un point qu'on calcule sans rien connaître du reste. Il
-      réserve donc son rond tout de suite, et les cotes s'en écartent au
-      lieu de se faire recouvrir dix mille points plus loin.
+      son mur, au milieu de son épaisseur — voir `placeDuNumero`. Il réserve
+      sa place tout de suite, et les cotes s'en écartent au lieu de se faire
+      recouvrir dix mille points plus loin. La place retenue est celle que
+      le dessin relira.
     */
+    const numerosPoses = new Map<
+      string,
+      { n: number; x: number; y: number; taille: number; couleur: string }
+    >();
     {
       const numeros = wallNumbers(ctx);
       const centre = centreDesMurs(walls);
       for (const w of walls) {
         const n = numeros.get(w.id);
         if (!n) continue;
-        posees.push(placeDuNumero(w, openings, n, scale, px, centre).boite);
+        const q = placeDuNumero(w, openings, n, scale, px, centre, poche.contours, encre, libre);
+        numerosPoses.set(w.id, { n, ...q });
+        posees.push(q.boite);
+        // Hors du poché, le numéro est un mot posé sur le blanc : il réserve
+        // aussi sa place sur la carte.
+        if (q.couleur !== '#FFFFFF') encre.boite(q.boite);
       }
     }
 
@@ -2061,6 +2212,40 @@ function planPage(
       couleur: string;
       bold: boolean;
     }[] = [];
+    /*
+      LES SYMBOLES S'ENCRENT AVANT LE PREMIER SIGLE — le disque de chaque
+      plaque, le filet qui la relie au mur, les liens de commande : un sigle
+      qui se pose ne doit tomber ni sur son voisin, ni sur un trait.
+    */
+    for (const { f, face, along, postes, membres } of unites) {
+      const x = Math.max(0, Math.min(face.len, along));
+      const q = px(facePoint(face, x, sortieDuMur(f.id)));
+      if (!dansLeCadre(q)) continue;
+      encre.disque(q, rayonDuSymbole(postes.length));
+      encre.segment(px(facePoint(face, x, 0.02)), q, 0.8);
+      for (const cid of membres.flatMap((m) => m.f.commands ?? [])) {
+        const cible = unites.find((u) => u.membres.some((m) => m.f.id === cid));
+        if (!cible) continue;
+        const de = facePoint(face, x, sortieDuMur(f.id));
+        const vers = facePoint(
+          cible.face,
+          Math.max(0, Math.min(cible.face.len, cible.along)),
+          sortieDuMur(cible.f.id),
+        );
+        encre.trait(linkCurve({ x: de.x, z: de.z }, { x: vers.x, z: vers.z }).map(px), 0.8);
+      }
+    }
+    for (const cl of ctx.ceiling ?? []) {
+      for (const fid of cl.commands ?? []) {
+        const f = (ctx.fixtures ?? []).find((v) => v.id === fid);
+        const w = f ? murParIdent.get(f.wallId) : undefined;
+        if (!f || !w) continue;
+        const face = wallFace(w, murQuads.get(w.id), f.side);
+        const depart = facePoint(face, faceX(face, f.along), 0.16);
+        const arrivee = linkAnchor({ x: depart.x, z: depart.z }, cl.at, CEILINGS[cl.kind].d * 0.7);
+        encre.trait(linkCurve({ x: depart.x, z: depart.z }, arrivee).map(px), 0.8);
+      }
+    }
     for (const { f, face, along, postes, membres } of unites) {
       const x = Math.max(0, Math.min(face.len, along));
       const q = px(facePoint(face, x, sortieDuMur(f.id)));
@@ -2098,9 +2283,10 @@ function planPage(
           { x: q.x - larg / 2, y: q.y + rayon + 11 },
         ];
         const p =
-          places.find((c) => libre(boiteEcrite(tags, c.x, c.y, TAILLE_SIGLE))) ??
+          laPlusBlanche(places, (c) => boiteEcrite(tags, c.x, c.y, TAILLE_SIGLE)) ??
+          laPlusBlanche(autourDe(places[0]), (c) => boiteEcrite(tags, c.x, c.y, TAILLE_SIGLE)) ??
           places[0];
-        posees.push(boiteEcrite(tags, p.x, p.y, TAILLE_SIGLE));
+        reserver(boiteEcrite(tags, p.x, p.y, TAILLE_SIGLE));
         motsAppareil.push({
           texte: tags,
           x: p.x,
@@ -2132,9 +2318,10 @@ function planPage(
           { x: q.x - larg / 2, y: q.y - rayon - 20 },
         ];
         const p =
-          places.find((c) => libre(boiteEcrite(mark, c.x, c.y, TAILLE_SIGLE))) ??
+          laPlusBlanche(places, (c) => boiteEcrite(mark, c.x, c.y, TAILLE_SIGLE)) ??
+          laPlusBlanche(autourDe(places[0]), (c) => boiteEcrite(mark, c.x, c.y, TAILLE_SIGLE)) ??
           places[0];
-        posees.push(boiteEcrite(mark, p.x, p.y, TAILLE_SIGLE));
+        reserver(boiteEcrite(mark, p.x, p.y, TAILLE_SIGLE));
         motsAppareil.push({
           texte: mark,
           x: p.x,
@@ -2178,6 +2365,7 @@ function planPage(
           Math.min(RAYON_PLAFOND_MAX, (CEILINGS[cl.kind].d / 2) * scale),
         ) + 2;
       pastillesPlafond.push({ x: q.x - r, y: q.y - r, w: r * 2, h: r * 2 });
+      encre.disque(q, r - 2);
     }
     posees.push(...pastillesPlafond);
     /**
@@ -2209,11 +2397,13 @@ function planPage(
         { x: q.x - larg / 2, y: q.y + r + E - 6 },
       ];
       const c =
-        places.find((v) =>
-          libre(boiteEcrite(spec.short, v.x, v.y, TAILLE_SIGLE_PLAFOND)),
-        ) ?? places[0];
+        laPlusBlanche(places, (v) => boiteEcrite(spec.short, v.x, v.y, TAILLE_SIGLE_PLAFOND)) ??
+        laPlusBlanche(autourDe(places[0]), (v) =>
+          boiteEcrite(spec.short, v.x, v.y, TAILLE_SIGLE_PLAFOND),
+        ) ??
+        places[0];
       const b = boiteEcrite(spec.short, c.x, c.y, TAILLE_SIGLE_PLAFOND);
-      posees.push(b);
+      reserver(b);
       siglesPose.set(cl.id, b);
     }
 
@@ -2287,14 +2477,30 @@ function planPage(
         const cp = px(part.labelAt);
         const label = roomNames[part.roomId] ?? '';
         const area = `${part.surface.exact ? '' : '≈ '}${fr1(part.surface.area)} m²`;
-        /** L'emprise du cartouche, avec ou sans sa ligne de surface. */
+        /**
+         * L'emprise du cartouche, avec ou sans sa ligne de surface — À LA
+         * LARGEUR DE CE QUI S'ÉCRIT. Sans nom, la pièce dit « 21,0 m² » en
+         * gras et « surface au sol » dessous : la réserve ne mesurait que la
+         * surface, plus étroite que la ligne d'en dessous, et une cote venait
+         * barrer « surface au sol » à l'endroit même que la réserve disait
+         * libre. On mesure maintenant chaque ligne dessinée.
+         */
         const emprise = (avecAire: boolean, cx: number, cy: number) => {
+          const lignes: [string, number][] = label
+            ? avecAire
+              ? [
+                  [label, gros * 1.05],
+                  [area, petit],
+                ]
+              : [[label, gros * 1.05]]
+            : avecAire
+              ? [
+                  [area, (parts.length === 1 ? 15 : 11) * 1.05],
+                  ['surface au sol', 8],
+                ]
+              : [[area, (parts.length === 1 ? 15 : 11) * 1.05]];
           const larg =
-            (avecAire
-              ? Math.max(latin1(label).length * gros, latin1(area).length * petit)
-              : latin1(label).length * gros) *
-              0.52 +
-            10;
+            Math.max(...lignes.map(([t, z]) => latin1(t).length * z)) * 0.52 + 10;
           const haut = avecAire ? (label ? 30 : 32) : 18;
           return {
             x: cx - larg / 2,
@@ -2306,8 +2512,14 @@ function planPage(
             avecAire,
           };
         };
-        // Sans nom, il ne reste rien à céder : la surface EST l'information.
-        const variantes = label ? [true, false] : [true];
+        /*
+          CE QUI SE CÈDE : la surface quand il y a un nom ; et sans nom, la
+          ligne « surface au sol » — la surface reste, c'est l'information.
+          Dans une entrée d'un mètre quatre-vingts, le cartouche complet ne
+          trouvait de place que sur l'arc de la porte, et son fond blanc
+          masquait ensuite la cote de la cloison.
+        */
+        const variantes = [true, false];
         const contour = (part.surface?.pts ?? []).map(px);
         /*
           ET SI RIEN N'EST LIBRE, IL EN DIT LE MOINS POSSIBLE.
@@ -2320,17 +2532,64 @@ function planPage(
         */
         let choisi = emprise(variantes[variantes.length - 1], cp.x, cp.y);
         let gene = true;
-        chercher: for (const avecAire of variantes) {
+        /*
+          SUR LE BLANC DE LA PIÈCE, pas sur un meuble ni sur un mur — voir la
+          carte d'encre. Le cartouche pose un fond blanc : posé sur un canapé,
+          il en effaçait la moitié, et posé contre un mur il rongeait le poché.
+          On prend la place la plus proche du milieu qui ne couvre AUCUN trait
+          — avec la surface d'abord, puis le nom seul ; et si toute la pièce
+          est encombrée, la moins encrée, surface comprise.
+        */
+        /*
+          ET IL LAISSE LA BANDE DES COTES. Le long de chaque mur, à l'intérieur,
+          court la place où se cote une cloison ; un cartouche posé contre le
+          mur la prenait toute, et la cote partait se loger dans la pièce
+          voisine, en travers de ses meubles. Il s'en tient donc à quatorze
+          points des murs quand il le peut — et s'en approche quand il le faut.
+        */
+        const entier = (b: Boite, marge = 0) =>
+          contour.length < 3 ||
+          [
+            { x: b.x - marge, y: b.y - marge },
+            { x: b.x + b.w + marge, y: b.y - marge },
+            { x: b.x + b.w + marge, y: b.y + b.h + marge },
+            { x: b.x - marge, y: b.y + b.h + marge },
+          ].every((q) => dansLaPiece(contour, q));
+        const candidat = (avecAire: boolean, propre: boolean, marge = 0) => {
+          let mieux: ReturnType<typeof emprise> | null = null;
+          let cout = Infinity;
           for (const [dx, dy] of ecarts) {
             const q = { x: cp.x + dx, y: cp.y + dy };
             if (contour.length >= 3 && !dansLaPiece(contour, q)) continue;
             const b = emprise(avecAire, q.x, q.y);
-            if (libre(b)) {
-              choisi = b;
-              gene = false;
-              break chercher;
+            if (!libre(b) || !entier(b, marge)) continue;
+            const tache = encre.sous(b);
+            if (propre) {
+              if (tache === 0) return b;
+              continue;
+            }
+            const c = tache + Math.hypot(dx, dy) * 0.05;
+            if (c < cout) {
+              cout = c;
+              mieux = b;
             }
           }
+          return mieux;
+        };
+        // La surface est une information : elle passe avant la bande des
+        // cotes, qui sait se replier ailleurs.
+        const BANDE = 14;
+        const trouve =
+          candidat(variantes[0], true, BANDE) ??
+          candidat(variantes[0], true, BANDE / 2) ??
+          candidat(variantes[0], true) ??
+          candidat(variantes[1], true, BANDE) ??
+          candidat(variantes[1], true) ??
+          candidat(variantes[0], false) ??
+          candidat(variantes[1], false);
+        if (trouve) {
+          choisi = trouve;
+          gene = false;
         }
         /*
           UNE PIÈCE SATURÉE GARDE SON NOM, ET C'EST LE SIGLE QUI S'EFFACE.
@@ -2361,55 +2620,20 @@ function planPage(
             if (i >= 0) posees.splice(i, 1);
           }
         }
+        // Réservé aux MOTS, pas encré : son fond blanc masquera les traits qui
+        // passent derrière lui — voir « un cartouche n'est pas un mot nu ».
         posees.push(choisi);
         cartouchesPiece.push(choisi);
         cartouchesPose.set(part.roomId, choisi);
       }
     }
 
-    // Meubles : contour + symbole d'architecte, recalés devant les murs
-    // de LEUR pièce.
-    for (const o of objects.map((ob) =>
-      clampFootprint(
-        toFootprint(ob),
-        partOf.get(roomOf(ob))?.walls ?? walls,
-        centerOf(roomOf(ob)),
-      ),
-    )) {
-      const cosY = Math.cos(o.yaw);
-      const sinY = Math.sin(o.yaw);
-      const hw = o.width / 2;
-      const hd = o.depth / 2;
-      const loc = (lx: number, lz: number) =>
-        px({ x: o.cx + lx * cosY - lz * sinY, z: o.cz + lx * sinY + lz * cosY });
-      const pts = [
-        [-hw, -hd],
-        [hw, -hd],
-        [hw, hd],
-        [-hw, hd],
-      ].map(([lx, lz]) => loc(lx, lz));
-      d.poly(pts, '#FFFFFF', '#9FACBF', 0.8);
-      for (const line of furnitureStrokes(furnKind(o.category), o.width, o.depth)) {
-        d.path(line.map((p) => loc(p.x, p.y)), 0.7, '#9FACBF');
-      }
-      /*
-        LE NOM DU MEUBLE, si la place le permet — et si personne n'y est.
-
-        Il s'écrivait au centre du meuble quoi qu'il arrive, et une note
-        posée là-dessus (elles passent en dernier, avec leur fond) le
-        mangeait : « Canapé » sous « Colonne montante à reprendre ». Le nom
-        d'un meuble est ce qu'on cède le plus volontiers — sa silhouette le
-        dit déjà — mais tant qu'à l'écrire, autant qu'il se lise.
-      */
-      if (o.width * scale > 42 && o.depth * scale > 16) {
-        const ctr2 = loc(0, 0);
-        const mot = frCategory(o.category);
-        const bb = boite(mot, ctr2.x, ctr2.y, 7, 0);
-        if (libre(bb)) {
-          posees.push(bb);
-          d.text(mot, ctr2.x, ctr2.y - 2.5, 7, GREY);
-        }
-      }
+    // Meubles : contour + symbole d'architecte, tels qu'encrés plus haut.
+    // Leur NOM s'écrit bien plus bas, quand tous les traits sont posés :
+    // dessiné ici, il se faisait recouvrir par le meuble suivant.
+    for (const m of meublesDuPlan) {
+      d.poly(m.contour, '#FFFFFF', '#9FACBF', 0.8);
+      for (const t of m.traits) d.path(t, 0.7, '#9FACBF');
     }
 
     /*
@@ -2417,227 +2641,491 @@ function planPage(
       `pocheDesMurs`) : les murs se fondent à leurs jonctions, les façades
       prennent leur épaisseur vers le dehors, les baies sont des vides.
     */
-    const poche = pocheDesMurs(walls, openings, ctx.rooms);
     d.contoursPleins(poche.contours.map((c) => c.map(px)), INK);
-    const baieDuPoche = new Map(poche.baies.map((b) => [b.id, b]));
 
     /*
       LES RECOINS TECHNIQUES, POCHÉS COMME LA MAÇONNERIE — la même encre
       qu'à l'écran. Un vide blanc au milieu d'un plan imprimé se lit comme
       une pièce qu'on aurait oublié de nommer ; c'est du plein.
     */
-    for (const contour of massifsTechniques(walls, openings, ctx.rooms)) {
+    for (const contour of massifs) {
       d.poly(contour.map(px), INK, null);
     }
 
+    // Ouvertures : les traits calculés plus haut, tels qu'encrés.
+    for (const t of traitsMenuiserie) d.path(t.pts, t.w, t.c);
+
     /*
-      DE QUEL BOUT CHAQUE PORTE PIVOTE : le même calcul qu'à l'écran, pour
-      que deux battants voisins ne se croisent pas sur le papier non plus.
+      LES COTES SE RANGENT COMME CHEZ L'ARCHITECTE.
+
+      Relevé du patron : « trop d'éléments se chevauchent sur le plan coté ;
+      essaie une technique de placement plus épurée, en gardant chaque cote
+      et notes ». La cause tenait en une ligne : chaque mur se cotait « vers
+      l'extérieur de SA pièce ». Pour une façade, c'est dehors ; pour une
+      cloison, c'est EN PLEINE PIÈCE VOISINE — un trait de trois mètres en
+      travers de la chambre, qui barrait son cartouche et ses meubles, et dont
+      la valeur, faute de place, finissait souvent par s'effacer.
+
+      Trois familles, trois places :
+
+        — LES FAÇADES se cotent dehors, en deux chaînes parallèles : la plus
+          proche détaille les pleins et les baies (c'est là que se lit la
+          largeur d'une fenêtre), la plus éloignée donne la longueur de
+          chaque mur. Rien n'entre dans le logement ;
+        — LES CLOISONS portent une cote COURTE, collée à leur face, du côté
+          et à l'endroit où elle ne coupe ni meuble, ni arc, ni mot — la
+          carte d'encre arbitre, et la valeur glisse le long du trait ;
+        — LES PORTES INTÉRIEURES disent leur largeur du côté où le battant
+          ne tourne pas : son arc est de l'encre, l'autre côté est le
+          passage, toujours libre.
+
+      Et aucune valeur ne s'efface : si rien n'est parfaitement blanc, c'est
+      la place la moins encombrée qui gagne.
     */
-    const pivotsPorte = pivotsDesBattants(
-      openings
-        .filter((o) => o.type === 'door')
-        // Le bord choisi à la main passe avant : le dossier imprime la
-        // porte telle qu'elle s'ouvre sur place, pas telle qu'elle arrange
-        // le dessin.
-        .map((o) => ({ id: o.id, a: o.a, b: o.b, pivot: o.pivot })),
-    );
-
-    // Ouvertures : trouée blanche + symbole
-    for (const o of openings) {
-      const room = roomOf(o);
-      const centroid = centerOf(room);
-      const dx = o.b.x - o.a.x;
-      const dz = o.b.z - o.a.z;
-      const len = Math.hypot(dx, dz) || 1;
-      // La baie est un VIDE dans le poché : plus d'aplat pour effacer le noir.
-      const baie = baieDuPoche.get(o.id);
-
-      // Côté intérieur de la pièce
-      const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
-      let inx = -dz / len;
-      let inz = dx / len;
-      if (inx * (centroid.x - mid.x) + inz * (centroid.z - mid.z) < 0) {
-        inx = -inx;
-        inz = -inz;
-      }
-      // Une porte qui ouvre vers l'AUTRE pièce — placard, cellier, porte
-      // palière : le vantail bascule de l'autre côté du dormant.
-      if (o.versExterieur) {
-        inx = -inx;
-        inz = -inz;
-      }
-
-      if (o.type === 'door') {
-        // Battant + arc d'ouverture, sur la charnière CHOISIE : deux
-        // portes en vis-à-vis se rangent dos à dos plutôt que de croiser
-        // leurs quarts de cercle.
-        const gond = pivotsPorte.get(o.id) === 'b' ? o.b : o.a;
-        const opp = gond === o.a ? o.b : o.a;
-        const leafEnd = { x: gond.x + inx * len, z: gond.z + inz * len };
-        d.line(px(gond).x, px(gond).y, px(leafEnd).x, px(leafEnd).y, 1.4,
-               colorOpenings ? AMBER : GREY);
-        /*
-          L'ARC DU BATTANT — le calcul commun.
-
-          Il vivait ici recopié, et il portait le même défaut latent que
-          l'export CAO : sur certaines orientations, l'écart d'angle passait
-          la coupure à ±π et le tracé prenait le chemin long — un tour
-          complet qui traverse le mur. Un seul calcul, une seule correction.
-        */
-        d.path(
-          arcDuBattant(gond, opp, { x: inx, z: inz }, len, 10).map(px),
-          0.8,
-          GREY,
+    if (showDims) {
+      const surfacesPieces = parts
+        .map((pt) => pt.surface?.pts ?? [])
+        .filter((pts) => pts.length >= 3);
+      const dansUnePiece = (q: { x: number; z: number }) =>
+        surfacesPieces.some((poly) => dansLePoche(q, [poly]));
+      const centrePlan = centreDesMurs(walls);
+      const TEXTE_COTE = '#2B313B';
+      const TRAIT_COTE = '#6B7380';
+      const unitaire = (v: Pt): Pt => {
+        const l = Math.hypot(v.x, v.y) || 1;
+        return { x: v.x / l, y: v.y / l };
+      };
+      /** L'angle de lecture d'un trait : jamais la tête en bas. */
+      const angleDe = (a: Pt, b: Pt) => {
+        let ang = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
+        if (ang > 90) ang -= 180;
+        if (ang < -90) ang += 180;
+        return ang;
+      };
+      /** La normale d'un mur, sur la page, du côté `cote` (+1 ou −1). */
+      const normalePage = (w: WallSeg, cote: number): Pt => {
+        const dx = w.b.x - w.a.x;
+        const dz = w.b.z - w.a.z;
+        const L = Math.hypot(dx, dz) || 1;
+        const m = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+        const p0 = px(m);
+        const p1 = px({ x: m.x + (-dz / L) * cote, z: m.z + (dx / L) * cote });
+        return unitaire({ x: p1.x - p0.x, y: p1.y - p0.y });
+      };
+      const plus = (a: Pt, v: Pt, k: number): Pt => ({ x: a.x + v.x * k, y: a.y + v.y * k });
+      const trace = (a: Pt, b: Pt, w: number, c: string) => {
+        d.line(a.x, a.y, b.x, b.y, w, c);
+        encre.segment(a, b, Math.max(0.8, w));
+      };
+      /**
+       * CE TRAIT TRAVERSE-T-IL UN MOT DÉJÀ POSÉ ? — bouts compris. La carte
+       * d'encre compte les traits sous un mot ; ici, c'est l'inverse : un trait
+       * qu'on s'apprête à tirer ne doit barrer aucune étiquette réservée,
+       * même par le tiret de son extrémité, qui dépasse de part et d'autre.
+       */
+      /*
+        UN CARTOUCHE N'EST PAS UN MOT NU : il pose son fond blanc par-dessus
+        tout le reste. Un trait de cote qui passe derrière lui s'interrompt
+        proprement — c'est ainsi qu'un dessinateur coupe sa ligne pour écrire
+        le nom d'une pièce. Le traverser coûte peu ; barrer un mot nu, tout.
+      */
+      const fondsBlancs = new Set(cartouchesPiece);
+      const barreUnMot = (a: Pt, b: Pt, deborde = 3) => {
+        const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const ux = (b.x - a.x) / L;
+        const uy = (b.y - a.y) / L;
+        const n = Math.ceil((L + deborde * 2) / 0.75);
+        let k = 0;
+        for (let i = 0; i <= n; i++) {
+          const s = -deborde + (i * (L + deborde * 2)) / n;
+          const x = a.x + ux * s;
+          const y = a.y + uy * s;
+          for (const o of posees) {
+            if (x > o.x + 0.3 && x < o.x + o.w - 0.3 && y > o.y + 0.3 && y < o.y + o.h - 0.3) {
+              k += fondsBlancs.has(o) ? 0.01 : 1;
+              break;
+            }
+          }
+        }
+        return k;
+      };
+      /** Le tiret à 45° d'une extrémité de cote. */
+      const tiret = (P: Pt, u: Pt, n: Pt, t: number, w: number, c: string) =>
+        trace(
+          { x: P.x - (u.x + n.x) * t, y: P.y - (u.y + n.y) * t },
+          { x: P.x + (u.x + n.x) * t, y: P.y + (u.y + n.y) * t },
+          w,
+          c,
         );
-      } else if (o.type === 'window' && baie) {
-        // Le dormant aux deux faces du tableau, le vitrage au cœur du mur.
-        const ligne = (decalage: number, w: number, hex: string) => {
-          const p1 = px({ x: baie.a.x + baie.n.x * decalage, z: baie.a.z + baie.n.z * decalage });
-          const p2 = px({ x: baie.b.x + baie.n.x * decalage, z: baie.b.z + baie.n.z * decalage });
-          d.line(p1.x, p1.y, p2.x, p2.y, w, hex);
-        };
-        // Le bleu doux des fenêtres (voir `ui/encreElec`), dormant et vitrage.
-        ligne(baie.plus, 0.7, BLEU_FENETRE);
-        ligne(-baie.moins, 0.7, BLEU_FENETRE);
-        ligne(0.015, 0.8, BLEU_FENETRE);
-        ligne(-0.015, 0.8, BLEU_FENETRE);
-      } else {
-        // Ouverture sans menuiserie : double trait dans la trouée
-        const wx = (-dz / len) * (WALL_T / 4);
-        const wz = (dx / len) * (WALL_T / 4);
-        const color = colorOpenings && o.type === 'window' ? SKY : GREY;
-        d.line(px({ x: o.a.x + wx, z: o.a.z + wz }).x, px({ x: o.a.x + wx, z: o.a.z + wz }).y,
-               px({ x: o.b.x + wx, z: o.b.z + wz }).x, px({ x: o.b.x + wx, z: o.b.z + wz }).y, 1, color);
-        d.line(px({ x: o.a.x - wx, z: o.a.z - wz }).x, px({ x: o.a.x - wx, z: o.a.z - wz }).y,
-               px({ x: o.b.x - wx, z: o.b.z - wz }).x, px({ x: o.b.x - wx, z: o.b.z - wz }).y, 1, color);
-      }
-    }
+      /**
+       * ÉCRIRE UNE VALEUR : parmi ses places, la plus blanche. Elles sont
+       * nombreuses — de part et d'autre du trait, le long du trait, au-delà
+       * de ses bouts —, et sur un logement réel l'une d'elles est toujours
+       * libre (le banc `planepure` le tient : aucune cote ne cède). Si
+       * VRAIMENT chacune tombe sur un autre mot — vingt retours de douze
+       * centimètres côte à côte —, la valeur cède : un chiffre imprimé sur
+       * un autre ne se lit pas, et fait douter des deux.
+       */
+      const ecrire = (
+        txt: string,
+        places: Pt[],
+        taille: number,
+        angle: number,
+        couleur: string,
+        surcout: (k: number) => number = () => 0,
+      ) => {
+        let mieux: { base: Pt; boite: Boite } | null = null;
+        let cout = Infinity;
+        places.forEach((c, k) => {
+          const q = boiteDuMot(txt, c.x, c.y, taille, angle);
+          if (!dansLaFenetre(q.boite)) return;
+          const chocs = posees.filter(
+            (o) =>
+              q.boite.x < o.x + o.w + 1.5 &&
+              o.x < q.boite.x + q.boite.w + 1.5 &&
+              q.boite.y < o.y + o.h + 1.5 &&
+              o.y < q.boite.y + q.boite.h + 1.5,
+          ).length;
+          const v = chocs * 10000 + encre.sous(q.boite) * 20 + surcout(k);
+          if (v < cout) {
+            cout = v;
+            mieux = q;
+          }
+        });
+        const pose = mieux as { base: Pt; boite: Boite } | null;
+        if (!pose || cout >= 10000) return;
+        reserver(pose.boite);
+        d.text(txt, pose.base.x, pose.base.y, taille, couleur, { angle });
+      };
 
-    /**
-     * Les cotes extérieures — et la place que prend leur valeur.
-     *
-     * Le plan à l'écran saute la valeur d'un mur trop court pour la porter ;
-     * le PDF, lui, les écrivait toutes. Sur un logement aux retours de mur
-     * nombreux, ou simplement à petite échelle, deux valeurs voisines se
-     * chevauchaient — et un chiffre illisible sur un plan coté est pire
-     * qu'un chiffre absent : on ne sait même pas qu'il manque.
-     *
-     * On place donc les valeurs comme un dessinateur : les GRANDES COTES
-     * d'abord (ce sont celles qu'on lit), chacune poussée vers l'extérieur
-     * tant qu'elle rencontre une voisine déjà posée. Trois tentatives, puis
-     * on renonce à la valeur — la ligne de cote et ses tirets restent, la
-     * longueur se retrouve au métré.
-     */
-    // Les plus longues d'abord : à égalité de place, c'est la grande cote
-    // qui doit gagner.
-    const cotes = showDims
-      ? [...walls].sort((u, v) => segLength(v) - segLength(u))
-      : [];
-    for (const w of cotes) {
-      const a = px(w.a);
-      const b = px(w.b);
-      const dx2 = b.x - a.x;
-      const dy2 = b.y - a.y;
-      const norm = Math.hypot(dx2, dy2) || 1;
-      const ux2 = dx2 / norm;
-      const uy2 = dy2 / norm;
-      let nx2 = -uy2;
-      let ny2 = ux2;
-      // vers l'extérieur : à l'opposé du centre de SA pièce
-      const midPt = px({ x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 });
-      const cPt = px(centerOf(roomOf(w)));
-      if (nx2 * (cPt.x - midPt.x) + ny2 * (cPt.y - midPt.y) > 0) {
-        nx2 = -nx2;
-        ny2 = -ny2;
+      // Quelle baie appartient à quel mur : celui dont l'axe la porte.
+      const baiesDuMur = new Map<string, WallSeg[]>();
+      for (const o of openings) {
+        let mieux: WallSeg | null = null;
+        let ecart = Infinity;
+        for (const w of walls) {
+          const da = pointOnSeg(o.a, w.a, w.b);
+          const db = pointOnSeg(o.b, w.a, w.b);
+          const tol = Math.max(epaisseurDe(w), 0.1);
+          if (da.dist > tol || db.dist > tol) continue;
+          if (da.t < -0.02 || da.t > 1.02 || db.t < -0.02 || db.t > 1.02) continue;
+          if (da.dist + db.dist < ecart) {
+            ecart = da.dist + db.dist;
+            mieux = w;
+          }
+        }
+        if (!mieux) continue;
+        baiesDuMur.set(mieux.id, [...(baiesDuMur.get(mieux.id) ?? []), o]);
       }
-      const off = WALL_T * scale + 16;
-      const A = { x: a.x + nx2 * off, y: a.y + ny2 * off };
-      const B = { x: b.x + nx2 * off, y: b.y + ny2 * off };
-      // attaches
-      d.line(a.x + nx2 * 4, a.y + ny2 * 4, A.x + nx2 * 4, A.y + ny2 * 4, 0.6, GREY);
-      d.line(b.x + nx2 * 4, b.y + ny2 * 4, B.x + nx2 * 4, B.y + ny2 * 4, 0.6, GREY);
-      // ligne de cote
-      d.line(A.x, A.y, B.x, B.y, 0.8, INK);
-      // tirets à 45°
-      const t = 3.2;
-      for (const P of [A, B]) {
-        d.line(P.x - (ux2 + nx2) * t, P.y - (uy2 + ny2) * t, P.x + (ux2 + nx2) * t, P.y + (uy2 + ny2) * t, 1, INK);
-      }
-      // valeur
-      let angle = (Math.atan2(dy2, dx2) * 180) / Math.PI;
-      if (angle > 90) angle -= 180;
-      if (angle < -90) angle += 180;
-      const texte = `${frLen(segLength(w))} m`;
-      const mx = (A.x + B.x) / 2;
-      const my = (A.y + B.y) / 2;
-      let place: { x: number; y: number } | null = null;
-      for (const ecart of [8, 19, 30]) {
-        const q = coteAPoser(texte, mx + nx2 * ecart, my + ny2 * ecart, 8.5, angle);
-        if (libre(q.boite) && dansLaFenetre(q.boite)) {
-          posees.push(q.boite);
-          place = { x: q.x, y: q.y };
-          break;
+
+      /** De quel côté est le dehors : +1, −1, ou 0 pour une cloison. */
+      const coteDehors = (w: WallSeg): number => {
+        const dx = w.b.x - w.a.x;
+        const dz = w.b.z - w.a.z;
+        const L = Math.hypot(dx, dz) || 1;
+        const n = { x: -dz / L, z: dx / L };
+        const h = epaisseurDe(w) / 2 + 0.3;
+        const dehors = (sgn: number) =>
+          [0.25, 0.5, 0.75].every((t) => {
+            const m = { x: w.a.x + dx * t, z: w.a.z + dz * t };
+            return !dansUnePiece({ x: m.x + n.x * sgn * h, z: m.z + n.z * sgn * h });
+          });
+        const p = dehors(1);
+        const m = dehors(-1);
+        if (p && !m) return 1;
+        if (m && !p) return -1;
+        if (p && m) {
+          const mid = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+          return n.x * (mid.x - centrePlan.x) + n.z * (mid.z - centrePlan.z) >= 0 ? 1 : -1;
+        }
+        return 0;
+      };
+
+      // Les grandes cotes d'abord : à égalité de place, elles gagnent.
+      const parLongueur = [...walls].sort((u, v) => segLength(v) - segLength(u));
+
+      // ------------------------------------------------ les façades, dehors
+      const RANG_BAIES = 11;
+      const RANG_MURS = 27;
+      for (const w of parLongueur) {
+        const sgn = coteDehors(w);
+        if (sgn === 0) continue;
+        const a = px(w.a);
+        const b = px(w.b);
+        const u = unitaire({ x: b.x - a.x, y: b.y - a.y });
+        const n = normalePage(w, sgn);
+        const E = (epaisseurDe(w) / 2 + SUREPAISSEUR_FACADE) * scale;
+        const angle = angleDe(a, b);
+        const L = segLength(w);
+
+        // La chaîne des murs : la longueur de chacun.
+        const A2 = plus(a, n, E + RANG_MURS);
+        const B2 = plus(b, n, E + RANG_MURS);
+        trace(plus(a, n, E + 2), plus(a, n, E + RANG_MURS + 3), 0.6, GREY);
+        trace(plus(b, n, E + 2), plus(b, n, E + RANG_MURS + 3), 0.6, GREY);
+        trace(A2, B2, 0.8, INK);
+        tiret(A2, u, n, 3.2, 1, INK);
+        tiret(B2, u, n, 3.2, 1, INK);
+        const mil2 = { x: (A2.x + B2.x) / 2, y: (A2.y + B2.y) / 2 };
+        ecrire(
+          `${frLen(L)} m`,
+          [6.5, 15, 24].flatMap((k) =>
+            [0, -0.22, 0.22].map((g) => plus(plus(mil2, n, k), u, g * Math.hypot(b.x - a.x, b.y - a.y))),
+          ),
+          8.5,
+          angle,
+          INK,
+          (k) => k * 3,
+        );
+
+        // La chaîne des baies : pleins et vides, au plus près de la façade.
+        const baies = (baiesDuMur.get(w.id) ?? [])
+          .map((o) => {
+            const ta = pointOnSeg(o.a, w.a, w.b).t;
+            const tb = pointOnSeg(o.b, w.a, w.b).t;
+            return { o, t0: Math.max(0, Math.min(ta, tb)), t1: Math.min(1, Math.max(ta, tb)) };
+          })
+          .sort((x, y) => x.t0 - y.t0);
+        if (baies.length === 0) continue;
+        const A1 = plus(a, n, E + RANG_BAIES);
+        const B1 = plus(b, n, E + RANG_BAIES);
+        trace(A1, B1, 0.6, TRAIT_COTE);
+        const morceaux: { t0: number; t1: number; o?: WallSeg }[] = [];
+        let t = 0;
+        for (const bb of baies) {
+          if (bb.t0 > t + 1e-4) morceaux.push({ t0: t, t1: bb.t0 });
+          morceaux.push({ t0: bb.t0, t1: bb.t1, o: bb.o });
+          t = Math.max(t, bb.t1);
+        }
+        if (t < 1 - 1e-4) morceaux.push({ t0: t, t1: 1 });
+        const surLigne = (tt: number) => ({
+          x: A1.x + (B1.x - A1.x) * tt,
+          y: A1.y + (B1.y - A1.y) * tt,
+        });
+        const bornes = new Set<number>();
+        for (const m of morceaux) {
+          bornes.add(m.t0);
+          bornes.add(m.t1);
+        }
+        for (const tt of bornes) {
+          const P = surLigne(tt);
+          tiret(P, u, n, 2.4, 0.8, TRAIT_COTE);
+          // Les bords des baies se rappellent jusqu'à la façade.
+          if (tt > 1e-4 && tt < 1 - 1e-4) {
+            const F = { x: a.x + (b.x - a.x) * tt, y: a.y + (b.y - a.y) * tt };
+            trace(plus(F, n, E + 2), plus(F, n, E + RANG_BAIES + 2.5), 0.5, GREY);
+          }
+        }
+        const longPage = Math.hypot(b.x - a.x, b.y - a.y);
+        for (const m of morceaux) {
+          const valeur = m.o ? segLength(m.o) : (m.t1 - m.t0) * L;
+          if (!m.o && valeur < 0.05) continue;
+          const txt = frLen(valeur);
+          const centre = surLigne((m.t0 + m.t1) / 2);
+          const place = (m.t1 - m.t0) * longPage;
+          const largeurTxt = txt.length * 7 * 0.5;
+          const places = [
+            plus(centre, n, 5.2),
+            plus(centre, n, -4.6),
+            plus(plus(centre, n, 5.2), u, place / 2 + largeurTxt / 2 + 2),
+            plus(plus(centre, n, 5.2), u, -(place / 2 + largeurTxt / 2 + 2)),
+          ];
+          // Un plein trop court pour sa valeur se déduit des autres : il se
+          // tait plutôt que de se loger chez le voisin. Une baie, jamais.
+          if (!m.o && place < largeurTxt + 3) continue;
+          ecrire(txt, places, 7, angle, TEXTE_COTE, (k) => k * 6);
         }
       }
-      // Rien de libre : la ligne de cote reste, la valeur cède la place.
-      if (!place) continue;
-      d.text(texte, place.x, place.y, 8.5, INK, { angle });
-    }
 
-    // ---------------------------------------- cotes des menuiseries
-    // Une porte se commande à sa largeur : elle doit figurer sur le plan,
-    // posée le long du mur qui la porte, à l'intérieur pour ne pas se
-    // mêler aux cotes extérieures.
-    if (showDims) {
+      /*
+        L'ORDRE DES LIBERTÉS, ICI AUSSI : la largeur d'une porte ne peut pas
+        s'éloigner de sa porte, la cote d'une cloison peut glisser le long de
+        tout son mur. La porte se pose donc d'abord.
+      */
+      // -------------------------------- les menuiseries hors des façades
+      const enFacade = new Set(
+        walls.filter((w) => coteDehors(w) !== 0).flatMap((w) => (baiesDuMur.get(w.id) ?? []).map((o) => o.id)),
+      );
       for (const o of openings) {
+        if (enFacade.has(o.id)) continue;
         const a = px(o.a);
         const b = px(o.b);
-        const norm = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-        if (norm < 22) continue;
-        const ux2 = (b.x - a.x) / norm;
-        const uy2 = (b.y - a.y) / norm;
-        let nx2 = -uy2;
-        let ny2 = ux2;
-        const midPt = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-        const cPt = px(centerOf(roomOf(o)));
-        // Vers l'INTÉRIEUR : dehors, la cote du mur occupe déjà la place.
-        if (nx2 * (cPt.x - midPt.x) + ny2 * (cPt.y - midPt.y) < 0) {
-          nx2 = -nx2;
-          ny2 = -ny2;
-        }
-        const off = WALL_T * scale + 12;
-        const A = { x: a.x + nx2 * off, y: a.y + ny2 * off };
-        const B = { x: b.x + nx2 * off, y: b.y + ny2 * off };
-        if (!dansLeCadre(A) || !dansLeCadre(B)) continue;
-        d.line(A.x, A.y, B.x, B.y, 0.7, GREY);
-        for (const P of [A, B]) {
-          d.line(
-            P.x - (ux2 + nx2) * 2.6,
-            P.y - (uy2 + ny2) * 2.6,
-            P.x + (ux2 + nx2) * 2.6,
-            P.y + (uy2 + ny2) * 2.6,
-            0.9,
-            GREY,
-          );
-        }
-        let angle = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
-        if (angle > 90) angle -= 180;
-        if (angle < -90) angle += 180;
-        // La largeur de porte entre dans le même jeu de places que les cotes
-        // de murs : deux menuiseries voisines ne doivent pas se marcher
-        // dessus, et une porte ne doit pas se poser sur une cote.
+        const longPage = Math.hypot(b.x - a.x, b.y - a.y);
+        if (longPage < 4) continue;
+        const u = unitaire({ x: b.x - a.x, y: b.y - a.y });
+        const angle = angleDe(a, b);
+        const porteur = walls.find((w) => (baiesDuMur.get(w.id) ?? []).includes(o));
+        const F = ((porteur ? epaisseurDe(porteur) : WALL_T) / 2) * scale;
         const txt = frLen(segLength(o));
-        const q = coteAPoser(
-          txt,
-          (A.x + B.x) / 2 + nx2 * 7,
-          (A.y + B.y) / 2 + ny2 * 7,
-          7.5,
-          angle,
-        );
-        if (!libre(q.boite) || !dansLaFenetre(q.boite)) continue;
-        posees.push(q.boite);
-        d.text(txt, q.x, q.y, 7.5, GREY, { angle });
+        let mieux: { A: Pt; B: Pt; n: Pt; texte: Pt; cout: number; dansLaBaie?: boolean } | null =
+          null;
+        /*
+          DANS LA BAIE MÊME, quand le mur est assez épais pour porter le
+          chiffre : entre ses deux tableaux, le vide est toujours blanc, et
+          ses bords disent déjà ce qui est mesuré — c'est ainsi qu'on cote à
+          la main une porte serrée entre deux pièces chargées. Pas de trait.
+        */
+        {
+          const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+          const q = boiteDuMot(txt, c.x, c.y, 7, angle);
+          if (dansLaFenetre(q.boite) && libre(q.boite) && encre.sous(q.boite) === 0) {
+            mieux = { A: c, B: c, n: { x: 0, y: 0 }, texte: c, cout: 6, dansLaBaie: true };
+          }
+        }
+        for (const sgn of [1, -1]) {
+          const n = normalePage(porteur ?? o, sgn);
+          for (const off of [5, 10, 15, 21]) {
+            const A = plus(a, n, F + off);
+            const B = plus(b, n, F + off);
+            const encreTrait = encre.leLong(plus(A, u, 1.5), plus(B, u, -1.5));
+            const barre = barreUnMot(A, B);
+            /*
+              Au milieu de la baie, puis de part et d'autre — et, en dernier
+              recours, AU-DELÀ de ses bords, contre le tiret : c'est ainsi
+              qu'on cote à la main une baie trop étroite pour son chiffre.
+            */
+            for (const t of [0.5, 0.3, 0.7, -0.35, 1.35, -0.6, 1.6]) {
+              const c = plus({ x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t }, n, 4.4);
+              const q = boiteDuMot(txt, c.x, c.y, 7, angle);
+              if (!dansLaFenetre(q.boite)) continue;
+              const chocs = libre(q.boite) ? 0 : 1;
+              const cout =
+                chocs * 10000 +
+                encre.sous(q.boite) * 20 +
+                encreTrait * 3 +
+                barre * 400 +
+                off * 0.4 +
+                Math.abs(t - 0.5) * 10;
+              if (!mieux || cout < mieux.cout) mieux = { A, B, n, texte: c, cout };
+            }
+          }
+        }
+        if (!mieux) continue;
+        const { A, B, n } = mieux;
+        if (!mieux.dansLaBaie) {
+          trace(A, B, 0.6, TRAIT_COTE);
+          tiret(A, u, n, 2.4, 0.8, TRAIT_COTE);
+          tiret(B, u, n, 2.4, 0.8, TRAIT_COTE);
+        }
+        ecrire(txt, [mieux.texte], 7, angle, TEXTE_COTE);
+      }
+
+      // ------------------------------------------- les cloisons, collées
+      for (const w of parLongueur) {
+        if (coteDehors(w) !== 0) continue;
+        const a = px(w.a);
+        const b = px(w.b);
+        const longPage = Math.hypot(b.x - a.x, b.y - a.y);
+        if (longPage < 4) continue;
+        const u = unitaire({ x: b.x - a.x, y: b.y - a.y });
+        const angle = angleDe(a, b);
+        const F = (epaisseurDe(w) / 2) * scale;
+        const txt = `${frLen(segLength(w))} m`;
+        let mieux: { A: Pt; B: Pt; n: Pt; texte: Pt; cout: number; taille: number } | null = null;
+        for (const sgn of [1, -1]) {
+          const n = normalePage(w, sgn);
+          for (const off of [6, 11, 16, 22, 28, 34]) {
+            const A = plus(a, n, F + off);
+            const B = plus(b, n, F + off);
+            // Les bouts du trait passent dans les murs qu'il rejoint : on ne
+            // compte que la portée libre.
+            const rogne = Math.min(longPage / 3, F + 4);
+            const encreTrait = encre.leLong(plus(A, u, rogne), plus(B, u, -rogne));
+            const barre = barreUnMot(A, B);
+            for (const [t, cote, taille] of [0.5, 0.38, 0.62, 0.26, 0.74, 0.16, 0.84, 0.08, 0.92, -0.14, 1.14].flatMap((tt) =>
+              // Le mot se pose au-delà du trait — ou, quand le trait est assez
+              // loin du mur, entre les deux ; et un cran plus petit s'il le faut.
+              [7.5, 6.5].flatMap((z) => (off >= 14 ? [[tt, 1, z], [tt, -1, z]] : [[tt, 1, z]])),
+            )) {
+              const c = plus({ x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t }, n, (taille * 0.64) * cote);
+              const q = boiteDuMot(txt, c.x, c.y, taille, angle);
+              if (!dansLaFenetre(q.boite)) continue;
+              const chocs = libre(q.boite) ? 0 : 1;
+              const cout =
+                chocs * 10000 +
+                encre.sous(q.boite) * 20 +
+                encreTrait * 2.5 +
+                barre * 400 +
+                off * 0.5 +
+                Math.abs(t - 0.5) * 14 +
+                (taille < 7.5 ? 25 : 0);
+              if (!mieux || cout < mieux.cout) mieux = { A, B, n, texte: c, cout, taille };
+            }
+          }
+        }
+        if (!mieux) continue;
+        const { A, B, n } = mieux;
+        trace(A, B, 0.6, TRAIT_COTE);
+        tiret(A, u, n, 2.6, 0.8, TRAIT_COTE);
+        tiret(B, u, n, 2.6, 0.8, TRAIT_COTE);
+        ecrire(txt, [mieux.texte], mieux.taille, angle, TEXTE_COTE);
+      }
+
+    }
+
+    /*
+      LE NOM DES MEUBLES, QUAND TOUS LES TRAITS SONT POSÉS — et seulement
+      sur le blanc du meuble.
+
+      Il s'écrivait au centre quoi qu'il arrive, et deux choses le
+      barraient : les traits du meuble lui-même (les coussins d'un canapé,
+      les portes d'un rangement), et le meuble SUIVANT, dessiné après lui,
+      qui le recouvrait de son fond blanc — « s » était tout ce qui restait
+      de « Table basse ». Le nom cherche donc, dans le meuble, une place sans
+      un trait : au milieu d'abord, puis vers les bords, puis un cran plus
+      petit. Sans place blanche, il se tait : la silhouette le dit déjà,
+      et un nom barré ne dit plus rien.
+    */
+    {
+      const dansPolyPage = (poly: Pt[], q: Pt) => {
+        let dedans = false;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+          const a = poly[i];
+          const b = poly[j];
+          if (a.y > q.y !== b.y > q.y && q.x < ((b.x - a.x) * (q.y - a.y)) / (b.y - a.y) + a.x) {
+            dedans = !dedans;
+          }
+        }
+        return dedans;
+      };
+      const ESSAIS: [number, number][] = [
+        [0, 0],
+        [0, -0.22],
+        [0, 0.22],
+        [-0.22, 0],
+        [0.22, 0],
+        [-0.22, -0.22],
+        [0.22, -0.22],
+        [-0.22, 0.22],
+        [0.22, 0.22],
+        [0, -0.34],
+        [0, 0.34],
+      ];
+      for (const m of meublesDuPlan) {
+        const { o, loc, contour } = m;
+        if (o.width * scale < 30 || o.depth * scale < 11) continue;
+        const mot = frCategory(o.category);
+        let pose: { base: Pt; boite: Boite; taille: number } | null = null;
+        chercher: for (const taille of [7, 6]) {
+          for (const [fu, fv] of ESSAIS) {
+            const c = loc(fu * o.width, fv * o.depth);
+            const q = boiteDuMot(mot, c.x, c.y, taille, 0);
+            const b = q.boite;
+            const coins = [
+              { x: b.x, y: b.y },
+              { x: b.x + b.w, y: b.y },
+              { x: b.x + b.w, y: b.y + b.h },
+              { x: b.x, y: b.y + b.h },
+            ];
+            if (!coins.every((k) => dansPolyPage(contour, k))) continue;
+            if (!libre(b) || encre.sous(b) > 0) continue;
+            pose = { ...q, taille };
+            break chercher;
+          }
+        }
+        if (!pose) continue;
+        reserver(pose.boite);
+        d.text(mot, pose.base.x, pose.base.y, pose.taille, GREY);
       }
     }
 
@@ -2655,7 +3143,7 @@ function planPage(
         referme sur l'appareil, pour que chaque gaine finisse exactement sur
         le symbole qu'elle alimente.
       */
-      for (const r of ecarterLesGaines(ctx.routes)) {
+      for (const r of gainesDuPlan) {
         if (r.path.length < 2) continue;
         // Un tireté fin : lisible sans manger le plan, et distinct du trait
         // plein des murs comme du pointillé des passages.
@@ -3206,9 +3694,14 @@ function planPage(
         } else if (label) {
           // La surface a cédé la place : il ne reste que le nom, centré.
           d.text(label, pose.cx, pose.cy - 3, gros, INK, { bold: true });
-        } else {
+        } else if (pose.avecAire) {
           d.text(area, pose.cx, pose.cy + 4, big ? 15 : 11, INK, { bold: true });
           d.text('surface au sol', pose.cx, pose.cy - 10, 8, GREY);
+        } else {
+          // « surface au sol » a cédé la place : la surface seule, centrée.
+          d.text(area, pose.cx, pose.cy - 0.36 * (big ? 15 : 11), big ? 15 : 11, INK, {
+            bold: true,
+          });
         }
       }
       /*
@@ -3250,10 +3743,13 @@ function planPage(
           for (let j = -16; j <= 16; j++) tours.push([i * 11, j * 8]);
         }
         tours.sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]));
+        // La place la plus proche qui ne couvre aucun trait ; sinon la plus
+        // proche libre de mots — la note se lit toujours.
+        const essais = tours.map((t) => ({ ...voulu, x: voulu.x + t[0], y: voulu.y + t[1] }));
         const pose =
-          tours
-            .map((t) => ({ ...voulu, x: voulu.x + t[0], y: voulu.y + t[1] }))
-            .find((b) => libre(b) && dansLaFenetre(b)) ?? voulu;
+          essais.find((b) => libre(b) && dansLaFenetre(b) && encre.sous(b) === 0) ??
+          essais.find((b) => libre(b) && dansLaFenetre(b)) ??
+          voulu;
         d.path([q, { x: q.x + 5, y: q.y - 3.5 }, { x: q.x + 5, y: q.y + 3.5 }, q], 0.8, INK);
         // Le filet qui relie la punaise à son étiquette quand elle s'est
         // écartée : sans lui, on ne sait plus quel mot désigne quel point.
@@ -3265,7 +3761,7 @@ function planPage(
         // Une note posée réserve sa place à son tour : deux notes voisines
         // se couvriraient l'une l'autre.
         emprises.push(pose);
-        posees.push(pose);
+        reserver(pose);
       }
     }
 
@@ -3280,15 +3776,8 @@ function planPage(
       Il se dessine APRÈS le mobilier et les cotes, AVANT la surcouche de
       schéma : c'est une annotation du plan, pas du schéma.
     */
-    {
-      const numeros = wallNumbers(ctx);
-      const centre = centreDesMurs(walls);
-      for (const w of walls) {
-        const n = numeros.get(w.id);
-        if (!n) continue;
-        const q = placeDuNumero(w, openings, n, scale, px, centre);
-        d.text(String(n), q.x, q.y - 0.36 * q.taille, q.taille, q.couleur);
-      }
+    for (const q of numerosPoses.values()) {
+      d.text(String(q.n), q.x, q.y - 0.36 * q.taille, q.taille, q.couleur);
     }
 
     // La surcouche vient EN DERNIER, dans la même fenêtre de découpe : un
@@ -4904,6 +5393,56 @@ function centreDesMurs(walls: WallSeg[]): { x: number; z: number } {
   return { x: x / walls.length, z: z / walls.length };
 }
 
+/** Dans le poché ? Pair-impair, comme le remplissage. */
+function dansLePoche(p: { x: number; z: number }, contours: { x: number; z: number }[][]): boolean {
+  let n = 0;
+  for (const c of contours) {
+    let dedans = false;
+    for (let i = 0, j = c.length - 1; i < c.length; j = i++) {
+      const a = c[i];
+      const b = c[j];
+      if (a.z > p.z !== b.z > p.z && p.x < ((b.x - a.x) * (p.z - a.z)) / (b.z - a.z) + a.x) {
+        dedans = !dedans;
+      }
+    }
+    if (dedans) n++;
+  }
+  return n % 2 === 1;
+}
+
+/**
+ * LE MILIEU DE LA MAÇONNERIE, en travers du mur — relevé du patron : « il
+ * faut centrer les numéros sur la largeur du mur pour bien les lire ».
+ *
+ * L'axe d'un mur n'est pas le milieu de son poché : une façade s'épaissit
+ * vers le dehors (`SUREPAISSEUR_FACADE`), et le chiffre posé sur l'axe
+ * frôlait la face intérieure. On sort donc du poché des deux côtés, à partir
+ * de l'axe, et l'on se pose au milieu des deux sorties — quelle que soit
+ * l'épaisseur, façade ou refend.
+ */
+function milieuDuPoche(
+  p: { x: number; z: number },
+  n: { x: number; z: number },
+  contours: { x: number; z: number }[][],
+  defaut: number,
+): { centre: { x: number; z: number }; epaisseur: number } {
+  if (!dansLePoche(p, contours)) return { centre: p, epaisseur: defaut };
+  const sortie = (s: number) => {
+    let k = 0;
+    while (k < 0.6 && dansLePoche({ x: p.x + n.x * s * k, z: p.z + n.z * s * k }, contours)) {
+      k += 0.004;
+    }
+    return k;
+  };
+  const plus = sortie(1);
+  const moins = sortie(-1);
+  const decale = (plus - moins) / 2;
+  return {
+    centre: { x: p.x + n.x * decale, z: p.z + n.z * decale },
+    epaisseur: plus + moins,
+  };
+}
+
 export function placeDuNumero(
   w: WallSeg,
   openings: WallSeg[],
@@ -4911,6 +5450,9 @@ export function placeDuNumero(
   scale: number,
   px: (p: { x: number; z: number }) => Pt,
   centre: { x: number; z: number },
+  contours: { x: number; z: number }[][] = [],
+  encre?: CarteDEncre,
+  libre?: (b: Boite) => boolean,
 ): { x: number; y: number; taille: number; couleur: string; boite: Boite } {
   const tag = wallTagAt(w, openings);
   const chiffres = String(n).length;
@@ -4923,7 +5465,12 @@ export function placeDuNumero(
   // Ce que le chiffre occupe EN TRAVERS du mur : sa largeur sur un mur
   // debout, sa hauteur sur un mur couché.
   const travers = (t: number) => (debout ? large(t) : haut(t));
-  const epaisseur = epaisseurDe(w) * scale;
+  const dx = w.b.x - w.a.x;
+  const dz = w.b.z - w.a.z;
+  const len = Math.hypot(dx, dz) || 1;
+  const normale = { x: -dz / len, z: dx / len };
+  const milieu = milieuDuPoche(tag, normale, contours, epaisseurDe(w));
+  const epaisseur = milieu.epaisseur * scale;
   const tient = (epaisseur - 1.6) / travers(1);
   const boite = (x: number, y: number, t: number): Boite => ({
     x: x - large(t) / 2 - 0.8,
@@ -4933,21 +5480,38 @@ export function placeDuNumero(
   });
   if (tient >= NUMERO_MIN) {
     const taille = Math.min(NUMERO_MAX, tient);
-    const p = px(tag);
+    const p = px(milieu.centre);
     return { x: p.x, y: p.y, taille, couleur: '#FFFFFF', boite: boite(p.x, p.y, taille) };
   }
-  const dx = w.b.x - w.a.x;
-  const dz = w.b.z - w.a.z;
-  const len = Math.hypot(dx, dz) || 1;
-  let nx = -dz / len;
-  let nz = dx / len;
-  if ((centre.x - tag.x) * nx + (centre.z - tag.z) * nz < 0) {
-    nx = -nx;
-    nz = -nz;
-  }
+  /*
+    TROP MINCE : À CÔTÉ DU MUR, LÀ OÙ LE PAPIER EST BLANC. Côté logement
+    d'abord, au milieu du pan d'abord ; puis de part et d'autre, le long du
+    mur, et de l'autre côté — la place la plus blanche de la carte gagne.
+  */
+  let vers = 1;
+  if ((centre.x - tag.x) * normale.x + (centre.z - tag.z) * normale.z < 0) vers = -1;
   const taille = NUMERO_A_COTE;
-  const ecart = epaisseurDe(w) / 2 + (1.5 + travers(taille) / 2) / scale;
-  const p = px({ x: tag.x + nx * ecart, z: tag.z + nz * ecart });
+  const ecart = milieu.epaisseur / 2 + (1.5 + travers(taille) / 2) / scale;
+  const candidats: { p: Pt; cout: number }[] = [];
+  const plein = wallRuns(w, openings).filter((r) => r.kind === 'mur');
+  const tMilieu = (tag.x - w.a.x) * (dx / len) + (tag.z - w.a.z) * (dz / len);
+  for (const cote of [vers, -vers]) {
+    for (const glisse of [0, -0.25, 0.25, -0.5, 0.5, -0.8, 0.8]) {
+      const t = tMilieu + glisse;
+      if (t < 0.1 || t > len - 0.1) continue;
+      if (plein.length > 0 && !plein.some((r) => t >= r.t0 * len && t <= r.t1 * len)) continue;
+      const surAxe = { x: w.a.x + (dx / len) * t, z: w.a.z + (dz / len) * t };
+      const p = px({ x: surAxe.x + normale.x * cote * ecart, z: surAxe.z + normale.z * cote * ecart });
+      const b = boite(p.x, p.y, taille);
+      if (libre && !libre(b)) continue;
+      const tache = encre ? encre.sous(b) : 0;
+      candidats.push({ p, cout: tache * 10 + Math.abs(glisse) * 4 + (cote === vers ? 0 : 3) });
+    }
+  }
+  candidats.sort((a, b) => a.cout - b.cout);
+  const p =
+    candidats[0]?.p ??
+    px({ x: tag.x + normale.x * vers * ecart, z: tag.z + normale.z * vers * ecart });
   return { x: p.x, y: p.y, taille, couleur: GRIS_NUMERO, boite: boite(p.x, p.y, taille) };
 }
 

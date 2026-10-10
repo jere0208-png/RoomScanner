@@ -14285,6 +14285,73 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le plan coté épuré : une carte d'encre, et les cotes rangées comme chez l'architecte
+
+Relevé du patron : « trop d'éléments se chevauchent sur le plan coté ;
+essaie une technique de placement plus épurée, en gardant chaque cote et
+notes — par exemple, "surface au sol" rentre en collision avec la cote de
+mur. On doit innover pour fournir un plan bien lisible. Les numéros de mur
+sont mieux, mais il faut les centrer sur la largeur du mur. »
+
+**Le diagnostic, mesuré.** Le plan imprimé savait qu'un mot ne doit pas en
+couvrir un autre (une réserve unique de boîtes) ; il ignorait les TRAITS.
+Et chaque mur se cotait « vers l'extérieur de SA pièce » : pour une
+cloison, c'est en pleine pièce voisine — un trait de trois mètres en travers
+de la chambre, qui barrait son cartouche et ses meubles, et dont la valeur,
+faute de place, s'effaçait souvent (treize cotes de mur absentes sur
+l'appartement d'exemple). S'y ajoutaient : les largeurs de fenêtres écrites
+presque sur la ligne de la cote du mur, les largeurs de porte sur l'arc du
+battant, les noms de meubles recouverts par le meuble dessiné ensuite, et la
+réserve du cartouche plus étroite que la ligne « surface au sol ».
+
+**La carte d'encre** (`src/export/encre.ts`, `CarteDEncre`). Une grille de
+la fenêtre du plan, au demi-point. Toute la géométrie — poché, recoins
+techniques, meubles et leurs traits, battants, arcs, dormants, gaines,
+symboles d'appareillage et du plafond, liens de commande — y est encrée
+AVANT la première étiquette ; puis chaque trait de cote et chaque mot posé
+s'y ajoutent. Une étiquette ne demande plus seulement « suis-je libre de
+mots ? » mais « combien d'encre sous moi ? », et prend, parmi ses places
+possibles, la plus blanche. Le dessin relit les tracés calculés : ce qui est
+encré est ce qui est dessiné.
+
+**Les cotes, comme chez l'architecte** (`planPage`, `export/pdf.ts`) :
+
+- **façades** : deux chaînes parallèles, dehors — la plus proche détaille
+  pleins et baies (la largeur d'une fenêtre s'y lit), la plus éloignée donne
+  la longueur de chaque mur ; elles partent de la face extérieure du poché ;
+- **cloisons** : une cote courte, collée à leur face, du côté, à la distance
+  et à l'endroit du trait où elle ne coupe ni meuble, ni arc, ni mot — la
+  valeur glisse le long du trait, peut passer entre le trait et le mur, sortir
+  au-delà d'un bout, ou prendre un cran plus petit ;
+- **portes intérieures** : leur largeur se pose avant la cote de la cloison
+  (l'ordre des libertés), du côté où le battant ne tourne pas, ou dans la
+  baie même quand le mur est assez épais pour porter le chiffre ;
+- un trait de cote ne barre aucun mot, tirets compris ; il peut passer
+  derrière un cartouche, dont le fond blanc l'interrompt proprement ;
+- une valeur ne cède que si TOUTES ses places tombent sur un autre mot
+  (vingt retours de 12 cm côte à côte) ; sur un logement réel, aucune ne cède.
+
+**Les cartouches** se posent sur le blanc de la pièce (aucun trait dessous),
+laissent si possible une bande de 14 points le long des murs pour les cotes,
+réservent la largeur réelle de chaque ligne, et, sans place, cèdent « surface
+au sol » avant la surface. **Les noms de meubles** s'écrivent après tous les
+traits, seulement sur un blanc à l'intérieur du meuble, sinon se taisent.
+**Les sigles** d'appareils et du plafond prennent la place la plus blanche
+autour de leur symbole. **Les notes** aussi, autour de leur punaise.
+
+**Les numéros de mur se centrent dans l'épaisseur du poché** (`milieuDuPoche`) :
+on sort de la maçonnerie des deux côtés de l'axe et l'on se pose au milieu —
+une façade s'épaissit vers le dehors, et son axe n'est pas son milieu. Trop
+mince, le numéro passe à côté du mur, à la place la plus blanche.
+
+Bancs : `planepure.test.ts` — une « imprimante » relit le flux PDF, repeint
+traits et aplats dans l'ordre (les fonds blancs effacent), et mesure l'encre
+sous chaque mot : moins de 5 % partout, sur l'appartement d'exemple (zooms 1 et
+1,3, avec et sans noms de pièces) et le plan de référence équipé ; chaque mur
+garde sa cote, chaque baie sa largeur, chaque note son mot ; chaque numéro est
+à égale distance des deux faces du poché (au quart de point). `planlisible`
+lit désormais l'inclinaison des mots, comme `cotespdfsanschoc`.
+
 ## Le travail non enregistré se range, l'invité n'est plus Pro
 
 Relevés du patron : « le mode invité est en Pro, et donc pas d'intérêt de
