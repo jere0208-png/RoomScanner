@@ -89,7 +89,7 @@ export function maillageDeLaMaquette(
     if (face.pts.length < 3 || !face.fill || face.ombre || face.isCeiling) continue;
     // Les meubles et l'appareillage en caisses restent au canevas : la carte
     // graphique a les vrais.
-    if (o.sansMeubles && (face.meuble || face.appareil)) continue;
+    if (o.sansMeubles && (face.meuble || face.appareil || face.enVolume)) continue;
     /*
       LA VRAIE IMAGE, SAUF SUR L'ÉCORCHÉ : une face qui se voile pour laisser
       voir la pièce ne doit pas boucher la vue d'une photo opaque.

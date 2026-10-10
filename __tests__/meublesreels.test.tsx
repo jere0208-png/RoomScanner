@@ -256,13 +256,16 @@ describe('dans la scène : chaque meuble à la place de sa caisse', () => {
   const ex = appartementExemple();
   const scene = buildScene(ex.walls, ex.openings, ex.objects as never, { palette: PAL, rooms: ex.rooms as never, showSurfaces: true });
 
-  // Les portes en volume voyagent avec les meubles, sans caisse au canevas.
-  const meubles = (scene.meubles ?? []).filter((m) => m.category !== 'porte3d');
+  // Les portes et les fenêtres en volume voyagent avec les meubles, sans caisse au canevas.
+  const menuiseries = (scene.meubles ?? []).filter((m) => m.category === 'porte3d' || m.category === 'fenetre3d');
+  const meubles = (scene.meubles ?? []).filter((m) => !menuiseries.includes(m));
 
-  it('la scène annonce une pose par meuble — et une porte en volume par porte', () => {
+  it('la scène annonce une pose par meuble — et une menuiserie en volume par porte, par fenêtre', () => {
     expect(meubles).toHaveLength(ex.objects.length);
     const portes = ex.openings.filter((o) => o.type === 'door').length;
-    expect((scene.meubles ?? []).length - meubles.length).toBe(portes);
+    const fenetres = ex.openings.filter((o) => o.type === 'window').length;
+    expect(menuiseries.filter((m) => m.category === 'porte3d')).toHaveLength(portes);
+    expect(menuiseries.filter((m) => m.category === 'fenetre3d')).toHaveLength(fenetres);
   });
 
   it('le modèle et la caisse tiennent dans la même emprise — et le modèle la remplit', () => {

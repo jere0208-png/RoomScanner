@@ -832,11 +832,11 @@ final class RoomScanVisite: UIView {
       }
       // Ce qui se pose PAR-DESSUS le reste — l'ombre, le verre — passe après.
       if code == 9 { n.renderingOrder = 5 }
-      if code == 3 { n.renderingOrder = 6 }
+      if code == 3 || code == 6 { n.renderingOrder = 6 }
       out.append(n)
       // Le liseré : pour ce qui a une forme pleine (ni ombre, ni verre, ni
       // feuille, ni lumière — un diffuseur allumé n'a pas de bord sombre).
-      if code != 9 && code != 3 && code != 4 && code != 5 {
+      if code != 9 && code != 3 && code != 4 && code != 5 && code != 6 {
         if let coque = noeudDeContour(sommets, indices) { out.append(coque) }
       }
     }
@@ -967,6 +967,14 @@ final class RoomScanVisite: UIView {
       // une ampoule : il donne la lumière au lieu de la recevoir. Il se
       // peint donc de sa propre teinte, sans ombre, comme une lampe allumée.
       m.lightingModel = .constant
+    case 6:
+      // LE VITRAGE : le bleu du dehors. Il montre le jour au lieu de prendre
+      // l'ombre de la pièce, et laisse deviner ce qu'il y a derrière.
+      m.lightingModel = .constant
+      m.transparency = 0.82
+      m.transparencyMode = .dualLayer
+      m.isDoubleSided = true
+      m.writesToDepthBuffer = false
     case 9:
       m.lightingModel = .constant
       m.diffuse.contents = RoomScanVisite.imageDOmbre

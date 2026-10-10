@@ -14285,6 +14285,41 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les fenêtres et les baies en volume, vitrées du bleu du dehors
+
+Relevé du patron : « fais aussi un 3D pour les ouvrants baie et fenêtres,
+avec le bleu de dehors pour les espaces vitrés ».
+
+**Ce qu'il y avait.** Une fenêtre était un aplat qui remplissait l'épaisseur
+du mur — bleu, gris ou la couleur relevée — sans dormant, sans vantail, sans
+poignée.
+
+**La menuiserie en volume** (`modeles3d` : `fenetre3d` ; `scene3d`).
+- Le **dormant** (un cadre de cinq centimètres), posé côté pièce dans
+  l'épaisseur, comme on pose chez nous ; les **vantaux** avec leur cadre ; le
+  **vitrage** ; la **poignée** côté pièce, à hauteur de main.
+- Le type se lit à la baie : elle descend au sol → **porte-fenêtre**
+  (soubassement plus haut, seuil plat) ; à partir de 1,80 m → **baie
+  coulissante** (deux vantaux sur deux rails qui se recouvrent, une poignée
+  cuvette sur chaque montant) ; sinon une **fenêtre**, à deux vantaux à la
+  française dès 90 cm, la crémone sur le battement.
+- Les fenêtres restent **fermées**.
+
+**Le bleu du dehors.** Le vitrage prend la teinte du ciel que la visite peint
+derrière les baies (la teinte des fenêtres adoucie de blanc). Une nouvelle
+matière, `vitrage` (code 6 au natif), montre le jour au lieu de prendre
+l'ombre de la pièce : éclairage constant, un rien transparent, deux faces,
+sans liseré.
+
+**Le canevas garde son aplat** ; la carte graphique le saute (`enVolume` sur
+ses faces, `sansMeubles` dans `maillageDeLaVisite` et `maillageDeLaMaquette`)
+et reçoit la menuiserie. Un mur isolé ne garde que ses fenêtres.
+
+Bancs : `portes3d` (+5 : la fenêtre d'allège, la porte-fenêtre et la baie
+coulissante, le vitrage et la poignée côté pièce, l'aplat sauté par la carte
+graphique, le natif), `meublesreels` (une menuiserie en volume par porte, par
+fenêtre).
+
 ## Des portes en volume, des murs nets, des fauteuils qui regardent la pièce
 
 Relevé du patron : « ajoute des portes 3D lors des ouvrants portes ; si rien

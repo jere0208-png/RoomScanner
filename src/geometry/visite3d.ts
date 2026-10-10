@@ -215,7 +215,8 @@ export function maillageDeLaVisite(faces: Face3D[], o: { sansMeubles?: boolean }
   for (const face of faces) {
     if (face.pts.length < 3 || !face.fill || face.ombre) continue;
     // Les meubles en caisses : la visite a les vrais modèles (`modeles3d`).
-    if (o.sansMeubles && (face.meuble || face.appareil)) continue;
+    // Une fenêtre aussi : la visite a sa menuiserie en volume.
+    if (o.sansMeubles && (face.meuble || face.appareil || face.enVolume)) continue;
     const voulue: P3 | null = face.isFloor
       ? { x: 0, y: 1, z: 0 }
       : face.isCeiling

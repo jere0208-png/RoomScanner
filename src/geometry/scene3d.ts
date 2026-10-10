@@ -59,6 +59,11 @@ export interface Face3D {
   habillage?: PieceHabillee[];
   /** Face d'une menuiserie (porte, fenêtre) : elle ne prend pas l'image du mur. */
   menuiserie?: boolean;
+  /**
+   * Ce panneau a son modèle EN VOLUME parmi les poses (une fenêtre) : le
+   * canevas le peint, la carte graphique le saute.
+   */
+  enVolume?: boolean;
   stroke: string | null;
   /** Ombrage recalculé à la projection, selon l'orientation du pan. */
   shade?: boolean;
@@ -2407,6 +2412,8 @@ export function buildScene(
   const holes = assignOpenings(walls, openings, floorY);
   /** Les portes de la scène, que la carte graphique dessinera en volume. */
   const portesAPoser: { seg: WallSeg; w: WallSeg; t0: number; t1: number; y0: number; y1: number }[] = [];
+  /** Les fenêtres et les baies vitrées, de même. */
+  const fenetresAPoser: { seg: WallSeg; w: WallSeg; t0: number; t1: number; y0: number; y1: number }[] = [];
 
   /*
     ON NE DÉCOUPE UN MUR QUE S'IL Y A QUELQUE CHOSE À DÉPARTAGER.
@@ -2634,7 +2641,9 @@ export function buildScene(
           peinture : l'audit comptait cent dix recouvrements, et le chantier
           aurait vu une porte plantée dans un matelas. Le débattement réel
           demanderait de connaître ce qui l'encombre, meuble par meuble, à
-          chaque image — c'est le prix qu'on a refusé.
+          chaque image — c'est le prix qu'on a refusé AU CANEVAS. La carte
+          graphique, elle, a un tampon de profondeur : elle reçoit le
+          vantail en volume, ouvert sans rien heurter (`portesAPoser`).
 
           Reste ce qu'un seuil dit à lui seul : ici on FERME, alors qu'une
           baie libre se traverse. Il tient dans l'épaisseur du mur, ne
@@ -2692,7 +2701,18 @@ export function buildScene(
         // La menuiserie appartient au plan du mur : elle s'y classe avec lui.
         depthY: w.height / 2,
       });
-      for (let k = avantMenuiserie; k < faces.length; k++) faces[k].menuiserie = true;
+      /*
+        LA FENÊTRE EN VOLUME — relevé du patron : « fais aussi un 3D pour les
+        ouvrants baie et fenêtres, avec le bleu de dehors pour les espaces
+        vitrés ». Le canevas garde son aplat ; la carte graphique, elle, le
+        saute (`enVolume`) et reçoit la vraie menuiserie (`fenetresAPoser`).
+      */
+      const enVolume = hole.seg.type === 'window';
+      if (enVolume) fenetresAPoser.push({ seg: hole.seg, w, t0: hole.t0, t1: hole.t1, y0: hole.y0, y1: hole.y1 });
+      for (let k = avantMenuiserie; k < faces.length; k++) {
+        faces[k].menuiserie = true;
+        if (enVolume) faces[k].enVolume = true;
+      }
     }
 
     // Tout ce que ce mur vient de poser — pans, chants, couronnement,
@@ -3677,6 +3697,45 @@ export function buildScene(
       yb: Math.max(0, p.y0),
       attributes: [`PorteAngle:${angle}`, `PorteGond:${gond === 1 ? 'droite' : 'gauche'}`, `PorteSens:${sens}`],
       murId: p.w.id,
+    });
+  }
+
+  /*
+    LES FENÊTRES EN VOLUME — le dormant, les vantaux, le vitrage au BLEU DU
+    DEHORS : celui du ciel que la visite peint derrière les baies (la teinte
+    des fenêtres, adoucie de blanc). Fermées : une fenêtre ne s'ouvre pas sur
+    le vide. Leur type se lit à la baie :
+      — elle descend au sol : une porte-fenêtre ; à partir d'un mètre
+        quatre-vingts, une baie coulissante ;
+      — sinon une fenêtre, à deux vantaux dès quatre-vingt-dix centimètres.
+  */
+  const bleuDuDehors = mixHex(pal.window, '#FFFFFF', 0.55);
+  for (const f of fenetresAPoser) {
+    const L = Math.hypot(f.w.b.x - f.w.a.x, f.w.b.z - f.w.a.z) || 1;
+    const u = { x: (f.w.b.x - f.w.a.x) / L, z: (f.w.b.z - f.w.a.z) / L };
+    const largeur = (f.t1 - f.t0) * L;
+    if (largeur < 0.2) continue;
+    const tm = (f.t0 + f.t1) / 2;
+    const centre = { x: f.w.a.x + u.x * tm * L, z: f.w.a.z + u.z * tm * L };
+    const n = { x: -u.z, z: u.x };
+    const dedans = interiorOf.get(roomOf(f.seg)) ?? interiorOf.get(roomOf(f.w));
+    const sens = dedans && (dedans.x - centre.x) * n.x + (dedans.z - centre.z) * n.z < 0 ? -1 : 1;
+    const auSol = f.y0 < 0.3;
+    const type = auSol ? (largeur >= 1.8 ? 'coulissant' : 'portefenetre') : 'fenetre';
+    const vantaux = type === 'coulissant' ? 2 : largeur >= 0.9 ? 2 : 1;
+    poses.push({
+      id: `fenetre-${f.seg.id}`,
+      category: 'fenetre3d',
+      width: largeur,
+      depth: epaisseurDe(f.w),
+      height: Math.max(0.3, f.y1 - f.y0),
+      cx: centre.x,
+      cz: centre.z,
+      yaw: Math.atan2(u.z, u.x),
+      yb: Math.max(0, f.y0),
+      color: bleuDuDehors,
+      attributes: [`FenetreType:${type}`, `Vantaux:${vantaux}`, `FenetreSens:${sens}`],
+      murId: f.w.id,
     });
   }
 

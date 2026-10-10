@@ -58,14 +58,20 @@ export type Matiere =
    * ampoule. Il ne reçoit pas la lumière de la scène : il la DONNE, et se
    * peint donc de sa propre teinte, sans ombre (voir `appareils3d`).
    */
-  | 'lumiere';
+  | 'lumiere'
+  /**
+   * LE VITRAGE D'UNE MENUISERIE — le bleu du dehors. Il ne reçoit pas la
+   * lumière de la pièce : il montre le jour, de sa propre teinte, et laisse
+   * deviner ce qu'il y a derrière.
+   */
+  | 'vitrage';
 
 /**
  * Comment la carte graphique rend chaque matière.
  *
  * `code` dit au natif ce qu'il ajoute à la teinte : 1 le fil du bois, 2 la
  * trame d'un tissu, 3 la transparence du verre, 4 les deux faces d'une
- * feuille, 5 la lumière propre d'un luminaire. `rugosite` et `metal` sont les deux réglages d'un matériau
+ * feuille, 5 la lumière propre d'un luminaire, 6 le jour d'un vitrage. `rugosite` et `metal` sont les deux réglages d'un matériau
  * physique : un chrome est lisse et métallique, un lin rugueux et mat.
  */
 export const RENDU: Record<Matiere, { code: number; rugosite: number; metal: number }> = {
@@ -85,6 +91,7 @@ export const RENDU: Record<Matiere, { code: number; rugosite: number; metal: num
   pierre: { code: 0, rugosite: 0.42, metal: 0 },
   papier: { code: 0, rugosite: 0.8, metal: 0 },
   lumiere: { code: 5, rugosite: 0.5, metal: 0 },
+  vitrage: { code: 6, rugosite: 0.05, metal: 0 },
 };
 
 /** Le code de l'ombre de contact : un voile doux sous le meuble. */
@@ -108,6 +115,8 @@ export const TEINTES = {
   anthracite: '#4A4D52',
   ceramique: '#F7F7F4',
   verre: '#CFE3EA',
+  /** Le bleu du dehors, quand la scène ne donne pas le sien. */
+  ciel: '#BFE3F4',
   hublot: '#3A4650',
   ecran: '#08090B',
   terre: '#BA7150',
@@ -711,6 +720,95 @@ function porte3d(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
       a.tube([xp, yp + 0.03, zr + cote * 0.05], [xp + gond * 0.12, yp + 0.03, zr + cote * 0.05], 0.009, 0.009, 'chrome', TEINTES.chrome, { seg: 10 });
     }
   });
+}
+
+/**
+ * UNE FENÊTRE, UNE PORTE-FENÊTRE, UNE BAIE COULISSANTE — son dormant, ses
+ * vantaux, leurs vitrages au bleu du dehors, la crémone côté pièce.
+ *
+ * Relevé du patron : « fais aussi un 3D pour les ouvrants baie et fenêtres,
+ * avec le bleu de dehors pour les espaces vitrés ». Le gabarit est celui de
+ * la baie : W sa largeur, D l'épaisseur du mur, H sa hauteur. La menuiserie
+ * se pose côté pièce dans l'épaisseur (`FenetreSens` : +1, la pièce est en
+ * +z local), comme on la pose chez nous, et reste FERMÉE :
+ *   — `fenetre` : un ou deux vantaux à la française, la crémone au milieu ;
+ *   — `portefenetre` : la même, jusqu'au sol, un soubassement plus haut et
+ *     un seuil plat ;
+ *   — `coulissant` : deux vantaux sur deux rails qui se recouvrent, une
+ *     poignée cuvette sur chaque montant extérieur.
+ */
+function fenetre3d(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const type = attribut(c, 'FenetreType') ?? 'fenetre';
+  const sens = attribut(c, 'FenetreSens') === '-1' ? -1 : 1;
+  const vantaux = Math.max(1, Math.min(4, Math.round(Number(attribut(c, 'Vantaux') ?? 1) || 1)));
+  const vitre = c.teinte ?? TEINTES.ciel;
+  const blanc = TEINTES.laque;
+  const auSol = type === 'portefenetre' || type === 'coulissant';
+  // Le dormant : un cadre de cinq centimètres, côté pièce dans l'épaisseur.
+  const dorm = Math.min(0.055, W * 0.08, H * 0.08);
+  const pD = Math.min(0.07, Math.max(0.035, D * 0.7));
+  const zc = sens * Math.max(0, D / 2 - pD / 2 - 0.015);
+  const z0 = zc - pD / 2;
+  const z1 = zc + pD / 2;
+  const bas = auSol ? 0.02 : dorm;
+  a.boite(-W / 2, -W / 2 + dorm, 0, H, z0, z1, 'laque', blanc, { r: 0.003 });
+  a.boite(W / 2 - dorm, W / 2, 0, H, z0, z1, 'laque', blanc, { r: 0.003 });
+  a.boite(-W / 2 + dorm, W / 2 - dorm, H - dorm, H, z0, z1, 'laque', blanc, { r: 0.003 });
+  a.boite(-W / 2 + dorm, W / 2 - dorm, 0, bas, z0, z1, auSol ? 'inox' : 'laque', auSol ? TEINTES.inox : blanc, { r: 0.003 });
+  const xi0 = -W / 2 + dorm;
+  const xi1 = W / 2 - dorm;
+  const yi0 = bas;
+  const yi1 = H - dorm;
+  if (xi1 - xi0 < 0.1 || yi1 - yi0 < 0.1) return;
+
+  /** Un vantail : son cadre, son vitrage. Rend l'abscisse de ses montants. */
+  const vantail = (x0: number, x1: number, zv: number, ep: number, soubassement: number) => {
+    const p = Math.min(0.06, (x1 - x0) * 0.16);
+    const pb = Math.max(p, soubassement);
+    a.boite(x0, x0 + p, yi0, yi1, zv - ep / 2, zv + ep / 2, 'laque', blanc, { r: 0.003 });
+    a.boite(x1 - p, x1, yi0, yi1, zv - ep / 2, zv + ep / 2, 'laque', blanc, { r: 0.003 });
+    a.boite(x0 + p, x1 - p, yi1 - p, yi1, zv - ep / 2, zv + ep / 2, 'laque', blanc, { r: 0.003 });
+    a.boite(x0 + p, x1 - p, yi0, yi0 + pb, zv - ep / 2, zv + ep / 2, 'laque', blanc, { r: 0.003 });
+    // Le vitrage : le bleu du dehors, en retrait d'un rien dans son cadre.
+    a.boite(x0 + p, x1 - p, yi0 + pb, yi1 - p, zv - 0.012, zv + 0.012, 'vitrage', vitre);
+  };
+  // La poignée, côté pièce, à hauteur de main.
+  const yMain = auSol ? Math.min(1.05, (yi0 + yi1) / 2) : (yi0 + yi1) / 2;
+  const cremone = (x: number, zFace: number) => {
+    a.boite(x - 0.014, x + 0.014, yMain - 0.045, yMain + 0.045, zFace, zFace + sens * 0.01, 'laque', blanc, { r: 0.004 });
+    a.tube([x, yMain, zFace + sens * 0.01], [x, yMain, zFace + sens * 0.035], 0.008, 0.008, 'laque', blanc, { seg: 8 });
+    a.tube([x, yMain, zFace + sens * 0.035], [x, yMain - 0.11, zFace + sens * 0.035], 0.008, 0.008, 'laque', blanc, { seg: 8 });
+  };
+
+  if (type === 'coulissant') {
+    // Deux rails, deux vantaux qui se recouvrent de quatre centimètres.
+    const milieu = (xi0 + xi1) / 2;
+    const recouvre = 0.04;
+    const ep = 0.035;
+    const zExt = zc - sens * 0.02;
+    const zInt = zc + sens * 0.02;
+    vantail(xi0, milieu + recouvre / 2, zExt, ep, 0.08);
+    vantail(milieu - recouvre / 2, xi1, zInt, ep, 0.08);
+    // Les poignées cuvettes, sur les montants extérieurs, côté pièce.
+    for (const [x, zv] of [
+      [xi0 + 0.03, zExt],
+      [xi1 - 0.03, zInt],
+    ] as const) {
+      const zf = zv + sens * (ep / 2);
+      a.boite(x - 0.011, x + 0.011, yMain - 0.13, yMain + 0.13, zf, zf + sens * 0.012, 'inox', TEINTES.inox, { r: 0.004 });
+    }
+    return;
+  }
+
+  // À la française : les vantaux côte à côte, la crémone sur le battement.
+  const ep = 0.055;
+  const zv = zc + sens * 0.004;
+  const pas = (xi1 - xi0) / vantaux;
+  for (let k = 0; k < vantaux; k++) {
+    vantail(xi0 + k * pas + 0.002, xi0 + (k + 1) * pas - 0.002, zv, ep, auSol ? 0.13 : 0);
+  }
+  const xc = vantaux >= 2 ? xi0 + Math.floor(vantaux / 2) * pas + 0.03 : xi1 - 0.035;
+  cremone(xc, zv + sens * (ep / 2));
 }
 
 /** Quatre pieds ronds, fuselés vers le sol. */
@@ -2026,6 +2124,7 @@ export function fabriquer(categorie: string, g: Gabarit, c: Omit<Commande, 'cate
   const cmd: Commande = { ...c, categorie: cat, modele: m };
   const gab: Gabarit = { W: Math.max(0.02, g.W), D: Math.max(0.02, g.D), H: Math.max(0.005, g.H) };
   if (cat === 'porte3d') porte3d(a, gab, cmd);
+  else if (cat === 'fenetre3d') fenetre3d(a, gab, cmd);
   else if (m.startsWith('tapis') || cat.includes('tapis') || cat.includes('rug')) tapis(a, gab, cmd);
   else if (m.startsWith('portemanteau') || cat.includes('portemanteau')) portemanteau(a, gab);
   else if (m.startsWith('miroir') || cat.includes('miroir') || cat.includes('mirror')) miroir(a, gab);
