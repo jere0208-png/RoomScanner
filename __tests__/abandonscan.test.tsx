@@ -216,6 +216,11 @@ describe('le refus du viseur', () => {
       useScanStore.setState({ screen: 'scan', scanning: true, paused: false });
     });
     const t = monter();
+    // Le rail commence rangé : on touche « Poser », comme sur le chantier.
+    const ouvrir = t.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Afficher la pose')!;
+    act(() => ouvrir.props.onPress());
     const bouton = t.root
       .findAllByType(TouchableOpacity)
       .find((n) => String(n.props.accessibilityLabel ?? '').startsWith('Poser Prise'))!;

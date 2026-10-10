@@ -112,8 +112,15 @@ export function ScanScreen() {
   const [choisi, setChoisi] = useState<string>('prise');
   /* Ce que le natif dit viser, dix fois par seconde au plus. */
   const [visee, setVisee] = useState<EtatDeVisee | null>(null);
-  /* Le rail se range, pour voir la pièce en grand le temps d'un balayage. */
-  const [railOuvert, setRailOuvert] = useState(true);
+  /*
+    LE RAIL SE RANGE, pour voir la pièce en grand le temps d'un balayage — et
+    il COMMENCE rangé. Relevé du patron : « lors du scan, réduis le menu Poser
+    par défaut ». Un scan commence par balayer la pièce, pas par poser des
+    prises : la pastille « Poser » attend contre le bord qu'on la touche. Le
+    viseur et son produit en 3D ne tournent qu'à ce moment-là — la caméra et
+    la batterie sont au relevé d'abord.
+  */
+  const [railOuvert, setRailOuvert] = useState(false);
   /*
     CE QU'ON VIENT DE POSER, ET À QUELLE COTE.
 
@@ -135,28 +142,38 @@ export function ScanScreen() {
     [],
   );
   /*
-    LE GUIDE S'OUVRE UNE FOIS, à la première caméra.
+    LE GUIDE S'OUVRE UNE FOIS, à la première ouverture du rail.
 
     Relevé du chantier : les trois boutons « ne sont pas forcément
-    compréhensibles de tous ». On explique donc AVANT, pendant que l'écran
-    est encore vide — et jamais plus ensuite : une explication qui revient à
-    chaque scan devient un obstacle, et on finit par la fermer sans la lire.
-    Le « ? » du bloc la rouvre quand on la veut.
+    compréhensibles de tous ». On explique donc AVANT de s'en servir — et
+    jamais plus ensuite : une explication qui revient à chaque scan devient
+    un obstacle, et on finit par la fermer sans la lire. Le « ? » du bloc la
+    rouvre quand on la veut.
+
+    Elle s'ouvrait à la première caméra ; le rail commence maintenant rangé
+    (voir `railOuvert`) : elle attend qu'on touche « Poser », là où elle
+    explique ce qu'on a sous les yeux.
   */
   const [guide, setGuide] = useState(false);
+  const guideLu = useRef<boolean | null>(null);
   useEffect(() => {
     let vivant = true;
     AsyncStorage.getItem(GUIDE_POSE_KEY)
       .then((vu) => {
-        if (vivant && vu !== '1') setGuide(true);
+        if (vivant) guideLu.current = vu === '1';
       })
       .catch(() => {});
     return () => {
       vivant = false;
     };
   }, []);
+  const ouvrirLeRail = () => {
+    setRailOuvert(true);
+    if (guideLu.current === false) setGuide(true);
+  };
   const fermerGuide = () => {
     setGuide(false);
+    guideLu.current = true;
     AsyncStorage.setItem(GUIDE_POSE_KEY, '1').catch(() => {});
   };
   /*
@@ -550,7 +567,7 @@ export function ScanScreen() {
         <TouchableOpacity
           style={[styles.railFerme, SUR_VERRE]}
           accessibilityLabel="Afficher la pose"
-          onPress={() => setRailOuvert(true)}>
+          onPress={ouvrirLeRail}>
           <FondDeVerre rayon={18} sombre voile={0.55} />
           <VignetteProduit code={produit.photo} libelle={produit.mot} taille={24} />
           <Text style={styles.railFermeTexte}>Poser</Text>

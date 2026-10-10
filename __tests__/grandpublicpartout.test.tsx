@@ -131,6 +131,17 @@ describe('1 — le scan : un scanner, pas un outil de pose', () => {
     enMode(true);
     scanEnCours();
     const t = monter(<ScanScreen />);
+    /*
+      IL COMMENCE RANGÉ — relevé du patron : « lors du scan, réduis le menu
+      Poser par défaut ». La pastille « Poser » attend contre le bord ; ni
+      déclencheur ni viseur tant qu'on balaie.
+    */
+    expect(libelles(t)).toContain('Afficher la pose');
+    expect(libelles(t).some((l) => l.startsWith('Poser '))).toBe(false);
+    const ouvrir = t.root
+      .findAllByType(TouchableOpacity)
+      .find((n) => n.props.accessibilityLabel === 'Afficher la pose')!;
+    act(() => ouvrir.props.onPress());
     // Un seul déclencheur, celui du produit choisi au rail…
     const poser = libelles(t).filter((l) => l.startsWith('Poser '));
     expect(poser).toHaveLength(1);

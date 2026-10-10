@@ -14285,6 +14285,23 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le menu « Poser » du scan commence rangé
+
+Relevé du patron : « lors du scan, réduis le menu Poser par défaut ». Un scan
+commence par balayer la pièce, pas par poser des prises : le rail des produits
+démarre RANGÉ (`railOuvert` à faux), la pastille « Poser » attend contre le
+bord. Tant qu'il est rangé, ni déclencheur ni produit 3D au viseur — le viseur
+et sa couche 3D ne tournent pas, la caméra et la batterie sont au relevé.
+
+Le guide de la pose suit : il s'ouvrait à la première caméra, pour expliquer
+des boutons désormais rangés ; il s'ouvre maintenant la première fois qu'on
+touche « Poser », là où il explique ce qu'on a sous les yeux (toujours une
+seule fois, le « ? » du rail le rouvre).
+
+Bancs : `railrange.test.tsx` (rangé au départ, sans viseur ; ouvert d'un
+appui ; le guide à ce moment-là) ; `viseur`, `abandonscan`,
+`grandpublicpartout` ouvrent le rail comme on toucherait « Poser ».
+
 ## Le verre se pose enfin — et la couleur des tuiles revient
 
 Relevé du patron, capture à l'appui : « il n'y a plus aucune couleur sur les

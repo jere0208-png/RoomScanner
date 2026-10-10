@@ -144,6 +144,11 @@ describe('l’écran de scan', () => {
       useScanStore.setState({ screen: 'scan', paused: false, processing: false });
       tree = TestRenderer.create(React.createElement(ScanScreen));
     });
+    // Le rail commence RANGÉ : on l'ouvre, comme on toucherait « Poser ».
+    const ouvrir = tree.root
+      .findAll((n: any) => typeof n.props?.onPress === 'function')
+      .find((n: any) => n.props.accessibilityLabel === 'Afficher la pose');
+    if (ouvrir) TestRenderer.act(() => ouvrir.props.onPress());
     return tree;
   };
 
