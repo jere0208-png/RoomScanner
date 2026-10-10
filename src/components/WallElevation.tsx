@@ -109,7 +109,9 @@ import { posesDUnLot, postesDuLot, type PoseDAppareil } from '../geometry/appare
 import { VignetteAppareil } from './VignetteAppareil';
 import { wallLabel } from '../geometry/naming';
 import { frCategory } from '../geometry/furniture';
-import { Sofa } from 'lucide-react-native';
+// Une icône, un module : l'import groupé de Lucide faisait entrer ses
+// quelque 1 770 icônes dans l'application, évaluées à l'ouverture du plan.
+import Sofa from 'lucide-react-native/icons/sofa';
 
 const PAD_X = 30;
 /**

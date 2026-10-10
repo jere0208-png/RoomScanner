@@ -19,16 +19,16 @@
  */
 import React from 'react';
 import Svg, { Path } from 'react-native-svg';
-import {
-  AirVent,
-  AlarmSmoke,
-  Cctv,
-  CircleDot,
-  Ellipsis,
-  LampCeiling,
-  LampWallUp,
-  ScanEye,
-} from 'lucide-react-native';
+// Une icône, un module : l'import groupé de Lucide faisait entrer ses
+// quelque 1 770 icônes dans l'application, évaluées à l'ouverture du plan.
+import AirVent from 'lucide-react-native/icons/air-vent';
+import AlarmSmoke from 'lucide-react-native/icons/alarm-smoke';
+import Cctv from 'lucide-react-native/icons/cctv';
+import CircleDot from 'lucide-react-native/icons/circle-dot';
+import Ellipsis from 'lucide-react-native/icons/ellipsis';
+import LampCeiling from 'lucide-react-native/icons/lamp-ceiling';
+import LampWallUp from 'lucide-react-native/icons/lamp-wall-up';
+import ScanEye from 'lucide-react-native/icons/scan-eye';
 import { useTheme } from '../theme';
 import { SOLAIRES } from '../ui/solaires';
 import { CEILINGS, type CeilingKind } from '../geometry/ceiling';

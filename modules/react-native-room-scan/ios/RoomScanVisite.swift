@@ -74,16 +74,23 @@ final class RoomScanVisite: UIView {
   /// L'état des lampes, par rang, tel que le JavaScript l'a posé.
   private var lampesPosees: [Float] = []
 
+  /*
+    CHAQUE PROPRIÉTÉ NE REBÂTIT QUE SI ELLE A CHANGÉ. La couche de
+    compatibilité réaffecte TOUTES les propriétés dès que l'une bouge (le fond,
+    le voile) : sans ces gardes, le logement entier se rebâtissait — des
+    dizaines de milliers de nombres reconvertis en géométrie — pour une
+    couleur de fond. Comparer deux tableaux coûte une fraction de ce prix.
+  */
   @objc var maillage: [NSNumber] = [] {
-    didSet { rebatir() }
+    didSet { if maillage != oldValue { rebatir() } }
   }
 
   @objc var sols: [NSNumber] = [] {
-    didSet { rebatir() }
+    didSet { if sols != oldValue { rebatir() } }
   }
 
   @objc var camera: [NSNumber] = [] {
-    didSet { placerOeil() }
+    didSet { if camera != oldValue { placerOeil() } }
   }
 
   @objc var fond: String = "#DCE8F4" {
@@ -91,31 +98,31 @@ final class RoomScanVisite: UIView {
   }
 
   @objc var orientes: [NSNumber] = [] {
-    didSet { rebatir() }
+    didSet { if orientes != oldValue { rebatir() } }
   }
 
   @objc var ecorche: [NSNumber] = [] {
-    didSet { rebatir() }
+    didSet { if ecorche != oldValue { rebatir() } }
   }
 
   @objc var voile: Bool = true {
-    didSet { rebatir() }
+    didSet { if voile != oldValue { rebatir() } }
   }
 
   @objc var orbite: [NSNumber] = [] {
-    didSet { placerOeil() }
+    didSet { if orbite != oldValue { placerOeil() } }
   }
 
   @objc var levee: NSNumber = 1 {
-    didSet { lever() }
+    didSet { if levee != oldValue { lever() } }
   }
 
   @objc var solY: NSNumber = 0 {
-    didSet { lever() }
+    didSet { if solY != oldValue { lever() } }
   }
 
   @objc var meubles: [NSNumber] = [] {
-    didSet { rebatir() }
+    didSet { if meubles != oldValue { rebatir() } }
   }
 
   /*

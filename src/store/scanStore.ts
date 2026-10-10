@@ -2,6 +2,7 @@ import { NOM_EXEMPLE, appartementExemple } from '../data/exemple';
 import { photosDesMurs } from '../geometry/photosAuto';
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { pasDeGeste } from './geste';
 import {
   catalogueDesPlans,
   deposerPlan,
@@ -794,12 +795,66 @@ const REPRISE_KEY = 'roomscanner.reprise.v1';
 export type ThemePref = 'system' | 'light' | 'dark';
 
 /**
- * Ce qui est déjà sur le disque, par scan. Sert à n'écrire QUE ce qui change.
+ * CE QUI EST DÉJÀ SUR LE DISQUE, par scan — pour n'écrire QUE ce qui change.
+ *
+ * On gardait le JSON ENTIER de chaque plan, et chaque sauvegarde
+ * resérialisait TOUTE la bibliothèque pour la comparer à ces copies : trente
+ * plans, plus d'un mégaoctet de JSON fabriqué sur le fil de l'interface à
+ * chaque renommage — et surtout à la sortie du plan, en pleine transition
+ * vers l'accueil. La copie elle-même doublait la bibliothèque en mémoire.
+ *
+ * Un plan modifié est un NOUVEL objet (le magasin ne mute jamais un plan en
+ * place) : un plan dont la référence et la date n'ont pas bougé depuis la
+ * dernière écriture n'est donc pas resérialisé. Pour les autres, on ne garde
+ * qu'une empreinte du JSON (sa longueur et un hachage), pas le texte.
  */
-const ecrits = new Map<string, string>();
+interface Ecrit {
+  ref: SavedScan | null;
+  quand: number | undefined;
+  empreinte: string;
+}
+const ecrits = new Map<string, Ecrit>();
 /** Remis à zéro par l'hydratation, et par les tests qui repartent à neuf. */
 export function resetPersistCache() {
   ecrits.clear();
+}
+
+/** L'empreinte d'un texte : sa longueur et un hachage FNV-1a sur 32 bits. */
+export function empreinteDe(texte: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < texte.length; i++) {
+    h ^= texte.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return `${texte.length}:${(h >>> 0).toString(36)}`;
+}
+
+/**
+ * LES CLÉS DE LA BIBLIOTHÈQUE, EN UN SEUL ALLER-RETOUR.
+ *
+ * Un `getItem` par plan, l'un après l'autre : trente plans, trente
+ * allers-retours au stockage natif avant que l'accueil puisse les montrer.
+ * `multiGet` les demande d'un coup ; sans lui (banc d'essai), on retombe sur
+ * la boucle.
+ */
+async function lireLesCles(cles: string[]): Promise<(string | null)[]> {
+  const multi = (
+    AsyncStorage as {
+      multiGet?: (k: string[]) => Promise<readonly (readonly [string, string | null])[]>;
+    }
+  ).multiGet;
+  if (multi && cles.length > 1) {
+    try {
+      const paires = await multi(cles);
+      const parCle = new Map(paires.map(([k, v]) => [k, v] as const));
+      return cles.map((k) => parCle.get(k) ?? null);
+    } catch {
+      // Le stockage refuse le lot : la boucle, plus lente, reste sûre.
+    }
+  }
+  const out: (string | null)[] = [];
+  for (const k of cles) out.push(await AsyncStorage.getItem(k));
+  return out;
 }
 
 /**
@@ -840,12 +895,15 @@ async function loadLibrary(): Promise<SavedScan[] | null> {
         .map((k) => k.slice(prefixe.length));
     }
     const out: SavedScan[] = [];
-    for (const id of ids) {
-      const raw = await AsyncStorage.getItem(scanKey(id));
+    const bruts = await lireLesCles(ids.map(scanKey));
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      const raw = bruts[i];
       if (!raw) continue;
       try {
-        out.push(JSON.parse(raw) as SavedScan);
-        ecrits.set(id, raw);
+        const plan = JSON.parse(raw) as SavedScan;
+        out.push(plan);
+        ecrits.set(id, { ref: plan, quand: plan.updatedAt, empreinte: empreinteDe(raw) });
       } catch {
         // Un scan corrompu est sauté, les autres restent lisibles — c'est
         // tout l'intérêt de ne plus tout mettre dans la même chaîne.
@@ -877,7 +935,7 @@ async function loadLibrary(): Promise<SavedScan[] | null> {
   for (const s of saves) {
     const json = JSON.stringify(s);
     await AsyncStorage.setItem(scanKey(s.id), json);
-    ecrits.set(s.id, json);
+    ecrits.set(s.id, { ref: s, quand: s.updatedAt, empreinte: empreinteDe(json) });
   }
   await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(saves.map((s) => s.id)));
   await AsyncStorage.removeItem(STORAGE_KEY);
@@ -1006,9 +1064,16 @@ function persistSoon(saves: SavedScan[]) {
       const vus = new Set<string>();
       for (const s of saves) {
         vus.add(s.id);
+        const deja = ecrits.get(s.id);
+        // Le même objet, à la même date : rien n'a bougé, rien à sérialiser.
+        if (deja && deja.ref === s && deja.quand === s.updatedAt) continue;
         const json = JSON.stringify(s);
-        if (ecrits.get(s.id) === json) continue;
-        ecrits.set(s.id, json);
+        const empreinte = empreinteDe(json);
+        if (deja && deja.empreinte === empreinte) {
+          ecrits.set(s.id, { ref: s, quand: s.updatedAt, empreinte });
+          continue;
+        }
+        ecrits.set(s.id, { ref: s, quand: s.updatedAt, empreinte });
         AsyncStorage.setItem(scanKey(s.id), json).catch((e) => {
           // Écriture perdue : on oublie ce qu'on croyait avoir écrit, la
           // prochaine sauvegarde réessaiera — et on le DIT.
@@ -2108,6 +2173,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       « Annuler » lui doit un retour en arrière.
     */
     const continu = key.includes(':');
+    // Le doigt bouge : les analyses de l'écran attendent qu'il se lève.
+    if (continu) pasDeGeste();
     if (continu && key === lastKey && now - lastAt < 800) {
       lastAt = now;
       return;

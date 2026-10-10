@@ -2,6 +2,10 @@ module.exports = {
   preset: '@react-native/jest-preset',
   // Le doublet du module natif et celui des icônes : voir jest.setup.js.
   setupFiles: ['<rootDir>/jest.setup.js'],
+  // Une icône Lucide importée seule : la même doublure que l'import groupé.
+  moduleNameMapper: {
+    '^lucide-react-native/icons/.+$': '<rootDir>/jest.icone-lucide.js',
+  },
   /*
     VINGT SECONDES PAR ÉPREUVE, ET NON CINQ.
 

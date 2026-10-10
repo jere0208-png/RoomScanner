@@ -47,36 +47,46 @@ final class VueDeVerre: UIView {
 
   private var verreSysteme = false
   private var pose = false
-  private var guet: CADisplayLink?
+  /// Ce que la forme a déjà reçu : on ne refait rien qui n'a pas changé.
+  private var rayonForme: CGFloat = -1
+  private var tailleReplique: CGSize = .zero
+  private var rayonReplique: CGFloat = -1
 
   /// Le rayon des coins, en points.
   @objc var rayon: NSNumber = 20 {
     didSet { setNeedsLayout() }
   }
 
+  /*
+    CHAQUE PROPRIÉTÉ NE REFAIT QUE SI ELLE A CHANGÉ. La couche d'interopérabilité
+    de React Native réaffecte TOUTES les propriétés d'une vue dès que l'une
+    bouge : sans ces gardes, chaque nouveau rendu d'une pastille reposait un
+    Liquid Glass neuf. Et le voile comme l'ombre ne servent qu'à la réplique.
+  */
+
   /// Le thème de l'app, qui n'est pas forcément celui du téléphone.
   @objc var sombre: Bool = false {
-    didSet { rafraichir() }
+    didSet { if oldValue != sombre { rafraichir() } }
   }
 
   /// La densité du voile de la réplique, de 0 (verre nu) à 1.
   @objc var voile: NSNumber = 0.22 {
-    didSet { rafraichir() }
+    didSet { if !verreSysteme && oldValue != voile { rafraichir() } }
   }
 
   /// La teinte du verre, « #RRGGBB » ; vide : verre neutre.
   @objc var teinte: NSString = "" {
-    didSet { rafraichir() }
+    didSet { if !oldValue.isEqual(to: teinte as String) { rafraichir() } }
   }
 
   /// La force de la teinte, de 0 à 1.
   @objc var force: NSNumber = 0.5 {
-    didSet { rafraichir() }
+    didSet { if oldValue != force { rafraichir() } }
   }
 
   /// L'ombre de l'élément (réplique seulement) : [opacité, rayon, décalage].
   @objc var ombre: NSArray = [0, 0, 0] {
-    didSet { rafraichir() }
+    didSet { if !verreSysteme && !oldValue.isEqual(ombre) { rafraichir() } }
   }
 
   override init(frame: CGRect) {
@@ -102,6 +112,10 @@ final class VueDeVerre: UIView {
       traitDuLisere.fillColor = nil
       traitDuLisere.strokeColor = UIColor.black.cgColor
       lisere.mask = traitDuLisere
+      // Un dégradé masqué se recalcule hors écran à chaque image animée :
+      // rasterisé, il se dessine une fois et se recolle ensuite.
+      lisere.shouldRasterize = true
+      lisere.rasterizationScale = UIScreen.main.scale
       layer.addSublayer(lisere)
       layer.shadowColor = UIColor(red: 0.043, green: 0.051, blue: 0.071, alpha: 1).cgColor
     }
@@ -109,8 +123,6 @@ final class VueDeVerre: UIView {
   }
 
   required init?(coder: NSCoder) { nil }
-
-  deinit { guet?.invalidate() }
 
   // ------------------------------------------------------------ le système
 
@@ -168,6 +180,7 @@ final class VueDeVerre: UIView {
   }
 
   private func formerLeVerre() {
+    rayonForme = rayonEffectif
     #if compiler(>=6.2)
     if #available(iOS 26.0, *) {
       let r = UICornerRadius(floatLiteral: Double(rayonEffectif))
@@ -182,10 +195,7 @@ final class VueDeVerre: UIView {
   }
 
   private func guetter() {
-    guard guet == nil else { return }
-    let lien = CADisplayLink(target: Relais(self), selector: #selector(Relais.battre))
-    lien.add(to: .main, forMode: .common)
-    guet = lien
+    GuetDesVerres.partage.ajouter(self)
   }
 
   fileprivate func battement() {
@@ -193,8 +203,7 @@ final class VueDeVerre: UIView {
   }
 
   private func arreterLeGuet() {
-    guet?.invalidate()
-    guet = nil
+    GuetDesVerres.partage.retirer(self)
   }
 
   override func didMoveToWindow() {
@@ -244,11 +253,15 @@ final class VueDeVerre: UIView {
     if verreSysteme {
       if !pose {
         if visible { poserLeVerre() } else { guetter() }
-      } else {
+      } else if r != rayonForme {
         formerLeVerre()
       }
       return
     }
+    // Rien n'a bougé : les tracés sont déjà les bons.
+    if bounds.size == tailleReplique && r == rayonReplique { return }
+    tailleReplique = bounds.size
+    rayonReplique = r
     // Les coins de React Native : circulaires. La carte garde son dessin.
     effet.layer.cornerRadius = r
     effet.layer.cornerCurve = .circular
@@ -270,11 +283,51 @@ final class VueDeVerre: UIView {
   }
 }
 
-/// Le guet ne retient pas la vue : un relais faible.
-private final class Relais: NSObject {
-  private weak var vue: VueDeVerre?
-  init(_ vue: VueDeVerre) { self.vue = vue }
-  @objc func battre() { vue?.battement() }
+/**
+ UN SEUL GUET POUR TOUS LES VERRES QUI ATTENDENT D'ÊTRE VISIBLES.
+
+ Chaque pastille avait le sien, à la cadence de l'écran — cent vingt fois par
+ seconde sur ProMotion — et une rangée montée cachée (opacité nulle, en
+ attendant son tour) en gardait vingt en marche : l'écran ne redescendait
+ jamais sous 120 Hz. Un guet partagé, à dix battements par seconde, qui
+ s'arrête quand plus personne n'attend.
+ */
+private final class GuetDesVerres: NSObject {
+  static let partage = GuetDesVerres()
+  private let vues = NSHashTable<VueDeVerre>.weakObjects()
+  private var lien: CADisplayLink?
+
+  func ajouter(_ v: VueDeVerre) {
+    vues.add(v)
+    guard lien == nil else { return }
+    let l = CADisplayLink(target: self, selector: #selector(battre))
+    if #available(iOS 15.0, *) {
+      l.preferredFrameRateRange = CAFrameRateRange(minimum: 4, maximum: 10, preferred: 10)
+    } else {
+      l.preferredFramesPerSecond = 10
+    }
+    l.add(to: .main, forMode: .common)
+    lien = l
+  }
+
+  func retirer(_ v: VueDeVerre) {
+    vues.remove(v)
+    if vues.allObjects.isEmpty { arreter() }
+  }
+
+  private func arreter() {
+    lien?.invalidate()
+    lien = nil
+  }
+
+  @objc private func battre() {
+    let attente = vues.allObjects
+    if attente.isEmpty {
+      arreter()
+      return
+    }
+    for v in attente { v.battement() }
+  }
 }
 
 @objc(RoomScanVerreManager)

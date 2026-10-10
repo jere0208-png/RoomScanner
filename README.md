@@ -14285,6 +14285,76 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les performances : ce qui suit le doigt ne paie plus pour le reste
+
+Relevé du patron : « dans la continuité, cherche à améliorer les performances
+de l'app ». Audit d'abord, mesuré : trois analyses (rendus du plan,
+sauvegarde et démarrage, natif) et un banc de temps sur le T2 de l'exemple
+(16 murs, 32 appareils). Le déplacement et le zoom du plan étaient déjà
+fluides ; le vrai chemin chaud était le GLISSER d'un objet — mur, coin,
+meuble, spot —, qui écrit le magasin à chaque image.
+
+**Le plan, pendant un glisser**
+- `filtrerAuNiveau` rendait sept tableaux neufs dès qu'UNE liste changeait :
+  glisser un meuble refaisait donc les murs, les pièces, les cheminements, le
+  devis, les diagnostics, les cotes et la visite, soixante fois par seconde.
+  Il rend maintenant la liste elle-même quand rien n'est filtré, et le même
+  résultat d'un appel à l'autre (cache faible par liste, support et étage).
+- Les analyses attendent que le doigt se lève (`store/geste`) : le magasin
+  signale chaque pas d'un geste continu, le geste finit après 220 ms de
+  silence ; cheminements, total du devis, circuits, volumes, diagnostics et
+  scène de la visite lisent le plan FIGÉ au début du geste, et se refont une
+  fois au lâcher. Le dessin, lui, suit le doigt.
+- La vue du plan vit dans une référence : chaque fin de déplacement ou de
+  zoom ne redessine plus l'écran entier une seconde fois.
+- Les poignées de coin gardent leur clé (elle contenait la position : la
+  poignée et son geste étaient démontés à chaque image) et ne recréent plus
+  leur `PanResponder` à chaque image.
+- Les « fourmis » du bouton Édition — animées sur le fil JavaScript —
+  s'arrêtent le temps d'un glisser.
+
+**La sauvegarde et le démarrage**
+- Chaque sauvegarde resérialisait TOUTE la bibliothèque pour la comparer à
+  une copie complète gardée en mémoire (plus d'un mégaoctet pour trente
+  plans, à la sortie du plan, en pleine transition). Un plan dont l'objet et
+  la date n'ont pas bougé n'est plus sérialisé ; la mémoire ne garde qu'une
+  empreinte.
+- La bibliothèque se relit d'un seul `multiGet` au lieu d'un aller-retour par
+  plan.
+- La vignette d'un plan ne refait plus le contrôle NF C 15-100 à chaque rendu
+  de la liste (cache par plan).
+- Lucide s'importe icône par icône : l'import groupé faisait entrer ses
+  quelque 1 770 icônes dans l'application.
+
+**Côté iPhone**
+- La couche 3D des poses se rendait à 60 images/s par-dessus le scan, même en
+  pause et pendant l'assemblage de RoomPlan : elle se fige avec lui, passe en
+  anticrénelage 2× et plafonne à 60 images/s.
+- Le maillage LiDAR (plusieurs mégaoctets) se bâtissait sur le fil principal
+  au toucher de « Terminer » : il se bâtit sur une file de fond, pendant
+  l'assemblage ; la livraison l'attend au plus trois secondes.
+- Le verre : un seul guet partagé à 10 Hz pour les verres qui attendent d'être
+  visibles (chaque pastille avait le sien, à 120 Hz, et une rangée cachée en
+  gardait vingt en marche) ; plus rien de refait quand une propriété n'a pas
+  changé ; liseré rasterisé.
+- Les photos de repérage se dessinaient à l'échelle de l'écran : « ramenées à
+  1 600 px », elles sortaient en 4 800 px (≈ 70 Mo en mémoire). Un pixel par
+  point, désormais.
+- La visite ne se rebâtit plus quand une propriété est réaffectée sans avoir
+  changé (la couche de compatibilité réaffecte tout dès que l'une bouge).
+- La boussole du scan s'arrête pendant la pause.
+
+**Corrigé au passage** : le bouton nord du plan n'allumait jamais la boussole
+— le natif répondait toujours « rien ». Elle s'allume à l'invitation et
+s'éteint après la lecture.
+
+Banc : `performances.test.tsx` (les listes d'un étage, le geste, la valeur
+figée et rafraîchie au lâcher, la sauvegarde qui ne resérialise pas un plan
+inchangé, la lecture groupée, la vue en référence, les poignées, les
+vignettes, les icônes ; et côté natif : la couche du scan suspendue, le
+maillage hors du fil principal, le guet partagé, les photos, la visite, la
+boussole du nord).
+
 ## Le lien affilié Amazon posé — et le prix Amazon seulement s'il est du jour
 
 Relevé du patron : « amazonpro09c3-21 pour le lien affilié Amazon ».

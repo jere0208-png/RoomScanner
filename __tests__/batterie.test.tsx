@@ -145,7 +145,8 @@ describe('4 — la visée ne bat que s’il y a quelque chose à viser', () => {
   it('rien à montrer, rien à rendre', () => {
     const s = natif('RoomScanPoseAR.swift');
     const rendre = s.slice(s.indexOf('private func rendreSiBesoin()'), s.indexOf('private func relancerHorloge()'));
-    expect(rendre).toContain('rendersContinuously = !poses.isEmpty || fantome != nil');
+    // Et rien non plus quand le scan est figé (pause, assemblage).
+    expect(rendre).toContain('rendersContinuously = !suspendue && (!poses.isEmpty || fantome != nil)');
   });
 });
 

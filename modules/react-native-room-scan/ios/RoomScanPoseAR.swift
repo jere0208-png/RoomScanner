@@ -56,6 +56,8 @@ final class ScenePoseAR: UIView, SCNSceneRendererDelegate {
   private var fantome: SCNNode?
   private var kindChoisi: String?
   private var horloge: CADisplayLink?
+  /// Le scan est figé (pause, assemblage) : plus rien ne se rend.
+  private var suspendue = false
   /// Lus sur le fil de rendu : recopiés depuis le fil principal.
   private var orientation: UIInterfaceOrientation = .portrait
   private var taille: CGSize = .zero
@@ -84,7 +86,10 @@ final class ScenePoseAR: UIView, SCNSceneRendererDelegate {
     vue.backgroundColor = .clear
     vue.isOpaque = false
     vue.isUserInteractionEnabled = false
-    vue.antialiasingMode = .multisampling4X
+    // 2× suffit à des appareils de quelques centimètres vus de près, et
+    // laisse au scan la carte graphique qu'il réclame.
+    vue.antialiasingMode = .multisampling2X
+    vue.preferredFramesPerSecond = 60
     vue.autoenablesDefaultLighting = false
     vue.scene = scene
     vue.delegate = self
@@ -304,13 +309,31 @@ final class ScenePoseAR: UIView, SCNSceneRendererDelegate {
 
   /// Rien à montrer : rien à rendre. La batterie du scan est déjà assez sollicitée.
   private func rendreSiBesoin() {
-    vue.rendersContinuously = !poses.isEmpty || fantome != nil
+    vue.rendersContinuously = !suspendue && (!poses.isEmpty || fantome != nil)
+  }
+
+  /**
+   LE SCAN SE FIGE, LA SCÈNE AUSSI. En pause comme pendant l'assemblage de
+   RoomPlan, cette couche continuait de se rendre soixante fois par seconde
+   par-dessus une image arrêtée — et l'assemblage est justement le moment où
+   la carte graphique a le plus à faire.
+   */
+  func suspendre(_ oui: Bool) {
+    suspendue = oui
+    vue.isPlaying = !oui
+    if oui {
+      horloge?.invalidate()
+      horloge = nil
+    } else {
+      relancerHorloge()
+    }
+    rendreSiBesoin()
   }
 
   private func relancerHorloge() {
     horloge?.invalidate()
     horloge = nil
-    guard window != nil, kindChoisi != nil else { return }
+    guard window != nil, kindChoisi != nil, !suspendue else { return }
     let h = CADisplayLink(target: RelaisPose(cible: self), selector: #selector(RelaisPose.battre))
     // Vingt visées par seconde : le fantôme suit la main sans courir après
     // chaque image.

@@ -251,7 +251,7 @@ describe('le natif est bien branché', () => {
     expect(s).toContain('.repeat');
     expect(s).toContain('look(');
     // La scène ne se reconstruit qu'au changement de maillage, jamais par image.
-    expect(s).toMatch(/var camera: \[NSNumber\][\s\S]*?didSet \{ placerOeil\(\) \}/);
+    expect(s).toMatch(/var camera: \[NSNumber\][\s\S]*?didSet \{ if camera != oldValue \{ placerOeil\(\) \} \}/);
   });
 
   it('et le JavaScript ne le demande que s’il est là', () => {

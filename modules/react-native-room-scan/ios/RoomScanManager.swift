@@ -28,8 +28,11 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    */
   private var debutDuScan: Date?
   private var batterieAuDepart: Float = -1
-  /// Le maillage LiDAR relevé à l'arrêt (voir `RoomScanMaillage`).
+  /// Le maillage LiDAR relevé à l'arrêt (voir `RoomScanMaillage`) — bâti
+  /// sur une file de fond, sous verrou ; la livraison attend qu'il soit prêt.
   private var maillageReleve: [String: Any]?
+  private let verrouMaillage = NSLock()
+  private let maillageFini = DispatchGroup()
   // startRoomScan() est appelé côté JS AVANT que la vue AR soit montée :
   // on mémorise la demande et on lance la session à la création de la vue.
   private var pendingStart = false
@@ -460,7 +463,11 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   func pause() {
     RoomColorSampler.shared.detach()
     PhotographeDesMurs.shared.detach()
+    // La boussole aussi : en pause, ses capteurs tournaient pour rien. La
+    // reprise la rattache (voir `start`).
+    RoomScanCompass.shared.detach()
     DispatchQueue.main.async {
+      self.couche?.suspendre(true)
       if #available(iOS 17.0, *) {
         // Garde la session ARKit chaude : la reprise relocalise
         // au lieu de repartir de zéro.
@@ -471,7 +478,10 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     }
   }
 
-  func resume() { start(fresh: false) }
+  func resume() {
+    DispatchQueue.main.async { self.couche?.suspendre(false) }
+    start(fresh: false)
+  }
 
   func stop(resolve: @escaping RCTPromiseResolveBlock,
             reject: @escaping RCTPromiseRejectBlock) {
@@ -484,10 +494,21 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     // Déclenche le post-traitement RoomPlan ; le résultat final
     // arrive dans captureView(didPresent:error:).
     DispatchQueue.main.async {
+      // La couche des poses se fige avec le scan : l'assemblage a besoin
+      // de la carte graphique.
+      self.couche?.suspendre(true)
       // Le maillage se lit AVANT l'arrêt : une session arrêtée n'a plus
       // d'image courante, donc plus d'ancres.
       if let session = self.captureView?.captureSession.arSession {
-        self.maillageReleve = RoomScanMaillage.relever(from: session)
+        let ancres = RoomScanMaillage.ancresDe(session)
+        self.maillageFini.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+          let maillage = RoomScanMaillage.construire(ancres)
+          self.verrouMaillage.lock()
+          self.maillageReleve = maillage
+          self.verrouMaillage.unlock()
+          self.maillageFini.leave()
+        }
       }
       self.captureView?.captureSession.stop()
     }
@@ -708,7 +729,14 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         payload["north"] = north
       }
       payload["energie"] = energieDuScan()
-      if let maillage = maillageReleve {
+      // Le maillage se bâtit pendant l'assemblage de RoomPlan, qui dure
+      // plusieurs secondes : il est presque toujours prêt. Au pire, on
+      // l'attend trois secondes — sans lui, le plan reste entier.
+      _ = maillageFini.wait(timeout: .now() + 3)
+      verrouMaillage.lock()
+      let maillage = maillageReleve
+      verrouMaillage.unlock()
+      if let maillage = maillage {
         payload["maillage"] = maillage
       }
       RoomColorSampler.shared.detach()

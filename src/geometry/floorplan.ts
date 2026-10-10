@@ -4274,22 +4274,60 @@ export function filtrerAuNiveau<
   },
   n: number,
 ): typeof jeu {
-  const murAuNiveau = new Map(jeu.walls.map((w) => [w.id, niveauDe(w)]));
-  const pieceAuNiveau = new Map(jeu.rooms.map((r) => [r.id, niveauDe(r)]));
-  const parSupport = (
-    table: Map<string, number>,
-    cle: string | undefined,
-  ) => (table.get(cle ?? '') ?? NIVEAU_RDC) === n;
+  let murs: Map<string, number> | null = null;
+  let pieces: Map<string, number> | null = null;
+  const murAuNiveau = () => (murs ??= new Map(jeu.walls.map((w) => [w.id, niveauDe(w)])));
+  const pieceAuNiveau = () => (pieces ??= new Map(jeu.rooms.map((r) => [r.id, niveauDe(r)])));
+  const parSupport = (table: () => Map<string, number>, cle: string | undefined) =>
+    (table().get(cle ?? '') ?? NIVEAU_RDC) === n;
   return {
-    walls: jeu.walls.filter((w) => niveauDe(w) === n),
-    openings: jeu.openings.filter((o) => niveauDe(o) === n),
-    rooms: jeu.rooms.filter((r) => niveauDe(r) === n),
-    fixtures: jeu.fixtures.filter((f) => parSupport(murAuNiveau, f.wallId)),
-    photos: jeu.photos.filter((p) => parSupport(murAuNiveau, p.wallId)),
-    objects: jeu.objects.filter((o) => parSupport(pieceAuNiveau, o.roomId)),
-    ceiling: jeu.ceiling.filter((c) => parSupport(pieceAuNiveau, c.roomId)),
-    notes: jeu.notes?.filter((x) => niveauDe(x) === n),
+    walls: auNiveau(jeu.walls, SANS_SUPPORT, n, (w) => niveauDe(w) === n),
+    openings: auNiveau(jeu.openings, SANS_SUPPORT, n, (o) => niveauDe(o) === n),
+    rooms: auNiveau(jeu.rooms, SANS_SUPPORT, n, (r) => niveauDe(r) === n),
+    fixtures: auNiveau(jeu.fixtures, jeu.walls, n, (f) => parSupport(murAuNiveau, f.wallId)),
+    photos: auNiveau(jeu.photos, jeu.walls, n, (p) => parSupport(murAuNiveau, p.wallId)),
+    objects: auNiveau(jeu.objects, jeu.rooms, n, (o) => parSupport(pieceAuNiveau, o.roomId)),
+    ceiling: auNiveau(jeu.ceiling, jeu.rooms, n, (c) => parSupport(pieceAuNiveau, c.roomId)),
+    notes: jeu.notes ? auNiveau(jeu.notes, SANS_SUPPORT, n, (x) => niveauDe(x) === n) : undefined,
   };
+}
+
+/**
+ * LE MÊME TABLEAU TANT QUE RIEN N'A CHANGÉ — c'est ce qui rend le glisser
+ * fluide.
+ *
+ * Mesuré sur le plan : glisser un meuble écrit le magasin à chaque image, et
+ * ce filtre rendait alors SEPT tableaux neufs — murs, pièces, appareils… —
+ * alors qu'un seul avait bougé. Chaque calcul de l'écran, mémoïsé sur ces
+ * tableaux, se relançait donc à chaque image : les pièces, les cheminements,
+ * le devis, les diagnostics, les cotes, la visite. Soixante fois par seconde.
+ *
+ * Deux règles, et le résultat est identique :
+ *   — une liste dont rien n'est filtré (un logement de plain-pied, presque
+ *     toujours) est rendue TELLE QUELLE ;
+ *   — une liste déjà filtrée, pour le même étage et le même support (les
+ *     murs d'un appareil, les pièces d'un meuble), rend le même résultat que
+ *     la fois d'avant.
+ */
+const SANS_SUPPORT = {};
+const DEJA_FILTRE = new WeakMap<object, WeakMap<object, Map<number, unknown[]>>>();
+function auNiveau<T>(liste: T[], support: object, n: number, garde: (x: T) => boolean): T[] {
+  let parSupport = DEJA_FILTRE.get(liste);
+  if (!parSupport) {
+    parSupport = new WeakMap();
+    DEJA_FILTRE.set(liste, parSupport);
+  }
+  let parNiveau = parSupport.get(support);
+  if (!parNiveau) {
+    parNiveau = new Map();
+    parSupport.set(support, parNiveau);
+  }
+  const deja = parNiveau.get(n);
+  if (deja) return deja as T[];
+  const f = liste.filter(garde);
+  const out = f.length === liste.length ? liste : f;
+  parNiveau.set(n, out);
+  return out;
 }
 
 /**

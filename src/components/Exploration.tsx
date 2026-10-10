@@ -70,6 +70,7 @@ import {
 import { haptic, releaseHaptic } from '../ui/haptic';
 import { ombreBouton, radius, themedStyles, useTheme, type Palette } from '../theme';
 import { FondDeVerre, SUR_VERRE } from './Verre';
+import { useFigePendantLeGeste } from '../store/geste';
 
 /**
  * LE PAS — 1,65 m/s à fond de manette : celui de quelqu'un qui visite d'un
@@ -275,7 +276,12 @@ export function Exploration({
   const toutLePlafond = useScanStore((s) => s.ceiling);
   const showTextures = useScanStore((s) => s.showTextures);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
-  const { walls, openings, rooms, objects, fixtures, ceiling } = useMemo(
+  /*
+    FIGÉ PENDANT UN GESTE DU PLAN (voir `store/geste`) : la scène se
+    prébâtit toujours, mais une fois au lâcher, plus à chaque image d'un
+    meuble qu'on fait glisser.
+  */
+  const { walls, openings, rooms, objects, fixtures, ceiling } = useFigePendantLeGeste(useMemo(
     () =>
       filtrerAuNiveau(
         {
@@ -299,7 +305,7 @@ export function Exploration({
       toutLePlafond,
       niveauCourant,
     ],
-  );
+  ));
   const obstacles = useMemo(
     () => obstaclesDeLaVisite(walls, openings, objects, rooms),
     [walls, openings, objects, rooms],

@@ -108,7 +108,7 @@ class RoomScanPhoto: NSObject {
     let echelle = min(1, cote / max(image.size.width, image.size.height))
     let taille = CGSize(width: image.size.width * echelle,
                         height: image.size.height * echelle)
-    let rendu = UIGraphicsImageRenderer(size: taille).image { _ in
+    let rendu = UIGraphicsImageRenderer(size: taille, format: RoomScanPhoto.pixelParPoint()).image { _ in
       image.draw(in: CGRect(origin: .zero, size: taille))
     }
     guard let data = rendu.jpegData(compressionQuality: 0.62) else {
@@ -302,13 +302,25 @@ class RoomScanPhoto: NSObject {
     reject = nil
   }
 
+  /**
+   UN PIXEL PAR POINT. Sans ce format, le rendu prend l'échelle de l'écran
+   (×3) : la photo « ramenée à 1600 px » sortait en 4800 px — neuf fois plus
+   lourde, environ 70 Mo en mémoire avant l'encodage, et autant de plus à
+   chaque relecture pour un PDF.
+   */
+  static func pixelParPoint() -> UIGraphicsImageRendererFormat {
+    let f = UIGraphicsImageRendererFormat.default()
+    f.scale = 1
+    return f
+  }
+
   /// Écrit l'image en JPEG, côté long ramené à 1600 px.
   private func save(_ image: UIImage) -> String? {
     let cote: CGFloat = 1600
     let echelle = min(1, cote / max(image.size.width, image.size.height))
     let taille = CGSize(width: image.size.width * echelle,
                         height: image.size.height * echelle)
-    let rendu = UIGraphicsImageRenderer(size: taille).image { _ in
+    let rendu = UIGraphicsImageRenderer(size: taille, format: RoomScanPhoto.pixelParPoint()).image { _ in
       image.draw(in: CGRect(origin: .zero, size: taille))
     }
     guard let data = rendu.jpegData(compressionQuality: 0.72) else { return nil }

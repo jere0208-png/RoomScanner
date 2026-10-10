@@ -66,7 +66,9 @@ import {
   ToolPill,
 } from '../components/ToolPill';
 import { PEIGNE_TOTAL } from '../components/RangeeOutils';
-import { ChevronsUpDown } from 'lucide-react-native';
+// Une icône, un module : l'import groupé de Lucide faisait entrer ses
+// quelque 1 770 icônes dans l'application, évaluées à l'ouverture du plan.
+import ChevronsUpDown from 'lucide-react-native/icons/chevrons-up-down';
 import Svg, { Path as Trace } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
 import {
@@ -179,6 +181,7 @@ import { astuce } from '../ui/astuce';
 import { celebrerSiAuxNormes, resetCelebration } from '../ui/auxNormes';
 import { useModeElec, useUsage } from '../store/usage';
 import { usePremieresFois } from '../store/premieresFois';
+import { useFigePendantLeGeste } from '../store/geste';
 import { FondDeVerre, SUR_VERRE } from '../components/Verre';
 
 type Tab = '2d' | '3d';
@@ -581,12 +584,21 @@ export function ResultScreen() {
     murs semblent sortir du papier. Au retour, on rabat d'abord, on change
     de vue ensuite : le dessin ne saute jamais.
   */
-  const [vuePlan, setVuePlan] = useState<VuePlan>({
+  /*
+    LA VUE DU PLAN VIT DANS UNE RÉFÉRENCE, pas dans l'état : elle n'est lue
+    que par des gestes (les flèches, la bascule 2D/3D) et à la naissance du
+    plan. En état, chaque fin de déplacement ou de zoom redessinait l'écran
+    entier une seconde fois, pour rien.
+  */
+  const vuePlanRef = useRef<VuePlan>({
     zoom: 1,
     ox: 0,
     oy: 0,
     rot: 0,
   });
+  const memoriserVuePlan = useCallback((v: VuePlan) => {
+    vuePlanRef.current = v;
+  }, []);
   const view3dRef = useRef(view3d);
   view3dRef.current = view3d;
   const releve = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -731,11 +743,11 @@ export function ResultScreen() {
     if (vue === '2d') {
       // On entre à PLAT, dans l'orientation, le zoom et le cadrage du plan.
       setView3d({
-        theta: (vuePlan.rot * 180) / Math.PI,
+        theta: (vuePlanRef.current.rot * 180) / Math.PI,
         tilt: TILT_PLAN,
-        zoom: vuePlan.zoom,
-        ox: vuePlan.ox,
-        oy: vuePlan.oy,
+        zoom: vuePlanRef.current.zoom,
+        ox: vuePlanRef.current.ox,
+        oy: vuePlanRef.current.oy,
       });
       setTab('3d');
       // Le relèvement attend que la vue 3D soit à l'écran : la bascule
@@ -746,12 +758,12 @@ export function ResultScreen() {
       // On rabat d'abord ; le plan reprendra ce cadrage-là.
       incliner(view3dRef.current.tilt, TILT_PLAN, () => {
         const v = view3dRef.current;
-        setVuePlan({
+        vuePlanRef.current = {
           zoom: v.zoom,
           ox: v.ox,
           oy: v.oy,
           rot: (v.theta * Math.PI) / 180,
-        });
+        };
         setTab('2d');
         setView3d((x) => ({ ...x, tilt: TILT_VOLUME }));
       });
@@ -1933,9 +1945,32 @@ export function ResultScreen() {
    * Cheminement des gaines et métré : même source que l'export, pour que le
    * document et l'écran ne racontent jamais deux choses.
    */
+  /*
+    LES ANALYSES ATTENDENT QUE LE DOIGT SE LÈVE — voir `store/geste`.
+
+    Glisser un mur, un meuble, un spot écrit le magasin à chaque image, et
+    relançait ici, à chaque image, les cheminements, le devis, les circuits,
+    les volumes et les diagnostics — que personne ne lit pendant le geste.
+    Ils lisent maintenant le plan FIGÉ au début du geste, et se refont une
+    fois au lâcher. Le dessin, lui, suit le doigt.
+  */
+  const fige = useFigePendantLeGeste({
+    walls,
+    rooms,
+    parts,
+    fixtures,
+    placement,
+    ceiling,
+    openings,
+    roomInputs,
+    wallRooms,
+    wallWorktops,
+    objects,
+  });
+
   const cheminements = useMemo(
-    () => planRoutes(walls, rooms, parts, fixtures, placement, ceiling, openings),
-    [walls, rooms, parts, fixtures, placement, ceiling, openings],
+    () => planRoutes(fige.walls, fige.rooms, fige.parts, fige.fixtures, fige.placement, fige.ceiling, fige.openings),
+    [fige.walls, fige.rooms, fige.parts, fige.fixtures, fige.placement, fige.ceiling, fige.openings],
   );
 
   /**
@@ -1952,17 +1987,17 @@ export function ResultScreen() {
    * qui n'a pas commencé.
    */
   const totalDevis = useMemo(() => {
-    if (fixtures.length === 0 && ceiling.length === 0) return null;
+    if (fige.fixtures.length === 0 && fige.ceiling.length === 0) return null;
     return chiffrerLePlan(
-      walls,
-      rooms,
-      fixtures,
-      ceiling,
+      fige.walls,
+      fige.rooms,
+      fige.fixtures,
+      fige.ceiling,
       gammeDevis,
       new Set(devisEcartes),
-      openings,
+      fige.openings,
     ).total;
-  }, [walls, rooms, fixtures, ceiling, gammeDevis, devisEcartes, openings]);
+  }, [fige.walls, fige.rooms, fige.fixtures, fige.ceiling, gammeDevis, devisEcartes, fige.openings]);
 
   /**
    * À QUELLE HAUTEUR ARRIVE CHAQUE GAINE.
@@ -2007,15 +2042,15 @@ export function ResultScreen() {
   */
   const circuitsDuPlan = useMemo(() => {
     const pieceDe = (f: Fixture) =>
-      rooms.find((r) => r.id === placement.get(f.id));
+      fige.rooms.find((r) => r.id === fige.placement.get(f.id));
     return planCircuits(
-      fixtures,
+      fige.fixtures,
       (f) => pieceDe(f)?.name ?? '',
       (f) => roomUse(pieceDe(f)?.name ?? '', pieceDe(f)?.kind) === 'cuisine',
       (f) => pieceDe(f)?.id,
-      ceiling,
+      fige.ceiling,
     );
-  }, [fixtures, rooms, placement, ceiling]);
+  }, [fige.fixtures, fige.rooms, fige.placement, fige.ceiling]);
   const marks = useMemo(() => fixtureMarks(circuitsDuPlan), [circuitsDuPlan]);
 
   /**
@@ -2028,15 +2063,15 @@ export function ResultScreen() {
   const zonesHumides = useMemo(() => wetZones(objects).length, [objects]);
 
   const volumes = useMemo(() => {
-    const zones = wetZones(objects);
+    const zones = wetZones(fige.objects);
     const out = new Map<string, VolumeVerdict>();
     if (zones.length === 0) return out;
-    const quads = wallQuadsOf(walls);
-    const murs = new Map(walls.map((w) => [w.id, w]));
-    for (const f of fixtures) {
+    const quads = wallQuadsOf(fige.walls);
+    const murs = new Map(fige.walls.map((w) => [w.id, w]));
+    for (const f of fige.fixtures) {
       const w = murs.get(f.wallId);
       if (!w) continue;
-      const piece = rooms.find((r) => r.id === placement.get(f.id));
+      const piece = fige.rooms.find((r) => r.id === fige.placement.get(f.id));
       if (roomUse(piece?.name ?? '', piece?.kind) !== 'sdb') continue;
       const face = wallFace(w, quads.get(w.id), f.side);
       const p = facePoint(face, faceX(face, f.along), 0.05);
@@ -2045,7 +2080,7 @@ export function ResultScreen() {
       out.set(f.id, volumeVerdict(f.kind, v));
     }
     return out;
-  }, [objects, walls, fixtures, rooms, placement]);
+  }, [fige.objects, fige.walls, fige.fixtures, fige.rooms, fige.placement]);
 
   /**
    * Les constats, calculés UNE fois par changement de plan.
@@ -2067,33 +2102,33 @@ export function ResultScreen() {
       !modeElec
         ? []
         : checkElectrical(
-            roomInputs,
-            fixtures,
-            wallRooms,
-            placement,
+            fige.roomInputs,
+            fige.fixtures,
+            fige.wallRooms,
+            fige.placement,
             volumes,
-            wallWorktops,
-            ceiling,
+            fige.wallWorktops,
+            fige.ceiling,
             // La géométrie ouvre les constats de pose : face extérieure d'un
             // mur, appareil dans le vide d'une baie.
-            { walls, openings },
+            { walls: fige.walls, openings: fige.openings },
           ),
     [
       modeElec,
-      roomInputs,
-      fixtures,
-      wallRooms,
-      placement,
+      fige.roomInputs,
+      fige.fixtures,
+      fige.wallRooms,
+      fige.placement,
       volumes,
-      wallWorktops,
-      ceiling,
-      walls,
-      openings,
+      fige.wallWorktops,
+      fige.ceiling,
+      fige.walls,
+      fige.openings,
     ],
   );
   const issues: Constat[] = useMemo(
     () => [
-      ...checkPlan(walls, rooms, openings).map((i, n) => ({
+      ...checkPlan(fige.walls, fige.rooms, fige.openings).map((i, n) => ({
         key: `p${n}`,
         message: i.message,
         hint: i.hint,
@@ -2137,7 +2172,7 @@ export function ResultScreen() {
         code: i.code,
       })),
     ],
-    [walls, rooms, openings, elecIssues, modeElec, cheminements],
+    [fige.walls, fige.rooms, fige.openings, elecIssues, modeElec, cheminements],
   );
   const alertes = useMemo(
     () => issues.filter((i) => i.severity === 'alerte').length,
@@ -3385,8 +3420,8 @@ export function ResultScreen() {
             les remonte, en une fois, sans les toucher un par un. */}
         {vue === '2d' ? (
           <FloorplanEditor
-            vueInitiale={vuePlan}
-            onView={setVuePlan}
+            vueInitiale={vuePlanRef.current}
+            onView={memoriserVuePlan}
             /* De quoi lâcher un meuble du catalogue à l'endroit du doigt. */
             onViseur={recevoirViseur}
             cableRoutes={showRoutes ? cheminements?.traces : undefined}
@@ -4208,8 +4243,8 @@ export function ResultScreen() {
                 yaw: Math.atan2(t0[2], t0[0]),
               };
               const murs = parts.find((p2) => p2.roomId === obj.roomId)?.walls ?? walls;
-              const cs = Math.cos(vuePlan.rot);
-              const sn = Math.sin(vuePlan.rot);
+              const cs = Math.cos(vuePlanRef.current.rot);
+              const sn = Math.sin(vuePlanRef.current.rot);
               const cote = (d: { x: number; z: number }) => {
                 const sx = d.x * cs - d.z * sn;
                 const sy = d.x * sn + d.z * cs;
@@ -4259,8 +4294,8 @@ export function ResultScreen() {
                 quoi le meuble part de travers, et l'on ne comprend pas
                 pourquoi.
               */
-              const c = Math.cos(-vuePlan.rot);
-              const s = Math.sin(-vuePlan.rot);
+              const c = Math.cos(-vuePlanRef.current.rot);
+              const s = Math.sin(-vuePlanRef.current.rot);
               const PAS = 0.01;
               const mx = (dx * c - dy * s) * PAS;
               const mz = (dx * s + dy * c) * PAS;
@@ -5378,8 +5413,8 @@ export function ResultScreen() {
           onPas={(dx, dy) => {
             // Un centimètre dans l'axe de l'ÉCRAN : on défait la rotation
             // du plan, comme les flèches du meuble.
-            const cs = Math.cos(-vuePlan.rot);
-            const sn = Math.sin(-vuePlan.rot);
+            const cs = Math.cos(-vuePlanRef.current.rot);
+            const sn = Math.sin(-vuePlanRef.current.rot);
             useScanStore
               .getState()
               .recalerNiveau(niveauCourant, (dx * cs - dy * sn) * 0.01, (dx * sn + dy * cs) * 0.01);

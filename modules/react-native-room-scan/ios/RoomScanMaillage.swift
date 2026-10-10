@@ -26,10 +26,23 @@ enum RoomScanMaillage {
 
   /// Relève le maillage de cette session ; rend ce qu'on en dira au JS.
   static func relever(from session: ARSession) -> [String: Any] {
-    guard let frame = session.currentFrame else {
-      return ["ancres": 0, "faces": 0, "sommets": 0, "classe": false]
-    }
-    let ancres = frame.anchors.compactMap { $0 as? ARMeshAnchor }
+    construire(ancresDe(session))
+  }
+
+  /// Les ancres de maillage de l'image courante — à prendre sur le fil
+  /// principal, AVANT l'arrêt de la session : c'est instantané.
+  static func ancresDe(_ session: ARSession) -> [ARMeshAnchor] {
+    session.currentFrame?.anchors.compactMap { $0 as? ARMeshAnchor } ?? []
+  }
+
+  /**
+   LE MAILLAGE, CONSTRUIT HORS DU FIL DE L'INTERFACE. Des centaines de
+   milliers de sommets passés dans le monde, quelques mégaoctets écrits sur
+   le disque : fait sur le fil principal, l'écran se figeait au toucher de
+   « Terminer ». Les ancres sont des instantanés immuables : on les lit d'une
+   autre file sans risque.
+   */
+  static func construire(_ ancres: [ARMeshAnchor]) -> [String: Any] {
     guard !ancres.isEmpty else {
       return ["ancres": 0, "faces": 0, "sommets": 0, "classe": false]
     }

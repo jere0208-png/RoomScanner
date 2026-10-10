@@ -115,6 +115,32 @@ function decoupageDe(item: SavedScan) {
   return calcule;
 }
 
+/**
+ * LES PIÈCES EN DÉFAUT D'UN SCAN, mémoïsées comme son découpage.
+ *
+ * La vignette les relançait à CHAQUE rendu de la liste — une frappe dans la
+ * recherche, un menu ouvert, une minute qui passe : le contrôle complet de
+ * la NF C 15-100, pour chaque plan. Le scan est immuable, sa référence suffit.
+ */
+const alertesDesScans = new WeakMap<SavedScan, Set<string>>();
+
+function alertesDe(scan: SavedScan, parts: ReturnType<typeof roomParts>): Set<string> {
+  const vu = alertesDesScans.get(scan);
+  if (vu) return vu;
+  let out = new Set<string>();
+  try {
+    const inputs = roomInputsOf(scan.rooms, parts);
+    const fx = scan.fixtures ?? [];
+    out = roomsInAlert(
+      checkElectrical(inputs, fx, wallToRooms(inputs), fixturePlacement(fx, scan.walls, inputs)),
+    );
+  } catch {
+    // Un plan illisible n'a pas de pièce en défaut à montrer.
+  }
+  alertesDesScans.set(scan, out);
+  return out;
+}
+
 /** La ligne de détails d'un scan, mémoïsée — partagée avec l'accueil. */
 export function detailsDuScan(item: SavedScan): string {
   return decoupageDe(item).details;
@@ -198,23 +224,7 @@ export function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
   // EN MODE ÉLECTRICITÉ SEULEMENT. Sans une prise posée, toutes les pièces
   // manquent à la NF C 15-100 : la vignette du salon de quelqu'un venu le
   // meubler sortait tout en rouge, pour une norme qu'il n'a jamais ouverte.
-  const alertes = (() => {
-    if (!modeElec) return new Set<string>();
-    try {
-      const inputs = roomInputsOf(scan.rooms, parts);
-      const fx = scan.fixtures ?? [];
-      return roomsInAlert(
-        checkElectrical(
-          inputs,
-          fx,
-          wallToRooms(inputs),
-          fixturePlacement(fx, scan.walls, inputs),
-        ),
-      );
-    } catch {
-      return new Set<string>();
-    }
-  })();
+  const alertes = modeElec ? alertesDe(scan, parts) : new Set<string>();
   const roomsOfWall = new Map<string, string[]>();
   for (const r of scan.rooms) {
     for (const id of r.wallIds ?? []) {

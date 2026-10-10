@@ -654,6 +654,11 @@ export function FloorplanEditor({
   const setNorth = useScanStore((s) => s.setNorth);
   /** La consigne d'orientation est affichée : le prochain appui valide. */
   const [invite, setInvite] = useState(false);
+  // Un plan qu'on quitte en pleine invitation n'oublie pas la boussole allumée.
+  const boussoleAllumee = useRef(false);
+  useEffect(() => () => {
+    if (boussoleAllumee.current) RoomScan.stopHeading().catch(() => {});
+  }, []);
 
   // Navigation du plan : zoom (pincer), déplacement (glisser), rotation (torsion).
   const [view, setView] = useState(
@@ -1763,7 +1768,13 @@ export function FloorplanEditor({
         if (!seen.has(key)) seen.set(key, { x: p.x, z: p.z, wallId: w.id, end });
       }
     }
-    return [...seen.entries()].map(([key, v]) => ({ key, ...v }));
+    /*
+      LA CLÉ DE RENDU NE DÉPEND PAS DE LA POSITION. Elle en dépendait : tirer un
+      coin démontait et remontait sa poignée à chaque image — et avec elle son
+      geste. La position sert seulement à fondre en une les extrémités
+      jointes ; la poignée, elle, garde le nom du premier mur qui la porte.
+    */
+    return [...seen.values()].map((v) => ({ key: `${v.wallId}:${v.end}`, ...v }));
   }, [walls]);
 
   /**
@@ -1863,12 +1874,23 @@ export function FloorplanEditor({
           y={10}
           invite={invite}
           onPress={async () => {
+            /*
+              LA BOUSSOLE S'ALLUME À L'INVITATION. Elle n'était jamais
+              démarrée : `heading` répondait toujours « rien », et le nord ne
+              se posait jamais. Le premier appui l'allume — le temps de se
+              tourner face au haut du plan, elle s'est calée —, la lecture
+              l'éteint.
+            */
             if (!invite) {
               setInvite(true);
+              boussoleAllumee.current = true;
+              RoomScan.startHeading().catch(() => {});
               return;
             }
             setInvite(false);
             const cap = await RoomScan.heading();
+            boussoleAllumee.current = false;
+            RoomScan.stopHeading().catch(() => {});
             if (cap === null) {
               haptic('alerte');
               return;
@@ -4951,6 +4973,14 @@ function CornerHandle({
   const startRef = useRef({ x: corner.x, z: corner.z });
   /* Le verrou du slop : un tap sur la poignée ne déplace plus rien. */
   const seuil = useRef(creerSeuil()).current;
+  /*
+    LE GESTE EST CRÉÉ UNE FOIS. Il lit le coin et la projection courants par
+    une référence : recréé à chaque image (le coin bouge sous le doigt), il
+    coûtait un `PanResponder` neuf par image pendant tout le glisser.
+  */
+  const live = useRef({ corner, mapping });
+  live.current = { corner, mapping };
+  const cible = useRef({ wallId: corner.wallId, end: corner.end });
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -4964,18 +4994,20 @@ function CornerHandle({
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
           seuil.reprendre();
-          startRef.current = { x: corner.x, z: corner.z };
+          const c = live.current.corner;
+          startRef.current = { x: c.x, z: c.z };
+          cible.current = { wallId: c.wallId, end: c.end };
         },
         onPanResponderMove: (_e, g) => {
           if (!seuil.franchi(g.dx, g.dy)) return;
-          const d = mapping.deltaToMeters(g.dx, g.dy);
-          useScanStore.getState().moveWallPoint(corner.wallId, corner.end, {
+          const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
+          useScanStore.getState().moveWallPoint(cible.current.wallId, cible.current.end, {
             x: startRef.current.x + d.x,
             z: startRef.current.z + d.z,
           });
         },
       }),
-    [corner.wallId, corner.end, corner.x, corner.z, mapping, seuil],
+    [seuil],
   );
 
   const px = mapping.toPx(corner);

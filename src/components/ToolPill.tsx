@@ -24,6 +24,7 @@ import Svg, { Path, Rect } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
 import { ombreBouton, themedStyles, useTheme, type Palette } from '../theme';
 import { FondDeVerre, SUR_VERRE } from './Verre';
+import { useGeste } from '../store/geste';
 
 export type ToolIcon =
   /* La nuit de la maquette : on éteint pour voir les lumières s'allumer. */
@@ -212,7 +213,13 @@ export function ToolPill({
     que le contour n'est plus à l'écran, plutôt que de tourner pour rien.
   */
   const fourmis = useRef(new Animated.Value(0)).current;
-  const tourne = halo && active;
+  /*
+    ET ELLES S'ARRÊTENT LE TEMPS D'UN GLISSER. Leur pas se calcule sur le fil
+    JavaScript, à chaque image — le fil même qui suit le doigt quand on tire
+    un mur. Un instant immobiles pendant le geste, elles repartent au lâcher.
+  */
+  const enGeste = useGeste((s) => s.enCours);
+  const tourne = halo && active && !enGeste;
   useEffect(() => {
     if (!tourne) return;
     fourmis.setValue(0);
