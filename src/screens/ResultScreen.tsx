@@ -1021,6 +1021,23 @@ export function ResultScreen() {
             useScanStore.getState().lierElements(f.id, l.id);
           },
         })),
+        /*
+          LE TABLEAU POSÉ MÈNE À SON RELEVÉ — relevé du patron : « les deux
+          systèmes doivent être liés ». Celui qu'on touche au mur est celui
+          qu'on a reconstruit organe par organe : on y va d'un appui.
+        */
+        ...(f.kind === 'tableau' && modeElec
+          ? [
+              {
+                label: existant?.departs.length ? 'Ouvrir son relevé' : 'Relever ce tableau',
+                hint: existant?.departs.length
+                  ? `${existant.departs.length} organe(s) relevé(s) — tels qu’ils sont dessinés ici.`
+                  : 'Reconstruisez-le organe par organe : il se dessinera tel quel.',
+                icon: 'tableau' as const,
+                onPress: () => setExistantOuvert(true),
+              },
+            ]
+          : []),
         {
           label: 'Voir le mur',
           icon: 'regle' as const,
@@ -2969,6 +2986,35 @@ export function ResultScreen() {
     useScanStore.getState().poserDAuto(res.fixtures, res.ceiling);
   };
 
+  /*
+    LE TABLEAU RELEVÉ, POSÉ SUR LE PLAN — d'un appui, à une place libre
+    (en dégagement de préférence, à 1,35 m), puis montré au mur : on le voit
+    arriver tel qu'on vient de le reconstruire. On le déplace ensuite au
+    doigt, comme tout appareil.
+  */
+  const tableauDuPlan = fixtures.find((f) => f.kind === 'tableau') ?? null;
+  const voirAuMur = (f: Fixture) => {
+    setElecWallId(f.wallId);
+    setElecSel(f.id);
+    setElecView('mur');
+    setElecOpen(true);
+  };
+  const poserLeTableau = () => {
+    corriger({
+      key: 'poser-tableau',
+      message: 'Poser le tableau',
+      hint: '',
+      severity: 'alerte',
+      code: 'tableau',
+      fix: { type: 'poser', kind: 'tableau', label: 'Poser tableau' },
+    });
+    const pose = useScanStore.getState().fixtures.find((f) => f.kind === 'tableau');
+    if (pose) {
+      haptic('succes');
+      voirAuMur(pose);
+    }
+  };
+
   const menuDuScan = () =>
     setMenu({
                 title: scanName,
@@ -3178,8 +3224,8 @@ export function ResultScreen() {
                         label: 'Relever le tableau existant',
                         icon: 'tableau' as const,
                         hint: existant?.departs.length
-                          ? `${existant.departs.length} module(s) relevé(s).`
-                          : 'Rénovation : notez les départs, l’app diagnostique.',
+                          ? `${existant.departs.length} organe(s) relevé(s) — le même tableau qu’au mur.`
+                          : 'Rénovation : reconstruisez-le organe par organe, l’app dit ce qui bloque.',
                         onPress: () => setExistantOuvert(true),
                       },
                       {
@@ -5499,6 +5545,14 @@ export function ResultScreen() {
         }
         onRetirer={(id) => useScanStore.getState().retirerDepart(id)}
         onDecrire={(t) => useScanStore.getState().decrireTableau(t)}
+        onDeplacer={(id, vers) => useScanStore.getState().deplacerDepart(id, vers)}
+        surLePlan={
+          tableauDuPlan
+            ? { piece: rooms.find((r) => r.id === placement.get(tableauDuPlan.id))?.name }
+            : null
+        }
+        onPlacer={poserLeTableau}
+        onVoir={tableauDuPlan ? () => voirAuMur(tableauDuPlan) : undefined}
       />
 
       {/* ---------- Diagnostic du plan ---------- */}

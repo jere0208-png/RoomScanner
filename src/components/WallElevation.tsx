@@ -105,7 +105,8 @@ import { CalquePhotoFond, CalquePhotoPoignee } from './CalquePhoto';
 import { SOLAIRES } from '../ui/solaires';
 import { CloseCross } from './CloseCross';
 import { AppareilDeFace, DefsAppareils, empriseDeFace } from './AppareilDeFace';
-import { posesDUnLot, postesDuLot, type PoseDAppareil } from '../geometry/appareils3d';
+import { habillerLesTableaux, posesDUnLot, postesDuLot, type PoseDAppareil } from '../geometry/appareils3d';
+import { railDuReleve } from '../geometry/existant';
 import { VignetteAppareil } from './VignetteAppareil';
 import { wallLabel } from '../geometry/naming';
 import { frCategory } from '../geometry/furniture';
@@ -218,6 +219,9 @@ export function WallElevation({
   onDemander,
 }: Props) {
   const walls = useScanStore(s => s.walls);
+  /* Le tableau relevé : celui qui se dessine au mur, organe pour organe. */
+  const existant = useScanStore(s => s.existant);
+  const rail = useMemo(() => railDuReleve(existant), [existant]);
   const openings = useScanStore(s => s.openings);
   const rooms = useScanStore(s => s.rooms);
   const fixtures = useScanStore(s => s.fixtures);
@@ -541,12 +545,15 @@ export function WallElevation({
       else lots.set(cle, [f]);
     }
     for (const lot of lots.values()) {
-      const poses = posesDUnLot(
-        lot.map(f => f.id).join('+'),
-        wallId,
-        postesDuLot(lot, f => faceX(face, f.along)),
-        (x, y) => ({ x, y, z: 0 }),
-        { nx: 0, nz: 1 },
+      const poses = habillerLesTableaux(
+        posesDUnLot(
+          lot.map(f => f.id).join('+'),
+          wallId,
+          postesDuLot(lot, f => faceX(face, f.along)),
+          (x, y) => ({ x, y, z: 0 }),
+          { nx: 0, nz: 1 },
+        ),
+        rail,
       );
       for (const pose of poses) {
         const tour = empriseDeFace(pose);
@@ -572,7 +579,7 @@ export function WallElevation({
       }
     }
     return { dessins: d, emprises: e };
-  }, [face, scale, mine, side, wallId, originX, originY]);
+  }, [face, scale, mine, side, wallId, originX, originY, rail]);
 
   // Le PanResponder se crée une fois : il lit l'état courant dans une boîte
   // mise à jour à chaque rendu, sinon il travaillerait sur des valeurs figées.

@@ -136,8 +136,10 @@ describe('les écarts à la norme', () => {
 
 describe('la réserve du tableau', () => {
   it('compte les modules libres', () => {
-    // Un tableau de 13 modules par rangée, deux rangées : 26 places.
-    expect(modulesLibres(CONFORME, 2, 13)).toBe(26 - CONFORME.length);
+    // Un tableau de 13 modules par rangée, deux rangées : 26 places. Un
+    // différentiel en prend DEUX : le compter pour un annonçait deux places
+    // qui n'existaient pas.
+    expect(modulesLibres(CONFORME, 2, 13)).toBe(26 - (CONFORME.length + 2));
   });
 
   it('exige un cinquième de réserve, comme la norme', () => {

@@ -9,7 +9,7 @@ import {
   reprendrePlan,
   type Identite,
 } from '../net/coffrePlans';
-import type { DepartExistant, TableauExistant } from '../geometry/existant';
+import { implanter, rattacher, type DepartExistant, type TableauExistant } from '../geometry/existant';
 
 export type { TableauExistant };
 import {
@@ -1223,6 +1223,11 @@ interface ScanState {
   retirerDepart: (id: string) => void;
   /** Décrit le contenant : rangées, modules par rangée, note libre. */
   decrireTableau: (t: Partial<Omit<TableauExistant, 'departs'>>) => void;
+  /**
+   * Déplace un organe sur le rail : d'une place à gauche ou à droite dans sa
+   * rangée (`pas`), ou dans une autre rangée, à la suite de ce qui y est.
+   */
+  deplacerDepart: (id: string, vers: { pas?: -1 | 1; rangee?: number }) => void;
   /** Change d'étage. */
   allerAuNiveau: (n: number) => void;
   /** Arme le prochain scan pour cet étage ; `null` désarme. */
@@ -2141,6 +2146,22 @@ const CALQUES_DE_BASE = {
   showSurfaces: false,
   showTextures: false,
 } as const;
+
+/**
+ * LE TABLEAU, RANGÉ APRÈS CHAQUE GESTE — chaque organe reçoit la rangée où
+ * il se trouve (un relevé ancien, rangé dans l'ordre, s'y fixe) et le
+ * différentiel qui le précède sur le rail (voir `rattacher`) : on ne demande
+ * plus « sous quel différentiel ? », on le lit sur le tableau.
+ */
+function rangerLeTableau(t: TableauExistant): TableauExistant {
+  const impl = implanter(t);
+  const rangeeDe = new Map(impl.modules.map((m) => [m.depart.id, m.rangee]));
+  const places = t.departs.map((d) => {
+    const r = rangeeDe.get(d.id);
+    return r === undefined || r === d.rangee ? d : { ...d, rangee: r };
+  });
+  return { ...t, departs: rattacher(places, impl) };
+}
 
 export const useScanStore = create<ScanState>((set, get) => {
   // Le pont entre l'écriture différée — qui vit hors du store — et l'état que
@@ -5261,10 +5282,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         .slice(2, 5)}`;
       const ex = get().existant;
       set({
-        existant: {
+        existant: rangerLeTableau({
           ...(ex ?? { departs: [] }),
           departs: [...(ex?.departs ?? []), { ...d, id }],
-        },
+        }),
         dirty: true,
       });
       return id;
@@ -5274,12 +5295,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       const ex = get().existant;
       if (!ex) return;
       set({
-        existant: {
+        existant: rangerLeTableau({
           ...ex,
           departs: ex.departs.map((d) =>
             d.id === id ? { ...d, ...champs, id } : d,
           ),
-        },
+        }),
         dirty: true,
       });
     },
@@ -5288,15 +5309,41 @@ export const useScanStore = create<ScanState>((set, get) => {
       const ex = get().existant;
       if (!ex) return;
       set({
-        existant: { ...ex, departs: ex.departs.filter((d) => d.id !== id) },
+        existant: rangerLeTableau({ ...ex, departs: ex.departs.filter((d) => d.id !== id) }),
         dirty: true,
       });
+    },
+
+    deplacerDepart: (id, vers) => {
+      const ex = get().existant;
+      if (!ex) return;
+      const ici = ex.departs.find((d) => d.id === id);
+      if (!ici) return;
+      let departs = ex.departs;
+      if (typeof vers.rangee === 'number' && vers.rangee !== ici.rangee) {
+        // Une autre rangée : il s'y clipse à la suite, s'il y a la place.
+        const autres = departs.filter((d) => d.id !== id);
+        departs = [...autres, { ...ici, rangee: vers.rangee }];
+        if (implanter({ ...ex, departs }).horsRail.some((d) => d.id === id)) return;
+      } else if (vers.pas) {
+        // Dans sa rangée : il échange sa place avec son voisin.
+        const memes = departs.filter((d) => d.rangee === ici.rangee);
+        const k = memes.findIndex((d) => d.id === id);
+        const voisin = memes[k + vers.pas];
+        if (!voisin) return;
+        const i = departs.indexOf(ici);
+        const j = departs.indexOf(voisin);
+        departs = [...departs];
+        departs[i] = voisin;
+        departs[j] = ici;
+      } else return;
+      set({ existant: rangerLeTableau({ ...ex, departs }), dirty: true });
     },
 
     decrireTableau: (t) => {
       const ex = get().existant;
       set({
-        existant: { ...(ex ?? { departs: [] }), ...t },
+        existant: rangerLeTableau({ ...(ex ?? { departs: [] }), ...t }),
         dirty: true,
       });
     },

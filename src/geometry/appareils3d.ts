@@ -59,6 +59,7 @@ import {
 } from './modeles3d';
 import { FIXTURES, PLAQUE, boxOffsets, postsOf, type Fixture, type FixtureKind } from './electrical';
 import type { CeilingKind } from './ceiling';
+import { dimensionsDuCoffret, type GenreDeModule, type RailDuTableau } from './existant';
 
 type V3 = [number, number, number];
 type P2 = [number, number];
@@ -128,6 +129,11 @@ export interface PoseDAppareil {
   postes?: PosteDAppareil[];
   /** Au plafond : ce qui y est posé. */
   plafond?: CeilingKind;
+  /**
+   * LE RAIL D'UN TABLEAU RELEVÉ — ses rangées et ses organes, à leur place.
+   * Absent : le tableau générique, quatre rangées garnies.
+   */
+  rail?: RailDuTableau;
   /** Le mur qui le porte — un mur isolé ne garde que les siens. */
   wallId?: string;
   /** Le centre de l'appareil, au nu du mur ou du plafond (m, repère de la scène). */
@@ -626,7 +632,7 @@ function applique(a: Atelier) {
  * fermer. Les rangées passent dans les fentes d'un plastron ; seules les
  * manettes en dépassent, noires.
  */
-function tableau(a: Atelier, W: number, H: number, D: number) {
+function tableau(a: Atelier, W: number, H: number, D: number, rail?: RailDuTableau) {
   const A = W / 2;
   const B = H / 2;
   const ep = 1.2;
@@ -661,11 +667,11 @@ function tableau(a: Atelier, W: number, H: number, D: number) {
   const zPl = Math.min(5.0, D - 2.6);
   const xg = -A + cadre;
   const xd = A - cadre;
-  const rangees = 4;
+  const rangees = rail ? rail.rangees : 4;
   const pas = (2 * (B - cadre)) / rangees;
   const fente = 2.2;
   const module = 1.75;
-  const largeurRangee = Math.min(xd - xg - 4, 24 * module);
+  const largeurRangee = rail ? Math.min(xd - xg, rail.parRangee * module) : Math.min(xd - xg - 4, 24 * module);
   const x0 = -largeurRangee / 2;
   let yHaut = B - cadre;
   for (let k = 0; k < rangees; k++) {
@@ -689,19 +695,41 @@ function tableau(a: Atelier, W: number, H: number, D: number) {
     );
     // L'étiquette de la rangée.
     a.boite(x0, -x0, yc + fente + 0.4, yc + fente + 1.3, zPl, zPl + 0.05, 'laque', T.etiquette);
-    // Le différentiel (deux modules), les disjoncteurs, puis les obturateurs.
-    const disjoncteurs = [13, 10, 14, 8][k];
     let x = x0;
-    const poserModule = (n: number, test: boolean) => {
+    const poserModule = (n: number, genre: GenreDeModule) => {
       const x1 = x + n * module;
-      a.boite(x + 0.06, x1 - 0.06, yc - fente + 0.05, yc + fente - 0.05, zPl - 0.6, zPl + 1.4, 'laque', T.module);
+      const fond = genre === 'fusible' ? '#E9E4DA' : T.module;
+      a.boite(x + 0.06, x1 - 0.06, yc - fente + 0.05, yc + fente - 0.05, zPl - 0.6, zPl + 1.4, 'laque', fond);
       const xm = (x + x1) / 2;
-      a.boite(xm - 0.32, xm + 0.32, yc - 0.3, yc + 1.25, zPl + 1.4, zPl + 2.0, 'noir', T.alveole);
-      if (test) a.boite(x1 - 0.75, x1 - 0.3, yc - 1.6, yc - 1.15, zPl + 1.4, zPl + 1.6, 'laque', '#4F7FB8');
+      if (genre === 'fusible') {
+        // La cartouche, et sa bague rouge.
+        a.boite(xm - 0.4, xm + 0.4, yc - 1.2, yc + 1.2, zPl + 1.4, zPl + 2.1, 'laque', '#B9B2A4');
+        a.boite(xm - 0.42, xm + 0.42, yc + 0.6, yc + 0.95, zPl + 2.1, zPl + 2.15, 'laque', '#C2402F');
+      } else if (genre === 'parafoudre') {
+        a.boite(xm - 0.5, xm + 0.5, yc - 0.5, yc + 0.5, zPl + 1.4, zPl + 1.5, 'laque', '#E0A800');
+      } else {
+        a.boite(xm - 0.32, xm + 0.32, yc - 0.3, yc + 1.25, zPl + 1.4, zPl + 2.0, 'noir', T.alveole);
+      }
+      if (genre === 'differentiel') a.boite(x1 - 0.75, x1 - 0.3, yc - 1.6, yc - 1.15, zPl + 1.4, zPl + 1.6, 'laque', '#4F7FB8');
       x = x1;
     };
-    poserModule(2, true);
-    for (let d = 0; d < disjoncteurs; d++) poserModule(1, false);
+    if (rail) {
+      /*
+        LE TABLEAU RELEVÉ, ORGANE POUR ORGANE — un disjoncteur relevé, un
+        disjoncteur dessiné : la rangée tient ce qu'on y a clipsé, à sa
+        place, et des obturateurs ferment le reste.
+      */
+      for (const m of rail.modules.filter((q) => q.rangee === k).sort((p, q) => p.debut - q.debut)) {
+        x = x0 + m.debut * module;
+        poserModule(m.largeur, m.genre);
+      }
+      x = x0 + Math.max(0, ...rail.modules.filter((q) => q.rangee === k).map((q) => q.debut + q.largeur)) * module;
+    } else {
+      // Le différentiel (deux modules), les disjoncteurs, puis les obturateurs.
+      const disjoncteurs = [13, 10, 14, 8][k];
+      poserModule(2, 'differentiel');
+      for (let d = 0; d < disjoncteurs; d++) poserModule(1, 'disjoncteur');
+    }
     if (x < -x0 - 0.1) {
       a.boite(x + 0.06, -x0 - 0.06, yc - fente + 0.05, yc + fente - 0.05, zPl - 0.6, zPl + 0.5, 'laque', T.module);
     }
@@ -1001,7 +1029,7 @@ export function fabriquerAppareil(p: PoseDAppareil): ModeleLocal {
       applique(a);
       break;
     case 'tableau':
-      tableau(a, cm(p.largeur ?? 0.55), cm(p.hauteur ?? 0.65), 9);
+      tableau(a, cm(p.largeur ?? 0.55), cm(p.hauteur ?? 0.65), 9, p.rail);
       break;
     case 'thermostat':
       thermostat(a, cm(p.largeur ?? 0.09), cm(p.hauteur ?? 0.09));
@@ -1140,7 +1168,23 @@ function cleDe(p: PoseDAppareil): string {
     (p.largeur ?? 0).toFixed(4),
     (p.hauteur ?? 0).toFixed(4),
     (p.postes ?? []).map((q) => `${q.kind}@${q.dx.toFixed(4)},${q.dy.toFixed(4)}`).join(';'),
+    // Deux tableaux relevés différemment n'ont pas le même modèle.
+    p.rail
+      ? `${p.rail.rangees}x${p.rail.parRangee}:${p.rail.modules.map((m) => `${m.genre[0]}${m.rangee}.${m.debut}.${m.largeur}`).join(',')}`
+      : '',
   ].join('|');
+}
+
+/**
+ * LE TABLEAU POSÉ PORTE LE RELEVÉ — relevé du patron : « le tableau placé sur
+ * le plan doit visuellement correspondre au tableau existant ». Chaque pose
+ * de tableau reçoit le rail relevé, et les cotes du coffret qui le porte :
+ * deux rangées de treize ne font pas un coffret de 55 × 65 cm.
+ */
+export function habillerLesTableaux<P extends PoseDAppareil>(poses: P[], rail: RailDuTableau | null | undefined): P[] {
+  if (!rail || !poses.some((p) => p.genre === 'tableau')) return poses;
+  const { largeur, hauteur } = dimensionsDuCoffret(rail);
+  return poses.map((p) => (p.genre === 'tableau' ? { ...p, rail, largeur, hauteur } : p));
 }
 
 /** Le modèle d'un appareil — fabriqué une fois par forme : vingt prises, un modèle. */

@@ -14285,6 +14285,72 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le tableau existant se reconstruit organe par organe — et c'est le même au mur
+
+Relevé du patron : « revois pour une refonte plus ludique et fonctionnelle du
+relevé du tableau existant. Le tableau placé sur le plan doit visuellement
+correspondre au tableau existant et les deux systèmes doivent être liés : si
+on a un disjoncteur, alors un seul doit s'afficher sur le tableau, avec les
+normes qui feront blocage, comme deux rangées minimum. »
+
+**Ce qu'il y avait.** Une liste de boutons d'un côté ; de l'autre, un tableau
+dessiné au mur (élévation et 3D) figé à quatre rangées de 13/10/14/8
+disjoncteurs, quoi qu'on ait relevé. Rien ne les reliait.
+
+**Le tableau est un objet** (`geometry/existant.ts`). Chaque organe a sa
+rangée et sa place sur le rail ; sa largeur en modules de 17,5 mm
+(`LARGEUR_ORGANE` : différentiel, AGCP et parafoudre 2, disjoncteur,
+porte-fusible, contacteur, télérupteur 1). `implanter` range le tout — un
+relevé ancien, sans rangées, se range dans l'ordre noté — et rend les places
+libres, la réserve d'un cinquième, ce qui ne tient plus (`horsRail`, jamais
+perdu). `rattacher` lit sur le rail le différentiel de chaque départ : celui
+qui le précède, comme le peigne le câble ; on ne le demande plus. Le store
+range et rattache après chaque geste (`rangerLeTableau`), et sait déplacer un
+organe d'une place ou d'une rangée (`deplacerDepart`).
+
+**La feuille, ludique** (`ExistantSheet` + `TableauVivant`). On reconstruit le
+coffret qu'on a devant soi : rangées (− / +) et largeur (13 / 18), puis on
+touche une place libre et l'on choisit — un calibre de disjoncteur en un
+appui, un différentiel 30 mA, un porte-fusible, un parafoudre, un contacteur,
+un télérupteur, un disjoncteur d'abonné. L'organe se CLIPSE (il tombe sur le
+rail d'un ressort court, avec un choc au doigt) ; une rangée pleine passe la
+main à la suivante. Chaque organe ressemble au vrai : manette, bouton de test
+et type du différentiel, cartouche du porte-fusible, bande de couleur et code
+de ce qu'il commande sur l'étiquette de la rangée. En haut, le verdict bat
+quand il change, une jauge des règles tenues se remplit et passe au vert —
+avec un choc de réussite — quand tout ce qui se voit est conforme.
+
+**Ce qui bloque.**
+- *Physiquement* : un différentiel ne se clipse pas sur une seule place, une
+  rangée qui porte encore des organes ne se retire pas, un 18 → 13 qui ne
+  tient plus est refusé — chaque refus dit pourquoi, avec un cadenas.
+- *Par la norme* : chaque constat porte désormais `bloquant` et ses `cibles`.
+  La grille du contrôle (`grilleDuTableau`) coche ou met son cadenas à chaque
+  règle : un 30 mA, deux au moins, un type A (ou F), chaque circuit sous un
+  30 mA (**nouveau** : `hors-30ma`, un départ clipsé avant tout différentiel
+  ou sous un 300 mA), huit circuits au plus par différentiel, des calibres
+  faits pour leurs fils, aucun porte-fusible, **deux rangées au minimum**
+  (`RANGEES_MIN`, nouveau constat `une-rangee`), un cinquième de réserve —
+  comptée **en modules** désormais (un différentiel en prend deux : l'ancien
+  compte annonçait deux places de trop). Sur le tableau, l'organe en faute est
+  cerclé de rouge ou d'ambre, la réserve est hachurée et rougit entamée.
+
+**Le même tableau, sur le plan.** `railDuReleve` donne le rail relevé,
+`habillerLesTableaux` le pose sur chaque tableau du plan avec les cotes de
+son coffret (`dimensionsDuCoffret` : 2 × 13 ≈ 33 × 34 cm, plus 55 × 65 quel
+que soit son contenu). L'élévation (`AppareilDeFace`), la maquette et la
+visite le dessinent organe pour organe : un disjoncteur relevé, un disjoncteur
+dessiné, des obturateurs pour le reste. La clé du modèle 3D porte le rail :
+deux relevés, deux modèles. Et le lien va dans les deux sens : la feuille dit
+où le tableau est posé (« Voir sur le mur ») ou le pose d'un appui à une place
+libre, en dégagement de préférence (« Le poser sur le plan ») ; la fiche du
+tableau posé ouvre son relevé. Ces gestes attendent que la feuille soit
+partie : iOS refuse une fenêtre demandée pendant qu'une autre descend.
+
+Bancs : `tableauvivant` (24 : implantation, rattachement, blocages, rail
+dessiné en élévation et en 3D, store, feuille — clipser, refuser, rangées,
+verdict, pose différée) ; `existant` (la réserve en modules).
+
 ## Visite : lâcher le regard ne coupe plus la marche
 
 Relevé du patron : « un déplacement se coupe lorsqu'on tourne en même temps

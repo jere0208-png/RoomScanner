@@ -46,7 +46,8 @@ import { filtrerAuNiveau, roomParts, type Pt } from '../geometry/floorplan';
 import { buildScene, type ScenePalette } from '../geometry/scene3d';
 import { cameraNative, maillageDeLaVisite } from '../geometry/visite3d';
 import { maillageDesMeubles } from '../geometry/modeles3d';
-import { groupesDesAppareils } from '../geometry/appareils3d';
+import { groupesDesAppareils, habillerLesTableaux } from '../geometry/appareils3d';
+import { railDuReleve } from '../geometry/existant';
 import {
   basculer,
   interrupteurSousLeDoigt,
@@ -288,6 +289,9 @@ export function Exploration({
   // L'appareillage ne se voit qu'en mode Électricité — comme partout.
   const modeElec = useModeElec();
   const toutLAppareillage = useScanStore((s) => s.fixtures);
+  /* Le tableau relevé, tel quel, au mur de la visite. */
+  const existant = useScanStore((s) => s.existant);
+  const rail = useMemo(() => railDuReleve(existant), [existant]);
   const toutLePlafond = useScanStore((s) => s.ceiling);
   const showTextures = useScanStore((s) => s.showTextures);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
@@ -374,7 +378,10 @@ export function Exploration({
     const lampes = lampesDeLaScene(appareils ?? []);
     return {
       ...maillageDeLaVisite(faces, { sansMeubles: true }),
-      meubles: maillageDesMeubles(meubles ?? [], groupesDesAppareils(appareils ?? [], rangsDesLampes(lampes))),
+      meubles: maillageDesMeubles(
+        meubles ?? [],
+        groupesDesAppareils(habillerLesTableaux(appareils ?? [], rail), rangsDesLampes(lampes)),
+      ),
       lampes,
     };
   }, [
@@ -389,6 +396,7 @@ export function Exploration({
     fixtures,
     ceiling,
     peintures,
+    rail,
   ]);
   /*
     LES INTERRUPTEURS DE LA VISITE, et ce que chacun allume — relevé du

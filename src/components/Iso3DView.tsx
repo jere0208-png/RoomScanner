@@ -23,7 +23,8 @@ import {
 } from 'react-native-room-scan';
 import { cameraOrbite, maillageDeLaMaquette } from '../geometry/maquette3d';
 import { maillageDesMeubles } from '../geometry/modeles3d';
-import { groupesDesAppareils } from '../geometry/appareils3d';
+import { groupesDesAppareils, habillerLesTableaux } from '../geometry/appareils3d';
+import { railDuReleve } from '../geometry/existant';
 import { grouperTraces } from '../ui/traces';
 import { mettreAPlat } from '../ui/canevas';
 import { estUnGlissement, estUnTap } from '../ui/geste';
@@ -494,6 +495,9 @@ export function Iso3DView({
   const toutLePlafondStocke = useScanStore((s) => s.ceiling);
   const toutesLesPieces = useScanStore((s) => s.rooms);
   const toutLAppareillageStocke = useScanStore((s) => s.fixtures);
+  /* Le tableau relevé se dessine tel quel dans la maquette. */
+  const existant = useScanStore((s) => s.existant);
+  const rail = useMemo(() => railDuReleve(existant), [existant]);
   // Masqués, pas effacés : la scène reçoit des listes vides, le relevé
   // garde les siennes.
   const toutLePlafond = modeElec ? toutLePlafondStocke : AUCUN_PLAFOND;
@@ -1278,11 +1282,14 @@ export function Iso3DView({
         ? maillageDesMeubles(
             scene.meubles ?? [],
             groupesDesAppareils(
-              (scene.appareils ?? []).filter((a) => !focusWallId || !a.wallId || a.wallId === focusWallId),
+              habillerLesTableaux(
+                (scene.appareils ?? []).filter((a) => !focusWallId || !a.wallId || a.wallId === focusWallId),
+                rail,
+              ),
             ),
           )
         : null,
-    [natif, scene, focusWallId],
+    [natif, scene, focusWallId, rail],
   );
 
   /*

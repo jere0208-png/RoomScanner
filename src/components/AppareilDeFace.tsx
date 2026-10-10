@@ -37,6 +37,7 @@ import {
 } from 'react-native-svg';
 import type { PoseDAppareil } from '../geometry/appareils3d';
 import type { FixtureKind } from '../geometry/electrical';
+import type { GenreDeModule, RailDuTableau } from '../geometry/existant';
 
 /** Les teintes du dessin : celles de la maquette, éclairées par le haut. */
 const C = {
@@ -154,7 +155,7 @@ export function AppareilDeFace({
       corps = <Applique u={u} />;
       break;
     case 'tableau':
-      corps = <Tableau W={cm(pose.largeur ?? 0.55)} H={cm(pose.hauteur ?? 0.65)} u={u} />;
+      corps = <Tableau W={cm(pose.largeur ?? 0.55)} H={cm(pose.hauteur ?? 0.65)} u={u} rail={pose.rail} />;
       break;
     case 'thermostat':
       corps = <Thermostat W={cm(pose.largeur ?? 0.09)} H={cm(pose.hauteur ?? 0.09)} u={u} />;
@@ -367,18 +368,24 @@ function Applique({ u }: { u: U }) {
 }
 
 /**
- * Le tableau : son coffret, quatre rangées derrière une porte fumée — un
+ * Le tableau : son coffret, ses rangées derrière une porte fumée — un
  * différentiel en tête de rangée, ses disjoncteurs, des obturateurs.
+ *
+ * RELEVÉ, IL EST LE SIEN (`rail`) : ses rangées, et sur chacune les organes
+ * qu'on y a clipsés, à leur place — un disjoncteur relevé, un disjoncteur
+ * dessiné. Sans relevé, le tableau générique : quatre rangées garnies.
  */
-function Tableau({ W, H, u }: { W: number; H: number; u: U }) {
+function Tableau({ W, H, u, rail }: { W: number; H: number; u: U; rail?: RailDuTableau }) {
   const A = W / 2;
   const B = H / 2;
   const cadre = 3;
-  const rangees = 4;
+  const rangees = rail ? rail.rangees : 4;
   const pas = (2 * (B - cadre)) / rangees;
   const fente = 2.2;
   const module = 1.75;
-  const largeur = Math.min(2 * (A - cadre) - 4, 24 * module);
+  const largeur = rail
+    ? Math.min(2 * (A - cadre), rail.parRangee * module)
+    : Math.min(2 * (A - cadre) - 4, 24 * module);
   const x0 = -largeur / 2;
   const nombres = [13, 10, 14, 8];
   const elements: React.ReactNode[] = [];
@@ -390,18 +397,36 @@ function Tableau({ W, H, u }: { W: number; H: number; u: U }) {
       <Rect key={`e${r}`} x={u(x0)} y={ys - u(fente + 1.3)} width={u(largeur)} height={u(0.9)} fill={C.etiquette} />,
     );
     let x = x0;
-    const poser = (n: number, test: boolean, cle: string) => {
+    const poser = (n: number, genre: GenreDeModule, cle: string) => {
       const x1 = x + n * module;
       const xm = (x + x1) / 2;
       elements.push(
-        <Rect key={`m${cle}`} x={u(x + 0.06)} y={ys - u(fente - 0.05)} width={u(n * module - 0.12)} height={u(2 * fente - 0.1)} fill={C.module} />,
-        <Rect key={`t${cle}`} x={u(xm - 0.32)} y={ys - u(1.25)} width={u(0.64)} height={u(1.55)} rx={u(0.1)} fill={C.alveole} />,
+        <Rect key={`m${cle}`} x={u(x + 0.06)} y={ys - u(fente - 0.05)} width={u(n * module - 0.12)} height={u(2 * fente - 0.1)} fill={genre === 'fusible' ? '#E9E4DA' : C.module} />,
       );
-      if (test) elements.push(<Rect key={`b${cle}`} x={u(x1 - 0.75)} y={ys + u(1.15)} width={u(0.45)} height={u(0.45)} fill={C.test} />);
+      if (genre === 'fusible') {
+        elements.push(
+          <Rect key={`c${cle}`} x={u(xm - 0.4)} y={ys - u(1.2)} width={u(0.8)} height={u(2.4)} rx={u(0.15)} fill="#B9B2A4" />,
+          <Rect key={`g${cle}`} x={u(xm - 0.42)} y={ys - u(0.95)} width={u(0.84)} height={u(0.35)} fill="#C2402F" />,
+        );
+      } else if (genre === 'parafoudre') {
+        elements.push(<Rect key={`p${cle}`} x={u(xm - 0.5)} y={ys - u(0.5)} width={u(1)} height={u(1)} rx={u(0.2)} fill="#E0A800" />);
+      } else {
+        elements.push(<Rect key={`t${cle}`} x={u(xm - 0.32)} y={ys - u(1.25)} width={u(0.64)} height={u(1.55)} rx={u(0.1)} fill={C.alveole} />);
+      }
+      if (genre === 'differentiel') elements.push(<Rect key={`b${cle}`} x={u(x1 - 0.75)} y={ys + u(1.15)} width={u(0.45)} height={u(0.45)} fill={C.test} />);
       x = x1;
     };
-    poser(2, true, `${r}d`);
-    for (let d = 0; d < nombres[r]; d++) poser(1, false, `${r}-${d}`);
+    if (rail) {
+      const ici = rail.modules.filter((m) => m.rangee === r).sort((p, q) => p.debut - q.debut);
+      for (const m of ici) {
+        x = x0 + m.debut * module;
+        poser(m.largeur, m.genre, `${r}-${m.debut}`);
+      }
+      x = x0 + Math.max(0, ...ici.map((m) => m.debut + m.largeur)) * module;
+    } else {
+      poser(2, 'differentiel', `${r}d`);
+      for (let d = 0; d < nombres[r]; d++) poser(1, 'disjoncteur', `${r}-${d}`);
+    }
     if (x < -x0 - 0.1) {
       elements.push(
         <Rect key={`o${r}`} x={u(x + 0.06)} y={ys - u(fente - 0.05)} width={u(-x0 - x - 0.12)} height={u(2 * fente - 0.1)} fill={C.module} />,
