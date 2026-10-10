@@ -20,6 +20,7 @@ import { useTheme } from '../../theme';
 import { RangeeOutils } from '../../components/RangeeOutils';
 import { ToolPill } from '../../components/ToolPill';
 import { CeilingIcon } from '../../components/CeilingIcon';
+import { VignetteProduit } from '../../components/VignetteProduit';
 
 /**
  * La boussole du calque « Nord » — cercle au trait, LOSANGE PLEIN.
@@ -229,9 +230,19 @@ export function Toolbar2D({
           elles restent là où elles servent : le contrôle de conformité et
           le dossier imprimé.
         */
+        /*
+          ET IL SE CHOISIT EN PHOTOS, COMME LES MURS — relevé du patron :
+          « trouve des images pour celles qui manquent, comme pour le
+          matériel de devis ». Le catalogue des murs montrait déjà le
+          produit ; le plafond restait en pictogrammes, faute de photos
+          pour le spot, la DCL, le plafonnier et le ventilateur. Elles
+          existent maintenant : on choisit ce qu'on posera, tel qu'on
+          l'achètera. La LIGNE de spots garde son pictogramme — c'est un
+          geste, pas un produit.
+        */
         ...CEILING_KINDS.map((k) => ({
           label: CEILINGS[k].label,
-          node: <CeilingIcon kind={k} />,
+          node: <VignetteProduit code={`plafond-${k}`} libelle={CEILINGS[k].label} taille={36} />,
           onPress: () => setPendingCeiling(k),
         })),
       ],

@@ -2607,7 +2607,12 @@ export function ResultScreen() {
     // Sortir d'un mode, c'est abandonner ce qu'on y avait commencé.
     seulGeste();
     setEditMode((e) => {
-      if (e) setSelectedWallId(null);
+      if (e) {
+        setSelectedWallId(null);
+        // Un meuble ne se tient qu'en édition : on le lâche en sortant.
+        setSelectedObjectId(null);
+        setObjDims(false);
+      }
       return !e;
     });
   };

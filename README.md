@@ -14285,6 +14285,91 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le vrai appareillage, en 3D comme face au mur ; des photos pour tout le catalogue ; plus de pointillés en 3D ; un meuble ne se prend qu'en édition
+
+Relevés du patron : « le clic sur les meubles ne doit pas être possible sans
+mode édition » ; « trouve un moyen, comme les meubles, d'avoir des modèles
+réalistes des prises, luminaires, tableau élec, etc. Tout appareillage élec.
+On ne doit plus voir un bloc noté mais une vraie prise ajoutée, comme le rendu
+qu'on aura à la fin » ; « trouve des images pour celles qui manquent, comme
+pour le matériel de devis : applique murale, etc. » ; « enlève les pointillés
+des ouvertures sur le plan 3D ».
+
+**Les vrais modèles d'appareillage** (`geometry/appareils3d.ts`). Une prise
+était une plaque blanche et un cube de la couleur de sa famille ; elle est
+maintenant FABRIQUÉE à ses cotes de catalogue, avec l'atelier des meubles :
+
+- une **plaque** de 82 mm, épaisse de 9, au bord en quart de rond, percée
+  d'une fenêtre de 51 mm par poste, à 71 mm d'entraxe — une double prise est
+  UNE plaque à deux fenêtres, comme deux appareils réunis à la main ;
+- dans chaque fenêtre, son **mécanisme** : le puits de la prise 2P+T, ses deux
+  alvéoles et sa broche de terre (trois alvéoles pour la 32 A) ; la bascule
+  d'un interrupteur ou d'un va-et-vient ; le poussoir et son voyant ; les deux
+  demi-touches fléchées d'un volet ; le bouton d'un variateur ; le port et
+  l'étiquette d'un RJ45 ; la fiche coaxiale d'une prise TV ; le presse-étoupe
+  et le câble d'une sortie de câble ;
+- hors gabarit : le **tableau** (coffret, porte de verre fumé, quatre rangées
+  — différentiel en tête, disjoncteurs, obturateurs — derrière un plastron),
+  l'**applique** (un coin blanc ouvert en haut et en bas, allumé), le
+  **thermostat** et son écran, la **boîte de dérivation** et ses quatre vis ;
+- au plafond : le **spot** et sa collerette, la **DCL** (rosace, câble,
+  douille, ampoule), le **plafonnier**, le **ventilateur** (1,10 m de pales de
+  bois), le **détecteur de fumée**, la **caméra** en dôme, la **bouche de
+  VMC** et ses gorges, le **détecteur de présence**.
+
+On fabrique en centimètres (l'atelier ignore les arrondis de moins de 5 mm,
+justes pour une armoire, pas pour une prise) et l'on pose en mètres. Ce qui
+éclaire est d'une nouvelle matière, `lumiere` (code 5) : le natif la peint de
+sa propre teinte, sans ombre ni liseré. La scène annonce chaque appareil à sa
+place (`Scene.appareils`, `posesDUnLot`, `postesDuLot`), ses caisses sont
+marquées `appareil` et la carte graphique ne les reçoit plus
+(`maillageDeLaMaquette` et `maillageDeLaVisite` en `sansMeubles`) : la
+maquette et la visite dessinent les vrais (`groupesDesAppareils`, dans le même
+flux que les meubles, `maillageDesMeubles(poses, dejaPoses)`). Un mur isolé ne
+garde que ses appareils. Le plan 2D garde ses symboles normalisés et ses
+couleurs de famille : c'est lui qui fait foi. Le canevas de secours et le PDF
+gardent les caisses.
+
+**Face au mur** (`AppareilDeFace`, `WallElevation`). Le carré ambre écrit
+« PC » est devenu la prise elle-même, vue de face, d'après les mêmes cotes :
+plaque éclairée d'en haut et son ombre portée, puits, alvéoles, broche, touches,
+flèches, port, fiche ; le tableau montre ses rangées derrière sa porte fumée,
+l'applique lave le mur au-dessus et au-dessous, le thermostat affiche sa
+consigne. Les postes réunis partagent une plaque. Un appareil trop petit pour
+le doigt est agrandi autour de son centre d'**un seul facteur** (32 points au
+moins sur son petit côté) : une prise reste carrée. La bague de sélection
+épouse la plaque de l'appareil tenu ; ceux de l'autre face restent un
+pointillé discret.
+
+**Des photos pour ce qui en manquait** (`assets/produits`, `ui/produits.ts`) :
+applique murale (Paulmann), point lumineux DCL (douille DCL E27 avec fiche,
+Legrand), spot encastré (Aric), plafonnier (Paulmann), ventilateur de plafond
+(Faro) — détourées et réduites comme les autres, mêmes droits, même décision.
+Le catalogue et le devis les montrent ; le menu « Équiper le plafond » passe
+lui aussi des pictogrammes aux photos (la ligne de spots, qui est un geste,
+garde le sien).
+
+**Plus de pointillés autour des ouvertures en 3D** (`scene3d`). Le pourtour
+tireté d'une porte ou d'une baie libre disparaît : le trou se lit sans trait,
+le mur s'arrête et ses tableaux tournent dans l'épaisseur. La porte garde ce
+qui la distingue d'une baie : son seuil. Les planches de référence 3D perdent
+leurs treize contours tiretés, et rien d'autre.
+
+**Un meuble ne se prend qu'en édition** (`FloorplanEditor`, `ResultScreen`).
+Hors édition, les cibles des meubles ne se posent plus : l'appui passe au
+plan. Sortir de l'édition lâche le meuble tenu.
+
+Bancs : `appareilsreels.test.ts` (chaque appareil du catalogue et chaque
+appareil de plafond a son modèle, à sa place ; une plaque par ensemble, postes
+dans l'ordre ; alvéoles et broche, porte fumée et manettes, lumière ; plus
+aucune teinte de famille ; aucune face retournée ; caisses retirées du natif,
+flux bien formé) ; `etabliergonomique.test.tsx` (une vraie prise face au mur,
+plus de sigle ; jamais sous trente points, sans déformer) ;
+`porte3d.test.ts` et `floorplan.test.ts` (le trou reste ouvert, sans aucun
+pointillé ; la porte se reconnaît à son seuil) ; `prisemeuble.test.tsx` et
+`bandeaux.test.tsx` (hors édition, aucun meuble ne répond ; sortir de
+l'édition lâche le meuble) ; `render.test.ts` (planches régénérées).
+
 ## Un menu fixe à la place des outils, une feuille qui ne passe plus sous l'heure, des bulles plus fines
 
 Relevés du patron, captures à l'appui : « le clavier remonte tout le bloc »

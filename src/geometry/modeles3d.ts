@@ -52,14 +52,20 @@ export type Matiere =
   | 'terre'
   | 'miroir'
   | 'pierre'
-  | 'papier';
+  | 'papier'
+  /**
+   * CE QUI ÉCLAIRE — le diffuseur d'une applique, le verre d'un spot, une
+   * ampoule. Il ne reçoit pas la lumière de la scène : il la DONNE, et se
+   * peint donc de sa propre teinte, sans ombre (voir `appareils3d`).
+   */
+  | 'lumiere';
 
 /**
  * Comment la carte graphique rend chaque matière.
  *
  * `code` dit au natif ce qu'il ajoute à la teinte : 1 le fil du bois, 2 la
  * trame d'un tissu, 3 la transparence du verre, 4 les deux faces d'une
- * feuille. `rugosite` et `metal` sont les deux réglages d'un matériau
+ * feuille, 5 la lumière propre d'un luminaire. `rugosite` et `metal` sont les deux réglages d'un matériau
  * physique : un chrome est lisse et métallique, un lin rugueux et mat.
  */
 export const RENDU: Record<Matiere, { code: number; rugosite: number; metal: number }> = {
@@ -78,6 +84,7 @@ export const RENDU: Record<Matiere, { code: number; rugosite: number; metal: num
   miroir: { code: 0, rugosite: 0.03, metal: 1 },
   pierre: { code: 0, rugosite: 0.42, metal: 0 },
   papier: { code: 0, rugosite: 0.8, metal: 0 },
+  lumiere: { code: 5, rugosite: 0.5, metal: 0 },
 };
 
 /** Le code de l'ombre de contact : un voile doux sous le meuble. */
@@ -541,6 +548,61 @@ export class Atelier {
       return this.sommet(g, p[0], p[1], p[2], nn[0], nn[1], nn[2]);
     });
     g.i.push(ids[0], ids[2], ids[1], ids[0], ids[3], ids[2], ids[1], ids[2], ids[4], ids[2], ids[3], ids[4]);
+  }
+
+  /**
+   * Un triangle, tourné pour regarder du côté de `n` : la carte graphique
+   * jette les faces vues de dos, et un sens se règle mieux sur la normale
+   * voulue que de tête, contour par contour.
+   */
+  private triangle(g: GroupeLocal, ids: [number, number, number], pts: [V3, V3, V3], n: V3) {
+    const [a, b, c] = pts;
+    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const x = u[1] * v[2] - u[2] * v[1];
+    const y = u[2] * v[0] - u[0] * v[2];
+    const z = u[0] * v[1] - u[1] * v[0];
+    if (x * n[0] + y * n[1] + z * n[2] >= 0) g.i.push(ids[0], ids[1], ids[2]);
+    else g.i.push(ids[0], ids[2], ids[1]);
+  }
+
+  /**
+   * UNE FACETTE PLANE ET CONVEXE — l'avant d'une plaque autour de ses
+   * fenêtres, le fond d'un puits de prise, le verre d'une porte de tableau.
+   * Une boîte n'a que des faces pleines ; une plaque a des TROUS, et c'est
+   * par eux qu'on reconnaît ce qu'elle porte.
+   */
+  polygone(pts: V3[], n: V3, mat: Matiere, couleur: string) {
+    if (pts.length < 3) return;
+    const g = this.groupe(mat, couleur);
+    const ids = pts.map((p) => this.sommet(g, p[0], p[1], p[2], n[0], n[1], n[2]));
+    for (let k = 1; k + 1 < pts.length; k++) {
+      this.triangle(g, [ids[0], ids[k], ids[k + 1]], [pts[0], pts[k], pts[k + 1]], n);
+    }
+  }
+
+  /**
+   * UNE BANDE entre deux contours de même nombre de points — le flanc d'une
+   * plaque, son biseau, la paroi d'un puits. Chaque point porte sa normale :
+   * la lumière glisse le long d'un bord arrondi au lieu de s'y casser.
+   */
+  bande(a: V3[], b: V3[], na: V3[], nb: V3[], mat: Matiere, couleur: string, ferme = true) {
+    const n = Math.min(a.length, b.length);
+    if (n < 2) return;
+    const g = this.groupe(mat, couleur);
+    const ia = a.slice(0, n).map((p, k) => this.sommet(g, p[0], p[1], p[2], na[k][0], na[k][1], na[k][2]));
+    const ib = b.slice(0, n).map((p, k) => this.sommet(g, p[0], p[1], p[2], nb[k][0], nb[k][1], nb[k][2]));
+    const fin = ferme ? n : n - 1;
+    for (let k = 0; k < fin; k++) {
+      const k2 = (k + 1) % n;
+      const m: V3 = [
+        na[k][0] + na[k2][0] + nb[k][0] + nb[k2][0],
+        na[k][1] + na[k2][1] + nb[k][1] + nb[k2][1],
+        na[k][2] + na[k2][2] + nb[k][2] + nb[k2][2],
+      ];
+      this.triangle(g, [ia[k], ia[k2], ib[k2]], [a[k], a[k2], b[k2]], m);
+      this.triangle(g, [ia[k], ib[k2], ib[k]], [a[k], b[k2], b[k]], m);
+    }
   }
 
   finir(): ModeleLocal {
@@ -2003,7 +2065,15 @@ const SANS_OMBRE = /tapis|rug|miroir|mirror/i;
  * peu plus grand que l'emprise, que le natif dégrade du centre vers le bord.
  * C'est ce qui fait qu'un meuble POSE au lieu de flotter.
  */
-export function maillageDesMeubles(poses: PoseDeMeuble[]): number[] {
+export function maillageDesMeubles(
+  poses: PoseDeMeuble[],
+  /**
+   * Des groupes DÉJÀ POSÉS dans la scène — l'appareillage, fabriqué à part
+   * (voir `appareils3d`). Ils rejoignent les groupes de même matière : une
+   * prise blanche et une table laquée partent dans le même appel de dessin.
+   */
+  dejaPoses: GroupeLocal[] = [],
+): number[] {
   const groupes = new Map<string, { code: number; rgb: [number, number, number]; rug: number; met: number; v: number[]; i: number[] }>();
   const groupe = (cle: string, code: number, couleur: string, rug: number, met: number) => {
     let g = groupes.get(cle);
@@ -2058,6 +2128,14 @@ export function maillageDesMeubles(poses: PoseDeMeuble[]): number[] {
       }
       g.i.push(base, base + 2, base + 1, base, base + 3, base + 2);
     }
+  }
+  for (const gl of dejaPoses) {
+    if (gl.i.length === 0) continue;
+    const r = RENDU[gl.mat];
+    const g = groupe(`${gl.mat}|${gl.couleur}`, r.code, gl.couleur, r.rugosite, r.metal);
+    const base = g.v.length / PAR_SOMMET;
+    for (const x of gl.v) g.v.push(x);
+    for (const idx of gl.i) g.i.push(base + idx);
   }
   const out: number[] = [];
   // L'ombre d'abord : elle se pose sur le sol, sous tout le reste.

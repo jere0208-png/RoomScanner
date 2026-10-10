@@ -75,8 +75,12 @@ const RENVOIS: Record<string, string> = {
   /*
     PAS DE RENVOI POUR L'APPLIQUE — vérifié à l'œil : la seule photo DCL du
     jeu porte un CROCHET, c'est une boîte de plafond. La montrer pour une
-    applique murale contredirait sa ligne, et « une vignette qui contredit
-    sa ligne est pire qu'une vignette absente ». Le nom, proprement.
+    applique murale aurait contredit sa ligne. Elle a désormais SA photo
+    (`meca-applique`), comme les quatre appareils de plafond qui n'en
+    avaient pas — relevé du patron : « trouve des images pour celles qui
+    manquent, comme pour le matériel de devis : applique murale, etc. ».
+    Applique, plafonnier : Paulmann ; douille DCL : Legrand ; spot : Aric ;
+    ventilateur : Faro. Mêmes droits, même décision que plus haut.
   */
 };
 
@@ -107,6 +111,7 @@ export const PHOTOS: Record<string, ImageSourcePropType> = {
   'icta-20': require('../../assets/produits/icta-20.png'),
   'icta-25': require('../../assets/produits/icta-25.png'),
   'icta-32': require('../../assets/produits/icta-32.png'),
+  'meca-applique': require('../../assets/produits/meca-applique.png'),
   'meca-boite': require('../../assets/produits/meca-boite.png'),
   'meca-inter': require('../../assets/produits/meca-inter.png'),
   'meca-poussoir': require('../../assets/produits/meca-poussoir.png'),
@@ -120,9 +125,13 @@ export const PHOTOS: Record<string, ImageSourcePropType> = {
   'meca-variateur': require('../../assets/produits/meca-variateur.png'),
   'meca-volet': require('../../assets/produits/meca-volet.png'),
   'peigne': require('../../assets/produits/peigne.png'),
+  'plafond-applique': require('../../assets/produits/plafond-applique.png'),
   'plafond-camera': require('../../assets/produits/plafond-camera.png'),
   'plafond-daaf': require('../../assets/produits/plafond-daaf.png'),
+  'plafond-dcl': require('../../assets/produits/plafond-dcl.png'),
   'plafond-detecteur': require('../../assets/produits/plafond-detecteur.png'),
+  'plafond-spot': require('../../assets/produits/plafond-spot.png'),
+  'plafond-ventilateur': require('../../assets/produits/plafond-ventilateur.png'),
   'plafond-vmc': require('../../assets/produits/plafond-vmc.png'),
   'plaque-1': require('../../assets/produits/plaque-1.png'),
   'plaque-2': require('../../assets/produits/plaque-2.png'),

@@ -46,6 +46,7 @@ import { filtrerAuNiveau, type Pt } from '../geometry/floorplan';
 import { buildScene, type ScenePalette } from '../geometry/scene3d';
 import { cameraNative, maillageDeLaVisite } from '../geometry/visite3d';
 import { maillageDesMeubles } from '../geometry/modeles3d';
+import { groupesDesAppareils } from '../geometry/appareils3d';
 import { mixHex } from '../geometry/appearance';
 import { MAQUETTE, matieresDesSols } from '../ui/maquette';
 import { hexDePeinture } from '../ui/peintures';
@@ -311,7 +312,7 @@ export function Exploration({
   }, [rooms]);
   const maille = useMemo(() => {
     if (!natif || walls.length === 0) return null;
-    const { faces, meubles } = buildScene(walls, openings, objects, {
+    const { faces, meubles, appareils } = buildScene(walls, openings, objects, {
       palette,
       colorOpenings,
       showSurfaces: true,
@@ -324,8 +325,12 @@ export function Exploration({
       matieres: matieresDesSols(rooms),
       peintures,
     });
-    // Les caisses restent au canevas : la visite a les vrais meubles.
-    return { ...maillageDeLaVisite(faces, { sansMeubles: true }), meubles: maillageDesMeubles(meubles ?? []) };
+    // Les caisses restent au canevas : la visite a les vrais meubles, et la
+    // vraie prise au mur (voir `appareils3d`).
+    return {
+      ...maillageDeLaVisite(faces, { sansMeubles: true }),
+      meubles: maillageDesMeubles(meubles ?? [], groupesDesAppareils(appareils ?? [])),
+    };
   }, [
     natif,
     walls,

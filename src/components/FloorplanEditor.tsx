@@ -2209,7 +2209,7 @@ export function FloorplanEditor({
                     height={d + PRISE_MARGE * 2}
                     fill="transparent"
                     onPress={
-                      onSelectObject
+                      onSelectObject && editable
                         ? () =>
                             onSelectObject(
                               o.id === selectedObjectId ? null : o.id,
@@ -2252,7 +2252,16 @@ export function FloorplanEditor({
               menuiseries : eux sont dessinés par-dessus les meubles, et leur
               tour de priorité est déjà réglé.
             */}
+            {/*
+              UN MEUBLE NE SE PREND QU'EN ÉDITION — relevé du patron : « le
+              clic sur les meubles ne doit pas être possible sans mode
+              édition ». Hors édition, on LIT le plan : un appui sur un lit
+              ouvrait sa barre et ses poignées, et le moindre effleurement
+              en passant d'une pièce à l'autre sortait un menu. Les cibles
+              ne se posent donc plus du tout : l'appui passe au plan.
+            */}
             {onSelectObject &&
+              editable &&
               objects
                 .map((o) => ({ o, f: footprintOf(o, partOf) }))
                 .sort((a, b) => b.f.width * b.f.depth - a.f.width * a.f.depth)

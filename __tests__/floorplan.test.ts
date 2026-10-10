@@ -1396,8 +1396,14 @@ describe('portes et fenêtres en volumes', () => {
     se pointille comme celui d'une baie. Ce que le banc garde de son intention
     d'origine : le pointille ne touche que des MENUISERIES, jamais un meuble
     ni un pan de maconnerie.
+
+    ENFIN, PLUS DE POINTILLE DU TOUT — releve du patron : « enleve les
+    pointilles des ouvertures sur le plan 3D ». Le trou se lit sans trait :
+    le mur s'arrete, ses tableaux tournent dans l'epaisseur. La fuite que ce
+    banc surveillait ne peut plus se produire, et il le verifie : aucune
+    face tiretee, nulle part, quelle que soit la menuiserie.
   */
-  it('ne met en pointillé QUE ce qu’on traverse', () => {
+  it('ne met plus rien en pointillé, quelle que soit la menuiserie', () => {
     const sofa = {
       id: 's',
       category: 'sofa',
@@ -1421,28 +1427,17 @@ describe('portes et fenêtres en volumes', () => {
       « oui pour le pourtour ». Une porte est donc ambre, une baie garde le
       bleu des passages, et cela sans reglage a cocher.
     */
-    for (const [seg, teinte] of [
-      [porte, TEST_PALETTE.door],
-      [{ ...porte, open: true }, TEST_PALETTE.door],
-      [{ ...porte, type: 'opening' as const }, TEST_PALETTE.passage],
-    ] as [WallSeg, string][]) {
+    for (const seg of [porte, { ...porte, open: true }, { ...porte, type: 'opening' as const }] as WallSeg[]) {
       const scene = buildScene(rect, [seg], [sofa], { palette: TEST_PALETTE });
-      const tirets = scene.faces.filter((f) => f.dashed);
-      expect(tirets).toHaveLength(2);
-      expect(tirets.every((f) => f.stroke === teinte)).toBe(true);
-      // Aucun meuble, aucun mur : le pointille ne fuit pas.
-      expect(tirets.every((f) => f.ownerId === undefined)).toBe(true);
+      expect(scene.faces.filter((f) => f.dashed)).toHaveLength(0);
     }
   });
 
-  it('rend une baie et une porte ouverte en vide bleu pointillé', () => {
+  it('rend une baie et une porte ouverte en vide, sans trait autour', () => {
     const baie: WallSeg = { ...porte, id: 'b1', type: 'opening', open: true };
     const scene = buildScene(rect, [baie], [], { palette: TEST_PALETTE });
-    const dashed = scene.faces.filter((f) => f.dashed);
-    // Une face par côté du mur : on traverse, on ne pose pas de panneau.
-    expect(dashed).toHaveLength(2);
-    expect(dashed.every((f) => f.fill === null)).toBe(true);
-    expect(dashed.every((f) => f.stroke === TEST_PALETTE.passage)).toBe(true);
+    // On traverse : ni panneau, ni pourtour tireté.
+    expect(scene.faces.filter((f) => f.dashed)).toHaveLength(0);
     // Aucun bloc de menuiserie n'a été posé dans le vide.
     expect(scene.faces.some((f) => f.fill === TEST_PALETTE.opening)).toBe(false);
     // Le mur reste découpé autour : trumeaux et linteau sont bien là.
@@ -1481,9 +1476,13 @@ describe('portes et fenêtres en volumes', () => {
     // Il RASE LE SOL : ce n'est pas un panneau qui remplit la baie.
     const haut = Math.max(...portes.flatMap((f) => f.pts.map((q) => q.y)));
     expect(haut).toBeLessThan(0.1);
-    // Et le vide, lui, monte jusqu'au linteau.
-    const tirets = scene.faces.filter((f) => f.dashed);
-    expect(Math.max(...tirets.flatMap((f) => f.pts.map((q) => q.y)))).toBeGreaterThan(1.9);
+    // Et le vide, lui, monte jusqu'au linteau : le mur ne reprend qu'au-dessus.
+    const holes = assignOpenings(rect, [porte], 0);
+    const panneaux = wallPanels(holes.get('n')!, height);
+    const linteau = panneaux.find((pn) => pn.y0 > 0.5);
+    expect(linteau).toBeDefined();
+    expect(linteau!.y0).toBeGreaterThan(1.9);
+    expect(scene.faces.filter((f) => f.dashed)).toHaveLength(0);
   });
 
   it('cadre à l’identique en mode geste : le modèle ne saute pas', () => {

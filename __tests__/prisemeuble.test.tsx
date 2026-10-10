@@ -154,4 +154,54 @@ describe('la prise d’un meuble', () => {
     expect(vus).toEqual(['chaise']);
     act(() => t.unmount());
   });
+
+  /*
+    HORS ÉDITION, UN MEUBLE NE SE PREND PAS — relevé du patron : « le clic
+    sur les meubles ne doit pas être possible sans mode édition ». Hors
+    édition on lit le plan ; un appui en passant ouvrait la barre d'un lit.
+  */
+  it('mais hors édition, aucun meuble ne répond au doigt', () => {
+    const vus: (string | null)[] = [];
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.setState({
+        walls: MURS,
+        openings: [],
+        objects: [CHAISE] as never,
+        rooms: [{ id: 'r1', name: 'Sejour', floor: null }] as never,
+        showFurniture: true,
+      });
+      t = TestRenderer.create(
+        <FloorplanEditor
+          showMeasures={false}
+          editable={false}
+          selectedWallId={null}
+          onSelectWall={() => {}}
+          onSelectObject={(id) => vus.push(id)}
+        />,
+      );
+    });
+    act(() => {
+      t.root.findAllByType(View)[0].props.onLayout?.({
+        nativeEvent: { layout: { width: 400, height: 700 } },
+      });
+    });
+    // Le meuble est bien dessiné…
+    expect(
+      t.root.findAll((n) => String(n.props?.accessibilityLabel ?? '').startsWith('Autour du meuble')).length,
+    ).toBeGreaterThan(0);
+    // … mais rien de ce qui le porte ne prend l'appui.
+    const prenables = t.root.findAll(
+      (n) =>
+        /meuble/i.test(String(n.props?.accessibilityLabel ?? '')) && typeof n.props?.onPress === 'function',
+    );
+    expect(prenables).toHaveLength(0);
+    for (const n of t.root.findAll((x) => typeof x.props?.onPress === 'function')) {
+      act(() => {
+        n.props.onPress();
+      });
+    }
+    expect(vus.filter((v) => v !== null)).toEqual([]);
+    act(() => t.unmount());
+  });
 });

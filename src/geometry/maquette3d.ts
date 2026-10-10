@@ -74,8 +74,9 @@ export function maillageDeLaMaquette(
   const out: MaillageDeMaquette = { maillage: [], orientes: [], ecorche: [], sols: [] };
   for (const face of faces) {
     if (face.pts.length < 3 || !face.fill || face.ombre || face.isCeiling) continue;
-    // Les meubles en caisses restent au canevas : la carte graphique a les vrais.
-    if (o.sansMeubles && face.meuble) continue;
+    // Les meubles et l'appareillage en caisses restent au canevas : la carte
+    // graphique a les vrais.
+    if (o.sansMeubles && (face.meuble || face.appareil)) continue;
     const { tris, oriente } = triangles(face);
     if (tris.length === 0) continue;
     const [r, g, b] = composantes(face.fill);

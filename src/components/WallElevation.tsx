@@ -104,6 +104,8 @@ import { haptic } from '../ui/haptic';
 import { CalquePhotoFond, CalquePhotoPoignee } from './CalquePhoto';
 import { SOLAIRES } from '../ui/solaires';
 import { CloseCross } from './CloseCross';
+import { AppareilDeFace, DefsAppareils, empriseDeFace } from './AppareilDeFace';
+import { posesDUnLot, postesDuLot, type PoseDAppareil } from '../geometry/appareils3d';
 import { VignetteAppareil } from './VignetteAppareil';
 import { wallLabel } from '../geometry/naming';
 import { frCategory } from '../geometry/furniture';
@@ -513,6 +515,62 @@ export function WallElevation({
   const originY = layout.h - PAD_BOTTOM;
   const px = (x: number) => originX + x * scale;
   const py = (y: number) => originY - y * scale;
+
+  /*
+    LES APPAREILS DE LA FACE, EN VRAI — une pose par plaque (ou par appareil
+    hors gabarit), d'après la même fabrique que la maquette 3D.
+
+    JAMAIS SOUS TRENTE POINTS — relevé du patron : « ça paraît petit,
+    inadapté ». Une plaque de 8,2 cm à l'échelle d'un mur de cinq mètres fait
+    six points ; elle est agrandie autour de son centre, d'UN SEUL facteur :
+    une prise reste carrée, une double prise deux fois plus large que haute.
+    Un tableau, lui, est assez grand pour garder l'échelle du mur.
+  */
+  const { dessins, emprises } = useMemo(() => {
+    const d: { pose: PoseDAppareil; k: number }[] = [];
+    const e: { id: string; x: number; y: number; w: number; h: number }[] = [];
+    if (!face || scale <= 0) return { dessins: d, emprises: e };
+    const lots = new Map<string, Fixture[]>();
+    for (const f of mine) {
+      if (f.side !== side) continue;
+      const cle = f.group ? `g:${f.group}` : `s:${f.id}`;
+      const l = lots.get(cle);
+      if (l) l.push(f);
+      else lots.set(cle, [f]);
+    }
+    for (const lot of lots.values()) {
+      const poses = posesDUnLot(
+        lot.map(f => f.id).join('+'),
+        wallId,
+        postesDuLot(lot, f => faceX(face, f.along)),
+        (x, y) => ({ x, y, z: 0 }),
+        { nx: 0, nz: 1 },
+      );
+      for (const pose of poses) {
+        const tour = empriseDeFace(pose);
+        // Trente-deux points, pas trente pile : le facteur se calcule en
+        // flottants, et une plaque à 29,999 points tomberait sous la règle.
+        const k = Math.max(scale, (32 * 100) / Math.min(tour.w, tour.h));
+        d.push({ pose, k });
+        const ox = originX + pose.x * scale;
+        const oy = originY - pose.y * scale;
+        if (pose.genre !== 'plaque') {
+          e.push({ id: pose.id, x: ox, y: oy, w: (tour.w * k) / 100, h: (tour.h * k) / 100 });
+          continue;
+        }
+        const ids = new Set((pose.postes ?? []).map(q => q.source ?? pose.id));
+        for (const id of ids) {
+          const siens = (pose.postes ?? []).filter(q => (q.source ?? pose.id) === id);
+          const dx = siens.reduce((t, q) => t + q.dx, 0) / siens.length;
+          const dy = siens.reduce((t, q) => t + q.dy, 0) / siens.length;
+          const xs = siens.map(q => q.dx);
+          const larg = Math.max(...xs) - Math.min(...xs) + PLAQUE;
+          e.push({ id, x: ox + dx * k, y: oy - dy * k, w: larg * k, h: PLAQUE * k });
+        }
+      }
+    }
+    return { dessins: d, emprises: e };
+  }, [face, scale, mine, side, wallId, originX, originY]);
 
   // Le PanResponder se crée une fois : il lit l'état courant dans une boîte
   // mise à jour à chaque rendu, sinon il travaillerait sur des valeurs figées.
@@ -1448,6 +1506,7 @@ export function WallElevation({
                   <Stop offset="1" stopColor={c.surfaceSunken} />
                 </LinearGradient>
               </Defs>
+              <DefsAppareils />
 
               {/*
               LÉGER RELIEF : l'épaisseur du mur, vue de trois quarts.
@@ -1882,38 +1941,6 @@ export function WallElevation({
                 );
               })}
 
-              {/* La plaque commune d'un ensemble : un cadre autour des postes
-                réunis. C'est ce qu'on visse, et ça se voit sur le mur. */}
-              {[...new Set(mine.filter(f => f.group).map(f => f.group))].map(
-                g => {
-                  const lot = mine.filter(
-                    f => f.group === g && f.side === side,
-                  );
-                  if (lot.length < 2) return null;
-                  const xs = lot.map(f => faceX(face, f.along));
-                  const ys = lot.map(f => f.height);
-                  const larg = Math.max(...lot.map(f => FIXTURES[f.kind].w));
-                  const haut = Math.max(...lot.map(f => FIXTURES[f.kind].h));
-                  const x0 = Math.min(...xs) - larg / 2;
-                  const x1 = Math.max(...xs) + larg / 2;
-                  const y0 = Math.min(...ys) - haut / 2;
-                  const y1 = Math.max(...ys) + haut / 2;
-                  return (
-                    <Rect
-                      key={g}
-                      x={px(x0) - 3}
-                      y={py(y1) - 3}
-                      width={(x1 - x0) * scale + 6}
-                      height={(y1 - y0) * scale + 6}
-                      rx={4}
-                      fill="none"
-                      stroke={c.inkFaint}
-                      strokeWidth={1.4}
-                    />
-                  );
-                },
-              )}
-
               {/* Repère d'accrochage, le temps du geste. */}
               {guide.x !== undefined && (
                 <Line
@@ -1970,54 +1997,75 @@ export function WallElevation({
                 </>
               )}
 
-              {/* Appareils. Ceux de l'autre face restent visibles, en creux :
-                savoir qu'une prise est déjà posée dos à dos évite de percer
-                deux fois au même endroit. */}
-              {mine.map(f => {
-                const s = FIXTURES[f.kind];
-                const x = faceX(face, f.along);
-                /*
-                JAMAIS SOUS TRENTE POINTS — relevé du patron : « ça paraît
-                petit, inadapté ». Une plaque de 8,2 cm à l'échelle d'un
-                mur de cinq mètres fait six points ; le plancher de vingt
-                restait la moitié d'une cible de pouce. À trente, on voit
-                ce qu'on va saisir — la cote reste vraie au bandeau.
-              */
-                const w = Math.max(30, s.w * scale);
-                const h = Math.max(30, s.h * scale);
-                const on = f.id === selectedId;
-                const ghost = f.side !== side;
-                return (
-                  <G key={f.id} opacity={ghost ? 0.32 : 1}>
+              {/* Ceux de l'autre face restent visibles, en creux : savoir
+                qu'une prise est déjà posée dos à dos évite de percer deux
+                fois au même endroit. Un pointillé, rien de plus — ils ne
+                sont pas de ce côté-ci. */}
+              {mine
+                .filter(f => f.side !== side)
+                .map(f => {
+                  const s2 = FIXTURES[f.kind];
+                  const w = Math.max(30, s2.w * scale);
+                  const h = Math.max(30, s2.h * scale);
+                  return (
                     <Rect
-                      x={px(x) - w / 2}
+                      key={f.id}
+                      x={px(faceX(face, f.along)) - w / 2}
                       y={py(f.height) - h / 2}
                       width={w}
                       height={h}
                       rx={4}
-                      fill={ghost ? 'none' : s.color}
-                      stroke={on ? c.ink : ghost ? c.inkFaint : '#00000033'}
-                      strokeWidth={on ? 2.4 : 1.2}
-                      strokeDasharray={ghost ? '4 3' : '0'}
+                      fill="none"
+                      stroke={c.inkFaint}
+                      strokeWidth={1.2}
+                      strokeDasharray="4 3"
+                      opacity={0.45}
                     />
-                    <SvgText
-                      x={px(x)}
-                      y={py(f.height) + 3.5}
-                      fill={ghost ? c.inkFaint : '#FFFFFF'}
-                      fontSize={Math.min(11, Math.max(8, w / 2.6))}
-                      fontWeight="800"
-                      textAnchor="middle"
-                    >
-                      {s.short}
-                    </SvgText>
+                  );
+                })}
+
+              {/*
+                LES APPAREILS DE CETTE FACE, TELS QU'ILS SERONT POSÉS —
+                relevé du patron : « on ne doit plus voir un bloc noté mais
+                une vraie prise ajoutée, comme le rendu qu'on aura à la
+                fin ». Un carré ambre écrit « PC » est devenu la prise
+                elle-même : sa plaque, son puits, sa broche de terre (voir
+                `AppareilDeFace`). Les postes réunis partagent UNE plaque,
+                comme au mur.
+              */}
+              {dessins.map(d => (
+                <AppareilDeFace
+                  key={d.pose.id}
+                  pose={d.pose}
+                  cx={px(d.pose.x)}
+                  cy={py(d.pose.y)}
+                  k={d.k}
+                />
+              ))}
+              {/* L'emprise de chaque appareil, et la bague de celui qu'on
+                tient : elle épouse sa plaque, pas un cercle autour. */}
+              {emprises.map(e => {
+                const on = e.id === selectedId;
+                return (
+                  <G key={`emprise-${e.id}`}>
+                    <Rect
+                      testID={`emprise-${e.id}`}
+                      x={e.x - e.w / 2}
+                      y={e.y - e.h / 2}
+                      width={e.w}
+                      height={e.h}
+                      fill="none"
+                    />
                     {on && (
-                      <Circle
-                        cx={px(x)}
-                        cy={py(f.height)}
-                        r={Math.max(w, h) / 2 + 7}
+                      <Rect
+                        x={e.x - e.w / 2 - 6}
+                        y={e.y - e.h / 2 - 6}
+                        width={e.w + 12}
+                        height={e.h + 12}
+                        rx={8}
                         fill="none"
                         stroke={c.blue}
-                        strokeWidth={1.6}
+                        strokeWidth={2}
                       />
                     )}
                   </G>

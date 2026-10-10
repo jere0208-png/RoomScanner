@@ -6,6 +6,7 @@
  * chaque rendu ne s'occupant plus que de projeter et de peindre.
  */
 import type { PoseDeMeuble } from './modeles3d';
+import { posesDUnLot, postesDuLot, type PoseDAppareil } from './appareils3d';
 import type { FloorData, ObjectData, SurfaceTexture } from 'react-native-room-scan';
 import {
   clampFootprint,
@@ -32,13 +33,10 @@ import { CEILINGS, type CeilingFixture } from './ceiling';
 import {
   FIXTURES,
   PLAQUE,
-  boxOffsets,
   faceX,
   facePoint,
-  postsOf,
   wallFace,
   type Fixture,
-  type FixtureKind,
 } from './electrical';
 
 export interface P3 {
@@ -68,6 +66,12 @@ export interface Face3D {
    * la reçoit pas : elle dessine le vrai modèle à sa place (`modeles3d`).
    */
   meuble?: boolean;
+  /**
+   * Face d'un APPAREIL en caisses — plaque et mécanisme de couleur. La carte
+   * graphique ne la reçoit pas non plus : elle dessine la vraie prise, le
+   * vrai tableau (voir `appareils3d`).
+   */
+  appareil?: boolean;
   /** Biais de tri (m), pour départager deux faces à la même profondeur. */
   bias?: number;
   isFloor?: boolean;
@@ -1667,6 +1671,12 @@ export interface Scene {
    * vrai modèle (voir `modeles3d`).
    */
   meubles?: PoseDeMeuble[];
+  /**
+   * Chaque appareil À SA PLACE — la plaque au nu de son mur, le luminaire au
+   * nu du plafond. La carte graphique y pose le vrai modèle, comme pour les
+   * meubles (voir `appareils3d`).
+   */
+  appareils?: PoseDAppareil[];
 }
 
 /**
@@ -2576,38 +2586,17 @@ export function buildScene(
         seuil, plus bas, pour le vantail en volume qu'on a écarté.
       */
       const porte = hole.seg.type === 'door';
-      // Une baie libre ou une porte, ça se TRAVERSE : pas de panneau,
-      // juste le pourtour du vide, en pointillé, sur les deux faces du mur.
+      /*
+        Une baie libre ou une porte, ça se TRAVERSE : pas de panneau, et
+        PLUS DE POURTOUR EN POINTILLÉ — relevé du patron : « enlève les
+        pointillés des ouvertures sur le plan 3D ». Le tireté cernait le
+        vide sur les deux faces du mur : un trait de dessin technique posé
+        sur une maquette, qui se lisait comme un gabarit à découper. Le trou
+        se dit tout seul — le mur s'arrête, ses tableaux tournent dans
+        l'épaisseur, on voit au travers —, et la porte garde ce qui la
+        distingue d'une baie : son SEUIL.
+      */
       if (porte || estTraversante(hole.seg)) {
-        const p1 = lerp2(q.a1, q.b1, hole.t0);
-        const r1 = lerp2(q.a1, q.b1, hole.t1);
-        const p2 = lerp2(q.a2, q.b2, hole.t0);
-        const r2 = lerp2(q.a2, q.b2, hole.t1);
-        for (const [p, r] of [
-          [p1, r1],
-          [r2, p2],
-        ] as [Pt, Pt][]) {
-          faces.push({
-            pts: vquad(p, r, hole.y0, hole.y1),
-            fill: null,
-            /*
-              LE POURTOUR D'UNE PORTE EST AMBRE, TOUJOURS.
-
-              Le seuil ne fait que deux centimètres : de loin, une porte et
-              une baie libre se ressemblaient trait pour trait. La teinte
-              des portes avait d'abord été réservée au réglage « Couleur des
-              portes/fenêtres » — décoché par défaut, donc invisible pour
-              qui ne l'a jamais trouvé. Décision du patron, sur question
-              posée : le pourtour la porte en toutes circonstances. C'est la
-              règle de la palette, d'ailleurs : les teintes de menuiserie ne
-              décorent pas, elles DÉSIGNENT (voir `MAQUETTE`).
-            */
-            stroke: porte ? pal.door : pal.passage,
-            dashed: true,
-            bias: 0.006,
-            normal: outwardOf(p, r),
-          });
-        }
         /*
           LE SEUIL — ce qui distingue une porte d'un trou dans un mur.
 
@@ -2811,6 +2800,7 @@ export function buildScene(
    * modèle doit montrer — sans quoi une double prise ressemble à une prise
    * posée de travers sur une autre.
    */
+  const appareils: PoseDAppareil[] = [];
   const lots = new Map<string, Fixture[]>();
   for (const f of opts.fixtures ?? []) {
     const cle = f.group ? `g:${f.group}:${f.wallId}:${f.side}` : `s:${f.id}`;
@@ -2868,16 +2858,21 @@ export function buildScene(
     // Les postes réels : une boîte d'encastrement par mécanisme, à
     // l'entraxe, qu'ils viennent d'un appareil multiposte du catalogue ou de
     // deux appareils réunis à la main.
-    const postes: { x: number; y: number; kind: FixtureKind }[] = [];
-    for (const f of lot) {
-      const sp = FIXTURES[f.kind];
-      const gauche = faceX(face, f.along) - sp.w / 2;
-      const kinds = postsOf(f.kind);
-      const offs = boxOffsets(f.kind);
-      kinds.forEach((k, i) =>
-        postes.push({ x: gauche + offs[i], y: f.height, kind: k }),
-      );
-    }
+    const postes = postesDuLot(lot, (f) => faceX(face, f.along));
+    appareils.push(
+      ...posesDUnLot(
+        lot.map((f) => f.id).join('+'),
+        w.id,
+        postes,
+        (fx, fy) => {
+          // Un demi-millimètre devant le nu : le dos de la plaque ne se bat
+          // pas avec le mur.
+          const q = at(fx, 0.0005);
+          return { x: q.x, y: fy, z: q.z };
+        },
+        { nx: face.nx, nz: face.nz },
+      ),
+    );
 
     // Un appareil hors gabarit — tableau, applique, thermostat large — n'est
     // pas de l'appareillage encastré : il garde son volume propre.
@@ -3022,6 +3017,7 @@ export function buildScene(
       // L'appareil appartient à une FACE de mur : il n'existe que pour qui
       // regarde ce côté-là.
       fa.facing = { x: face.nx, y: 0, z: face.nz };
+      fa.appareil = true;
       /*
         ET IL SE PEINT AVEC LE CONTENU DE LA PIÈCE QU'IL DESSERT.
 
@@ -3120,6 +3116,16 @@ export function buildScene(
     });
     const dessus = Array.from({ length: cotes }, (_, i) => bord(i));
     const centre: P3 = { x: cl.at.x, y: (y0 + y1) / 2, z: cl.at.z };
+    appareils.push({
+      id: `cl-${cl.id}`,
+      genre: 'plafond',
+      plafond: cl.kind,
+      x: cl.at.x,
+      y: haut,
+      z: cl.at.z,
+      nx: 0,
+      nz: 0,
+    });
     for (let i = 0; i < cotes; i++) {
       const p = dessus[i];
       const q = dessus[(i + 1) % cotes];
@@ -3132,6 +3138,7 @@ export function buildScene(
         ownerId: `cl-${cl.id}`,
         roomId: cl.roomId,
         depthAt: centre,
+        appareil: true,
       });
     }
     // Dessus et dessous : le même disque, deux normales opposées.
@@ -3149,6 +3156,7 @@ export function buildScene(
         ownerId: `cl-${cl.id}`,
         roomId: cl.roomId,
         depthAt: centre,
+        appareil: true,
       });
     }
   }
@@ -3534,7 +3542,7 @@ export function buildScene(
     }
   }
 
-  return { faces: faces.filter(nonDegenere), rooms, floorY, meubles: poses };
+  return { faces: faces.filter(nonDegenere), rooms, floorY, meubles: poses, appareils };
 }
 
 /**

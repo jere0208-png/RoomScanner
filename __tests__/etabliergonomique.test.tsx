@@ -118,11 +118,13 @@ const monterEtabli = () => {
   return tree;
 };
 
-/** Le rectangle de l'appareil : le seul Rect arrondi plein de couleur. */
+/**
+ * L'emprise de l'appareil : ce que son dessin couvre à l'écran. Il était un
+ * rectangle de couleur ; c'est maintenant une vraie prise (`AppareilDeFace`),
+ * et son emprise est posée à part, nommée.
+ */
 const rectAppareil = (tree: TestRenderer.ReactTestRenderer) =>
-  tree.root
-    .findAllByType(Rect)
-    .find((n) => n.props.rx === 4 && n.props.fill !== 'none');
+  tree.root.findAllByType(Rect).find((n) => n.props.testID === 'emprise-a');
 
 /**
  * UN GLISSEMENT, tel que le `PanResponder` le voit — le piège documenté :
@@ -196,6 +198,29 @@ describe('les appareils se voient', () => {
     expect(r).toBeTruthy();
     expect(Number(r.props.width)).toBeGreaterThanOrEqual(30);
     expect(Number(r.props.height)).toBeGreaterThanOrEqual(30);
+    // Agrandie d'un seul facteur : une prise reste carrée.
+    expect(Number(r.props.width)).toBeCloseTo(Number(r.props.height), 3);
+  });
+
+  /*
+    UNE VRAIE PRISE, PLUS UN BLOC NOTÉ — relevé du patron : « on ne doit plus
+    voir un bloc noté mais une vraie prise ajoutée, comme le rendu qu'on aura
+    à la fin ». Le carré ambre écrit « PC » est devenu la prise elle-même.
+  */
+  it('dessine une vraie prise : son puits, ses alvéoles, sa broche — et plus de sigle', () => {
+    const t = monterEtabli();
+    const textes = t.root
+      .findAll((n) => n.type === ('RNSVGText' as never) || typeof n.props?.children === 'string')
+      .map((n) => String(n.props.children ?? ''));
+    expect(textes).not.toContain('PC');
+    const cercles = t.root.findAll((n) => typeof n.props?.r === 'number' && typeof n.props?.fill === 'string');
+    // Le puits, éclairé par le haut.
+    expect(cercles.some((n) => n.props.fill === 'url(#app-puits)')).toBe(true);
+    // Deux alvéoles noires, et la broche de terre chromée.
+    expect(cercles.filter((n) => n.props.fill === '#1C1D20' && typeof n.type !== 'string').length).toBe(2);
+    expect(cercles.some((n) => n.props.fill === 'url(#app-chrome)')).toBe(true);
+    // Plus aucun aplat de la couleur de famille.
+    expect(t.root.findAll((n) => n.props?.fill === '#C8770A')).toHaveLength(0);
   });
 });
 

@@ -14,8 +14,11 @@
  * DEUX CHOSES FONT UNE PORTE, et la maquette les montre maintenant toutes
  * les deux :
  *
- *   — LE PERCEMENT : le pourtour du vide, en pointillé sur les deux faces du
- *     mur, exactement comme une baie libre. C'est le trou dans la maçonnerie ;
+ *   — LE PERCEMENT : le vide, exactement comme une baie libre — le mur
+ *     s'arrête et on voit au travers. C'est le trou dans la maçonnerie. Il
+ *     était cerné d'un pointillé sur les deux faces du mur ; relevé du
+ *     patron, « enlève les pointillés des ouvertures sur le plan 3D » : le
+ *     trou se lit sans trait, et plus rien n'est tireté dans la maquette ;
  *
  *   — LE SEUIL : une barre plate au sol, dans l'epaisseur du tableau. C'est
  *     lui qui dit qu'ici on FERME, alors qu'une baie libre se traverse.
@@ -91,11 +94,37 @@ const scene = (o: WallSeg) =>
     rooms: ROOMS,
   });
 
-/** Le pourtour du percement : un trait tirete, a la hauteur de la baie. */
-const pointilles = (
-  faces: { dashed?: boolean; stroke: string | null; pts: { y: number }[] }[],
+/** Tout trait tirete de la maquette : il n'y en a plus aucun. */
+const pointilles = (faces: { dashed?: boolean }[]) => faces.filter((f) => f.dashed);
+
+/**
+ * Ce qui BOUCHE la baie : une surface pleine, dans sa travee (x de 1,6 a
+ * 2,43), entre le seuil et le linteau, dans l'epaisseur du mur. Les tableaux
+ * — les flancs du trou, qui tournent dans l'epaisseur — sont perpendiculaires
+ * au mur : on ne compte que ce qui lui est parallele.
+ */
+const bouchons = (
+  faces: {
+    fill: string | null;
+    isFloor?: boolean;
+    pts: { x: number; y: number; z: number }[];
+  }[],
 ) =>
-  faces.filter((f) => f.dashed && Math.max(...f.pts.map((p) => p.y)) > 1.5);
+  faces.filter((f) => {
+    if (f.isFloor || !f.fill) return false;
+    const x = f.pts.map((p) => p.x);
+    const y = f.pts.map((p) => p.y);
+    const z = f.pts.map((p) => p.z);
+    const parallele = Math.max(...z) - Math.min(...z) < 0.01;
+    return (
+      parallele &&
+      Math.min(...x) < 2.3 &&
+      Math.max(...x) > 1.7 &&
+      Math.max(...y) > 0.5 &&
+      Math.min(...y) < 1.8 &&
+      Math.max(...z.map(Math.abs)) < 0.25
+    );
+  });
 
 /**
  * Le SEUIL, cherche par sa NATURE : une surface PLEINE qui rase le sol, dans
@@ -138,7 +167,15 @@ const enTraversDeLaPiece = (
 
 describe('la porte en volume', () => {
   it('perce le mur au lieu de le reboucher', () => {
-    expect(pointilles(scene(menuiserie('door')).faces).length).toBeGreaterThan(0);
+    expect(bouchons(scene(menuiserie('door')).faces)).toHaveLength(0);
+    // Le contre-sens : une fenetre, elle, garde son vitrage dans la baie.
+    expect(bouchons(scene(menuiserie('window')).faces).length).toBeGreaterThan(0);
+  });
+
+  it('sans aucun pointillé autour du trou', () => {
+    for (const t of ['door', 'opening', 'window'] as const) {
+      expect(pointilles(scene(menuiserie(t)).faces)).toHaveLength(0);
+    }
   });
 
   it('pose son seuil au sol, dans la travee de la baie', () => {
@@ -158,22 +195,16 @@ describe('la porte en volume', () => {
   });
 
   /*
-    LE POURTOUR DIT LA NATURE, SANS REGLAGE A COCHER.
+    LE SEUIL DIT LA NATURE, SANS REGLAGE A COCHER.
 
-    Le seuil ne fait que deux centimetres : de loin, une porte et une baie
-    libre se ressemblaient trait pour trait. La teinte des portes a d'abord
-    ete reservee au reglage « Couleur des portes/fenetres » — decoche par
-    defaut, donc invisible pour qui ne l'a jamais trouve. Question posee au
-    patron, reponse : « oui pour le pourtour ». Les teintes de menuiserie ne
-    decorent pas, elles DESIGNENT (voir `MAQUETTE`) : le pourtour d'une porte
-    est ambre en toutes circonstances, celui d'une baie reste le bleu des
-    passages.
+    Le pourtour tirete — ambre pour une porte, bleu pour une baie — a ete
+    retire a la demande du patron. Ce qui reste pour les distinguer est ce
+    qui les distingue sur le chantier : la porte a un seuil, la baie libre
+    n'en a pas.
   */
-  it('se distingue d’une baie au premier coup d’œil, sans rien cocher', () => {
-    const teinteDe = (o: WallSeg) =>
-      new Set(pointilles(scene(o).faces).map((f) => f.stroke));
-    expect([...teinteDe(menuiserie('door'))]).toEqual([MAQUETTE.door]);
-    expect([...teinteDe(menuiserie('opening'))]).toEqual([MAQUETTE.passage]);
+  it('se distingue d’une baie par son seuil, sans rien cocher', () => {
+    expect(seuils(scene(menuiserie('door')).faces).length).toBeGreaterThan(0);
+    expect(seuils(scene(menuiserie('opening')).faces)).toHaveLength(0);
   });
 
   /*
@@ -182,7 +213,7 @@ describe('la porte en volume', () => {
   */
   it('une baie libre se traverse, et ne porte pas de seuil', () => {
     const f = scene(menuiserie('opening')).faces;
-    expect(pointilles(f).length).toBeGreaterThan(0);
+    expect(bouchons(f)).toHaveLength(0);
     expect(seuils(f)).toHaveLength(0);
   });
 

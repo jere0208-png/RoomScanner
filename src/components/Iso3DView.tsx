@@ -23,6 +23,7 @@ import {
 } from 'react-native-room-scan';
 import { cameraOrbite, maillageDeLaMaquette } from '../geometry/maquette3d';
 import { maillageDesMeubles } from '../geometry/modeles3d';
+import { groupesDesAppareils } from '../geometry/appareils3d';
 import { grouperTraces } from '../ui/traces';
 import { mettreAPlat } from '../ui/canevas';
 import { estUnGlissement, estUnTap } from '../ui/geste';
@@ -1264,9 +1265,24 @@ export function Iso3DView({
     que la scène lui a donnée ; ses caisses restent au canevas, qui ne sait
     pas peindre mille triangles par meuble.
   */
+  /*
+    ET LE VRAI APPAREILLAGE — relevé du patron : « on ne doit plus voir un
+    bloc noté mais une vraie prise ajoutée, comme le rendu qu'on aura à la
+    fin ». Plaques, prises, interrupteurs, tableau, luminaires : fabriqués à
+    leurs cotes (`appareils3d`), dans le même flux que les meubles. Un mur
+    isolé ne garde que ses appareils, comme il ne garde que ses caisses.
+  */
   const meublesNatifs = useMemo(
-    () => (natif ? maillageDesMeubles(scene.meubles ?? []) : null),
-    [natif, scene],
+    () =>
+      natif
+        ? maillageDesMeubles(
+            scene.meubles ?? [],
+            groupesDesAppareils(
+              (scene.appareils ?? []).filter((a) => !focusWallId || !a.wallId || a.wallId === focusWallId),
+            ),
+          )
+        : null,
+    [natif, scene, focusWallId],
   );
 
   /*

@@ -515,8 +515,9 @@ final class RoomScanVisite: UIView {
       if code == 9 { n.renderingOrder = 5 }
       if code == 3 { n.renderingOrder = 6 }
       out.append(n)
-      // Le liseré : pour ce qui a une forme pleine (ni ombre, ni verre, ni feuille).
-      if code != 9 && code != 3 && code != 4 {
+      // Le liseré : pour ce qui a une forme pleine (ni ombre, ni verre, ni
+      // feuille, ni lumière — un diffuseur allumé n'a pas de bord sombre).
+      if code != 9 && code != 3 && code != 4 && code != 5 {
         if let coque = noeudDeContour(sommets, indices) { out.append(coque) }
       }
     }
@@ -640,6 +641,11 @@ final class RoomScanVisite: UIView {
       m.writesToDepthBuffer = false
     case 4:
       m.isDoubleSided = true
+    case 5:
+      // CE QUI ÉCLAIRE — le diffuseur d'une applique, le verre d'un spot,
+      // une ampoule : il donne la lumière au lieu de la recevoir. Il se
+      // peint donc de sa propre teinte, sans ombre, comme une lampe allumée.
+      m.lightingModel = .constant
     case 9:
       m.lightingModel = .constant
       m.diffuse.contents = RoomScanVisite.imageDOmbre

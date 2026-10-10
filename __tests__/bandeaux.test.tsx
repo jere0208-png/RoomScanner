@@ -915,8 +915,41 @@ describe('l’écran des résultats', () => {
     expect(carte!.findAll((n) => n.props?.accessibilityLabel === 'Tout le mur').length).toBeGreaterThan(0);
   });
 
+  /*
+    UN MEUBLE NE SE PREND QU'EN ÉDITION — relevé du patron : « le clic sur
+    les meubles ne doit pas être possible sans mode édition ». Hors édition,
+    on lit le plan : aucun meuble ne répond au doigt.
+  */
+  const enEdition = (tree: TestRenderer.ReactTestRenderer) => {
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+  };
+  const ciblesDeMeuble = (tree: TestRenderer.ReactTestRenderer) =>
+    tree.root.findAll(
+      // « Meuble Lit », « Meuble Chaise »… — pas la pastille « Meubles » du calque.
+      (n) => /^Meuble /.test(String(n.props?.accessibilityLabel ?? '')) && typeof n.props?.onPress === 'function',
+    );
+
+  it('hors édition, aucun meuble ne se prend ; en édition, si', () => {
+    const tree = monter();
+    expect(ciblesDeMeuble(tree)).toHaveLength(0);
+    enEdition(tree);
+    expect(ciblesDeMeuble(tree).length).toBeGreaterThan(0);
+    // Et en sortant de l'édition, le meuble tenu est lâché.
+    act(() => ciblesDeMeuble(tree)[0].props.onPress());
+    expect(bouton(tree, 'Cotes du meuble')).toBeDefined();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(bouton(tree, 'Cotes du meuble')).toBeUndefined();
+  });
+
   it('déplace le meuble d’un centimètre à la flèche', () => {
     const tree = monter();
+    enEdition(tree);
     // On touche le meuble sur le plan, puis on ouvre ses cotes : c'est là que
     // les flèches se trouvent.
     // Le meuble se prend par sa cible nommée, plus par son dessin : voir
@@ -955,6 +988,7 @@ describe('l’écran des résultats', () => {
    */
   it('ouvre le bandeau du meuble, avec ses cotes', () => {
     const tree = monter();
+    enEdition(tree);
     /** Un meuble : un groupe touchable qui porte son emprise arrondie. */
     // Le meuble se prend par sa cible nommée, plus par son dessin : voir
     // l'épreuve « toucher le sol lâche le meuble tenu » pour le pourquoi.
@@ -984,6 +1018,7 @@ describe('l’écran des résultats', () => {
    */
   it('ne pose aucun champ de saisie dans les bandeaux', () => {
     const tree = monter();
+    enEdition(tree);
     // Le meuble se prend par sa cible nommée, plus par son dessin : voir
     // l'épreuve « toucher le sol lâche le meuble tenu » pour le pourquoi.
     const meuble = tree.root.findAll((n) =>
