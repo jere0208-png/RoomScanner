@@ -411,7 +411,8 @@ export function Exploration({
   const publier = (arret: boolean) => {
     if (natifPret) {
       const cam = cameraNative(cameraDe(pose.current));
-      if (!poserCameraDeVisite(cle, cam)) setSecours(cam);
+      const pris = typeof poserCameraDeVisite === 'function' && poserCameraDeVisite(cle, cam);
+      if (!pris) setSecours(cam);
     } else {
       montrer(arret);
     }

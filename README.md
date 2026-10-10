@@ -14285,6 +14285,36 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## La maquette en rotation par la régie, et des contours de meubles discrets
+
+Relevés du patron : « corrige aussi la maquette 3D en rotation de la même
+façon » ; « réduis l'opacité des contours de meubles, ça fait trop dessin
+animé ; je cherche juste à mieux différencier les meubles des murs et des
+sols ».
+
+**La maquette en orbite** (`Iso3DView`) avait le même défaut que la visite :
+son orbite (à chaque image du doigt) et sa levée (à chaque image de
+l'animation de retour de scan) étaient des propriétés, et chacune faisait
+reconvertir par la couche de compatibilité tout le maillage du logement.
+La vue reçoit désormais son orbite et sa levée D'ENTRÉE, une fois à son
+montage, sous sa clé (`cle`) ; ensuite la régie les lui pose
+(`poserOrbiteDeMaquette`, `poserLeveeDeMaquette`, `RoomScanVisiteRegie.orbite`
+et `.levee`). Sans régie (ancien binaire), elles repassent par les
+propriétés. Côté natif, une valeur posée avant que la vue soit montée attend
+sa vue et s'applique juste après ses propriétés de montage — deux chemins
+mènent au fil principal, l'ordre d'arrivée n'est pas garanti.
+
+**Les contours des meubles** (`RoomScanVisite.noeudDeContour`) deviennent un
+voile : gris chaud plus clair, au tiers de son opacité, sans écrire la
+profondeur (il ne cache rien), dessiné après le reste ; plus fin aussi —
+quatre cinquièmes de point d'écran en orbite, 3 mm en visite. Le bord d'un
+meuble blanc se détache du mur blanc d'un souffle, sans être cerné.
+
+Bancs : `maquettegpu.test.tsx` — en tournant, la propriété garde l'orbite
+d'entrée et la régie reçoit la nouvelle, à la clé de la vue ; ni maillage, ni
+sols, ni meubles ne sont renvoyés ; sans régie, l'orbite repasse par la
+propriété.
+
 ## La visite 3D : la caméra hors des propriétés, une boucle par image, plus de manette affichée
 
 Relevé du patron : « la visite est bug encore plus qu'avant pour le

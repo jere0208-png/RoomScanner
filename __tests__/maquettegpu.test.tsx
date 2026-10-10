@@ -19,7 +19,15 @@
  *     voyage plus quand seule la caméra bouge.
  */
 const natifPresent = { valeur: true };
+/** La régie de la vue native : présente, elle reçoit l'orbite à chaque image. */
+const mockRegie = { presente: true, orbites: [] as { cle: string; orbite: number[] }[] };
 jest.mock('react-native-room-scan', () => ({
+  poserOrbiteDeMaquette: (cle: string, orbite: number[]) => {
+    if (!mockRegie.presente) return false;
+    mockRegie.orbites.push({ cle, orbite });
+    return true;
+  },
+  poserLeveeDeMaquette: () => mockRegie.presente,
   RoomScan: {
     isSupported: jest.fn(async () => true),
     viewModel: jest.fn(async () => false),
@@ -202,8 +210,17 @@ describe('la vue 3D', () => {
     expect(t.root.findAll((n) => typeof n.props?.d === 'string' && n.props.d.length > 2)).toHaveLength(0);
   });
 
-  it('quand la caméra tourne, seule la caméra voyage : la géométrie ne bouge pas', () => {
+  /*
+    ET LA CAMÉRA NE PASSE PLUS PAR LES PROPRIÉTÉS — relevé du patron :
+    « corrige aussi la maquette 3D en rotation de la même façon ». Chaque
+    propriété changée faisait reconvertir tout le maillage par la couche de
+    compatibilité de React Native : l'orbite part par la régie, à la clé de
+    la vue, et les propriétés ne bougent plus quand on tourne.
+  */
+  it('quand la caméra tourne, seule la caméra voyage — par la régie', () => {
     natifPresent.valeur = true;
+    mockRegie.presente = true;
+    mockRegie.orbites.length = 0;
     const t = monter();
     const avant = natif(t).props;
     act(() => {
@@ -213,7 +230,26 @@ describe('la vue 3D', () => {
     expect(apres.orientes).toBe(avant.orientes);
     expect(apres.maillage).toBe(avant.maillage);
     expect(apres.sols).toBe(avant.sols);
-    expect(apres.orbite).not.toEqual(avant.orbite);
+    expect(apres.meubles).toBe(avant.meubles);
+    // La propriété garde l'orbite d'entrée ; la régie a reçu la nouvelle.
+    expect(apres.orbite).toBe(avant.orbite);
+    const derniere = mockRegie.orbites[mockRegie.orbites.length - 1];
+    expect(derniere.cle).toBe(apres.cle);
+    expect(derniere.orbite).toHaveLength(10);
+    expect(derniere.orbite).not.toEqual(avant.orbite);
+  });
+
+  it('sans régie (ancien binaire), l’orbite repasse par la propriété', () => {
+    natifPresent.valeur = true;
+    mockRegie.presente = false;
+    const t = monter();
+    const avant = natif(t).props;
+    act(() => {
+      t.update(<Iso3DView value={{ theta: 80, tilt: 40, zoom: 1.6, ox: 12, oy: -8 }} />);
+    });
+    expect(natif(t).props.orbite).not.toEqual(avant.orbite);
+    expect(natif(t).props.maillage).toBe(avant.maillage);
+    mockRegie.presente = true;
   });
 
   it('sans SceneKit, le canevas reprend la maquette, entière', () => {

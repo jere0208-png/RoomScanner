@@ -123,6 +123,8 @@ RCT_EXPORT_VIEW_PROPERTY(styles, NSArray)
 */
 @interface RCT_EXTERN_MODULE(RoomScanVisiteRegie, NSObject)
 RCT_EXTERN_METHOD(camera:(NSString *)cle valeurs:(NSArray *)valeurs)
+RCT_EXTERN_METHOD(orbite:(NSString *)cle valeurs:(NSArray *)valeurs)
+RCT_EXTERN_METHOD(levee:(NSString *)cle k:(nonnull NSNumber *)k solY:(nonnull NSNumber *)solY)
 @end
 
 /*

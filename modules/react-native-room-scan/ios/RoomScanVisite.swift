@@ -132,7 +132,19 @@ final class RoomScanVisite: UIView {
   @objc var cle: String = "" {
     didSet {
       if !oldValue.isEmpty { RoomScanVisite.registre.removeObject(forKey: oldValue as NSString) }
-      if !cle.isEmpty { RoomScanVisite.registre.setObject(self, forKey: cle as NSString) }
+      guard !cle.isEmpty else { return }
+      RoomScanVisite.registre.setObject(self, forKey: cle as NSString)
+      /*
+        CE QUI EST ARRIVÉ AVANT LA VUE. La régie peut poser une caméra avant
+        que la vue ne soit montée — elles empruntent deux chemins vers le fil
+        principal. La valeur attend sa vue, et s'applique au tour suivant,
+        APRÈS les propriétés de montage, qui sont plus anciennes qu'elle.
+      */
+      let cle = self.cle
+      DispatchQueue.main.async { [weak self] in
+        guard let self, self.cle == cle else { return }
+        RoomScanVisite.appliquerEnAttente(cle, a: self)
+      }
     }
   }
 
@@ -140,9 +152,37 @@ final class RoomScanVisite: UIView {
     registre.object(forKey: cle as NSString)
   }
 
+  /** Ce que la régie a posé pour une clé dont la vue n'était pas encore là. */
+  private static var camerasEnAttente: [String: [NSNumber]] = [:]
+  private static var orbitesEnAttente: [String: [NSNumber]] = [:]
+  private static var leveesEnAttente: [String: (NSNumber, NSNumber)] = [:]
+
+  static func attendre(_ cle: String, camera: [NSNumber]) { camerasEnAttente[cle] = camera }
+  static func attendre(_ cle: String, orbite: [NSNumber]) { orbitesEnAttente[cle] = orbite }
+  static func attendre(_ cle: String, levee: NSNumber, solY: NSNumber) {
+    leveesEnAttente[cle] = (levee, solY)
+  }
+
+  private static func appliquerEnAttente(_ cle: String, a vue: RoomScanVisite) {
+    if let c = camerasEnAttente.removeValue(forKey: cle) { vue.poserCamera(c) }
+    if let o = orbitesEnAttente.removeValue(forKey: cle) { vue.poserOrbite(o) }
+    if let l = leveesEnAttente.removeValue(forKey: cle) { vue.poserLevee(l.0, solY: l.1) }
+  }
+
   /** La caméra de la visite, posée directement : voir `cle`. */
   func poserCamera(_ valeurs: [NSNumber]) {
     camera = valeurs
+  }
+
+  /** La caméra de la maquette en orbite, posée directement : voir `cle`. */
+  func poserOrbite(_ valeurs: [NSNumber]) {
+    orbite = valeurs
+  }
+
+  /** La levée de la maquette au retour d'un scan, posée directement. */
+  func poserLevee(_ k: NSNumber, solY y: NSNumber) {
+    solY = y
+    levee = k
   }
 
   /// Le fil du bois et la trame des tissus, dessinés une fois par teinte.
@@ -274,7 +314,7 @@ final class RoomScanVisite: UIView {
       return
     }
     oeil.camera?.usesOrthographicProjection = false
-    regleLeContour(0.005)
+    regleLeContour(0.003)
     guard camera.count >= 6 else { return }
     let x = camera[0].floatValue
     let y = camera[1].floatValue
@@ -343,9 +383,9 @@ final class RoomScanVisite: UIView {
       x: cible.x + vers.x * recul, y: cible.y + vers.y * recul, z: cible.z + vers.z * recul)
     oeil.look(at: cible, up: haut, localFront: SCNVector3(x: 0, y: 0, z: -1))
     SCNTransaction.commit()
-    // Un point et quart d'écran, en mètres, au zoom de cette image.
+    // Quatre cinquièmes de point d'écran, en mètres, au zoom de cette image.
     let hauteur = Float(max(1, bounds.height))
-    regleLeContour(o[9] * 2 / hauteur * 1.25)
+    regleLeContour(o[9] * 2 / hauteur * 0.8)
   }
 
   /**
@@ -525,7 +565,18 @@ final class RoomScanVisite: UIView {
       elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)])
     let m = SCNMaterial()
     m.lightingModel = .constant
-    m.diffuse.contents = UIColor(red: 0.36, green: 0.34, blue: 0.31, alpha: 1)
+    /*
+      UN VOILE AU BORD, PAS UN TRAIT DE BANDE DESSINÉE — relevé du patron :
+      « réduis l'opacité des contours de meubles, ça fait trop dessin animé ;
+      je cherche juste à mieux différencier les meubles des murs et des
+      sols ». Un gris chaud plus clair, au tiers de son opacité : le bord d'un
+      meuble blanc se détache du mur blanc d'un souffle, sans être cerné.
+      Il n'écrit pas la profondeur : un voile ne doit rien cacher.
+    */
+    m.diffuse.contents = UIColor(red: 0.42, green: 0.40, blue: 0.37, alpha: 1)
+    m.transparency = 0.32
+    m.blendMode = .alpha
+    m.writesToDepthBuffer = false
     // Seules les faces ARRIÈRE : la coque ne se voit qu'au bord de la forme.
     m.cullMode = .front
     m.isDoubleSided = false
@@ -540,7 +591,10 @@ final class RoomScanVisite: UIView {
     m.setValue(NSNumber(value: epaisseurContour), forKey: "epaisseur")
     materiauxContour.append(m)
     g.materials = [m]
-    return SCNNode(geometry: g)
+    let noeud = SCNNode(geometry: g)
+    // Après le reste : un voile se pose sur ce qui est déjà peint.
+    noeud.renderingOrder = 4
+    return noeud
   }
 
   /** L'épaisseur du liseré, en mètres — un point d'écran, au zoom du moment. */
@@ -926,7 +980,31 @@ final class RoomScanVisiteRegie: NSObject {
 
   @objc func camera(_ cle: String, valeurs: [NSNumber]) {
     DispatchQueue.main.async {
-      RoomScanVisite.parCle(cle)?.poserCamera(valeurs)
+      if let vue = RoomScanVisite.parCle(cle) {
+        vue.poserCamera(valeurs)
+      } else {
+        RoomScanVisite.attendre(cle, camera: valeurs)
+      }
+    }
+  }
+
+  @objc func orbite(_ cle: String, valeurs: [NSNumber]) {
+    DispatchQueue.main.async {
+      if let vue = RoomScanVisite.parCle(cle) {
+        vue.poserOrbite(valeurs)
+      } else {
+        RoomScanVisite.attendre(cle, orbite: valeurs)
+      }
+    }
+  }
+
+  @objc func levee(_ cle: String, k: NSNumber, solY: NSNumber) {
+    DispatchQueue.main.async {
+      if let vue = RoomScanVisite.parCle(cle) {
+        vue.poserLevee(k, solY: solY)
+      } else {
+        RoomScanVisite.attendre(cle, levee: k, solY: solY)
+      }
     }
   }
 }

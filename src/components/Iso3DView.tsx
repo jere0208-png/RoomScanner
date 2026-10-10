@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, PanResponder, StyleSheet, View } from 'react-native';
 import Svg, {
   Circle,
@@ -15,7 +15,12 @@ import Svg, {
   se pose pas sur une balise SVG ordinaire.
 */
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-import { RoomScanCanvas, RoomScanVisite } from 'react-native-room-scan';
+import {
+  RoomScanCanvas,
+  RoomScanVisite,
+  poserLeveeDeMaquette,
+  poserOrbiteDeMaquette,
+} from 'react-native-room-scan';
 import { cameraOrbite, maillageDeLaMaquette } from '../geometry/maquette3d';
 import { maillageDesMeubles } from '../geometry/modeles3d';
 import { grouperTraces } from '../ui/traces';
@@ -1263,6 +1268,55 @@ export function Iso3DView({
     () => (natif ? maillageDesMeubles(scene.meubles ?? []) : null),
     [natif, scene],
   );
+
+  /*
+    LA CAMÉRA DE LA MAQUETTE NE PASSE PLUS PAR LES PROPRIÉTÉS — relevé du
+    patron : « corrige aussi la maquette 3D en rotation de la même façon »
+    (voir la visite, `RoomScanVisite.cle`).
+
+    La vue native est montée par la couche de compatibilité de React Native :
+    chaque propriété changée lui faisait reconvertir et recomparer TOUTES les
+    autres — le maillage du logement, ses sols, ses meubles —, et l'orbite
+    changeait à chaque image du doigt, la levée à chaque image de son
+    animation. La vue reçoit donc sa caméra et sa levée D'ENTRÉE, une fois à
+    son montage ; ensuite la régie les lui pose, à la clé de la vue. Sans
+    régie (ancien binaire), elles repassent par les propriétés.
+  */
+  const cleMaquette = useRef(
+    `maquette-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+  ).current;
+  const vueNativeMontee = natif && !!maquette && !!RoomScanVisite;
+  const orbite = cameraOrbite(view, center, radius3d, layout);
+  const entreeOrbite = useRef<number[] | null>(null);
+  const entreeLevee = useRef<{ k: number; solY: number } | null>(null);
+  if (!vueNativeMontee) {
+    entreeOrbite.current = null;
+    entreeLevee.current = null;
+  } else {
+    if (!entreeOrbite.current) entreeOrbite.current = orbite;
+    if (!entreeLevee.current) entreeLevee.current = { k: leve, solY: scene.floorY };
+  }
+  const [secoursOrbite, setSecoursOrbite] = useState<number[] | null>(null);
+  const [secoursLevee, setSecoursLevee] = useState<{ k: number; solY: number } | null>(null);
+  const cleOrbite = orbite.join(',');
+  useLayoutEffect(() => {
+    if (!vueNativeMontee) return;
+    const pose =
+      typeof poserOrbiteDeMaquette === 'function' && poserOrbiteDeMaquette(cleMaquette, orbite);
+    if (!pose) setSecoursOrbite(orbite);
+    // L'orbite est lue par sa valeur : un rendu qui ne la change pas ne
+    // pose rien.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vueNativeMontee, cleOrbite, cleMaquette]);
+  useLayoutEffect(() => {
+    if (!vueNativeMontee) return;
+    const pose =
+      typeof poserLeveeDeMaquette === 'function' &&
+      poserLeveeDeMaquette(cleMaquette, leve, scene.floorY);
+    if (!pose) setSecoursLevee({ k: leve, solY: scene.floorY });
+  }, [vueNativeMontee, leve, scene.floorY, cleMaquette]);
+  const orbiteDeLaVue = secoursOrbite ?? entreeOrbite.current ?? orbite;
+  const leveeDeLaVue = secoursLevee ?? entreeLevee.current ?? { k: leve, solY: scene.floorY };
 
   /**
    * Quel pan masque quel meuble : la part qui ne dépend pas de l'angle.
@@ -2525,9 +2579,10 @@ export function Iso3DView({
               sols={maquette.sols}
               meubles={meublesNatifs ?? undefined}
               voile={!solidWalls}
-              orbite={cameraOrbite(view, center, radius3d, layout)}
-              levee={leve}
-              solY={scene.floorY}
+              orbite={orbiteDeLaVue}
+              levee={leveeDeLaVue.k}
+              solY={leveeDeLaVue.solY}
+              cle={cleMaquette}
               fond={c.surface}
             />
           ) : (

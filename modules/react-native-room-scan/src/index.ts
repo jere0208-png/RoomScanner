@@ -271,6 +271,27 @@ export function poserCameraDeVisite(cle: string, camera: number[]): boolean {
 }
 
 /**
+ * LA CAMÉRA DE LA MAQUETTE EN ORBITE, POSÉE DIRECTEMENT — dix nombres, à
+ * chaque image du doigt. Même raison que pour la visite : en propriété, elle
+ * faisait reconvertir tout le maillage du logement par la couche de
+ * compatibilité. `false` sans régie : l'appelant repasse par `orbite`.
+ */
+export function poserOrbiteDeMaquette(cle: string, orbite: number[]): boolean {
+  const regie = Platform.OS === 'ios' ? NativeModules.RoomScanVisiteRegie : undefined;
+  if (!regie?.orbite) return false;
+  regie.orbite(cle, orbite);
+  return true;
+}
+
+/** La levée de la maquette au retour d'un scan, posée directement. */
+export function poserLeveeDeMaquette(cle: string, levee: number, solY: number): boolean {
+  const regie = Platform.OS === 'ios' ? NativeModules.RoomScanVisiteRegie : undefined;
+  if (!regie?.levee) return false;
+  regie.levee(cle, levee, solY);
+  return true;
+}
+
+/**
  * Émetteur d'événements du scan : 'onScanUpdate', 'onInstruction', 'onScanError'.
  * iOS émet via le module RoomScanEvents, Android via le DeviceEventEmitter.
  */
