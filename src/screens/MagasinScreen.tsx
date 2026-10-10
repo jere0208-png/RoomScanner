@@ -40,7 +40,7 @@ import { VignetteProduit } from '../components/VignetteProduit';
 import {
   RAYONS,
   catalogueDuMagasin,
-  offreAmazon,
+  propositionAmazon,
   type ArticleTarife,
 } from '../geometry/magasin';
 import { dateDuReleve } from '../geometry/prix';
@@ -109,7 +109,7 @@ function LigneArticle({
 }) {
   const c = useTheme();
   const styles = getStyles(c);
-  const amazon = offreAmazon(article, article.tarif);
+  const amazon = propositionAmazon(article, article.tarif, Date.now());
   return (
     <View style={styles.article}>
       <View style={styles.ligne}>
@@ -147,7 +147,7 @@ function LigneArticle({
 
       {amazon && (
         <View style={styles.amazon}>
-          <BoutonAmazon offre={amazon} reference={article.tarif.pu} />
+          <BoutonAmazon offre={amazon.offre} reference={article.tarif.pu} avecPrix={amazon.avecPrix} />
         </View>
       )}
 

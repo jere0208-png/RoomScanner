@@ -14285,6 +14285,27 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le lien affilié Amazon posé — et le prix Amazon seulement s'il est du jour
+
+Relevé du patron : « amazonpro09c3-21 pour le lien affilié Amazon ».
+`PARTENAIRE_AMAZON` (`magasin.ts`) porte maintenant cette balise : tous les
+liens du magasin la portent (`lienAmazon` → `amazon.fr/dp/<ASIN>?tag=…`).
+
+**Ce que ça change au bouton Amazon.** Avec une balise partenaire, l'app est un
+site affilié, et le programme Partenaires n'autorise l'affichage des prix
+d'Amazon que s'ils viennent de son API, rafraîchis. Le bouton affichait un prix
+relevé à la main le 28 août (« un meilleur prix a été trouvé sur Amazon ») :
+c'est exactement ce qui peut faire fermer un compte affilié.
+`propositionAmazon` tranche donc : un prix Amazon DU JOUR se montre, et
+seulement s'il vaut le détour (la règle du patron, « équivalent ou
+inférieur ») ; un prix plus vieux ne se montre pas — le bouton devient un
+simple lien, logo et « Aussi disponible sur Amazon », sans prix ni économie.
+Le jour où l'API fournira des prix du jour, le bouton reprendra de lui-même son
+prix et l'écart.
+
+Banc : `magasin.test.ts` (la balise dans le lien ; un prix vieux → le lien
+seul ; un prix du jour moins cher → le prix ; un prix du jour plus cher → rien).
+
 ## Le vrai Liquid Glass d'Apple, sans changer le dessin des cartes ; plus de trait sous les plans
 
 Relevé du patron, l'IPA en main : « l'effet de verre est raté : sur l'accueil

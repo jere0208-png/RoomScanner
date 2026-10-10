@@ -36,6 +36,7 @@ import {
   catalogueDuMagasin,
   lienAmazon,
   offreAmazon,
+  propositionAmazon,
 } from '../src/geometry/magasin';
 import {
   GAMMES,
@@ -349,11 +350,34 @@ describe('le bouton Amazon ne s’affiche que sur du vérifié', () => {
 });
 
 describe('le lien Amazon se fabrique à un seul endroit', () => {
-  it('sans balise partenaire, il mène à la fiche produit', () => {
-    // Relevé du patron : « on mettra plus tard un lien partenaires amazon ».
-    // Tant qu'il n'y en a pas, le lien marche et ne rapporte rien.
-    expect(PARTENAIRE_AMAZON).toBe('');
-    expect(lienAmazon('B007AKRUZG')).toBe('https://www.amazon.fr/dp/B007AKRUZG');
+  it('il porte la balise partenaire d’EchoPlan', () => {
+    // Relevé du patron : « amazonpro09c3-21 pour le lien affilié Amazon ».
+    expect(PARTENAIRE_AMAZON).toBe('amazonpro09c3-21');
+    expect(lienAmazon('B007AKRUZG')).toBe('https://www.amazon.fr/dp/B007AKRUZG?tag=amazonpro09c3-21');
+  });
+
+  it('et un prix Amazon ne se montre que s’il est du jour — sinon, le lien seul', () => {
+    /*
+      Règle du programme Partenaires : les prix d'Amazon affichés à côté d'un
+      lien affilié viennent de son API, rafraîchis. Un prix relevé à la main
+      des semaines plus tôt ne se montre pas, et ne se compare pas.
+    */
+    const a = ARTICLES.find((x) => x.code === 'diff-AC')!;
+    const t = TARIFS_COMMUNS['diff-AC'];
+    const vieux = propositionAmazon(a, t, Date.parse('2026-10-10T12:00:00'));
+    expect(vieux?.avecPrix).toBe(false);
+    expect(vieux?.offre.asin).toBe('B007AKRUZG');
+    // Le jour où un prix du jour arrive, le bouton reprend le prix — s'il vaut le détour.
+    const frais = {
+      ...a,
+      offres: (a.offres ?? []).map((o) => (o.enseigne === 'Amazon' ? { ...o, jour: '2026-10-10', prix: t.pu - 2 } : o)),
+    };
+    expect(propositionAmazon(frais, t, Date.parse('2026-10-10T12:00:00'))?.avecPrix).toBe(true);
+    const cher = {
+      ...a,
+      offres: (a.offres ?? []).map((o) => (o.enseigne === 'Amazon' ? { ...o, jour: '2026-10-10', prix: t.pu + 5 } : o)),
+    };
+    expect(propositionAmazon(cher, t, Date.parse('2026-10-10T12:00:00'))).toBeNull();
   });
 
   it('et aucune adresse n’est écrite en dur dans le catalogue', () => {

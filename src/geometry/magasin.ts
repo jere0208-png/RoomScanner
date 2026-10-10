@@ -110,14 +110,13 @@ export interface Offre {
 }
 
 /**
- * LA BALISE PARTENAIRE AMAZON — vide tant qu'on n'en a pas.
+ * LA BALISE PARTENAIRE AMAZON — celle du compte EchoPlan.
  *
- * Relevé du patron : « on mettra plus tard un lien partenaires amazon ». Le
- * jour où le compte existe, on écrit la balise ICI et tous les liens du
- * magasin la portent. Vide, les liens marchent quand même : ils mènent
- * simplement à la fiche produit sans rien rapporter.
+ * Relevé du patron : « on mettra plus tard un lien partenaires amazon », puis,
+ * le compte ouvert : « amazonpro09c3-21 pour le lien affilié Amazon ». Elle
+ * vit ICI, une fois : tous les liens du magasin la portent (`lienAmazon`).
  */
-export const PARTENAIRE_AMAZON = '';
+export const PARTENAIRE_AMAZON = 'amazonpro09c3-21';
 
 /** L'adresse d'une offre Amazon, balise partenaire comprise s'il y en a une. */
 export function lienAmazon(asin: string): string {
@@ -179,6 +178,41 @@ export function offreAmazon(a: ArticleMagasin, tarif: Tarif): Offre | null {
   );
   if (!vu) return null;
   return amazon.prix <= tarif.pu + 0.005 ? amazon : null;
+}
+
+/**
+ * UN PRIX AMAZON NE S'AFFICHE QUE FRAIS.
+ *
+ * Avec la balise partenaire, l'app devient un site affilié, et le programme
+ * Partenaires d'Amazon n'autorise l'affichage de SES prix que s'ils viennent
+ * de son API officielle, rafraîchis (et datés quand ils ne le sont pas
+ * d'heure en heure). Un prix relevé à la main il y a six semaines n'est pas
+ * un prix qu'on peut montrer à côté d'un lien affilié — ni le comparer à ceux
+ * des magasins.
+ *
+ * Tant qu'aucun prix du jour n'arrive, le bouton reste donc un LIEN : le logo
+ * et « Aussi sur Amazon », sans prix ni économie annoncée. Le jour où l'API
+ * fournit un prix daté du jour, le bouton reprend de lui-même ce que le
+ * patron avait demandé — le prix, et l'écart quand Amazon est moins cher.
+ */
+export function prixAmazonDuJour(o: Offre, maintenant: number): boolean {
+  const d = new Date(maintenant);
+  const deux = (n: number) => String(n).padStart(2, '0');
+  return o.jour === `${d.getFullYear()}-${deux(d.getMonth() + 1)}-${deux(d.getDate())}`;
+}
+
+/** Ce que le magasin propose côté Amazon : l'offre, et si son prix peut se montrer. */
+export function propositionAmazon(
+  a: ArticleMagasin,
+  tarif: Tarif,
+  maintenant: number,
+): { offre: Offre; avecPrix: boolean } | null {
+  const amazon = (a.offres ?? []).find((o) => o.enseigne === 'Amazon' && !!o.asin);
+  if (!amazon) return null;
+  if (!prixAmazonDuJour(amazon, maintenant)) return { offre: amazon, avecPrix: false };
+  // Un prix frais : la règle du patron — seulement s'il vaut le détour.
+  const vaut = offreAmazon(a, tarif);
+  return vaut ? { offre: vaut, avecPrix: true } : null;
 }
 
 /*

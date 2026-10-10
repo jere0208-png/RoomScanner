@@ -62,9 +62,15 @@ export function BoutonAmazon({
   offre,
   /** Le prix de la grande surface, pour dire ce qu'on économise. */
   reference,
+  avecPrix = true,
 }: {
   offre: Offre;
   reference: number;
+  /**
+   * Le prix Amazon peut-il se montrer ? Non tant qu'il n'est pas du jour
+   * (voir `propositionAmazon`) : le bouton est alors un simple lien.
+   */
+  avecPrix?: boolean;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
@@ -80,10 +86,12 @@ export function BoutonAmazon({
     tous les autres : à égalité, on dit simplement qu'on le trouve aussi
     là-bas.
   */
-  const meilleur = gain >= 0.01;
-  const phrase = meilleur
-    ? 'Un meilleur prix a été trouvé sur Amazon'
-    : 'Cet article est au même prix sur Amazon';
+  const meilleur = avecPrix && gain >= 0.01;
+  const phrase = !avecPrix
+    ? 'Aussi disponible sur Amazon'
+    : meilleur
+      ? 'Un meilleur prix a été trouvé sur Amazon'
+      : 'Cet article est au même prix sur Amazon';
 
   const ouvrir = () => {
     if (!offre.asin) return;
@@ -95,9 +103,11 @@ export function BoutonAmazon({
     <TouchableOpacity
       style={styles.bouton}
       accessibilityRole="link"
-      accessibilityLabel={`${phrase}, ${fr(offre.prix, 2)} euros${
-        meilleur ? `, ${fr(gain, 2)} euros de moins` : ''
-      }`}
+      accessibilityLabel={
+        avecPrix
+          ? `${phrase}, ${fr(offre.prix, 2)} euros${meilleur ? `, ${fr(gain, 2)} euros de moins` : ''}`
+          : phrase
+      }
       activeOpacity={0.75}
       onPress={ouvrir}>
       {/*
@@ -114,7 +124,7 @@ export function BoutonAmazon({
           resizeMode="contain"
           accessibilityLabel="Amazon"
         />
-        <Text style={styles.prix}>{`${fr(offre.prix, 2)} €`}</Text>
+        {avecPrix && <Text style={styles.prix}>{`${fr(offre.prix, 2)} €`}</Text>}
         {meilleur && (
           <Text style={styles.gain}>{`− ${fr(gain, 2)} €`}</Text>
         )}
