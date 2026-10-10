@@ -157,11 +157,18 @@ final class OrthophotosDuReleve {
       regarde : du côté +z du mur, l'axe x va vers la droite ; de l'autre,
       vers la gauche.
     */
+    // En sous-expressions typées : d'un seul tenant, le compilateur abandonne.
     let sens = Float(cote)
-    let du = axe * (sens * L / Float(w))
-    let dv = -haut * (H / Float(h))
-    let origine = centre + axe * (-sens * L / 2) + haut * (H / 2) + du * 0.5 + dv * 0.5
-    let poids = incidence * incidence / max(distance * distance, 0.25)
+    let pasU: Float = sens * L / Float(w)
+    let pasV: Float = H / Float(h)
+    let du: SIMD3<Float> = axe * pasU
+    let dv: SIMD3<Float> = haut * (-pasV)
+    let gauche: SIMD3<Float> = axe * (-sens * L / 2)
+    let dessus: SIMD3<Float> = haut * (H / 2)
+    let demiPas: SIMD3<Float> = (du + dv) * 0.5
+    let origine: SIMD3<Float> = centre + gauche + dessus + demiPas
+    let carre: Float = max(distance * distance, 0.25)
+    let poids: Float = incidence * incidence / carre
     vue.projeter(toile: &face.toile, origine: origine, du: du, dv: dv, poids: poids)
     faces[cle] = face
   }
@@ -450,7 +457,11 @@ private struct VueDeCamera {
         var w = poids
         if let n = normale {
           // Au sol, l'incidence se juge au pixel : le regard rasant pèse peu.
-          let monde = SIMD3<Float>(origine.x + du.x * Float(i) + dv.x * Float(j), origine.y, origine.z + du.z * Float(i) + dv.z * Float(j))
+          let fi = Float(i)
+          let fj = Float(j)
+          let mx: Float = origine.x + du.x * fi + dv.x * fj
+          let mz: Float = origine.z + du.z * fi + dv.z * fj
+          let monde = SIMD3<Float>(mx, origine.y, mz)
           let vers = simd_normalize(oeil - monde)
           let cosinus = abs(simd_dot(n, vers))
           guard cosinus > 0.3 else { continue }
