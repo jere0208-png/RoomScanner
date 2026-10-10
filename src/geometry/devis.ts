@@ -36,6 +36,7 @@ import {
   tarifPlaque,
   tarifRecu,
   type GammeId,
+  type OffreEnseigne,
   type Tarif,
 } from './prix';
 
@@ -66,6 +67,14 @@ export interface LigneDevis {
    * dernier.
    */
   source?: string;
+  /**
+   * LE PRIX DE CHAQUE ENSEIGNE — relevé du patron : « liste en petit le prix
+   * de chaque magasin ; le devis total se fiera au prix le moins cher ». `pu`
+   * est le moins cher de ceux-là.
+   */
+  offres?: OffreEnseigne[];
+  /** Le prix public de référence (Castorama), quand il n'est pas `pu`. */
+  puPublic?: number;
   /**
    * ÉCARTÉ DU DEVIS — présent sur le ticket, absent du total.
    *
@@ -148,8 +157,13 @@ export interface Devis {
   /** La version du catalogue employé : deux devis à deux mois ne s'égalent pas. */
   version: string;
   lignes: LigneDevis[];
-  /** Total TTC des fournitures. */
+  /** Total TTC des fournitures — au prix le moins cher de chaque article. */
   total: number;
+  /**
+   * LE MÊME DEVIS AU PRIX PUBLIC — l'enseigne de référence partout. Il
+   * s'écrit en petit sous le total : c'est ce qu'économise le « moins cher ».
+   */
+  totalPublic: number;
   /** Par rayon, ce que ça pèse — le récapitulatif court. */
   parFamille: { famille: string; total: number }[];
   /** Les articles que le catalogue ne connaît pas : dits, jamais tus. */
@@ -329,7 +343,9 @@ export function chiffrer(
   const sansPrix: string[] = [];
 
   const poser = (
-    r: Omit<LigneDevis, 'pu' | 'total' | 'releve' | 'source'> & { code: string },
+    r: Omit<LigneDevis, 'pu' | 'total' | 'releve' | 'source' | 'offres' | 'puPublic'> & {
+      code: string;
+    },
   ) => {
     const tarif = tarifDe(r.code, gamme);
     if (!tarif) {
@@ -343,6 +359,8 @@ export function chiffrer(
       total: centimes(tarif.pu * r.quantite),
       releve: tarif.releve,
       source: tarif.source,
+      ...(tarif.offres ? { offres: tarif.offres } : {}),
+      ...(tarif.public !== undefined ? { puPublic: tarif.public } : {}),
     });
   };
 
@@ -555,6 +573,8 @@ export function chiffrer(
       total: centimes(art.tarif.pu * q),
       releve: art.tarif.releve,
       source: art.tarif.source,
+      ...(art.tarif.offres ? { offres: art.tarif.offres } : {}),
+      ...(art.tarif.public !== undefined ? { puPublic: art.tarif.public } : {}),
       duMagasin: true,
     });
   }
@@ -575,6 +595,13 @@ export function chiffrer(
     }
   }
   const total = centimes(lignes.reduce((s, l) => s + l.total, 0));
+  // Au prix public : les mêmes lignes, les mêmes quantités, les mêmes écarts.
+  const totalPublic = centimes(
+    lignes.reduce(
+      (s, l) => s + (l.ecarte || l.pu === null ? 0 : (l.puPublic ?? l.pu) * l.quantite),
+      0,
+    ),
+  );
   const parFamille: { famille: string; total: number }[] = [];
   for (const l of lignes) {
     const f = parFamille.find((x) => x.famille === l.famille);
@@ -625,6 +652,7 @@ export function chiffrer(
     version: VERSION_TARIFS,
     lignes,
     total,
+    totalPublic,
     parFamille,
     sansPrix,
     exclusions,

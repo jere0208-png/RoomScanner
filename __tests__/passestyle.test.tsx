@@ -133,21 +133,25 @@ describe('2 — du blanc net sur les pages claires', () => {
 
       — UN SEUL VERRE. Un seul composant parle au natif (`Verre.tsx`) : pas
         d'imitation par écran, qui reviendrait grise à la première retouche.
-      — JAMAIS GRIS. Son voile par défaut est un blanc dense.
-      — AUCUN FILET DESSINÉ PAR REACT NATIVE sur le verre : le liseré est
-        celui de la couche native, vectoriel.
+      — LE VRAI. Sur iOS 26, le Liquid Glass d'Apple (`UIGlassEffect`) — qui
+        adapte sa luminance à ce qu'il couvre ; avant, sa réplique native.
+      — AUCUN FILET NI AUCUN APLAT DESSINÉ PAR REACT NATIVE sur le verre : le
+        liseré est celui de la couche native, vectoriel, et rien ne recouvre
+        le verre (relevé suivant : « la forme des cards a été modifiée »).
     */
     for (const p of [...sources('src'), 'App.tsx']) {
       if (p === 'src/components/Verre.tsx') continue;
       expect([p, /RoomScanVerre/.test(lire(p))]).toEqual([p, false]);
     }
     const verre = lire('src/components/Verre.tsx');
-    const voile = Number(/export const VOILE = ([\d.]+)/.exec(verre)?.[1]);
-    expect(voile).toBeGreaterThanOrEqual(0.65);
-    expect(verre).not.toMatch(/borderWidth|hairlineWidth/);
-    expect(lire('modules/react-native-room-scan/ios/RoomScanVerre.swift')).toContain(
-      'effet.layer.borderWidth = 1 / UIScreen.main.scale',
-    );
+    expect(verre).not.toMatch(/borderWidth|hairlineWidth|<View|<Svg/);
+    const natif = lire('modules/react-native-room-scan/ios/RoomScanVerre.swift');
+    expect(natif).toContain('UIGlassEffect(style: .regular)');
+    // Le verre n'est posé que VISIBLE : iOS abandonne en silence un verre posé
+    // sous un parent transparent (nos fondus d'entrée partent de zéro).
+    expect(natif).toMatch(/if visible \{ poserLeVerre\(\) \} else \{ guetter\(\) \}/);
+    // Et la compilation se fait avec le SDK d'iOS 26.
+    expect(lire('.github/workflows/build-ios-unsigned.yml')).toMatch(/xcode-select -s \/Applications\/Xcode_26/);
   });
 
   it('« Terminer » porte lui-même sa pilule : ce qu’on voit est ce qu’on touche', () => {
@@ -162,7 +166,7 @@ describe('2 — du blanc net sur les pages claires', () => {
     expect(visite).toMatch(
       /style=\{\(\{ pressed \}\) => \[styles\.terminer, SUR_VERRE, pressed && styles\.enfonce\]\}/,
     );
-    expect(lire('src/components/Verre.tsx')).toMatch(/style=\{\[StyleSheet\.absoluteFill, \{ borderRadius: r \}\]\}/);
+    expect(lire('src/components/Verre.tsx')).toMatch(/style=\{\[StyleSheet\.absoluteFill, \{ borderRadius: rayon \}\]\}/);
   });
 });
 

@@ -240,7 +240,14 @@ export const RoomScanCanvas = UIManager.getViewManagerConfig?.(
  */
 export const RoomScanVerre = UIManager.getViewManagerConfig?.('RoomScanVerre')
   ? requireNativeComponent<
-      ViewProps & { rayon?: number; sombre?: boolean; voile?: number; ombre?: number[] }
+      ViewProps & {
+        rayon?: number;
+        sombre?: boolean;
+        voile?: number;
+        ombre?: number[];
+        teinte?: string;
+        force?: number;
+      }
     >('RoomScanVerre')
   : undefined;
 

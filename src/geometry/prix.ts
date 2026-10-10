@@ -25,14 +25,40 @@
 import type { FixtureKind } from './electrical';
 import type { CeilingKind } from './ceiling';
 
+/** Le prix d'un article dans UNE enseigne. */
+export interface OffreEnseigne {
+  enseigne: string;
+  /** Prix TTC, au conditionnement du devis. */
+  pu: number;
+  /** Le jour où on l'a vu, AAAA-MM-JJ. */
+  jour?: string;
+  /** La page produit. */
+  url?: string;
+}
+
+/**
+ * L'ENSEIGNE QUI DONNE LE « PRIX PUBLIC » DE RÉFÉRENCE.
+ *
+ * Relevé du patron : « le devis total se fiera au prix le moins cher ; donne
+ * aussi le prix total "public" sous le total, en petit ». Le total prend
+ * l'enseigne la moins chère article par article ; le prix public, lui, est
+ * celui de l'enseigne de référence du catalogue — là où tous les articles ont
+ * été relevés, celle qu'un client trouve partout.
+ */
+export const ENSEIGNE_PUBLIQUE = 'Castorama';
+
 /** Un prix, et ce qu'il faut savoir pour s'en méfier. */
 export interface Tarif {
-  /** Prix unitaire TTC, en euros. */
+  /** Prix unitaire TTC, en euros — le MOINS CHER des enseignes relevées. */
   pu: number;
   /** Mois du relevé, AAAA-MM : ce qui dit si le prix a vieilli. */
   releve: string;
-  /** D'où il sort. */
+  /** D'où il sort — l'enseigne de ce prix-là. */
   source: string;
+  /** Le prix de chaque enseigne où l'article a été vu, du moins cher au plus cher. */
+  offres?: OffreEnseigne[];
+  /** Le prix public de référence (`ENSEIGNE_PUBLIQUE`), quand il diffère. */
+  public?: number;
 }
 
 /**
@@ -42,7 +68,7 @@ export interface Tarif {
  * d'écart ne donnent pas le même total, et c'est normal : encore faut-il
  * pouvoir le dire.
  */
-export const VERSION_TARIFS = '2026-09.2';
+export const VERSION_TARIFS = '2026-10.1';
 
 /** La source commune à tout ce qui a été posé à la main. */
 const A_VALIDER =
@@ -84,14 +110,10 @@ const t = (pu: number): Tarif => ({ pu, releve: RELEVE, source: A_VALIDER });
  * cinquante articles à la main ; ceux qu'on n'a pas vus sont recalés famille
  * par famille sur l'écart mesuré par ceux qu'on a vus, et ils portent
  * `A_VALIDER`. L'écran du devis le dit ligne par ligne.
+ *
+ * (Depuis le relevé du 10 octobre 2026, chaque prix vu l'est dans CHAQUE
+ * enseigne qui vend le produit — voir `v`, plus bas.)
  */
-const releveLe = (pu: number, source: string, jour: string): Tarif => ({
-  pu,
-  releve: jour,
-  source,
-});
-/** L'enseigne du relevé du 28 août 2026, et le jour. */
-const ENSEIGNE = 'Castorama';
 /**
  * LE JOUR DU DERNIER PASSAGE EN RAYON — exporté, et c'était le manque.
  *
@@ -102,16 +124,36 @@ const ENSEIGNE = 'Castorama';
  * en français et rend telle quelle. Le jour du passage existait pourtant ici,
  * à la journée près ; personne ne le lui passait.
  */
-export const RELEVE_RAYON = '2026-09-05';
+export const RELEVE_RAYON = '2026-10-10';
+
 /**
- * UN PRIX VU EN RAYON, LE JOUR DE LA CAMPAGNE.
+ * UN PRIX RELEVÉ DANS CHAQUE ENSEIGNE QUI VEND LE PRODUIT — le relevé du
+ * 10 octobre 2026, page produit par page produit (`server/sources-prix.json`).
  *
- * Il n'y a qu'UNE date, et c'est le sujet du relevé du 5 septembre — relevé
- * du patron : « tous les prix ne sont pas à jour, des prix s'affichent à la
- * date d'aujourd'hui mais d'autres restent par exemple au 28 août ». Deux
- * dates dans un catalogue embarqué, c'est une campagne laissée à moitié.
+ * Relevés du patron : « vérifie que tous les prix sont bien réels », puis « le
+ * devis total se fiera au prix le moins cher ». Le moins cher fait le prix, et
+ * dit d'où il vient ; les autres restent sur la ligne, en petit ; Castorama
+ * reste le prix public de référence. Ces valeurs sont le FOND DE CARTE : le
+ * relevé de chaque matin (voir `net/tarifs`) les remplace dès qu'il arrive.
+ *
+ * UNE SEULE DATE, celle du relevé — relevé du patron : « des prix s'affichent
+ * à la date d'aujourd'hui mais d'autres restent par exemple au 28 août ».
+ * Deux dates dans un catalogue embarqué, c'est une campagne laissée à moitié.
+ *
+ * Écrites par le relevé : ne pas les retoucher à la main.
  */
-const r = (pu: number): Tarif => releveLe(pu, ENSEIGNE, RELEVE_RAYON);
+const v = (offres: [string, number][]): Tarif => {
+  const triees = [...offres].sort((a, b) => a[1] - b[1]);
+  const tarif: Tarif = {
+    pu: triees[0][1],
+    releve: RELEVE_RAYON,
+    source: triees[0][0],
+    offres: triees.map(([enseigne, pu]) => ({ enseigne, pu, jour: RELEVE_RAYON })),
+  };
+  const pub = offres.find(([e]) => e === ENSEIGNE_PUBLIQUE)?.[1];
+  if (pub !== undefined && pub !== tarif.pu) tarif.public = pub;
+  return tarif;
+};
 
 // --------------------------------------------------------------- gammes
 
@@ -199,18 +241,18 @@ export const TARIFS_MECANISME: Record<
       le confirmer. Un prix qu'on ne comprend pas ne se recopie pas : il
       reste estimé, et l'écran le dit.
     */
-    prise: r(5.5),
-    prise20: t(11.9),
-    prise32: t(18.9),
-    inter: r(5.5),
-    volet: t(19.9),
-    va: r(5.5),
-    poussoir: r(9.69),
-    variateur: t(29.9),
-    rj45: r(19.5),
-    tv: r(12.9),
-    sortieCable: t(6.9),
-    thermostat: t(55),
+    prise: v([['Castorama', 5.5]]),
+    prise20: v([['Castorama', 5.5]]),
+    prise32: v([['Brico Dépôt', 6.79], ['Castorama', 8.25]]),
+    inter: v([['Brico Dépôt', 4.59], ['Castorama', 5.5]]),
+    volet: v([['Brico Dépôt', 23.9], ['Castorama', 25]]),
+    va: v([['Brico Dépôt', 4.59], ['Castorama', 5.5]]),
+    poussoir: v([['Brico Dépôt', 8.99], ['Castorama', 9.69]]),
+    variateur: v([['Brico Dépôt', 71.9], ['Castorama', 74.9]]),
+    rj45: v([['Brico Dépôt', 15.9], ['Castorama', 19.5]]),
+    tv: v([['Brico Dépôt', 9.99], ['Castorama', 12.9]]),
+    sortieCable: v([['Brico Dépôt', 5.99], ['Castorama', 7.09]]),
+    thermostat: v([['Castorama', 179.9]]),
     applique: t(0),
     boite: t(2.2),
     tableau: t(0),
@@ -237,52 +279,52 @@ export const TARIFS_MECANISME: Record<
     resteront estimés tant qu'on relèvera en grande surface.
   */
   ovalis: {
-    prise: t(5.9),
-    prise20: t(12.5),
-    prise32: t(19.9),
-    inter: t(5.9),
-    volet: t(21.9),
-    va: t(5.9),
-    poussoir: t(9.9),
-    variateur: t(32),
-    rj45: t(20.9),
-    tv: t(13.9),
-    sortieCable: t(7.2),
-    thermostat: t(59),
+    prise: v([['Brico Dépôt', 4.09], ['Castorama', 5.45]]),
+    prise20: v([['Brico Dépôt', 4.09], ['Castorama', 5.45]]),
+    prise32: v([['Brico Dépôt', 6.79], ['Castorama', 8.25]]),
+    inter: v([['Brico Dépôt', 3.29], ['Castorama', 4.99]]),
+    volet: v([['Brico Dépôt', 21.9], ['Castorama', 24.9]]),
+    va: v([['Brico Dépôt', 3.29], ['Castorama', 4.99]]),
+    poussoir: v([['Brico Dépôt', 6.99], ['Castorama', 8.99]]),
+    variateur: v([['Castorama', 59.9], ['Brico Dépôt', 60.9]]),
+    rj45: v([['Brico Dépôt', 13.9], ['Castorama', 17.5]]),
+    tv: v([['Brico Dépôt', 9.99], ['Castorama', 10.9]]),
+    sortieCable: v([['Brico Dépôt', 4.99], ['Castorama', 6.99]]),
+    thermostat: v([['Castorama', 79.9]]),
     applique: t(0),
     boite: t(2.2),
     tableau: t(0),
   },
   odace: {
-    prise: t(8.9),
-    prise20: t(15.5),
-    prise32: t(23),
-    inter: t(9.5),
-    volet: t(29.9),
-    va: t(9.5),
-    poussoir: t(16.9),
-    variateur: t(49),
-    rj45: t(22.9),
-    tv: t(16.5),
-    sortieCable: t(9.9),
-    thermostat: t(89),
+    prise: v([['Castorama', 5.19]]),
+    prise20: v([['Castorama', 5.19]]),
+    prise32: v([['Brico Dépôt', 6.79], ['Castorama', 8.25]]),
+    inter: v([['Castorama', 5.49]]),
+    volet: v([['Castorama', 22.9]]),
+    va: v([['Castorama', 5.49]]),
+    poussoir: v([['Castorama', 5.49]]),
+    variateur: v([['Castorama', 54.9]]),
+    rj45: v([['Castorama', 18.9]]),
+    tv: v([['Castorama', 11.9]]),
+    sortieCable: v([['Castorama', 5.99]]),
+    thermostat: v([['Castorama', 79.9]]),
     applique: t(0),
     boite: t(2.2),
     tableau: t(0),
   },
   mosaic: {
-    prise: t(9.9),
-    prise20: t(16.5),
-    prise32: t(24),
-    inter: t(10.5),
-    volet: t(33.9),
-    va: t(10.5),
-    poussoir: t(18.5),
-    variateur: t(52),
-    rj45: t(24.5),
-    tv: t(17.5),
-    sortieCable: t(10.5),
-    thermostat: t(92),
+    prise: v([['Brico Dépôt', 5.79], ['Castorama', 7.59]]),
+    prise20: v([['Brico Dépôt', 5.79], ['Castorama', 7.59]]),
+    prise32: v([['Brico Dépôt', 6.79], ['Castorama', 8.25]]),
+    inter: v([['Brico Dépôt', 7.49], ['Castorama', 9.25]]),
+    volet: v([['Brico Dépôt', 36.9], ['Castorama', 41.9]]),
+    va: v([['Brico Dépôt', 7.49], ['Castorama', 9.25]]),
+    poussoir: v([['Brico Dépôt', 12.9], ['Castorama', 13.9]]),
+    variateur: v([['Brico Dépôt', 109], ['Castorama', 119.9]]),
+    rj45: v([['Brico Dépôt', 16.9], ['Castorama', 19.5]]),
+    tv: v([['Brico Dépôt', 11.9], ['Castorama', 13.5]]),
+    sortieCable: v([['Brico Dépôt', 9.99], ['Castorama', 11.9]]),
+    thermostat: v([['Castorama', 179.9]]),
     applique: t(0),
     boite: t(2.2),
     tableau: t(0),
@@ -303,18 +345,18 @@ export const TARIFS_MECANISME: Record<
       courant, et le devis d'un chantier qui commence dans trois semaines ne
       peut pas s'appuyer dessus.
     */
-    prise: r(10.9),
-    prise20: t(17),
-    prise32: t(26),
-    inter: r(11.9),
-    volet: t(39.9),
-    va: r(11.9),
-    poussoir: r(20.9),
-    variateur: t(62),
-    rj45: r(25.9),
-    tv: t(19.9),
-    sortieCable: t(12.5),
-    thermostat: t(99),
+    prise: v([['Castorama', 10.9]]),
+    prise20: v([['Castorama', 10.9]]),
+    prise32: v([['Brico Dépôt', 6.79], ['Castorama', 8.25]]),
+    inter: v([['Castorama', 11.9]]),
+    volet: v([['Castorama', 52.9]]),
+    va: v([['Castorama', 11.9]]),
+    poussoir: v([['Castorama', 20.9]]),
+    variateur: v([['Castorama', 92.9]]),
+    rj45: v([['Castorama', 25.9]]),
+    tv: v([['Castorama', 19.9]]),
+    sortieCable: v([['Castorama', 20.5]]),
+    thermostat: v([['Castorama', 179.9]]),
     applique: t(0),
     boite: t(2.2),
     tableau: t(0),
@@ -365,12 +407,30 @@ export const TARIFS_MECANISME: Record<
 export const TARIFS_PLAQUE: Record<GammeId, Tarif[]> = {
   // Index 0 = plaque 1 poste, index 1 = 2 postes, et ainsi de suite.
   /* Legrand Dooxie 6 009 0x, blanc. */
-  dooxie: [r(1.9), r(3.9), r(6.09), r(7.9), t(9.9)],
+  dooxie: [
+    v([['Brico Dépôt', 1.69], ['Castorama', 1.9]]),
+    v([['Brico Dépôt', 3.19], ['Castorama', 3.9]]),
+    v([['Brico Dépôt', 4.99], ['Castorama', 6.09]]),
+    v([['Castorama', 7.9]]),
+    t(9.9),
+  ],
   /* Schneider Ovalis S3207xx, blanc. Le 4 postes n'était pas affiché au
      relevé : il suit le prix du poste des trois autres. */
-  ovalis: [r(2.15), r(4.29), r(6.49), t(8.6), t(10.75)],
+  ovalis: [
+    v([['Brico Dépôt', 1.19], ['Castorama', 2.15]]),
+    v([['Brico Dépôt', 3.49], ['Castorama', 4.29]]),
+    v([['Brico Dépôt', 5.59], ['Castorama', 6.49]]),
+    v([['Castorama', 6.49]]),
+    t(8.1),
+  ],
   /* Schneider Odace, blanc craie — la finition de base de la gamme. */
-  odace: [r(1.99), r(3.99), r(5.69), r(8.0), t(9.95)],
+  odace: [
+    v([['Castorama', 1.99]]),
+    v([['Castorama', 3.99]]),
+    v([['Castorama', 5.69]]),
+    v([['Castorama', 8]]),
+    t(9.95),
+  ],
   /*
     MOSAIC RESTE ESTIMÉE, et le relevé l'a confirmé une seconde fois :
     Castorama n'affiche qu'UN article Mosaic blanc, vendu par un tiers. C'est
@@ -378,9 +438,21 @@ export const TARIFS_PLAQUE: Record<GammeId, Tarif[]> = {
     pose beaucoup en tertiaire —, mais son prix ne peut pas prétendre avoir
     été vu en rayon. Recalée sur le poste des gammes voisines.
   */
-  mosaic: [t(3.2), t(6.4), t(9.3), t(12.4), t(15.5)],
+  mosaic: [
+    v([['Castorama', 4.99]]),
+    v([['Castorama', 12.5]]),
+    v([['Castorama', 22.5]]),
+    t(30),
+    t(37.5),
+  ],
   /* Legrand Céliane CP002x, blanc émaillé — celui du relevé du patron. */
-  celiane: [r(2.29), r(4.59), r(6.99), r(9.45), t(11.8)],
+  celiane: [
+    v([['Castorama', 2.29]]),
+    v([['Castorama', 4.59]]),
+    v([['Castorama', 6.99]]),
+    v([['Castorama', 9.45]]),
+    t(11.8),
+  ],
 };
 
 // --------------------------------------------------------- hors gamme
@@ -394,18 +466,18 @@ export const TARIFS_PLAQUE: Record<GammeId, Tarif[]> = {
  */
 export const TARIFS_COMMUNS: Record<string, Tarif> = {
   // Conduits — la couronne de 100 m, telle qu'elle se commande.
-  'icta-16': r(26.9),
-  'icta-20': r(30.9),
-  'icta-25': r(53.9),
+  'icta-16': v([['Castorama', 26.9]]),
+  'icta-20': v([['Castorama', 30.9]]),
+  'icta-25': v([['Castorama', 53.9]]),
   'icta-32': t(84),
   // Conducteurs rigides — la couronne de 100 m, par section.
-  'fil-1.5': r(25.9),
-  'fil-2.5': r(41.9),
-  'fil-6': r(16.9),
-  'fil-10': t(28),
+  'fil-1.5': v([['Castorama', 27.9], ['Brico Dépôt', 27.9]]),
+  'fil-2.5': v([['Brico Dépôt', 31.9], ['Castorama', 47.9]]),
+  'fil-6': v([['Castorama', 18.9], ['Brico Dépôt', 18.9]]),
+  'fil-10': v([['Castorama', 26.9]]),
   // Courants faibles — ce qu'on tire dans la gaine de communication.
-  futp6: t(99),
-  coax: t(69),
+  futp6: v([['Castorama', 79.9], ['Brico Dépôt', 82.9]]),
+  coax: v([['Castorama', 44.9], ['Brico Dépôt', 45.9]]),
   // Encastrement.
   /*
     LA BOÎTE SE VEND PAR DIX, et c'est comme ça qu'on l'achète pour un
@@ -414,9 +486,9 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
     cent mètres — on chiffre au conditionnement du chantier, pas à la pièce
     détachée. L'ancienne valeur, 1,69 €, ne correspondait à aucun des deux.
   */
-  'boite-encastrement': r(2.05),
-  'boite-dcl': t(4.9),
-  'boite-derivation': t(3.9),
+  'boite-encastrement': v([['Brico Dépôt', 1.99], ['Castorama', 2.39]]),
+  'boite-dcl': v([['Castorama', 11.5]]),
+  'boite-derivation': v([['Castorama', 4.19]]),
   /*
     LE TABLEAU, RELEVÉ ARTICLE PAR ARTICLE LE 05/09/2026.
 
@@ -443,14 +515,14 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
     sous-estimé (10,50 posés, 27,90 en rayon — un petit calibre est rare, donc
     cher), et les coffrets 3 et 4 rangées.
   */
-  'disj-2': r(27.9),
-  'disj-10': r(9.99),
-  'disj-16': r(9.99),
-  'disj-20': r(9.99),
-  'disj-32': r(23.9),
-  'diff-AC': r(49.9),
-  'diff-A': r(64.9),
-  'coffret-com': t(179),
+  'disj-2': v([['Castorama', 27.9], ['Brico Dépôt', 27.9]]),
+  'disj-10': v([['Brico Dépôt', 8.99], ['Castorama', 9.99]]),
+  'disj-16': v([['Brico Dépôt', 8.99], ['Castorama', 9.99]]),
+  'disj-20': v([['Brico Dépôt', 8.99], ['Castorama', 9.99]]),
+  'disj-32': v([['Castorama', 23.9], ['Brico Dépôt', 23.9]]),
+  'diff-AC': v([['Castorama', 49.9], ['Brico Dépôt', 51.9]]),
+  'diff-A': v([['Brico Dépôt', 59.9], ['Castorama', 64.9]]),
+  'coffret-com': v([['Brico Dépôt', 91.9], ['Castorama', 99]]),
   /*
     LE COFFRET SE CHIFFRE À LA RANGÉE, ET IL EN FAUT UN.
 
@@ -459,18 +531,18 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
     il faut avant de savoir où on l'accroche —, et un devis sans coffret
     manque le poste le plus visible du tableau.
   */
-  'coffret-1': r(34.9),
-  'coffret-2': r(52.9),
-  'coffret-3': r(85.9),
-  'coffret-4': r(109.9),
+  'coffret-1': v([['Brico Dépôt', 28.9], ['Castorama', 34.9]]),
+  'coffret-2': v([['Brico Dépôt', 48.9], ['Castorama', 52.9]]),
+  'coffret-3': v([['Brico Dépôt', 75.9], ['Castorama', 85.9]]),
+  'coffret-4': v([['Brico Dépôt', 96.9], ['Castorama', 109.9]]),
   // Le peigne, qu'on oublie toujours. (Le bornier de terre, lui, est fourni
   // avec le coffret : voir `chiffrer`.)
-  peigne: r(5.19),
+  peigne: v([['Castorama', 5.19], ['Brico Dépôt', 5.49]]),
   // Plafond : ce qui n'est pas un luminaire.
-  'plafond-daaf': t(24.9),
-  'plafond-vmc': t(16.9),
-  'plafond-detecteur': t(44.9),
-  'plafond-camera': t(119),
+  'plafond-daaf': v([['Castorama', 21.9]]),
+  'plafond-vmc': v([['Castorama', 8.55]]),
+  'plafond-detecteur': v([['Castorama', 22.9]]),
+  'plafond-camera': v([['Castorama', 49.9]]),
   /*
     ET TOUT CE QU'ON ACHÈTE AUSSI — relevé du patron : « tu fais un vrai
     catalogue aux prix actuels mis à jour avec un maximum de produits utiles,
@@ -489,65 +561,65 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   */
   // ------------------------------------------------ conducteurs et conduits
   'fil-4': t(66),
-  'fil-16': t(43),
+  'fil-16': v([['Castorama', 36.9]]),
   'fil-25': t(65),
   // Les câbles souples, pour ce qui sort du mur : four, plaque, extérieur.
-  'cable-3g1.5': r(89.9),
-  'cable-3g2.5': r(139.9),
-  'cable-5g2.5': t(219),
-  'cable-3g6': t(289),
+  'cable-3g1.5': v([['Castorama', 94.9], ['Brico Dépôt', 94.9]]),
+  'cable-3g2.5': v([['Brico Dépôt', 139], ['Castorama', 144.9]]),
+  'cable-5g2.5': v([['Brico Dépôt', 270], ['Castorama', 279.8]]),
+  'cable-3g6': v([['Castorama', 359.8], ['Brico Dépôt', 378]]),
   'icta-40': t(59),
   // Les gaines de terre et de réseau, en tranchée.
-  'gaine-tpc-40': t(32),
-  'gaine-tpc-63': t(55),
-  'gaine-annelee-16': t(12),
+  'gaine-tpc-40': v([['Castorama', 24.9]]),
+  'gaine-tpc-63': v([['Castorama', 45.9]]),
+  'gaine-annelee-16': v([['Castorama', 13.9]]),
   // Ce qui passe EN APPARENT, quand on ne saigne pas le mur.
-  'goulotte-40': t(9.5),
-  'plinthe-passe-cable': t(12),
+  'goulotte-40': v([['Brico Dépôt', 15.9], ['Castorama', 16.5]]),
+  'plinthe-passe-cable': v([['Brico Dépôt', 31], ['Castorama', 33.9]]),
   // ---------------------------------------------------------- encastrement
-  'boite-encastrement-2': t(2.9),
-  'boite-encastrement-3': t(4.2),
-  'boite-maconnerie': t(1.95),
-  'boite-maconnerie-2': t(3.3),
-  'boite-etanche': t(6.9),
-  'boite-derivation-etanche': t(7.9),
-  'couvercle-derivation': t(2.2),
-  'boite-sol': t(45),
+  'boite-encastrement-2': v([['Castorama', 6.49], ['Brico Dépôt', 6.49]]),
+  'boite-encastrement-3': v([['Brico Dépôt', 8.09], ['Castorama', 8.15]]),
+  'boite-maconnerie': v([['Brico Dépôt', 1.89], ['Castorama', 2.09]]),
+  'boite-maconnerie-2': v([['Castorama', 5.19]]),
+  'boite-etanche': v([['Brico Dépôt', 3.5], ['Castorama', 4.5]]),
+  'boite-derivation-etanche': v([['Castorama', 3.59]]),
+  'couvercle-derivation': v([['Castorama', 0.95]]),
+  'boite-sol': v([['Castorama', 61.9]]),
   // --------------------------------------------------------------- tableau
   'disj-6': t(10.5),
   'disj-25': t(16.9),
   'disj-40': t(28.9),
-  'diff-A-63': t(105),
-  'diff-AC-63': t(92),
-  'diff-HPI': t(119),
-  parafoudre: t(89),
-  'contacteur-jn': t(56),
-  telerupteur: t(42),
-  'horloge-modulaire': t(72),
+  'diff-A-63': v([['Brico Dépôt', 109], ['Castorama', 109.9]]),
+  'diff-AC-63': v([['Brico Dépôt', 89.9], ['Castorama', 99.9]]),
+  'diff-HPI': v([['Castorama', 219.9]]),
+  parafoudre: v([['Castorama', 264.9], ['Brico Dépôt', 272]]),
+  'contacteur-jn': v([['Brico Dépôt', 57.9], ['Castorama', 59.9]]),
+  telerupteur: v([['Brico Dépôt', 29.9], ['Castorama', 39.9]]),
+  'horloge-modulaire': v([['Castorama', 229.9]]),
   delesteur: t(169),
-  'bornier-terre': t(8.9),
+  'bornier-terre': v([['Castorama', 13.5]]),
   'bornier-repartition': t(18.9),
-  'peigne-vertical': t(30.9),
-  gtl: t(79),
-  'coffret-etanche': t(59),
-  'disj-abonne': t(99),
+  'peigne-vertical': v([['Brico Dépôt', 18.35], ['Castorama', 25.9]]),
+  gtl: v([['Brico Dépôt', 125], ['Castorama', 139]]),
+  'coffret-etanche': v([['Castorama', 29.9]]),
+  'disj-abonne': v([['Brico Dépôt', 159], ['Castorama', 189]]),
   'sectionneur-63': t(36),
   // ------------------------------------------------------- courants faibles
-  'rj45-keystone': t(8.9),
-  brassage: t(5.9),
-  dti: t(24.9),
-  'repartiteur-tv': t(18.9),
+  'rj45-keystone': v([['Brico Dépôt', 18.9], ['Castorama', 19.9]]),
+  brassage: v([['Castorama', 5.99]]),
+  dti: v([['Castorama', 30.03]]),
+  'repartiteur-tv': v([['Castorama', 9.9]]),
   // ------------------------------------------------- fixation, jusqu'aux vis
-  'vis-placo': t(6.9),
-  'vis-beton': t(18),
-  'cheville-placo': t(14),
-  'cheville-nylon': t(5.5),
-  'collier-colson': r(9.99),
-  'collier-gaine-20': t(9.5),
-  'cavalier-16': t(4.5),
-  'agrafe-icta': t(8.9),
+  'vis-placo': v([['Castorama', 4.99]]),
+  'vis-beton': v([['Castorama', 43.9]]),
+  'cheville-placo': v([['Castorama', 14.9]]),
+  'cheville-nylon': v([['Brico Dépôt', 5.79], ['Castorama', 7.39]]),
+  'collier-colson': v([['Brico Dépôt', 9.49], ['Castorama', 9.99]]),
+  'collier-gaine-20': v([['Brico Dépôt', 14.98], ['Castorama', 15.1]]),
+  'cavalier-16': v([['Brico Dépôt', 14.98], ['Castorama', 15.1]]),
+  'agrafe-icta': v([['Brico Dépôt', 14.98], ['Castorama', 15.1]]),
   // ------------------------------------------------------------ connexions
-  'ruban-isolant': t(5.9),
+  'ruban-isolant': v([['Castorama', 4.07]]),
   /*
     LES BORNES WAGO 273 NE SONT PLUS VENDUES — l'article est marqué « n'est
     plus proposé à la vente ». Le prix redevient donc une ESTIMATION : un
@@ -555,25 +627,25 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
     passer pour tel ferait vieillir la confiance qu'on accorde à tous les
     autres. La valeur est celle du dernier lot vu (10,90 € les cinquante).
   */
-  'wago-2': t(19.9),
-  'wago-3': t(17.9),
-  'wago-5': t(15.9),
-  domino: t(4.5),
+  'wago-2': v([['Brico Dépôt', 18.71], ['Castorama', 19.41]]),
+  'wago-3': v([['Brico Dépôt', 32.45], ['Castorama', 42.95]]),
+  'wago-5': v([['Castorama', 19.45]]),
+  domino: v([['Brico Dépôt', 14.9], ['Castorama', 17.5]]),
   'embout-cable': t(16),
-  'gaine-thermo': t(9.9),
+  'gaine-thermo': v([['Brico Dépôt', 8.29], ['Castorama', 8.99]]),
   // ------------------------------------------------------- scellement, pose
-  'platre-scellement': t(14),
-  'mousse-pu': t(8.9),
-  silicone: t(6.5),
+  'platre-scellement': v([['Castorama', 12.5], ['Brico Dépôt', 12.5]]),
+  'mousse-pu': v([['Castorama', 9.99]]),
+  silicone: v([['Castorama', 3.79]]),
   // ----------------------------------------------------------------- outils
-  'tire-fil': t(32),
-  'scie-cloche-67': t(18),
-  'foret-beton-6': t(4.5),
-  'fraise-placo-67': t(22),
-  'niveau-40': t(15),
-  'pince-coupante': t(22),
-  'tournevis-testeur': t(9),
-  multimetre: t(35),
+  'tire-fil': v([['Castorama', 16.5]]),
+  'scie-cloche-67': v([['Brico Dépôt', 24.9], ['Castorama', 25.9]]),
+  'foret-beton-6': v([['Castorama', 5.25]]),
+  'fraise-placo-67': v([['Castorama', 32.9]]),
+  'niveau-40': v([['Castorama', 14.9]]),
+  'pince-coupante': v([['Brico Dépôt', 9.99], ['Castorama', 12.5]]),
+  'tournevis-testeur': v([['Castorama', 3.25]]),
+  multimetre: v([['Castorama', 24.9]]),
   /*
     CE QU'UNE RÉNOVATION D'APPARTEMENT DEMANDE, ET QUI MANQUAIT.
 
@@ -589,10 +661,10 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
     le chantier. Elle n'était nulle part.
   */
   // ---------------------------------------------- propre à la rénovation
-  'icta-prefilee-3g1.5': r(95.9),
-  'icta-prefilee-3g2.5': r(149.9),
-  'barrette-equipotentielle': t(12.9),
-  'collier-equipotentiel': t(4.5),
+  'icta-prefilee-3g1.5': v([['Castorama', 95.9]]),
+  'icta-prefilee-3g2.5': v([['Castorama', 149.9]]),
+  'barrette-equipotentielle': v([['Brico Dépôt', 9.89], ['Castorama', 10.9]]),
+  'collier-equipotentiel': v([['Castorama', 3.89]]),
   'rehausse-boite': t(1.9),
   /*
     L'OBTURATEUR N'EST PLUS AFFICHÉ QU'EN DÉSTOCKAGE (7,92 € le 05/09). La
@@ -602,23 +674,23 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
     peut pas s'appuyer dessus ». Le prix retombe donc au rang d'estimation,
     à la valeur du dernier relevé courant.
   */
-  'obturateur': t(6.09),
+  'obturateur': v([['Castorama', 6.09]]),
   // Protections d'un départ seul : courantes en rénovation, où l'on ajoute
   // un circuit sans refaire toute la rangée.
-  'disj-diff-16': t(59),
-  'disj-diff-20': t(62),
+  'disj-diff-16': v([['Castorama', 90.9]]),
+  'disj-diff-20': v([['Castorama', 94.9]]),
   // Pièces humides et non chauffées — salle d'eau, cave, balcon.
-  'prise-etanche': t(12.9),
-  'inter-etanche': t(14.9),
+  'prise-etanche': v([['Brico Dépôt', 9.49], ['Castorama', 10.5]]),
+  'inter-etanche': v([['Brico Dépôt', 9.89], ['Castorama', 9.99]]),
   // Ce qui se raccorde en dur : plaque, sèche-serviette, volet.
-  'sortie-cable-32': t(12.9),
-  'inter-volet': t(24.9),
-  carillon: t(32),
+  'sortie-cable-32': v([['Brico Dépôt', 6.79], ['Castorama', 8.25]]),
+  'inter-volet': v([['Brico Dépôt', 23.9], ['Castorama', 25]]),
+  carillon: v([['Castorama', 13.9]]),
   // ------------------------------------------------------ plafond et divers
-  'transfo-led': t(28),
-  'ruban-led': t(24),
-  'gaine-vmc-125': t(18),
-  'bouche-vmc': t(12),
+  'transfo-led': v([['Castorama', 51.9]]),
+  'ruban-led': v([['Castorama', 52.99]]),
+  'gaine-vmc-125': v([['Castorama', 14.95]]),
+  'bouche-vmc': v([['Castorama', 69.9]]),
 };
 
 /**
@@ -671,6 +743,24 @@ export interface TarifsRecus {
   source: string;
   /** Le prix TTC de chaque article connu, par clé de catalogue. */
   prix: Record<string, number>;
+  /**
+   * LE JOUR OÙ CHAQUE PRIX A ÉTÉ VU, quand il diffère du relevé.
+   *
+   * Le relevé du matin ne relit pas toujours toutes les pages : un article
+   * qu'il n'a pas pu revoir garde le jour où on l'a vu pour la dernière fois.
+   * Le dater du jour du catalogue écrirait « aujourd'hui » sur un prix qu'on
+   * n'a pas vu aujourd'hui — l'antidate à l'envers.
+   */
+  jours?: Record<string, string>;
+  /** Le code EAN du produit relevé, par clé : ce qui le désigne sans ambiguïté. */
+  ean?: Record<string, string>;
+  /** La page produit où le prix a été lu, par clé. */
+  liens?: Record<string, string>;
+  /**
+   * LE PRIX DE CHAQUE ENSEIGNE, par clé — du moins cher au plus cher.
+   * `prix` est alors le premier : c'est lui qui fait le total du devis.
+   */
+  offres?: Record<string, OffreEnseigne[]>;
 }
 
 /*
@@ -714,7 +804,18 @@ export function cleDuTarif(code: string, gamme: GammeId): string {
 export function tarifRecu(cle: string): Tarif | null {
   const pu = recus?.prix[cle];
   if (pu === undefined || !isFinite(pu) || pu < 0) return null;
-  return { pu, releve: recus!.releve, source: recus!.source };
+  // Le jour de CE prix d'abord ; celui du catalogue à défaut.
+  const tarif: Tarif = { pu, releve: recus!.jours?.[cle] ?? recus!.releve, source: recus!.source };
+  const offres = recus!.offres?.[cle];
+  if (offres && offres.length) {
+    tarif.offres = offres;
+    // L'enseigne du prix retenu — la moins chère — et non celle du catalogue.
+    const retenue = offres.find((o) => Math.abs(o.pu - pu) < 0.005);
+    if (retenue) tarif.source = retenue.enseigne;
+    const pub = offres.find((o) => o.enseigne === ENSEIGNE_PUBLIQUE);
+    if (pub && Math.abs(pub.pu - pu) >= 0.005) tarif.public = pub.pu;
+  }
+  return tarif;
 }
 
 /**

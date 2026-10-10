@@ -1,0 +1,2046 @@
+{
+ "_lisez_moi": [
+  "LES PAGES PRODUIT DU RELEVÉ — une par article du catalogue, choisie à la main.",
+  "tools/releve-prix.js les relit chaque matin (voir .github/workflows/releve-prix.yml).",
+  "`url` : la page Castorama (enseigne de référence, le « prix public »).",
+  "`ean` : le code du produit — une page qui en change n'est plus relue.",
+  "`facteur` : le conditionnement du devis rapporté à celui du produit",
+  "  (0,1 pour un lot de 10 compté à la pièce ; 2 pour 50 m comptés en 100 m).",
+  "`autres` : le MÊME produit (même EAN) dans une autre enseigne — le devis",
+  "  prend la moins chère, et liste les autres en petit.",
+  "`confiance` : exact (le produit décrit) ou proche (l'équivalent le plus juste, dit dans `note`).",
+  "Ce qui n'a pas de page ici garde son estimation, marquée comme telle dans l'app.",
+  "Relevé initial : 10 octobre 2026."
+ ],
+ "enseigne": "Castorama",
+ "articles": {
+  "agrafe-icta": {
+   "url": "https://www.castorama.fr/50-cavaliers-ronds-en-nylon-diall-16-a-20-mm-gris/3663602793069_CAFR.prd",
+   "ean": "3663602793069",
+   "facteur": 2,
+   "intitule": "50 cavaliers ronds en nylon Diall ø 16 à 20 mm gris",
+   "confiance": "proche",
+   "note": "Cavaliers ronds Ø16–20 mm (Diall), par 50 ramenés à 100 : ils tiennent la gaine comme une agrafe.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3663602793069/lot-de-50-attaches-cable-o-16-20-mm-blanc"
+    }
+   ]
+  },
+  "barrette-equipotentielle": {
+   "url": "https://www.castorama.fr/barrette-de-terre-basse-zenitech-cables-10-a-35-mm-/3545411230211_CAFR.prd",
+   "ean": "3545411230211",
+   "facteur": 1,
+   "intitule": "Barrette de terre basse Zenitech câbles Ø 10 à 35 mm²",
+   "confiance": "proche",
+   "note": "Pas de barrette ni de boîte « LES salle d'eau » dédiée chez Castorama. Le plus proche est cette barrette de terre (platine de 95 × 20 mm).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3545411230211/barrette-de-coupure-basse"
+    }
+   ]
+  },
+  "boite-dcl": {
+   "url": "https://www.castorama.fr/boitier-dcl-piton-et-fiche-2-poles-terre-tibelec-blanc/3233550418439_CAFR.prd",
+   "ean": "3233550418439",
+   "facteur": 1,
+   "intitule": "Boîtier DCL + piton et fiche 2 pôles + terre Tibelec blanc",
+   "confiance": "exact",
+   "note": "Se pose encastré au plafond (Ø65, P. 45, couvercle Ø80). Piton de suspension et fiche 2P+T fournis, comme le demande le sens. La boîte Legrand « point de centre plaque de plâtre » (12,90 €) fournit un piton mais ne mentionne pas la fiche."
+  },
+  "boite-derivation": {
+   "url": "https://www.castorama.fr/boite-de-derivation-jacobsen-67-x-p-40-mm-pour-8-cables/5063022098375_CAFR.prd",
+   "ean": "5063022098375",
+   "facteur": 1,
+   "intitule": "Boîte de dérivation Jacobsen ø67 x P.40 mm pour 8 câbles",
+   "confiance": "proche",
+   "note": "Boîte encastrable Ø67 × P40. La description parle d'une plaque Ø86 mm × 2 mm, mais la liste « Inclus » ne cite que la boîte, 2 griffes et 2 vis. Le couvercle Jacobsen Ø86 à clipser est vendu à part (0,89 €) : doute sur la présence du couvercle."
+  },
+  "boite-derivation-etanche": {
+   "url": "https://www.castorama.fr/boite-de-derivation-etanche-legrand-70-mm-x-45-mm/3245060945145_CAFR.prd",
+   "ean": "3245060945145",
+   "facteur": 1,
+   "intitule": "Boîte de dérivation étanche Legrand ø70 mm x 45 mm",
+   "confiance": "exact",
+   "note": "Boîte de dérivation étanche Legrand Ø70 × 45 mm. La fiche technique indique IP55. Entrées directes pour tubes Ø16, embouts pour Ø20."
+  },
+  "boite-encastrement": {
+   "url": "https://www.castorama.fr/boite-d-encastrement-monoposte-67-x-p-40-mm-legrand-eco-batibox/3414972954365_CAFR.prd",
+   "ean": "3414972954365",
+   "facteur": 1,
+   "intitule": "Boîte d'encastrement monoposte Ø.67 x P.40 mm Legrand Eco Batibox",
+   "confiance": "exact",
+   "note": "Legrand Eco Batibox (gamme Batibox actuelle) 1 poste pour cloison creuse, P. 40 mm, à l'unité. Écartée : « Boîte Batibox cloison sèche Legrand Céliane / Mosaïc » (EAN 3245060800406), 9,45 € l'unité, un prix hors norme pour la même fonction.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414972954365/boite-a-encastrer-eco-batibox-profondeur-40-mm-pour-plaque-de-platre-1-poste"
+    }
+   ]
+  },
+  "boite-encastrement-2": {
+   "url": "https://www.castorama.fr/boite-d-encastrement-double-plaque-de-platre-legrand-p-40-mm/3245060905422_CAFR.prd",
+   "ean": "3245060905422",
+   "facteur": 1,
+   "intitule": "Boîte d'encastrement double plaque de plâtre Legrand P. 40 mm",
+   "confiance": "exact",
+   "note": "Legrand Batibox pour plaque de plâtre (cloison creuse), 2 postes, P. 40 mm. Version standard, pas la version Energy étanche à l'air.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060905422/boite-cloison-seche-double"
+    }
+   ]
+  },
+  "boite-encastrement-3": {
+   "url": "https://www.castorama.fr/boite-d-encastrement-triple-plaque-de-platre-legrand-p-40-mm/3245060905439_CAFR.prd",
+   "ean": "3245060905439",
+   "facteur": 1,
+   "intitule": "Boîte d'encastrement triple plaque de plâtre Legrand P. 40 mm",
+   "confiance": "exact",
+   "note": "Legrand Batibox pour plaque de plâtre, 3 postes, P. 40 mm.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060905439/boite-d-encastrement-triple-plaque-de-platre-p-40-mm"
+    }
+   ]
+  },
+  "boite-etanche": {
+   "url": "https://www.castorama.fr/boite-de-derivation-carree-exterieure-avec-7-passe-cables-et-systeme-de-verrouillage-80-x-80-x-45-mm-schneider-electric-mureva-gris/3606489505752_CAFR.prd",
+   "ean": "3606489505752",
+   "facteur": 1,
+   "intitule": "Boîte de dérivation carrée extérieure avec 7 passe-câbles et système de verrouillage 80 x 80 x 45 mm Schneider Electric Mureva gris",
+   "confiance": "proche",
+   "note": "La description « boîte étanche IP 55 » est générale. Retenu : la boîte Schneider Mureva 80 × 80 × 45 mm pour l'intérieur et l'extérieur, en milieu humide, avec 7 passe-câbles. Le nom de la page ne dit pas IP55, mais la même boîte en 65 × 65 (4,10 €) est annoncée IP55. Si l'article désigne plutôt une boîte d'appareillage en saillie étanche, rien de tel n'est vendu seul.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606489505752/boite-de-derivation-carree-80-x-80-mm-4"
+    }
+   ]
+  },
+  "boite-maconnerie": {
+   "url": "https://www.castorama.fr/boite-d-encastrement-simple-ronde-maconnerie-legrand-p-40mm/3245060905118_CAFR.prd",
+   "ean": "3245060905118",
+   "facteur": 1,
+   "intitule": "Boîte d'encastrement simple ronde maçonnerie Legrand P. 40mm",
+   "confiance": "exact",
+   "note": "Legrand Batibox maçonnerie (cloison pleine, à sceller), 1 poste, Ø67, P. 40 mm. Choisie pour rester dans la même gamme que la 2 postes.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060905118/boite-a-encastrer-ronde-pour-maconnerie-o-65-mm"
+    }
+   ]
+  },
+  "boite-maconnerie-2": {
+   "url": "https://www.castorama.fr/boite-d-encastrement-double-maconnerie-legrand-p-40-mm/3245060905323_CAFR.prd",
+   "ean": "3245060905323",
+   "facteur": 1,
+   "intitule": "Boîte d'encastrement double maçonnerie Legrand P. 40 mm",
+   "confiance": "exact",
+   "note": "Legrand Batibox maçonnerie, 2 postes, P. 40 mm, à sceller au plâtre ou au ciment."
+  },
+  "boite-sol": {
+   "url": "https://www.castorama.fr/prise-de-sol-2-poles-terre-carree-metal-unica-system-schneider-electric-gris/3606489818906_CAFR.prd",
+   "ean": "3606489818906",
+   "facteur": 1,
+   "intitule": "Prise de sol 2 pôles + terre carrée métal Unica System+ Schneider Electric gris",
+   "confiance": "proche",
+   "note": "Castorama ne vend pas de boîte de sol seule. Retenu : la prise de sol Schneider Unica System+ (métal, IP44), à poser en chape béton ou en faux plancher, avec la prise 2P+T comprise. Elle coûte donc plus qu'une boîte vide."
+  },
+  "bornier-terre": {
+   "url": "https://www.castorama.fr/bornier-de-terre-legrand-vert-et-gris/3245060927813_CAFR.prd",
+   "ean": "3245060927813",
+   "facteur": 1,
+   "intitule": "Bornier de terre Legrand vert et gris",
+   "confiance": "exact",
+   "note": "Bornier de terre Legrand vert « conçu pour un tableau électrique Legrand ». Le nombre de bornes n'est pas indiqué sur la page."
+  },
+  "bouche-vmc": {
+   "url": "https://www.castorama.fr/bouche-d-extraction-hygrostat-aldes-bahia-sdb-vmc-80-mm/3542280352709_CAFR.prd",
+   "ean": "3542280352709",
+   "facteur": 1,
+   "intitule": "Bouche d'extraction VMC Ø80 mm avec détecteur d'humidité pour salle de bains, Aldes Bahia",
+   "confiance": "exact",
+   "note": "Bouche d'extraction hygroréglable de salle de bains, Ø 80. Très au-dessus de l'estimation (12 €) : une bouche hygroréglable coûte réellement ce prix."
+  },
+  "brassage": {
+   "url": "https://www.castorama.fr/cordon-rj45-informatique-cat6-erard-2-m/3700101223670_CAFR.prd",
+   "ean": "3700101223670",
+   "facteur": 1,
+   "intitule": "Cordon RJ45 informatique CAT6 Erard 2 m",
+   "confiance": "proche",
+   "note": "Cordon RJ45 cat. 6 Erard de 2 m au lieu de 1 m. Le seul 1 m en cat. 6, le Blyss proposé en alternative, est incohérent : sa fiche indique 10 m et il coûte plus cher que les versions de 2 m (15,50 €) et 5 m (14,90 €)."
+  },
+  "cable-3g1.5": {
+   "url": "https://www.castorama.fr/cable-electrique-u1000r2v-3x1-5-mm-100-m/3427500883839_CAFR.prd",
+   "ean": "3427500883839",
+   "facteur": 1,
+   "intitule": "Câble électrique U1000R2V 3x1,5 mm² 100 m",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026 ; prix passé de 89,90 € à 94,90 €.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3427500883839/cable-electrique-r2v-3g1-5-mm-noir-100-m"
+    }
+   ]
+  },
+  "cable-3g2.5": {
+   "url": "https://www.castorama.fr/cable-electrique-u1000r2v-3x2-5-mm-100-m/3427500884041_CAFR.prd",
+   "ean": "3427500884041",
+   "facteur": 1,
+   "intitule": "Câble électrique U1000R2V 3X2,5 mm² 100 m",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026 ; prix passé de 139,90 € à 144,90 €.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3427500884041/cable-electrique-r2v-3g2-5-mm-noir-100-m-1"
+    }
+   ]
+  },
+  "cable-3g6": {
+   "url": "https://www.castorama.fr/cable-3x6-mm-u1000r2v-couronne-50m-nexans/3170230008217_CAFR.prd",
+   "ean": "3170230008217",
+   "facteur": 2,
+   "intitule": "Câble 3x6 mm² U1000R2V couronne 50m Nexans",
+   "confiance": "exact",
+   "note": "Pas de couronne de 100 m : couronne de 50 m × 2. À la coupe (5,29 €/m, EAN 3663602083580), on paierait 529 € les 100 m.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3170230008217/cable-electrique-r2v-3g6-mm-noir-50-m"
+    }
+   ]
+  },
+  "cable-5g2.5": {
+   "url": "https://www.castorama.fr/cable-u-1000-r2v-5g-2-5c-50-m-nexans/3170230957317_CAFR.prd",
+   "ean": "3170230957317",
+   "facteur": 2,
+   "intitule": "Câble U-1000 R2V 5G 2.5C 50 m Nexans",
+   "confiance": "exact",
+   "note": "Pas de couronne de 100 m : couronne de 50 m × 2. Le même câble au mètre (3,99 €/m, EAN 3663602083535) reviendrait à 399 € les 100 m.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3170230957317/couronne-de-cable-u-1000-r2v-5g2-5-50m"
+    }
+   ]
+  },
+  "carillon": {
+   "url": "https://www.castorama.fr/carillon-filaire-a-piles-embry-blanc/3663602631828_CAFR.prd",
+   "ean": "3663602631828",
+   "facteur": 1,
+   "intitule": "Carillon filaire / à piles Embry blanc",
+   "confiance": "proche",
+   "note": "Seul carillon filaire chez Castorama (Blyss Embry). Il fonctionne à piles ou sur transformateur, intégré d'après la fiche. Le bouton n'est PAS inclus : il faut ajouter le bouton filaire lumineux Blyss blanc (4,29 €, EAN 3663602631774), soit 18,19 € l'ensemble. Le pu ci-contre est sans bouton."
+  },
+  "cavalier-16": {
+   "url": "https://www.castorama.fr/50-cavaliers-ronds-en-nylon-diall-16-a-20-mm-gris/3663602793069_CAFR.prd",
+   "ean": "3663602793069",
+   "facteur": 2,
+   "intitule": "50 cavaliers ronds en nylon Diall ø 16 à 20 mm gris",
+   "confiance": "proche",
+   "note": "Cavalier Ø 16 à 20 avec clous. Sachet de 50 : facteur 2. Même produit que collier-gaine-20.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3663602793069/lot-de-50-attaches-cable-o-16-20-mm-blanc"
+    }
+   ]
+  },
+  "cheville-nylon": {
+   "url": "https://www.castorama.fr/100-chevilles-diall-nylon-cl-6x30mm/3663602926207_CAFR.prd",
+   "ean": "3663602926207",
+   "facteur": 1,
+   "intitule": "100 chevilles Diall nylon CL Ø6x30mm",
+   "confiance": "exact",
+   "note": "Cheville nylon Ø 6, boîte de 100.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3663602926207/lot-de-100-chevilles-nylon-6-x-30-mm"
+    }
+   ]
+  },
+  "cheville-placo": {
+   "url": "https://www.castorama.fr/50-chevilles-diall-murs-creux-pz-m4x33mm/3663602925569_CAFR.prd",
+   "ean": "3663602925569",
+   "facteur": 1,
+   "intitule": "50 chevilles Diall murs creux PZ M4x33mm",
+   "confiance": "proche",
+   "note": "Cheville métallique à expansion pour cloison creuse, boîte de 50, M4. Aucune 4 × 38 chez Castorama : tailles M4 disponibles 33 et 46 mm ; 33 mm retenu (BA13 standard)."
+  },
+  "coax": {
+   "url": "https://www.castorama.fr/cable-coaxial-17vatc-blanc-100-m-nexans/3170230959656_CAFR.prd",
+   "ean": "3170230959656",
+   "facteur": 1,
+   "intitule": "Câble coaxial 17VATC Blanc 100 m Nexans",
+   "confiance": "exact",
+   "note": "17 VATC en 100 m, Nexans.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3170230959656/cable-coaxial-17-vatc-blanc-100-m"
+    }
+   ]
+  },
+  "coffret-1": {
+   "url": "https://www.castorama.fr/tableau-electrique-a-equiper-1-rangee-13-modules-legrand/3245060930202_CAFR.prd",
+   "ean": "3245060930202",
+   "facteur": 1,
+   "intitule": "Tableau électrique à équiper 1 rangée - 13 modules Legrand",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026, inchangé.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060930202/tableau-electrique-nu-drivia-13-modules"
+    }
+   ]
+  },
+  "coffret-2": {
+   "url": "https://www.castorama.fr/tableau-electrique-a-equiper-2-rangees-26-modules-legrand/3245060930219_CAFR.prd",
+   "ean": "3245060930219",
+   "facteur": 1,
+   "intitule": "Tableau électrique à équiper 2 rangées - 26 modules Legrand",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026, inchangé.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060930219/coffret-nu-2-rangees-26-modules"
+    }
+   ]
+  },
+  "coffret-3": {
+   "url": "https://www.castorama.fr/tableau-electrique-a-equiper-3-rangees-39-modules-legrand/3245060930226_CAFR.prd",
+   "ean": "3245060930226",
+   "facteur": 1,
+   "intitule": "Tableau électrique à équiper 3 rangées - 39 modules Legrand",
+   "confiance": "exact",
+   "note": "Legrand Drivia, 3 rangées / 39 modules. Bornier de terre et borniers phase/neutre fournis, porte vendue à part. Même prix que l'app.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060930226/coffret-nu-39-modules-3-rangees"
+    }
+   ]
+  },
+  "coffret-4": {
+   "url": "https://www.castorama.fr/tableau-electrique-a-equiper-4-rangees-52-modules-legrand/3245060930233_CAFR.prd",
+   "ean": "3245060930233",
+   "facteur": 1,
+   "intitule": "Tableau électrique à équiper 4 rangées - 52 modules Legrand",
+   "confiance": "exact",
+   "note": "Legrand Drivia, 4 rangées / 52 modules. Borniers fournis, porte vendue à part. Même prix que l'app.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060930233/coffret-nu-52-modules-4-rangees"
+    }
+   ]
+  },
+  "coffret-com": {
+   "url": "https://www.castorama.fr/coffret-de-communication-1-rangee-13-modules-grade-2tv-4-x-rj45-cat6-schneider-electric-resi9-connect/3606486419342_CAFR.prd",
+   "ean": "3606486419342",
+   "facteur": 1,
+   "intitule": "Coffret de communication 1 rangée 13 modules grade 2TV 4 x RJ45 cat6 Schneider Electric Resi9 Connect",
+   "confiance": "exact",
+   "note": "Grade 2 TV, 4 prises RJ45, DTIO, répartiteur TV 2 sorties, conforme NF C 15-100. Sans porte. Le Legrand Full Media RJ45 (259,90 €) n'est pas annoncé grade 2TV.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606486419342/coffret-de-communication-13m-1r-grade-2tv-4-x-rj45-cat6-resi9-connect"
+    }
+   ]
+  },
+  "coffret-etanche": {
+   "url": "https://www.castorama.fr/tableau-electrique-12-modules-ip65-resistant-aux-intemperies-jacobsen/5063022755254_CAFR.prd",
+   "ean": "5063022755254",
+   "facteur": 1,
+   "intitule": "Tableau électrique 12 modules IP65 résistant aux intempéries Jacobsen",
+   "confiance": "exact",
+   "note": "Coffret Jacobsen 12 modules IP65 en 1 rangée, en saillie, pour atelier, garage et extérieur."
+  },
+  "collier-colson": {
+   "url": "https://www.castorama.fr/100-colliers-de-serrage-en-nylon-diall-4-8-x-250-mm-noir/3663602792376_CAFR.prd",
+   "ean": "3663602792376",
+   "facteur": 1,
+   "intitule": "100 colliers de serrage en nylon Diall 4,8 x 250 mm noir",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026 toujours en ligne, prix inchangé.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3663602792376/lot-de-100-colliers-de-fixation-noir-4-8-x-250-mm"
+    }
+   ]
+  },
+  "collier-equipotentiel": {
+   "url": "https://www.castorama.fr/colliers-de-mise-a-la-terre-zenitech/3545411230235_CAFR.prd",
+   "ean": "3545411230235",
+   "facteur": 1,
+   "intitule": "Colliers de mise à la terre Zenitech",
+   "confiance": "proche",
+   "note": "Collier équipotentiel à feuillard (borne 16 mm²). Le titre est au pluriel mais la fiche décrit « Collier équipotentiel » sans donner de quantité : probablement 1 pièce et non un lot."
+  },
+  "collier-gaine-20": {
+   "url": "https://www.castorama.fr/50-cavaliers-ronds-en-nylon-diall-16-a-20-mm-gris/3663602793069_CAFR.prd",
+   "ean": "3663602793069",
+   "facteur": 2,
+   "intitule": "50 cavaliers ronds en nylon Diall ø 16 à 20 mm gris",
+   "confiance": "proche",
+   "note": "Cavalier rond à clouer (clous inclus d'après la fiche) pour gaine Ø 16 à 20. Vendu par 50 : facteur 2 pour le sachet de 100. Aucun « collier à clouer Ø 20 » par 100 chez Castorama. Même produit que cavalier-16.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3663602793069/lot-de-50-attaches-cable-o-16-20-mm-blanc"
+    }
+   ]
+  },
+  "contacteur-jn": {
+   "url": "https://www.castorama.fr/contacteur-20a-schneider-electric-resi9-xp/3606481323996_CAFR.prd",
+   "ean": "3606481323996",
+   "facteur": 1,
+   "intitule": "Contacteur 20A Schneider Electric Resi9 XP",
+   "confiance": "exact",
+   "note": "Contacteur modulaire Schneider Resi9 XP 20 A. La description dit « contacteur heures creuses modulaire ». Calibre exact. Chez Legrand, Castorama ne vend que le 25 A (64,90 €).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606481323996/contacteur-jour-nuit-20a"
+    }
+   ]
+  },
+  "couvercle-derivation": {
+   "url": "https://www.castorama.fr/couvercle-de-boite-de-derivation-diall-86-mm-fermeture-a-ressorts/3663602794509_CAFR.prd",
+   "ean": "3663602794509",
+   "facteur": 1,
+   "intitule": "Couvercle de boîte de dérivation Diall ø86 mm, fermeture à ressorts",
+   "confiance": "proche",
+   "note": "Couvercle de boîte de dérivation Diall Ø86 mm à ressorts (IP20, EN 60670). C'est le couvercle qui se pose sur une boîte d'encastrement Ø67, mais la page ne dit pas noir sur blanc qu'il convertit une boîte d'appareillage. Il n'existe pas de couvercle Legrand Batibox chez Castorama."
+  },
+  "diff-A": {
+   "url": "https://www.castorama.fr/interrupteur-differentiel-40a-30ma-type-a-sortie-haut-legrand/3245060928360_CAFR.prd",
+   "ean": "3245060928360",
+   "facteur": 1,
+   "intitule": "Interrupteur différentiel 40A 30mA type A sortie haut Legrand",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026, inchangé.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060928360/interrupteur-differentiel-30-ma-40a-type-a-2"
+    }
+   ]
+  },
+  "diff-A-63": {
+   "url": "https://www.castorama.fr/interrupteur-differentiel-30ma-63a-type-a-legrand/3245060928377_CAFR.prd",
+   "ean": "3245060928377",
+   "facteur": 1,
+   "intitule": "Interrupteur différentiel 30mA 63A type A Legrand",
+   "confiance": "exact",
+   "note": "Interrupteur différentiel Legrand DX, 63 A, 30 mA, type A, 2 pôles, arrivée par le haut et départ par le bas, raccordement direct au peigne. Même gamme que les 40 A déjà relevés.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060928377/interrupteur-differentiel-30-ma-63a-type-a-1"
+    }
+   ]
+  },
+  "diff-AC": {
+   "url": "https://www.castorama.fr/interrupteur-differentiel-40a-30ma-type-ac-sortie-haut-legrand/3245060928407_CAFR.prd",
+   "ean": "3245060928407",
+   "facteur": 1,
+   "intitule": "Interrupteur différentiel 40A 30mA type AC sortie haut Legrand",
+   "confiance": "exact",
+   "note": "Produit du relevé (référence Legrand 092840) ; son vrai EAN est 3245060928407. Prix inchangé.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060928407/interrupteur-differentiel-30-ma-40a-type-ac-2"
+    }
+   ]
+  },
+  "diff-AC-63": {
+   "url": "https://www.castorama.fr/interrupteur-differentiel-30ma-63a-type-ac-legrand/3245060928414_CAFR.prd",
+   "ean": "3245060928414",
+   "facteur": 1,
+   "intitule": "Interrupteur différentiel 30mA 63A type AC Legrand",
+   "confiance": "exact",
+   "note": "Interrupteur différentiel Legrand DX, 63 A, 30 mA, type AC. La fiche précise une sortie par le bas, avec repiquage nécessaire pour alimenter les disjoncteurs.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060928414/interrupteur-differentiel-bipolaire-type-ac-63-a-30-ma"
+    }
+   ]
+  },
+  "diff-HPI": {
+   "url": "https://www.castorama.fr/interrupteur-differentiel-30ma-40a-type-hpi-legrand/3245064116237_CAFR.prd",
+   "ean": "3245064116237",
+   "facteur": 1,
+   "intitule": "Interrupteur différentiel 30mA 40A type HPI Legrand",
+   "confiance": "exact",
+   "note": "Interrupteur différentiel Legrand 40 A, 30 mA, type HPI (type A super-immunisé, appelé type F/Hpi chez Legrand), conseillé pour le congélateur et l'informatique. Le prix de la page (219,90 €) est presque le double de celui de l'app : à vérifier. C'est le seul HPI ou type F vendu par Castorama."
+  },
+  "disj-10": {
+   "url": "https://www.castorama.fr/disjoncteur-phase-neutre-10a-legrand/3245060928223_CAFR.prd",
+   "ean": "3245060928223",
+   "facteur": 1,
+   "intitule": "Disjoncteur Phase + neutre 10A Legrand",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026, inchangé. Courbe non indiquée sur la page.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060928223/disjoncteur-phase-neutre-10a-bornes-a-vis-1-module"
+    }
+   ]
+  },
+  "disj-16": {
+   "url": "https://www.castorama.fr/disjoncteur-phase-neutre-16a-legrand/3245060928230_CAFR.prd",
+   "ean": "3245060928230",
+   "facteur": 1,
+   "intitule": "Disjoncteur Phase + neutre 16A Legrand",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026, inchangé.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060928230/disjoncteur-phase-neutre-peignable-16a"
+    }
+   ]
+  },
+  "disj-2": {
+   "url": "https://www.castorama.fr/disjoncteur-phase-neutre-2a-legrand/3245060928209_CAFR.prd",
+   "ean": "3245060928209",
+   "facteur": 1,
+   "intitule": "Disjoncteur Phase + neutre 2A Legrand",
+   "confiance": "exact",
+   "note": "Même série Legrand Ph+N que les 10/16/20/32 A, prix inchangé (27,90 €). La page n'indique pas la courbe, comme pour toute la série.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060928209/disjoncteur-phase-neutre-2a-bornes-a-vis-1-module"
+    }
+   ]
+  },
+  "disj-20": {
+   "url": "https://www.castorama.fr/disjoncteur-phase-neutre-20a-legrand/3245060928247_CAFR.prd",
+   "ean": "3245060928247",
+   "facteur": 1,
+   "intitule": "Disjoncteur Phase + neutre 20A Legrand",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026, inchangé.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060928247/disjoncteur-phase-neutre-peignable-20a"
+    }
+   ]
+  },
+  "disj-32": {
+   "url": "https://www.castorama.fr/disjoncteur-phase-neutre-32a-legrand/3245060928254_CAFR.prd",
+   "ean": "3245060928254",
+   "facteur": 1,
+   "intitule": "Disjoncteur Phase + neutre 32A Legrand",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026, inchangé.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060928254/disjoncteur-phase-neutre-peignable-32a"
+    }
+   ]
+  },
+  "disj-abonne": {
+   "url": "https://www.castorama.fr/disjoncteur-branchement-enedis-tarif-bleu-500ma-selectif-15-30-45a-legrand/3245060928704_CAFR.prd",
+   "ean": "3245060928704",
+   "facteur": 1,
+   "intitule": "Disjoncteur branchement Enedis Tarif bleu 500mA sélectif 15/30/45A Legrand",
+   "confiance": "exact",
+   "note": "Disjoncteur de branchement Legrand Enedis tarif bleu, différentiel 500 mA sélectif, réglable 15/30/45 A. Le prix de la page (189 €) est presque le double de celui de l'app.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060928704/disjoncteur-d-abonne-baco-selectif-15-45a"
+    }
+   ]
+  },
+  "disj-diff-16": {
+   "url": "https://www.castorama.fr/disjoncteur-differentiel-30ma-16a-type-ac-abb/8012542162001_CAFR.prd",
+   "ean": "8012542162001",
+   "facteur": 1,
+   "intitule": "Disjoncteur différentiel 30MA 16A type AC ABB",
+   "confiance": "exact",
+   "note": "Disjoncteur différentiel 16 A 30 mA type AC. Le moins cher chez Castorama, bien au-dessus de l'estimation (59 €)."
+  },
+  "disj-diff-20": {
+   "url": "https://www.castorama.fr/disjoncteur-differentiel-30ma-20a-type-ac-abb/8012542162100_CAFR.prd",
+   "ean": "8012542162100",
+   "facteur": 1,
+   "intitule": "Disjoncteur différentiel 30MA 20A type AC ABB",
+   "confiance": "exact",
+   "note": "Disjoncteur différentiel 20 A 30 mA, type AC seulement (pas de type A chez Castorama). Le moins cher, bien au-dessus de l'estimation (62 €)."
+  },
+  "domino": {
+   "url": "https://www.castorama.fr/barrette-de-connexion-12-x-2-entrees-diall-6-mm-10-a/3663602794738_CAFR.prd",
+   "ean": "3663602794738",
+   "facteur": 10,
+   "intitule": "Barrette de connexion 12 X 2 entrées Diall 6 mm² / 10 A",
+   "confiance": "proche",
+   "note": "DOUTEUX. Barrette de 12 dominos, vendue à l'unité. « Lot de 10 » est lu comme 10 barrettes, d'où le facteur 10. Si le catalogue entend 10 dominos, soit une seule barrette, le facteur passe à 1 (1,75 €). Le titre de la page indique 10 A, mais sa fiche technique indique 6 A.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3663602794738/barrette-de-connexion-a-visser-12-x-2-entrees-6-mm"
+    }
+   ]
+  },
+  "dti": {
+   "url": "https://www.castorama.fr/dispositif-de-terminaison-interieur-dti-legrand/3245060910662_CAFR.prd",
+   "ean": "3245060910662",
+   "facteur": 1,
+   "intitule": "Dispositif de terminaison intérieur DTI Legrand",
+   "confiance": "exact",
+   "note": "DTI Legrand à installer à l'arrivée de la ligne, dans le coffret de communication (NF C 15-100). Erreur sur la fiche : « Type d'article = Gonfleur à main »."
+  },
+  "fil-1.5": {
+   "url": "https://www.castorama.fr/fil-1-5mm-h07vu-noir-couronne-100m-nexans/3427500597262_CAFR.prd",
+   "ean": "3427500597262",
+   "facteur": 1,
+   "intitule": "Fil 1,5mm² H07VU noir couronne 100m Nexans",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026 ; prix passé de 25,90 € à 27,90 €.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3427500597262/fil-electrique-h07vu-1-5-mm-noir-100-m"
+    }
+   ]
+  },
+  "fil-10": {
+   "url": "https://www.castorama.fr/fil-electrique-h07vr-10-mm-nexans-rouge-vendu-au-metre-lineaire/3663602082088_CAFR.prd",
+   "ean": "3663602082088",
+   "facteur": 10,
+   "intitule": "Fil électrique H07VR 10 mm² Nexans rouge vendu au mètre linéaire",
+   "confiance": "exact",
+   "note": "Pas de couronne de 10 m en 10 mm² chez Castorama : seul le fil au mètre existe (rouge, bleu, vert/jaune). Prix au mètre × 10 pour la couronne de 10 m du catalogue."
+  },
+  "fil-16": {
+   "url": "https://www.castorama.fr/fil-electrique-h07vr-16-mm-nexans-rouge-vendu-au-metre-lineaire/3663602082897_CAFR.prd",
+   "ean": "3663602082897",
+   "facteur": 10,
+   "intitule": "Fil électrique H07VR 16 mm² Nexans rouge vendu au mètre linéaire",
+   "confiance": "exact",
+   "note": "Pas de couronne de 10 m en 16 mm² : seul le fil au mètre existe (rouge, bleu, vert/jaune). Prix au mètre × 10."
+  },
+  "fil-2.5": {
+   "url": "https://www.castorama.fr/fil-electrique-h07vu-2-5mm-rouge-couronne-100-m/3427500597828_CAFR.prd",
+   "ean": "3427500597828",
+   "facteur": 1,
+   "intitule": "Fil électrique H07VU 2,5mm² rouge couronne 100 m",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026 ; prix passé de 41,90 € à 47,90 €.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3427500597828/cable-h07-vu-100-m-section-2-5-mm-rouge"
+    }
+   ]
+  },
+  "fil-6": {
+   "url": "https://www.castorama.fr/fil-electrique-h07vr-6mm-nexans-rouge-10-m/3170231002078_CAFR.prd",
+   "ean": "3170231002078",
+   "facteur": 1,
+   "intitule": "Fil électrique H07VR 6mm² Nexans rouge - 10 m",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026 ; prix passé de 16,90 € à 18,90 €.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3170231002078/fil-electrique-h07vr-6-mm-rouge-10-m"
+    }
+   ]
+  },
+  "foret-beton-6": {
+   "url": "https://www.castorama.fr/foret-beton-x1-dimensions-6-x-l-100-165-mm-emmanchement-sds-plus-bosch/3165140027755_CAFR.prd",
+   "ean": "3165140027755",
+   "facteur": 1,
+   "intitule": "Foret béton (x1) - dimensions Ø.6 x L.100/165 mm - emmanchement SDS Plus - Bosch",
+   "confiance": "exact",
+   "note": "Foret béton Ø 6 à l'unité, emmanchement SDS+ (perforateur)."
+  },
+  "fraise-placo-67": {
+   "url": "https://www.castorama.fr/trepan-bosch-pro-pour-multi-materiaux-68mm/6949509240422_CAFR.prd",
+   "ean": "6949509240422",
+   "facteur": 1,
+   "intitule": "Trépan Bosch pro pour multi-matériaux Ø.68mm",
+   "confiance": "proche",
+   "note": "Castorama ne vend pas de fraise à placo dédiée. Le plus proche est ce trépan multi-matériaux Ø 68 (pas de Ø 67), que la page destine aux électriciens pour les boîtiers en installation intérieure."
+  },
+  "futp6": {
+   "url": "https://www.castorama.fr/cable-ethernet-lan-cat6-ftp-nexans-100-m/3170230062608_CAFR.prd",
+   "ean": "3170230062608",
+   "facteur": 1,
+   "intitule": "Câble Ethernet LAN-CAT6-FTP Nexans 100 m",
+   "confiance": "exact",
+   "note": "Cat. 6 FTP (= F/UTP) en 100 m, Nexans.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3170230062608/cable-ethernet-categorie-6-f-utp-blinde-l-100-m"
+    }
+   ]
+  },
+  "gaine-annelee-16": {
+   "url": "https://www.castorama.fr/gaine-electrique-icta-diall-16-25-m/3454978114295_CAFR.prd",
+   "ean": "3454978114295",
+   "facteur": 1,
+   "intitule": "Gaine électrique ICTA Diall ø16 - 25 m",
+   "confiance": "exact",
+   "note": "Gaine ICTA annelée Diall Ø16 en couronne de 25 m (même gamme que la Ø16 100 m déjà relevée, EAN 3454978152402)."
+  },
+  "gaine-thermo": {
+   "url": "https://www.castorama.fr/15-gaines-thermoretractable-noires-8-6-4-3-2-mm/3663602794691_CAFR.prd",
+   "ean": "3663602794691",
+   "facteur": 1,
+   "intitule": "15 gaines thermorétractable noires ø8/ø6/ø4/ø3/ø2 mm",
+   "confiance": "exact",
+   "note": "Assortiment Diall de 5 diamètres (3 de chaque, L. 150 mm).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3663602794691/lot-de-15-gaines-thermo-retractables-noires"
+    }
+   ]
+  },
+  "gaine-tpc-40": {
+   "url": "https://www.castorama.fr/gaine-pour-reseaux-enterres-rouge-40-mm-x-25-m-fitt/3396049012546_CAFR.prd",
+   "ean": "3396049012546",
+   "facteur": 1,
+   "intitule": "Gaine pour réseaux enterrés rouge Ø 40 mm x 25 m Fitt",
+   "confiance": "exact",
+   "note": "Description de la page : « Gaine TPC rouge Ø40 couronne 25m Fitt ». Rouge, Ø40, couronne de 25 m, manchon inclus. La fiche technique indique « 250 cm », une coquille : le titre et la description disent 25 m."
+  },
+  "gaine-tpc-63": {
+   "url": "https://www.castorama.fr/gaine-pour-reseaux-enterres-rouge-63-mm-x-25-m-fitt/3396049012560_CAFR.prd",
+   "ean": "3396049012560",
+   "facteur": 1,
+   "intitule": "Gaine pour réseaux enterrés rouge Ø 63 mm x 25 m Fitt",
+   "confiance": "exact",
+   "note": "Gaine TPC rouge Fitt Ø63 en couronne de 25 m (même gamme que la Ø40). Existe aussi en 15 m, non retenue. Usage : raccordements électriques enterrés, NF EN 50086-2-6. La fiche indique « 2,5 m », une coquille : le titre dit 25 m et le poids, 6,5 kg, correspond à une couronne."
+  },
+  "gaine-vmc-125": {
+   "url": "https://www.castorama.fr/gaine-flexible-isolee-pour-reseau-vmc-en-habitat-pavillonnaire-s1p-ecosoft-125-mm/3411458139223_CAFR.prd",
+   "ean": "3411458139223",
+   "facteur": 0.5,
+   "intitule": "Gaine flexible isolée pour réseau VMC en habitat pavillonnaire S1P Ecosoft ø 125 mm",
+   "confiance": "proche",
+   "note": "Gaine VMC isolée Ø 125, vendue en 6 m (fiche : 6000 mm). Aucune 3 m isolée chez Castorama, d'où le facteur 0,5."
+  },
+  "goulotte-40": {
+   "url": "https://www.castorama.fr/conduit-de-distribution-40x25-mm-legrand/3414970337528_CAFR.prd",
+   "ean": "3414970337528",
+   "facteur": 1,
+   "intitule": "Conduit de distribution 40x25 mm Legrand",
+   "confiance": "exact",
+   "note": "Goulotte Legrand 40 × 25 mm (40 mm de haut, 25 mm de profondeur), barre de 2 m d'après la fiche technique. Blanc.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414970337528/conduit-de-distribution-de-section-40x25mm"
+    }
+   ]
+  },
+  "gtl": {
+   "url": "https://www.castorama.fr/gaine-technique-de-logement-250-x-65-mm-legrand/3414970540584_CAFR.prd",
+   "ean": "3414970540584",
+   "facteur": 1,
+   "intitule": "Gaine technique de logement 250 x 65 mm Legrand",
+   "confiance": "proche",
+   "note": "GTL Legrand Drivia 250 × 65 mm, pour fixer directement les coffrets de 13 modules. Elle est livrée en 2 longueurs de 1,30 m, soit 2,60 m à recouper, et non 2,10 m. Aucune GTL de 2,10 m chez Castorama.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414970540584/gtl-compacte"
+    }
+   ]
+  },
+  "horloge-modulaire": {
+   "url": "https://www.castorama.fr/interrupteur-horaire-jour-hebdo-1-voie-numerique-legrand/3245064126311_CAFR.prd",
+   "ean": "3245064126311",
+   "facteur": 1,
+   "intitule": "Interrupteur horaire jour/hebdo 1 voie numérique Legrand",
+   "confiance": "exact",
+   "note": "Interrupteur horaire Legrand modulaire, numérique, programmation journalière et hebdomadaire, 1 voie, 16 A, 56 programmes, 1 module. Le prix de la page (229,90 €) est 3 fois celui de l'app."
+  },
+  "icta-16": {
+   "url": "https://www.castorama.fr/gaine-electrique-icta-diall-16-100-m/3454978152402_CAFR.prd",
+   "ean": "3454978152402",
+   "facteur": 1,
+   "intitule": "Gaine électrique ICTA Diall ø16 - 100 m",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026, inchangé (26,90 €)."
+  },
+  "icta-20": {
+   "url": "https://www.castorama.fr/gaine-electrique-icta-diall-20-100-m/3454978152419_CAFR.prd",
+   "ean": "3454978152419",
+   "facteur": 1,
+   "intitule": "Gaine électrique ICTA Diall ø20 - 100 m",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026, inchangé. Le sens dit « ICTA 3422 », la page ne donne pas la classe ; c'est la seule ICTA Ø20 Diall en 100 m (Legrand Turbogliss Ø20 100 m existe aussi)."
+  },
+  "icta-25": {
+   "url": "https://www.castorama.fr/gaine-electrique-icta-diall-25-100-m/3454978114332_CAFR.prd",
+   "ean": "3454978114332",
+   "facteur": 1,
+   "intitule": "Gaine électrique ICTA Diall ø25 - 100 m",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026, inchangé."
+  },
+  "icta-prefilee-3g1.5": {
+   "url": "https://www.castorama.fr/gaine-prefilee-3g1-5-diall-16-100-m/3389978204113_CAFR.prd",
+   "ean": "3389978204113",
+   "facteur": 1,
+   "intitule": "Gaine préfilée 3G1,5 Diall ø16 - 100 m",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026 toujours en ligne, prix inchangé."
+  },
+  "icta-prefilee-3g2.5": {
+   "url": "https://www.castorama.fr/gaine-prefilee-3g2-5-diall-20-100-m/3389978204120_CAFR.prd",
+   "ean": "3389978204120",
+   "facteur": 1,
+   "intitule": "Gaine préfilée 3G2,5 Diall ø20 - 100 m",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026 toujours en ligne, prix inchangé."
+  },
+  "inter-etanche": {
+   "url": "https://www.castorama.fr/interrupteur-legrand-plexo-gris-en-saillie/3414971904521_CAFR.prd",
+   "ean": "3414971904521",
+   "facteur": 1,
+   "intitule": "Interrupteur Legrand Plexo gris en saillie",
+   "confiance": "exact",
+   "note": "Interrupteur Plexo en saillie, IP55.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971904521/interrupteur-va-et-vient-plexo-complet-saillie-gris-1"
+    }
+   ]
+  },
+  "inter-volet": {
+   "url": "https://www.castorama.fr/commande-volet-roulant-legrand-dooxie-blanc/3414971087095_CAFR.prd",
+   "ean": "3414971087095",
+   "facteur": 1,
+   "intitule": "Commande volet roulant Legrand Dooxie blanc",
+   "confiance": "proche",
+   "note": "Commande Dooxie à 3 boutons (montée, stop, descente). La plaque de finition n'est PAS fournie : il faut ajouter la plaque Dooxie 1 poste blanche (1,90 €, EAN 3414971090040), soit 26,90 € avec sa plaque. Le pu ci-contre est sans plaque.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971087095/interrupteur-volet-roulant-dooxie-blanc"
+    }
+   ]
+  },
+  "meca-celiane-inter": {
+   "url": "https://www.castorama.fr/interrupteur-va-et-vient-legrand-celiane-10a-blanc-sans-plaque/3414972441544_CAFR.prd",
+   "ean": "3414972441544",
+   "facteur": 1,
+   "intitule": "Interrupteur va-et-vient Legrand Céliane 10A blanc sans plaque",
+   "confiance": "exact",
+   "note": "Interrupteur va-et-vient 10 A Céliane blanc sans plaque, catégorie « à assembler ». L'ancien mécanisme 3245060997205 (11,12 €) est en Déstockage, donc écarté."
+  },
+  "meca-celiane-poussoir": {
+   "url": "https://www.castorama.fr/mecanisme-de-poussoir-legrand-celiane-6a-blanc-sans-plaque/3414972442572_CAFR.prd",
+   "ean": "3414972442572",
+   "facteur": 1,
+   "intitule": "Mécanisme de poussoir Legrand Céliane 6A Blanc sans plaque",
+   "confiance": "exact",
+   "note": "Poussoir 6 A Céliane blanc sans plaque. L'ancien mécanisme 3245060997304 (16,72 €) est en Déstockage, donc écarté."
+  },
+  "meca-celiane-prise": {
+   "url": "https://www.castorama.fr/prise-de-courant-avec-terre-legrand-celiane-sans-plaque-blanc/3414972443180_CAFR.prd",
+   "ean": "3414972443180",
+   "facteur": 1,
+   "intitule": "Prise de courant avec terre Legrand Céliane sans plaque blanc",
+   "confiance": "exact",
+   "note": "Prise 2P+T 16 A Céliane blanc sans plaque (« à équiper d'une plaque Céliane »), affleurante, nouvelle génération. L'ancien mécanisme 3245060997014 (10,32 €) est en Déstockage, donc écarté ; 3414972443272 (bornes à vis) coûte 14,90 €."
+  },
+  "meca-celiane-prise20": {
+   "url": "https://www.castorama.fr/prise-de-courant-avec-terre-legrand-celiane-sans-plaque-blanc/3414972443180_CAFR.prd",
+   "ean": "3414972443180",
+   "facteur": 1,
+   "intitule": "Prise de courant avec terre Legrand Céliane sans plaque blanc",
+   "confiance": "exact",
+   "note": "Circuit spécialisé 20 A (lave-linge, four…) : la prise 2P+T 16 A de la gamme, sur un circuit 20 A en 2,5 mm² — c'est le même mécanisme."
+  },
+  "meca-celiane-prise32": {
+   "url": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd",
+   "ean": "3245060901493",
+   "facteur": 1,
+   "intitule": "Sortie de câble Legrand 20/32 A blanc brillant",
+   "confiance": "proche",
+   "note": "Plaque de cuisson : sortie de câble Legrand 20/32 A (hors gamme — aucune gamme ne propose de 32 A en grande surface).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060901493/sortie-de-cable-20a-a-32a-blanc"
+    }
+   ]
+  },
+  "meca-celiane-rj45": {
+   "url": "https://www.castorama.fr/prise-rj45-legrand-celiane-telephone-et-informatique-ftp-categorie-6-blanc/3414972443784_CAFR.prd",
+   "ean": "3414972443784",
+   "facteur": 1,
+   "intitule": "Prise RJ45 Legrand Céliane téléphone et informatique FTP catégorie 6 blanc",
+   "confiance": "exact",
+   "note": "Prise RJ45 cat. 6 FTP Céliane blanc, à équiper d'une plaque. La version STP coûte 29,90 € (3414972443883) ; l'ancienne 3245060997113 (19,92 €) est en Déstockage."
+  },
+  "meca-celiane-sortieCable": {
+   "url": "https://www.castorama.fr/sortie-de-cable-legrand-celiane-blanc-avec-support-sans-plaque/3414972444460_CAFR.prd",
+   "ean": "3414972444460",
+   "facteur": 1,
+   "intitule": "Sortie de câble Legrand Céliane blanc avec support sans plaque",
+   "confiance": "exact",
+   "note": "Sortie de câble Céliane blanc avec support, sans plaque, fil rigide 2,5 mm², adaptée au 16/20 A. L'ancienne 3245060997083 (19,92 €) est en Déstockage."
+  },
+  "meca-celiane-thermostat": {
+   "url": "https://www.castorama.fr/thermostat-d-ambiance-connecte-smarther-with-netatmo-legrand-blanc/3414971920057_CAFR.prd",
+   "ean": "3414971920057",
+   "facteur": 1,
+   "intitule": "Thermostat d'ambiance connecté Smarther with Netatmo Legrand blanc",
+   "confiance": "proche",
+   "note": "Thermostat d'ambiance de la marque, hors gamme (la gamme n'en propose pas en grande surface)."
+  },
+  "meca-celiane-tv": {
+   "url": "https://www.castorama.fr/prise-tv-simple-legrand-celiane-blanc-sans-plaque/3414972444248_CAFR.prd",
+   "ean": "3414972444248",
+   "facteur": 1,
+   "intitule": "Prise tv simple Legrand Céliane blanc sans plaque",
+   "confiance": "exact",
+   "note": "Prise TV simple Céliane blanc sans plaque (nouvelle génération). L'ancienne 3245060997151 (16,72 €) est en Déstockage."
+  },
+  "meca-celiane-va": {
+   "url": "https://www.castorama.fr/interrupteur-va-et-vient-legrand-celiane-10a-blanc-sans-plaque/3414972441544_CAFR.prd",
+   "ean": "3414972441544",
+   "facteur": 1,
+   "intitule": "Interrupteur va-et-vient Legrand Céliane 10A blanc sans plaque",
+   "confiance": "exact",
+   "note": "Même article que meca-celiane-inter : interrupteur va-et-vient 10 A Céliane blanc sans plaque."
+  },
+  "meca-celiane-variateur": {
+   "url": "https://www.castorama.fr/variateur-rotatif-avec-bague-legrand-celiane-200w/3414972646758_CAFR.prd",
+   "ean": "3414972646758",
+   "facteur": 1,
+   "intitule": "Variateur rotatif avec bague Legrand Céliane 200W",
+   "confiance": "exact",
+   "note": "Variateur rotatif Céliane blanc 200 W LED, « tous types de lampes », avec ou sans neutre, à équiper d'une plaque Céliane. L'écovariateur 2 fils Céliane blanc (3414972441056, 125 W max) est au même prix de 92,90 €. Les anciens variateurs (3245060999063 à 84 €, 3245060997359 à 43,92 €) sont en Déstockage."
+  },
+  "meca-celiane-volet": {
+   "url": "https://www.castorama.fr/interrupteur-volet-roulant-et-store-legrand-celiane-blanc/3414972441933_CAFR.prd",
+   "ean": "3414972441933",
+   "facteur": 1,
+   "intitule": "Interrupteur volet roulant et store Legrand Céliane blanc",
+   "confiance": "exact",
+   "note": "Interrupteur volet roulant et store Céliane blanc, montée/descente/stop, « à équiper d'une plaque Céliane ». L'ancien mécanisme 3245060997403 (39,92 €) est en Déstockage, donc écarté, ce qui explique le prix plus élevé que l'estimation."
+  },
+  "meca-dooxie-inter": {
+   "url": "https://www.castorama.fr/interrupteur-va-et-vient-legrand-dooxie-blanc-non-complet/3414971086746_CAFR.prd",
+   "ean": "3414971086746",
+   "facteur": 1,
+   "intitule": "Interrupteur va-et-vient Legrand Dooxie blanc non complet",
+   "confiance": "exact",
+   "note": "Mécanisme Dooxie blanc « non complet » : simple allumage OU va-et-vient (page), plaque non fournie. Même produit que meca-dooxie-va.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971086746/va-et-vient-mecanisme-support-10a-dooxie-blanc"
+    }
+   ]
+  },
+  "meca-dooxie-poussoir": {
+   "url": "https://www.castorama.fr/poussoir-simple-legrand-dooxie-blanc/3414971086852_CAFR.prd",
+   "ean": "3414971086852",
+   "facteur": 1,
+   "intitule": "Poussoir simple Legrand Dooxie blanc",
+   "confiance": "exact",
+   "note": "Poussoir simple 6 A Dooxie blanc, plaque non fournie (page).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971086852/poussoir-6a-dooxie-blanc"
+    }
+   ]
+  },
+  "meca-dooxie-prise": {
+   "url": "https://www.castorama.fr/prise-2-poles-terre-legrand-dooxie-blanc-carree-a-composer/3414971129191_CAFR.prd",
+   "ean": "3414971129191",
+   "facteur": 1,
+   "intitule": "Prise 2 pôles + terre Legrand Dooxie blanc carrée à composer",
+   "confiance": "exact",
+   "note": "Mécanisme 2P+T 16 A Dooxie blanc à composer ; page : « plaque de finition (non fournie) ». Préféré aux lots (6 / 40 pièces)."
+  },
+  "meca-dooxie-prise20": {
+   "url": "https://www.castorama.fr/prise-2-poles-terre-legrand-dooxie-blanc-carree-a-composer/3414971129191_CAFR.prd",
+   "ean": "3414971129191",
+   "facteur": 1,
+   "intitule": "Prise 2 pôles + terre Legrand Dooxie blanc carrée à composer",
+   "confiance": "exact",
+   "note": "Circuit spécialisé 20 A (lave-linge, four…) : la prise 2P+T 16 A de la gamme, sur un circuit 20 A en 2,5 mm² — c'est le même mécanisme."
+  },
+  "meca-dooxie-prise32": {
+   "url": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd",
+   "ean": "3245060901493",
+   "facteur": 1,
+   "intitule": "Sortie de câble Legrand 20/32 A blanc brillant",
+   "confiance": "proche",
+   "note": "Plaque de cuisson : sortie de câble Legrand 20/32 A (hors gamme — aucune gamme ne propose de 32 A en grande surface).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060901493/sortie-de-cable-20a-a-32a-blanc"
+    }
+   ]
+  },
+  "meca-dooxie-rj45": {
+   "url": "https://www.castorama.fr/prise-rj45-legrand-dooxie-blanc-carree/3414971087408_CAFR.prd",
+   "ean": "3414971087408",
+   "facteur": 1,
+   "intitule": "Prise RJ45 Legrand Dooxie blanc carrée",
+   "confiance": "exact",
+   "note": "RJ45 cat. 6 STP Dooxie blanc, plaque non fournie (page).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971087408/prise-ethernet-rj45-categorie-6-dooxie-blanc"
+    }
+   ]
+  },
+  "meca-dooxie-sortieCable": {
+   "url": "https://www.castorama.fr/prise-sortie-de-cable-legrand-dooxie-blanc-carree/3414971087286_CAFR.prd",
+   "ean": "3414971087286",
+   "facteur": 1,
+   "intitule": "Prise sortie de câble Legrand Dooxie blanc carrée",
+   "confiance": "exact",
+   "note": "Sortie de câble Dooxie blanc (câble Ø 5-12 mm, convecteurs), plaque non fournie. Intensité non indiquée sur la page.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971087286/sortie-de-cable-associable-dooxie-blanc"
+    }
+   ]
+  },
+  "meca-dooxie-thermostat": {
+   "url": "https://www.castorama.fr/thermostat-d-ambiance-connecte-smarther-with-netatmo-legrand-blanc/3414971920057_CAFR.prd",
+   "ean": "3414971920057",
+   "facteur": 1,
+   "intitule": "Thermostat d'ambiance connecté Smarther with Netatmo Legrand blanc",
+   "confiance": "proche",
+   "note": "Thermostat d'ambiance de la marque, hors gamme (la gamme n'en propose pas en grande surface)."
+  },
+  "meca-dooxie-tv": {
+   "url": "https://www.castorama.fr/prise-tv-legrand-dooxie-blanc-carree/3414971087316_CAFR.prd",
+   "ean": "3414971087316",
+   "facteur": 1,
+   "intitule": "Prise TV Legrand Dooxie blanc carrée",
+   "confiance": "exact",
+   "note": "Prise TV simple Dooxie blanc, plaque non fournie. (Version type F à visser : 16,90 €, 3414971087347.)",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971087316/prise-tv-male-etoile-blindee-dooxie-blanc"
+    }
+   ]
+  },
+  "meca-dooxie-va": {
+   "url": "https://www.castorama.fr/interrupteur-va-et-vient-legrand-dooxie-blanc-non-complet/3414971086746_CAFR.prd",
+   "ean": "3414971086746",
+   "facteur": 1,
+   "intitule": "Interrupteur va-et-vient Legrand Dooxie blanc non complet",
+   "confiance": "exact",
+   "note": "Même produit que meca-dooxie-inter (va-et-vient 10 A Dooxie blanc sans plaque).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971086746/va-et-vient-mecanisme-support-10a-dooxie-blanc"
+    }
+   ]
+  },
+  "meca-dooxie-variateur": {
+   "url": "https://www.castorama.fr/variateur-legrand-dooxie-blanc-l-80-mm/3414971087033_CAFR.prd",
+   "ean": "3414971087033",
+   "facteur": 1,
+   "intitule": "Variateur Legrand Dooxie blanc l. 80 mm",
+   "confiance": "exact",
+   "note": "Variateur Dooxie blanc, catégorie « à assembler » (sans plaque). Fort écart vs actuel (29,90). La page ne cite pas explicitement les LED ; l'autre variateur Dooxie blanc (3414972446723, « 2 fils 125W », LED dimmables) est au MÊME prix, 74,90 €.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971087033/ecovariateur-toutes-charges-2-fils-dooxie-blanc"
+    }
+   ]
+  },
+  "meca-dooxie-volet": {
+   "url": "https://www.castorama.fr/commande-volet-roulant-legrand-dooxie-blanc/3414971087095_CAFR.prd",
+   "ean": "3414971087095",
+   "facteur": 1,
+   "intitule": "Commande volet roulant Legrand Dooxie blanc",
+   "confiance": "exact",
+   "note": "Commande volet roulant 3 boutons (montée/stop/descente) Dooxie blanc, plaque non fournie (page).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971087095/interrupteur-volet-roulant-dooxie-blanc"
+    }
+   ]
+  },
+  "meca-mosaic-inter": {
+   "url": "https://www.castorama.fr/mecanisme-interrupteur-va-et-vient-legrand-mosaic-blanc/3414971679726_CAFR.prd",
+   "ean": "3414971679726",
+   "facteur": 1,
+   "intitule": "Mécanisme interrupteur va-et-vient Legrand Mosaïc blanc",
+   "confiance": "proche",
+   "note": "Mécanisme va-et-vient 10 A Mosaic blanc sans plaque (catégorie « à assembler »). Mécanisme 1 module (largeur réduite, photo vérifiée) : dans une plaque Mosaic 1 poste (2 modules), il faut ajouter un obturateur 1 module Mosaic (3245060996703, 3,15 €), soit environ 12,40 € le poste. Castorama ne vend pas de va-et-vient Mosaic simple en 2 modules sans plaque, seulement à témoin ou à voyant.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971679726/interrupteur-va-et-vient-composable-mosaic-easy-led-blanc"
+    }
+   ]
+  },
+  "meca-mosaic-poussoir": {
+   "url": "https://www.castorama.fr/mecanisme-poussoir-legrand-mosaic-blanc-2-modules/3414971679955_CAFR.prd",
+   "ean": "3414971679955",
+   "facteur": 1,
+   "intitule": "Mécanisme poussoir Legrand Mosaïc blanc, 2 modules",
+   "confiance": "exact",
+   "note": "Mécanisme poussoir 6 A Mosaic blanc en 2 modules ; la page précise « A compléter d'une plaque de finition (non fournie) ». Il existe aussi une version 1 module à 12,90 € (3414971679924), écartée parce qu'elle demande un obturateur.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971679955/poussoir-mecanisme-2-modules-mosaic"
+    }
+   ]
+  },
+  "meca-mosaic-prise": {
+   "url": "https://www.castorama.fr/mecanisme-prise-2poles-terre-affleurante-2-modules-legrand-mosaic/3245060996246_CAFR.prd",
+   "ean": "3245060996246",
+   "facteur": 1,
+   "intitule": "Mécanisme prise 2pôles+terre affleurante 2 modules Legrand Mosaïc",
+   "confiance": "exact",
+   "note": "Mécanisme 2P+T 16 A (3680 W) en 2 modules, Mosaic, sans plaque (« à associer aux plaques supports Mosaic »), affleurant, bornes automatiques. La fiche technique Castorama indique « Couleur : Noir » pour toute la série 3245060996xxx, mais l'intitulé n'en parle pas, la photo produit est blanche et la version noire existe sous un autre EAN (3414971824xxx) : erreur de fiche probable, produit blanc. Le lot de 10 « sans plaque blanc » (3414972631211) coûte 49,90 €, soit 4,99 € pièce, mais on garde l'unité puisqu'elle existe.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060996246/prise-avec-terre-affleurante-2-modules-mosaic"
+    }
+   ]
+  },
+  "meca-mosaic-prise20": {
+   "url": "https://www.castorama.fr/mecanisme-prise-2poles-terre-affleurante-2-modules-legrand-mosaic/3245060996246_CAFR.prd",
+   "ean": "3245060996246",
+   "facteur": 1,
+   "intitule": "Mécanisme prise 2pôles+terre affleurante 2 modules Legrand Mosaïc",
+   "confiance": "exact",
+   "note": "Circuit spécialisé 20 A (lave-linge, four…) : la prise 2P+T 16 A de la gamme, sur un circuit 20 A en 2,5 mm² — c'est le même mécanisme.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060996246/prise-avec-terre-affleurante-2-modules-mosaic"
+    }
+   ]
+  },
+  "meca-mosaic-prise32": {
+   "url": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd",
+   "ean": "3245060901493",
+   "facteur": 1,
+   "intitule": "Sortie de câble Legrand 20/32 A blanc brillant",
+   "confiance": "proche",
+   "note": "Plaque de cuisson : sortie de câble Legrand 20/32 A (hors gamme — aucune gamme ne propose de 32 A en grande surface).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060901493/sortie-de-cable-20a-a-32a-blanc"
+    }
+   ]
+  },
+  "meca-mosaic-rj45": {
+   "url": "https://www.castorama.fr/mecanisme-prise-rj45-cat6-2-modules-legrand-mosaic/3245060996468_CAFR.prd",
+   "ean": "3245060996468",
+   "facteur": 1,
+   "intitule": "Mécanisme prise RJ45 cat6 2 modules Legrand Mosaïc",
+   "confiance": "exact",
+   "note": "Mécanisme RJ45 cat. 6 Mosaic en 2 modules sans plaque, photo blanche. La version 1 module coûte 19,90 € (3245060996451). La fiche technique Castorama indique « Couleur : Noir » pour toute la série 3245060996xxx, mais l'intitulé n'en parle pas, la photo produit est blanche et la version noire existe sous un autre EAN (3414971824xxx) : erreur de fiche probable, produit blanc.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060996468/prise-ethernet-rj45-2-modules-categorie-6-mosaic"
+    }
+   ]
+  },
+  "meca-mosaic-sortieCable": {
+   "url": "https://www.castorama.fr/sortie-de-cable-2-modules-legrand-mosaic/3245060996444_CAFR.prd",
+   "ean": "3245060996444",
+   "facteur": 1,
+   "intitule": "Sortie de câble 2 modules Legrand Mosaïc",
+   "confiance": "exact",
+   "note": "Sortie de câble Mosaic 2 modules sans plaque, avec serre-câble anti-arrachement, photo blanche. La page ne précise pas l'intensité (16/20 A). La fiche technique Castorama indique « Couleur : Noir » pour toute la série 3245060996xxx, mais l'intitulé n'en parle pas, la photo produit est blanche et la version noire existe sous un autre EAN (3414971824xxx) : erreur de fiche probable, produit blanc.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060996444/sortie-de-cable-2-modules-mosaic"
+    }
+   ]
+  },
+  "meca-mosaic-thermostat": {
+   "url": "https://www.castorama.fr/thermostat-d-ambiance-connecte-smarther-with-netatmo-legrand-blanc/3414971920057_CAFR.prd",
+   "ean": "3414971920057",
+   "facteur": 1,
+   "intitule": "Thermostat d'ambiance connecté Smarther with Netatmo Legrand blanc",
+   "confiance": "proche",
+   "note": "Thermostat d'ambiance de la marque, hors gamme (la gamme n'en propose pas en grande surface)."
+  },
+  "meca-mosaic-tv": {
+   "url": "https://www.castorama.fr/mecanisme-prise-tv-male-9-5-mm-2-modules-legrand-mosaic/3245060996475_CAFR.prd",
+   "ean": "3245060996475",
+   "facteur": 1,
+   "intitule": "Mécanisme prise TV mâle ø9,5 mm 2 modules Legrand Mosaïc",
+   "confiance": "exact",
+   "note": "Mécanisme prise TV simple (mâle ø 9,5 mm) Mosaic en 2 modules sans plaque, photo blanche. La fiche technique Castorama indique « Couleur : Noir » pour toute la série 3245060996xxx, mais l'intitulé n'en parle pas, la photo produit est blanche et la version noire existe sous un autre EAN (3414971824xxx) : erreur de fiche probable, produit blanc.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060996475/prise-tv-male-2-modules-mosaic"
+    }
+   ]
+  },
+  "meca-mosaic-va": {
+   "url": "https://www.castorama.fr/mecanisme-interrupteur-va-et-vient-legrand-mosaic-blanc/3414971679726_CAFR.prd",
+   "ean": "3414971679726",
+   "facteur": 1,
+   "intitule": "Mécanisme interrupteur va-et-vient Legrand Mosaïc blanc",
+   "confiance": "proche",
+   "note": "Même article que meca-mosaic-inter (un interrupteur va-et-vient). Mécanisme 1 module (largeur réduite, photo vérifiée) : dans une plaque Mosaic 1 poste (2 modules), il faut ajouter un obturateur 1 module Mosaic (3245060996703, 3,15 €), soit environ 12,40 € le poste. Castorama ne vend pas de va-et-vient Mosaic simple en 2 modules sans plaque, seulement à témoin ou à voyant.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971679726/interrupteur-va-et-vient-composable-mosaic-easy-led-blanc"
+    }
+   ]
+  },
+  "meca-mosaic-variateur": {
+   "url": "https://www.castorama.fr/mecanisme-ecovariateur-a-griffes-legrand-mosaic-blanc/3414971679634_CAFR.prd",
+   "ean": "3414971679634",
+   "facteur": 1,
+   "intitule": "Mécanisme écovariateur à griffes Legrand Mosaïc blanc",
+   "confiance": "proche",
+   "note": "\"avecPlaque\": true. C'est le seul variateur Mosaic blanc vendu par Castorama : un écovariateur toutes lampes (LED dimmables, etc.), en version complète (catégorie « Interrupteur encastrable complet », 82x82, à griffes). Il n'existe pas de mécanisme seul sans plaque.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971679634/variateur-toutes-charges-mosaic-2-fils-blanc-complet-avec-plaque"
+    }
+   ]
+  },
+  "meca-mosaic-volet": {
+   "url": "https://www.castorama.fr/mecanisme-commande-de-volets-roulants-2-modules-legrand-mosaic/3245060996567_CAFR.prd",
+   "ean": "3245060996567",
+   "facteur": 1,
+   "intitule": "Mécanisme commande de volets roulants 2 modules Legrand Mosaïc",
+   "confiance": "exact",
+   "note": "Mécanisme de commande de volets roulants Mosaic en 2 modules, sans plaque, à associer aux plaques supports Mosaic. La fiche technique Castorama indique « Couleur : Noir » pour toute la série 3245060996xxx, mais l'intitulé n'en parle pas, la photo produit est blanche et la version noire existe sous un autre EAN (3414971824xxx) : erreur de fiche probable, produit blanc.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060996567/interrupteur-volet-roulant-2-modules-mosaic"
+    }
+   ]
+  },
+  "meca-odace-inter": {
+   "url": "https://www.castorama.fr/va-et-vient-ou-poussoir-10ax-blanc-craie-odace/3606487212270_CAFR.prd",
+   "ean": "3606487212270",
+   "facteur": 1,
+   "intitule": "Va-et-vient ou poussoir, 10AX, blanc craie, Odace",
+   "confiance": "exact",
+   "note": "Nouvelle gamme Odace (coloris blanc craie, badge « nouveau »). L'ancienne gamme Odace « blanc » (S520…) est en DÉSTOCKAGE chez Castorama (badge déstockage vu sur variateur, RJ45, prise TV) : écartée. Mécanisme multifonction interrupteur / va-et-vient / poussoir 10AX, à assembler. Ancien va-et-vient Odace blanc : 4,59 € (3606480459924)."
+  },
+  "meca-odace-poussoir": {
+   "url": "https://www.castorama.fr/va-et-vient-ou-poussoir-10ax-blanc-craie-odace/3606487212270_CAFR.prd",
+   "ean": "3606487212270",
+   "facteur": 1,
+   "intitule": "Va-et-vient ou poussoir, 10AX, blanc craie, Odace",
+   "confiance": "exact",
+   "note": "Nouvelle gamme Odace (coloris blanc craie, badge « nouveau »). L'ancienne gamme Odace « blanc » (S520…) est en DÉSTOCKAGE chez Castorama (badge déstockage vu sur variateur, RJ45, prise TV) : écartée. Le même mécanisme passe en mode poussoir par un quart de tour (page). 10AX au lieu de 6 A, sans incidence. Ancien poussoir Odace blanc : 9,99 € (3606480459986)."
+  },
+  "meca-odace-prise": {
+   "url": "https://www.castorama.fr/prise-2p-t-affleurante-bornes-automatiques-blanc-craie-odace/3606487212737_CAFR.prd",
+   "ean": "3606487212737",
+   "facteur": 1,
+   "intitule": "Prise 2P+T affleurante, bornes automatiques, blanc craie, Odace",
+   "confiance": "exact",
+   "note": "Nouvelle gamme Odace (coloris blanc craie, badge « nouveau »). L'ancienne gamme Odace « blanc » (S520…) est en DÉSTOCKAGE chez Castorama (badge déstockage vu sur variateur, RJ45, prise TV) : écartée. Prise 2P+T 16 A affleurante, bornes automatiques, à assembler (sans plaque). Ancien mécanisme Odace blanc : 3,99 € (3606480459870)."
+  },
+  "meca-odace-prise20": {
+   "url": "https://www.castorama.fr/prise-2p-t-affleurante-bornes-automatiques-blanc-craie-odace/3606487212737_CAFR.prd",
+   "ean": "3606487212737",
+   "facteur": 1,
+   "intitule": "Prise 2P+T affleurante, bornes automatiques, blanc craie, Odace",
+   "confiance": "exact",
+   "note": "Circuit spécialisé 20 A (lave-linge, four…) : la prise 2P+T 16 A de la gamme, sur un circuit 20 A en 2,5 mm² — c'est le même mécanisme."
+  },
+  "meca-odace-prise32": {
+   "url": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd",
+   "ean": "3245060901493",
+   "facteur": 1,
+   "intitule": "Sortie de câble Legrand 20/32 A blanc brillant",
+   "confiance": "proche",
+   "note": "Plaque de cuisson : sortie de câble Legrand 20/32 A (hors gamme — aucune gamme ne propose de 32 A en grande surface).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060901493/sortie-de-cable-20a-a-32a-blanc"
+    }
+   ]
+  },
+  "meca-odace-rj45": {
+   "url": "https://www.castorama.fr/prise-rj45-cat6-stp-grade-2tv-min-a-grade-3tv-blanc-craie-odace/3606487213192_CAFR.prd",
+   "ean": "3606487213192",
+   "facteur": 1,
+   "intitule": "Prise RJ45, Cat6 STP grade 2TV min à grade 3TV, blanc craie, Odace",
+   "confiance": "exact",
+   "note": "Nouvelle gamme Odace (coloris blanc craie, badge « nouveau »). L'ancienne gamme Odace « blanc » (S520…) est en DÉSTOCKAGE chez Castorama (badge déstockage vu sur variateur, RJ45, prise TV) : écartée. RJ45 Cat6 STP grade 2TV-3TV, à assembler. Ancienne RJ45 cat6 Odace blanc : 13,20 € en déstockage."
+  },
+  "meca-odace-sortieCable": {
+   "url": "https://www.castorama.fr/sortie-de-cable-serre-cable-6-a-12-mm-blanc-craie-odace/3606487213512_CAFR.prd",
+   "ean": "3606487213512",
+   "facteur": 1,
+   "intitule": "Sortie de câble, serre câble 6 à 12 mm², blanc craie, Odace",
+   "confiance": "exact",
+   "note": "Nouvelle gamme Odace (coloris blanc craie, badge « nouveau »). L'ancienne gamme Odace « blanc » (S520…) est en DÉSTOCKAGE chez Castorama (badge déstockage vu sur variateur, RJ45, prise TV) : écartée. Sortie de câble Ø 6-12 mm (convecteurs, sèche-serviettes), à assembler ; intensité non indiquée sur la page. Ancien mécanisme Odace blanc (sans badge déstockage) : 6,99 € (3606480460272)."
+  },
+  "meca-odace-thermostat": {
+   "url": "https://www.castorama.fr/thermostat-d-ambiance-connecte-blanc-schneider-electric-wiser/3606489710194_CAFR.prd",
+   "ean": "3606489710194",
+   "facteur": 1,
+   "intitule": "Thermostat d'ambiance connecté blanc - Schneider Electric Wiser",
+   "confiance": "proche",
+   "note": "Thermostat d'ambiance de la marque, hors gamme (la gamme n'en propose pas en grande surface)."
+  },
+  "meca-odace-tv": {
+   "url": "https://www.castorama.fr/prise-tv-simple-male-sortie-coaxiale-blanc-craie-odace/3606487213062_CAFR.prd",
+   "ean": "3606487213062",
+   "facteur": 1,
+   "intitule": "Prise TV simple mâle, sortie coaxiale, blanc craie, Odace",
+   "confiance": "exact",
+   "note": "Nouvelle gamme Odace (coloris blanc craie, badge « nouveau »). L'ancienne gamme Odace « blanc » (S520…) est en DÉSTOCKAGE chez Castorama (badge déstockage vu sur variateur, RJ45, prise TV) : écartée. Prise TV simple mâle, à assembler. Ancienne prise TV Odace blanc : 10,80 € en déstockage."
+  },
+  "meca-odace-va": {
+   "url": "https://www.castorama.fr/va-et-vient-ou-poussoir-10ax-blanc-craie-odace/3606487212270_CAFR.prd",
+   "ean": "3606487212270",
+   "facteur": 1,
+   "intitule": "Va-et-vient ou poussoir, 10AX, blanc craie, Odace",
+   "confiance": "exact",
+   "note": "Même produit que meca-odace-inter (va-et-vient 10AX blanc craie)."
+  },
+  "meca-odace-variateur": {
+   "url": "https://www.castorama.fr/variateur-de-lumiere-universel-2-ou-3-fils-rotatif-blanc-craie-odace/3606487342281_CAFR.prd",
+   "ean": "3606487342281",
+   "facteur": 1,
+   "intitule": "Variateur de lumière universel 2 ou 3 fils, rotatif, blanc craie, Odace",
+   "confiance": "exact",
+   "note": "Nouvelle gamme Odace (coloris blanc craie, badge « nouveau »). L'ancienne gamme Odace « blanc » (S520…) est en DÉSTOCKAGE chez Castorama (badge déstockage vu sur variateur, RJ45, prise TV) : écartée. Variateur rotatif universel 2 ou 3 fils (LED, incandescence, transfos électroniques), enjoliveur, sans plaque. Ancien variateur Odace blanc : 39,92 € en déstockage (3606486520888)."
+  },
+  "meca-odace-volet": {
+   "url": "https://www.castorama.fr/inter-ou-poussoir-volet-roulant-3-positions-a-levier-blanc-craie-odace/3606487212690_CAFR.prd",
+   "ean": "3606487212690",
+   "facteur": 1,
+   "intitule": "Inter ou poussoir volet roulant 3 positions à levier, blanc craie, Odace",
+   "confiance": "exact",
+   "note": "Nouvelle gamme Odace (coloris blanc craie, badge « nouveau »). L'ancienne gamme Odace « blanc » (S520…) est en DÉSTOCKAGE chez Castorama (badge déstockage vu sur variateur, RJ45, prise TV) : écartée. Inter/poussoir volet roulant 3 positions à levier, à assembler. Ancien modèle 3 boutons Odace blanc : 21,52 € (prix de déstockage)."
+  },
+  "meca-ovalis-inter": {
+   "url": "https://www.castorama.fr/interrupteur-va-et-vient-schneider-electric-ovalis-blanc/3606482213395_CAFR.prd",
+   "ean": "3606482213395",
+   "facteur": 1,
+   "intitule": "Interrupteur va-et-vient Schneider Electric Ovalis blanc",
+   "confiance": "exact",
+   "note": "Interrupteur va-et-vient 10 A Ovalis blanc, « à compléter d'une plaque de finition Ovalis à acheter séparément » (page). Même produit que meca-ovalis-va.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606482213395/interrupteur-va-et-vient-ovalis-blanc-bornes-automatiques-10-a"
+    }
+   ]
+  },
+  "meca-ovalis-poussoir": {
+   "url": "https://www.castorama.fr/interrupteur-poussoir-10a-schneider-electric-ovalis-blanc/3606482213418_CAFR.prd",
+   "ean": "3606482213418",
+   "facteur": 1,
+   "intitule": "Interrupteur poussoir 10A Schneider Electric Ovalis blanc",
+   "confiance": "exact",
+   "note": "Poussoir Ovalis blanc, à assembler. Écart mineur : 10 A (au lieu de 6 A), sans incidence.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606482213418/poussoir-a-fermeture-ovalis-blanc-bornes-automatiques-10-a"
+    }
+   ]
+  },
+  "meca-ovalis-prise": {
+   "url": "https://www.castorama.fr/prise-avec-terre-schneider-electric-ovalis-blanc/3606482213531_CAFR.prd",
+   "ean": "3606482213531",
+   "facteur": 1,
+   "intitule": "Prise avec terre Schneider Electric Ovalis blanc",
+   "confiance": "exact",
+   "note": "Prise 2P+T Ovalis blanc, catégorie « à assembler » (équivalent blanc du « mécanisme prise avec terre » anthracite). Version affleurante : 5,99 € (3606482213517, « à compléter d'une plaque Ovalis »).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606482213531/prise-a-puits-avec-terre-ovalis-blanc-bornes-automatiques-16-a"
+    }
+   ]
+  },
+  "meca-ovalis-prise20": {
+   "url": "https://www.castorama.fr/prise-avec-terre-schneider-electric-ovalis-blanc/3606482213531_CAFR.prd",
+   "ean": "3606482213531",
+   "facteur": 1,
+   "intitule": "Prise avec terre Schneider Electric Ovalis blanc",
+   "confiance": "exact",
+   "note": "Circuit spécialisé 20 A (lave-linge, four…) : la prise 2P+T 16 A de la gamme, sur un circuit 20 A en 2,5 mm² — c'est le même mécanisme.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606482213531/prise-a-puits-avec-terre-ovalis-blanc-bornes-automatiques-16-a"
+    }
+   ]
+  },
+  "meca-ovalis-prise32": {
+   "url": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd",
+   "ean": "3245060901493",
+   "facteur": 1,
+   "intitule": "Sortie de câble Legrand 20/32 A blanc brillant",
+   "confiance": "proche",
+   "note": "Plaque de cuisson : sortie de câble Legrand 20/32 A (hors gamme — aucune gamme ne propose de 32 A en grande surface).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060901493/sortie-de-cable-20a-a-32a-blanc"
+    }
+   ]
+  },
+  "meca-ovalis-rj45": {
+   "url": "https://www.castorama.fr/prise-rj45-grade-3-cat-6-stp-reseaux-vdi-schneider-electric-ovalis-blanc/3606482213579_CAFR.prd",
+   "ean": "3606482213579",
+   "facteur": 1,
+   "intitule": "Prise RJ45 grade 3 cat 6 STP réseaux VDI Schneider Electric Ovalis blanc",
+   "confiance": "exact",
+   "note": "RJ45 cat. 6 STP grade 3 Ovalis blanc, à assembler (sans plaque).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606482213579/prise-ethernet-rj45-ovalis-blanc-grade-3-cat-6-stp-reseaux-vdi"
+    }
+   ]
+  },
+  "meca-ovalis-sortieCable": {
+   "url": "https://www.castorama.fr/sortie-de-cable-schneider-electric-ovalis-16a-blanc/3606482213593_CAFR.prd",
+   "ean": "3606482213593",
+   "facteur": 1,
+   "intitule": "Sortie de câble Schneider Electric Ovalis 16A blanc",
+   "confiance": "exact",
+   "note": "Sortie de câble Ovalis blanc, « 16 à 20 A » selon la page, à l'unité, à assembler.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606482213593/sortie-de-cable-ovalis-blanc-diametre-6-12mm-16-a"
+    }
+   ]
+  },
+  "meca-ovalis-thermostat": {
+   "url": "https://www.castorama.fr/thermostat-d-ambiance-connecte-blanc-schneider-electric-wiser/3606489710194_CAFR.prd",
+   "ean": "3606489710194",
+   "facteur": 1,
+   "intitule": "Thermostat d'ambiance connecté blanc - Schneider Electric Wiser",
+   "confiance": "proche",
+   "note": "Thermostat d'ambiance de la marque, hors gamme (la gamme n'en propose pas en grande surface)."
+  },
+  "meca-ovalis-tv": {
+   "url": "https://www.castorama.fr/prise-tv-simple-schneider-electric-ovalis-blanc/3606482213616_CAFR.prd",
+   "ean": "3606482213616",
+   "facteur": 1,
+   "intitule": "Prise TV simple Schneider Electric Ovalis blanc",
+   "confiance": "exact",
+   "note": "Prise TV simple (mâle IEC 9,52) Ovalis blanc, à assembler.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606482213616/prise-tv-simple-ovalis-blanc-connecteur-tv-male-cei-9-52-mm"
+    }
+   ]
+  },
+  "meca-ovalis-va": {
+   "url": "https://www.castorama.fr/interrupteur-va-et-vient-schneider-electric-ovalis-blanc/3606482213395_CAFR.prd",
+   "ean": "3606482213395",
+   "facteur": 1,
+   "intitule": "Interrupteur va-et-vient Schneider Electric Ovalis blanc",
+   "confiance": "exact",
+   "note": "Même produit que meca-ovalis-inter.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606482213395/interrupteur-va-et-vient-ovalis-blanc-bornes-automatiques-10-a"
+    }
+   ]
+  },
+  "meca-ovalis-variateur": {
+   "url": "https://www.castorama.fr/variateur-de-lumiere-universel-en-2-ou-3-fils-complet-schneider-electric-ovalis-blanc/3606482163317_CAFR.prd",
+   "ean": "3606482163317",
+   "facteur": 1,
+   "intitule": "Variateur de lumière universel en 2 ou 3 fils complet Schneider Electric Ovalis blanc",
+   "confiance": "exact",
+   "note": "avecPlaque: true — seul variateur Ovalis vendu, uniquement en version complète (« Livré avec sa plaque de finition »). Universel 2 ou 3 fils.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606482163317/variateur-de-lumiere-universel-ovalis-blanc-raccordement-2-fils"
+    }
+   ]
+  },
+  "meca-ovalis-volet": {
+   "url": "https://www.castorama.fr/interrupteur-commande-volet-roulant-2-boutons-schneider-electric-ovalis-blanc/3606482213692_CAFR.prd",
+   "ean": "3606482213692",
+   "facteur": 1,
+   "intitule": "Interrupteur commande volet-roulant 2 boutons Schneider Electric Ovalis blanc",
+   "confiance": "exact",
+   "note": "Commande volet roulant 2 boutons Ovalis blanc, catégorie « à assembler » (sans plaque).",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606482213692/commande-volet-roulant-2-boutons-ovalis-blanc-bornes-automatiques-6-a"
+    }
+   ]
+  },
+  "mousse-pu": {
+   "url": "https://www.castorama.fr/mousse-expansive-universelle-volden-500ml/5059340044415_CAFR.prd",
+   "ean": "5059340044415",
+   "facteur": 1,
+   "intitule": "Mousse expansive universelle Volden 500ml",
+   "confiance": "exact",
+   "note": "Mousse PU expansive en aérosol de 500 ml."
+  },
+  "multimetre": {
+   "url": "https://www.castorama.fr/multimetre-affichage-lcd-retroeclaire-diall/5059340161938_CAFR.prd",
+   "ean": "5059340161938",
+   "facteur": 1,
+   "intitule": "Multimètre affichage LCD rétroéclairé Diall",
+   "confiance": "exact",
+   "note": "Multimètre numérique d'entrée de gamme (marque Diall)."
+  },
+  "niveau-40": {
+   "url": "https://www.castorama.fr/niveau-a-bulle-stanley-2-fioles-40-cm/3253561428029_CAFR.prd",
+   "ean": "3253561428029",
+   "facteur": 1,
+   "intitule": "Niveau à bulle Stanley 2 fioles 40 cm",
+   "confiance": "exact",
+   "note": "Niveau alu de 40 cm, milieu de gamme."
+  },
+  "obturateur": {
+   "url": "https://www.castorama.fr/obturateur-legrand-dooxie-blanc-carree/3414971089112_CAFR.prd",
+   "ean": "3414971089112",
+   "facteur": 1,
+   "intitule": "Obturateur Legrand Dooxie blanc carrée",
+   "confiance": "exact",
+   "note": "Obturateur Dooxie du relevé précédent (EAN réel 3414971089112), prix inchangé. Plaque de finition non fournie."
+  },
+  "parafoudre": {
+   "url": "https://www.castorama.fr/parafoudre-de-secteur-legrand-1000a-230-v/3245060927660_CAFR.prd",
+   "ean": "3245060927660",
+   "facteur": 1,
+   "intitule": "Parafoudre de secteur Legrand 1000A 230 V",
+   "confiance": "proche",
+   "note": "Parafoudre modulaire Legrand pour tableau électrique, 10 kA, NF EN 61643-11, « installations à faibles risques ». Ces caractéristiques sont celles d'un type 2, mais la page ne le dit pas. Prix élevé : 264,90 €. L'AEG proposé en alternative porte « II » (type 2) dans son nom, mais sa fiche technique est vide.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060927660/parafoudre-modulaire-avec-un-cablage-simplifie-1"
+    }
+   ]
+  },
+  "peigne": {
+   "url": "https://www.castorama.fr/peigne-horizontal-13-modules-reversibles-ph-n-legrand/3245060927936_CAFR.prd",
+   "ean": "3245060927936",
+   "facteur": 1,
+   "intitule": "Peigne horizontal 13 modules réversibles Ph/N Legrand",
+   "confiance": "exact",
+   "note": "Produit du relevé du 05/09/2026, inchangé.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060927936/barre-d-alimentation-reversible-horizontale"
+    }
+   ]
+  },
+  "peigne-vertical": {
+   "url": "https://www.castorama.fr/peigne-d-alimentation-verticale-2-rangees-legrand/3245064050005_CAFR.prd",
+   "ean": "3245064050005",
+   "facteur": 1,
+   "intitule": "Peigne d'alimentation verticale 2 rangées Legrand",
+   "confiance": "exact",
+   "note": "Peigne d'alimentation vertical Legrand pour coffret de 2 rangées, la même gamme que le coffret 2 rangées de l'app. Existe aussi en 3 rangées (29,90 €) et en 4 rangées.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245064050005/peigne-vertical-pour-coffret-2-rangees"
+    }
+   ]
+  },
+  "pince-coupante": {
+   "url": "https://www.castorama.fr/pince-coupante-diagonale-laterale-isolee-magnusson-160mm/3663602816775_CAFR.prd",
+   "ean": "3663602816775",
+   "facteur": 1,
+   "intitule": "Pince coupante diagonale/latérale isolée Magnusson 160mm",
+   "confiance": "exact",
+   "note": "Pince coupante isolée, certifiée VDE 1000 V, 160 mm.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3663602816775/pince-coupante-diagonale-laterale-isolee-160-mm"
+    }
+   ]
+  },
+  "plafond-camera": {
+   "url": "https://www.castorama.fr/camera-de-surveillance-exterieure-connectee-ezviz-h8c-2mp/6941545613284_CAFR.prd",
+   "ean": "6941545613284",
+   "facteur": 1,
+   "intitule": "Caméra de surveillance extérieure connectée Ezviz H8C 2MP",
+   "confiance": "proche",
+   "note": "Le sens se limite à « Caméra ». Retenu : une caméra Wi-Fi extérieure motorisée 360° alimentée sur secteur, posable au plafond, d'entrée de gamme. Ce prix ne vaut que comme ordre de grandeur, la gamme allant de 50 à plus de 300 €."
+  },
+  "plafond-daaf": {
+   "url": "https://www.castorama.fr/detecteur-de-fumee-anti-vandalisme-kidde-10y29/0047871097531_CAFR.prd",
+   "ean": "0047871097531",
+   "facteur": 1,
+   "intitule": "Détecteur de fumée anti-vandalisme Kidde 10Y29",
+   "confiance": "exact",
+   "note": "Norme CE / NF / EN14604, pile lithium scellée 10 ans. Moins chers et aussi NF EN 14604 : Kidde 5Y29 (5 ans) à 17,90 €, Evacuate NF 5 ans à 15,50 €."
+  },
+  "plafond-detecteur": {
+   "url": "https://www.castorama.fr/detecteur-a-infrarouge-360-tibelec-a-encastrer/3233550579413_CAFR.prd",
+   "ean": "3233550579413",
+   "facteur": 1,
+   "intitule": "Détecteur à infrarouge 360° Tibelec à encastrer",
+   "confiance": "proche",
+   "note": "Détecteur de mouvement infrarouge 360° à encastrer au plafond (portée ≈ 6 m, 800 W, temporisation réglable). Convient aux circulations et escaliers, mais pas à l'extérieur. La fiche contient des incohérences (texte d'un autre produit, couleur « or »)."
+  },
+  "plafond-vmc": {
+   "url": "https://www.castorama.fr/bouche-d-extraction-aldes-125mm-blanche/3542280352235_CAFR.prd",
+   "ean": "3542280352235",
+   "facteur": 1,
+   "intitule": "Bouche d'extraction Aldes ø125mm blanche",
+   "confiance": "proche",
+   "note": "Le sens ne précise ni le diamètre ni le type. Retenu : une bouche d'extraction autoréglable standard Ø125, pour VMC simple flux. Une bouche hygroréglable coûte nettement plus cher."
+  },
+  "plaque-celiane-1": {
+   "url": "https://www.castorama.fr/plaque-de-finition-1-poste-legrand-celiane-cp0021-coloris-blanc-emaille-l-90-x-p-9-x-h-82-mm/3414972417211_CAFR.prd",
+   "ean": "3414972417211",
+   "facteur": 1,
+   "intitule": "Plaque de finition 1 poste Legrand Céliane CP0021 coloris blanc émaillé l.90 x P.9 x H.82 mm",
+   "confiance": "exact",
+   "note": "Plaque Céliane blanc émaillé réf. CP0021, nouvelle collection, entraxe standard, horizontale, à l'unité. C'est le blanc courant le moins cher : blanc relief et blanc amande sont à environ 7,30 € en 1 poste, et l'ancienne plaque 0 988 40 blanc à 1,84 € est en Déstockage, donc écartée. Prix identique au relevé actuel."
+  },
+  "plaque-celiane-2": {
+   "url": "https://www.castorama.fr/plaque-de-finition-2-postes-legrand-celiane-cp0022-coloris-blanc-emaille-l-161-x-p-9-x-h-82-mm/3414972417952_CAFR.prd",
+   "ean": "3414972417952",
+   "facteur": 1,
+   "intitule": "Plaque de finition 2 postes Legrand Céliane CP0022 coloris blanc émaillé l.161 x P.9 x H.82 mm",
+   "confiance": "exact",
+   "note": "Plaque Céliane blanc émaillé réf. CP0022, nouvelle collection, entraxe standard, horizontale, à l'unité. C'est le blanc courant le moins cher : blanc relief et blanc amande sont à environ 7,30 € en 1 poste, et l'ancienne plaque 0 988 60 blanc à 3,68 € est en Déstockage, donc écartée. Prix identique au relevé actuel."
+  },
+  "plaque-celiane-3": {
+   "url": "https://www.castorama.fr/plaque-de-finition-3-postes-legrand-celiane-cp0023-coloris-blanc-emaille-l-232-x-p-9-x-h-82-mm/3414972419048_CAFR.prd",
+   "ean": "3414972419048",
+   "facteur": 1,
+   "intitule": "Plaque de finition 3 postes Legrand Céliane CP0023 coloris blanc émaillé l.232 x P.9 x H.82 mm",
+   "confiance": "exact",
+   "note": "Plaque Céliane blanc émaillé réf. CP0023, nouvelle collection, entraxe standard, horizontale, à l'unité. C'est le blanc courant le moins cher : blanc relief et blanc amande sont à environ 7,30 € en 1 poste, et l'ancienne plaque 0 988 80 blanc à 5,52 € est en Déstockage, donc écartée. Prix identique au relevé actuel."
+  },
+  "plaque-celiane-4": {
+   "url": "https://www.castorama.fr/plaque-de-finition-4-postes-legrand-celiane-cp0024-coloris-blanc-emaille-l-303-x-p-9-x-h-82-mm/3414972420112_CAFR.prd",
+   "ean": "3414972420112",
+   "facteur": 1,
+   "intitule": "Plaque de finition 4 postes Legrand Céliane CP0024 coloris blanc émaillé l.303 x P.9 x H.82 mm",
+   "confiance": "exact",
+   "note": "Plaque Céliane blanc émaillé réf. CP0024, nouvelle collection, entraxe standard, horizontale, à l'unité. C'est le blanc courant le moins cher : blanc relief et blanc amande sont à environ 7,30 € en 1 poste, et l'ancienne plaque 0 988 99 laqué blanc à 7,28 € est en Déstockage, donc écartée. Prix identique au relevé actuel."
+  },
+  "plaque-dooxie-1": {
+   "url": "https://www.castorama.fr/plaque-de-finition-1-poste-legrand-dooxie-6-009-01-coloris-blanc-l-87-x-p-10-x-h-87-mm/3414971090040_CAFR.prd",
+   "ean": "3414971090040",
+   "facteur": 1,
+   "intitule": "Plaque de finition 1 poste Legrand Dooxie 6 009 01 coloris blanc l.87 x P.10 x H.87 mm",
+   "confiance": "exact",
+   "note": "Plaque Dooxie blanc réf. 6 009 01, 1 poste, horizontale, à l'unité. Prix identique au relevé actuel.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971090040/plaque-1-poste-carree-dooxie-blanc"
+    }
+   ]
+  },
+  "plaque-dooxie-2": {
+   "url": "https://www.castorama.fr/plaque-de-finition-2-postes-legrand-dooxie-6-009-02-coloris-blanc-l-158-x-p-10-x-h-87-mm/3414971090071_CAFR.prd",
+   "ean": "3414971090071",
+   "facteur": 1,
+   "intitule": "Plaque de finition 2 postes Legrand Dooxie 6 009 02 coloris blanc l.158 x P.10 x H.87 mm",
+   "confiance": "exact",
+   "note": "Plaque Dooxie blanc réf. 6 009 02, 2 postes, horizontale, à l'unité. Prix identique au relevé actuel.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971090071/plaque-2-postes-carree-dooxie-blanc"
+    }
+   ]
+  },
+  "plaque-dooxie-3": {
+   "url": "https://www.castorama.fr/plaque-de-finition-3-postes-legrand-dooxie-6-009-03-coloris-blanc-l-229-x-p-10-x-h-87-mm/3414971090101_CAFR.prd",
+   "ean": "3414971090101",
+   "facteur": 1,
+   "intitule": "Plaque de finition 3 postes Legrand Dooxie 6 009 03 coloris blanc l.229 x P.10 x H.87 mm",
+   "confiance": "exact",
+   "note": "Plaque Dooxie blanc réf. 6 009 03, 3 postes, horizontale, à l'unité. Prix identique au relevé actuel.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971090101/plaque-3-postes-carree-dooxie-blanc"
+    }
+   ]
+  },
+  "plaque-dooxie-4": {
+   "url": "https://www.castorama.fr/plaque-de-finition-4-postes-legrand-dooxie-6-009-04-coloris-blanc-l-300-x-p-10-x-h-87-mm/3414971090132_CAFR.prd",
+   "ean": "3414971090132",
+   "facteur": 1,
+   "intitule": "Plaque de finition 4 postes Legrand Dooxie 6 009 04 coloris blanc l.300 x P.10 x H.87 mm",
+   "confiance": "exact",
+   "note": "Plaque Dooxie blanc réf. 6 009 04, 4 postes, horizontale, à l'unité. Prix identique au relevé actuel."
+  },
+  "plaque-mosaic-1": {
+   "url": "https://www.castorama.fr/plaque-de-finition-2-modules-legrand-mosaic-0-994-72-coloris-blanc-l-82-x-p-9-x-h-82-mm/3414971680357_CAFR.prd",
+   "ean": "3414971680357",
+   "facteur": 1,
+   "intitule": "Plaque de finition 2 modules Legrand Mosaïc 0 994 72 coloris blanc l.82 x P.9 x H.82 mm",
+   "confiance": "exact",
+   "note": "Plaque Mosaic 2 modules (1 poste) blanc réf. 0 994 72, 82x82, livrée avec son support (fixation à vis). La version à griffes 0 994 71 coûte 7,19 €."
+  },
+  "plaque-mosaic-2": {
+   "url": "https://www.castorama.fr/plaque-de-finition-2x2-modules-legrand-mosaic-0-994-73-coloris-blanc-l-153-x-p-9-x-h-82-mm/3414971680371_CAFR.prd",
+   "ean": "3414971680371",
+   "facteur": 1,
+   "intitule": "Plaque de finition 2x2 modules Legrand Mosaïc 0 994 73 coloris blanc l.153 x P.9 x H.82 mm",
+   "confiance": "exact",
+   "note": "Plaque Mosaic 2x2 modules (2 postes horizontaux) blanc réf. 0 994 73, 153x82, avec support à vis."
+  },
+  "plaque-mosaic-3": {
+   "url": "https://www.castorama.fr/plaque-de-finition-3x2-modules-legrand-mosaic-0-994-75-coloris-blanc-l-224-x-p-9-x-h-82-mm/3414971680418_CAFR.prd",
+   "ean": "3414971680418",
+   "facteur": 1,
+   "intitule": "Plaque de finition 3x2 modules Legrand Mosaïc 0 994 75 coloris blanc l.224 x P.9 x H.82 mm",
+   "confiance": "exact",
+   "note": "Plaque Mosaic 3x2 modules (3 postes horizontaux) blanc réf. 0 994 75, 224x82, avec support à vis."
+  },
+  "plaque-odace-1": {
+   "url": "https://www.castorama.fr/plaque-de-finition-1-poste-blanc-craie-odace/3606487342335_CAFR.prd",
+   "ean": "3606487342335",
+   "facteur": 1,
+   "intitule": "Plaque de finition 1 poste, blanc craie, Odace",
+   "confiance": "exact",
+   "note": "Plaque Odace blanc craie, la collection Odace actuelle (seul blanc proposé en 1 à 4 postes), à clipser, montage horizontal ou vertical. Prix identique au relevé actuel."
+  },
+  "plaque-odace-2": {
+   "url": "https://www.castorama.fr/plaque-de-finition-2-postes-blanc-craie-odace/3606487342434_CAFR.prd",
+   "ean": "3606487342434",
+   "facteur": 1,
+   "intitule": "Plaque de finition 2 postes, blanc craie, Odace",
+   "confiance": "exact",
+   "note": "Plaque Odace blanc craie, la collection Odace actuelle (seul blanc proposé en 1 à 4 postes), à clipser, montage horizontal ou vertical. Prix identique au relevé actuel."
+  },
+  "plaque-odace-3": {
+   "url": "https://www.castorama.fr/plaque-de-finition-3-postes-blanc-craie-odace/3606487342526_CAFR.prd",
+   "ean": "3606487342526",
+   "facteur": 1,
+   "intitule": "Plaque de finition 3 postes, blanc craie, Odace",
+   "confiance": "exact",
+   "note": "Plaque Odace blanc craie, la collection Odace actuelle (seul blanc proposé en 1 à 4 postes), à clipser, montage horizontal ou vertical. Prix identique au relevé actuel."
+  },
+  "plaque-odace-4": {
+   "url": "https://www.castorama.fr/plaque-de-finition-4-postes-blanc-craie-odace/3606487342618_CAFR.prd",
+   "ean": "3606487342618",
+   "facteur": 1,
+   "intitule": "Plaque de finition 4 postes, blanc craie, Odace",
+   "confiance": "exact",
+   "note": "Plaque Odace blanc craie, la collection Odace actuelle (seul blanc proposé en 1 à 4 postes), à clipser, montage horizontal ou vertical. Prix identique au relevé actuel."
+  },
+  "plaque-ovalis-1": {
+   "url": "https://www.castorama.fr/plaque-de-finition-1-poste-schneider-electric-ovalis-s320702-coloris-blanc-l-87-x-p-10-x-h-87-mm/3606482163119_CAFR.prd",
+   "ean": "3606482163119",
+   "facteur": 1,
+   "intitule": "Plaque de finition 1 poste Schneider Electric Ovalis S320702 coloris blanc l.87 x P.10 x H.87 mm",
+   "confiance": "exact",
+   "note": "Plaque Ovalis blanc horizontale réf. S320702, à l'unité.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606482163119/plaque-de-finition-simple-ovalis-blanc"
+    }
+   ]
+  },
+  "plaque-ovalis-2": {
+   "url": "https://www.castorama.fr/plaque-de-finition-2-postes-schneider-electric-ovalis-s320704-coloris-blanc-l-158-x-p-10-x-h-87-mm/3606482163164_CAFR.prd",
+   "ean": "3606482163164",
+   "facteur": 1,
+   "intitule": "Plaque de finition 2 postes Schneider Electric Ovalis S320704 coloris blanc l.158 x P.10 x H.87 mm",
+   "confiance": "exact",
+   "note": "Plaque Ovalis blanc horizontale réf. S320704, à l'unité.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606482163164/plaque-de-finition-double-ovalis-blanc-installation-horizontale"
+    }
+   ]
+  },
+  "plaque-ovalis-3": {
+   "url": "https://www.castorama.fr/plaque-de-finition-3-postes-schneider-electric-ovalis-s320706-coloris-blanc-l-229-x-p-10-x-h-87-mm/3606482163195_CAFR.prd",
+   "ean": "3606482163195",
+   "facteur": 1,
+   "intitule": "Plaque de finition 3 postes Schneider Electric Ovalis S320706 coloris blanc l.229 x P.10 x H.87 mm",
+   "confiance": "exact",
+   "note": "Plaque Ovalis blanc horizontale réf. S320706, à l'unité.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3606482163195/plaque-de-finition-triple-ovalis-blanc-installation-horizontale"
+    }
+   ]
+  },
+  "plaque-ovalis-4": {
+   "url": "https://www.castorama.fr/plaque-de-finition-4-postes-schneider-electric-ovalis-s320708-coloris-blanc-l-300-x-p-10-x-h-87-mm/3606482163232_CAFR.prd",
+   "ean": "3606482163232",
+   "facteur": 1,
+   "intitule": "Plaque de finition 4 postes Schneider Electric Ovalis S320708 coloris blanc l.300 x P.10 x H.87 mm",
+   "confiance": "exact",
+   "note": "Plaque Ovalis blanc horizontale réf. S320708, à l'unité. Le prix est identique à celui de la 3 postes (6,49 €)."
+  },
+  "platre-scellement": {
+   "url": "https://www.castorama.fr/platre-multi-usage-joker-25kg-pour-reboucher-et-sceller/3496252008739_CAFR.prd",
+   "ean": "3496252008739",
+   "facteur": 1,
+   "intitule": "Plâtre multi usage Joker 25kg pour reboucher et sceller",
+   "confiance": "exact",
+   "note": "Sac de 25 kg, plâtre à prise rapide pour reboucher et sceller.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3496252008739/platre-multi-usages-25-kg-1"
+    }
+   ]
+  },
+  "plinthe-passe-cable": {
+   "url": "https://www.castorama.fr/plinthe-avec-cloison-80x20-mm-legrand-2-compartiments/3414970008312_CAFR.prd",
+   "ean": "3414970008312",
+   "facteur": 1,
+   "intitule": "Plinthe avec cloison 80x20 mm Legrand - 2 compartiments",
+   "confiance": "proche",
+   "note": "Castorama n'a pas de plinthe électrique 70 × 20 mm. La plus proche est la plinthe Legrand DLPlus 80 × 20 mm à 2 compartiments, en barre de 2 m (largeur 200 cm sur la fiche). Les plinthes MDF « passe-câble » de 2,44 m sont de la menuiserie, pas des goulottes électriques.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414970008312/plinthe-blanche-80x20-mm-dim-80-x-20-mm-long-2-m"
+    }
+   ]
+  },
+  "prise-etanche": {
+   "url": "https://www.castorama.fr/prise-legrand-plexo-gris-en-saillie-220v/3414971904613_CAFR.prd",
+   "ean": "3414971904613",
+   "facteur": 1,
+   "intitule": "Prise Legrand Plexo gris en saillie 220V",
+   "confiance": "exact",
+   "note": "Prise étanche en saillie avec clapet, IP55 d'après la fiche, donc au-delà de l'IP44 demandé.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3414971904613/prise-de-courant-avec-volet-plexo-complet-saillie-gris"
+    }
+   ]
+  },
+  "repartiteur-tv": {
+   "url": "https://www.castorama.fr/repartiteur-interieur-tv-4-directions-erard/3700101254049_CAFR.prd",
+   "ean": "3700101254049",
+   "facteur": 1,
+   "intitule": "Répartiteur intérieur TV 4 directions - Erard",
+   "confiance": "exact",
+   "note": "Répartiteur Erard TV/SAT intérieur 1 entrée vers 4 sorties, boîtier métal (blindé), raccords F à visser."
+  },
+  "rj45-keystone": {
+   "url": "https://www.castorama.fr/mecanisme-prise-rj45-cat6-1-module-legrand-mosaic/3245060996451_CAFR.prd",
+   "ean": "3245060996451",
+   "facteur": 1,
+   "intitule": "Mécanisme prise RJ45 cat6 1 module Legrand Mosaïc",
+   "confiance": "proche",
+   "note": "Castorama ne vend pas de RJ45 Keystone. Le plus proche : un mécanisme de prise RJ45 cat. 6, 1 module, Legrand Mosaic (noir), qui se monte sur support et plaque Mosaic. Le format n'est pas le même.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060996451/prise-rj45-categorie-6-mosaic"
+    }
+   ]
+  },
+  "ruban-isolant": {
+   "url": "https://www.castorama.fr/ruban-d-isolation-couleur-melangee-19-mm-x-10-m-vendu-par-5-pieces/3663602931966_CAFR.prd",
+   "ean": "3663602931966",
+   "facteur": 0.6,
+   "intitule": "Ruban d'isolation, couleur mélangée 19 mm x 10 m vendu par 5 pièces",
+   "confiance": "proche",
+   "note": "Rouleaux de 10 m. Pas de lot de 3 : le lot le plus proche est de 5 rouleaux, d'où le facteur 0,6. Autre option : 3 rouleaux unitaires à 1,49 €, soit 4,47 €."
+  },
+  "ruban-led": {
+   "url": "https://www.castorama.fr/kit-strips-ip65-2100lm-20w-230-24v-blanc-chaud-paulmann-5m/4000870789063_CAFR.prd",
+   "ean": "4000870789063",
+   "facteur": 1,
+   "intitule": "Kit Strips IP65 2100lm 20W 230/24V blanc chaud Paulmann 5m",
+   "confiance": "proche",
+   "note": "Seul ruban de 5 m en 24 V explicite. Il est vendu en kit AVEC son alimentation 230/24 V, ce qui fait doublon avec transfo-led. Aucun rouleau 24 V nu à prix courant."
+  },
+  "scie-cloche-67": {
+   "url": "https://www.castorama.fr/trepan-avec-foret-pilote-erbauer-pour-multi-materiaux-68-mm/3663602810186_CAFR.prd",
+   "ean": "3663602810186",
+   "facteur": 1,
+   "intitule": "Trépan avec foret pilote Erbauer pour multi-matériaux Ø.68 mm",
+   "confiance": "proche",
+   "note": "Scie cloche SDS+ à pointe carbure, Ø 68 (maçonnerie et brique d'après la fiche, malgré « multi-matériaux » dans le titre). Castorama n'a pas de Ø 67 : le Ø 68 est la cote courante pour les boîtes d'encastrement.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3663602810186/scies-trepans-o-68-mm"
+    }
+   ]
+  },
+  "silicone": {
+   "url": "https://www.castorama.fr/mastic-silicone-interieur-transparent-300ml/5059340043692_CAFR.prd",
+   "ean": "5059340043692",
+   "facteur": 1,
+   "intitule": "Mastic silicone intérieur transparent 300ml",
+   "confiance": "exact",
+   "note": "Cartouche de silicone standard de 300 ml. La fiche la classe en cuisine et salle de bains, usage intérieur ; pour une traversée extérieure, prendre l'alternative."
+  },
+  "sortie-cable-32": {
+   "url": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd",
+   "ean": "3245060901493",
+   "facteur": 1,
+   "intitule": "Sortie de câble Legrand 20/32 A blanc brillant",
+   "confiance": "exact",
+   "note": "Sortie de câble 20/32 A avec serre-câble, pour câble Ø 17 à 19 mm. La sortie de câble Dooxie, elle, ne prend que du Ø 5 à 12 mm et ne convient pas pour 32 A.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060901493/sortie-de-cable-20a-a-32a-blanc"
+    }
+   ]
+  },
+  "telerupteur": {
+   "url": "https://www.castorama.fr/telerupteur-unipolaire-modulaire-legrand/3245060927004_CAFR.prd",
+   "ean": "3245060927004",
+   "facteur": 1,
+   "intitule": "Télérupteur unipolaire modulaire Legrand",
+   "confiance": "exact",
+   "note": "Télérupteur unipolaire modulaire Legrand 16 A pour tableau électrique.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3245060927004/telerupteur-unipolaire-230v-16a-1-module"
+    }
+   ]
+  },
+  "tire-fil": {
+   "url": "https://www.castorama.fr/tire-fil-nylon-25-m-pour-gaines-icta-et-prefilees/3296840000257_CAFR.prd",
+   "ean": "3296840000257",
+   "facteur": 1,
+   "intitule": "Tire-fil nylon 25 m pour gaines ICTA et préfilées",
+   "confiance": "proche",
+   "note": "Tire-fil nylon (Siance). Pas de 20 m chez Castorama, seulement 10 m et 25 m : 25 m retenu."
+  },
+  "tournevis-testeur": {
+   "url": "https://www.castorama.fr/tournevis-testeur-de-tension-vde-lame-acier-sl-plat-3-mm-outilfrance/3223430141953_CAFR.prd",
+   "ean": "3223430141953",
+   "facteur": 1,
+   "intitule": "Tournevis testeur de tension VDE lame acier SL-plat 3 mm Outilfrance",
+   "confiance": "exact",
+   "note": "Tournevis testeur VDE avec témoin lumineux. Le Fischer Darex à 0,99 € est écarté comme premier prix."
+  },
+  "transfo-led": {
+   "url": "https://www.castorama.fr/alimentation-maxled-paulmann-ip20-60w-blanc-p-18-4-cm-x-h-3-2-cm/4000870798300_CAFR.prd",
+   "ean": "4000870798300",
+   "facteur": 1,
+   "intitule": "Alimentation MaxLED Paulmann IP20 60W blanc P.18,4 cm x H.3,2 cm",
+   "confiance": "proche",
+   "note": "60 W. Les 24 V ne figurent pas dans la fiche technique, seulement dans les questions-réponses de la page (« le MaxLed en 24V »). C'est une alimentation propriétaire MaxLED (fiche Euro, connecteur à 5 broches), pas un bloc 24 V à bornes. Aucune autre alimentation LED 24 V de 60 W chez Castorama."
+  },
+  "vis-beton": {
+   "url": "https://www.castorama.fr/boulon-beton-6-x-60-mm-scell-it-10-pieces/3553975777592_CAFR.prd",
+   "ean": "3553975777592",
+   "facteur": 10,
+   "intitule": "Boulon béton 6 x 60 mm Scell-It, 10 pièces",
+   "confiance": "proche",
+   "note": "Vis à béton (« boulon béton ») 6 × 60 bien présente, mais Castorama ne la vend qu'en sachet de 10 : aucune boîte de 100 dans le plan du site. Facteur 10."
+  },
+  "vis-placo": {
+   "url": "https://www.castorama.fr/vis-pour-plaque-de-platre-universelle-noir-mat-3-5x25-mm-200-pieces/3663602758075_CAFR.prd",
+   "ean": "3663602758075",
+   "facteur": 1,
+   "intitule": "Vis pour plaque de plâtre (universelle), noir mat, 3,5x25 mm - 200 pièces",
+   "confiance": "exact",
+   "note": "3,5 × 25, boîte de 200 : correspondance exacte (vis universelle pointe fine)."
+  },
+  "wago-2": {
+   "url": "https://www.castorama.fr/85-bornes-automatiques-diall-serie-273-wago-1-2-5-mm-/3663602793489_CAFR.prd",
+   "ean": "3663602793489",
+   "facteur": 1.1765,
+   "intitule": "85 bornes automatiques Diall (= série 273 Wago) 1 - 2,5 mm²",
+   "confiance": "proche",
+   "note": "Les Wago 273 sont épuisées : bornes Diall équivalentes (série 273), lot de 85 ramené à 100.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3663602793489/lot-de-85-bornes-de-connexion-panachees"
+    }
+   ]
+  },
+  "wago-3": {
+   "url": "https://www.castorama.fr/10-mini-bornes-a-cliquet-3-entrees-wago-serie-221-0-14-4-mm-/3662366024136_CAFR.prd",
+   "ean": "3662366024136",
+   "facteur": 5,
+   "intitule": "10 mini bornes à cliquet 3 entrées Wago (série 221) 0,14-4 mm²",
+   "confiance": "proche",
+   "note": "Borne à levier 3 entrées Wago 221. Aucun sachet de 50 en 3 entrées : vendue par 10, facteur 5.",
+   "autres": [
+    {
+     "enseigne": "Brico Dépôt",
+     "url": "https://www.bricodepot.fr/p/3662366024136/sachet-de-10-bornes-3-entrees"
+    }
+   ]
+  },
+  "wago-5": {
+   "url": "https://www.castorama.fr/50-mini-bornes-a-cliquet-5-entrees-wago-serie-221-0-14-4-mm-/3662366024150_CAFR.prd",
+   "ean": "3662366024150",
+   "facteur": 0.5,
+   "intitule": "50 mini bornes à cliquet 5 entrées Wago (série 221) 0,14-4 mm²",
+   "confiance": "proche",
+   "note": "Borne à levier 5 entrées Wago 221. Pas de sachet de 25 : le lot de 50 est le plus proche, facteur 0,5."
+  }
+ }
+}

@@ -1,106 +1,2801 @@
 {
   "_lisez_moi": [
-    "LE CATALOGUE PUBLIC DES PRIX — a deposer a cote de `api.php`.",
-    "",
-    "RELEVE COMPLET DU 05/09/2026, page produit par page produit, chez",
-    "Castorama. Ce n'est pas un exemple : c'est le catalogue qui chiffre.",
-    "",
-    "SEULE UNE PAGE PRODUIT FAIT FOI. Au cours de ce relevé, les listes de",
-    "recherche automatique ont annonce trois fois un prix faux : 219 EUR pour",
-    "un interrupteur differentiel a 49,90, 72,90 pour un cable a 89,90, et",
-    "4,90 pour un peigne a 5,19. C'est le meme piege qui avait fait chiffrer",
-    "les plaques de finition sur une finition decorative.",
-    "",
-    "CE QUI A BOUGE DEPUIS LE 28/08 :",
-    "  differentiel type AC  72,90 -> 49,90  (-32 %)",
-    "  differentiel type A   81,90 -> 64,90  (-21 %)",
-    "  disjoncteurs 10/16/20 10,50 ->  9,99",
-    "  boite d'encastrement   1,69 ->  2,05  (lot Batibox P.40 de 10)",
-    "  disjoncteur 2 A       10,50 -> 27,90  (etait estime)",
-    "  coffret 3 rangees     70,90 -> 85,90  (etait estime)",
-    "  coffret 4 rangees     88,90 -> 109,90 (etait estime)",
-    "Les vingt-quatre autres articles releves sont INCHANGES.",
-    "",
-    "DEUX ARTICLES NE SONT PLUS RELEVABLES et restent des estimations dans",
-    "l'application : l'obturateur (plus affiche qu'en destockage) et les",
-    "bornes Wago serie 273 (plus vendues). Un prix de fin de serie ne se",
-    "recopie pas — le devis d'un chantier qui commence dans trois semaines ne",
-    "peut pas s'appuyer dessus. Ils ne figurent donc pas ci-dessous.",
-    "",
-    "POUR METTRE A JOUR : changez `version` (l'application compare les",
-    "versions pour dire « prix actualises » plutot que « deja a jour »),",
-    "changez `releve` au JOUR ou vous etes alle voir, et corrigez les prix.",
-    "Ce que ce fichier ne porte pas garde le prix embarque dans",
-    "l'application : on peut donc le remplir rayon par rayon.",
-    "",
-    "TOUS LES PRIX SONT TTC, EN EUROS."
+    "LE CATALOGUE DES PRIX DU JOUR — écrit chaque matin par tools/releve-prix.js.",
+    "Ne pas le modifier à la main : corriger plutôt server/sources-prix.json",
+    "(la page produit de chaque article) ; le prochain relevé le réécrira.",
+    "Tous les prix sont TTC, en euros, au conditionnement du devis.",
+    "`prix` : le MOINS CHER des enseignes ; `offres` : chaque enseigne, du moins cher au plus cher.",
+    "`jours` : le jour où chaque prix a été vu ; `ean`, `liens`, `facteurs` : le produit."
   ],
-
-  "version": "2026-09.2",
-  "releve": "2026-09-05",
+  "version": "2026-10.10",
+  "releve": "2026-10-10",
   "source": "Castorama",
-
   "prix": {
-    "plaque-dooxie-1": 1.9,
-    "plaque-dooxie-2": 3.9,
-    "plaque-dooxie-3": 6.09,
-    "plaque-dooxie-4": 7.9,
-
-    "plaque-ovalis-1": 2.15,
-    "plaque-ovalis-2": 4.29,
-    "plaque-ovalis-3": 6.49,
-
-    "plaque-odace-1": 1.99,
-    "plaque-odace-2": 3.99,
-    "plaque-odace-3": 5.69,
-    "plaque-odace-4": 8.0,
-
-    "plaque-celiane-1": 2.29,
-    "plaque-celiane-2": 4.59,
-    "plaque-celiane-3": 6.99,
-    "plaque-celiane-4": 9.45,
-
-    "meca-dooxie-prise": 5.5,
-    "meca-dooxie-inter": 5.5,
-    "meca-dooxie-va": 5.5,
-    "meca-dooxie-poussoir": 9.69,
-    "meca-dooxie-rj45": 19.5,
-    "meca-dooxie-tv": 12.9,
-
-    "meca-celiane-prise": 10.9,
-    "meca-celiane-inter": 11.9,
-    "meca-celiane-va": 11.9,
-    "meca-celiane-poussoir": 20.9,
-    "meca-celiane-rj45": 25.9,
-
+    "agrafe-icta": 14.98,
+    "barrette-equipotentielle": 9.89,
+    "boite-dcl": 11.5,
+    "boite-derivation": 4.19,
+    "boite-derivation-etanche": 3.59,
+    "boite-encastrement": 1.99,
+    "boite-encastrement-2": 6.49,
+    "boite-encastrement-3": 8.09,
+    "boite-etanche": 3.5,
+    "boite-maconnerie": 1.89,
+    "boite-maconnerie-2": 5.19,
+    "boite-sol": 61.9,
+    "bornier-terre": 13.5,
+    "bouche-vmc": 69.9,
+    "brassage": 5.99,
+    "cable-3g1.5": 94.9,
+    "cable-3g2.5": 139,
+    "cable-3g6": 359.8,
+    "cable-5g2.5": 270,
+    "carillon": 13.9,
+    "cavalier-16": 14.98,
+    "cheville-nylon": 5.79,
+    "cheville-placo": 14.9,
+    "coax": 44.9,
+    "coffret-1": 28.9,
+    "coffret-2": 48.9,
+    "coffret-3": 75.9,
+    "coffret-4": 96.9,
+    "coffret-com": 91.9,
+    "coffret-etanche": 29.9,
+    "collier-colson": 9.49,
+    "collier-equipotentiel": 3.89,
+    "collier-gaine-20": 14.98,
+    "contacteur-jn": 57.9,
+    "couvercle-derivation": 0.95,
+    "diff-A": 59.9,
+    "diff-A-63": 109,
+    "diff-AC": 49.9,
+    "diff-AC-63": 89.9,
+    "diff-HPI": 219.9,
+    "disj-10": 8.99,
+    "disj-16": 8.99,
+    "disj-2": 27.9,
+    "disj-20": 8.99,
+    "disj-32": 23.9,
+    "disj-abonne": 159,
+    "disj-diff-16": 90.9,
+    "disj-diff-20": 94.9,
+    "domino": 14.9,
+    "dti": 30.03,
+    "fil-1.5": 27.9,
+    "fil-10": 26.9,
+    "fil-16": 36.9,
+    "fil-2.5": 31.9,
+    "fil-6": 18.9,
+    "foret-beton-6": 5.25,
+    "fraise-placo-67": 32.9,
+    "futp6": 79.9,
+    "gaine-annelee-16": 13.9,
+    "gaine-thermo": 8.29,
+    "gaine-tpc-40": 24.9,
+    "gaine-tpc-63": 45.9,
+    "gaine-vmc-125": 14.95,
+    "goulotte-40": 15.9,
+    "gtl": 125,
+    "horloge-modulaire": 229.9,
     "icta-16": 26.9,
     "icta-20": 30.9,
     "icta-25": 53.9,
     "icta-prefilee-3g1.5": 95.9,
     "icta-prefilee-3g2.5": 149.9,
-
-    "fil-1.5": 25.9,
-    "fil-2.5": 41.9,
-    "fil-6": 16.9,
-    "cable-3g1.5": 89.9,
-    "cable-3g2.5": 139.9,
-
-    "boite-encastrement": 2.05,
-
-    "disj-2": 27.9,
-    "disj-10": 9.99,
-    "disj-16": 9.99,
-    "disj-20": 9.99,
-    "disj-32": 23.9,
-    "diff-AC": 49.9,
-    "diff-A": 64.9,
-
-    "coffret-1": 34.9,
-    "coffret-2": 52.9,
-    "coffret-3": 85.9,
-    "coffret-4": 109.9,
+    "inter-etanche": 9.89,
+    "inter-volet": 23.9,
+    "meca-celiane-inter": 11.9,
+    "meca-celiane-poussoir": 20.9,
+    "meca-celiane-prise": 10.9,
+    "meca-celiane-prise20": 10.9,
+    "meca-celiane-prise32": 6.79,
+    "meca-celiane-rj45": 25.9,
+    "meca-celiane-sortieCable": 20.5,
+    "meca-celiane-thermostat": 179.9,
+    "meca-celiane-tv": 19.9,
+    "meca-celiane-va": 11.9,
+    "meca-celiane-variateur": 92.9,
+    "meca-celiane-volet": 52.9,
+    "meca-dooxie-inter": 4.59,
+    "meca-dooxie-poussoir": 8.99,
+    "meca-dooxie-prise": 5.5,
+    "meca-dooxie-prise20": 5.5,
+    "meca-dooxie-prise32": 6.79,
+    "meca-dooxie-rj45": 15.9,
+    "meca-dooxie-sortieCable": 5.99,
+    "meca-dooxie-thermostat": 179.9,
+    "meca-dooxie-tv": 9.99,
+    "meca-dooxie-va": 4.59,
+    "meca-dooxie-variateur": 71.9,
+    "meca-dooxie-volet": 23.9,
+    "meca-mosaic-inter": 7.49,
+    "meca-mosaic-poussoir": 12.9,
+    "meca-mosaic-prise": 5.79,
+    "meca-mosaic-prise20": 5.79,
+    "meca-mosaic-prise32": 6.79,
+    "meca-mosaic-rj45": 16.9,
+    "meca-mosaic-sortieCable": 9.99,
+    "meca-mosaic-thermostat": 179.9,
+    "meca-mosaic-tv": 11.9,
+    "meca-mosaic-va": 7.49,
+    "meca-mosaic-variateur": 109,
+    "meca-mosaic-volet": 36.9,
+    "meca-odace-inter": 5.49,
+    "meca-odace-poussoir": 5.49,
+    "meca-odace-prise": 5.19,
+    "meca-odace-prise20": 5.19,
+    "meca-odace-prise32": 6.79,
+    "meca-odace-rj45": 18.9,
+    "meca-odace-sortieCable": 5.99,
+    "meca-odace-thermostat": 79.9,
+    "meca-odace-tv": 11.9,
+    "meca-odace-va": 5.49,
+    "meca-odace-variateur": 54.9,
+    "meca-odace-volet": 22.9,
+    "meca-ovalis-inter": 3.29,
+    "meca-ovalis-poussoir": 6.99,
+    "meca-ovalis-prise": 4.09,
+    "meca-ovalis-prise20": 4.09,
+    "meca-ovalis-prise32": 6.79,
+    "meca-ovalis-rj45": 13.9,
+    "meca-ovalis-sortieCable": 4.99,
+    "meca-ovalis-thermostat": 79.9,
+    "meca-ovalis-tv": 9.99,
+    "meca-ovalis-va": 3.29,
+    "meca-ovalis-variateur": 59.9,
+    "meca-ovalis-volet": 21.9,
+    "mousse-pu": 9.99,
+    "multimetre": 24.9,
+    "niveau-40": 14.9,
+    "obturateur": 6.09,
+    "parafoudre": 264.9,
     "peigne": 5.19,
-
-    "collier-colson": 9.99
-  }
+    "peigne-vertical": 18.35,
+    "pince-coupante": 9.99,
+    "plafond-camera": 49.9,
+    "plafond-daaf": 21.9,
+    "plafond-detecteur": 22.9,
+    "plafond-vmc": 8.55,
+    "plaque-celiane-1": 2.29,
+    "plaque-celiane-2": 4.59,
+    "plaque-celiane-3": 6.99,
+    "plaque-celiane-4": 9.45,
+    "plaque-dooxie-1": 1.69,
+    "plaque-dooxie-2": 3.19,
+    "plaque-dooxie-3": 4.99,
+    "plaque-dooxie-4": 7.9,
+    "plaque-mosaic-1": 4.99,
+    "plaque-mosaic-2": 12.5,
+    "plaque-mosaic-3": 22.5,
+    "plaque-odace-1": 1.99,
+    "plaque-odace-2": 3.99,
+    "plaque-odace-3": 5.69,
+    "plaque-odace-4": 8,
+    "plaque-ovalis-1": 1.19,
+    "plaque-ovalis-2": 3.49,
+    "plaque-ovalis-3": 5.59,
+    "plaque-ovalis-4": 6.49,
+    "platre-scellement": 12.5,
+    "plinthe-passe-cable": 31,
+    "prise-etanche": 9.49,
+    "repartiteur-tv": 9.9,
+    "rj45-keystone": 18.9,
+    "ruban-isolant": 4.07,
+    "ruban-led": 52.99,
+    "scie-cloche-67": 24.9,
+    "silicone": 3.79,
+    "sortie-cable-32": 6.79,
+    "telerupteur": 29.9,
+    "tire-fil": 16.5,
+    "tournevis-testeur": 3.25,
+    "transfo-led": 51.9,
+    "vis-beton": 43.9,
+    "vis-placo": 4.99,
+    "wago-2": 18.71,
+    "wago-3": 32.45,
+    "wago-5": 19.45
+  },
+  "jours": {
+    "agrafe-icta": "2026-10-10",
+    "barrette-equipotentielle": "2026-10-10",
+    "boite-dcl": "2026-10-10",
+    "boite-derivation": "2026-10-10",
+    "boite-derivation-etanche": "2026-10-10",
+    "boite-encastrement": "2026-10-10",
+    "boite-encastrement-2": "2026-10-10",
+    "boite-encastrement-3": "2026-10-10",
+    "boite-etanche": "2026-10-10",
+    "boite-maconnerie": "2026-10-10",
+    "boite-maconnerie-2": "2026-10-10",
+    "boite-sol": "2026-10-10",
+    "bornier-terre": "2026-10-10",
+    "bouche-vmc": "2026-10-10",
+    "brassage": "2026-10-10",
+    "cable-3g1.5": "2026-10-10",
+    "cable-3g2.5": "2026-10-10",
+    "cable-3g6": "2026-10-10",
+    "cable-5g2.5": "2026-10-10",
+    "carillon": "2026-10-10",
+    "cavalier-16": "2026-10-10",
+    "cheville-nylon": "2026-10-10",
+    "cheville-placo": "2026-10-10",
+    "coax": "2026-10-10",
+    "coffret-1": "2026-10-10",
+    "coffret-2": "2026-10-10",
+    "coffret-3": "2026-10-10",
+    "coffret-4": "2026-10-10",
+    "coffret-com": "2026-10-10",
+    "coffret-etanche": "2026-10-10",
+    "collier-colson": "2026-10-10",
+    "collier-equipotentiel": "2026-10-10",
+    "collier-gaine-20": "2026-10-10",
+    "contacteur-jn": "2026-10-10",
+    "couvercle-derivation": "2026-10-10",
+    "diff-A": "2026-10-10",
+    "diff-A-63": "2026-10-10",
+    "diff-AC": "2026-10-10",
+    "diff-AC-63": "2026-10-10",
+    "diff-HPI": "2026-10-10",
+    "disj-10": "2026-10-10",
+    "disj-16": "2026-10-10",
+    "disj-2": "2026-10-10",
+    "disj-20": "2026-10-10",
+    "disj-32": "2026-10-10",
+    "disj-abonne": "2026-10-10",
+    "disj-diff-16": "2026-10-10",
+    "disj-diff-20": "2026-10-10",
+    "domino": "2026-10-10",
+    "dti": "2026-10-10",
+    "fil-1.5": "2026-10-10",
+    "fil-10": "2026-10-10",
+    "fil-16": "2026-10-10",
+    "fil-2.5": "2026-10-10",
+    "fil-6": "2026-10-10",
+    "foret-beton-6": "2026-10-10",
+    "fraise-placo-67": "2026-10-10",
+    "futp6": "2026-10-10",
+    "gaine-annelee-16": "2026-10-10",
+    "gaine-thermo": "2026-10-10",
+    "gaine-tpc-40": "2026-10-10",
+    "gaine-tpc-63": "2026-10-10",
+    "gaine-vmc-125": "2026-10-10",
+    "goulotte-40": "2026-10-10",
+    "gtl": "2026-10-10",
+    "horloge-modulaire": "2026-10-10",
+    "icta-16": "2026-10-10",
+    "icta-20": "2026-10-10",
+    "icta-25": "2026-10-10",
+    "icta-prefilee-3g1.5": "2026-10-10",
+    "icta-prefilee-3g2.5": "2026-10-10",
+    "inter-etanche": "2026-10-10",
+    "inter-volet": "2026-10-10",
+    "meca-celiane-inter": "2026-10-10",
+    "meca-celiane-poussoir": "2026-10-10",
+    "meca-celiane-prise": "2026-10-10",
+    "meca-celiane-prise20": "2026-10-10",
+    "meca-celiane-prise32": "2026-10-10",
+    "meca-celiane-rj45": "2026-10-10",
+    "meca-celiane-sortieCable": "2026-10-10",
+    "meca-celiane-thermostat": "2026-10-10",
+    "meca-celiane-tv": "2026-10-10",
+    "meca-celiane-va": "2026-10-10",
+    "meca-celiane-variateur": "2026-10-10",
+    "meca-celiane-volet": "2026-10-10",
+    "meca-dooxie-inter": "2026-10-10",
+    "meca-dooxie-poussoir": "2026-10-10",
+    "meca-dooxie-prise": "2026-10-10",
+    "meca-dooxie-prise20": "2026-10-10",
+    "meca-dooxie-prise32": "2026-10-10",
+    "meca-dooxie-rj45": "2026-10-10",
+    "meca-dooxie-sortieCable": "2026-10-10",
+    "meca-dooxie-thermostat": "2026-10-10",
+    "meca-dooxie-tv": "2026-10-10",
+    "meca-dooxie-va": "2026-10-10",
+    "meca-dooxie-variateur": "2026-10-10",
+    "meca-dooxie-volet": "2026-10-10",
+    "meca-mosaic-inter": "2026-10-10",
+    "meca-mosaic-poussoir": "2026-10-10",
+    "meca-mosaic-prise": "2026-10-10",
+    "meca-mosaic-prise20": "2026-10-10",
+    "meca-mosaic-prise32": "2026-10-10",
+    "meca-mosaic-rj45": "2026-10-10",
+    "meca-mosaic-sortieCable": "2026-10-10",
+    "meca-mosaic-thermostat": "2026-10-10",
+    "meca-mosaic-tv": "2026-10-10",
+    "meca-mosaic-va": "2026-10-10",
+    "meca-mosaic-variateur": "2026-10-10",
+    "meca-mosaic-volet": "2026-10-10",
+    "meca-odace-inter": "2026-10-10",
+    "meca-odace-poussoir": "2026-10-10",
+    "meca-odace-prise": "2026-10-10",
+    "meca-odace-prise20": "2026-10-10",
+    "meca-odace-prise32": "2026-10-10",
+    "meca-odace-rj45": "2026-10-10",
+    "meca-odace-sortieCable": "2026-10-10",
+    "meca-odace-thermostat": "2026-10-10",
+    "meca-odace-tv": "2026-10-10",
+    "meca-odace-va": "2026-10-10",
+    "meca-odace-variateur": "2026-10-10",
+    "meca-odace-volet": "2026-10-10",
+    "meca-ovalis-inter": "2026-10-10",
+    "meca-ovalis-poussoir": "2026-10-10",
+    "meca-ovalis-prise": "2026-10-10",
+    "meca-ovalis-prise20": "2026-10-10",
+    "meca-ovalis-prise32": "2026-10-10",
+    "meca-ovalis-rj45": "2026-10-10",
+    "meca-ovalis-sortieCable": "2026-10-10",
+    "meca-ovalis-thermostat": "2026-10-10",
+    "meca-ovalis-tv": "2026-10-10",
+    "meca-ovalis-va": "2026-10-10",
+    "meca-ovalis-variateur": "2026-10-10",
+    "meca-ovalis-volet": "2026-10-10",
+    "mousse-pu": "2026-10-10",
+    "multimetre": "2026-10-10",
+    "niveau-40": "2026-10-10",
+    "obturateur": "2026-10-10",
+    "parafoudre": "2026-10-10",
+    "peigne": "2026-10-10",
+    "peigne-vertical": "2026-10-10",
+    "pince-coupante": "2026-10-10",
+    "plafond-camera": "2026-10-10",
+    "plafond-daaf": "2026-10-10",
+    "plafond-detecteur": "2026-10-10",
+    "plafond-vmc": "2026-10-10",
+    "plaque-celiane-1": "2026-10-10",
+    "plaque-celiane-2": "2026-10-10",
+    "plaque-celiane-3": "2026-10-10",
+    "plaque-celiane-4": "2026-10-10",
+    "plaque-dooxie-1": "2026-10-10",
+    "plaque-dooxie-2": "2026-10-10",
+    "plaque-dooxie-3": "2026-10-10",
+    "plaque-dooxie-4": "2026-10-10",
+    "plaque-mosaic-1": "2026-10-10",
+    "plaque-mosaic-2": "2026-10-10",
+    "plaque-mosaic-3": "2026-10-10",
+    "plaque-odace-1": "2026-10-10",
+    "plaque-odace-2": "2026-10-10",
+    "plaque-odace-3": "2026-10-10",
+    "plaque-odace-4": "2026-10-10",
+    "plaque-ovalis-1": "2026-10-10",
+    "plaque-ovalis-2": "2026-10-10",
+    "plaque-ovalis-3": "2026-10-10",
+    "plaque-ovalis-4": "2026-10-10",
+    "platre-scellement": "2026-10-10",
+    "plinthe-passe-cable": "2026-10-10",
+    "prise-etanche": "2026-10-10",
+    "repartiteur-tv": "2026-10-10",
+    "rj45-keystone": "2026-10-10",
+    "ruban-isolant": "2026-10-10",
+    "ruban-led": "2026-10-10",
+    "scie-cloche-67": "2026-10-10",
+    "silicone": "2026-10-10",
+    "sortie-cable-32": "2026-10-10",
+    "telerupteur": "2026-10-10",
+    "tire-fil": "2026-10-10",
+    "tournevis-testeur": "2026-10-10",
+    "transfo-led": "2026-10-10",
+    "vis-beton": "2026-10-10",
+    "vis-placo": "2026-10-10",
+    "wago-2": "2026-10-10",
+    "wago-3": "2026-10-10",
+    "wago-5": "2026-10-10"
+  },
+  "offres": {
+    "agrafe-icta": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 14.98,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3663602793069/lot-de-50-attaches-cable-o-16-20-mm-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 15.1,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/50-cavaliers-ronds-en-nylon-diall-16-a-20-mm-gris/3663602793069_CAFR.prd"
+      }
+    ],
+    "barrette-equipotentielle": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 9.89,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3545411230211/barrette-de-coupure-basse"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 10.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/barrette-de-terre-basse-zenitech-cables-10-a-35-mm-/3545411230211_CAFR.prd"
+      }
+    ],
+    "boite-dcl": [
+      {
+        "enseigne": "Castorama",
+        "pu": 11.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/boitier-dcl-piton-et-fiche-2-poles-terre-tibelec-blanc/3233550418439_CAFR.prd"
+      }
+    ],
+    "boite-derivation": [
+      {
+        "enseigne": "Castorama",
+        "pu": 4.19,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/boite-de-derivation-jacobsen-67-x-p-40-mm-pour-8-cables/5063022098375_CAFR.prd"
+      }
+    ],
+    "boite-derivation-etanche": [
+      {
+        "enseigne": "Castorama",
+        "pu": 3.59,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/boite-de-derivation-etanche-legrand-70-mm-x-45-mm/3245060945145_CAFR.prd"
+      }
+    ],
+    "boite-encastrement": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 1.99,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414972954365/boite-a-encastrer-eco-batibox-profondeur-40-mm-pour-plaque-de-platre-1-poste"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 2.39,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/boite-d-encastrement-monoposte-67-x-p-40-mm-legrand-eco-batibox/3414972954365_CAFR.prd"
+      }
+    ],
+    "boite-encastrement-2": [
+      {
+        "enseigne": "Castorama",
+        "pu": 6.49,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/boite-d-encastrement-double-plaque-de-platre-legrand-p-40-mm/3245060905422_CAFR.prd"
+      },
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 6.49,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060905422/boite-cloison-seche-double"
+      }
+    ],
+    "boite-encastrement-3": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 8.09,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060905439/boite-d-encastrement-triple-plaque-de-platre-p-40-mm"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 8.15,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/boite-d-encastrement-triple-plaque-de-platre-legrand-p-40-mm/3245060905439_CAFR.prd"
+      }
+    ],
+    "boite-etanche": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 3.5,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606489505752/boite-de-derivation-carree-80-x-80-mm-4"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 4.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/boite-de-derivation-carree-exterieure-avec-7-passe-cables-et-systeme-de-verrouillage-80-x-80-x-45-mm-schneider-electric-mureva-gris/3606489505752_CAFR.prd"
+      }
+    ],
+    "boite-maconnerie": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 1.89,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060905118/boite-a-encastrer-ronde-pour-maconnerie-o-65-mm"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 2.09,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/boite-d-encastrement-simple-ronde-maconnerie-legrand-p-40mm/3245060905118_CAFR.prd"
+      }
+    ],
+    "boite-maconnerie-2": [
+      {
+        "enseigne": "Castorama",
+        "pu": 5.19,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/boite-d-encastrement-double-maconnerie-legrand-p-40-mm/3245060905323_CAFR.prd"
+      }
+    ],
+    "boite-sol": [
+      {
+        "enseigne": "Castorama",
+        "pu": 61.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-de-sol-2-poles-terre-carree-metal-unica-system-schneider-electric-gris/3606489818906_CAFR.prd"
+      }
+    ],
+    "bornier-terre": [
+      {
+        "enseigne": "Castorama",
+        "pu": 13.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/bornier-de-terre-legrand-vert-et-gris/3245060927813_CAFR.prd"
+      }
+    ],
+    "bouche-vmc": [
+      {
+        "enseigne": "Castorama",
+        "pu": 69.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/bouche-d-extraction-hygrostat-aldes-bahia-sdb-vmc-80-mm/3542280352709_CAFR.prd"
+      }
+    ],
+    "brassage": [
+      {
+        "enseigne": "Castorama",
+        "pu": 5.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/cordon-rj45-informatique-cat6-erard-2-m/3700101223670_CAFR.prd"
+      }
+    ],
+    "cable-3g1.5": [
+      {
+        "enseigne": "Castorama",
+        "pu": 94.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/cable-electrique-u1000r2v-3x1-5-mm-100-m/3427500883839_CAFR.prd"
+      },
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 94.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3427500883839/cable-electrique-r2v-3g1-5-mm-noir-100-m"
+      }
+    ],
+    "cable-3g2.5": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 139,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3427500884041/cable-electrique-r2v-3g2-5-mm-noir-100-m-1"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 144.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/cable-electrique-u1000r2v-3x2-5-mm-100-m/3427500884041_CAFR.prd"
+      }
+    ],
+    "cable-3g6": [
+      {
+        "enseigne": "Castorama",
+        "pu": 359.8,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/cable-3x6-mm-u1000r2v-couronne-50m-nexans/3170230008217_CAFR.prd"
+      },
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 378,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3170230008217/cable-electrique-r2v-3g6-mm-noir-50-m"
+      }
+    ],
+    "cable-5g2.5": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 270,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3170230957317/couronne-de-cable-u-1000-r2v-5g2-5-50m"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 279.8,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/cable-u-1000-r2v-5g-2-5c-50-m-nexans/3170230957317_CAFR.prd"
+      }
+    ],
+    "carillon": [
+      {
+        "enseigne": "Castorama",
+        "pu": 13.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/carillon-filaire-a-piles-embry-blanc/3663602631828_CAFR.prd"
+      }
+    ],
+    "cavalier-16": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 14.98,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3663602793069/lot-de-50-attaches-cable-o-16-20-mm-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 15.1,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/50-cavaliers-ronds-en-nylon-diall-16-a-20-mm-gris/3663602793069_CAFR.prd"
+      }
+    ],
+    "cheville-nylon": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 5.79,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3663602926207/lot-de-100-chevilles-nylon-6-x-30-mm"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 7.39,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/100-chevilles-diall-nylon-cl-6x30mm/3663602926207_CAFR.prd"
+      }
+    ],
+    "cheville-placo": [
+      {
+        "enseigne": "Castorama",
+        "pu": 14.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/50-chevilles-diall-murs-creux-pz-m4x33mm/3663602925569_CAFR.prd"
+      }
+    ],
+    "coax": [
+      {
+        "enseigne": "Castorama",
+        "pu": 44.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/cable-coaxial-17vatc-blanc-100-m-nexans/3170230959656_CAFR.prd"
+      },
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 45.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3170230959656/cable-coaxial-17-vatc-blanc-100-m"
+      }
+    ],
+    "coffret-1": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 28.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060930202/tableau-electrique-nu-drivia-13-modules"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 34.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/tableau-electrique-a-equiper-1-rangee-13-modules-legrand/3245060930202_CAFR.prd"
+      }
+    ],
+    "coffret-2": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 48.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060930219/coffret-nu-2-rangees-26-modules"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 52.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/tableau-electrique-a-equiper-2-rangees-26-modules-legrand/3245060930219_CAFR.prd"
+      }
+    ],
+    "coffret-3": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 75.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060930226/coffret-nu-39-modules-3-rangees"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 85.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/tableau-electrique-a-equiper-3-rangees-39-modules-legrand/3245060930226_CAFR.prd"
+      }
+    ],
+    "coffret-4": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 96.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060930233/coffret-nu-52-modules-4-rangees"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 109.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/tableau-electrique-a-equiper-4-rangees-52-modules-legrand/3245060930233_CAFR.prd"
+      }
+    ],
+    "coffret-com": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 91.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606486419342/coffret-de-communication-13m-1r-grade-2tv-4-x-rj45-cat6-resi9-connect"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/coffret-de-communication-1-rangee-13-modules-grade-2tv-4-x-rj45-cat6-schneider-electric-resi9-connect/3606486419342_CAFR.prd"
+      }
+    ],
+    "coffret-etanche": [
+      {
+        "enseigne": "Castorama",
+        "pu": 29.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/tableau-electrique-12-modules-ip65-resistant-aux-intemperies-jacobsen/5063022755254_CAFR.prd"
+      }
+    ],
+    "collier-colson": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 9.49,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3663602792376/lot-de-100-colliers-de-fixation-noir-4-8-x-250-mm"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 9.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/100-colliers-de-serrage-en-nylon-diall-4-8-x-250-mm-noir/3663602792376_CAFR.prd"
+      }
+    ],
+    "collier-equipotentiel": [
+      {
+        "enseigne": "Castorama",
+        "pu": 3.89,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/colliers-de-mise-a-la-terre-zenitech/3545411230235_CAFR.prd"
+      }
+    ],
+    "collier-gaine-20": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 14.98,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3663602793069/lot-de-50-attaches-cable-o-16-20-mm-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 15.1,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/50-cavaliers-ronds-en-nylon-diall-16-a-20-mm-gris/3663602793069_CAFR.prd"
+      }
+    ],
+    "contacteur-jn": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 57.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606481323996/contacteur-jour-nuit-20a"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 59.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/contacteur-20a-schneider-electric-resi9-xp/3606481323996_CAFR.prd"
+      }
+    ],
+    "couvercle-derivation": [
+      {
+        "enseigne": "Castorama",
+        "pu": 0.95,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/couvercle-de-boite-de-derivation-diall-86-mm-fermeture-a-ressorts/3663602794509_CAFR.prd"
+      }
+    ],
+    "diff-A": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 59.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060928360/interrupteur-differentiel-30-ma-40a-type-a-2"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 64.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-differentiel-40a-30ma-type-a-sortie-haut-legrand/3245060928360_CAFR.prd"
+      }
+    ],
+    "diff-A-63": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 109,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060928377/interrupteur-differentiel-30-ma-63a-type-a-1"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 109.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-differentiel-30ma-63a-type-a-legrand/3245060928377_CAFR.prd"
+      }
+    ],
+    "diff-AC": [
+      {
+        "enseigne": "Castorama",
+        "pu": 49.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-differentiel-40a-30ma-type-ac-sortie-haut-legrand/3245060928407_CAFR.prd"
+      },
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 51.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060928407/interrupteur-differentiel-30-ma-40a-type-ac-2"
+      }
+    ],
+    "diff-AC-63": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 89.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060928414/interrupteur-differentiel-bipolaire-type-ac-63-a-30-ma"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 99.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-differentiel-30ma-63a-type-ac-legrand/3245060928414_CAFR.prd"
+      }
+    ],
+    "diff-HPI": [
+      {
+        "enseigne": "Castorama",
+        "pu": 219.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-differentiel-30ma-40a-type-hpi-legrand/3245064116237_CAFR.prd"
+      }
+    ],
+    "disj-10": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 8.99,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060928223/disjoncteur-phase-neutre-10a-bornes-a-vis-1-module"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 9.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/disjoncteur-phase-neutre-10a-legrand/3245060928223_CAFR.prd"
+      }
+    ],
+    "disj-16": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 8.99,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060928230/disjoncteur-phase-neutre-peignable-16a"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 9.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/disjoncteur-phase-neutre-16a-legrand/3245060928230_CAFR.prd"
+      }
+    ],
+    "disj-2": [
+      {
+        "enseigne": "Castorama",
+        "pu": 27.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/disjoncteur-phase-neutre-2a-legrand/3245060928209_CAFR.prd"
+      },
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 27.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060928209/disjoncteur-phase-neutre-2a-bornes-a-vis-1-module"
+      }
+    ],
+    "disj-20": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 8.99,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060928247/disjoncteur-phase-neutre-peignable-20a"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 9.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/disjoncteur-phase-neutre-20a-legrand/3245060928247_CAFR.prd"
+      }
+    ],
+    "disj-32": [
+      {
+        "enseigne": "Castorama",
+        "pu": 23.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/disjoncteur-phase-neutre-32a-legrand/3245060928254_CAFR.prd"
+      },
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 23.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060928254/disjoncteur-phase-neutre-peignable-32a"
+      }
+    ],
+    "disj-abonne": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 159,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060928704/disjoncteur-d-abonne-baco-selectif-15-45a"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 189,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/disjoncteur-branchement-enedis-tarif-bleu-500ma-selectif-15-30-45a-legrand/3245060928704_CAFR.prd"
+      }
+    ],
+    "disj-diff-16": [
+      {
+        "enseigne": "Castorama",
+        "pu": 90.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/disjoncteur-differentiel-30ma-16a-type-ac-abb/8012542162001_CAFR.prd"
+      }
+    ],
+    "disj-diff-20": [
+      {
+        "enseigne": "Castorama",
+        "pu": 94.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/disjoncteur-differentiel-30ma-20a-type-ac-abb/8012542162100_CAFR.prd"
+      }
+    ],
+    "domino": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 14.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3663602794738/barrette-de-connexion-a-visser-12-x-2-entrees-6-mm"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 17.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/barrette-de-connexion-12-x-2-entrees-diall-6-mm-10-a/3663602794738_CAFR.prd"
+      }
+    ],
+    "dti": [
+      {
+        "enseigne": "Castorama",
+        "pu": 30.03,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/dispositif-de-terminaison-interieur-dti-legrand/3245060910662_CAFR.prd"
+      }
+    ],
+    "fil-1.5": [
+      {
+        "enseigne": "Castorama",
+        "pu": 27.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/fil-1-5mm-h07vu-noir-couronne-100m-nexans/3427500597262_CAFR.prd"
+      },
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 27.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3427500597262/fil-electrique-h07vu-1-5-mm-noir-100-m"
+      }
+    ],
+    "fil-10": [
+      {
+        "enseigne": "Castorama",
+        "pu": 26.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/fil-electrique-h07vr-10-mm-nexans-rouge-vendu-au-metre-lineaire/3663602082088_CAFR.prd"
+      }
+    ],
+    "fil-16": [
+      {
+        "enseigne": "Castorama",
+        "pu": 36.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/fil-electrique-h07vr-16-mm-nexans-rouge-vendu-au-metre-lineaire/3663602082897_CAFR.prd"
+      }
+    ],
+    "fil-2.5": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 31.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3427500597828/cable-h07-vu-100-m-section-2-5-mm-rouge"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 47.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/fil-electrique-h07vu-2-5mm-rouge-couronne-100-m/3427500597828_CAFR.prd"
+      }
+    ],
+    "fil-6": [
+      {
+        "enseigne": "Castorama",
+        "pu": 18.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/fil-electrique-h07vr-6mm-nexans-rouge-10-m/3170231002078_CAFR.prd"
+      },
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 18.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3170231002078/fil-electrique-h07vr-6-mm-rouge-10-m"
+      }
+    ],
+    "foret-beton-6": [
+      {
+        "enseigne": "Castorama",
+        "pu": 5.25,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/foret-beton-x1-dimensions-6-x-l-100-165-mm-emmanchement-sds-plus-bosch/3165140027755_CAFR.prd"
+      }
+    ],
+    "fraise-placo-67": [
+      {
+        "enseigne": "Castorama",
+        "pu": 32.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/trepan-bosch-pro-pour-multi-materiaux-68mm/6949509240422_CAFR.prd"
+      }
+    ],
+    "futp6": [
+      {
+        "enseigne": "Castorama",
+        "pu": 79.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/cable-ethernet-lan-cat6-ftp-nexans-100-m/3170230062608_CAFR.prd"
+      },
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 82.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3170230062608/cable-ethernet-categorie-6-f-utp-blinde-l-100-m"
+      }
+    ],
+    "gaine-annelee-16": [
+      {
+        "enseigne": "Castorama",
+        "pu": 13.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/gaine-electrique-icta-diall-16-25-m/3454978114295_CAFR.prd"
+      }
+    ],
+    "gaine-thermo": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 8.29,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3663602794691/lot-de-15-gaines-thermo-retractables-noires"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 8.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/15-gaines-thermoretractable-noires-8-6-4-3-2-mm/3663602794691_CAFR.prd"
+      }
+    ],
+    "gaine-tpc-40": [
+      {
+        "enseigne": "Castorama",
+        "pu": 24.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/gaine-pour-reseaux-enterres-rouge-40-mm-x-25-m-fitt/3396049012546_CAFR.prd"
+      }
+    ],
+    "gaine-tpc-63": [
+      {
+        "enseigne": "Castorama",
+        "pu": 45.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/gaine-pour-reseaux-enterres-rouge-63-mm-x-25-m-fitt/3396049012560_CAFR.prd"
+      }
+    ],
+    "gaine-vmc-125": [
+      {
+        "enseigne": "Castorama",
+        "pu": 14.95,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/gaine-flexible-isolee-pour-reseau-vmc-en-habitat-pavillonnaire-s1p-ecosoft-125-mm/3411458139223_CAFR.prd"
+      }
+    ],
+    "goulotte-40": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 15.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414970337528/conduit-de-distribution-de-section-40x25mm"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 16.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/conduit-de-distribution-40x25-mm-legrand/3414970337528_CAFR.prd"
+      }
+    ],
+    "gtl": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 125,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414970540584/gtl-compacte"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 139,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/gaine-technique-de-logement-250-x-65-mm-legrand/3414970540584_CAFR.prd"
+      }
+    ],
+    "horloge-modulaire": [
+      {
+        "enseigne": "Castorama",
+        "pu": 229.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-horaire-jour-hebdo-1-voie-numerique-legrand/3245064126311_CAFR.prd"
+      }
+    ],
+    "icta-16": [
+      {
+        "enseigne": "Castorama",
+        "pu": 26.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/gaine-electrique-icta-diall-16-100-m/3454978152402_CAFR.prd"
+      }
+    ],
+    "icta-20": [
+      {
+        "enseigne": "Castorama",
+        "pu": 30.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/gaine-electrique-icta-diall-20-100-m/3454978152419_CAFR.prd"
+      }
+    ],
+    "icta-25": [
+      {
+        "enseigne": "Castorama",
+        "pu": 53.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/gaine-electrique-icta-diall-25-100-m/3454978114332_CAFR.prd"
+      }
+    ],
+    "icta-prefilee-3g1.5": [
+      {
+        "enseigne": "Castorama",
+        "pu": 95.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/gaine-prefilee-3g1-5-diall-16-100-m/3389978204113_CAFR.prd"
+      }
+    ],
+    "icta-prefilee-3g2.5": [
+      {
+        "enseigne": "Castorama",
+        "pu": 149.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/gaine-prefilee-3g2-5-diall-20-100-m/3389978204120_CAFR.prd"
+      }
+    ],
+    "inter-etanche": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 9.89,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971904521/interrupteur-va-et-vient-plexo-complet-saillie-gris-1"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 9.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-legrand-plexo-gris-en-saillie/3414971904521_CAFR.prd"
+      }
+    ],
+    "inter-volet": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 23.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971087095/interrupteur-volet-roulant-dooxie-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 25,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/commande-volet-roulant-legrand-dooxie-blanc/3414971087095_CAFR.prd"
+      }
+    ],
+    "meca-celiane-inter": [
+      {
+        "enseigne": "Castorama",
+        "pu": 11.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-va-et-vient-legrand-celiane-10a-blanc-sans-plaque/3414972441544_CAFR.prd"
+      }
+    ],
+    "meca-celiane-poussoir": [
+      {
+        "enseigne": "Castorama",
+        "pu": 20.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/mecanisme-de-poussoir-legrand-celiane-6a-blanc-sans-plaque/3414972442572_CAFR.prd"
+      }
+    ],
+    "meca-celiane-prise": [
+      {
+        "enseigne": "Castorama",
+        "pu": 10.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-de-courant-avec-terre-legrand-celiane-sans-plaque-blanc/3414972443180_CAFR.prd"
+      }
+    ],
+    "meca-celiane-prise20": [
+      {
+        "enseigne": "Castorama",
+        "pu": 10.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-de-courant-avec-terre-legrand-celiane-sans-plaque-blanc/3414972443180_CAFR.prd"
+      }
+    ],
+    "meca-celiane-prise32": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 6.79,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060901493/sortie-de-cable-20a-a-32a-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 8.25,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd"
+      }
+    ],
+    "meca-celiane-rj45": [
+      {
+        "enseigne": "Castorama",
+        "pu": 25.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-rj45-legrand-celiane-telephone-et-informatique-ftp-categorie-6-blanc/3414972443784_CAFR.prd"
+      }
+    ],
+    "meca-celiane-sortieCable": [
+      {
+        "enseigne": "Castorama",
+        "pu": 20.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/sortie-de-cable-legrand-celiane-blanc-avec-support-sans-plaque/3414972444460_CAFR.prd"
+      }
+    ],
+    "meca-celiane-thermostat": [
+      {
+        "enseigne": "Castorama",
+        "pu": 179.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/thermostat-d-ambiance-connecte-smarther-with-netatmo-legrand-blanc/3414971920057_CAFR.prd"
+      }
+    ],
+    "meca-celiane-tv": [
+      {
+        "enseigne": "Castorama",
+        "pu": 19.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-tv-simple-legrand-celiane-blanc-sans-plaque/3414972444248_CAFR.prd"
+      }
+    ],
+    "meca-celiane-va": [
+      {
+        "enseigne": "Castorama",
+        "pu": 11.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-va-et-vient-legrand-celiane-10a-blanc-sans-plaque/3414972441544_CAFR.prd"
+      }
+    ],
+    "meca-celiane-variateur": [
+      {
+        "enseigne": "Castorama",
+        "pu": 92.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/variateur-rotatif-avec-bague-legrand-celiane-200w/3414972646758_CAFR.prd"
+      }
+    ],
+    "meca-celiane-volet": [
+      {
+        "enseigne": "Castorama",
+        "pu": 52.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-volet-roulant-et-store-legrand-celiane-blanc/3414972441933_CAFR.prd"
+      }
+    ],
+    "meca-dooxie-inter": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 4.59,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971086746/va-et-vient-mecanisme-support-10a-dooxie-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 5.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-va-et-vient-legrand-dooxie-blanc-non-complet/3414971086746_CAFR.prd"
+      }
+    ],
+    "meca-dooxie-poussoir": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 8.99,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971086852/poussoir-6a-dooxie-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 9.69,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/poussoir-simple-legrand-dooxie-blanc/3414971086852_CAFR.prd"
+      }
+    ],
+    "meca-dooxie-prise": [
+      {
+        "enseigne": "Castorama",
+        "pu": 5.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-2-poles-terre-legrand-dooxie-blanc-carree-a-composer/3414971129191_CAFR.prd"
+      }
+    ],
+    "meca-dooxie-prise20": [
+      {
+        "enseigne": "Castorama",
+        "pu": 5.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-2-poles-terre-legrand-dooxie-blanc-carree-a-composer/3414971129191_CAFR.prd"
+      }
+    ],
+    "meca-dooxie-prise32": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 6.79,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060901493/sortie-de-cable-20a-a-32a-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 8.25,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd"
+      }
+    ],
+    "meca-dooxie-rj45": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 15.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971087408/prise-ethernet-rj45-categorie-6-dooxie-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 19.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-rj45-legrand-dooxie-blanc-carree/3414971087408_CAFR.prd"
+      }
+    ],
+    "meca-dooxie-sortieCable": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 5.99,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971087286/sortie-de-cable-associable-dooxie-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 7.09,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-sortie-de-cable-legrand-dooxie-blanc-carree/3414971087286_CAFR.prd"
+      }
+    ],
+    "meca-dooxie-thermostat": [
+      {
+        "enseigne": "Castorama",
+        "pu": 179.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/thermostat-d-ambiance-connecte-smarther-with-netatmo-legrand-blanc/3414971920057_CAFR.prd"
+      }
+    ],
+    "meca-dooxie-tv": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 9.99,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971087316/prise-tv-male-etoile-blindee-dooxie-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 12.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-tv-legrand-dooxie-blanc-carree/3414971087316_CAFR.prd"
+      }
+    ],
+    "meca-dooxie-va": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 4.59,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971086746/va-et-vient-mecanisme-support-10a-dooxie-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 5.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-va-et-vient-legrand-dooxie-blanc-non-complet/3414971086746_CAFR.prd"
+      }
+    ],
+    "meca-dooxie-variateur": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 71.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971087033/ecovariateur-toutes-charges-2-fils-dooxie-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 74.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/variateur-legrand-dooxie-blanc-l-80-mm/3414971087033_CAFR.prd"
+      }
+    ],
+    "meca-dooxie-volet": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 23.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971087095/interrupteur-volet-roulant-dooxie-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 25,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/commande-volet-roulant-legrand-dooxie-blanc/3414971087095_CAFR.prd"
+      }
+    ],
+    "meca-mosaic-inter": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 7.49,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971679726/interrupteur-va-et-vient-composable-mosaic-easy-led-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 9.25,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/mecanisme-interrupteur-va-et-vient-legrand-mosaic-blanc/3414971679726_CAFR.prd"
+      }
+    ],
+    "meca-mosaic-poussoir": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 12.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971679955/poussoir-mecanisme-2-modules-mosaic"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 13.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/mecanisme-poussoir-legrand-mosaic-blanc-2-modules/3414971679955_CAFR.prd"
+      }
+    ],
+    "meca-mosaic-prise": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 5.79,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060996246/prise-avec-terre-affleurante-2-modules-mosaic"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 7.59,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/mecanisme-prise-2poles-terre-affleurante-2-modules-legrand-mosaic/3245060996246_CAFR.prd"
+      }
+    ],
+    "meca-mosaic-prise20": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 5.79,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060996246/prise-avec-terre-affleurante-2-modules-mosaic"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 7.59,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/mecanisme-prise-2poles-terre-affleurante-2-modules-legrand-mosaic/3245060996246_CAFR.prd"
+      }
+    ],
+    "meca-mosaic-prise32": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 6.79,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060901493/sortie-de-cable-20a-a-32a-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 8.25,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd"
+      }
+    ],
+    "meca-mosaic-rj45": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 16.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060996468/prise-ethernet-rj45-2-modules-categorie-6-mosaic"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 19.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/mecanisme-prise-rj45-cat6-2-modules-legrand-mosaic/3245060996468_CAFR.prd"
+      }
+    ],
+    "meca-mosaic-sortieCable": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 9.99,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060996444/sortie-de-cable-2-modules-mosaic"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 11.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/sortie-de-cable-2-modules-legrand-mosaic/3245060996444_CAFR.prd"
+      }
+    ],
+    "meca-mosaic-thermostat": [
+      {
+        "enseigne": "Castorama",
+        "pu": 179.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/thermostat-d-ambiance-connecte-smarther-with-netatmo-legrand-blanc/3414971920057_CAFR.prd"
+      }
+    ],
+    "meca-mosaic-tv": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 11.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060996475/prise-tv-male-2-modules-mosaic"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 13.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/mecanisme-prise-tv-male-9-5-mm-2-modules-legrand-mosaic/3245060996475_CAFR.prd"
+      }
+    ],
+    "meca-mosaic-va": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 7.49,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971679726/interrupteur-va-et-vient-composable-mosaic-easy-led-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 9.25,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/mecanisme-interrupteur-va-et-vient-legrand-mosaic-blanc/3414971679726_CAFR.prd"
+      }
+    ],
+    "meca-mosaic-variateur": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 109,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971679634/variateur-toutes-charges-mosaic-2-fils-blanc-complet-avec-plaque"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 119.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/mecanisme-ecovariateur-a-griffes-legrand-mosaic-blanc/3414971679634_CAFR.prd"
+      }
+    ],
+    "meca-mosaic-volet": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 36.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060996567/interrupteur-volet-roulant-2-modules-mosaic"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 41.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/mecanisme-commande-de-volets-roulants-2-modules-legrand-mosaic/3245060996567_CAFR.prd"
+      }
+    ],
+    "meca-odace-inter": [
+      {
+        "enseigne": "Castorama",
+        "pu": 5.49,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/va-et-vient-ou-poussoir-10ax-blanc-craie-odace/3606487212270_CAFR.prd"
+      }
+    ],
+    "meca-odace-poussoir": [
+      {
+        "enseigne": "Castorama",
+        "pu": 5.49,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/va-et-vient-ou-poussoir-10ax-blanc-craie-odace/3606487212270_CAFR.prd"
+      }
+    ],
+    "meca-odace-prise": [
+      {
+        "enseigne": "Castorama",
+        "pu": 5.19,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-2p-t-affleurante-bornes-automatiques-blanc-craie-odace/3606487212737_CAFR.prd"
+      }
+    ],
+    "meca-odace-prise20": [
+      {
+        "enseigne": "Castorama",
+        "pu": 5.19,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-2p-t-affleurante-bornes-automatiques-blanc-craie-odace/3606487212737_CAFR.prd"
+      }
+    ],
+    "meca-odace-prise32": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 6.79,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060901493/sortie-de-cable-20a-a-32a-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 8.25,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd"
+      }
+    ],
+    "meca-odace-rj45": [
+      {
+        "enseigne": "Castorama",
+        "pu": 18.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-rj45-cat6-stp-grade-2tv-min-a-grade-3tv-blanc-craie-odace/3606487213192_CAFR.prd"
+      }
+    ],
+    "meca-odace-sortieCable": [
+      {
+        "enseigne": "Castorama",
+        "pu": 5.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/sortie-de-cable-serre-cable-6-a-12-mm-blanc-craie-odace/3606487213512_CAFR.prd"
+      }
+    ],
+    "meca-odace-thermostat": [
+      {
+        "enseigne": "Castorama",
+        "pu": 79.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/thermostat-d-ambiance-connecte-blanc-schneider-electric-wiser/3606489710194_CAFR.prd"
+      }
+    ],
+    "meca-odace-tv": [
+      {
+        "enseigne": "Castorama",
+        "pu": 11.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-tv-simple-male-sortie-coaxiale-blanc-craie-odace/3606487213062_CAFR.prd"
+      }
+    ],
+    "meca-odace-va": [
+      {
+        "enseigne": "Castorama",
+        "pu": 5.49,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/va-et-vient-ou-poussoir-10ax-blanc-craie-odace/3606487212270_CAFR.prd"
+      }
+    ],
+    "meca-odace-variateur": [
+      {
+        "enseigne": "Castorama",
+        "pu": 54.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/variateur-de-lumiere-universel-2-ou-3-fils-rotatif-blanc-craie-odace/3606487342281_CAFR.prd"
+      }
+    ],
+    "meca-odace-volet": [
+      {
+        "enseigne": "Castorama",
+        "pu": 22.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/inter-ou-poussoir-volet-roulant-3-positions-a-levier-blanc-craie-odace/3606487212690_CAFR.prd"
+      }
+    ],
+    "meca-ovalis-inter": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 3.29,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606482213395/interrupteur-va-et-vient-ovalis-blanc-bornes-automatiques-10-a"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 4.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-va-et-vient-schneider-electric-ovalis-blanc/3606482213395_CAFR.prd"
+      }
+    ],
+    "meca-ovalis-poussoir": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 6.99,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606482213418/poussoir-a-fermeture-ovalis-blanc-bornes-automatiques-10-a"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 8.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-poussoir-10a-schneider-electric-ovalis-blanc/3606482213418_CAFR.prd"
+      }
+    ],
+    "meca-ovalis-prise": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 4.09,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606482213531/prise-a-puits-avec-terre-ovalis-blanc-bornes-automatiques-16-a"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 5.45,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-avec-terre-schneider-electric-ovalis-blanc/3606482213531_CAFR.prd"
+      }
+    ],
+    "meca-ovalis-prise20": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 4.09,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606482213531/prise-a-puits-avec-terre-ovalis-blanc-bornes-automatiques-16-a"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 5.45,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-avec-terre-schneider-electric-ovalis-blanc/3606482213531_CAFR.prd"
+      }
+    ],
+    "meca-ovalis-prise32": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 6.79,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060901493/sortie-de-cable-20a-a-32a-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 8.25,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd"
+      }
+    ],
+    "meca-ovalis-rj45": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 13.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606482213579/prise-ethernet-rj45-ovalis-blanc-grade-3-cat-6-stp-reseaux-vdi"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 17.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-rj45-grade-3-cat-6-stp-reseaux-vdi-schneider-electric-ovalis-blanc/3606482213579_CAFR.prd"
+      }
+    ],
+    "meca-ovalis-sortieCable": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 4.99,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606482213593/sortie-de-cable-ovalis-blanc-diametre-6-12mm-16-a"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 6.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/sortie-de-cable-schneider-electric-ovalis-16a-blanc/3606482213593_CAFR.prd"
+      }
+    ],
+    "meca-ovalis-thermostat": [
+      {
+        "enseigne": "Castorama",
+        "pu": 79.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/thermostat-d-ambiance-connecte-blanc-schneider-electric-wiser/3606489710194_CAFR.prd"
+      }
+    ],
+    "meca-ovalis-tv": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 9.99,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606482213616/prise-tv-simple-ovalis-blanc-connecteur-tv-male-cei-9-52-mm"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 10.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-tv-simple-schneider-electric-ovalis-blanc/3606482213616_CAFR.prd"
+      }
+    ],
+    "meca-ovalis-va": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 3.29,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606482213395/interrupteur-va-et-vient-ovalis-blanc-bornes-automatiques-10-a"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 4.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-va-et-vient-schneider-electric-ovalis-blanc/3606482213395_CAFR.prd"
+      }
+    ],
+    "meca-ovalis-variateur": [
+      {
+        "enseigne": "Castorama",
+        "pu": 59.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/variateur-de-lumiere-universel-en-2-ou-3-fils-complet-schneider-electric-ovalis-blanc/3606482163317_CAFR.prd"
+      },
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 60.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606482163317/variateur-de-lumiere-universel-ovalis-blanc-raccordement-2-fils"
+      }
+    ],
+    "meca-ovalis-volet": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 21.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606482213692/commande-volet-roulant-2-boutons-ovalis-blanc-bornes-automatiques-6-a"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 24.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/interrupteur-commande-volet-roulant-2-boutons-schneider-electric-ovalis-blanc/3606482213692_CAFR.prd"
+      }
+    ],
+    "mousse-pu": [
+      {
+        "enseigne": "Castorama",
+        "pu": 9.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/mousse-expansive-universelle-volden-500ml/5059340044415_CAFR.prd"
+      }
+    ],
+    "multimetre": [
+      {
+        "enseigne": "Castorama",
+        "pu": 24.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/multimetre-affichage-lcd-retroeclaire-diall/5059340161938_CAFR.prd"
+      }
+    ],
+    "niveau-40": [
+      {
+        "enseigne": "Castorama",
+        "pu": 14.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/niveau-a-bulle-stanley-2-fioles-40-cm/3253561428029_CAFR.prd"
+      }
+    ],
+    "obturateur": [
+      {
+        "enseigne": "Castorama",
+        "pu": 6.09,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/obturateur-legrand-dooxie-blanc-carree/3414971089112_CAFR.prd"
+      }
+    ],
+    "parafoudre": [
+      {
+        "enseigne": "Castorama",
+        "pu": 264.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/parafoudre-de-secteur-legrand-1000a-230-v/3245060927660_CAFR.prd"
+      },
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 272,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060927660/parafoudre-modulaire-avec-un-cablage-simplifie-1"
+      }
+    ],
+    "peigne": [
+      {
+        "enseigne": "Castorama",
+        "pu": 5.19,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/peigne-horizontal-13-modules-reversibles-ph-n-legrand/3245060927936_CAFR.prd"
+      },
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 5.49,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060927936/barre-d-alimentation-reversible-horizontale"
+      }
+    ],
+    "peigne-vertical": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 18.35,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245064050005/peigne-vertical-pour-coffret-2-rangees"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 25.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/peigne-d-alimentation-verticale-2-rangees-legrand/3245064050005_CAFR.prd"
+      }
+    ],
+    "pince-coupante": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 9.99,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3663602816775/pince-coupante-diagonale-laterale-isolee-160-mm"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 12.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/pince-coupante-diagonale-laterale-isolee-magnusson-160mm/3663602816775_CAFR.prd"
+      }
+    ],
+    "plafond-camera": [
+      {
+        "enseigne": "Castorama",
+        "pu": 49.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/camera-de-surveillance-exterieure-connectee-ezviz-h8c-2mp/6941545613284_CAFR.prd"
+      }
+    ],
+    "plafond-daaf": [
+      {
+        "enseigne": "Castorama",
+        "pu": 21.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/detecteur-de-fumee-anti-vandalisme-kidde-10y29/0047871097531_CAFR.prd"
+      }
+    ],
+    "plafond-detecteur": [
+      {
+        "enseigne": "Castorama",
+        "pu": 22.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/detecteur-a-infrarouge-360-tibelec-a-encastrer/3233550579413_CAFR.prd"
+      }
+    ],
+    "plafond-vmc": [
+      {
+        "enseigne": "Castorama",
+        "pu": 8.55,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/bouche-d-extraction-aldes-125mm-blanche/3542280352235_CAFR.prd"
+      }
+    ],
+    "plaque-celiane-1": [
+      {
+        "enseigne": "Castorama",
+        "pu": 2.29,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-1-poste-legrand-celiane-cp0021-coloris-blanc-emaille-l-90-x-p-9-x-h-82-mm/3414972417211_CAFR.prd"
+      }
+    ],
+    "plaque-celiane-2": [
+      {
+        "enseigne": "Castorama",
+        "pu": 4.59,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-2-postes-legrand-celiane-cp0022-coloris-blanc-emaille-l-161-x-p-9-x-h-82-mm/3414972417952_CAFR.prd"
+      }
+    ],
+    "plaque-celiane-3": [
+      {
+        "enseigne": "Castorama",
+        "pu": 6.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-3-postes-legrand-celiane-cp0023-coloris-blanc-emaille-l-232-x-p-9-x-h-82-mm/3414972419048_CAFR.prd"
+      }
+    ],
+    "plaque-celiane-4": [
+      {
+        "enseigne": "Castorama",
+        "pu": 9.45,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-4-postes-legrand-celiane-cp0024-coloris-blanc-emaille-l-303-x-p-9-x-h-82-mm/3414972420112_CAFR.prd"
+      }
+    ],
+    "plaque-dooxie-1": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 1.69,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971090040/plaque-1-poste-carree-dooxie-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 1.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-1-poste-legrand-dooxie-6-009-01-coloris-blanc-l-87-x-p-10-x-h-87-mm/3414971090040_CAFR.prd"
+      }
+    ],
+    "plaque-dooxie-2": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 3.19,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971090071/plaque-2-postes-carree-dooxie-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 3.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-2-postes-legrand-dooxie-6-009-02-coloris-blanc-l-158-x-p-10-x-h-87-mm/3414971090071_CAFR.prd"
+      }
+    ],
+    "plaque-dooxie-3": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 4.99,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971090101/plaque-3-postes-carree-dooxie-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 6.09,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-3-postes-legrand-dooxie-6-009-03-coloris-blanc-l-229-x-p-10-x-h-87-mm/3414971090101_CAFR.prd"
+      }
+    ],
+    "plaque-dooxie-4": [
+      {
+        "enseigne": "Castorama",
+        "pu": 7.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-4-postes-legrand-dooxie-6-009-04-coloris-blanc-l-300-x-p-10-x-h-87-mm/3414971090132_CAFR.prd"
+      }
+    ],
+    "plaque-mosaic-1": [
+      {
+        "enseigne": "Castorama",
+        "pu": 4.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-2-modules-legrand-mosaic-0-994-72-coloris-blanc-l-82-x-p-9-x-h-82-mm/3414971680357_CAFR.prd"
+      }
+    ],
+    "plaque-mosaic-2": [
+      {
+        "enseigne": "Castorama",
+        "pu": 12.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-2x2-modules-legrand-mosaic-0-994-73-coloris-blanc-l-153-x-p-9-x-h-82-mm/3414971680371_CAFR.prd"
+      }
+    ],
+    "plaque-mosaic-3": [
+      {
+        "enseigne": "Castorama",
+        "pu": 22.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-3x2-modules-legrand-mosaic-0-994-75-coloris-blanc-l-224-x-p-9-x-h-82-mm/3414971680418_CAFR.prd"
+      }
+    ],
+    "plaque-odace-1": [
+      {
+        "enseigne": "Castorama",
+        "pu": 1.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-1-poste-blanc-craie-odace/3606487342335_CAFR.prd"
+      }
+    ],
+    "plaque-odace-2": [
+      {
+        "enseigne": "Castorama",
+        "pu": 3.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-2-postes-blanc-craie-odace/3606487342434_CAFR.prd"
+      }
+    ],
+    "plaque-odace-3": [
+      {
+        "enseigne": "Castorama",
+        "pu": 5.69,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-3-postes-blanc-craie-odace/3606487342526_CAFR.prd"
+      }
+    ],
+    "plaque-odace-4": [
+      {
+        "enseigne": "Castorama",
+        "pu": 8,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-4-postes-blanc-craie-odace/3606487342618_CAFR.prd"
+      }
+    ],
+    "plaque-ovalis-1": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 1.19,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606482163119/plaque-de-finition-simple-ovalis-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 2.15,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-1-poste-schneider-electric-ovalis-s320702-coloris-blanc-l-87-x-p-10-x-h-87-mm/3606482163119_CAFR.prd"
+      }
+    ],
+    "plaque-ovalis-2": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 3.49,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606482163164/plaque-de-finition-double-ovalis-blanc-installation-horizontale"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 4.29,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-2-postes-schneider-electric-ovalis-s320704-coloris-blanc-l-158-x-p-10-x-h-87-mm/3606482163164_CAFR.prd"
+      }
+    ],
+    "plaque-ovalis-3": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 5.59,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3606482163195/plaque-de-finition-triple-ovalis-blanc-installation-horizontale"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 6.49,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-3-postes-schneider-electric-ovalis-s320706-coloris-blanc-l-229-x-p-10-x-h-87-mm/3606482163195_CAFR.prd"
+      }
+    ],
+    "plaque-ovalis-4": [
+      {
+        "enseigne": "Castorama",
+        "pu": 6.49,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plaque-de-finition-4-postes-schneider-electric-ovalis-s320708-coloris-blanc-l-300-x-p-10-x-h-87-mm/3606482163232_CAFR.prd"
+      }
+    ],
+    "platre-scellement": [
+      {
+        "enseigne": "Castorama",
+        "pu": 12.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/platre-multi-usage-joker-25kg-pour-reboucher-et-sceller/3496252008739_CAFR.prd"
+      },
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 12.5,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3496252008739/platre-multi-usages-25-kg-1"
+      }
+    ],
+    "plinthe-passe-cable": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 31,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414970008312/plinthe-blanche-80x20-mm-dim-80-x-20-mm-long-2-m"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 33.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/plinthe-avec-cloison-80x20-mm-legrand-2-compartiments/3414970008312_CAFR.prd"
+      }
+    ],
+    "prise-etanche": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 9.49,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3414971904613/prise-de-courant-avec-volet-plexo-complet-saillie-gris"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 10.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/prise-legrand-plexo-gris-en-saillie-220v/3414971904613_CAFR.prd"
+      }
+    ],
+    "repartiteur-tv": [
+      {
+        "enseigne": "Castorama",
+        "pu": 9.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/repartiteur-interieur-tv-4-directions-erard/3700101254049_CAFR.prd"
+      }
+    ],
+    "rj45-keystone": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 18.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060996451/prise-rj45-categorie-6-mosaic"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 19.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/mecanisme-prise-rj45-cat6-1-module-legrand-mosaic/3245060996451_CAFR.prd"
+      }
+    ],
+    "ruban-isolant": [
+      {
+        "enseigne": "Castorama",
+        "pu": 4.07,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/ruban-d-isolation-couleur-melangee-19-mm-x-10-m-vendu-par-5-pieces/3663602931966_CAFR.prd"
+      }
+    ],
+    "ruban-led": [
+      {
+        "enseigne": "Castorama",
+        "pu": 52.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/kit-strips-ip65-2100lm-20w-230-24v-blanc-chaud-paulmann-5m/4000870789063_CAFR.prd"
+      }
+    ],
+    "scie-cloche-67": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 24.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3663602810186/scies-trepans-o-68-mm"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 25.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/trepan-avec-foret-pilote-erbauer-pour-multi-materiaux-68-mm/3663602810186_CAFR.prd"
+      }
+    ],
+    "silicone": [
+      {
+        "enseigne": "Castorama",
+        "pu": 3.79,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/mastic-silicone-interieur-transparent-300ml/5059340043692_CAFR.prd"
+      }
+    ],
+    "sortie-cable-32": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 6.79,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060901493/sortie-de-cable-20a-a-32a-blanc"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 8.25,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd"
+      }
+    ],
+    "telerupteur": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 29.9,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3245060927004/telerupteur-unipolaire-230v-16a-1-module"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 39.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/telerupteur-unipolaire-modulaire-legrand/3245060927004_CAFR.prd"
+      }
+    ],
+    "tire-fil": [
+      {
+        "enseigne": "Castorama",
+        "pu": 16.5,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/tire-fil-nylon-25-m-pour-gaines-icta-et-prefilees/3296840000257_CAFR.prd"
+      }
+    ],
+    "tournevis-testeur": [
+      {
+        "enseigne": "Castorama",
+        "pu": 3.25,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/tournevis-testeur-de-tension-vde-lame-acier-sl-plat-3-mm-outilfrance/3223430141953_CAFR.prd"
+      }
+    ],
+    "transfo-led": [
+      {
+        "enseigne": "Castorama",
+        "pu": 51.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/alimentation-maxled-paulmann-ip20-60w-blanc-p-18-4-cm-x-h-3-2-cm/4000870798300_CAFR.prd"
+      }
+    ],
+    "vis-beton": [
+      {
+        "enseigne": "Castorama",
+        "pu": 43.9,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/boulon-beton-6-x-60-mm-scell-it-10-pieces/3553975777592_CAFR.prd"
+      }
+    ],
+    "vis-placo": [
+      {
+        "enseigne": "Castorama",
+        "pu": 4.99,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/vis-pour-plaque-de-platre-universelle-noir-mat-3-5x25-mm-200-pieces/3663602758075_CAFR.prd"
+      }
+    ],
+    "wago-2": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 18.71,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3663602793489/lot-de-85-bornes-de-connexion-panachees"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 19.41,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/85-bornes-automatiques-diall-serie-273-wago-1-2-5-mm-/3663602793489_CAFR.prd"
+      }
+    ],
+    "wago-3": [
+      {
+        "enseigne": "Brico Dépôt",
+        "pu": 32.45,
+        "jour": "2026-10-10",
+        "url": "https://www.bricodepot.fr/p/3662366024136/sachet-de-10-bornes-3-entrees"
+      },
+      {
+        "enseigne": "Castorama",
+        "pu": 42.95,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/10-mini-bornes-a-cliquet-3-entrees-wago-serie-221-0-14-4-mm-/3662366024136_CAFR.prd"
+      }
+    ],
+    "wago-5": [
+      {
+        "enseigne": "Castorama",
+        "pu": 19.45,
+        "jour": "2026-10-10",
+        "url": "https://www.castorama.fr/50-mini-bornes-a-cliquet-5-entrees-wago-serie-221-0-14-4-mm-/3662366024150_CAFR.prd"
+      }
+    ]
+  },
+  "ean": {
+    "agrafe-icta": "3663602793069",
+    "barrette-equipotentielle": "3545411230211",
+    "boite-dcl": "3233550418439",
+    "boite-derivation": "5063022098375",
+    "boite-derivation-etanche": "3245060945145",
+    "boite-encastrement": "3414972954365",
+    "boite-encastrement-2": "3245060905422",
+    "boite-encastrement-3": "3245060905439",
+    "boite-etanche": "3606489505752",
+    "boite-maconnerie": "3245060905118",
+    "boite-maconnerie-2": "3245060905323",
+    "boite-sol": "3606489818906",
+    "bornier-terre": "3245060927813",
+    "bouche-vmc": "3542280352709",
+    "brassage": "3700101223670",
+    "cable-3g1.5": "3427500883839",
+    "cable-3g2.5": "3427500884041",
+    "cable-3g6": "3170230008217",
+    "cable-5g2.5": "3170230957317",
+    "carillon": "3663602631828",
+    "cavalier-16": "3663602793069",
+    "cheville-nylon": "3663602926207",
+    "cheville-placo": "3663602925569",
+    "coax": "3170230959656",
+    "coffret-1": "3245060930202",
+    "coffret-2": "3245060930219",
+    "coffret-3": "3245060930226",
+    "coffret-4": "3245060930233",
+    "coffret-com": "3606486419342",
+    "coffret-etanche": "5063022755254",
+    "collier-colson": "3663602792376",
+    "collier-equipotentiel": "3545411230235",
+    "collier-gaine-20": "3663602793069",
+    "contacteur-jn": "3606481323996",
+    "couvercle-derivation": "3663602794509",
+    "diff-A": "3245060928360",
+    "diff-A-63": "3245060928377",
+    "diff-AC": "3245060928407",
+    "diff-AC-63": "3245060928414",
+    "diff-HPI": "3245064116237",
+    "disj-10": "3245060928223",
+    "disj-16": "3245060928230",
+    "disj-2": "3245060928209",
+    "disj-20": "3245060928247",
+    "disj-32": "3245060928254",
+    "disj-abonne": "3245060928704",
+    "disj-diff-16": "8012542162001",
+    "disj-diff-20": "8012542162100",
+    "domino": "3663602794738",
+    "dti": "3245060910662",
+    "fil-1.5": "3427500597262",
+    "fil-10": "3663602082088",
+    "fil-16": "3663602082897",
+    "fil-2.5": "3427500597828",
+    "fil-6": "3170231002078",
+    "foret-beton-6": "3165140027755",
+    "fraise-placo-67": "6949509240422",
+    "futp6": "3170230062608",
+    "gaine-annelee-16": "3454978114295",
+    "gaine-thermo": "3663602794691",
+    "gaine-tpc-40": "3396049012546",
+    "gaine-tpc-63": "3396049012560",
+    "gaine-vmc-125": "3411458139223",
+    "goulotte-40": "3414970337528",
+    "gtl": "3414970540584",
+    "horloge-modulaire": "3245064126311",
+    "icta-16": "3454978152402",
+    "icta-20": "3454978152419",
+    "icta-25": "3454978114332",
+    "icta-prefilee-3g1.5": "3389978204113",
+    "icta-prefilee-3g2.5": "3389978204120",
+    "inter-etanche": "3414971904521",
+    "inter-volet": "3414971087095",
+    "meca-celiane-inter": "3414972441544",
+    "meca-celiane-poussoir": "3414972442572",
+    "meca-celiane-prise": "3414972443180",
+    "meca-celiane-prise20": "3414972443180",
+    "meca-celiane-prise32": "3245060901493",
+    "meca-celiane-rj45": "3414972443784",
+    "meca-celiane-sortieCable": "3414972444460",
+    "meca-celiane-thermostat": "3414971920057",
+    "meca-celiane-tv": "3414972444248",
+    "meca-celiane-va": "3414972441544",
+    "meca-celiane-variateur": "3414972646758",
+    "meca-celiane-volet": "3414972441933",
+    "meca-dooxie-inter": "3414971086746",
+    "meca-dooxie-poussoir": "3414971086852",
+    "meca-dooxie-prise": "3414971129191",
+    "meca-dooxie-prise20": "3414971129191",
+    "meca-dooxie-prise32": "3245060901493",
+    "meca-dooxie-rj45": "3414971087408",
+    "meca-dooxie-sortieCable": "3414971087286",
+    "meca-dooxie-thermostat": "3414971920057",
+    "meca-dooxie-tv": "3414971087316",
+    "meca-dooxie-va": "3414971086746",
+    "meca-dooxie-variateur": "3414971087033",
+    "meca-dooxie-volet": "3414971087095",
+    "meca-mosaic-inter": "3414971679726",
+    "meca-mosaic-poussoir": "3414971679955",
+    "meca-mosaic-prise": "3245060996246",
+    "meca-mosaic-prise20": "3245060996246",
+    "meca-mosaic-prise32": "3245060901493",
+    "meca-mosaic-rj45": "3245060996468",
+    "meca-mosaic-sortieCable": "3245060996444",
+    "meca-mosaic-thermostat": "3414971920057",
+    "meca-mosaic-tv": "3245060996475",
+    "meca-mosaic-va": "3414971679726",
+    "meca-mosaic-variateur": "3414971679634",
+    "meca-mosaic-volet": "3245060996567",
+    "meca-odace-inter": "3606487212270",
+    "meca-odace-poussoir": "3606487212270",
+    "meca-odace-prise": "3606487212737",
+    "meca-odace-prise20": "3606487212737",
+    "meca-odace-prise32": "3245060901493",
+    "meca-odace-rj45": "3606487213192",
+    "meca-odace-sortieCable": "3606487213512",
+    "meca-odace-thermostat": "3606489710194",
+    "meca-odace-tv": "3606487213062",
+    "meca-odace-va": "3606487212270",
+    "meca-odace-variateur": "3606487342281",
+    "meca-odace-volet": "3606487212690",
+    "meca-ovalis-inter": "3606482213395",
+    "meca-ovalis-poussoir": "3606482213418",
+    "meca-ovalis-prise": "3606482213531",
+    "meca-ovalis-prise20": "3606482213531",
+    "meca-ovalis-prise32": "3245060901493",
+    "meca-ovalis-rj45": "3606482213579",
+    "meca-ovalis-sortieCable": "3606482213593",
+    "meca-ovalis-thermostat": "3606489710194",
+    "meca-ovalis-tv": "3606482213616",
+    "meca-ovalis-va": "3606482213395",
+    "meca-ovalis-variateur": "3606482163317",
+    "meca-ovalis-volet": "3606482213692",
+    "mousse-pu": "5059340044415",
+    "multimetre": "5059340161938",
+    "niveau-40": "3253561428029",
+    "obturateur": "3414971089112",
+    "parafoudre": "3245060927660",
+    "peigne": "3245060927936",
+    "peigne-vertical": "3245064050005",
+    "pince-coupante": "3663602816775",
+    "plafond-camera": "6941545613284",
+    "plafond-daaf": "0047871097531",
+    "plafond-detecteur": "3233550579413",
+    "plafond-vmc": "3542280352235",
+    "plaque-celiane-1": "3414972417211",
+    "plaque-celiane-2": "3414972417952",
+    "plaque-celiane-3": "3414972419048",
+    "plaque-celiane-4": "3414972420112",
+    "plaque-dooxie-1": "3414971090040",
+    "plaque-dooxie-2": "3414971090071",
+    "plaque-dooxie-3": "3414971090101",
+    "plaque-dooxie-4": "3414971090132",
+    "plaque-mosaic-1": "3414971680357",
+    "plaque-mosaic-2": "3414971680371",
+    "plaque-mosaic-3": "3414971680418",
+    "plaque-odace-1": "3606487342335",
+    "plaque-odace-2": "3606487342434",
+    "plaque-odace-3": "3606487342526",
+    "plaque-odace-4": "3606487342618",
+    "plaque-ovalis-1": "3606482163119",
+    "plaque-ovalis-2": "3606482163164",
+    "plaque-ovalis-3": "3606482163195",
+    "plaque-ovalis-4": "3606482163232",
+    "platre-scellement": "3496252008739",
+    "plinthe-passe-cable": "3414970008312",
+    "prise-etanche": "3414971904613",
+    "repartiteur-tv": "3700101254049",
+    "rj45-keystone": "3245060996451",
+    "ruban-isolant": "3663602931966",
+    "ruban-led": "4000870789063",
+    "scie-cloche-67": "3663602810186",
+    "silicone": "5059340043692",
+    "sortie-cable-32": "3245060901493",
+    "telerupteur": "3245060927004",
+    "tire-fil": "3296840000257",
+    "tournevis-testeur": "3223430141953",
+    "transfo-led": "4000870798300",
+    "vis-beton": "3553975777592",
+    "vis-placo": "3663602758075",
+    "wago-2": "3663602793489",
+    "wago-3": "3662366024136",
+    "wago-5": "3662366024150"
+  },
+  "liens": {
+    "agrafe-icta": "https://www.castorama.fr/50-cavaliers-ronds-en-nylon-diall-16-a-20-mm-gris/3663602793069_CAFR.prd",
+    "barrette-equipotentielle": "https://www.castorama.fr/barrette-de-terre-basse-zenitech-cables-10-a-35-mm-/3545411230211_CAFR.prd",
+    "boite-dcl": "https://www.castorama.fr/boitier-dcl-piton-et-fiche-2-poles-terre-tibelec-blanc/3233550418439_CAFR.prd",
+    "boite-derivation": "https://www.castorama.fr/boite-de-derivation-jacobsen-67-x-p-40-mm-pour-8-cables/5063022098375_CAFR.prd",
+    "boite-derivation-etanche": "https://www.castorama.fr/boite-de-derivation-etanche-legrand-70-mm-x-45-mm/3245060945145_CAFR.prd",
+    "boite-encastrement": "https://www.castorama.fr/boite-d-encastrement-monoposte-67-x-p-40-mm-legrand-eco-batibox/3414972954365_CAFR.prd",
+    "boite-encastrement-2": "https://www.castorama.fr/boite-d-encastrement-double-plaque-de-platre-legrand-p-40-mm/3245060905422_CAFR.prd",
+    "boite-encastrement-3": "https://www.castorama.fr/boite-d-encastrement-triple-plaque-de-platre-legrand-p-40-mm/3245060905439_CAFR.prd",
+    "boite-etanche": "https://www.castorama.fr/boite-de-derivation-carree-exterieure-avec-7-passe-cables-et-systeme-de-verrouillage-80-x-80-x-45-mm-schneider-electric-mureva-gris/3606489505752_CAFR.prd",
+    "boite-maconnerie": "https://www.castorama.fr/boite-d-encastrement-simple-ronde-maconnerie-legrand-p-40mm/3245060905118_CAFR.prd",
+    "boite-maconnerie-2": "https://www.castorama.fr/boite-d-encastrement-double-maconnerie-legrand-p-40-mm/3245060905323_CAFR.prd",
+    "boite-sol": "https://www.castorama.fr/prise-de-sol-2-poles-terre-carree-metal-unica-system-schneider-electric-gris/3606489818906_CAFR.prd",
+    "bornier-terre": "https://www.castorama.fr/bornier-de-terre-legrand-vert-et-gris/3245060927813_CAFR.prd",
+    "bouche-vmc": "https://www.castorama.fr/bouche-d-extraction-hygrostat-aldes-bahia-sdb-vmc-80-mm/3542280352709_CAFR.prd",
+    "brassage": "https://www.castorama.fr/cordon-rj45-informatique-cat6-erard-2-m/3700101223670_CAFR.prd",
+    "cable-3g1.5": "https://www.castorama.fr/cable-electrique-u1000r2v-3x1-5-mm-100-m/3427500883839_CAFR.prd",
+    "cable-3g2.5": "https://www.castorama.fr/cable-electrique-u1000r2v-3x2-5-mm-100-m/3427500884041_CAFR.prd",
+    "cable-3g6": "https://www.castorama.fr/cable-3x6-mm-u1000r2v-couronne-50m-nexans/3170230008217_CAFR.prd",
+    "cable-5g2.5": "https://www.castorama.fr/cable-u-1000-r2v-5g-2-5c-50-m-nexans/3170230957317_CAFR.prd",
+    "carillon": "https://www.castorama.fr/carillon-filaire-a-piles-embry-blanc/3663602631828_CAFR.prd",
+    "cavalier-16": "https://www.castorama.fr/50-cavaliers-ronds-en-nylon-diall-16-a-20-mm-gris/3663602793069_CAFR.prd",
+    "cheville-nylon": "https://www.castorama.fr/100-chevilles-diall-nylon-cl-6x30mm/3663602926207_CAFR.prd",
+    "cheville-placo": "https://www.castorama.fr/50-chevilles-diall-murs-creux-pz-m4x33mm/3663602925569_CAFR.prd",
+    "coax": "https://www.castorama.fr/cable-coaxial-17vatc-blanc-100-m-nexans/3170230959656_CAFR.prd",
+    "coffret-1": "https://www.castorama.fr/tableau-electrique-a-equiper-1-rangee-13-modules-legrand/3245060930202_CAFR.prd",
+    "coffret-2": "https://www.castorama.fr/tableau-electrique-a-equiper-2-rangees-26-modules-legrand/3245060930219_CAFR.prd",
+    "coffret-3": "https://www.castorama.fr/tableau-electrique-a-equiper-3-rangees-39-modules-legrand/3245060930226_CAFR.prd",
+    "coffret-4": "https://www.castorama.fr/tableau-electrique-a-equiper-4-rangees-52-modules-legrand/3245060930233_CAFR.prd",
+    "coffret-com": "https://www.castorama.fr/coffret-de-communication-1-rangee-13-modules-grade-2tv-4-x-rj45-cat6-schneider-electric-resi9-connect/3606486419342_CAFR.prd",
+    "coffret-etanche": "https://www.castorama.fr/tableau-electrique-12-modules-ip65-resistant-aux-intemperies-jacobsen/5063022755254_CAFR.prd",
+    "collier-colson": "https://www.castorama.fr/100-colliers-de-serrage-en-nylon-diall-4-8-x-250-mm-noir/3663602792376_CAFR.prd",
+    "collier-equipotentiel": "https://www.castorama.fr/colliers-de-mise-a-la-terre-zenitech/3545411230235_CAFR.prd",
+    "collier-gaine-20": "https://www.castorama.fr/50-cavaliers-ronds-en-nylon-diall-16-a-20-mm-gris/3663602793069_CAFR.prd",
+    "contacteur-jn": "https://www.castorama.fr/contacteur-20a-schneider-electric-resi9-xp/3606481323996_CAFR.prd",
+    "couvercle-derivation": "https://www.castorama.fr/couvercle-de-boite-de-derivation-diall-86-mm-fermeture-a-ressorts/3663602794509_CAFR.prd",
+    "diff-A": "https://www.castorama.fr/interrupteur-differentiel-40a-30ma-type-a-sortie-haut-legrand/3245060928360_CAFR.prd",
+    "diff-A-63": "https://www.castorama.fr/interrupteur-differentiel-30ma-63a-type-a-legrand/3245060928377_CAFR.prd",
+    "diff-AC": "https://www.castorama.fr/interrupteur-differentiel-40a-30ma-type-ac-sortie-haut-legrand/3245060928407_CAFR.prd",
+    "diff-AC-63": "https://www.castorama.fr/interrupteur-differentiel-30ma-63a-type-ac-legrand/3245060928414_CAFR.prd",
+    "diff-HPI": "https://www.castorama.fr/interrupteur-differentiel-30ma-40a-type-hpi-legrand/3245064116237_CAFR.prd",
+    "disj-10": "https://www.castorama.fr/disjoncteur-phase-neutre-10a-legrand/3245060928223_CAFR.prd",
+    "disj-16": "https://www.castorama.fr/disjoncteur-phase-neutre-16a-legrand/3245060928230_CAFR.prd",
+    "disj-2": "https://www.castorama.fr/disjoncteur-phase-neutre-2a-legrand/3245060928209_CAFR.prd",
+    "disj-20": "https://www.castorama.fr/disjoncteur-phase-neutre-20a-legrand/3245060928247_CAFR.prd",
+    "disj-32": "https://www.castorama.fr/disjoncteur-phase-neutre-32a-legrand/3245060928254_CAFR.prd",
+    "disj-abonne": "https://www.castorama.fr/disjoncteur-branchement-enedis-tarif-bleu-500ma-selectif-15-30-45a-legrand/3245060928704_CAFR.prd",
+    "disj-diff-16": "https://www.castorama.fr/disjoncteur-differentiel-30ma-16a-type-ac-abb/8012542162001_CAFR.prd",
+    "disj-diff-20": "https://www.castorama.fr/disjoncteur-differentiel-30ma-20a-type-ac-abb/8012542162100_CAFR.prd",
+    "domino": "https://www.castorama.fr/barrette-de-connexion-12-x-2-entrees-diall-6-mm-10-a/3663602794738_CAFR.prd",
+    "dti": "https://www.castorama.fr/dispositif-de-terminaison-interieur-dti-legrand/3245060910662_CAFR.prd",
+    "fil-1.5": "https://www.castorama.fr/fil-1-5mm-h07vu-noir-couronne-100m-nexans/3427500597262_CAFR.prd",
+    "fil-10": "https://www.castorama.fr/fil-electrique-h07vr-10-mm-nexans-rouge-vendu-au-metre-lineaire/3663602082088_CAFR.prd",
+    "fil-16": "https://www.castorama.fr/fil-electrique-h07vr-16-mm-nexans-rouge-vendu-au-metre-lineaire/3663602082897_CAFR.prd",
+    "fil-2.5": "https://www.castorama.fr/fil-electrique-h07vu-2-5mm-rouge-couronne-100-m/3427500597828_CAFR.prd",
+    "fil-6": "https://www.castorama.fr/fil-electrique-h07vr-6mm-nexans-rouge-10-m/3170231002078_CAFR.prd",
+    "foret-beton-6": "https://www.castorama.fr/foret-beton-x1-dimensions-6-x-l-100-165-mm-emmanchement-sds-plus-bosch/3165140027755_CAFR.prd",
+    "fraise-placo-67": "https://www.castorama.fr/trepan-bosch-pro-pour-multi-materiaux-68mm/6949509240422_CAFR.prd",
+    "futp6": "https://www.castorama.fr/cable-ethernet-lan-cat6-ftp-nexans-100-m/3170230062608_CAFR.prd",
+    "gaine-annelee-16": "https://www.castorama.fr/gaine-electrique-icta-diall-16-25-m/3454978114295_CAFR.prd",
+    "gaine-thermo": "https://www.castorama.fr/15-gaines-thermoretractable-noires-8-6-4-3-2-mm/3663602794691_CAFR.prd",
+    "gaine-tpc-40": "https://www.castorama.fr/gaine-pour-reseaux-enterres-rouge-40-mm-x-25-m-fitt/3396049012546_CAFR.prd",
+    "gaine-tpc-63": "https://www.castorama.fr/gaine-pour-reseaux-enterres-rouge-63-mm-x-25-m-fitt/3396049012560_CAFR.prd",
+    "gaine-vmc-125": "https://www.castorama.fr/gaine-flexible-isolee-pour-reseau-vmc-en-habitat-pavillonnaire-s1p-ecosoft-125-mm/3411458139223_CAFR.prd",
+    "goulotte-40": "https://www.castorama.fr/conduit-de-distribution-40x25-mm-legrand/3414970337528_CAFR.prd",
+    "gtl": "https://www.castorama.fr/gaine-technique-de-logement-250-x-65-mm-legrand/3414970540584_CAFR.prd",
+    "horloge-modulaire": "https://www.castorama.fr/interrupteur-horaire-jour-hebdo-1-voie-numerique-legrand/3245064126311_CAFR.prd",
+    "icta-16": "https://www.castorama.fr/gaine-electrique-icta-diall-16-100-m/3454978152402_CAFR.prd",
+    "icta-20": "https://www.castorama.fr/gaine-electrique-icta-diall-20-100-m/3454978152419_CAFR.prd",
+    "icta-25": "https://www.castorama.fr/gaine-electrique-icta-diall-25-100-m/3454978114332_CAFR.prd",
+    "icta-prefilee-3g1.5": "https://www.castorama.fr/gaine-prefilee-3g1-5-diall-16-100-m/3389978204113_CAFR.prd",
+    "icta-prefilee-3g2.5": "https://www.castorama.fr/gaine-prefilee-3g2-5-diall-20-100-m/3389978204120_CAFR.prd",
+    "inter-etanche": "https://www.castorama.fr/interrupteur-legrand-plexo-gris-en-saillie/3414971904521_CAFR.prd",
+    "inter-volet": "https://www.castorama.fr/commande-volet-roulant-legrand-dooxie-blanc/3414971087095_CAFR.prd",
+    "meca-celiane-inter": "https://www.castorama.fr/interrupteur-va-et-vient-legrand-celiane-10a-blanc-sans-plaque/3414972441544_CAFR.prd",
+    "meca-celiane-poussoir": "https://www.castorama.fr/mecanisme-de-poussoir-legrand-celiane-6a-blanc-sans-plaque/3414972442572_CAFR.prd",
+    "meca-celiane-prise": "https://www.castorama.fr/prise-de-courant-avec-terre-legrand-celiane-sans-plaque-blanc/3414972443180_CAFR.prd",
+    "meca-celiane-prise20": "https://www.castorama.fr/prise-de-courant-avec-terre-legrand-celiane-sans-plaque-blanc/3414972443180_CAFR.prd",
+    "meca-celiane-prise32": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd",
+    "meca-celiane-rj45": "https://www.castorama.fr/prise-rj45-legrand-celiane-telephone-et-informatique-ftp-categorie-6-blanc/3414972443784_CAFR.prd",
+    "meca-celiane-sortieCable": "https://www.castorama.fr/sortie-de-cable-legrand-celiane-blanc-avec-support-sans-plaque/3414972444460_CAFR.prd",
+    "meca-celiane-thermostat": "https://www.castorama.fr/thermostat-d-ambiance-connecte-smarther-with-netatmo-legrand-blanc/3414971920057_CAFR.prd",
+    "meca-celiane-tv": "https://www.castorama.fr/prise-tv-simple-legrand-celiane-blanc-sans-plaque/3414972444248_CAFR.prd",
+    "meca-celiane-va": "https://www.castorama.fr/interrupteur-va-et-vient-legrand-celiane-10a-blanc-sans-plaque/3414972441544_CAFR.prd",
+    "meca-celiane-variateur": "https://www.castorama.fr/variateur-rotatif-avec-bague-legrand-celiane-200w/3414972646758_CAFR.prd",
+    "meca-celiane-volet": "https://www.castorama.fr/interrupteur-volet-roulant-et-store-legrand-celiane-blanc/3414972441933_CAFR.prd",
+    "meca-dooxie-inter": "https://www.castorama.fr/interrupteur-va-et-vient-legrand-dooxie-blanc-non-complet/3414971086746_CAFR.prd",
+    "meca-dooxie-poussoir": "https://www.castorama.fr/poussoir-simple-legrand-dooxie-blanc/3414971086852_CAFR.prd",
+    "meca-dooxie-prise": "https://www.castorama.fr/prise-2-poles-terre-legrand-dooxie-blanc-carree-a-composer/3414971129191_CAFR.prd",
+    "meca-dooxie-prise20": "https://www.castorama.fr/prise-2-poles-terre-legrand-dooxie-blanc-carree-a-composer/3414971129191_CAFR.prd",
+    "meca-dooxie-prise32": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd",
+    "meca-dooxie-rj45": "https://www.castorama.fr/prise-rj45-legrand-dooxie-blanc-carree/3414971087408_CAFR.prd",
+    "meca-dooxie-sortieCable": "https://www.castorama.fr/prise-sortie-de-cable-legrand-dooxie-blanc-carree/3414971087286_CAFR.prd",
+    "meca-dooxie-thermostat": "https://www.castorama.fr/thermostat-d-ambiance-connecte-smarther-with-netatmo-legrand-blanc/3414971920057_CAFR.prd",
+    "meca-dooxie-tv": "https://www.castorama.fr/prise-tv-legrand-dooxie-blanc-carree/3414971087316_CAFR.prd",
+    "meca-dooxie-va": "https://www.castorama.fr/interrupteur-va-et-vient-legrand-dooxie-blanc-non-complet/3414971086746_CAFR.prd",
+    "meca-dooxie-variateur": "https://www.castorama.fr/variateur-legrand-dooxie-blanc-l-80-mm/3414971087033_CAFR.prd",
+    "meca-dooxie-volet": "https://www.castorama.fr/commande-volet-roulant-legrand-dooxie-blanc/3414971087095_CAFR.prd",
+    "meca-mosaic-inter": "https://www.castorama.fr/mecanisme-interrupteur-va-et-vient-legrand-mosaic-blanc/3414971679726_CAFR.prd",
+    "meca-mosaic-poussoir": "https://www.castorama.fr/mecanisme-poussoir-legrand-mosaic-blanc-2-modules/3414971679955_CAFR.prd",
+    "meca-mosaic-prise": "https://www.castorama.fr/mecanisme-prise-2poles-terre-affleurante-2-modules-legrand-mosaic/3245060996246_CAFR.prd",
+    "meca-mosaic-prise20": "https://www.castorama.fr/mecanisme-prise-2poles-terre-affleurante-2-modules-legrand-mosaic/3245060996246_CAFR.prd",
+    "meca-mosaic-prise32": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd",
+    "meca-mosaic-rj45": "https://www.castorama.fr/mecanisme-prise-rj45-cat6-2-modules-legrand-mosaic/3245060996468_CAFR.prd",
+    "meca-mosaic-sortieCable": "https://www.castorama.fr/sortie-de-cable-2-modules-legrand-mosaic/3245060996444_CAFR.prd",
+    "meca-mosaic-thermostat": "https://www.castorama.fr/thermostat-d-ambiance-connecte-smarther-with-netatmo-legrand-blanc/3414971920057_CAFR.prd",
+    "meca-mosaic-tv": "https://www.castorama.fr/mecanisme-prise-tv-male-9-5-mm-2-modules-legrand-mosaic/3245060996475_CAFR.prd",
+    "meca-mosaic-va": "https://www.castorama.fr/mecanisme-interrupteur-va-et-vient-legrand-mosaic-blanc/3414971679726_CAFR.prd",
+    "meca-mosaic-variateur": "https://www.castorama.fr/mecanisme-ecovariateur-a-griffes-legrand-mosaic-blanc/3414971679634_CAFR.prd",
+    "meca-mosaic-volet": "https://www.castorama.fr/mecanisme-commande-de-volets-roulants-2-modules-legrand-mosaic/3245060996567_CAFR.prd",
+    "meca-odace-inter": "https://www.castorama.fr/va-et-vient-ou-poussoir-10ax-blanc-craie-odace/3606487212270_CAFR.prd",
+    "meca-odace-poussoir": "https://www.castorama.fr/va-et-vient-ou-poussoir-10ax-blanc-craie-odace/3606487212270_CAFR.prd",
+    "meca-odace-prise": "https://www.castorama.fr/prise-2p-t-affleurante-bornes-automatiques-blanc-craie-odace/3606487212737_CAFR.prd",
+    "meca-odace-prise20": "https://www.castorama.fr/prise-2p-t-affleurante-bornes-automatiques-blanc-craie-odace/3606487212737_CAFR.prd",
+    "meca-odace-prise32": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd",
+    "meca-odace-rj45": "https://www.castorama.fr/prise-rj45-cat6-stp-grade-2tv-min-a-grade-3tv-blanc-craie-odace/3606487213192_CAFR.prd",
+    "meca-odace-sortieCable": "https://www.castorama.fr/sortie-de-cable-serre-cable-6-a-12-mm-blanc-craie-odace/3606487213512_CAFR.prd",
+    "meca-odace-thermostat": "https://www.castorama.fr/thermostat-d-ambiance-connecte-blanc-schneider-electric-wiser/3606489710194_CAFR.prd",
+    "meca-odace-tv": "https://www.castorama.fr/prise-tv-simple-male-sortie-coaxiale-blanc-craie-odace/3606487213062_CAFR.prd",
+    "meca-odace-va": "https://www.castorama.fr/va-et-vient-ou-poussoir-10ax-blanc-craie-odace/3606487212270_CAFR.prd",
+    "meca-odace-variateur": "https://www.castorama.fr/variateur-de-lumiere-universel-2-ou-3-fils-rotatif-blanc-craie-odace/3606487342281_CAFR.prd",
+    "meca-odace-volet": "https://www.castorama.fr/inter-ou-poussoir-volet-roulant-3-positions-a-levier-blanc-craie-odace/3606487212690_CAFR.prd",
+    "meca-ovalis-inter": "https://www.castorama.fr/interrupteur-va-et-vient-schneider-electric-ovalis-blanc/3606482213395_CAFR.prd",
+    "meca-ovalis-poussoir": "https://www.castorama.fr/interrupteur-poussoir-10a-schneider-electric-ovalis-blanc/3606482213418_CAFR.prd",
+    "meca-ovalis-prise": "https://www.castorama.fr/prise-avec-terre-schneider-electric-ovalis-blanc/3606482213531_CAFR.prd",
+    "meca-ovalis-prise20": "https://www.castorama.fr/prise-avec-terre-schneider-electric-ovalis-blanc/3606482213531_CAFR.prd",
+    "meca-ovalis-prise32": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd",
+    "meca-ovalis-rj45": "https://www.castorama.fr/prise-rj45-grade-3-cat-6-stp-reseaux-vdi-schneider-electric-ovalis-blanc/3606482213579_CAFR.prd",
+    "meca-ovalis-sortieCable": "https://www.castorama.fr/sortie-de-cable-schneider-electric-ovalis-16a-blanc/3606482213593_CAFR.prd",
+    "meca-ovalis-thermostat": "https://www.castorama.fr/thermostat-d-ambiance-connecte-blanc-schneider-electric-wiser/3606489710194_CAFR.prd",
+    "meca-ovalis-tv": "https://www.castorama.fr/prise-tv-simple-schneider-electric-ovalis-blanc/3606482213616_CAFR.prd",
+    "meca-ovalis-va": "https://www.castorama.fr/interrupteur-va-et-vient-schneider-electric-ovalis-blanc/3606482213395_CAFR.prd",
+    "meca-ovalis-variateur": "https://www.castorama.fr/variateur-de-lumiere-universel-en-2-ou-3-fils-complet-schneider-electric-ovalis-blanc/3606482163317_CAFR.prd",
+    "meca-ovalis-volet": "https://www.castorama.fr/interrupteur-commande-volet-roulant-2-boutons-schneider-electric-ovalis-blanc/3606482213692_CAFR.prd",
+    "mousse-pu": "https://www.castorama.fr/mousse-expansive-universelle-volden-500ml/5059340044415_CAFR.prd",
+    "multimetre": "https://www.castorama.fr/multimetre-affichage-lcd-retroeclaire-diall/5059340161938_CAFR.prd",
+    "niveau-40": "https://www.castorama.fr/niveau-a-bulle-stanley-2-fioles-40-cm/3253561428029_CAFR.prd",
+    "obturateur": "https://www.castorama.fr/obturateur-legrand-dooxie-blanc-carree/3414971089112_CAFR.prd",
+    "parafoudre": "https://www.castorama.fr/parafoudre-de-secteur-legrand-1000a-230-v/3245060927660_CAFR.prd",
+    "peigne": "https://www.castorama.fr/peigne-horizontal-13-modules-reversibles-ph-n-legrand/3245060927936_CAFR.prd",
+    "peigne-vertical": "https://www.castorama.fr/peigne-d-alimentation-verticale-2-rangees-legrand/3245064050005_CAFR.prd",
+    "pince-coupante": "https://www.castorama.fr/pince-coupante-diagonale-laterale-isolee-magnusson-160mm/3663602816775_CAFR.prd",
+    "plafond-camera": "https://www.castorama.fr/camera-de-surveillance-exterieure-connectee-ezviz-h8c-2mp/6941545613284_CAFR.prd",
+    "plafond-daaf": "https://www.castorama.fr/detecteur-de-fumee-anti-vandalisme-kidde-10y29/0047871097531_CAFR.prd",
+    "plafond-detecteur": "https://www.castorama.fr/detecteur-a-infrarouge-360-tibelec-a-encastrer/3233550579413_CAFR.prd",
+    "plafond-vmc": "https://www.castorama.fr/bouche-d-extraction-aldes-125mm-blanche/3542280352235_CAFR.prd",
+    "plaque-celiane-1": "https://www.castorama.fr/plaque-de-finition-1-poste-legrand-celiane-cp0021-coloris-blanc-emaille-l-90-x-p-9-x-h-82-mm/3414972417211_CAFR.prd",
+    "plaque-celiane-2": "https://www.castorama.fr/plaque-de-finition-2-postes-legrand-celiane-cp0022-coloris-blanc-emaille-l-161-x-p-9-x-h-82-mm/3414972417952_CAFR.prd",
+    "plaque-celiane-3": "https://www.castorama.fr/plaque-de-finition-3-postes-legrand-celiane-cp0023-coloris-blanc-emaille-l-232-x-p-9-x-h-82-mm/3414972419048_CAFR.prd",
+    "plaque-celiane-4": "https://www.castorama.fr/plaque-de-finition-4-postes-legrand-celiane-cp0024-coloris-blanc-emaille-l-303-x-p-9-x-h-82-mm/3414972420112_CAFR.prd",
+    "plaque-dooxie-1": "https://www.castorama.fr/plaque-de-finition-1-poste-legrand-dooxie-6-009-01-coloris-blanc-l-87-x-p-10-x-h-87-mm/3414971090040_CAFR.prd",
+    "plaque-dooxie-2": "https://www.castorama.fr/plaque-de-finition-2-postes-legrand-dooxie-6-009-02-coloris-blanc-l-158-x-p-10-x-h-87-mm/3414971090071_CAFR.prd",
+    "plaque-dooxie-3": "https://www.castorama.fr/plaque-de-finition-3-postes-legrand-dooxie-6-009-03-coloris-blanc-l-229-x-p-10-x-h-87-mm/3414971090101_CAFR.prd",
+    "plaque-dooxie-4": "https://www.castorama.fr/plaque-de-finition-4-postes-legrand-dooxie-6-009-04-coloris-blanc-l-300-x-p-10-x-h-87-mm/3414971090132_CAFR.prd",
+    "plaque-mosaic-1": "https://www.castorama.fr/plaque-de-finition-2-modules-legrand-mosaic-0-994-72-coloris-blanc-l-82-x-p-9-x-h-82-mm/3414971680357_CAFR.prd",
+    "plaque-mosaic-2": "https://www.castorama.fr/plaque-de-finition-2x2-modules-legrand-mosaic-0-994-73-coloris-blanc-l-153-x-p-9-x-h-82-mm/3414971680371_CAFR.prd",
+    "plaque-mosaic-3": "https://www.castorama.fr/plaque-de-finition-3x2-modules-legrand-mosaic-0-994-75-coloris-blanc-l-224-x-p-9-x-h-82-mm/3414971680418_CAFR.prd",
+    "plaque-odace-1": "https://www.castorama.fr/plaque-de-finition-1-poste-blanc-craie-odace/3606487342335_CAFR.prd",
+    "plaque-odace-2": "https://www.castorama.fr/plaque-de-finition-2-postes-blanc-craie-odace/3606487342434_CAFR.prd",
+    "plaque-odace-3": "https://www.castorama.fr/plaque-de-finition-3-postes-blanc-craie-odace/3606487342526_CAFR.prd",
+    "plaque-odace-4": "https://www.castorama.fr/plaque-de-finition-4-postes-blanc-craie-odace/3606487342618_CAFR.prd",
+    "plaque-ovalis-1": "https://www.castorama.fr/plaque-de-finition-1-poste-schneider-electric-ovalis-s320702-coloris-blanc-l-87-x-p-10-x-h-87-mm/3606482163119_CAFR.prd",
+    "plaque-ovalis-2": "https://www.castorama.fr/plaque-de-finition-2-postes-schneider-electric-ovalis-s320704-coloris-blanc-l-158-x-p-10-x-h-87-mm/3606482163164_CAFR.prd",
+    "plaque-ovalis-3": "https://www.castorama.fr/plaque-de-finition-3-postes-schneider-electric-ovalis-s320706-coloris-blanc-l-229-x-p-10-x-h-87-mm/3606482163195_CAFR.prd",
+    "plaque-ovalis-4": "https://www.castorama.fr/plaque-de-finition-4-postes-schneider-electric-ovalis-s320708-coloris-blanc-l-300-x-p-10-x-h-87-mm/3606482163232_CAFR.prd",
+    "platre-scellement": "https://www.castorama.fr/platre-multi-usage-joker-25kg-pour-reboucher-et-sceller/3496252008739_CAFR.prd",
+    "plinthe-passe-cable": "https://www.castorama.fr/plinthe-avec-cloison-80x20-mm-legrand-2-compartiments/3414970008312_CAFR.prd",
+    "prise-etanche": "https://www.castorama.fr/prise-legrand-plexo-gris-en-saillie-220v/3414971904613_CAFR.prd",
+    "repartiteur-tv": "https://www.castorama.fr/repartiteur-interieur-tv-4-directions-erard/3700101254049_CAFR.prd",
+    "rj45-keystone": "https://www.castorama.fr/mecanisme-prise-rj45-cat6-1-module-legrand-mosaic/3245060996451_CAFR.prd",
+    "ruban-isolant": "https://www.castorama.fr/ruban-d-isolation-couleur-melangee-19-mm-x-10-m-vendu-par-5-pieces/3663602931966_CAFR.prd",
+    "ruban-led": "https://www.castorama.fr/kit-strips-ip65-2100lm-20w-230-24v-blanc-chaud-paulmann-5m/4000870789063_CAFR.prd",
+    "scie-cloche-67": "https://www.castorama.fr/trepan-avec-foret-pilote-erbauer-pour-multi-materiaux-68-mm/3663602810186_CAFR.prd",
+    "silicone": "https://www.castorama.fr/mastic-silicone-interieur-transparent-300ml/5059340043692_CAFR.prd",
+    "sortie-cable-32": "https://www.castorama.fr/sortie-de-cable-legrand-20-32-a-blanc-brillant/3245060901493_CAFR.prd",
+    "telerupteur": "https://www.castorama.fr/telerupteur-unipolaire-modulaire-legrand/3245060927004_CAFR.prd",
+    "tire-fil": "https://www.castorama.fr/tire-fil-nylon-25-m-pour-gaines-icta-et-prefilees/3296840000257_CAFR.prd",
+    "tournevis-testeur": "https://www.castorama.fr/tournevis-testeur-de-tension-vde-lame-acier-sl-plat-3-mm-outilfrance/3223430141953_CAFR.prd",
+    "transfo-led": "https://www.castorama.fr/alimentation-maxled-paulmann-ip20-60w-blanc-p-18-4-cm-x-h-3-2-cm/4000870798300_CAFR.prd",
+    "vis-beton": "https://www.castorama.fr/boulon-beton-6-x-60-mm-scell-it-10-pieces/3553975777592_CAFR.prd",
+    "vis-placo": "https://www.castorama.fr/vis-pour-plaque-de-platre-universelle-noir-mat-3-5x25-mm-200-pieces/3663602758075_CAFR.prd",
+    "wago-2": "https://www.castorama.fr/85-bornes-automatiques-diall-serie-273-wago-1-2-5-mm-/3663602793489_CAFR.prd",
+    "wago-3": "https://www.castorama.fr/10-mini-bornes-a-cliquet-3-entrees-wago-serie-221-0-14-4-mm-/3662366024136_CAFR.prd",
+    "wago-5": "https://www.castorama.fr/50-mini-bornes-a-cliquet-5-entrees-wago-serie-221-0-14-4-mm-/3662366024150_CAFR.prd"
+  },
+  "facteurs": {
+    "agrafe-icta": 2,
+    "cable-3g6": 2,
+    "cable-5g2.5": 2,
+    "cavalier-16": 2,
+    "collier-gaine-20": 2,
+    "domino": 10,
+    "fil-10": 10,
+    "fil-16": 10,
+    "gaine-vmc-125": 0.5,
+    "ruban-isolant": 0.6,
+    "vis-beton": 10,
+    "wago-2": 1.1765,
+    "wago-3": 5,
+    "wago-5": 0.5
+  },
+  "echecs": [],
+  "suspects": []
 }

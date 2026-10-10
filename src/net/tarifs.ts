@@ -33,7 +33,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SERVEUR } from '../config/serveur';
-import { appliquerLesTarifs, type TarifsRecus } from '../geometry/prix';
+import { appliquerLesTarifs, type OffreEnseigne, type TarifsRecus } from '../geometry/prix';
 
 /** Où le dernier catalogue reçu dort entre deux chantiers. */
 const CLE = 'echoplan.tarifs.v1';
@@ -75,6 +75,19 @@ export interface Verification {
   vu: number | null;
 }
 
+/** Une table de chaînes, sans ce qui n'en est pas une (`filtre` en plus). */
+function chaines(
+  brut: unknown,
+  filtre: (v: string) => boolean = () => true,
+): Record<string, string> | undefined {
+  if (!brut || typeof brut !== 'object') return undefined;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(brut as Record<string, unknown>)) {
+    if (typeof v === 'string' && v && filtre(v)) out[k] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 /** Un catalogue mal formé ne doit pas casser un devis : on le refuse en bloc. */
 function lire(brut: unknown): TarifsRecus | null {
   if (!brut || typeof brut !== 'object') return null;
@@ -90,7 +103,35 @@ function lire(brut: unknown): TarifsRecus | null {
     // plutôt que d'annoncer une gaine à zéro euro.
     if (isFinite(n) && n > 0) prix[k] = n;
   }
-  return { version: o.version, releve: o.releve, source: o.source, prix };
+  const t: TarifsRecus = { version: o.version, releve: o.releve, source: o.source, prix };
+  // Ce que le relevé du matin ajoute — le jour de chaque prix, son produit.
+  // Un catalogue d'avant n'en a pas : il reste lisible tel quel.
+  const jours = chaines(o.jours, (v) => /^\d{4}-\d{2}-\d{2}$/.test(v));
+  const ean = chaines(o.ean, (v) => /^\d{8,14}$/.test(v));
+  const liens = chaines(o.liens, (v) => v.startsWith('https://'));
+  if (jours) t.jours = jours;
+  if (ean) t.ean = ean;
+  if (liens) t.liens = liens;
+  // Le prix de chaque enseigne : on ne garde que les offres lisibles, et
+  // seulement pour les articles dont le prix est là.
+  if (o.offres && typeof o.offres === 'object') {
+    const offres: Record<string, OffreEnseigne[]> = {};
+    for (const [cle, liste] of Object.entries(o.offres as Record<string, unknown>)) {
+      if (!Array.isArray(liste) || prix[cle] === undefined) continue;
+      const bonnes: OffreEnseigne[] = [];
+      for (const x of liste as Record<string, unknown>[]) {
+        const pu = Number(x?.pu);
+        if (typeof x?.enseigne !== 'string' || !x.enseigne || !(isFinite(pu) && pu > 0)) continue;
+        const of: OffreEnseigne = { enseigne: x.enseigne, pu };
+        if (typeof x.jour === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x.jour)) of.jour = x.jour;
+        if (typeof x.url === 'string' && x.url.startsWith('https://')) of.url = x.url;
+        bonnes.push(of);
+      }
+      if (bonnes.length) offres[cle] = bonnes.sort((a, b) => a.pu - b.pu);
+    }
+    if (Object.keys(offres).length) t.offres = offres;
+  }
+  return t;
 }
 
 /**
@@ -153,7 +194,40 @@ async function parLeFichier(): Promise<TarifsRecus | null> {
 }
 
 /**
- * VA CHERCHER LE CATALOGUE — PAR DEUX CHEMINS, EN MÊME TEMPS.
+ * LE RELEVÉ DU MATIN, publié par le dépôt (voir `SERVEUR.tarifsDuJour`).
+ *
+ * C'est le seul des trois chemins qui change TOUS LES JOURS sans personne :
+ * les deux autres attendent qu'on dépose un fichier sur l'hébergement.
+ */
+async function parLeReleveDuJour(): Promise<TarifsRecus | null> {
+  if (!SERVEUR.tarifsDuJour) return null;
+  try {
+    const reponse = await fetch(SERVEUR.tarifsDuJour);
+    return lire(await reponse.json());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * LE PLUS RÉCENT DES CATALOGUES ARRIVÉS — et, à égalité, dans l'ordre donné.
+ *
+ * Relevé du patron : « les prix ne s'actualisent pas même après un forçage,
+ * ça reste antidaté ». Le script de l'hébergement passait AVANT tout le
+ * reste : tant qu'il répondait, il imposait son fichier du 5 septembre, même
+ * à côté d'un relevé du matin. Ce qui départage maintenant, c'est le JOUR DU
+ * RELEVÉ ; l'ordre ne sert plus qu'à trancher entre deux relevés du même jour.
+ */
+export function lePlusRecent(...catalogues: (TarifsRecus | null)[]): TarifsRecus | null {
+  let meilleur: TarifsRecus | null = null;
+  for (const c of catalogues) {
+    if (c && (!meilleur || c.releve > meilleur.releve)) meilleur = c;
+  }
+  return meilleur;
+}
+
+/**
+ * VA CHERCHER LE CATALOGUE — PAR TROIS CHEMINS, EN MÊME TEMPS.
  *
  * CE DÉFAUT S'EST PRODUIT DEUX FOIS. Interrogé, `bourseur.fr/api.php`
  * répondait « Identifiant manquant » : le fichier en ligne était ANTÉRIEUR à
@@ -178,27 +252,33 @@ async function parLeFichier(): Promise<TarifsRecus | null> {
  * seul budget d'attente.
  */
 async function demander(): Promise<TarifsRecus | null> {
-  if (!SERVEUR.url) return null;
+  if (!SERVEUR.url && !SERVEUR.tarifsDuJour) return null;
   let duScript: TarifsRecus | null = null;
   let duFichier: TarifsRecus | null = null;
-  const script = parLeScript().then((r) => {
+  let duJour: TarifsRecus | null = null;
+  const script = (SERVEUR.url ? parLeScript() : Promise.resolve(null)).then((r) => {
     duScript = r;
   });
-  const fichier = parLeFichier().then((r) => {
+  const fichier = (SERVEUR.url ? parLeFichier() : Promise.resolve(null)).then((r) => {
     duFichier = r;
+  });
+  const releve = parLeReleveDuJour().then((r) => {
+    duJour = r;
   });
   const sable = sablier();
   try {
     /*
-      ON REND LA MAIN AU PREMIER DES DEUX : les deux portes ont répondu, ou
-      le délai est passé. Dans ce second cas on repart avec ce qui EST déjà
-      arrivé — un fichier rapide ne doit pas attendre un script qui pend.
+      ON REND LA MAIN QUAND TOUT A RÉPONDU, ou quand le délai est passé.
+      Dans ce second cas on repart avec ce qui EST déjà arrivé — un fichier
+      rapide ne doit pas attendre un script qui pend.
     */
-    await Promise.race([Promise.all([script, fichier]), sable.attendre]);
+    await Promise.race([Promise.all([script, fichier, releve]), sable.attendre]);
   } finally {
     sable.ranger();
   }
-  return duScript ?? duFichier;
+  // À égalité de jour : l'API d'abord (elle pourra un jour calculer), puis
+  // le relevé du matin, puis le fichier déposé.
+  return lePlusRecent(duScript, duJour, duFichier);
 }
 
 /** Le catalogue gardé sur le téléphone, s'il y en a un de lisible. */

@@ -38,6 +38,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # LE SDK D'iOS 26 : sans lui, le Liquid Glass (`UIGlassEffect`) n'existe
+      # pas à la compilation, et le verre de l'app retombe sur sa réplique.
+      # L'image macos-15 l'embarque ; Xcode 16.4 y reste celui par défaut.
+      - name: Choisir Xcode 26
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.3.app
+          xcodebuild -version
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22

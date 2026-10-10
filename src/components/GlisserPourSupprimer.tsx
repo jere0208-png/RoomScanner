@@ -18,6 +18,15 @@
  * appui : `children` reçoit `refermer`, qui referme une ligne entrouverte et
  * dit qu'il l'était. On ne s'ouvre pas un plan par accident en voulant
  * ranger la corbeille.
+ *
+ * ET AU REPOS, ON NE LE VOIT PAS. Relevé du patron : « tu as rajouté
+ * inutilement un trait sous le listing des plans ; je veux rendre le cadre
+ * avec l'effet, pas changer de style ». Le fond rouge de la corbeille était
+ * toujours là, sous la carte : il dépassait en bande sous elle (la carte
+ * gardait sa marge DANS le cadre) et en liseré rouge au bord de ses coins ;
+ * et le cadre, qui rognait ce qui dépassait, rognait aussi l'ombre de la
+ * carte. La corbeille n'apparaît donc qu'au premier millimètre de glissé, et
+ * c'est elle seule qui se rogne à ses coins : la carte garde son ombre.
  */
 import React, { useRef } from 'react';
 import { Animated, PanResponder, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
@@ -95,9 +104,17 @@ export function GlisserPourSupprimer({
   ).current;
 
   return (
-    <View style={[s.cadre, { borderRadius: rayon }, style]}>
-      {/* Derrière : la corbeille, collée au bord droit, qui suit le doigt. */}
-      <View style={[s.derriere, { borderRadius: rayon }]}>
+    <View style={[s.cadre, style]}>
+      {/* Derrière : la corbeille, collée au bord droit, qui suit le doigt —
+          invisible tant que la carte n'a pas bougé. */}
+      <Animated.View
+        style={[
+          s.derriere,
+          {
+            borderRadius: rayon,
+            opacity: x.interpolate({ inputRange: [-6, -1, 0], outputRange: [1, 0, 0], extrapolate: 'clamp' }),
+          },
+        ]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Supprimer ${libelle}`}
@@ -133,7 +150,7 @@ export function GlisserPourSupprimer({
             </Animated.Text>
           </Animated.View>
         </Pressable>
-      </View>
+      </Animated.View>
       <Animated.View style={{ transform: [{ translateX: x }] }} {...pan.panHandlers}>
         {children(refermer)}
       </Animated.View>
@@ -143,13 +160,14 @@ export function GlisserPourSupprimer({
 
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
-    cadre: { position: 'relative', overflow: 'hidden' },
+    cadre: { position: 'relative' },
     derriere: {
       position: 'absolute',
       top: 0,
       left: 0,
       right: 0,
       bottom: 0,
+      overflow: 'hidden',
       backgroundColor: c.danger,
       flexDirection: 'row',
       justifyContent: 'flex-end',

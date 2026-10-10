@@ -143,8 +143,8 @@ describe('le script ne comprend plus la question : le fichier prend le relais', 
   });
 });
 
-describe('les deux portes s’ouvrent EN MÊME TEMPS', () => {
-  it('le fichier est demandé sans attendre la réponse du script', async () => {
+describe('les portes s’ouvrent EN MÊME TEMPS', () => {
+  it('le fichier — et le relevé du matin — sont demandés sans attendre la réponse du script', async () => {
     /*
       Deux attentes de six secondes en file donneraient douze secondes sur un
       chantier sans réseau, pour un geste dont toute la promesse est d'être
@@ -172,7 +172,9 @@ describe('les deux portes s’ouvrent EN MÊME TEMPS', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(appels.filter((a) => a.includes('api.php'))).toHaveLength(1);
-    expect(appels.filter((a) => a.endsWith('tarifs.json'))).toHaveLength(1);
+    expect(appels.filter((a) => a === `${SERVEUR.url}/tarifs.json`)).toHaveLength(1);
+    // La troisième porte, ouverte depuis : le relevé publié chaque matin.
+    expect(appels.filter((a) => a === SERVEUR.tarifsDuJour)).toHaveLength(1);
     libere!();
     await course;
   });
@@ -206,10 +208,11 @@ describe('les deux portes s’ouvrent EN MÊME TEMPS', () => {
         l'horloge tout de suite le ferait sonner AVANT d'exister — la course
         ne se réglerait jamais, et l'épreuve pendrait sans rien prouver.
       */
-      for (let i = 0; i < 50 && appels.length < 2; i++) {
+      for (let i = 0; i < 50 && appels.length < 3; i++) {
         await Promise.resolve();
       }
-      expect(appels).toHaveLength(2);
+      // Le script, le fichier, le relevé du matin.
+      expect(appels).toHaveLength(3);
       // Les deux requêtes sont PARTIES ; celle du fichier doit encore être
       // lue et validée, ce qui prend quelques microtâches de plus. C'est le
       // cas qu'on veut : le fichier a fini, le script n'a pas commencé.

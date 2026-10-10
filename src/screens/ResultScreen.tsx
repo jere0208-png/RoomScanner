@@ -3972,6 +3972,15 @@ export function ResultScreen() {
             )}
             {modeElec && (
               <>
+              {/*
+                LE PRIX N'APPARAÎT QU'AVEC CE QUI COÛTE — relevé du patron :
+                « n'affiche le bouton du devis qu'à partir d'un élément coûtant
+                placé, à côté du bouton des normes ». Un bouton « — » devant un
+                plan vide invitait à ouvrir une page qui n'avait rien à dire ;
+                il paraît maintenant avec le premier appareil chiffré, contre
+                le contrôle, et c'est son arrivée qui dit « ça a un prix ».
+              */}
+              {totalDevis !== null && totalDevis > 0 && (
               <DevisPastille
                 total={totalDevis}
                 /* On a TOUCHÉ le prix : le devis ira voir si les tarifs ont
@@ -3988,6 +3997,7 @@ export function ResultScreen() {
                   setScreen('devis');
                 }}
               />
+              )}
               <ControlePastille
                 alertes={alertes}
                 /* Un plan sans le moindre appareil n'est pas une installation

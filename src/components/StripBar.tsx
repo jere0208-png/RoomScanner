@@ -244,10 +244,8 @@ export function CarteDuMenu({
           ],
         },
       ]}>
-      {/* Un voile plus léger que celui des boutons : c'est la bulle qu'on
-          regarde, et le plan doit se deviner dessous. Son ombre est celle
-          de la carte. */}
-      <FondDeVerre rayon={rayon} voile={0.55} ombre={plat} />
+      {/* Le verre de la bulle : le plan se devine dessous, flouté. */}
+      <FondDeVerre rayon={rayon} ombre={plat} />
       {anneau(0)}
       {anneau(0.18)}
       {children}

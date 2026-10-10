@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { GlisserPourSupprimer } from '../components/GlisserPourSupprimer';
+import { FondDeVerre, SUR_VERRE } from '../components/Verre';
 import { BandeauAnnuler, useSuppressionDifferee } from '../components/BandeauAnnuler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { etatDAttente, rangerLeTravail, useMaintenant } from '../ui/miseDeCote';
@@ -622,7 +623,7 @@ function ScanRow({
     : null;
   return (
     <Animated.View
-      style={[styles.row, styles.rowDansGlissante, pris && styles.rowGhost, anim]}
+      style={[styles.row, styles.rowDansGlissante, SUR_VERRE, pris && styles.rowGhost, anim]}
       onTouchStart={(e) =>
         onHold({ x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })
       }
@@ -631,6 +632,8 @@ function ScanRow({
       }
       onTouchEnd={() => onRelease(true)}
       onTouchCancel={() => onRelease(false)}>
+      {/* Le cadre prend le verre ; il garde sa forme, son ombre, son contenu. */}
+      <FondDeVerre rayon={radius.md + 2} ombre={styles.row} />
       {/*
         L'APPUI LONG NE FAIT PLUS QU'UNE CHOSE : LEVER LA BULLE.
 

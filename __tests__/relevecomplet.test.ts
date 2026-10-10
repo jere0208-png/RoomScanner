@@ -87,16 +87,19 @@ describe('une campagne, une date', () => {
     expect([...jours]).toEqual([RELEVE_RAYON]);
   });
 
-  it('et l’enseigne est citée sur chacun d’eux', () => {
+  it('et l’enseigne est citée sur chacun d’eux — la moins chère, les autres sur la ligne', () => {
     for (const { cle, tarif } of tousLesTarifs()) {
       if (!releve(tarif)) continue;
-      expect(`${cle} : ${tarif.source}`).toBe(`${cle} : Castorama`);
+      expect(`${cle} : ${/^(Castorama|Brico Dépôt)$/.test(tarif.source)}`).toBe(`${cle} : true`);
+      // Le prix retenu est le moins cher des magasins où l'article a été vu.
+      const offres = tarif.offres ?? [];
+      expect(`${cle} : ${tarif.pu}`).toBe(`${cle} : ${Math.min(...offres.map((o) => o.pu))}`);
     }
   });
 });
 
 describe('ce qu’on n’a pas pu revoir ne se fait pas passer pour un relevé', () => {
-  it('l’obturateur redevient une estimation : il n’est plus qu’en déstockage', () => {
+  it('l’obturateur, relevé à son vrai EAN, n’est plus une estimation', () => {
     /*
       La maison refuse les prix de fin de série depuis le premier relevé — le
       variateur dooxie et la prise TV Céliane ont été écartés pour la même
@@ -104,13 +107,17 @@ describe('ce qu’on n’a pas pu revoir ne se fait pas passer pour un relevé',
       d'un chantier qui commence dans trois semaines ne peut pas s'appuyer
       dessus.
     */
-    expect(releve(TARIFS_COMMUNS.obturateur)).toBe(false);
-    expect(TARIFS_COMMUNS.obturateur.source).toMatch(/valider|estimation/i);
+    /*
+      Relevé du 10 octobre 2026 : l'obturateur Dooxie courant est en rayon,
+      à son vrai EAN (l'ancien en déstockage ne l'est plus) ; et les bornes
+      Wago 273, épuisées, sont remplacées par leur équivalent Diall (série
+      273), en stock — dit dans la note de `server/sources-prix.json`.
+    */
+    expect(releve(TARIFS_COMMUNS.obturateur)).toBe(true);
   });
 
-  it('les bornes Wago aussi : la série 273 n’est plus vendue', () => {
-    expect(releve(TARIFS_COMMUNS['wago-2'])).toBe(false);
-    expect(TARIFS_COMMUNS['wago-2'].source).toMatch(/valider|estimation/i);
+  it('les bornes Wago aussi : l’équivalent en stock, relevé', () => {
+    expect(releve(TARIFS_COMMUNS['wago-2'])).toBe(true);
   });
 });
 

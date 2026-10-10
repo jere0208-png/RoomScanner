@@ -14,4 +14,12 @@ export const SERVEUR = {
   url: 'https://bourseur.fr',
   /** Le schéma de retour du flux Google, déclaré dans auth-google.php. */
   schemaRetour: 'echoplan',
+  /**
+   * LE CATALOGUE DES PRIX DU JOUR — relevé chaque matin, page produit par
+   * page produit, par `tools/releve-prix.js` (voir
+   * `.github/workflows/releve-prix.yml`), et publié en lecture seule sur la
+   * branche `tarifs` du dépôt. Il ne dépend pas du serveur des comptes : un
+   * hébergement en panne ne fige plus les prix.
+   */
+  tarifsDuJour: 'https://raw.githubusercontent.com/jere0208-png/RoomScanner/tarifs/tarifs.json',
 };

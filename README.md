@@ -14285,6 +14285,174 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le vrai Liquid Glass d'Apple, sans changer le dessin des cartes ; plus de trait sous les plans
+
+Relevé du patron, l'IPA en main : « l'effet de verre est raté : sur l'accueil
+la forme des cards a été modifiée, pas de transparence + flou type Apple
+glass ; pareil pour les autres, il ne se voit pas. Tu dois répliquer le liquid
+glass » (référence : Dribbble, « Liquid Glass – Apple's Modern UI Trend ») ;
+« tu as rajouté inutilement un trait sous le listing des plans, je veux rendre
+le cadre avec l'effet, pas changer de style ».
+
+**Pourquoi il ne se voyait pas.** Trois causes, toutes corrigées :
+- le voile blanc à 70 % (posé pour ne pas « griser » les boutons) rendait le
+  verre OPAQUE — ni transparence, ni flou ;
+- React Native peignait PAR-DESSUS le verre une teinte et un reflet, à coins
+  circulaires, sur un verre à coins continus, et une lumière de couleur
+  débordait autour des tuiles : la carte n'avait plus son dessin ;
+- iOS abandonne EN SILENCE un verre posé pendant qu'un parent est transparent
+  — et les tuiles comme la bulle du menu entrent en fondu depuis zéro.
+
+**Le vrai Liquid Glass** (`RoomScanVerre.swift`). L'app se compile maintenant
+avec Xcode 26.3 (SDK d'iOS 26, déjà présent sur les Mac de GitHub), et le verre
+est celui d'Apple : `UIGlassEffect` — transparence, flou, reflets spéculaires,
+lentille sur les bords, luminance qui s'adapte à ce qu'il couvre, teinte portée
+par le verre lui-même (les tuiles de l'accueil). Il n'est posé que lorsque la
+vue est réellement visible (un guet par image tant qu'elle ne l'est pas —
+la méthode d'`expo-glass-effect`), et reposé quand elle revient à l'écran.
+Avant iOS 26 : sa réplique, tout en natif — flou système, voile léger (22 %),
+liseré lumineux en dégradé (clair en haut à gauche, éteint au milieu, rallumé
+en bas à droite : le bord épais d'un verre), reflet en haut, ombre douce, et
+les coins CIRCULAIRES de React Native.
+
+**Le cadre prend le verre, il garde son style** (`Verre.tsx`). `FondDeVerre`
+n'est plus qu'une chose : le verre natif, à la forme de l'élément, en premier
+enfant ; `SUR_VERRE` retire au cadre son fond plein et son ombre. Rien d'autre
+n'est peint. En verre : les quatre tuiles (teintées de leur couleur), les
+cartes de plans de l'accueil et de la bibliothèque, la carte du relevé
+interrompu, la bulle du menu du plan, les pastilles du plan, la visite, le
+scan (fumé). La lumière de couleur sous le moulinet est retirée.
+
+**Plus de trait sous les plans** (`GlisserPourSupprimer`). Le fond rouge de la
+corbeille vivait sous chaque carte : à l'accueil, la carte gardait sa marge
+DANS le cadre de balayage, et le rouge dépassait en bande dessous ; ailleurs,
+en liseré à ses coins ; et le cadre, qui rognait ce qui dépassait, rognait
+l'ombre de la carte. La corbeille n'apparaît plus qu'au premier millimètre de
+glissé, elle seule se rogne à ses coins, et la carte garde son ombre.
+
+Bancs : `verreapp.test.tsx` (natif présent : une seule matière, transparente ;
+rien de peint par-dessus le verre ; la bulle ; les pastilles ; prix et contrôle
+pleins ; les tuiles teintées par le verre, sans lumière dessous ; les cadres
+des plans en verre ; plus de trait : la corbeille invisible au repos, le cadre
+qui ne rogne plus) ; `passestyle.test.tsx` (le vrai `UIGlassEffect`, posé
+seulement visible, compilé avec Xcode 26 ; ni filet ni aplat React Native).
+
+**À vérifier sur l'iPhone** : l'accueil (tuiles et cartes de plans en verre, à
+leur forme exacte), la bulle du menu sur le plan, les pastilles, le scan ; et
+le glissé d'un plan vers la gauche (la corbeille apparaît, rien au repos).
+
+## Des prix réels, relevés chaque matin, au moins cher des magasins ; les prix pro du distributeur
+
+Relevés du patron : « revois le système de devis, les prix ne s'actualisent pas
+même après un forçage, ça reste antidaté ; vérifie que tous les prix sont bien
+réels ; trouve un moyen d'avoir aussi les prix pro Rexel, Balitrand, Yesss » ;
+puis « liste en petit le prix de chaque magasin et trouve l'équivalent Amazon
+avec notre lien affilié ; le devis total se fiera au prix le moins cher ; donne
+aussi le prix total public sous le total, en petit » ; et « n'affiche le
+bouton du devis qu'à partir d'un élément coûtant placé, à côté du bouton des
+normes ».
+
+**Pourquoi c'était « antidaté ».** Le forçage allait bien chercher le
+catalogue — mais c'était un fichier posé à la main sur l'hébergement, relevé
+le 5 septembre, que personne ne relisait. Redemander un fichier qui ne change
+pas rend le même fichier, avec sa date. Et trois prix sur quatre étaient encore
+des estimations. Le relevé du 10 octobre l'a confirmé : le fil 1,5 mm² était
+passé de 25,90 à 27,90 €, le 2,5 mm² de 41,90 à 47,90 €, les câbles R2V de
+5 € — sans que l'app le sache.
+
+**Des prix réels.** Chaque article du catalogue a maintenant SA page produit
+(`server/sources-prix.json`), choisie une fois, article par article, avec son
+code EAN et le conditionnement du devis (`facteur` : un lot de 10 compté à la
+boîte, une couronne de 50 m comptée en 100 m). 183 articles sur 201 ont une
+vraie page — le produit décrit (`exact`) ou l'équivalent le plus juste, dit
+dans sa note (`proche` : une prise « 20 A » de circuit spécialisé est la prise
+2P+T 16 A de la gamme ; la cuisson se raccorde par la sortie de câble Legrand
+20/32 A, aucune gamme n'en vendant en grande surface ; les Wago 273 épuisées
+sont remplacées par leur équivalent Diall…). Les 18 restants (plaques 5
+postes, ICTA Ø32/Ø40, fils 4 et 25 mm², disjoncteurs 6/25/40 A, délesteur,
+sectionneur, répartiteur, embouts, rehausse) ne sont vendus ni chez Castorama
+ni chez Brico Dépôt : ils restent des ESTIMATIONS, et l'écran le dit ligne par
+ligne. Les pages de recherche ne sont jamais lues (robots.txt les interdit) :
+les produits se trouvent par le plan du site, les prix sur la page produit.
+
+**Relevés chaque matin, sans personne** (`tools/releve-prix.js`,
+`.github/workflows/releve-prix.yml`). Tous les jours vers 6 h, une tâche GitHub
+relit chaque page produit, vérifie que c'est le même produit (l'EAN), ramène
+le prix au conditionnement du devis, écarte un saut invraisemblable (×3 ou ÷3
+d'un jour à l'autre), et publie le catalogue du jour sur la branche `tarifs`
+du dépôt — une branche d'un seul commit, réécrite chaque jour : `main` n'est
+jamais touchée, aucun build n'est déclenché. Un prix qu'on n'a pas pu relire
+garde le jour où on l'a vu (`jours`), et quitte le catalogue au bout d'une
+semaine : on n'écrit jamais « aujourd'hui » sur un prix qu'on n'a pas vu
+aujourd'hui. Moins de 80 % des pages relues : le catalogue de la veille reste.
+
+**L'app prend le plus récent** (`net/tarifs`). Elle interroge trois portes en
+même temps — l'API de l'hébergement, son `tarifs.json`, et le relevé du matin
+(`SERVEUR.tarifsDuJour`) — et retient le relevé le PLUS RÉCENT ; l'ordre ne
+départage que deux relevés du même jour. Le fichier du 5 septembre ne passe
+plus devant le relevé du matin. Chaque ligne du devis porte le jour de SON
+prix, et le bandeau « prix vérifiés aujourd'hui » redevient vrai.
+
+**Le prix de chaque magasin, et le total au moins cher.** Brico Dépôt vend
+94 de ces produits sous le MÊME EAN (son adresse produit le porte) : le
+relevé les lit aussi. Le devis retient, article par article, le magasin le
+moins cher (`prix`), écrit d'où vient ce prix, et liste en petit sous la ligne
+le prix de chaque magasin (« Brico Dépôt 1,69 € · Castorama 1,90 € »). Sous le
+total, en petit : le même devis **au prix public** (Castorama partout,
+`totalPublic`) — l'écart, c'est ce que le « moins cher » fait gagner.
+Leroy Merlin et ManoMano refusent la lecture (HTTP 403) ; ils n'y sont pas.
+
+**Amazon : pas de prix relevé sur le site, et pourquoi.** Le programme
+Partenaires d'Amazon n'autorise l'affichage de SES prix que s'ils viennent de
+son API officielle (Creators API, qui remplace PA-API), rafraîchis — jamais
+relevés sur le site, ce qui ferait fermer le compte affilié. L'app est prête à
+les recevoir : une offre « Amazon » rejoint la liste des magasins de la ligne et
+le calcul du moins cher, comme les autres. Il manque deux choses, qui sont au
+patron : l'identifiant Partenaires (`PARTENAIRE_AMAZON`, dans `magasin.ts`, est
+VIDE — le lien affilié n'est pas encore posé) et l'accès à l'API (réservé aux
+comptes Partenaires qui ont des ventes récentes), dont les clés iront dans les
+secrets du dépôt, jamais dans l'app.
+
+**Les prix pro du distributeur** (`geometry/tarifPro`, `store/prixPro`,
+`components/CartePrixPro`, natif `RoomScanTarifPro.swift`). Rexel répond
+« connectez-vous pour voir vos prix », Balitrand et Yesss réservent les leurs à
+l'espace pro : ce sont des prix NETS, négociés compte par compte, sans
+interface publique. Il n'existe donc pas de « prix Rexel » à aller chercher
+pour tout le monde, et les lire à la place de l'électricien demanderait ses
+identifiants. Le chemin du métier existe : chaque distributeur laisse son
+client EXPORTER son tarif (Excel ou CSV, ou le fichier FAB-DIS du commercial).
+Dans le devis, la carte « Vos prix d'achat pro » ouvre la fenêtre Fichiers
+d'iOS ; le téléphone lit le fichier sur place (un .xlsx est ouvert sans
+bibliothèque : l'archive zip, le DEFLATE d'Apple, deux fichiers XML),
+reconnaît les colonnes (EAN, référence fabricant ou distributeur,
+désignation, prix net, prix public et remise, unité de prix « C »/« M »), et
+rapproche chaque ligne d'un article du devis par l'EAN, puis par la référence
+fabricant — jamais par la désignation. Sous chaque article reconnu :
+« Achat pro 3,12 € HT · Rexel » ; sous le total : l'achat pro des articles
+reconnus et ce qu'ils coûtent au prix public. On ne garde que les prix
+reconnus, pas le fichier ; rien ne part sur un serveur.
+
+**Le bouton du devis** n'apparaît qu'avec le premier élément chiffré posé
+(`totalDevis > 0`), toujours contre le bouton des normes.
+
+Bancs : `releveduJour.test.ts` (la page produit lue dans ses données
+structurées ; le même produit ou rien ; le conditionnement ; le moins cher des
+magasins et la liste des autres ; un saut écarté ; un prix non relu garde son
+jour puis sort au bout d'une semaine ; chaque article a sa page, son EAN et,
+chez Brico Dépôt, le même EAN ; le plus récent l'emporte ; le forçage rapporte
+le relevé du matin même quand le script répond l'ancien ; la tâche du matin
+sur sa branche ; jamais la recherche du site) ; `prixpro.test.tsx` (CSV
+français, en-têtes des distributeurs, en-tête sous un titre, prix au cent,
+remise, rapprochement EAN / référence / référence préfixée, jamais par la
+désignation, le tarif gardé et retiré, le total au moins cher et le prix public
+à part, l'achat pro hors écartés, la carte, le bouton du devis) ;
+`tarifsdesecours.test.ts` (trois portes ouvertes ensemble).
+
+**À vérifier** : lancer une fois le relevé depuis l'onglet Actions de GitHub
+(« Relevé des prix » → « Run workflow ») pour s'assurer que Castorama répond aux
+machines de GitHub ; importer un vrai export de tarif (Rexel, Yesss…) et
+regarder combien d'articles sont reconnus.
+
 ## Le scan voit mieux ; le menu s'ouvre en bulle de verre ; le verre dans toute l'app
 
 Relevés du patron : « trouve encore des améliorations natives, en améliorant

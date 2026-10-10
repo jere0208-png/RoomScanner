@@ -125,17 +125,18 @@ describe('l’ordre des gammes se tient', () => {
   */
   const ORDRE = ['dooxie', 'ovalis', 'odace', 'mosaic', 'celiane'] as const;
 
-  it('l’entrée de gamme reste sous le haut de gamme, pièce par pièce', () => {
+  it('le haut de gamme reste au-dessus de toutes les autres, pièce par pièce', () => {
+    /*
+      RELEVÉ DU 10 OCTOBRE 2026 : l'entrée de gamme n'est pas celle qu'on
+      croyait. Ovalis (Schneider) est la moins chère des cinq — prise à
+      4,09 € chez Brico Dépôt, contre 5,50 € la Dooxie. La page produit fait
+      foi : ce qui tient, c'est que Céliane reste au-dessus de toutes.
+    */
     for (const kind of ['prise', 'inter', 'va', 'rj45', 'tv'] as const) {
-      const bas = TARIFS_MECANISME.dooxie[kind]!.pu;
       const haut = TARIFS_MECANISME.celiane[kind]!.pu;
-      expect(`${kind} : ${bas < haut}`).toBe(`${kind} : true`);
-      // Et ce qui est entre les deux y reste vraiment.
       for (const g of ORDRE) {
         const pu = TARIFS_MECANISME[g][kind]!.pu;
-        expect(`${g}/${kind} : ${pu >= bas && pu <= haut}`).toBe(
-          `${g}/${kind} : true`,
-        );
+        expect(`${g}/${kind} : ${pu <= haut}`).toBe(`${g}/${kind} : true`);
       }
     }
   });
@@ -268,11 +269,12 @@ describe('une comparaison ne porte que sur le même produit', () => {
       magasin annonce un prix que le devis ne retrouve pas — et c'est l'écart
       que personne ne remarque avant le client.
     */
+    // Le catalogue retient le MOINS CHER des magasins où l'article a été vu.
     for (const a of ARTICLES) {
-      const rayon = (a.offres ?? []).find((o) => o.enseigne !== 'Amazon');
-      if (!rayon) continue;
+      const rayons = (a.offres ?? []).filter((o) => o.enseigne !== 'Amazon');
+      if (!rayons.length) continue;
       const tarif = TARIFS_COMMUNS[a.code];
-      expect(`${a.code} : ${tarif?.pu}`).toBe(`${a.code} : ${rayon.prix}`);
+      expect(`${a.code} : ${tarif?.pu}`).toBe(`${a.code} : ${Math.min(...rayons.map((o) => o.prix))}`);
     }
   });
 });
@@ -289,8 +291,21 @@ describe('le bouton Amazon ne s’affiche que sur du vérifié', () => {
   });
 
   it('à prix égal aussi — « équivalent ou inférieur »', () => {
+    /*
+      Le cas réel des colliers Diall ne tient plus : Brico Dépôt les vend
+      maintenant 9,49 €, sous Amazon. L'épreuve pose donc l'égalité elle-même,
+      sur des prix VUS des deux côtés.
+    */
     const a = article('collier-colson');
-    expect(offreAmazon(a, TARIFS_COMMUNS['collier-colson'])).not.toBeNull();
+    const t = TARIFS_COMMUNS['collier-colson'];
+    const egal = {
+      ...a,
+      offres: [
+        { enseigne: 'Castorama', prix: t.pu, intitule: 'x', reference: 'r', jour: '2026-10-10' },
+        { enseigne: 'Amazon', prix: t.pu, intitule: 'x', reference: 'r', jour: '2026-10-10', asin: 'B0TEST' },
+      ],
+    };
+    expect(offreAmazon(egal, t)).not.toBeNull();
   });
 
   it('mais jamais quand Amazon est plus cher', () => {

@@ -81,10 +81,17 @@ import { chiffrerLePlan } from '../geometry/devisplan';
 import { CEILINGS, CEILING_SYMBOL, type CeilingKind } from '../geometry/ceiling';
 import { FIXTURES, postsSymbol, type FixtureKind } from '../geometry/electrical';
 import {
+  ENSEIGNE_PUBLIQUE,
   GAMMES,
+  cleDuTarif,
   dateDuReleve,
   moisDeLaVersion,
 } from '../geometry/prix';
+import { achatPro, type PrixPro } from '../geometry/tarifPro';
+import { usePrixPro } from '../store/prixPro';
+import { importPossible } from '../native/tarifPro';
+import { refsPourLeRapprochement } from '../data/refsCatalogue';
+import { CartePrixPro, motDeLImport } from '../components/CartePrixPro';
 import {
   ATTENTE_MIN,
   BandeauTarifs,
@@ -227,6 +234,8 @@ function Article({
   onBasculer,
   onMoins,
   onPlus,
+  pro,
+  distributeur,
 }: {
   ligne: LigneDevis;
   styles: ReturnType<typeof getStyles>;
@@ -234,6 +243,9 @@ function Article({
   onBasculer: () => void;
   onMoins: () => void;
   onPlus: () => void;
+  /** Le prix d'achat de l'électricien, quand son tarif reconnaît l'article. */
+  pro?: PrixPro;
+  distributeur?: string;
 }) {
   const hors = !!ligne.ecarte;
   return (
@@ -280,6 +292,22 @@ function Article({
         {!!ligne.source && ligne.pu !== null && (
           <Text style={styles.articleSource}>
             {`${ligne.source}${ligne.releve ? ` · ${dateDuReleve(ligne.releve)}` : ''}`}
+          </Text>
+        )}
+        {/*
+          LE PRIX DE CHAQUE MAGASIN, EN PETIT — relevé du patron : « liste en
+          petit le prix de chaque magasin ; le devis total se fiera au prix le
+          moins cher ». Le premier est celui que le total retient.
+        */}
+        {!!ligne.offres && ligne.offres.length > 1 && (
+          <Text style={styles.articleOffres} testID="offres-de-la-ligne">
+            {ligne.offres.map((o) => `${o.enseigne} ${euros(o.pu)}`).join(' · ')}
+          </Text>
+        )}
+        {/* SON PRIX D'ACHAT, À LUI — en plus du prix public, jamais à sa place. */}
+        {!!pro && (
+          <Text style={styles.articlePro}>
+            {`Achat pro ${euros(pro.pu)} HT${distributeur ? ` · ${distributeur}` : ''}`}
           </Text>
         )}
         {!!ligne.note && <Text style={styles.articleNote}>{ligne.note}</Text>}
@@ -412,6 +440,13 @@ export function DevisScreen() {
   /** Une vérification déjà partie ne repart pas : on n'appelle qu'une fois. */
   const dejaVu = useRef(false);
   const [tri, setTri] = useState<'rayon' | 'cher' | 'pasCher'>('rayon');
+  /* LES PRIX PRO : le tarif du distributeur de l'électricien (`tarifPro`). */
+  const tarifPro = usePrixPro((p) => p.tarif);
+  const [importEnCours, setImportEnCours] = useState(false);
+  const [motImport, setMotImport] = useState<string | null>(null);
+  useEffect(() => {
+    usePrixPro.getState().charger().catch(() => {});
+  }, []);
 
   /*
     LE MÊME CALCUL QUE LE BOUTON DU PLAN.
@@ -617,6 +652,32 @@ export function DevisScreen() {
    * ticket. Une ligne du métré, elle, reste — à zéro, mais visible : un
    * article qu'on ne voit plus est un article qu'on croit oublié.
    */
+  /*
+    L'ACHAT PRO DU DEVIS — ligne par ligne, et sur les seuls articles
+    reconnus par le tarif de l'électricien. Le prix public reste le prix du
+    devis : c'est celui qu'on montre au client.
+  */
+  const achat = useMemo(
+    () => achatPro(devis.lignes, (code) => cleDuTarif(code, devis.gamme), tarifPro),
+    [devis, tarifPro],
+  );
+  const proDe = (l: LigneDevis) => achat?.parCle[cleDuTarif(l.code, devis.gamme)];
+  const importerLeTarif = async () => {
+    haptic('leger');
+    setImportEnCours(true);
+    setMotImport(null);
+    const d = new Date();
+    const deux = (n: number) => String(n).padStart(2, '0');
+    const jour = `${d.getFullYear()}-${deux(d.getMonth() + 1)}-${deux(d.getDate())}`;
+    try {
+      const r = await usePrixPro.getState().importer(refsPourLeRapprochement(), jour);
+      setMotImport(r.ok ? null : motDeLImport(r.raison));
+      if (r.ok) haptic('succes');
+    } finally {
+      setImportEnCours(false);
+    }
+  };
+
   const reglerLaQuantite = (l: LigneDevis, pas: number) => {
     haptic('leger');
     const voulue = Math.max(0, l.quantite + pas);
@@ -871,6 +932,26 @@ export function DevisScreen() {
             )}
 
             {/*
+              VOS PRIX PRO — sous les prix publics, pas à leur place : le devis
+              qu'on montre au client reste au prix public. Voir `CartePrixPro`.
+            */}
+            <CartePrixPro
+              tarif={tarifPro}
+              reconnus={achat?.reconnus ?? 0}
+              enCours={importEnCours}
+              message={motImport}
+              possible={importPossible()}
+              onImporter={() => {
+                importerLeTarif().catch(() => setImportEnCours(false));
+              }}
+              onRetirer={() => {
+                haptic('leger');
+                setMotImport(null);
+                usePrixPro.getState().retirer();
+              }}
+            />
+
+            {/*
               LA PORTE DU MAGASIN, EN TÊTE DE TICKET.
 
               Relevé du patron : « ou d'en ajouter un ». C'est ici qu'on s'en
@@ -959,6 +1040,8 @@ export function DevisScreen() {
                     ligne={l}
                     styles={styles}
                     couleurs={c}
+                    pro={proDe(l)}
+                    distributeur={tarifPro?.distributeur}
                     onBasculer={() => {
                       haptic('leger');
                       basculer(cleDeLigne(l));
@@ -981,6 +1064,8 @@ export function DevisScreen() {
                           ligne={l}
                           styles={styles}
                           couleurs={c}
+                          pro={proDe(l)}
+                          distributeur={tarifPro?.distributeur}
                           onMoins={() => reglerLaQuantite(l, -1)}
                           onPlus={() => reglerLaQuantite(l, 1)}
                           onBasculer={() => {
@@ -1022,9 +1107,33 @@ export function DevisScreen() {
               pose donc SOUS le total, en français de tout le monde, et le
               banc mesure cette distance-là.
             */}
+            {/*
+              LE MÊME DEVIS AU PRIX PUBLIC, EN PETIT — relevé du patron : « donne
+              aussi le prix total "public" sous le total ». Le total retient le
+              magasin le moins cher, article par article ; celui-ci, l'enseigne
+              de référence partout : l'écart entre les deux, c'est ce que le
+              « moins cher » fait gagner.
+            */}
+            {devis.totalPublic > 0 && (
+              <Text style={styles.sousTotal} testID="total-public">
+                {`Prix public (${ENSEIGNE_PUBLIQUE}) : ${euros(devis.totalPublic)}`}
+              </Text>
+            )}
             <Text style={styles.sousTotal}>
               Le matériel seul — la pose n’est pas comprise.
             </Text>
+            {/*
+              CE QUE L'ÉLECTRICIEN, LUI, PAIERA — sur les articles que son tarif
+              reconnaît, et seulement eux : la comparaison porte sur les mêmes
+              lignes des deux côtés, sinon elle ne veut rien dire.
+            */}
+            {!!achat && achat.reconnus > 0 && (
+              <Text style={styles.sousTotalPro} testID="achat-pro">
+                {`Achat pro ${tarifPro?.distributeur ?? ''} : ${euros(achat.totalHT)} HT sur ${
+                  achat.reconnus
+                } article${achat.reconnus > 1 ? 's' : ''} (${euros(achat.publicTTC)} TTC au prix public)`}
+              </Text>
+            )}
             {/*
               CE QU'ON A ÉCARTÉ SE DIT SOUS LE TOTAL.
 
@@ -1051,8 +1160,8 @@ export function DevisScreen() {
               </TouchableOpacity>
             )}
             <Text style={styles.mentions}>
-              Les luminaires ne sont pas comptés. Prix publics indicatifs, à
-              confirmer en magasin.
+              Les luminaires ne sont pas comptés. Chaque article au prix le moins
+              cher relevé entre les enseignes, à confirmer en magasin.
             </Text>
 
             {/*
@@ -1345,6 +1454,9 @@ const getStyles = themedStyles((c: Palette) =>
     /* La provenance du prix : plus petite et plus pâle que le reste. On la
        cherche quand on la cherche, elle ne dispute pas la ligne au libellé. */
     articleSource: { color: c.inkFaint, fontSize: 10, marginTop: 2 },
+    articleOffres: { color: c.inkSoft, fontSize: 10, marginTop: 1 },
+    /* Le prix d'achat pro : en vert d'encre, c'est ce qui reste en poche. */
+    articlePro: { color: c.green, fontSize: 10.5, fontWeight: '600', marginTop: 2 },
     /* Ce qui n'a pas été mesuré le dit, en bleu : c'est la couleur du devis. */
     articleOrigine: {
       color: c.blue,
@@ -1435,6 +1547,14 @@ const getStyles = themedStyles((c: Palette) =>
       color: c.inkSoft,
       fontSize: 12.5,
       lineHeight: 17,
+      textAlign: 'right',
+      marginTop: 4,
+    },
+    sousTotalPro: {
+      color: c.green,
+      fontSize: 12.5,
+      lineHeight: 17,
+      fontWeight: '600',
       textAlign: 'right',
       marginTop: 4,
     },

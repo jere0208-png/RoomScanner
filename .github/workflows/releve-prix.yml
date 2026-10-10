@@ -1,0 +1,53 @@
+# LE RELEVÉ DES PRIX, CHAQUE MATIN.
+#
+# Relevé du patron : « les prix ne s'actualisent pas même après un forçage, ça
+# reste antidaté ». Le catalogue était un fichier posé à la main et jamais
+# relu. Ce travail repasse en rayon tous les jours à 6 h (heure de Paris, à
+# l'heure d'été ; 5 h l'hiver) : il relit la page produit Castorama de chaque
+# article (`server/sources-prix.json`, voir `tools/releve-prix.js`) et publie
+# le catalogue du jour sur la branche `tarifs`, que l'app lit en direct.
+#
+# UNE BRANCHE À PART, D'UN SEUL COMMIT, réécrite chaque jour : le relevé ne
+# touche jamais à `main` — ni build déclenché, ni historique qui grossit, ni
+# conflit avec le travail en cours.
+name: Relevé des prix
+
+on:
+  schedule:
+    - cron: '7 4 * * *'
+  workflow_dispatch: # bouton « Run workflow » : un relevé tout de suite
+
+permissions:
+  contents: write
+
+concurrency:
+  group: releve-prix
+  cancel-in-progress: false
+
+jobs:
+  releve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Le catalogue de la veille
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/tarifs/tarifs.json" -o /tmp/precedent.json \
+            || cp server/tarifs.json /tmp/precedent.json
+      - name: Le relevé
+        run: node tools/releve-prix.js --sources server/sources-prix.json --precedent /tmp/precedent.json --sortie /tmp/tarifs.json
+      - name: Publication sur la branche tarifs
+        env:
+          JETON: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/pub && cd /tmp/pub
+          git init -q -b tarifs
+          cp /tmp/tarifs.json tarifs.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tarifs.json
+          git commit -q -m "Relevé des prix du $(TZ=Europe/Paris date +%F)"
+          git push -q -f "https://x-access-token:${JETON}@github.com/${{ github.repository }}.git" tarifs

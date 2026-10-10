@@ -40,7 +40,9 @@ const { ToolPill } = require('../src/components/ToolPill');
 const { DevisPastille } = require('../src/components/DevisPastille');
 const { ControlePastille } = require('../src/components/ControlePastille');
 const theme = require('../src/theme');
-const { HomeScreen, TEINTES_TUILES, HALOS_TUILES } = require('../src/screens/HomeScreen');
+const { GlisserPourSupprimer } = require('../src/components/GlisserPourSupprimer');
+const lire = (p: string) => require('node:fs').readFileSync(require('node:path').join(__dirname, '..', p), 'utf8');
+const { HomeScreen, TEINTES_TUILES } = require('../src/screens/HomeScreen');
 const { ScanScreen } = require('../src/screens/ScanScreen');
 
 type Arbre = TestRenderer.ReactTestRenderer;
@@ -83,18 +85,18 @@ describe('le verre de l’app', () => {
     expect(v.props.pointerEvents).toBe('none');
     // Le thème clair : un verre clair.
     expect(v.props.sombre).toBe(false);
-    // Sans ombre demandée, pas d'ombre.
+    // Sans ombre demandée, pas d'ombre propre ; neutre, sans teinte.
     expect(v.props.ombre).toEqual([0, 0, 0]);
+    expect(v.props.teinte).toBe('');
   });
 
-  it('jamais gris : le voile par défaut est un blanc dense', () => {
+  it('transparent : le verre laisse voir à travers lui', () => {
     /*
-      Relevé du patron, la première fois : « le design des boutons grisés ne
-      me plaît pas — je t'ai demandé une modernisation pas un déclin ». Le
-      matériau seul prend la couleur de la page gris clair ; un voile blanc
-      dense le garde blanc.
+      Relevé du patron, l'IPA en main : « pas de transparence + flou type Apple
+      glass ; il ne se voit pas ». Le voile blanc à 70 % rendait le verre
+      opaque. La réplique d'avant iOS 26 n'en garde qu'un soupçon.
     */
-    expect(VOILE).toBeGreaterThanOrEqual(0.65);
+    expect(VOILE).toBeLessThanOrEqual(0.3);
     const t = monter(
       <View>
         <FondDeVerre rayon={14} />
@@ -103,14 +105,25 @@ describe('le verre de l’app', () => {
     expect(verres(t)[0].props.voile).toBe(VOILE);
   });
 
-  it('une pilule (rayon 999) se borne à sa demi-hauteur', () => {
+  it('rien n’est peint par-dessus le verre : il EST le fond du cadre', () => {
+    /*
+      React Native posait une teinte et un reflet par-dessus, à d'autres coins
+      que les siens : « la forme des cards a été modifiée ». Le verre est
+      maintenant la seule chose posée, à la forme de l'élément.
+    */
     const t = monter(
       <View>
-        <FondDeVerre rayon={999} />
+        <FondDeVerre rayon={999} teinte="#CDF1F6" force={0.55} />
       </View>,
     );
-    mesurer(t, 120, 34);
-    expect(verres(t)[0].props.rayon).toBe(17);
+    const hotes = t.root.findAll((n) => typeof n.type === 'string');
+    // La vue qui l'accueille, et le verre : rien d'autre.
+    expect(hotes.map((n) => String(n.type))).toEqual(['View', 'RoomScanVerre']);
+    const [v] = verres(t);
+    expect(v.props.teinte).toBe('#CDF1F6');
+    expect(v.props.force).toBe(0.55);
+    // Le rayon de l'élément ; c'est le natif qui borne une pilule.
+    expect(v.props.rayon).toBe(999);
   });
 
   it('le verre fumé se demande, quel que soit le thème', () => {
@@ -134,9 +147,7 @@ describe('le verre de l’app', () => {
     );
     const [v] = verres(t);
     expect(v.props.rayon).toBe(20);
-    // Plus léger que les boutons : on doit deviner le plan dessous. Et
-    // l'ombre est celle de la carte.
-    expect(v.props.voile).toBeLessThan(VOILE);
+    // L'ombre est celle de la carte.
     expect(v.props.ombre[0]).toBeGreaterThan(0);
   });
 
@@ -159,7 +170,7 @@ describe('le verre de l’app', () => {
     expect(verres(ctrl)).toHaveLength(0);
   });
 
-  it('les quatre tuiles de l’accueil : du verre teinté de leur couleur, sur leur lumière', () => {
+  it('les quatre tuiles de l’accueil : du verre teinté de leur couleur, à leur forme', () => {
     jest.useFakeTimers();
     try {
       useScanStore.setState({ screen: 'home', supported: true, saves: [], brouillon: null, error: null });
@@ -169,21 +180,50 @@ describe('le verre de l’app', () => {
       mesurer(t, 342, 280);
       const tuiles = verres(t).filter((v) => v.props.rayon === 26);
       expect(tuiles).toHaveLength(4);
-      // Chaque tuile garde SA couleur, posée sur le verre.
-      const teintes = t.root
-        .findAll((n) => typeof n.type === 'string' && n.props.style)
-        .map((n) => StyleSheet.flatten(n.props.style) as { backgroundColor?: string; opacity?: number })
-        .filter((st) => st.opacity === 0.75 && st.backgroundColor)
-        .map((st) => st.backgroundColor);
-      expect(teintes.sort()).toEqual(Object.values(TEINTES_TUILES.clair).sort());
-      // Et la lumière du moulinet, sous elles, une tache par tuile.
-      expect(t.root.findAll((n) => n.props.testID === 'halo-du-moulinet').length).toBeGreaterThan(0);
-      expect(Object.keys(HALOS_TUILES.clair).sort()).toEqual(Object.keys(TEINTES_TUILES.clair).sort());
+      // Chaque tuile garde SA couleur : c'est le verre qui la porte.
+      expect(tuiles.map((v) => v.props.teinte).sort()).toEqual(Object.values(TEINTES_TUILES.clair).sort());
+      // Plus de lumière de couleur sous le moulinet : elle brouillait les tuiles.
+      expect(t.root.findAll((n) => n.props.testID === 'halo-du-moulinet')).toHaveLength(0);
+
     } finally {
       act(() => arbre?.unmount());
       arbre = null;
       jest.useRealTimers();
     }
+  });
+
+  it('les cadres des plans prennent le verre — sans changer de style', () => {
+    /*
+      Relevé du patron : « je veux rendre le cadre avec l'effet, pas changer de
+      style ». La carte d'un plan (accueil, bibliothèque) garde sa forme, son
+      ombre, son contenu ; son fond devient le verre.
+    */
+    const accueil = lire('src/screens/HomeScreen.tsx');
+    expect(accueil).toContain('<FondDeVerre rayon={20} ombre={styles.carte} />');
+    expect(accueil).toMatch(/\[styles\.carte, SUR_VERRE, pressed && styles\.cartePressee\]/);
+    const biblio = lire('src/screens/LibraryScreen.tsx');
+    expect(biblio).toContain('<FondDeVerre rayon={radius.md + 2} ombre={styles.row} />');
+  });
+
+  it('et plus de trait sous les plans : la corbeille ne se voit qu’en glissant', () => {
+    /*
+      Le fond rouge de la corbeille dépassait en bande sous chaque carte (la
+      carte gardait sa marge DANS le cadre de balayage) et en liseré à ses
+      coins ; et le cadre rognait l'ombre de la carte.
+    */
+    const t = monter(
+      <GlisserPourSupprimer libelle="Plan" rayon={20} onSupprimer={() => {}}>
+        {() => <View style={{ height: 60 }} />}
+      </GlisserPourSupprimer>,
+    );
+    const cadre = t.root.findAll((n) => typeof n.type === 'string')[0];
+    expect((StyleSheet.flatten(cadre.props.style) as { overflow?: string }).overflow).not.toBe('hidden');
+    const corbeille = t.root.findAll(
+      (n) => typeof n.type === 'string' && (StyleSheet.flatten(n.props.style) as { backgroundColor?: string })?.backgroundColor === theme.light.danger,
+    )[0];
+    expect((StyleSheet.flatten(corbeille.props.style) as { opacity: number }).opacity).toBe(0);
+    // La carte de l'accueil ne garde plus de marge dans le cadre.
+    expect(lire('src/screens/HomeScreen.tsx')).not.toMatch(/paddingRight: 14,\n      marginBottom: 10,\n      \.\.\.ombre/);
   });
 
   it('sur la caméra du scan, tout le verre est fumé — même en thème clair', async () => {

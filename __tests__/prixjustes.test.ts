@@ -49,6 +49,16 @@ import {
 import { catalogueDuMagasin } from '../src/geometry/magasin';
 
 const IDS = GAMMES.map((g) => g.id as GammeId);
+/**
+ * MOSAIC SE VEND AVEC SON SUPPORT. Relevé du 10 octobre 2026 : la plaque
+ * Mosaic de grande surface est livrée avec le support à modules (4,99 € le
+ * poste, 12,50 € les deux, 22,50 € les trois), là où les autres gammes
+ * vendent la plaque seule. Ce n'est plus « un morceau de plastique » : les
+ * règles de la plaque ne la jugent pas — c'est la page produit qui fait foi.
+ */
+const PLAQUE_SEULE = IDS.filter((g) => g !== 'mosaic');
+/** Un prix estimé porte un mois ; un prix vu en rayon porte son jour. */
+const estime = (g: GammeId, n: number) => !/^\d{4}-\d{2}-\d{2}$/.test(tarifPlaque(g, n)!.releve);
 
 /**
  * LE MÉCANISME DE RÉFÉRENCE D'UNE GAMME : la prise 16 A.
@@ -82,7 +92,7 @@ describe('une plaque coûte ce que coûte un morceau de plastique', () => {
       ovalis, les deux qui étaient justes. Il ne dit pas seulement « c'est
       faux » : il dit LESQUELLES.
     */
-    for (const g of IDS) {
+    for (const g of PLAQUE_SEULE) {
       const plaque = tarifPlaque(g, 1)!.pu;
       const plafond = mecaLePlusBasDe(g) / 2;
       // La gamme est NOMMÉE dans l'attendu : un banc qui tombe doit dire
@@ -102,7 +112,7 @@ describe('une plaque coûte ce que coûte un morceau de plastique', () => {
       table. (Ancien catalogue : 8,50 contre 2,50, soit 3,4 fois.)
     */
     for (let n = 1; n <= 4; n++) {
-      const tous = IDS.map((g) => tarifPlaque(g, n)!.pu);
+      const tous = PLAQUE_SEULE.map((g) => tarifPlaque(g, n)!.pu);
       const bas = Math.min(...tous);
       const haut = Math.max(...tous);
       expect(`${n} poste(s) : ${(haut / bas).toFixed(2)}`).toBe(
@@ -126,9 +136,19 @@ describe('une plaque coûte ce que coûte un morceau de plastique', () => {
       poste, une dégringolade de vingt pour cent qu'aucun tarif de rayon ne
       fait.
     */
+    /*
+      DEPUIS LE RELEVÉ DU 10 OCTOBRE, chaque plaque vue en rayon l'est par son
+      EAN, et le devis prend le magasin le moins cher : deux tailles d'une
+      même gamme peuvent venir de deux enseignes, et leur rapport au poste
+      n'est plus une preuve de rien. La règle juge donc ce qui reste ESTIMÉ —
+      qui doit suivre, au poste, la plus grande plaque relevée de sa gamme.
+    */
     for (const g of IDS) {
-      const unite = tarifPlaque(g, 1)!.pu;
+      const vues = [1, 2, 3, 4, 5].filter((n) => !estime(g, n));
+      const ref = vues[vues.length - 1];
+      const unite = tarifPlaque(g, ref)!.pu / ref;
       for (let n = 2; n <= 5; n++) {
+        if (!estime(g, n)) continue;
         const auPoste = tarifPlaque(g, n)!.pu / n;
         expect(`${g}/${n} : ${(auPoste / unite).toFixed(2)}`).toBe(
           `${g}/${n} : ${
@@ -158,22 +178,25 @@ describe('une plaque dit d’où sort son prix — c’est ce qui manquait', () 
       les avait jamais vérifiées — et c'est pour ça qu'elles sont restées
       fausses pendant que tout le reste se corrigeait.
     */
-    for (const g of ['dooxie', 'ovalis', 'odace', 'celiane'] as GammeId[]) {
-      expect(tarifPlaque(g, 1)!.source).toMatch(/castorama/i);
+    for (const g of IDS) {
+      // L'enseigne la moins chère qui la vend — et les autres sur la ligne.
+      expect(tarifPlaque(g, 1)!.source).toMatch(/castorama|brico dépôt/i);
       // Daté au JOUR : on sait exactement quand on est allé voir.
       expect(tarifPlaque(g, 1)!.releve).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     }
   });
 
-  it('et Mosaic avoue être estimée : elle ne se vend pas en grande surface', () => {
+  it('et ce qui n’est vendu nulle part avoue être estimé', () => {
     /*
-      Le relevé l'a confirmé : Castorama n'affiche qu'un seul article Mosaic
-      blanc, vendu par un tiers. C'est une gamme de distributeur
-      professionnel. Elle reste au catalogue — elle se pose beaucoup en
-      tertiaire — mais son prix ne peut pas prétendre avoir été vu en rayon.
+      Relevé du 10 octobre 2026 : Mosaic est maintenant en rayon chez
+      Castorama (plaques 1 à 3 postes, support compris) ; mais aucune enseigne
+      ne vend de plaque 5 postes, ni de Mosaic 4 postes. Celles-là restent des
+      estimations, et le disent.
     */
-    expect(tarifPlaque('mosaic', 1)!.source).not.toMatch(/castorama/i);
-    expect(tarifPlaque('mosaic', 1)!.source).toMatch(/valider|estimation/i);
+    expect(tarifPlaque('mosaic', 1)!.source).toMatch(/castorama/i);
+    for (const [g, n] of [['mosaic', 4], ['mosaic', 5], ['dooxie', 5], ['celiane', 5]] as [GammeId, number][]) {
+      expect(tarifPlaque(g, n)!.source).toMatch(/valider|estimation/i);
+    }
   });
 });
 
