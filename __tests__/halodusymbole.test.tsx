@@ -68,7 +68,8 @@ describe('les cotes passent maintenant derrière le symbole', () => {
     const halo = source.indexOf('HALO_BLANC');
     const bloc = source.slice(halo, halo + 2500);
     const posHalo = bloc.indexOf('stroke="#FFFFFF"');
-    const posCouleur = bloc.indexOf('stroke={spec.color}', posHalo);
+    // Le trait de couleur : l'encre du plan électrique, ou celle de la famille.
+    const posCouleur = bloc.indexOf('stroke={(encre ?? spec.color)}', posHalo);
     expect(posHalo).toBeGreaterThan(-1);
     expect(posCouleur).toBeGreaterThan(posHalo);
   });

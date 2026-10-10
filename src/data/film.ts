@@ -21,54 +21,53 @@ export type SorteDArete = 'sol' | 'angle' | 'plafond' | 'baie' | 'meuble';
  * rendu : chaque trait tombe pile sur le mur, la baie ou le meuble qu'il relève.
  */
 export const ARETES_DU_SCAN: { a: [number, number]; b: [number, number]; sorte: SorteDArete }[] = [
-  { a: [-0.02, 0.6516], b: [0.3151, 0.5825], sorte: 'sol' },
-  { a: [0.3151, 0.5825], b: [0.4422, 0.5563], sorte: 'sol' },
-  { a: [1.02, 0.6088], b: [0.4422, 0.5563], sorte: 'sol' },
-  { a: [0.3152, 0.5841], b: [0.288, 0.1152], sorte: 'angle' },
-  { a: [-0.02, 0.0673], b: [0.288, 0.1152], sorte: 'plafond' },
-  { a: [0.288, 0.1152], b: [0.4347, 0.138], sorte: 'plafond' },
-  { a: [1.02, 0.0975], b: [0.4347, 0.138], sorte: 'plafond' },
-  { a: [-0.02, 0.1859], b: [0.2173, 0.2053], sorte: 'baie' },
-  { a: [-0.0087, 0.6513], b: [0.2485, 0.598], sorte: 'baie' },
-  { a: [-0.0087, 0.6513], b: [-0.02, 0.5821], sorte: 'baie' },
-  { a: [0.2485, 0.598], b: [0.2173, 0.2053], sorte: 'baie' },
-  { a: [0.5579, 0.5683], b: [0.5645, 0.2072], sorte: 'baie' },
-  { a: [1.02, 0.6106], b: [0.5579, 0.5683], sorte: 'baie' },
-  { a: [1.02, 0.1887], b: [0.5645, 0.2072], sorte: 'baie' },
-  { a: [-0.02, 0.6645], b: [0.1699, 0.6238], sorte: 'meuble' },
-  { a: [-0.02, 0.486], b: [0.1536, 0.468], sorte: 'meuble' },
-  { a: [-0.02, 0.7956], b: [0.3511, 0.686], sorte: 'meuble' },
-  { a: [-0.02, 0.6621], b: [0.3462, 0.5842], sorte: 'meuble' },
-  { a: [0.1536, 0.468], b: [0.4853, 0.4893], sorte: 'meuble' },
-  { a: [0.1699, 0.6238], b: [0.4861, 0.6649], sorte: 'meuble' },
-  { a: [0.1699, 0.6238], b: [0.1536, 0.468], sorte: 'meuble' },
-  { a: [0.245, 0.7936], b: [-0.02, 0.7415], sorte: 'meuble' },
-  { a: [0.2593, 0.9593], b: [-0.02, 0.8858], sorte: 'meuble' },
-  { a: [0.2593, 0.9593], b: [0.245, 0.7936], sorte: 'meuble' },
-  { a: [0.3462, 0.5842], b: [0.7262, 0.6243], sorte: 'meuble' },
-  { a: [0.3511, 0.686], b: [0.7179, 0.7394], sorte: 'meuble' },
-  { a: [0.3511, 0.686], b: [0.3462, 0.5842], sorte: 'meuble' },
-  { a: [0.4853, 0.4893], b: [-0.02, 0.567], sorte: 'meuble' },
-  { a: [0.4861, 0.6649], b: [-0.02, 0.823], sorte: 'meuble' },
-  { a: [0.4861, 0.6649], b: [0.4853, 0.4893], sorte: 'meuble' },
-  { a: [0.7179, 0.7394], b: [0.2593, 0.9593], sorte: 'meuble' },
-  { a: [0.7179, 0.7394], b: [0.7262, 0.6243], sorte: 'meuble' },
-  { a: [0.7262, 0.6243], b: [0.245, 0.7936], sorte: 'meuble' },
-  { a: [0.738, 0.6883], b: [0.8911, 0.6223], sorte: 'meuble' },
-  { a: [0.738, 0.6883], b: [0.7554, 0.4639], sorte: 'meuble' },
-  { a: [0.7554, 0.4639], b: [0.9142, 0.4364], sorte: 'meuble' },
-  { a: [0.8911, 0.6223], b: [1.02, 0.6351], sorte: 'meuble' },
-  { a: [0.8911, 0.6223], b: [0.9142, 0.4364], sorte: 'meuble' },
-  { a: [0.9142, 0.4364], b: [1.02, 0.4405], sorte: 'meuble' },
-  { a: [1.02, 0.7241], b: [0.738, 0.6883], sorte: 'meuble' },
-  { a: [1.02, 0.4771], b: [0.7554, 0.4639], sorte: 'meuble' }
+  { a: [-0.02, 0.6291], b: [0.4725, 0.578], sorte: 'sol' },
+  { a: [0.4725, 0.578], b: [1.02, 0.6729], sorte: 'sol' },
+  { a: [0.4725, 0.5794], b: [0.4697, 0.1836], sorte: 'angle' },
+  { a: [-0.02, 0.1461], b: [0.4697, 0.1836], sorte: 'plafond' },
+  { a: [0.4697, 0.1836], b: [1.02, 0.113], sorte: 'plafond' },
+  { a: [-0.02, 0.6309], b: [0.3358, 0.5937], sorte: 'baie' },
+  { a: [-0.02, 0.2197], b: [0.3207, 0.2365], sorte: 'baie' },
+  { a: [0.3358, 0.5937], b: [0.3207, 0.2365], sorte: 'baie' },
+  { a: [-0.02, 0.7088], b: [0.3071, 0.6651], sorte: 'meuble' },
+  { a: [-0.02, 0.6069], b: [0.3026, 0.5761], sorte: 'meuble' },
+  { a: [0.268, 0.7127], b: [-0.02, 0.6184], sorte: 'meuble' },
+  { a: [0.2764, 0.8489], b: [-0.02, 0.7162], sorte: 'meuble' },
+  { a: [0.2764, 0.8489], b: [0.268, 0.7127], sorte: 'meuble' },
+  { a: [0.2991, 0.4902], b: [0.58, 0.4736], sorte: 'meuble' },
+  { a: [0.3026, 0.5761], b: [0.6791, 0.6505], sorte: 'meuble' },
+  { a: [0.3065, 0.638], b: [0.5774, 0.6049], sorte: 'meuble' },
+  { a: [0.3065, 0.638], b: [0.2991, 0.4902], sorte: 'meuble' },
+  { a: [0.3071, 0.6651], b: [0.6737, 0.7658], sorte: 'meuble' },
+  { a: [0.3071, 0.6651], b: [0.3026, 0.5761], sorte: 'meuble' },
+  { a: [0.5774, 0.6049], b: [1.02, 0.6844], sorte: 'meuble' },
+  { a: [0.5774, 0.6049], b: [0.58, 0.4736], sorte: 'meuble' },
+  { a: [0.58, 0.4736], b: [1.02, 0.5116], sorte: 'meuble' },
+  { a: [0.6359, 0.885], b: [1.0008, 0.7886], sorte: 'meuble' },
+  { a: [0.6359, 0.885], b: [0.648, 0.5644], sorte: 'meuble' },
+  { a: [0.648, 0.5644], b: [1.02, 0.5249], sorte: 'meuble' },
+  { a: [0.6737, 0.7658], b: [0.2764, 0.8489], sorte: 'meuble' },
+  { a: [0.6737, 0.7658], b: [0.6791, 0.6505], sorte: 'meuble' },
+  { a: [0.6791, 0.6505], b: [0.268, 0.7127], sorte: 'meuble' },
+  { a: [0.8911, 0.7848], b: [0.3065, 0.638], sorte: 'meuble' },
+  { a: [0.8911, 0.7848], b: [0.9143, 0.5655], sorte: 'meuble' },
+  { a: [0.9143, 0.5655], b: [0.2991, 0.4902], sorte: 'meuble' },
+  { a: [1.0008, 0.7886], b: [1.02, 0.7932], sorte: 'meuble' },
+  { a: [1.0008, 0.7886], b: [1.02, 0.647], sorte: 'meuble' },
+  { a: [1.0081, 1.02], b: [0.6359, 0.885], sorte: 'meuble' },
+  { a: [1.02, 0.7531], b: [0.8911, 0.7848], sorte: 'meuble' },
+  { a: [1.02, 0.5525], b: [0.9143, 0.5655], sorte: 'meuble' },
+  { a: [1.02, 0.6178], b: [0.648, 0.5644], sorte: 'meuble' }
 ];
 
 export interface Chapitre {
   cle: 'scan' | 'plan' | 'meubles' | '3d' | 'partage';
   titre: string;
   phrase: string;
-  /** La durée du chapitre, en millisecondes : rapide, sans précipiter. */
+  /**
+   * La durée du chapitre, en millisecondes. Relevé du patron : « fais la
+   * vidéo tuto plus rapide » — dix-sept secondes en tout, sans précipiter.
+   */
   duree: number;
 }
 
@@ -77,30 +76,30 @@ export const CHAPITRES: Chapitre[] = [
     cle: 'scan',
     titre: 'Scannez la pièce',
     phrase: 'Balayez lentement avec l’iPhone : murs, ouvertures et meubles sont relevés en direct.',
-    duree: 5200,
+    duree: 3600,
   },
   {
     cle: 'plan',
     titre: 'Le plan se dessine',
     phrase: 'Coté au centimètre, pièce par pièce, avec ses surfaces.',
-    duree: 4600,
+    duree: 3200,
   },
   {
     cle: 'meubles',
     titre: 'Aménagez-le',
     phrase: 'Glissez un meuble du catalogue : il se pose à ses vraies dimensions.',
-    duree: 5000,
+    duree: 3400,
   },
   {
     cle: '3d',
     titre: 'Visitez-le en 3D',
     phrase: 'Le logement se lève, meublé — et l’on y entre à hauteur d’œil.',
-    duree: 5200,
+    duree: 3600,
   },
   {
     cle: 'partage',
     titre: 'Partagez un dossier pro',
     phrase: 'Un PDF à imprimer, un DXF pour l’architecte, la 3D pour vos proches.',
-    duree: 4800,
+    duree: 3200,
   },
 ];

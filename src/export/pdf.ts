@@ -6,6 +6,7 @@
  * de vues 3D avec les mesures portées sur les murs.
  * PDF 1.4 non compressé, A4, polices Helvetica (WinAnsi).
  */
+import { BLEU_FENETRE, ENCRE_ELEC } from '../ui/encreElec';
 import { pocheDesMurs } from '../geometry/poche';
 import type { FloorData, ObjectData } from 'react-native-room-scan';
 import {
@@ -1622,7 +1623,7 @@ function planPage(
   if (openings.some((o) => o.type === 'window')) {
     lignesDuPlan.push({
       texte: 'Fenêtre',
-      symbole: { paths: [{ d: 'M-5 -1.2 H5' }, { d: 'M-5 1.2 H5' }], color: GREY },
+      symbole: { paths: [{ d: 'M-5 -1.2 H5' }, { d: 'M-5 1.2 H5' }], color: BLEU_FENETRE },
     });
   }
   const colonnesLegende: LegendSection[][] = [];
@@ -1632,7 +1633,7 @@ function planPage(
         titre: 'APPAREILLAGE',
         lignes: kindsLegende.map((k) => ({
           texte: FIXTURES[k].label,
-          symbole: { paths: assemblySymbol(k), color: FIXTURES[k].color },
+          symbole: { paths: assemblySymbol(k), color: ENCRE_ELEC },
         })),
       },
     ]);
@@ -1644,7 +1645,7 @@ function planPage(
         titre: 'PLAFOND',
         lignes: plafondLegende.map((k) => ({
           texte: CEILINGS[k].label,
-          symbole: { paths: CEILING_SYMBOL[k], color: CEILINGS[k].color },
+          symbole: { paths: CEILING_SYMBOL[k], color: ENCRE_ELEC },
         })),
       });
       seconde.push({ lignes: [{ couleur: GREY, texte: 'Lien de commande' }] });
@@ -2102,7 +2103,7 @@ function planPage(
           texte: tags,
           x: p.x,
           y: p.y,
-          couleur: FIXTURES[f.kind].color,
+          couleur: ENCRE_ELEC,
           bold: false,
         });
       }
@@ -2494,11 +2495,11 @@ function planPage(
           const p2 = px({ x: baie.b.x + baie.n.x * decalage, z: baie.b.z + baie.n.z * decalage });
           d.line(p1.x, p1.y, p2.x, p2.y, w, hex);
         };
-        ligne(baie.plus, 0.6, INK);
-        ligne(-baie.moins, 0.6, INK);
-        const vitre = colorOpenings ? SKY : GREY;
-        ligne(0.015, 0.8, vitre);
-        ligne(-0.015, 0.8, vitre);
+        // Le bleu doux des fenêtres (voir `ui/encreElec`), dormant et vitrage.
+        ligne(baie.plus, 0.7, BLEU_FENETRE);
+        ligne(-baie.moins, 0.7, BLEU_FENETRE);
+        ligne(0.015, 0.8, BLEU_FENETRE);
+        ligne(-0.015, 0.8, BLEU_FENETRE);
       } else {
         // Ouverture sans menuiserie : double trait dans la trouée
         const wx = (-dz / len) * (WALL_T / 4);
@@ -2692,13 +2693,12 @@ function planPage(
           d.dashedPath(
             linkCurve({ x: de.x, z: de.z }, { x: vers.x, z: vers.z }).map(px),
             0.7,
-            GREY,
-            [1.6, 3],
+            ENCRE_ELEC,
+            [3, 2.2],
           );
         }
       }
       for (const { f, face, along, postes } of unites) {
-        const spec = FIXTURES[f.kind];
         // Une cote d'appareil devenue folle — un mur recoupé depuis la pose,
         // par exemple — enverrait son symbole à l'autre bout de la feuille.
         // On la borne à la face, et on jette ce qui sortirait du cadre.
@@ -2706,7 +2706,7 @@ function planPage(
         const anchor = px(facePoint(face, x, 0.02));
         const q = px(facePoint(face, x, sortieDuMur(f.id)));
         if (!dansLeCadre(q)) continue;
-        d.path([anchor, q], 0.6, spec.color);
+        d.path([anchor, q], 0.6, ENCRE_ELEC);
         /*
           PLUS DE PASTILLE BLANCHE SOUS LE SYMBOLE — relevé du patron :
           « enlève le bloc blanc derrière les icônes des éléments
@@ -2723,7 +2723,7 @@ function planPage(
           q.x,
           q.y,
           ECHELLE_SYMBOLE,
-          spec.color,
+          ENCRE_ELEC,
           0.9,
         );
       }
@@ -2792,8 +2792,8 @@ function planPage(
             d.dashedPath(
               linkCurve({ x: depart.x, z: depart.z }, arrivee).map(px),
               0.7,
-              GREY,
-              [1.6, 3],
+              ENCRE_ELEC,
+              [3, 2.2],
             );
           }
         }
@@ -3115,7 +3115,7 @@ function planPage(
             aucune étiquette ne vient s'y écrire, et le symbole se lit sans
             avoir besoin de creuser un trou.
           */
-          drawSymbol(d, CEILING_SYMBOL[cl.kind], q.x, q.y, r / 9, spec.color, 1.1);
+          drawSymbol(d, CEILING_SYMBOL[cl.kind], q.x, q.y, r / 9, ENCRE_ELEC, 1.1);
           // La place retenue plus haut, avant que les cotes ne se posent.
           // Absente : le sigle a cédé la place au nom de sa pièce, qui n'en
           // avait aucune autre — voir « une pièce saturée garde son nom ».
@@ -3129,7 +3129,7 @@ function planPage(
             pose ? pose.x : q.x - latin1(spec.short).length * 6.5 * 0.25,
             pose ? pose.y : q.y - r - 8,
             6.5,
-            spec.color,
+            ENCRE_ELEC,
             { bold: true, align: 'left' },
           );
         }

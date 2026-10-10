@@ -35,7 +35,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import Svg, { G, Path, Polygon, Rect } from 'react-native-svg';
+import Svg, { Defs, G, LinearGradient, Path, Polygon, Rect, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 import { haptic } from '../ui/haptic';
@@ -45,13 +45,14 @@ import { roomParts, toFootprint, type WallSeg } from '../geometry/floorplan';
 import { cheminDuPoche, pocheDesMurs, type Poche } from '../geometry/poche';
 import { furnKind, furnitureStrokes } from '../geometry/furniture';
 import { LogoEcho } from './LogoMark';
+import { bleuFenetre } from '../ui/encreElec';
 
 const IMAGE_PIECE = require('../assets/film/piece.jpg');
 const IMAGE_MAISON = require('../assets/film/maison.jpg');
 const IMAGE_MAISON_VIDE = require('../assets/film/maison-vide.jpg');
 /** Les proportions des rendus : l'écran d'un iPhone, et le plan 3D. */
 const RATIO_PIECE = 780 / 1688;
-const RATIO_MAISON = 1160 / 1060;
+const RATIO_MAISON = 1200 / 1114;
 
 // ------------------------------------------------------------ l'horloge
 
@@ -194,10 +195,10 @@ function Murs({ plan, k, c }: { plan: PlanDuFilm; k: ReturnType<typeof cadrage>;
         if (b.type === 'window') {
           return (
             <G key={i}>
-              <Path d={ligne(b, b.plus)} stroke={c.ink} strokeWidth={1} />
-              <Path d={ligne(b, -b.moins)} stroke={c.ink} strokeWidth={1} />
-              <Path d={ligne(b, 0.015)} stroke={c.sky} strokeWidth={1.1} />
-              <Path d={ligne(b, -0.015)} stroke={c.sky} strokeWidth={1.1} />
+              <Path d={ligne(b, b.plus)} stroke={bleuFenetre(c)} strokeWidth={1.2} />
+              <Path d={ligne(b, -b.moins)} stroke={bleuFenetre(c)} strokeWidth={1.2} />
+              <Path d={ligne(b, 0.015)} stroke={bleuFenetre(c)} strokeWidth={1.1} />
+              <Path d={ligne(b, -0.015)} stroke={bleuFenetre(c)} strokeWidth={1.1} />
             </G>
           );
         }
@@ -289,24 +290,153 @@ interface Scene {
   c: Palette;
 }
 
+/**
+ * L'IPHONE 17 PRO, À SES COTES — relevé du patron : « fais un mockup plus
+ * réaliste, modèle iPhone 17 Pro ; les bords du mockup doivent être
+ * strictement au-dessus du tutoriel dessiné, là des traits dépassent ».
+ *
+ * 150,0 × 71,9 mm ; une dalle de 6,3″ (2622 × 1206 px à 460 ppi, soit
+ * 144,8 × 66,6 mm) ; des angles d'écran de 55 points ; la Dynamic Island de
+ * 126 × 37 points à 11 points du haut. Le bouton Action et le volume à
+ * gauche ; le bouton latéral et la Camera Control, en saphir, à droite. Le
+ * cadre est d'aluminium bleu intense.
+ *
+ * LE CADRE EST PEINT PAR-DESSUS L'ÉCRAN : le contenu se découpe à la forme
+ * de la dalle, puis le corps du téléphone — troué à cette même forme — se
+ * pose au-dessus. Rien ne peut plus dépasser du verre.
+ */
+const IPHONE = {
+  l: 71.9,
+  h: 150.0,
+  ecranL: 66.6,
+  ecranH: 144.8,
+  rayonEcran: 9.1,
+  cadre: 0.95,
+  ileL: 20.9,
+  ileH: 6.1,
+  ileHaut: 1.8,
+  saillie: 0.6,
+};
+
+/** Un rectangle arrondi, en chemin SVG. */
+const arrondi = (x: number, y: number, w: number, h: number, r: number) =>
+  `M${x + r} ${y} H${x + w - r} A${r} ${r} 0 0 1 ${x + w} ${y + r} V${y + h - r} ` +
+  `A${r} ${r} 0 0 1 ${x + w - r} ${y + h} H${x + r} A${r} ${r} 0 0 1 ${x} ${y + h - r} ` +
+  `V${y + r} A${r} ${r} 0 0 1 ${x + r} ${y} Z`;
+
+export function IPhone17Pro({
+  largeur,
+  children,
+}: {
+  largeur: number;
+  /** Le contenu de l'écran, dessiné à la taille de la dalle. */
+  children: (ecran: { w: number; h: number }) => React.ReactNode;
+}) {
+  const k = largeur / IPHONE.l;
+  const W = largeur;
+  const H = IPHONE.h * k;
+  const m = Math.max(2, IPHONE.saillie * k + 1);
+  const ex = ((IPHONE.l - IPHONE.ecranL) / 2) * k;
+  const ey = ((IPHONE.h - IPHONE.ecranH) / 2) * k;
+  const sw = IPHONE.ecranL * k;
+  const sh = IPHONE.ecranH * k;
+  const re = IPHONE.rayonEcran * k;
+  const rc = re + ex;
+  const cadre = IPHONE.cadre * k;
+  const bouton = (cote: -1 | 1, de: number, a: number, saphir = false) => (
+    <Rect
+      x={cote < 0 ? m - IPHONE.saillie * k : m + W - 1}
+      y={de * k}
+      width={IPHONE.saillie * k + 1}
+      height={(a - de) * k}
+      rx={IPHONE.saillie * k * 0.8}
+      fill={saphir ? '#20283A' : 'url(#alu-bouton)'}
+    />
+  );
+  return (
+    <View style={[stylesIPhone.corps, { width: W + 2 * m, height: H }]}>
+      <View
+        style={[
+          stylesIPhone.ecran,
+          { left: m + ex, top: ey, width: sw, height: sh, borderRadius: re },
+        ]}>
+        {children({ w: sw, h: sh })}
+      </View>
+      <Svg width={W + 2 * m} height={H} style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          <LinearGradient id="alu" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor="#1A2130" />
+            <Stop offset="0.06" stopColor="#4C5B78" />
+            <Stop offset="0.14" stopColor="#273144" />
+            <Stop offset="0.86" stopColor="#273144" />
+            <Stop offset="0.94" stopColor="#52627F" />
+            <Stop offset="1" stopColor="#1A2130" />
+          </LinearGradient>
+          <LinearGradient id="alu-bouton" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor="#3A4660" />
+            <Stop offset="0.5" stopColor="#5E6E8C" />
+            <Stop offset="1" stopColor="#2A3346" />
+          </LinearGradient>
+          <LinearGradient id="reflet" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor="#FFFFFF" stopOpacity="0.16" />
+            <Stop offset="0.35" stopColor="#FFFFFF" stopOpacity="0.04" />
+            <Stop offset="0.36" stopColor="#FFFFFF" stopOpacity="0" />
+            <Stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
+          </LinearGradient>
+        </Defs>
+        {/* Les boutons, sous le corps : ils n'en dépassent que d'une saillie. */}
+        {bouton(-1, 30.5, 38.5)}
+        {bouton(-1, 45, 56)}
+        {bouton(-1, 59.5, 70.5)}
+        {bouton(1, 44, 62)}
+        {bouton(1, 97, 116, true)}
+        {/* Le verre noir autour de la dalle. */}
+        <Path d={arrondi(m, 0, W, H, rc) + ' ' + arrondi(m + ex, ey, sw, sh, re)} fill="#060708" fillRule="evenodd" />
+        {/* Le cadre d'aluminium, au bord. */}
+        <Path
+          d={arrondi(m, 0, W, H, rc) + ' ' + arrondi(m + cadre, cadre, W - 2 * cadre, H - 2 * cadre, rc - cadre)}
+          fill="url(#alu)"
+          fillRule="evenodd"
+        />
+        {/* Le liseré de lumière sur l'arête du cadre. */}
+        <Path d={arrondi(m + 0.5, 0.5, W - 1, H - 1, rc - 0.5)} stroke="#8A9AB8" strokeOpacity={0.55} strokeWidth={0.8} fill="none" />
+        {/* La Dynamic Island. */}
+        <Rect
+          x={m + W / 2 - (IPHONE.ileL * k) / 2}
+          y={ey + IPHONE.ileHaut * k}
+          width={IPHONE.ileL * k}
+          height={IPHONE.ileH * k}
+          rx={(IPHONE.ileH * k) / 2}
+          fill="#000000"
+        />
+        {/* Le reflet du verre, à peine. */}
+        <Path d={arrondi(m + ex, ey, sw, sh, re)} fill="url(#reflet)" />
+      </Svg>
+    </View>
+  );
+}
+
+const stylesIPhone = StyleSheet.create({
+  corps: {
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 16 },
+    elevation: 12,
+  },
+  ecran: { position: 'absolute', overflow: 'hidden', backgroundColor: '#000' },
+});
+
 /*
-  CHAPITRE 1 — LE SCAN. Un iPhone, la pièce dans l'écran ; le téléphone
+  CHAPITRE 1 — LE SCAN. L'iPhone 17 Pro, la pièce dans l'écran ; le téléphone
   balaie (l'image glisse et se resserre), et les arêtes se tracent sur les
   murs, les baies, puis autour des meubles — à leur place exacte, puisque le
   rendu et le tracé ont la même caméra.
 */
 function SceneScan({ t, w, h, c }: Scene) {
   const styles = getStyles(c);
-  const pw = Math.min(w * 0.6, (h * 0.96) / 2.07);
-  const ph = pw * 2.07;
-  const lunette = pw * 0.035;
-  const sw = pw - 2 * lunette;
-  const sh = ph - 2 * lunette;
-  // L'image couvre l'écran : même proportion, à un cheveu près.
-  const iw = Math.max(sw, sh * RATIO_PIECE);
-  const ih = iw / RATIO_PIECE;
-  const ordre = { sol: 0, angle: 1, plafond: 2, baie: 3, meuble: 4 };
-  const fenetres = { sol: [0.1, 0.38], angle: [0.16, 0.4], plafond: [0.2, 0.44], baie: [0.36, 0.58], meuble: [0.52, 0.8] };
+  const largeur = Math.min(w * 0.62, (h * 0.97 * IPHONE.l) / IPHONE.h);
+  const fenetres = { sol: [0.08, 0.32], angle: [0.12, 0.34], plafond: [0.16, 0.38], baie: [0.3, 0.5], meuble: [0.44, 0.76] };
   const parSorte = new Map<string, number>();
   const nb = (s: string) => ARETES_DU_SCAN.filter((a) => a.sorte === s).length;
   return (
@@ -315,64 +445,70 @@ function SceneScan({ t, w, h, c }: Scene) {
         opacity: paraitre(t, 0, 0.08),
         transform: [{ translateY: fenetre(t, 0, 0.14, 26, 0) }, { scale: fenetre(t, 0, 0.14, 0.96, 1) }],
       }}>
-      <View style={[styles.telephone, { width: pw, height: ph, borderRadius: pw * 0.16, padding: lunette }]}>
-        <View style={[styles.ecranTel, { width: sw, height: sh, borderRadius: pw * 0.13 }]}>
-          <Animated.View
-            style={{
-              width: iw,
-              height: ih,
-              transform: [
-                { translateX: fenetre(t, 0, 1, -0.05 * sw, 0.02 * sw, (x) => x) },
-                { scale: fenetre(t, 0, 1, 1.12, 1.02, (x) => x) },
-              ],
-            }}>
-            <Image source={IMAGE_PIECE} style={{ width: iw, height: ih }} resizeMode="cover" />
-            {ARETES_DU_SCAN.map((s, i) => {
-              const ax = s.a[0] * iw;
-              const ay = s.a[1] * ih;
-              const L = Math.hypot(s.b[0] * iw - ax, s.b[1] * ih - ay);
-              const ang = Math.atan2(s.b[1] * ih - ay, s.b[0] * iw - ax);
-              const rangDansSorte = parSorte.get(s.sorte) ?? 0;
-              parSorte.set(s.sorte, rangDansSorte + 1);
-              const [f0, f1] = fenetres[s.sorte];
-              const debut = f0 + ((f1 - f0 - 0.1) * rangDansSorte) / Math.max(1, nb(s.sorte));
-              const meuble = s.sorte === 'meuble';
-              return (
-                <Animated.View
-                  key={i}
-                  testID={`arete-${ordre[s.sorte]}-${i}`}
-                  style={[
-                    styles.arete,
-                    meuble && styles.areteMeuble,
-                    {
-                      left: ax,
-                      top: ay - 1,
-                      width: L,
-                      transform: [{ rotate: `${ang}rad` }, { scaleX: fenetre(t, debut, debut + 0.1) }],
-                    },
-                  ]}
-                />
-              );
-            })}
-          </Animated.View>
-          {/* L'îlot de la caméra, et la pastille qui guide le geste. */}
-          <View style={[styles.ilot, { top: sh * 0.018, left: sw / 2 - sw * 0.16, width: sw * 0.32, height: sw * 0.09 }]} />
-          <Animated.View style={[styles.consigne, { top: sh * 0.075, opacity: fenetre(t, 0.06, 0.14, 0, 1) }]}>
-            <Animated.Text style={[styles.consigneTexte, { opacity: fenetre(t, 0.8, 0.86, 1, 0) }]}>
-              Balayez lentement
-            </Animated.Text>
-            <Animated.View style={[styles.consigneFin, { opacity: fenetre(t, 0.86, 0.92, 0, 1) }]}>
-              <Svg width={13} height={13} viewBox="0 0 24 24">
-                <Path d="M5 12.5l4.2 4.2L19 7" stroke="#3DDC84" strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-              </Svg>
-              <Text style={styles.consigneTexte}>Pièce relevée</Text>
-            </Animated.View>
-          </Animated.View>
-          <View style={[styles.declencheur, { bottom: sh * 0.04, left: sw / 2 - 23 }]}>
-            <View style={styles.declencheurCoeur} />
-          </View>
-        </View>
-      </View>
+      <IPhone17Pro largeur={largeur}>
+        {({ w: sw, h: sh }) => {
+          // L'image couvre la dalle : même proportion, à un cheveu près.
+          const iw = Math.max(sw, sh * RATIO_PIECE);
+          const ih = iw / RATIO_PIECE;
+          return (
+            <>
+              <Animated.View
+                style={{
+                  width: iw,
+                  height: ih,
+                  transform: [
+                    { translateX: fenetre(t, 0, 1, -0.05 * sw, 0.02 * sw, (x) => x) },
+                    { scale: fenetre(t, 0, 1, 1.12, 1.02, (x) => x) },
+                  ],
+                }}>
+                <Image source={IMAGE_PIECE} style={{ width: iw, height: ih }} resizeMode="cover" />
+                {ARETES_DU_SCAN.map((s, i) => {
+                  const ax = s.a[0] * iw;
+                  const ay = s.a[1] * ih;
+                  const L = Math.hypot(s.b[0] * iw - ax, s.b[1] * ih - ay);
+                  const ang = Math.atan2(s.b[1] * ih - ay, s.b[0] * iw - ax);
+                  const rangDansSorte = parSorte.get(s.sorte) ?? 0;
+                  parSorte.set(s.sorte, rangDansSorte + 1);
+                  const [f0, f1] = fenetres[s.sorte];
+                  const debut = f0 + ((f1 - f0 - 0.08) * rangDansSorte) / Math.max(1, nb(s.sorte));
+                  const meuble = s.sorte === 'meuble';
+                  return (
+                    <Animated.View
+                      key={i}
+                      testID={`arete-${i}`}
+                      style={[
+                        styles.arete,
+                        meuble && styles.areteMeuble,
+                        {
+                          left: ax,
+                          top: ay - 1,
+                          width: L,
+                          transform: [{ rotate: `${ang}rad` }, { scaleX: fenetre(t, debut, debut + 0.08) }],
+                        },
+                      ]}
+                    />
+                  );
+                })}
+              </Animated.View>
+              {/* La pastille qui guide le geste, sous la Dynamic Island. */}
+              <Animated.View style={[styles.consigne, { top: sh * 0.072, opacity: fenetre(t, 0.05, 0.12, 0, 1) }]}>
+                <Animated.Text style={[styles.consigneTexte, { opacity: fenetre(t, 0.8, 0.86, 1, 0) }]}>
+                  Balayez lentement
+                </Animated.Text>
+                <Animated.View style={[styles.consigneFin, { opacity: fenetre(t, 0.86, 0.92, 0, 1) }]}>
+                  <Svg width={13} height={13} viewBox="0 0 24 24">
+                    <Path d="M5 12.5l4.2 4.2L19 7" stroke="#3DDC84" strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                  <Text style={styles.consigneTexte}>Pièce relevée</Text>
+                </Animated.View>
+              </Animated.View>
+              <View style={[styles.declencheur, { bottom: sh * 0.045, left: sw / 2 - 23 }]}>
+                <View style={styles.declencheurCoeur} />
+              </View>
+            </>
+          );
+        }}
+      </IPhone17Pro>
     </Animated.View>
   );
 }
@@ -387,7 +523,7 @@ function ScenePlan({ t, w, h, c }: Scene) {
   const plan = planDuFilm();
   const cw = w;
   const ch = Math.min(h, w * 0.92);
-  const k = cadrage(plan, cw, ch, 34);
+  const k = cadrage(plan, cw, ch, 42);
   const largeur = plan.lx * k.s;
   const balayage = fenetre(t, 0.08, 0.5, 0, 1, (x) => x * x * (3 - 2 * x));
   return (
@@ -405,6 +541,8 @@ function ScenePlan({ t, w, h, c }: Scene) {
           {
             left: k.px(plan.x0) - 4,
             width: largeur + 8,
+            // Le balayage fini, le faisceau ne reste pas collé au bord du plan.
+            opacity: fenetre(t, 0.5, 0.56, 1, 0),
             transform: [{ translateX: balayage.interpolate({ inputRange: [0, 1], outputRange: [0, largeur + 8] }) }],
           },
         ]}>
@@ -436,16 +574,16 @@ function ScenePlan({ t, w, h, c }: Scene) {
       })}
       {/* Les cotes d'ensemble, qui s'étirent depuis leur milieu. */}
       <Animated.View
-        style={[styles.cote, { left: k.px(plan.x0), top: k.py(plan.z0) - 18, width: largeur, transform: [{ scaleX: fenetre(t, 0.74, 0.88) }] }]}
+        style={[styles.cote, { left: k.px(plan.x0), top: k.py(plan.z0) - 14, width: largeur, transform: [{ scaleX: fenetre(t, 0.74, 0.88) }] }]}
       />
-      <Animated.Text style={[styles.coteTexte, { left: k.px(plan.x0), top: k.py(plan.z0) - 34, width: largeur, opacity: paraitre(t, 0.82, 0.9) }]}>
+      <Animated.Text style={[styles.coteTexte, { left: k.px(plan.x0), top: k.py(plan.z0) - 31, width: largeur, opacity: paraitre(t, 0.82, 0.9) }]}>
         {`${plan.lx.toFixed(2).replace('.', ',')} m`}
       </Animated.Text>
       <Animated.View
         style={[
           styles.cote,
           {
-            left: k.px(plan.x0) - 18 - (plan.lz * k.s) / 2,
+            left: k.px(plan.x0) - 14 - (plan.lz * k.s) / 2,
             top: k.py(plan.z0) + (plan.lz * k.s) / 2,
             width: plan.lz * k.s,
             transform: [{ rotate: '90deg' }, { scaleX: fenetre(t, 0.78, 0.92) }],
@@ -457,7 +595,8 @@ function ScenePlan({ t, w, h, c }: Scene) {
           styles.coteTexte,
           styles.coteVerticale,
           {
-            left: k.px(plan.x0) - 34 - 40,
+            // Centré à 26 points du plan : entier dans la marge de 42.
+            left: k.px(plan.x0) - 26 - 40,
             top: k.py(plan.z0) + (plan.lz * k.s) / 2 - 8,
             opacity: paraitre(t, 0.86, 0.94),
             transform: [{ rotate: '-90deg' }],
@@ -479,7 +618,7 @@ function SceneMeubles({ t, w, h, c }: Scene) {
   const plan = planDuFilm();
   const cw = w;
   const ch = Math.min(h, w * 0.92);
-  const k = cadrage(plan, cw, ch, 34);
+  const k = cadrage(plan, cw, ch, 42);
   const canape = plan.meubles.find((m) => m.modele.startsWith('canape')) ?? plan.meubles[0];
   // Le catalogue, en bas de la feuille : quatre tuiles.
   const tuiles = ['sofa', 'bed', 'table', 'storage'] as const;
@@ -491,7 +630,7 @@ function SceneMeubles({ t, w, h, c }: Scene) {
   const autres = plan.meubles.filter((m) => m.id !== canape.id);
   return (
     <View style={[styles.feuille, { width: cw, height: ch }]}>
-      <PlanFige w={cw} h={ch} marge={34} meubles={false} c={c} />
+      <PlanFige w={cw} h={ch} marge={42} meubles={false} c={c} />
       {[canape, ...autres].map((m, i) => {
         const t0 = i === 0 ? 0.47 : 0.56 + (i - 1) * (0.3 / autres.length);
         const R = (Math.hypot(m.w, m.d) * k.s) / 2 + 3;
@@ -583,9 +722,9 @@ function Scene3D({ t, w, h, c }: Scene) {
           styles.carteImage,
           { width: cw, height: ch, opacity: paraitre(t, 0, 0.1) },
         ]}>
-        <Animated.View style={{ width: cw, height: ch, transform: [{ scale: fenetre(t, 0, 1, 1.0, 1.1, (x) => x) }, { translateY: fenetre(t, 0, 1, 12, -8, (x) => x) }] }}>
+        <Animated.View style={{ width: cw, height: ch, transform: [{ scale: fenetre(t, 0, 1, 1.0, 1.05, (x) => x) }] }}>
           <Image source={IMAGE_MAISON_VIDE} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          <Animated.View style={[StyleSheet.absoluteFill, { opacity: fenetre(t, 0.24, 0.46) }]}>
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: fenetre(t, 0.14, 0.34) }]}>
             <Image source={IMAGE_MAISON} style={StyleSheet.absoluteFill} resizeMode="cover" />
           </Animated.View>
         </Animated.View>
@@ -784,9 +923,9 @@ export function FilmTutoriel({
       onFini();
       return;
     }
-    Animated.timing(coupure, { toValue: 1, duration: 110, easing: Easing.out(Easing.quad), useNativeDriver: true }).start(() => {
+    Animated.timing(coupure, { toValue: 1, duration: 90, easing: Easing.out(Easing.quad), useNativeDriver: true }).start(() => {
       setRang((r) => r + 1);
-      Animated.timing(coupure, { toValue: 0, duration: 220, easing: Easing.in(Easing.quad), useNativeDriver: true }).start();
+      Animated.timing(coupure, { toValue: 0, duration: 160, easing: Easing.in(Easing.quad), useNativeDriver: true }).start();
     });
   };
 
@@ -917,16 +1056,6 @@ const getStyles = themedStyles((c: Palette) =>
     },
     suivantTexte: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
     enfonce: { opacity: 0.85, transform: [{ scale: 0.985 }] },
-    // Le téléphone : une lunette noire, un écran arrondi, une ombre franche.
-    telephone: {
-      backgroundColor: '#101114',
-      shadowColor: '#000',
-      shadowOpacity: 0.28,
-      shadowRadius: 22,
-      shadowOffset: { width: 0, height: 14 },
-      elevation: 12,
-    },
-    ecranTel: { overflow: 'hidden', backgroundColor: '#000', alignItems: 'flex-start' },
     arete: {
       position: 'absolute',
       height: 2,
@@ -939,7 +1068,6 @@ const getStyles = themedStyles((c: Palette) =>
       shadowOffset: { width: 0, height: 0 },
     },
     areteMeuble: { backgroundColor: '#FFE3A8', shadowColor: '#FFC24D' },
-    ilot: { position: 'absolute', borderRadius: 20, backgroundColor: '#000' },
     consigne: {
       position: 'absolute',
       alignSelf: 'center',

@@ -380,7 +380,7 @@ export function HomeScreen() {
                     hauteur={HAUTE}
                     icone={SOLAIRES.etoile}
                     titre={'Comment\nça marche'}
-                    sous="Le film, en 25 secondes"
+                    sous="Le film, en 17 secondes"
                     label="Comment ça marche"
                     onPress={() => revoir('accueil')}
                   />

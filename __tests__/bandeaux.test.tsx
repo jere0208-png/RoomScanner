@@ -2021,9 +2021,10 @@ describe('le lien mural sur le plan', () => {
         }
       }
     });
-    // Le filet du lien : le tireté fin des liaisons de commande.
+    // Le filet du lien : le tireté des liaisons de commande — celui de
+    // l'architecte, à l'encre rouge, dès que l'électricité est affichée.
     const filets = tree.root.findAll(
-      (n) => n.props?.strokeDasharray === '1.5 3.5',
+      (n) => n.props?.strokeDasharray === '4 3' || n.props?.strokeDasharray === '1.5 3.5',
     );
     expect(filets.length).toBeGreaterThanOrEqual(1);
     act(() => tree.unmount());

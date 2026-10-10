@@ -78,7 +78,7 @@ const tourner = <T extends { a: Pt; b: Pt }>(w: T): T => ({
   },
 });
 
-function rendu(editable: boolean, regle?: string, biais = false) {
+function rendu(editable: boolean, regle?: string, biais = false, elec = true) {
   const murs = biais ? SNAPSHOT_WALLS.map(tourner) : SNAPSHOT_WALLS;
   const baies = biais ? SNAPSHOT_OPENINGS.map(tourner) : SNAPSHOT_OPENINGS;
   useScanStore.setState({
@@ -106,7 +106,8 @@ function rendu(editable: boolean, regle?: string, biais = false) {
         selectedWallId={null}
         onSelectWall={() => {}}
         ceiling={PLAFOND}
-        showCeiling
+        showCeiling={elec}
+        showFixtures={elec}
         selectedCeilingId={regle ?? null}
       />,
     );
@@ -207,7 +208,8 @@ describe('les conventions du dessin de plan', () => {
    * ce qui passe dessous. Ni vitre, ni dalle.
    */
   it('donne au cartouche un fond translucide mais couvrant', () => {
-    const tree = rendu(false);
+    // Le plan d'architecte : sans la couche électrique.
+    const tree = rendu(false, undefined, false, false);
     const cartouches = tous(tree, 'Rect').filter((n) => n.props.rx === 5);
     expect(cartouches.length).toBeGreaterThan(0);
     for (const r of cartouches) {
@@ -222,6 +224,22 @@ describe('les conventions du dessin de plan', () => {
       */
       expect(op).toBeGreaterThanOrEqual(0.6);
       expect(op).toBeLessThanOrEqual(0.8);
+    }
+  });
+
+  /*
+    LE PLAN ÉLECTRIQUE, COMME CELUI DE L'ARCHITECTE — relevé du patron :
+    « fais pareil pour le plan électrique ». Sur le plan d'électricité d'un
+    cabinet, le nom de la pièce est écrit à même le sol : le cartouche n'a
+    ni fond ni cadre, les symboles et leurs liaisons passent sans masque.
+  */
+  it('sur le plan électrique, le cartouche est écrit à même le sol', () => {
+    const tree = rendu(false);
+    const cartouches = tous(tree, 'Rect').filter((n) => n.props.rx === 5);
+    expect(cartouches.length).toBeGreaterThan(0);
+    for (const r of cartouches) {
+      expect(Number(r.props.fillOpacity ?? 1)).toBe(0);
+      expect(r.props.stroke).toBe('none');
     }
   });
 

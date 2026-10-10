@@ -150,36 +150,54 @@ const meuble = (key: string, x: number, z: number, quarts = 0): ObjectData => {
   };
 };
 
+/*
+  CHAQUE MEUBLE FAIT FACE À LA PIÈCE — relevé du patron : « le placement des
+  meubles n'est pas cohérent : le canapé et la table devant une porte, un
+  siège pas face au bureau mais tourné sur le côté ».
+
+  L'avant d'un meuble est son côté −z (voir `furniture3d`, `modeles3d`) ; un
+  quart de tour le tourne vers l'est, deux vers le sud, trois vers l'ouest.
+  Les fronts de cuisine, le canapé, la tête de lit, les chevets, la
+  bibliothèque, la vasque et la moitié des chaises regardaient LE MUR : les
+  caisses ne le montraient pas, les vrais modèles si. Et le coin salon bouchait
+  la porte de la chambre, le fauteuil le passage vers l'entrée.
+*/
 const OBJECTS: ObjectData[] = [
-  // Séjour — la cuisine ouverte le long du mur nord.
-  meuble('frigo', 0.07 + NU + 0.3, NU + 0.33),
-  meuble('meubleBas120', 1.38, NU + 0.3),
-  meuble('plaque', 2.28, NU + 0.26),
+  // Séjour — la cuisine ouverte le long du mur nord, façades vers la pièce.
+  // Deux millimètres de jeu au mur : retourné d'un demi-tour, un meuble posé
+  // pile au nu le « mordrait » d'une erreur d'arrondi.
+  meuble('frigo', 0.07 + NU + 0.3, NU + 0.332, 2),
+  meuble('meubleBas120', 1.38, NU + 0.302, 2),
+  meuble('plaque', 2.28, NU + 0.262, 2),
+  // La table, ses quatre chaises tournées vers elle.
   meuble('tableRepas', 1.3, 2.1),
-  meuble('chaise', 0.85, 1.4),
-  meuble('chaise', 1.75, 1.4),
+  meuble('chaise', 0.85, 1.4, 2),
+  meuble('chaise', 1.75, 1.4, 2),
   meuble('chaise', 0.85, 2.8),
   meuble('chaise', 1.75, 2.8),
-  // Le coin salon, dos au refend.
-  meuble('tapis', 3.75, 2.05, 1),
-  meuble('canape2', 5 - NU - 0.44, 2.05, 1),
-  meuble('tableBasse', 3.75, 2.05, 1),
-  meuble('fauteuil', 3.1, 3.45),
+  // Le coin salon, dos au refend — ENTRE la porte-fenêtre et la porte de la
+  // chambre, sans boucher ni l'une ni l'autre.
+  meuble('tapis', 3.75, 1.5, 1),
+  meuble('canape2', 5 - NU - 0.44, 1.5, 3),
+  meuble('tableBasse', 3.45, 1.5, 1),
+  // Le fauteuil face au canapé, de l'autre côté de la table basse ; le
+  // passage vers l'entrée reste libre derrière lui.
+  meuble('fauteuil', 3.75, 2.95),
   meuble('plante', 2.95, NU + 0.3),
   // Chambre — le lit, tête au mur est, entre ses deux chevets.
-  meuble('lit140', 8 - NU - 0.995, 1.8, 1),
-  meuble('chevet', 8 - NU - 0.175, 0.82, 1),
-  meuble('chevet', 8 - NU - 0.175, 2.78, 1),
+  meuble('lit140', 8 - NU - 0.995, 1.8, 3),
+  meuble('chevet', 8 - NU - 0.175, 0.82, 3),
+  meuble('chevet', 8 - NU - 0.175, 2.78, 3),
   meuble('armoire2p', 5 + NU + 0.29, 0.75, 1),
-  // Salle d'eau.
-  meuble('douche', 8 - NU - 0.46, 3.6 + NU + 0.46),
-  meuble('meubleVasque', 6.15, 3.6 + NU + 0.26),
+  // Salle d'eau — la douche dans l'angle, ouverte vers la pièce.
+  meuble('douche', 8 - NU - 0.46, 3.6 + NU + 0.46, 3),
+  meuble('meubleVasque', 6.15, 3.6 + NU + 0.26, 2),
   meuble('wc', 7.45, 6 - NU - 0.35),
   meuble('ll', 6.3, 6 - NU - 0.3),
-  // Bureau, sous la fenêtre ouest.
+  // Bureau, sous la fenêtre ouest — et le fauteuil face à lui.
   meuble('bureau', NU + 0.31, 5.1, 1),
-  meuble('fauteuilBureau', 0.95, 5.1),
-  meuble('biblio', 1.75, 4.2 + NU + 0.14),
+  meuble('fauteuilBureau', 0.95, 5.1, 3),
+  meuble('biblio', 1.75, 4.2 + NU + 0.14, 2),
   // Entrée.
   meuble('plante', 4.62, 5.55),
 ];

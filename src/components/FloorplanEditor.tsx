@@ -63,6 +63,7 @@ import {
 } from '../geometry/electrical';
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 import { markColor } from '../geometry/schema';
+import { bleuFenetre, encreElectrique } from '../ui/encreElec';
 import { cheminDuPoche, pocheDesMurs } from '../geometry/poche';
 import { CeilingLayer } from './CeilingLayer';
 import { FixtureLayer } from './FixtureLayer';
@@ -1522,7 +1523,19 @@ export function FloorplanEditor({
   // Le sol garde sa teinte neutre. Les couleurs relevées au scan ne servent
   // qu'à la vue 3D : sur un plan vu de dessus, sous le poché des murs et le
   // semis des points, elles ne se lisaient pas.
-  const fillOf = useMemo(() => (_roomId: string) => c.surfaceSunken, [c]);
+  /*
+    LE PLAN ÉLECTRIQUE, COMME CELUI DE L'ARCHITECTE — relevé du patron :
+    « fais pareil pour le plan électrique, comme le plan d'architecte ».
+    Dès que l'électricité est affichée, elle parle d'une seule encre rouge
+    (voir `ui/encreElec`), et l'architecture se met en retrait : sols blancs,
+    mobilier en gris clair. On lit l'électricité d'un coup d'œil.
+  */
+  const planElec = showFixtures || showCeiling;
+  const encre = planElec ? encreElectrique(c) : undefined;
+  const fillOf = useMemo(
+    () => (_roomId: string) => (planElec ? c.surface : c.surfaceSunken),
+    [c, planElec],
+  );
   const partOf = useMemo(
     () => new Map(parts.map((p) => [p.roomId, p])),
     [parts],
@@ -2191,7 +2204,9 @@ export function FloorplanEditor({
                     fill={
                       poseRefusee && o.id === selectedObjectId
                         ? c.danger
-                        : c.blueSoft
+                        : planElec
+                          ? c.surface
+                          : c.blueSoft
                     }
                     fillOpacity={
                       poseRefusee && o.id === selectedObjectId ? 0.35 : 1
@@ -2201,7 +2216,9 @@ export function FloorplanEditor({
                         ? c.danger
                         : o.id === selectedObjectId
                         ? c.blue
-                        : c.lineStrong
+                        : planElec
+                          ? c.line
+                          : c.lineStrong
                     }
                     strokeWidth={o.id === selectedObjectId ? 2.5 : 1}
                     rx={3}
@@ -2231,8 +2248,8 @@ export function FloorplanEditor({
                               `${pi === 0 ? 'M' : 'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`,
                           )
                           .join(' ')}
-                        stroke={c.inkSoft}
-                        strokeWidth={1.2}
+                        stroke={planElec ? c.inkFaint : c.inkSoft}
+                        strokeWidth={planElec ? 1 : 1.2}
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         fill="none"
@@ -2923,7 +2940,8 @@ export function FloorplanEditor({
                     stroke="transparent"
                     strokeWidth={26}
                   />
-                  {/* Les deux faces du tableau : le dormant, en traits fins. */}
+                  {/* Les deux faces du tableau : le dormant, en traits fins, dans
+                      le bleu doux des fenêtres (voir `ui/encreElec`). */}
                   {o.type === 'window' &&
                     [face(1), face(-1)].map((f, i) =>
                       f ? (
@@ -2933,8 +2951,8 @@ export function FloorplanEditor({
                           y1={f[0].y}
                           x2={f[1].x}
                           y2={f[1].y}
-                          stroke={c.ink}
-                          strokeWidth={1}
+                          stroke={choisie ? c.blue : bleuFenetre(c)}
+                          strokeWidth={1.2}
                         />
                       ) : null,
                     )}
@@ -2949,7 +2967,7 @@ export function FloorplanEditor({
                           y1={v[0].y}
                           x2={v[1].x}
                           y2={v[1].y}
-                          stroke={choisie ? c.blue : color}
+                          stroke={choisie ? c.blue : bleuFenetre(c)}
                           strokeWidth={choisie ? 2 : 1.1}
                         />
                       );
@@ -3057,6 +3075,7 @@ export function FloorplanEditor({
               partOf={partOf}
               mapping={mapping}
               frame={frame}
+              encre={encre}
               c={c}
             />
 
@@ -3070,6 +3089,7 @@ export function FloorplanEditor({
               elecLod={elecLod}
               navigating={false}
               onSelectFixture={onSelectFixture}
+              encre={encre}
               c={c}
             />
 
@@ -3215,8 +3235,15 @@ export function FloorplanEditor({
                     /* Et son fond laisse voir davantage : sept dixièmes,
                        pas huit et demi. Ce qui passe dessous — un meuble,
                        une gaine — se devine sans qu'on ait à le déplacer. */
-                    fillOpacity={0.7}
-                    stroke={selected ? c.blue : c.lineStrong}
+                    fillOpacity={planElec ? 0 : 0.7}
+                    /*
+                      SUR LE PLAN ÉLECTRIQUE, LE NOM EST UN TEXTE NU — comme
+                      sur le plan de l'architecte. L'encadré, même à demi
+                      transparent, grisait la cloison qu'il chevauchait et
+                      pâlissait l'interrupteur posé dessous. Il garde le
+                      toucher (fond transparent) et le bleu de la sélection.
+                    */
+                    stroke={selected ? c.blue : planElec ? 'none' : c.lineStrong}
                     strokeWidth={selected ? 2 : 1}
                   />
                   {/* Le point ambre de conformité a vécu ici — relevé du

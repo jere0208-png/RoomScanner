@@ -137,7 +137,8 @@ describe('le lien sur le papier', () => {
     );
     let src = '';
     for (let i = 0; i < bytes.length; i++) src += String.fromCharCode(bytes[i]);
-    const lien = src.indexOf('[1.6 3]');
+    // Le tireté du plan électrique : celui de l'architecte (voir `ui/encreElec`).
+    const lien = src.indexOf('[3 2.2]');
     const sigle = src.indexOf('(RJ');
     expect(lien).toBeGreaterThanOrEqual(0);
     expect(sigle).toBeGreaterThanOrEqual(0);

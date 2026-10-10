@@ -49,8 +49,15 @@ export function FixtureLayer({
   elecLod,
   navigating,
   onSelectFixture,
+  encre,
   c,
 }: {
+  /**
+   * L'ENCRE DU PLAN ÉLECTRIQUE (voir `ui/encreElec`) : toute l'électricité
+   * d'un seul rouge, comme sur un plan d'architecte. Absente, chaque
+   * appareil garde la couleur de sa famille.
+   */
+  encre?: string;
   fixtures?: Fixture[];
   circuitMarks?: Map<string, string>;
   walls: WallSeg[];
@@ -125,9 +132,9 @@ export function FixtureLayer({
               <Polyline
                 points={courbe.join(' ')}
                 fill="none"
-                stroke={c.inkSoft}
+                stroke={encre ?? c.inkSoft}
                 strokeWidth={1.1}
-                strokeDasharray="1.5 3.5"
+                strokeDasharray={encre ? '4 3' : '1.5 3.5'}
                 strokeLinecap="round"
               />
               {liensNes.has(`${f.id}|${cid}`) && (
@@ -136,7 +143,7 @@ export function FixtureLayer({
                 <LienQuiSeTisse
                   points={[...courbe].reverse().join(' ')}
                   bout={mapping.toPx({ x: de.x, z: de.z })}
-                  color={c.inkSoft}
+                  color={encre ?? c.inkSoft}
                 />
               )}
             </G>
@@ -155,7 +162,7 @@ export function FixtureLayer({
               id={f.id}
               cx={g.x}
               cy={g.y}
-              color={FIXTURES[f.kind].color}
+              color={encre ?? FIXTURES[f.kind].color}
               retard={i * 70}
             />
           );
@@ -316,7 +323,7 @@ export function FixtureLayer({
                 entier dès que le doigt se lève.
               */}
               {navigating && (
-                <Circle cx={p.x} cy={p.y} r={3.4} fill={spec.color} />
+                <Circle cx={p.x} cy={p.y} r={3.4} fill={(encre ?? spec.color)} />
               )}
               {!navigating && (
               <>
@@ -336,7 +343,7 @@ export function FixtureLayer({
                     y1={anchor.y}
                     x2={p.x}
                     y2={p.y}
-                    stroke={spec.color}
+                    stroke={(encre ?? spec.color)}
                     strokeWidth={1.2}
                   />
                   {/*
@@ -384,11 +391,11 @@ export function FixtureLayer({
                       <Path
                         key={si}
                         d={seg.d}
-                        stroke={spec.color}
+                        stroke={(encre ?? spec.color)}
                         strokeWidth={1.6}
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        fill={seg.fill ? spec.color : 'none'}
+                        fill={seg.fill ? (encre ?? spec.color) : 'none'}
                       />
                     ))}
                   </G>
@@ -403,7 +410,7 @@ export function FixtureLayer({
                       <SvgText
                         x={pose.x}
                         y={pose.y}
-                        fill={spec.color}
+                        fill={(encre ?? spec.color)}
                         fontSize={taillePolice}
                         fontWeight="800">
                         {tag}

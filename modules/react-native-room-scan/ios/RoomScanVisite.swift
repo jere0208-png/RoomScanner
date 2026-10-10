@@ -114,6 +114,23 @@ final class RoomScanVisite: UIView {
   /// Le fil du bois et la trame des tissus, dessinés une fois par teinte.
   private var texturesDesMeubles: [String: UIImage] = [:]
 
+  /**
+   * LE LISERÉ DES MEUBLES — relevé du patron : « les meubles blancs sont trop
+   * blancs et se fondent dans le sol blanc sans texture ; donne-leur un
+   * aspect différent, comme un léger contour sur leurs formes ».
+   *
+   * La « coque inversée » des dessins au trait : chaque meuble est redessiné
+   * une seconde fois, gonflé le long de ses normales et vu par l'intérieur
+   * (seules ses faces arrière se peignent). Là où le meuble se découpe sur le
+   * sol ou sur un mur, cette coque dépasse d'un cheveu : un liseré sombre
+   * tout autour de la forme, coussins arrondis compris.
+   *
+   * Son épaisseur se recalcule à chaque mouvement de caméra pour rester
+   * d'un point à l'écran, quel que soit le zoom.
+   */
+  private var materiauxContour: [SCNMaterial] = []
+  private var epaisseurContour: Float = 0.006
+
   override init(frame: CGRect) {
     super.init(frame: frame)
     // La vue ne reçoit jamais le doigt : la manette et le regard sont au
@@ -223,6 +240,7 @@ final class RoomScanVisite: UIView {
       return
     }
     oeil.camera?.usesOrthographicProjection = false
+    regleLeContour(0.005)
     guard camera.count >= 6 else { return }
     let x = camera[0].floatValue
     let y = camera[1].floatValue
@@ -291,6 +309,9 @@ final class RoomScanVisite: UIView {
       x: cible.x + vers.x * recul, y: cible.y + vers.y * recul, z: cible.z + vers.z * recul)
     oeil.look(at: cible, up: haut, localFront: SCNVector3(x: 0, y: 0, z: -1))
     SCNTransaction.commit()
+    // Un point et quart d'écran, en mètres, au zoom de cette image.
+    let hauteur = Float(max(1, bounds.height))
+    regleLeContour(o[9] * 2 / hauteur * 1.25)
   }
 
   /**
@@ -331,6 +352,7 @@ final class RoomScanVisite: UIView {
 
   private func rebatirMaintenant() {
     for enfant in bati.childNodes { enfant.removeFromParentNode() }
+    materiauxContour.removeAll()
     if let g = geometrie(maillage, deuxFaces: true) {
       bati.addChildNode(SCNNode(geometry: g))
     }
@@ -419,8 +441,81 @@ final class RoomScanVisite: UIView {
       if code == 9 { n.renderingOrder = 5 }
       if code == 3 { n.renderingOrder = 6 }
       out.append(n)
+      // Le liseré : pour ce qui a une forme pleine (ni ombre, ni verre, ni feuille).
+      if code != 9 && code != 3 && code != 4 {
+        if let coque = noeudDeContour(sommets, indices) { out.append(coque) }
+      }
     }
     return out
+  }
+
+  /**
+   * La coque d'un groupe : les mêmes triangles, avec une normale SOUDÉE par
+   * position (la moyenne des normales des sommets confondus) — sans quoi la
+   * coque se fendrait à chaque arête vive d'une boîte.
+   */
+  private func noeudDeContour(_ sommets: [SCNVector3], _ indices: [UInt32]) -> SCNNode? {
+    guard !sommets.isEmpty, !indices.isEmpty else { return nil }
+    var cumul: [String: SCNVector3] = [:]
+    var cles: [String] = []
+    cles.reserveCapacity(sommets.count)
+    // Les normales géométriques, par triangle, cumulées sur leurs sommets.
+    var parSommet = [SCNVector3](repeating: SCNVector3(x: 0, y: 0, z: 0), count: sommets.count)
+    var t = 0
+    while t + 2 < indices.count {
+      let a = Int(indices[t]), b = Int(indices[t + 1]), c = Int(indices[t + 2])
+      t += 3
+      guard a < sommets.count, b < sommets.count, c < sommets.count else { continue }
+      let n = normale(sommets[a], sommets[b], sommets[c])
+      for k in [a, b, c] {
+        parSommet[k] = SCNVector3(
+          x: parSommet[k].x + n.x, y: parSommet[k].y + n.y, z: parSommet[k].z + n.z)
+      }
+    }
+    for (k, p) in sommets.enumerated() {
+      let cle = "\(Int((p.x * 2000).rounded())),\(Int((p.y * 2000).rounded())),\(Int((p.z * 2000).rounded()))"
+      cles.append(cle)
+      let deja = cumul[cle] ?? SCNVector3(x: 0, y: 0, z: 0)
+      cumul[cle] = SCNVector3(
+        x: deja.x + parSommet[k].x, y: deja.y + parSommet[k].y, z: deja.z + parSommet[k].z)
+    }
+    var soudees: [SCNVector3] = []
+    soudees.reserveCapacity(sommets.count)
+    for cle in cles {
+      let v = cumul[cle] ?? SCNVector3(x: 0, y: 1, z: 0)
+      let l = sqrtf(v.x * v.x + v.y * v.y + v.z * v.z)
+      soudees.append(l > 1e-6 ? SCNVector3(x: v.x / l, y: v.y / l, z: v.z / l) : SCNVector3(x: 0, y: 1, z: 0))
+    }
+    let g = SCNGeometry(
+      sources: [SCNGeometrySource(vertices: sommets), SCNGeometrySource(normals: soudees)],
+      elements: [SCNGeometryElement(indices: indices, primitiveType: .triangles)])
+    let m = SCNMaterial()
+    m.lightingModel = .constant
+    m.diffuse.contents = UIColor(red: 0.36, green: 0.34, blue: 0.31, alpha: 1)
+    // Seules les faces ARRIÈRE : la coque ne se voit qu'au bord de la forme.
+    m.cullMode = .front
+    m.isDoubleSided = false
+    m.shaderModifiers = [
+      .geometry: """
+      #pragma arguments
+      float epaisseur;
+      #pragma body
+      _geometry.position.xyz += _geometry.normal * epaisseur;
+      """
+    ]
+    m.setValue(NSNumber(value: epaisseurContour), forKey: "epaisseur")
+    materiauxContour.append(m)
+    g.materials = [m]
+    return SCNNode(geometry: g)
+  }
+
+  /** L'épaisseur du liseré, en mètres — un point d'écran, au zoom du moment. */
+  private func regleLeContour(_ metres: Float) {
+    guard metres.isFinite, metres > 0 else { return }
+    epaisseurContour = min(0.05, max(0.002, metres))
+    for m in materiauxContour {
+      m.setValue(NSNumber(value: epaisseurContour), forKey: "epaisseur")
+    }
   }
 
   /** Une matière physique : teinte, rugosité, métal — et ce que son code ajoute. */

@@ -187,9 +187,14 @@ export interface Zone {
 
 /** Le symbole d'un appareil de plafond, dans un carré de 24 centré. */
 export const CEILING_SYMBOL: Record<CeilingKind, { d: string; fill?: boolean }[]> = {
-  // La croix du point lumineux : le symbole normalisé, celui que tout
-  // électricien reconnaît sans légende.
-  dcl: [{ d: 'M-8 -8 L8 8' }, { d: 'M8 -8 L-8 8' }],
+  // Le point lumineux : le cercle barré d'une croix, le symbole normalisé
+  // que tout électricien reconnaît sans légende — celui des plans
+  // d'architecte. La croix seule se confondait avec une cote annulée.
+  dcl: [
+    { d: 'M-8 0 a8 8 0 1 0 16 0 a8 8 0 1 0 -16 0' },
+    { d: 'M-5.66 -5.66 L5.66 5.66' },
+    { d: 'M5.66 -5.66 L-5.66 5.66' },
+  ],
   spot: [
     { d: 'M-5 0 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0' },
     { d: 'M0 -8 v3', },

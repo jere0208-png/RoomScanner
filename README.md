@@ -14285,6 +14285,67 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le plan électrique en plan d'architecte, le film plus vif, les meubles cernés
+
+Relevés du patron : « fais pareil pour le plan électrique, comme le plan
+d'architecte » ; « fais la vidéo tuto plus rapide », « les bords du mockup
+iPhone doivent être strictement au-dessus du tutoriel dessiné », « un mockup
+plus réaliste, iPhone 17 Pro » ; « la 2e étape, une cote est cachée à
+gauche, et le trait bleu du scan doit disparaître » ; « le canapé et la table
+devant une porte, un siège pas face au bureau » ; « l'étape Visitez-le en 3D,
+rien n'est visible » ; « les meubles blancs se fondent dans le sol blanc :
+un léger contour sur leurs formes » ; « les fenêtres en bleu doux plutôt
+que noir ».
+
+**Le plan électrique** (`FloorplanEditor`, `FixtureLayer`, `CeilingLayer`,
+`export/pdf.ts`) garde le poché d'architecte et pose l'électricité à l'encre
+rouge par-dessus, comme la planche d'électricité d'un cabinet :
+`ui/encreElec.ts` donne `ENCRE_ELEC` (#D7263D, #FF6B78 en sombre). Symboles,
+liaisons en tirets `4 3` (PDF `[3 2.2]`), légende : tout à l'encre. Le sol
+reste blanc, les meubles s'effacent en gris, le nom de la pièce s'écrit à
+même le sol — cartouche sans fond ni cadre. Le point lumineux (DCL) devient
+le cercle barré normalisé.
+
+**Les fenêtres** sont d'un bleu doux, `BLEU_FENETRE` (#86AECF, #7FA9D1 en
+sombre) : traits de tableau et vitrage, au plan, au PDF et dans le film.
+
+**Le liseré des meubles** (`RoomScanVisite.swift`) : une coque inversée —
+le même maillage gonflé le long de normales soudées par position, vu par
+l'intérieur (`cullMode = .front`), teinte constante gris chaud. Elle dépasse
+d'un cheveu là où le meuble se découpe sur le sol ou le mur : un trait
+autour de chaque forme, coussins arrondis compris. L'épaisseur est recalculée
+à chaque mouvement de caméra (un point et quart d'écran en orbite, 5 mm en
+visite), bornée de 2 à 50 mm. Ni l'ombre, ni le verre, ni les feuilles n'en
+ont.
+
+**L'appartement d'exemple** (`data/exemple.ts`) : chaque meuble regarde là
+où il sert — canapé dos au mur, face à la table basse et au tapis, hors du
+débattement des portes ; chaises de part et d'autre de la table ; fauteuil
+de bureau tourné vers le bureau ; cuisine, lit, chevets, armoire, douche,
+vasque contre leur mur, façade vers la pièce. Les images du film
+(`assets/film/*.jpg`) sont refaites sur cet aménagement, avec le liseré.
+
+**Le film** (`FilmTutoriel.tsx`, `data/film.ts`) :
+
+- plus vif : 17 s au lieu de 25 (chapitres de 3,2 à 3,6 s, coupe de 90 ms,
+  reprise de 160 ms) ; la tuile d'accueil le dit ;
+- `IPhone17Pro` : un vrai châssis aux proportions de l'iPhone 17 Pro
+  (71,9 × 150,0 mm, écran 6,3 po, coins de 9,1 mm, Dynamic Island,
+  boutons latéraux, cadre aluminium Bleu intense avec reflet). L'écran
+  est un calque qui ROGNE son contenu, et le châssis est dessiné PAR-DESSUS
+  — verre noir en pair-impair compris : plus aucun trait ne dépasse ;
+- l'étape 2 : le plan se dessine avec une marge de 42 pt, la cote verticale
+  est sortie à gauche, lisible ; le faisceau bleu du scan s'efface avant le
+  plan ;
+- l'étape « Visitez-le en 3D » : l'image est cadrée au rapport réel de la
+  maquette rendue (1200 × 1114), passe de la maison vide à la maison meublée
+  en fondu, avec un léger avancement (×1,05) — elle est entière à l'écran.
+
+Bancs : `renderplan.test.tsx` (cartouche du plan d'architecte translucide, du
+plan électrique écrit à même le sol ; planches de référence régénérées),
+`halodusymbole`, `bandeaux`, `liermur` (encre et tirets), `premierlancement`
+(film), `meublesreels`, `exemple` (aménagement valide).
+
 ## Un plan d'architecte : la maçonnerie d'un seul tenant
 
 Relevés du patron : « il y a des triangles visibles dans les murs lors de

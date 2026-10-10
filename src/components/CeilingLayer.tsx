@@ -59,8 +59,11 @@ export function CeilingLayer({
   partOf,
   mapping,
   frame,
+  encre,
   c,
 }: {
+  /** L'encre du plan électrique : voir `FixtureLayer`. */
+  encre?: string;
   ceiling?: CeilingFixture[];
   /**
    * LES ÉCARTS QUE LE PLAN A GARDÉS, ET OÙ IL LES A POSÉS.
@@ -157,11 +160,11 @@ export function CeilingLayer({
                   <Path
                     key={si}
                     d={seg.d}
-                    stroke={spec.color}
+                    stroke={encre ?? spec.color}
                     strokeWidth={1.5}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    fill={seg.fill ? spec.color : 'none'}
+                    fill={seg.fill ? encre ?? spec.color : 'none'}
                   />
                 ))}
               </G>
@@ -195,9 +198,9 @@ export function CeilingLayer({
                 <Polyline
                   points={courbe.join(' ')}
                   fill="none"
-                  stroke={c.inkSoft}
+                  stroke={encre ?? c.inkSoft}
                   strokeWidth={1.1}
-                  strokeDasharray="1.5 3.5"
+                  strokeDasharray={encre ? '4 3' : '1.5 3.5'}
                   strokeLinecap="round"
                 />
                 {liensNes.has(`${cl.id}|${fid}`) && (
@@ -206,7 +209,7 @@ export function CeilingLayer({
                   <LienQuiSeTisse
                     points={courbe.join(' ')}
                     bout={mapping.toPx(cl.at)}
-                    color={c.inkSoft}
+                    color={encre ?? c.inkSoft}
                   />
                 )}
               </G>
@@ -224,7 +227,7 @@ export function CeilingLayer({
                 id={cl.id}
                 cx={g.x}
                 cy={g.y}
-                color={c.amber}
+                color={encre ?? c.amber}
                 retard={i * 70}
               />
             );
