@@ -751,6 +751,10 @@ final class RoomScanVisite: UIView {
       m.diffuse.wrapS = .clamp
       m.diffuse.wrapT = .clamp
       m.diffuse.mipFilter = .linear
+      // Un mur vu de biais garde son détail : filtrage anisotrope.
+      m.diffuse.maxAnisotropy = 16
+      m.diffuse.minificationFilter = .linear
+      m.diffuse.magnificationFilter = .linear
       m.emission.contents = image
       m.emission.intensity = 0.35
       m.isDoubleSided = false

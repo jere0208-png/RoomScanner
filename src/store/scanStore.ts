@@ -111,6 +111,7 @@ import { GAMMES, type GammeId } from '../geometry/prix';
 import { equilibrerLaScene, pointInPolygon } from '../geometry/appearance';
 import { ancrerElec } from '../geometry/viseur';
 import { poserLibre } from '../geometry/poser';
+import { orienterLesSieges } from '../geometry/sieges';
 import type { SurfaceTexture } from 'react-native-room-scan';
 import {
   deduceRoomKind, deduireLaPiece,
@@ -5219,14 +5220,18 @@ export const useScanStore = create<ScanState>((set, get) => {
       const photos = reprojectAnchors(st.walls, walls, st.photos);
 
       const floor = avecOrthoDuSol(r.floor ?? r.rooms?.[0]?.floor ?? st.rooms[0]?.floor ?? null, r);
-      const objects: ObjectData[] = separerLeMobilier(
-        entrants.map((o) => ({
-          ...o,
-          roomId: `room-${roomIndexAt(
-            { x: o.transform[12], z: o.transform[14] },
-            shapes.map((x) => x.outline),
-          ) + 1}`,
-        })),
+      // Les sièges regardent la pièce, pas le mur : voir `orienterLesSieges`.
+      const objects: ObjectData[] = orienterLesSieges(
+        separerLeMobilier(
+          entrants.map((o) => ({
+            ...o,
+            roomId: `room-${roomIndexAt(
+              { x: o.transform[12], z: o.transform[14] },
+              shapes.map((x) => x.outline),
+            ) + 1}`,
+          })),
+        ),
+        walls,
       );
       // Ce que RoomPlan dit de chaque pièce d'abord, le mobilier ensuite.
       const kinds = shapes.map((sh, i) =>
@@ -5604,23 +5609,26 @@ export const useScanStore = create<ScanState>((set, get) => {
           : [{ outline: [], wallIds: walls.map((w) => w.id), area: 0 }];
       const idPiece = (i: number) => `room-${n}-${i + 1}`;
 
-      const objects: ObjectData[] = separerLeMobilier(
-        entrants.map((o) => {
-          const t = [...o.transform];
-          t[12] += dx;
-          t[14] += dz;
-          return {
-            ...o,
-            id: `${o.id}-n${n}`,
-            transform: t,
-            roomId: idPiece(
-              roomIndexAt(
-                { x: t[12], z: t[14] },
-                shapes.map((s) => s.outline),
+      const objects: ObjectData[] = orienterLesSieges(
+        separerLeMobilier(
+          entrants.map((o) => {
+            const t = [...o.transform];
+            t[12] += dx;
+            t[14] += dz;
+            return {
+              ...o,
+              id: `${o.id}-n${n}`,
+              transform: t,
+              roomId: idPiece(
+                roomIndexAt(
+                  { x: t[12], z: t[14] },
+                  shapes.map((s) => s.outline),
+                ),
               ),
-            ),
-          };
-        }),
+            };
+          }),
+        ),
+        walls,
       );
       const kinds = shapes.map((sh, i) =>
         deduireLaPiece(
@@ -5709,14 +5717,18 @@ export const useScanStore = create<ScanState>((set, get) => {
       // Chaque meuble revient à la pièce qui le contient.
       // À la sortie du scan comme à l'ouverture d'un dossier : deux meubles que
       // la caméra a fait se traverser sont écartés du strict nécessaire.
-      const objects: ObjectData[] = separerLeMobilier(
-        incomingObjects.map((o) => ({
-          ...o,
-          roomId: `room-${roomIndexAt(
-            { x: o.transform[12], z: o.transform[14] },
-            shapes.map((s) => s.outline),
-          ) + 1}`,
-        })),
+      // Les sièges regardent la pièce, pas le mur : voir `orienterLesSieges`.
+      const objects: ObjectData[] = orienterLesSieges(
+        separerLeMobilier(
+          incomingObjects.map((o) => ({
+            ...o,
+            roomId: `room-${roomIndexAt(
+              { x: o.transform[12], z: o.transform[14] },
+              shapes.map((s) => s.outline),
+            ) + 1}`,
+          })),
+        ),
+        walls,
       );
 
       /*

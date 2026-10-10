@@ -89,7 +89,7 @@ describe('le natif fabrique les vraies images', () => {
   it('chaque face de mur et le sol, projetés dans la caméra, la profondeur LiDAR décide', () => {
     const o = lire('modules/react-native-room-scan/ios/RoomScanOrtho.swift');
     expect(o).toContain('final class OrthophotosDuReleve');
-    expect(o).toContain('guard mesure > 0.05, abs(mesure - z) < 0.08 else { continue }');
+    expect(o).toContain('guard mesure > 0.05, abs(mesure - z) < 0.08 else { return }');
     expect(o).toContain('ortho-mur-');
     expect(o).toContain('ortho-sol-');
     const m = lire('modules/react-native-room-scan/ios/RoomScanManager.swift');
@@ -112,6 +112,36 @@ describe('le natif fabrique les vraies images', () => {
     expect(t).toContain('func couleurs(for o: CapturedRoom.Object)');
     const m = lire('modules/react-native-room-scan/ios/RoomScanManager.swift');
     expect(m).not.toMatch(/c\.x \/ 255/);
+  });
+});
+
+describe('la netteté des murs — « la texture murale est de faible qualité »', () => {
+  const o = lire('modules/react-native-room-scan/ios/RoomScanOrtho.swift');
+
+  it('un centimètre le pixel au mur, un et demi au sol, sur une toile compacte', () => {
+    expect(o).toContain('private static let pasMur: Float = 0.01');
+    expect(o).toContain('private static let pasSol: Float = 0.015');
+    expect(o).toContain('var couleur: [SIMD4<UInt8>]');
+    expect(o).not.toContain('[SIMD4<Float>]');
+  });
+
+  it('la meilleure vue l’emporte, la vue bougée ne compte presque plus', () => {
+    expect(o).toContain('let poids: Float = q2 * q2 * nettete');
+    expect(o).toMatch(/private static func nettete\(/);
+    expect(o).toContain('frame.camera.exposureDuration');
+    expect(o).toContain('guard nettete > 0.04 else { return }');
+  });
+
+  it('quatre lectures par pixel, des blocs hors champ écartés, des trous comblés de proche en proche', () => {
+    expect(o).toContain('let m: SIMD3<Float> = (haut + bas) * 0.25');
+    expect(o).toContain('if blocVisible(');
+    expect(o).toContain('while !front.isEmpty && couche < 80');
+    expect(o).toContain('jpegData(compressionQuality: 0.9)');
+  });
+
+  it('la 3D lit l’image de biais sans baver', () => {
+    const v = lire('modules/react-native-room-scan/ios/RoomScanVisite.swift');
+    expect(v).toContain('m.diffuse.maxAnisotropy = 16');
   });
 });
 

@@ -1281,7 +1281,8 @@ export function Iso3DView({
     () =>
       natif
         ? maillageDesMeubles(
-            scene.meubles ?? [],
+            // Un mur isolé ne garde que ses portes : pas de vantail en l'air.
+            (scene.meubles ?? []).filter((m) => !focusWallId || !m.murId || m.murId === focusWallId),
             groupesDesAppareils(
               habillerLesTableaux(
                 (scene.appareils ?? []).filter((a) => !focusWallId || !a.wallId || a.wallId === focusWallId),

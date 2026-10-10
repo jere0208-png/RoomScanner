@@ -13,6 +13,7 @@ import {
   clampFootprint,
   estTraversante,
   pointOnSeg,
+  pivotsDesBattants,
   roomOf,
   roomHeight,
   roomParts,
@@ -2404,6 +2405,8 @@ export function buildScene(
   // dessous. Plus rien ne se superpose, donc plus une seule couleur qui en
   // recouvre une autre selon l'angle.
   const holes = assignOpenings(walls, openings, floorY);
+  /** Les portes de la scène, que la carte graphique dessinera en volume. */
+  const portesAPoser: { seg: WallSeg; w: WallSeg; t0: number; t1: number; y0: number; y1: number }[] = [];
 
   /*
     ON NE DÉCOUPE UN MUR QUE S'IL Y A QUELQUE CHOSE À DÉPARTAGER.
@@ -2638,6 +2641,8 @@ export function buildScene(
           rencontre donc rien, et se lit de tous les angles.
         */
         if (porte) {
+          // Le vantail en volume se pose après les meubles : voir `portesAPoser`.
+          portesAPoser.push({ seg: hole.seg, w, t0: hole.t0, t1: hole.t1, y0: hole.y0, y1: hole.y1 });
           const teinte = opts.colorOpenings ? pal.door : pal.opening;
           pushWallBlock(q, hole.t0, hole.t1, hole.y0, hole.y0 + 0.02, {
             fill: teinte,
@@ -3586,6 +3591,93 @@ export function buildScene(
       f.depthAt = undefined;
       f.depthRefs = triRefs;
     }
+  }
+
+  /*
+    LES PORTES EN VOLUME — relevé du patron : « ajoute des portes 3D lors des
+    ouvrants portes ; si rien derrière, la porte doit être fermée ».
+
+    Un vantail en volume avait été écarté : dessiné au canevas, ouvert, il
+    traversait le lit voisin et le peintre ne savait plus les ordonner. La
+    carte graphique, elle, a un tampon de profondeur — et l'on ne l'ouvre
+    plus à l'aveugle :
+      — RIEN DERRIÈRE (le dehors, ce qu'on n'a pas relevé) : FERMÉE ;
+      — une pièce de chaque côté : OUVERTE, du côté du battant du plan (le
+        même gond, le même sens que le dessin), jusqu'à l'angle le plus grand
+        où le vantail ne heurte aucun meuble — fermée si aucun ne passe.
+    Seule la carte graphique les reçoit : le canevas garde le seuil.
+  */
+  const pivots = pivotsDesBattants(portesAPoser.map((p) => p.seg));
+  const contours = parts.map((p) => p.surface?.pts).filter((x): x is Pt[] => !!x && x.length >= 3);
+  const dansUnePiece = (p: Pt) => contours.some((c) => pointInPolygon(p, c));
+  const heurte = (p: Pt) =>
+    poses.some((m) => {
+      if (m.category === 'porte3d') return false;
+      const dx = p.x - m.cx;
+      const dz = p.z - m.cz;
+      const c = Math.cos(m.yaw);
+      const s = Math.sin(m.yaw);
+      const lx = dx * c + dz * s;
+      const lz = -dx * s + dz * c;
+      return Math.abs(lx) <= m.width / 2 + 0.03 && Math.abs(lz) <= m.depth / 2 + 0.03;
+    });
+  for (const p of portesAPoser) {
+    const L = Math.hypot(p.w.b.x - p.w.a.x, p.w.b.z - p.w.a.z) || 1;
+    const u = { x: (p.w.b.x - p.w.a.x) / L, z: (p.w.b.z - p.w.a.z) / L };
+    const A = { x: p.w.a.x + u.x * p.t0 * L, z: p.w.a.z + u.z * p.t0 * L };
+    const B = { x: p.w.a.x + u.x * p.t1 * L, z: p.w.a.z + u.z * p.t1 * L };
+    const largeur = Math.hypot(B.x - A.x, B.z - A.z);
+    if (largeur < 0.3) continue;
+    const centre = { x: (A.x + B.x) / 2, z: (A.z + B.z) / 2 };
+    const ep = epaisseurDe(p.w);
+    const n = { x: -u.z, z: u.x };
+    // Le battant du plan : sa normale vers la pièce de la porte, retournée si
+    // elle ouvre vers l'extérieur ; son gond, celui du dessin.
+    const dedans = interiorOf.get(roomOf(p.seg)) ?? interiorOf.get(roomOf(p.w));
+    let sens: 1 | -1 = 1;
+    if (dedans && (dedans.x - centre.x) * n.x + (dedans.z - centre.z) * n.z < 0) sens = -1;
+    if (p.seg.versExterieur) sens = sens === 1 ? -1 : 1;
+    const pointGond = pivots.get(p.seg.id) === 'b' ? p.seg.b : p.seg.a;
+    const gond: 1 | -1 = (pointGond.x - centre.x) * u.x + (pointGond.z - centre.z) * u.z > 0 ? 1 : -1;
+    // Rien derrière : fermée. Une pièce de chaque côté : ouverte, sans heurter.
+    const recul = ep / 2 + 0.35;
+    const deuxPieces =
+      dansUnePiece({ x: centre.x + n.x * recul, z: centre.z + n.z * recul }) &&
+      dansUnePiece({ x: centre.x - n.x * recul, z: centre.z - n.z * recul });
+    let angle = 0;
+    if (deuxPieces) {
+      const gondMonde = { x: centre.x + u.x * gond * (largeur / 2), z: centre.z + u.z * gond * (largeur / 2) };
+      for (const essai of [85, 70, 55, 40, 25]) {
+        const r = (essai * Math.PI) / 180;
+        // Le vantail part du gond vers l'autre bord, puis tourne vers `sens`.
+        const dir = {
+          x: -gond * u.x * Math.cos(r) + sens * n.x * Math.sin(r),
+          z: -gond * u.z * Math.cos(r) + sens * n.z * Math.sin(r),
+        };
+        let libre = true;
+        for (let k = 1; k <= 8 && libre; k++) {
+          const d = (largeur * k) / 8;
+          if (heurte({ x: gondMonde.x + dir.x * d, z: gondMonde.z + dir.z * d })) libre = false;
+        }
+        if (libre) {
+          angle = essai;
+          break;
+        }
+      }
+    }
+    poses.push({
+      id: `porte-${p.seg.id}`,
+      category: 'porte3d',
+      width: largeur,
+      depth: ep,
+      height: Math.max(0.5, p.y1 - p.y0),
+      cx: centre.x,
+      cz: centre.z,
+      yaw: Math.atan2(u.z, u.x),
+      yb: Math.max(0, p.y0),
+      attributes: [`PorteAngle:${angle}`, `PorteGond:${gond === 1 ? 'droite' : 'gauche'}`, `PorteSens:${sens}`],
+      murId: p.w.id,
+    });
   }
 
   return { faces: faces.filter(nonDegenere), rooms, floorY, meubles: poses, appareils };

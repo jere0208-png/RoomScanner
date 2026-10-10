@@ -256,12 +256,17 @@ describe('dans la scène : chaque meuble à la place de sa caisse', () => {
   const ex = appartementExemple();
   const scene = buildScene(ex.walls, ex.openings, ex.objects as never, { palette: PAL, rooms: ex.rooms as never, showSurfaces: true });
 
-  it('la scène annonce une pose par meuble', () => {
-    expect(scene.meubles).toHaveLength(ex.objects.length);
+  // Les portes en volume voyagent avec les meubles, sans caisse au canevas.
+  const meubles = (scene.meubles ?? []).filter((m) => m.category !== 'porte3d');
+
+  it('la scène annonce une pose par meuble — et une porte en volume par porte', () => {
+    expect(meubles).toHaveLength(ex.objects.length);
+    const portes = ex.openings.filter((o) => o.type === 'door').length;
+    expect((scene.meubles ?? []).length - meubles.length).toBe(portes);
   });
 
   it('le modèle et la caisse tiennent dans la même emprise — et le modèle la remplit', () => {
-    for (const pose of scene.meubles ?? []) {
+    for (const pose of meubles) {
       const c = Math.cos(pose.yaw);
       const sn = Math.sin(pose.yaw);
       /** Un point du monde, ramené dans le repère de la pose. */

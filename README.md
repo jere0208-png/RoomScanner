@@ -14285,6 +14285,60 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Des portes en volume, des murs nets, des fauteuils qui regardent la pièce
+
+Relevé du patron : « ajoute des portes 3D lors des ouvrants portes ; si rien
+derrière, la porte doit être fermée. La texture murale est de faible qualité,
+vois si tu peux améliorer la chose. Parfois les fauteuils sont captés mais
+tournés vers le mur sans logique ; il faut manuellement les tourner tout le
+temps, corrige ça. »
+
+**Les portes en volume** (`modeles3d` : `porte3d` ; `scene3d`).
+- Chaque porte du plan reçoit, dans la visite et la maquette, son huisserie
+  (deux montants, une traverse, un rien plus épais que le mur), son vantail
+  et ses deux poignées, aux cotes de la baie.
+- **Rien derrière** (le dehors, ce qui n'a pas été relevé) : la porte est
+  **fermée**, dans l'épaisseur du mur.
+- **Une pièce de chaque côté** : elle est **ouverte**, du côté et sur le gond
+  du battant dessiné au plan (`pivotsDesBattants`, `versExterieur`), jusqu'à
+  l'angle le plus grand (85°, 70°, 55°, 40°, 25°) où le vantail ne heurte
+  aucun meuble — fermée si aucun ne passe.
+- Seule la carte graphique les reçoit : le canevas garde le seuil. Un mur
+  isolé ne garde que ses portes.
+
+**Des murs nets** (`RoomScanOrtho.swift`).
+- **Un centimètre le pixel** au mur (deux avant), un et demi au sol ; la toile
+  garde une couleur moyenne et son poids (8 octets le pixel au lieu de 16).
+- **La meilleure vue l'emporte** : le poids monte à la puissance quatre de la
+  qualité (incidence, distance) ; le bord de l'objectif pèse moins que son
+  centre.
+- **Les vues bougées ne comptent presque plus** : le flou de bougé se calcule
+  (vitesse × temps de pose × focale, en pixels) ; une image franchement floue
+  est passée.
+- **Quatre lectures par pixel**, à l'écart de son empreinte dans l'image : plus
+  de grain ni de moirage sur un carrelage ou un papier peint.
+- Les blocs hors du champ sont écartés d'un coup ; les trous se comblent de
+  proche en proche (on ne visite que les trous) ; JPEG à 0,9.
+- La 3D lit l'image de biais sans baver : filtrage anisotrope.
+
+**Les sièges regardent la pièce** (`geometry/sieges.ts`, `orienterLesSieges`).
+RoomPlan rend un angle qui vaut aussi bien θ que θ + 180° pour un siège. À la
+fin du scan (et de chaque passage), une fois pour toutes, par demi-tour
+seulement :
+- **attablé** (sa table juste devant) : on n'y touche pas, même le nez au
+  mur — la chaise glissée sous le bureau reste ;
+- **adossé** à un mur : il regarde déjà la pièce ;
+- **le nez contre un mur proche**, la place dans son dos : demi-tour ;
+- sinon, il **tourne le dos à ce qu'il devrait regarder** (la télé ou la
+  table basse pour un canapé, un fauteuil ; la table pour une chaise) :
+  demi-tour.
+
+Bancs : `portes3d` (12 : la cloison s'ouvre, la porte sur le dehors reste
+fermée, le meuble dans le débattement, le meuble à l'écart, le gond du plan,
+le vantail dans le mur ou dehors ; les sièges : nez au mur, adossé, canapé et
+télé, chaise attablée, le reste jamais retourné), `reproduction` (+4 : la
+netteté), `meublesreels` (une porte en volume par porte).
+
 ## La 3D à l'identique du relevé : vraies images des murs et du sol, meubles à leurs cotes et à leurs couleurs
 
 Relevé du patron : « améliore considérablement la récupération des textures

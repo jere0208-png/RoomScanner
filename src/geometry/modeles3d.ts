@@ -671,6 +671,48 @@ const attribut = (c: Commande, type: string): string | undefined => {
   return undefined;
 };
 
+/**
+ * UNE PORTE — son huisserie, son vantail, ses deux poignées.
+ *
+ * Relevé du patron : « ajoute des portes 3D lors des ouvrants portes ; si
+ * rien derrière, la porte doit être fermée ». Le gabarit est celui de la
+ * baie : W sa largeur, D l'épaisseur du mur, H sa hauteur. Le vantail
+ * pivote autour de son gond (`PorteGond` : gauche = −x, droite = +x), de
+ * `PorteAngle` degrés, vers le côté `PorteSens` (+1 : +z local, la normale du
+ * mur). Fermé, il se tient dans l'épaisseur du mur.
+ */
+function porte3d(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const angle = ((Number(attribut(c, 'PorteAngle') ?? 0) || 0) * Math.PI) / 180;
+  const gond = attribut(c, 'PorteGond') === 'droite' ? 1 : -1;
+  const sens = attribut(c, 'PorteSens') === '-1' ? -1 : 1;
+  const teinte = c.teinte ?? TEINTES.laque;
+  const cadre = Math.min(0.05, W * 0.08);
+  const prof = D + 0.012;
+  // L'huisserie : deux montants et une traverse, un rien plus épais que le mur.
+  a.boite(-W / 2, -W / 2 + cadre, 0, H, -prof / 2, prof / 2, 'laque', teinte, { r: 0.004 });
+  a.boite(W / 2 - cadre, W / 2, 0, H, -prof / 2, prof / 2, 'laque', teinte, { r: 0.004 });
+  a.boite(-W / 2, W / 2, H - cadre, H, -prof / 2, prof / 2, 'laque', teinte, { r: 0.004 });
+  // Le vantail, autour de son gond.
+  const e = 0.04;
+  const xg = gond * (W / 2 - cadre);
+  const largeur = Math.max(0.2, W - 2 * cadre - 0.006);
+  const hV = Math.max(0.3, H - cadre - 0.01);
+  a.avec(tourner('y', gond * sens * angle, [xg, 0, 0]), () => {
+    const x0 = xg - gond * 0.003;
+    const x1 = xg - gond * largeur;
+    a.boite(x0, x1, 0.008, 0.008 + hV, -e / 2, e / 2, 'laque', teinte, { r: 0.004 });
+    // Les poignées, une de chaque côté, à 1,05 m, à l'opposé du gond.
+    const xp = xg - gond * (largeur - 0.065);
+    const yp = Math.min(1.05, hV * 0.5);
+    for (const cote of [-1, 1]) {
+      const zr = cote * (e / 2 + 0.002);
+      a.boite(xp - 0.018, xp + 0.018, yp - 0.07, yp + 0.07, zr, zr + cote * 0.008, 'chrome', TEINTES.chrome, { r: 0.004 });
+      a.tube([xp, yp + 0.03, zr], [xp, yp + 0.03, zr + cote * 0.05], 0.009, 0.009, 'chrome', TEINTES.chrome, { seg: 10 });
+      a.tube([xp, yp + 0.03, zr + cote * 0.05], [xp + gond * 0.12, yp + 0.03, zr + cote * 0.05], 0.009, 0.009, 'chrome', TEINTES.chrome, { seg: 10 });
+    }
+  });
+}
+
 /** Quatre pieds ronds, fuselés vers le sol. */
 function pieds(
   a: Atelier,
@@ -1983,7 +2025,8 @@ export function fabriquer(categorie: string, g: Gabarit, c: Omit<Commande, 'cate
   const m = (c.modele || '').toLowerCase();
   const cmd: Commande = { ...c, categorie: cat, modele: m };
   const gab: Gabarit = { W: Math.max(0.02, g.W), D: Math.max(0.02, g.D), H: Math.max(0.005, g.H) };
-  if (m.startsWith('tapis') || cat.includes('tapis') || cat.includes('rug')) tapis(a, gab, cmd);
+  if (cat === 'porte3d') porte3d(a, gab, cmd);
+  else if (m.startsWith('tapis') || cat.includes('tapis') || cat.includes('rug')) tapis(a, gab, cmd);
   else if (m.startsWith('portemanteau') || cat.includes('portemanteau')) portemanteau(a, gab);
   else if (m.startsWith('miroir') || cat.includes('miroir') || cat.includes('mirror')) miroir(a, gab);
   else if (m.startsWith('plante') || cat.includes('plant')) plante(a, gab, cmd);
@@ -2027,6 +2070,8 @@ export interface PoseDeMeuble {
   /** Le dessus et les côtés relevés, chacun sa couleur. */
   couleurs?: { dessus?: string; cotes?: string };
   attributes?: string[];
+  /** Le mur qui porte une porte en volume : un mur isolé ne garde que les siennes. */
+  murId?: string;
 }
 
 const ATELIER_CACHE = new Map<string, ModeleLocal>();
