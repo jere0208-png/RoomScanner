@@ -17,7 +17,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ExportScreen, feuillesElevations } from '../src/screens/ExportScreen';
 import { RetourGlisse } from '../src/components/RetourGlisse';
@@ -149,18 +149,23 @@ describe('le nord dans le dossier', () => {
    * cases franches désormais, et cocher les deux n'imprime toujours
    * qu'une seule série, la plus large.
    */
-  it('offre deux cases franches, sans jamais doubler les élévations', () => {
+  it('offre les murs de face : tous, ou les équipés — sans jamais doubler les élévations', () => {
+    /*
+      Deux cases qui se conditionnaient (« Élévations », « Cotes Élec ») sont
+      devenues ce qu'elles voulaient dire : une feuille « Murs de face », et
+      le choix franc entre tous les murs et les murs équipés.
+    */
     const tree = monter('export');
-    expect(
-      tree.root
-        .findAllByType(TouchableOpacity)
-        .find((n) => n.props.accessibilityLabel === 'Cotes Élec'),
-    ).toBeDefined();
-    expect(
-      tree.root
-        .findAllByType(TouchableOpacity)
-        .find((n) => n.props.accessibilityLabel === 'Tous les murs'),
-    ).toBeUndefined();
+    const choix = (label: string) =>
+      tree.root.findAll((n) => n.props.accessibilityLabel === label && typeof n.props.onPress === 'function', {
+        deep: false,
+      })[0];
+    expect(choix('Tous les murs')).toBeDefined();
+    expect(choix('Murs équipés')).toBeDefined();
+    expect(choix('Cotes Élec')).toBeUndefined();
+    act(() => choix('Murs équipés').props.onPress());
+    expect(choix('Murs équipés').props.accessibilityState.selected).toBe(true);
+    expect(choix('Tous les murs').props.accessibilityState.selected).toBe(false);
     // Cotes Élec seul : les murs équipés.
     expect(feuillesElevations(false, true)).toEqual({
       elevations: true,
@@ -182,19 +187,15 @@ describe('le nord dans le dossier', () => {
     });
   });
 
-  it('les tuiles d’options sont basses, l’icône garde sa taille', () => {
-    // Relevé du patron : « réduis plus les blocs que les icônes ». La
-    // tuile perd six points (46 → 40), l'icône deux (26 → 24) : ce qu'on
-    // reconnaît, c'est le dessin, pas la surface bleue.
-    const tree = monter('export');
-    const tuile = tree.root
-      .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Vues 3D')!;
-    const st = StyleSheet.flatten(tuile.props.style) as { height?: number };
-    expect(st.height).toBeLessThanOrEqual(42);
-    const svg = tuile.findAll((n) => Number(n.props?.width) >= 22)[0];
-    expect(svg).toBeDefined();
-    expect(Number(svg.props.width)).toBeGreaterThanOrEqual(24);
+  it('chaque feuille dit à quoi elle sert — plus d’icône muette', () => {
+    // Relevé du patron : « on ne comprend pas réellement leur intérêt sur le
+    // plan PDF ». Chaque carte porte une phrase : ce que la feuille montre,
+    // et pour quoi faire.
+    const lu = textes(monter('export'));
+    expect(lu).toMatch(/Plan coté/);
+    expect(lu).toMatch(/de quoi chiffrer sols et peinture/);
+    expect(lu).toMatch(/le client s’y projette/);
+    expect(lu).toMatch(/là où l’on perce/);
   });
 
   it('l’aperçu du PDF rend le retour au bord gauche', () => {

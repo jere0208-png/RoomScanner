@@ -7,6 +7,7 @@ import {
   Easing,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -24,7 +25,9 @@ import {
 } from '../theme';
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from '../components/Iso3DView';
-import { buildScanPdf, pdfFilename, toBase64 } from '../export/pdf';
+import { buildScanPdf, pdfFilename, sommaireDuDossier, toBase64 } from '../export/pdf';
+import { ApercuDuDossier } from '../components/ApercuDuDossier';
+import { haptic } from '../ui/haptic';
 import { hasCapturedColors } from '../geometry/appearance';
 import {
   filtrerAuNiveau,
@@ -44,7 +47,7 @@ import { useModeElec } from '../store/usage';
 import type { Fixture } from '../geometry/electrical';
 import { planRoutes } from '../geometry/elecplan';
 import { floorsOf, useScanStore } from '../store/scanStore';
-import { useAccountStore } from '../store/accountStore';
+import { useAccountStore, useDossierNet } from '../store/accountStore';
 import { deviceNames } from '../geometry/naming';
 import { PromptSheet, type PromptData } from '../components/Sheet';
 import type { CeilingFixture } from '../geometry/ceiling';
@@ -119,7 +122,7 @@ function PlanPreview({
 }
 
 const planStyles = StyleSheet.create({
-  box: { height: 380, borderRadius: 16, overflow: 'hidden' },
+  box: { height: 250, borderRadius: 14, overflow: 'hidden' },
   inner: { flex: 1 },
 });
 
@@ -172,8 +175,6 @@ export function ExportScreen() {
   const setShowTextures = useScanStore((s) => s.setShowTextures);
   const toutesLesPieces = useScanStore((s) => s.rooms);
   const c = useTheme();
-  /** Une case de la grille : icône, mot, état, bascule. */
-type OptionDef = [keyof typeof EXPORT_ICONS, string, boolean, () => void];
 
 /**
  * Icônes des options d'export — le jeu « SOLAR BOLD », le même que la
@@ -422,6 +423,8 @@ const styles = getStyles(c);
   };
 
   const exportOuvert = useAccountStore((st) => st.exportOuvert);
+  /** Abonné : les feuilles de l'aperçu sont nettes ; sinon floutées. */
+  const net = useDossierNet();
 
   const doExport = async () => {
     /* L'aperçu est libre, l'export est Pro : la barrière est ici — voir
@@ -433,21 +436,16 @@ const styles = getStyles(c);
        *
        * TOUTES, et dans l'ordre où elles ont été prises — relevé du
        * patron : « plusieurs photos d'un mur, et un retour doit pouvoir
-       * avoir la sienne ». Le dossier n'en gardait qu'une par mur, au
-       * motif que « deux vignettes de la même cloison n'apprennent rien
-       * de plus » : c'est faux dès qu'un mur est percé, le pan de gauche
-       * et le tableau de droite sont deux chantiers. Chacune emporte la
-       * cote de sa punaise, qui dit de quel retour elle parle.
-       *
-       * Celle qui ne se relit pas — fichier effacé hors de l'app — est
-       * simplement absente : sa feuille sort sans elle.
+       * avoir la sienne ». Chacune emporte la cote de sa punaise, qui dit
+       * de quel retour elle parle. Celle qui ne se relit pas — fichier
+       * effacé hors de l'app — est simplement absente.
        */
       const vignettes: {
         wallId: string;
         base64: string;
         along?: number;
       }[] = [];
-      if (elevations) {
+      if (elevations || cotesElec) {
         for (const ph of [...photos].sort((a, b) => a.at - b.at)) {
           const b64 = await RoomScan.readPhoto(ph.path, 900);
           if (b64) {
@@ -469,20 +467,6 @@ const styles = getStyles(c);
     }
   };
 
-  /**
-   * LE DOSSIER SE BÂTIT PENDANT QU'ON CHOISIT, PAS APRÈS.
-   *
-   * Sur un logement meublé, l'assemblage du PDF prend près d'une demi-seconde :
-   * plan, deux vues 3D, élévations, schémas, métré. Elle tombait tout entière
-   * APRÈS l'appui sur « Exporter » — l'écran se fige, et l'électricien croit
-   * que rien ne s'est passé.
-   *
-   * Or il passe plusieurs secondes à régler ses options : c'est là qu'on
-   * travaille. Dès que ses choix se posent — six cents millisecondes sans
-   * changement, et une fois les animations finies — on bâtit le document en
-   * tâche de fond et on le garde. S'il n'a rien retouché depuis, l'appui sur le
-   * bouton n'a plus qu'à partager des octets déjà prêts.
-   */
   /** Une vue de l'écran, dans les unités du document. */
   const conv = (v: View3DParams, b: { w: number; h: number }) => ({
     theta: v.theta,
@@ -492,55 +476,68 @@ const styles = getStyles(c);
     fy: v.oy / (b.h / 2),
   });
 
-  const batir = (vignettes: { wallId: string; base64: string }[]) =>
-    buildScanPdf(
-        {
-          name: titreDuDossier,
-          walls,
-          openings,
-          objects: showFurniture ? objects : [],
-          rooms,
-          fixtures,
-          routes: gaines || schema ? cheminements?.traces : undefined,
-          // Les mots du relevé passent au dossier : c'est celui qui pose
-          // qui les lit, et il lit cette feuille-là.
-          notes,
-          floors: floorsOf(rooms),
-          roomNames: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
-          photos: vignettes,
-          north,
-          deviceNames: noms,
-          client,
-          address,
-        },
-        include3D,
-        {
-          // Pas de `plan` : le document cadre le sien, droit et entier.
-          views: vues.map((v, i) =>
-            conv(v, boites.current[i] ?? { w: 1, h: 1 }),
-          ),
-          colorOpenings: showOpeningColors,
-          // Le tableau trouve sur place : sa feuille ne sort qu en renovation,
-          // et seulement au rez-de-chaussee — un tableau ne se releve qu une
-          // fois, il n a pas a se repeter sur le dossier de chaque etage.
-          existant: niveauCourant === 0 ? (existant ?? undefined) : undefined,
-          measures2D,
-          measures3D,
-          schemas: schema ? schemas : null,
-          // Les repères de circuit voyagent À PART : le plan les porte dès
-          // que l'app les connaît, que la feuille de schéma soit demandée
-          // ou non. C'est le lien entre le plan et le tableau, pas une
-          // dépendance de pagination.
-          marks: schemas?.marks ?? null,
-          // Le plafond ne s'impose pas : il fait une feuille de plus, et
-          // tout le monde n'équipe pas les plafonds.
-          ceiling: plafond ? ceiling : undefined,
-          surfaces: showSurfaces,
-          textures: showTextures,
-          metre: includeMetre,
-          ...feuillesElevations(elevations, cotesElec),
-        },
-      );
+  /**
+   * CE QUI ENTRE DANS LE DOSSIER — une seule écriture, pour le document et
+   * pour son sommaire : l'aperçu ne peut pas annoncer une feuille que le PDF
+   * n'imprime pas.
+   */
+  const entrees = (vignettes: { wallId: string; base64: string; along?: number }[]) =>
+    [
+      {
+        name: titreDuDossier,
+        walls,
+        openings,
+        objects: showFurniture ? objects : [],
+        rooms,
+        fixtures,
+        routes: gaines || schema ? cheminements?.traces : undefined,
+        // Les mots du relevé passent au dossier : c'est celui qui pose
+        // qui les lit, et il lit cette feuille-là.
+        notes,
+        floors: floorsOf(rooms),
+        roomNames: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
+        photos: vignettes,
+        north,
+        deviceNames: noms,
+        client,
+        address,
+      },
+      include3D,
+      {
+        // Pas de `plan` : le document cadre le sien, droit et entier.
+        views: vues.map((v, i) => conv(v, boites.current[i] ?? { w: 1, h: 1 })),
+        colorOpenings: showOpeningColors,
+        // Le tableau trouvé sur place : sa feuille ne sort qu'en rénovation,
+        // et seulement au rez-de-chaussée — un tableau ne se relève qu'une
+        // fois, il n'a pas à se répéter sur le dossier de chaque étage.
+        existant: niveauCourant === 0 ? (existant ?? undefined) : undefined,
+        measures2D,
+        measures3D,
+        schemas: schema ? schemas : null,
+        // Les repères de circuit voyagent À PART : le plan les porte dès
+        // que l'app les connaît. C'est le lien entre le plan et le tableau.
+        marks: schemas?.marks ?? null,
+        // Le plafond se dessine sur le plan d'ensemble, quand on le demande.
+        ceiling: plafond ? ceiling : undefined,
+        surfaces: showSurfaces,
+        textures: showTextures,
+        metre: includeMetre,
+        ...feuillesElevations(elevations, cotesElec),
+      },
+    ] as const;
+
+  const batir = (vignettes: { wallId: string; base64: string; along?: number }[]) =>
+    buildScanPdf(...entrees(vignettes));
+
+  /*
+    LES PHOTOS COMPTENT DANS LE SOMMAIRE, PAS DANS L'APERÇU. Un mur
+    photographié a sa feuille : on la compte, avec une photo vide — la vraie
+    se relit sur le disque au moment d'envoyer.
+  */
+  const photosVides = useMemo(
+    () => photos.map((p) => ({ wallId: p.wallId, base64: '', along: p.along })),
+    [photos],
+  );
 
   /** L'empreinte des choix : si elle n'a pas bougé, le document non plus. */
   const empreinte = JSON.stringify([
@@ -551,6 +548,7 @@ const styles = getStyles(c);
     rooms.length,
     fixtures.length,
     ceiling.length,
+    photos.length,
     showFurniture,
     showSurfaces,
     showTextures,
@@ -568,22 +566,70 @@ const styles = getStyles(c);
     address,
     vues,
   ]);
+
+  /** Le sommaire : les feuilles, dans l'ordre — il suit chaque réglage. */
+  const sommaire = useMemo(
+    () => sommaireDuDossier(...entrees(photosVides)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [empreinte, photosVides],
+  );
+  /** Ce qu'apporterait chaque feuille si on la cochait : on le dit avant. */
+  const avecTout = useMemo(() => {
+    const [scan, , opts] = entrees(photosVides);
+    return sommaireDuDossier(scan, true, {
+      ...opts,
+      metre: true,
+      schemas: schemas ?? null,
+      ...feuillesElevations(true, true),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empreinte, photosVides, schemas]);
+  const combien = (liste: { genre: string }[], ...genres: string[]) =>
+    liste.filter((f) => genres.includes(f.genre)).length;
+
+  /**
+   * LE DOSSIER SE BÂTIT PENDANT QU'ON CHOISIT — ET SE MONTRE.
+   *
+   * Dès que les choix se posent (six cents millisecondes sans changement,
+   * les animations finies), on bâtit le document en tâche de fond : l'appui
+   * sur « Exporter » n'a plus qu'à partager des octets déjà prêts. Et ces
+   * octets, on les MONTRE : le natif rend chaque feuille en image — nette
+   * pour l'abonné, floutée et filigranée pour les autres (`apercuPdf`).
+   */
   const pret = useRef<{ cle: string; bytes: Uint8Array } | null>(null);
+  const [images, setImages] = useState<string[] | null>(null);
+  const [enCours, setEnCours] = useState(true);
+  const generation = useRef(0);
   useEffect(() => {
-    // Les élévations relisent les photos sur le disque : c'est asynchrone, et
-    // c'est le geste coûteux. On ne prépare donc que les dossiers sans photo.
-    if ((elevations || cotesElec) && photos.length > 0) return;
     let vivant = true;
     let tache: { cancel: () => void } | null = null;
+    setEnCours(true);
     const t = setTimeout(() => {
       tache = InteractionManager.runAfterInteractions(() => {
         if (!vivant) return;
+        const ici = ++generation.current;
         try {
-          pret.current = { cle: empreinte, bytes: batir([]) };
+          const bytes = batir(photosVides);
+          pret.current = { cle: empreinte, bytes };
+          RoomScan.apercuPdf(toBase64(bytes), {
+            largeur: 1100,
+            flou: net ? 0 : FLOU_DE_L_APERCU,
+            filigrane: net ? '' : 'EchoPlan',
+            maxPages: 40,
+          })
+            .then((pages) => {
+              if (ici !== generation.current) return;
+              setImages(pages);
+              setEnCours(false);
+            })
+            .catch(() => {
+              if (ici === generation.current) setEnCours(false);
+            });
         } catch {
           // Un dossier qui refuse de se bâtir à blanc le dira à l'appui :
           // ici, on ne dérange personne.
           pret.current = null;
+          setEnCours(false);
         }
       });
     }, 600);
@@ -593,7 +639,7 @@ const styles = getStyles(c);
       tache?.cancel();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [empreinte]);
+  }, [empreinte, net]);
 
   // Arrivée en fondu rapide, dans la continuité de l'onde de transition.
   const fade = useRef(new Animated.Value(0)).current;
@@ -606,12 +652,81 @@ const styles = getStyles(c);
     }).start();
   }, [fade]);
 
+  /** Le mot qui explique le dernier calque touché du plan. */
+  const [calqueDit, setCalqueDit] = useState<string | null>(null);
+  const basculer = (fait: () => void, mot?: string) => {
+    fait();
+    if (mot) setCalqueDit(mot);
+    haptic('leger');
+  };
+
+  /* LES MURS DE FACE : tous, seulement les équipés, ou aucun. */
+  const murs: 'tous' | 'equipes' | null = elevations ? 'tous' : cotesElec ? 'equipes' : null;
+  const choisirMurs = (m: 'tous' | 'equipes' | null) => {
+    setElevations(m === 'tous');
+    setCotesElec(m !== null);
+    haptic('leger');
+  };
+
+  /** Les calques du plan : ce qu'on voit sur la feuille maîtresse. */
+  const calques: { cle: keyof typeof EXPORT_ICONS; mot: string; dit: string; actif: boolean; basculer: () => void }[] = [
+    {
+      cle: 'cotes2d',
+      mot: 'Cotes',
+      dit: 'Les longueurs de chaque mur, au centimètre.',
+      actif: measures2D,
+      basculer: () => setMeasures2D(!measures2D),
+    },
+    {
+      cle: 'meubles',
+      mot: 'Meubles',
+      dit: 'Le mobilier, dessiné à sa place.',
+      actif: showFurniture,
+      basculer: () => setShowFurniture(!showFurniture),
+    },
+    {
+      cle: 'surface',
+      mot: 'Surfaces',
+      dit: 'Chaque pièce teintée, avec sa surface au sol.',
+      actif: showSurfaces,
+      basculer: () => setShowSurfaces(!showSurfaces),
+    },
+    {
+      cle: 'ouvertures',
+      mot: 'Menuiseries en couleur',
+      dit: 'Portes et fenêtres en couleur, repérées d’un coup d’œil.',
+      actif: showOpeningColors,
+      basculer: () => setShowOpeningColors(!showOpeningColors),
+    },
+    ...(colorsAvailable
+      ? [
+          {
+            cle: 'couleurs' as const,
+            mot: 'Couleurs relevées',
+            dit: 'Les teintes des murs et des sols, telles que le scan les a vues.',
+            actif: showTextures,
+            basculer: () => setShowTextures(!showTextures),
+          },
+        ]
+      : []),
+    ...(ceiling.length > 0
+      ? [
+          {
+            cle: 'plafond' as const,
+            mot: 'Plafond',
+            dit: 'Les points lumineux du plafond, et ce qui les commande.',
+            actif: plafond,
+            basculer: () => setPlafond(!plafond),
+          },
+        ]
+      : []),
+  ];
+
   return (
     /*
       EN ENVELOPPE, comme le plan et la bibliothèque : l'écran porte des
       boutons jusqu'au bord, et une bande posée par-dessus leur volerait leurs
-      vingt-quatre premiers points sans que rien ne l'explique. L'enveloppe,
-      elle, ne prend le geste qu'en route.
+      vingt-quatre premiers points sans que rien ne l'explique.
     */
     <RetourGlisse onRetour={() => setScreen('result')} style={styles.container}>
       <Animated.View
@@ -619,358 +734,352 @@ const styles = getStyles(c);
           styles.fadeWrap,
           {
             opacity: fade,
-            transform: [
-              {
-                translateY: fade.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [8, 0],
-                }),
-              },
-            ],
+            transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
           },
         ]}>
-      <View style={styles.headerRow}>
-        <TouchableOpacity
-          style={styles.roundButton}
-          // Le seul retour de l'app qui restait muet : le nom s'écrit,
-          // comme sur les trois autres écrans.
-          accessibilityLabel="Retour"
-          onPress={() => setScreen('result')}>
-          <BackChevron color={c.ink} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Aperçu du PDF</Text>
-        <TouchableOpacity
-          style={[styles.roundButton, styles.resetButton]}
-          accessibilityLabel="Remettre les cadrages à zéro"
-          onPress={reset}>
-          <Text style={styles.resetIcon}>↻</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scroll}
-        scrollEnabled={!scrollLocked}>
-        {/*
-          À QUI EST CE DOSSIER.
-
-          Le cartouche ne portait que le nom du fichier. Un devis, un plan
-          d'exécution, un dossier de réception portent toujours le nom de
-          celui qui le reçoit et l'adresse du chantier — c'est ce qu'on
-          cherche en premier sur une pile de plans, et ce qui distingue
-          deux T3 identiques rue Pasteur.
-        */}
-        <View style={styles.dossier}>
-          {(
-            [
-              ['Client', client, 'Nom du client', (t: string) => setClientInfo(t, address)],
-              ['Chantier', address, 'Adresse du chantier', (t: string) => setClientInfo(client, t)],
-            ] as [string, string, string, (t: string) => void][]
-          ).map(([titre, valeur, invite, poser]) => (
-            <TouchableOpacity
-              key={titre}
-              /*
-                ON NE DEVINE PAS QU'UNE ÉTIQUETTE SE TOUCHE.
-
-                Ces deux cases s'éditaient déjà, mais rien ne le disait :
-                « CLIENT — Non renseigné » se lit comme une constatation, pas
-                comme un champ. Le parcours d'essai l'a montré — on arrive à
-                l'export, le cartouche annonce « non renseigné », et l'on
-                repart avec un dossier anonyme sans avoir compris qu'il
-                suffisait d'appuyer. Le crayon dit « ça s'édite » : c'est le
-                même signe que sur le bandeau des cotes, et il vaut mieux
-                qu'une notice.
-              */
-              accessibilityLabel={`Renseigner : ${invite}`}
-              style={styles.dossierCase}
-              onPress={() =>
-                setPrompt({
-                  title: invite,
-                  subtitle: 'Il paraît dans le cartouche de chaque feuille.',
-                  value: valeur,
-                  okLabel: 'Enregistrer',
-                  onSubmit: poser,
-                })
-              }>
-              <View style={styles.dossierEntete}>
-                <Text style={styles.dossierTitre}>{titre.toUpperCase()}</Text>
-                <Svg width={11} height={11} viewBox="0 0 24 24">
-                  <Path
-                    d={SOLAIRES.crayon}
-                    fill={c.inkFaint}
-                    fillRule="evenodd"
-                  />
-                </Svg>
-              </View>
-              <Text
-                style={[styles.dossierValeur, !valeur && styles.dossierVide]}
-                numberOfLines={1}>
-                {valeur || 'Non renseigné'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.roundButton} accessibilityLabel="Retour" onPress={() => setScreen('result')}>
+            <BackChevron color={c.ink} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Export PDF</Text>
         </View>
 
-        {/* Ce qui entre dans le document : neuf réglages, en une grille
-            d'icônes plutôt qu'en neuf lignes d'interrupteurs. Empilés, ils
-            repoussaient l'aperçu — la seule chose qu'on veuille vraiment
-            voir ici — sous la ligne de flottaison. Actif = pastille bleue,
-            comme partout ailleurs dans l'app. */}
-        <View style={styles.grille}>
-          {(
-            [
-              ['vues3d', 'Vues 3D', include3D, () => setInclude3D(!include3D)],
-              [
-                'metre',
-                'Métré',
-                includeMetre,
-                () => setIncludeMetre(!includeMetre),
-              ],
-              [
-                'cotes2d',
-                'Cotes 2D',
-                measures2D,
-                () => setMeasures2D(!measures2D),
-              ],
-              [
-                'cotes3d',
-                'Cotes 3D',
-                measures3D,
-                () => setMeasures3D(!measures3D),
-              ],
-              [
-                'meubles',
-                'Meubles',
-                showFurniture,
-                () => setShowFurniture(!showFurniture),
-              ],
-              [
-                'surface',
-                'Surfaces',
-                showSurfaces,
-                () => setShowSurfaces(!showSurfaces),
-              ],
-              [
-                'ouvertures',
-                'Ouvertures',
-                showOpeningColors,
-                () => setShowOpeningColors(!showOpeningColors),
-              ],
-              ...(colorsAvailable
-                ? [
-                    [
-                      'couleurs',
-                      'Couleurs',
-                      showTextures,
-                      () => setShowTextures(!showTextures),
-                    ] as OptionDef,
-                  ]
-                : []),
-              ...(cheminements
-                ? [
-                    [
-                      'gaines',
-                      'Gaines',
-                      gaines,
-                      () => setGaines(!gaines),
-                    ] as OptionDef,
-                  ]
-                : []),
-              ...(ceiling.length > 0
-                ? [
-                    [
-                      'plafond',
-                      'Plafond',
-                      plafond,
-                      () => setPlafond(!plafond),
-                    ] as OptionDef,
-                  ]
-                : []),
-              [
-                'elevations',
-                'Élévations',
-                elevations,
-                () => setElevations(!elevations),
-              ],
-              // Les murs équipés, de face et cotés — absorbé par les
-              // élévations quand elles sont là : jamais de feuille double.
-              // Les cotes d'appareils n'ont rien à coter sans le mode.
-              ...(modeElec
-                ? [
-                    [
-                      'cotesElec',
-                      'Cotes Élec',
-                      cotesElec,
-                      () => setCotesElec(!cotesElec),
-                    ] as OptionDef,
-                  ]
-                : []),
-              ...(schemas
-                ? [
-                    [
-                      'schema',
-                      'Schémas',
-                      schema,
-                      () => setSchema(!schema),
-                    ] as OptionDef,
-                  ]
-                : []),
-            ] as OptionDef[]
-          ).map(([icon, label, actif, press]) => (
-            /* Le nom SOUS le bloc, pas dedans : la pastille ne porte que son
-               icône, centrée, et le mot se lit en légende. Un carré qui
-               contient à la fois un dessin et un mot n'a de place ni pour
-               l'un ni pour l'autre — l'icône rétrécissait, le mot se
-               tronquait, et l'état actif se lisait mal sous le texte. */
-            <View key={icon} style={styles.optionCell}>
-              <TouchableOpacity
-                style={[styles.option, actif && styles.optionOn]}
-                activeOpacity={0.8}
-                accessibilityLabel={label}
-                onPress={press}>
-                <Svg width={24} height={24} viewBox="0 0 24 24">
-                  {/* La silhouette Solar, remplie — jamais de trait. */}
-                  <Path
-                    d={EXPORT_ICONS[icon]}
-                    fill={actif ? '#FFFFFF' : c.ink}
-                    fillRule="evenodd"
-                  />
-                </Svg>
-              </TouchableOpacity>
-              <Text
-                style={[styles.optionText, actif && styles.optionTextOn]}
-                numberOfLines={1}>
-                {label}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        {/*
-          LES NUMÉROS DE FEUILLE SUIVENT LE DOCUMENT.
-
-          Ils étaient écrits en dur — « Feuille 1 », « Feuille 2 · Vues
-          3D » — alors que le PDF insère le plafond en deuxième et le
-          métré en troisième. On cadrait donc la « feuille 2 » pour la
-          retrouver en quatrième page, et on cherchait la feuille du
-          plafond dans un écran qui ne la montrait nulle part.
-        */}
-        <Text style={styles.sheetLabel}>
-          {avecPlafond
-            ? 'Feuille 1 · Plan d’ensemble et plafond'
-            : 'Feuille 1 · Plan d’ensemble'}
-        </Text>
-        <View style={styles.sheetCard}>
-          {/* Plus de verrou de défilement ici : rien ne se manipule sur le
-              plan, donc le doigt doit pouvoir le traverser pour faire
-              défiler la page. */}
-          <PlanPreview
-            cotes={measures2D}
-            routes={gaines || schema ? cheminements?.traces : undefined}
-            ceiling={avecPlafond ? ceiling : undefined}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scroll}
+          scrollEnabled={!scrollLocked}>
+          {/*
+            L'APERÇU D'ABORD — relevé du patron : « tous ces boutons ne sont
+            pas ludiques, on ne comprend pas réellement leur intérêt sur le
+            plan PDF ». On voit le dossier, feuille par feuille, AVANT de le
+            régler : chaque réglage, en dessous, l'ajoute ou le retire sous
+            les yeux.
+          */}
+          <ApercuDuDossier
+            sommaire={sommaire}
+            images={images}
+            enCours={enCours}
+            net={net}
+            onDeflouter={doExport}
           />
-        </View>
+
+          {/*
+            À QUI EST CE DOSSIER — le cartouche de chaque feuille porte le
+            nom du client et l'adresse du chantier. Le crayon dit que ça
+            s'édite.
+          */}
+          <View style={styles.dossier}>
+            {(
+              [
+                ['Client', client, 'Nom du client', (t: string) => setClientInfo(t, address)],
+                ['Chantier', address, 'Adresse du chantier', (t: string) => setClientInfo(client, t)],
+              ] as [string, string, string, (t: string) => void][]
+            ).map(([titre, valeur, invite, poser]) => (
+              <TouchableOpacity
+                key={titre}
+                accessibilityLabel={`Renseigner : ${invite}`}
+                style={styles.dossierCase}
+                onPress={() =>
+                  setPrompt({
+                    title: invite,
+                    subtitle: 'Il paraît dans le cartouche de chaque feuille.',
+                    value: valeur,
+                    okLabel: 'Enregistrer',
+                    onSubmit: poser,
+                  })
+                }>
+                <View style={styles.dossierEntete}>
+                  <Text style={styles.dossierTitre}>{titre.toUpperCase()}</Text>
+                  <Svg width={11} height={11} viewBox="0 0 24 24">
+                    <Path d={SOLAIRES.crayon} fill={c.inkFaint} fillRule="evenodd" />
+                  </Svg>
+                </View>
+                <Text style={[styles.dossierValeur, !valeur && styles.dossierVide]} numberOfLines={1}>
+                  {valeur || 'Non renseigné'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.section}>Composez votre dossier</Text>
+
+          {/* ------------------------------------------------ le plan coté */}
+          <Carte
+            icone={EXPORT_ICONS.cotes2d}
+            titre="Plan coté"
+            dit="La feuille maîtresse : le logement vu du dessus, droit et entier."
+            pages="Toujours inclus">
+            <View style={styles.calques}>
+              {calques.map((k) => (
+                <TouchableOpacity
+                  key={k.cle}
+                  accessibilityLabel={k.mot}
+                  accessibilityState={{ selected: k.actif }}
+                  style={[styles.calque, k.actif && styles.calqueOn]}
+                  onPress={() => basculer(k.basculer, `${k.mot} : ${k.dit}`)}>
+                  <Svg width={15} height={15} viewBox="0 0 24 24">
+                    <Path d={EXPORT_ICONS[k.cle]} fill={k.actif ? '#FFFFFF' : c.ink} fillRule="evenodd" />
+                  </Svg>
+                  <Text style={[styles.calqueMot, k.actif && styles.calqueMotOn]}>{k.mot}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.calqueDit}>
+              {calqueDit ?? 'Touchez un calque : le plan ci-dessous le montre ou le retire.'}
+            </Text>
+            <PlanPreview
+              cotes={measures2D}
+              routes={gaines || schema ? cheminements?.traces : undefined}
+              ceiling={avecPlafond ? ceiling : undefined}
+            />
+          </Carte>
+
+          {/* ------------------------------------------------- le métré */}
+          <Carte
+            icone={EXPORT_ICONS.metre}
+            titre="Métré"
+            dit="Surfaces, périmètres, plinthes et ouvertures : de quoi chiffrer sols et peinture."
+            pages={pagesDe(includeMetre, combien(sommaire, 'metre'), combien(avecTout, 'metre'))}
+            actif={includeMetre}
+            label="Métré"
+            onChange={(v) => basculer(() => setIncludeMetre(v))}
+          />
+
+          {/* ---------------------------------------------- les vues 3D */}
+          <Carte
+            icone={EXPORT_ICONS.vues3d}
+            titre="Vues 3D"
+            dit="Le logement en perspective : le client s’y projette d’un regard."
+            pages={pagesDe(include3D, combien(sommaire, 'perspective'), Math.max(1, vues.length))}
+            actif={include3D}
+            label="Vues 3D"
+            onChange={(v) => basculer(() => setInclude3D(v))}>
+            {include3D && (
+              <>
+                <View style={styles.calques}>
+                  <TouchableOpacity
+                    accessibilityLabel="Cotes sur la 3D"
+                    accessibilityState={{ selected: measures3D }}
+                    style={[styles.calque, measures3D && styles.calqueOn]}
+                    onPress={() => basculer(() => setMeasures3D(!measures3D))}>
+                    <Svg width={15} height={15} viewBox="0 0 24 24">
+                      <Path d={EXPORT_ICONS.cotes3d} fill={measures3D ? '#FFFFFF' : c.ink} fillRule="evenodd" />
+                    </Svg>
+                    <Text style={[styles.calqueMot, measures3D && styles.calqueMotOn]}>Cotes sur la 3D</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity accessibilityLabel="Remettre les cadrages à zéro" style={styles.calque} onPress={reset}>
+                    <Text style={styles.calqueMot}>↻ Recadrer</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.calqueDit}>Un doigt pour tourner, deux pour zoomer : chaque vue part telle quelle.</Text>
+                {vues.map((v, i) => (
+                  <React.Fragment key={i}>
+                    {vues.length > 1 && (
+                      <View style={styles.vueTete}>
+                        <Text style={styles.vueNom}>Vue {i + 1}</Text>
+                        {i > 0 && (
+                          <TouchableOpacity
+                            accessibilityLabel={`Retirer la perspective ${i + 1}`}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            onPress={() => setVues((liste) => liste.filter((_, k) => k !== i))}>
+                            <Text style={styles.retirer}>Retirer</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+                    <View
+                      {...lockProps}
+                      style={styles.view3d}
+                      onLayout={(e) => {
+                        boites.current[i] = {
+                          w: e.nativeEvent.layout.width,
+                          h: e.nativeEvent.layout.height,
+                        };
+                      }}>
+                      <Iso3DView
+                        value={v}
+                        onChange={(nv) => setVues((liste) => liste.map((x, k) => (k === i ? nv : x)))}
+                        showMeasures={measures3D}
+                        // Les cardinaux appartiennent au plan 2D : sur une
+                        // perspective, quatre lettres au bord du cadre ne
+                        // désignent plus rien.
+                        showNorth={false}
+                      />
+                    </View>
+                  </React.Fragment>
+                ))}
+                {vues.length < MAX_VUES && (
+                  <TouchableOpacity
+                    style={styles.ajouter}
+                    accessibilityLabel="Ajouter une perspective"
+                    onPress={() => setVues((liste) => [...liste, { ...angleSuivant(liste.length) }])}>
+                    <Text style={styles.ajouterTexte}>+ Un autre angle</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </Carte>
+
+          {/* ------------------------------------------ les murs de face */}
+          <Carte
+            icone={EXPORT_ICONS.elevations}
+            titre="Murs de face"
+            dit="Chaque mur vu de face, coté : là où l’on perce, à la bonne hauteur."
+            pages={pagesDe(murs !== null, combien(sommaire, 'elevation'), combien(avecTout, 'elevation'))}
+            actif={murs !== null}
+            label="Murs de face"
+            onChange={(v) => choisirMurs(v ? 'tous' : null)}>
+            {murs !== null && modeElec && (
+              <View style={styles.segment}>
+                {(
+                  [
+                    ['tous', 'Tous les murs'],
+                    ['equipes', 'Murs équipés'],
+                  ] as const
+                ).map(([m, mot]) => (
+                  <TouchableOpacity
+                    key={m}
+                    accessibilityLabel={mot}
+                    accessibilityState={{ selected: murs === m }}
+                    style={[styles.segmentCase, murs === m && styles.segmentCaseOn]}
+                    onPress={() => choisirMurs(m)}>
+                    <Text style={[styles.segmentMot, murs === m && styles.segmentMotOn]}>{mot}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </Carte>
+
+          {/* ------------------------------------------ le plan des gaines */}
+          {cheminements && (
+            <Carte
+              icone={EXPORT_ICONS.gaines}
+              titre="Plan des gaines"
+              dit="Le chemin de chaque câble, et le tirage circuit par circuit."
+              pages={pagesDe(gaines, combien(sommaire, 'gaines'), 1)}
+              actif={gaines}
+              label="Plan des gaines"
+              onChange={(v) => basculer(() => setGaines(v))}
+            />
+          )}
+
+          {/* ------------------------------------------- les schémas */}
+          {schemas && (
+            <Carte
+              icone={EXPORT_ICONS.schema}
+              titre="Schémas électriques"
+              dit="L’unifilaire et le multifilaire : le tableau, et le câblage de chaque circuit."
+              pages={pagesDe(schema, combien(sommaire, 'unifilaire', 'multifilaire'), combien(avecTout, 'unifilaire', 'multifilaire'))}
+              actif={schema}
+              label="Schémas"
+              onChange={(v) => basculer(() => setSchema(v))}
+            />
+          )}
+
+          {/* ------------------------------------------ le tableau existant */}
+          {combien(sommaire, 'existant') > 0 && (
+            <Carte
+              icone={EXPORT_ICONS.cotesElec}
+              titre="Tableau existant"
+              dit="Le tableau relevé sur place, et ce qu’il faut reprendre."
+              pages="Inclus d’office"
+            />
+          )}
+        </ScrollView>
 
         {/*
-          LA PRÉSENTATION N'EST PLUS ICI.
-
-          Elle a occupé trois places avant celle-ci — pied de page, écran du
-          scan, sous l'aperçu — et le malentendu était le même à chaque
-          fois : on la rangeait dans le RÉGLAGE D'UN DOCUMENT alors que
-          c'est une SORTIE. Elle se choisit donc sur le bouton
-          « Exporter », avec le PDF, le modèle 3D et le bordereau. Cet
-          écran-ci ne sert qu'à composer une feuille.
+          LE BOUTON DIT CE QU'IL FAIT. Abonné : il envoie le dossier. Sinon :
+          il défloute — c'est l'offre, au moment où le dossier est sous les
+          yeux.
         */}
-
-        {include3D && (
-          <>
-            {/*
-              UNE PERSPECTIVE PAR FEUILLE, ET AUTANT QU'IL EN FAUT.
-
-              Deux vues se partageaient une page, chacune dans une case du
-              tiers d'un A4 : on n'y distinguait plus une porte d'une
-              fenêtre. Chacune prend maintenant sa feuille entière, et l'on
-              en ajoute quand un angle manque — de face pour la cuisine, de
-              l'autre bout pour le séjour.
-            */}
-            {vues.map((v, i) => (
-              <React.Fragment key={i}>
-                <View style={styles.sheetHead}>
-                  <Text style={styles.sheetLabel}>
-                    {`Feuille ${(includeMetre ? 1 : 0) + 2 + i} · Perspective${
-                      vues.length > 1 ? ` ${i + 1}` : ''
-                    }`}
-                  </Text>
-                  {i > 0 && (
-                    <TouchableOpacity
-                      accessibilityLabel={`Retirer la perspective ${i + 1}`}
-                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      onPress={() =>
-                        setVues((liste) => liste.filter((_, k) => k !== i))
-                      }>
-                      <Text style={styles.retirer}>Retirer</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-                <View style={styles.sheetCard}>
-                  <View
-                    {...lockProps}
-                    style={[styles.view3d, styles.view3dLast]}
-                    onLayout={(e) => {
-                      boites.current[i] = {
-                        w: e.nativeEvent.layout.width,
-                        h: e.nativeEvent.layout.height,
-                      };
-                    }}>
-                    <Iso3DView
-                      value={v}
-                      onChange={(nv) =>
-                        setVues((liste) =>
-                          liste.map((x, k) => (k === i ? nv : x)),
-                        )
-                      }
-                      showMeasures={measures3D}
-                      // Les cardinaux appartiennent au plan 2D : sur une
-                      // perspective, quatre lettres au bord du cadre ne
-                      // désignent plus rien.
-                      showNorth={false}
-                    />
-                  </View>
-                </View>
-              </React.Fragment>
-            ))}
-            {vues.length < MAX_VUES && (
-              <TouchableOpacity
-                style={styles.ajouter}
-                accessibilityLabel="Ajouter une perspective"
-                onPress={() =>
-                  setVues((liste) => [
-                    ...liste,
-                    { ...angleSuivant(liste.length) },
-                  ])
-                }>
-                <Text style={styles.ajouterTexte}>+ Ajouter une perspective</Text>
-              </TouchableOpacity>
-            )}
-          </>
-        )}
-
-        <Text style={styles.hint}>
-          Le plan 2D est cadré par le document : droit, entier, coté. Les
-          perspectives, elles, se règlent — un doigt pour tourner, deux pour
-          zoomer. ↻ remet leurs angles à zéro.
-        </Text>
-      </ScrollView>
-
-      {/* Cet écran compose UNE feuille et la sort. La présentation, elle,
-          se choisit sur le bouton « Exporter » du plan, avec les autres
-          sorties. */}
-      <TouchableOpacity style={styles.exportButton} onPress={doExport}>
-        <Text style={styles.exportText}>Exporter le PDF</Text>
-      </TouchableOpacity>
-      <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
+        <TouchableOpacity
+          style={styles.exportButton}
+          accessibilityLabel={net ? 'Exporter le PDF' : 'Déflouter et télécharger'}
+          onPress={doExport}>
+          {!net && (
+            <Svg width={16} height={16} viewBox="0 0 24 24">
+              <Path d={CADENAS} fill="#FFFFFF" />
+            </Svg>
+          )}
+          <Text style={styles.exportText}>
+            {net
+              ? `Exporter le PDF · ${sommaire.length} feuille${sommaire.length > 1 ? 's' : ''}`
+              : 'Déflouter et télécharger'}
+          </Text>
+        </TouchableOpacity>
+        <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
       </Animated.View>
     </RetourGlisse>
+  );
+}
+
+/** Le flou de l'aperçu sans abonnement : on reconnaît son plan, on ne lit pas une cote. */
+export const FLOU_DE_L_APERCU = 6;
+
+const CADENAS =
+  'M7 10V7a5 5 0 0 1 10 0v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1Zm2 0h6V7a3 3 0 0 0-6 0v3Z';
+
+/** Ce qu'une feuille pèse dans le dossier, dit avant qu'on la coche. */
+function pagesDe(actif: boolean, ici: number, siCochee: number): string {
+  const n = actif ? ici : siCochee;
+  if (n <= 0) return actif ? 'Rien à imprimer' : '';
+  const mot = `${n} feuille${n > 1 ? 's' : ''}`;
+  return actif ? mot : `+ ${mot}`;
+}
+
+/**
+ * UNE FEUILLE DU DOSSIER, UNE CARTE — son icône, son nom, À QUOI ELLE SERT,
+ * ce qu'elle pèse, et son interrupteur. On ne coche plus une icône muette :
+ * on décide d'une feuille dont on sait ce qu'elle dit.
+ */
+function Carte({
+  icone,
+  titre,
+  dit,
+  pages,
+  actif,
+  label,
+  onChange,
+  children,
+}: {
+  icone: string;
+  titre: string;
+  dit: string;
+  pages: string;
+  actif?: boolean;
+  label?: string;
+  onChange?: (v: boolean) => void;
+  children?: React.ReactNode;
+}) {
+  const c = useTheme();
+  const s = getStyles(c);
+  const allumee = actif === undefined || actif;
+  return (
+    <View style={[s.carte, !allumee && s.carteEteinte]}>
+      <View style={s.carteTete}>
+        <View style={[s.carteIcone, allumee && { backgroundColor: c.blue }]}>
+          <Svg width={20} height={20} viewBox="0 0 24 24">
+            <Path d={icone} fill={allumee ? '#FFFFFF' : c.inkSoft} fillRule="evenodd" />
+          </Svg>
+        </View>
+        <View style={s.carteTexte}>
+          <View style={s.carteLigne}>
+            <Text style={s.carteTitre}>{titre}</Text>
+            {!!pages && <Text style={[s.cartePages, allumee && { color: c.blue }]}>{pages}</Text>}
+          </View>
+          <Text style={s.carteDit}>{dit}</Text>
+        </View>
+        {onChange && (
+          <Switch
+            accessibilityLabel={label ?? titre}
+            value={!!actif}
+            onValueChange={onChange}
+            trackColor={{ true: c.blue, false: c.surfaceSunken }}
+          />
+        )}
+      </View>
+      {children ? <View style={s.carteCorps}>{children}</View> : null}
+    </View>
   );
 }
 
@@ -981,7 +1090,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingTop: 58,
     paddingHorizontal: 18,
   },
-  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
   roundButton: {
     width: 38,
     height: 38,
@@ -993,8 +1102,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 8,
   },
-  resetButton: { marginLeft: 'auto' },
-  resetIcon: { color: c.blue, fontSize: 20, fontWeight: '700' },
   title: {
     color: c.ink,
     fontSize: 21,
@@ -1002,71 +1109,10 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     letterSpacing: -0.3,
     marginLeft: 12,
   },
-  scroll: { paddingBottom: 16 },
-  // Quatre par ligne : la grille tient en deux rangées, l'aperçu remonte.
-  grille: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    rowGap: 8,
-    columnGap: 6,
-    marginBottom: 10,
-  },
-  optionCell: { width: '23.5%', alignItems: 'center' },
-  option: {
-    // Une tuile BASSE, et une icône plus grande dedans.
-    //
-    // Le carré parfait donnait des pavés de 85 px de haut : neuf options
-    // occupaient tout l'écran avant même l'aperçu du plan, qu'on ne voyait
-    // plus. La hauteur est fixe et courte, l'icône y gagne trois points —
-    // ce qu'on doit reconnaître, c'est le dessin, pas la surface bleue.
-    width: '100%',
-    // Neuf options remplissaient l'écran avant même l'aperçu du plan.
-    // Quarante points — relevé du patron : « réduis plus les blocs que
-    // les icônes » ; la tuile perd six points, l'icône deux.
-    height: 40,
-    borderRadius: radius.sm,
-    backgroundColor: c.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...shadowCard,
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-  },
-  optionOn: { backgroundColor: c.blue },
-  optionText: {
-    color: c.inkFaint,
-    fontSize: 9.5,
-    fontWeight: '700',
-    letterSpacing: -0.1,
-    textAlign: 'center',
-    marginTop: 3,
-  },
-  optionTextOn: { color: c.blue, fontWeight: '600' },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: c.surface,
-    borderRadius: radius.sm,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    marginBottom: 6,
-    ...shadowCard,
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-  },
-  switchLabel: {
-    color: c.ink,
-    fontSize: 13.5,
-    fontWeight: '600',
-    flexShrink: 1,
-    marginRight: 10,
-  },
-  // Zone centrale du modèle : les gouttières latérales restent au scroll.
-  lockWrap: { marginHorizontal: 32 },
+  scroll: { paddingBottom: 18, gap: 12 },
   fadeWrap: { flex: 1 },
-  /** Le bloc « à qui est ce dossier », en tête de l'écran. */
-  dossier: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  /** Le bloc « à qui est ce dossier ». */
+  dossier: { flexDirection: 'row', gap: 10, marginTop: 4 },
   dossierCase: {
     flex: 1,
     minHeight: 56,
@@ -1087,58 +1133,75 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   dossierValeur: { color: c.ink, fontSize: 14.5, fontWeight: '700', marginTop: 3 },
   dossierVide: { color: c.inkFaint, fontWeight: '600' },
-  sheetLabel: {
+  section: {
     color: c.inkSoft,
     fontSize: 12.5,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
-    marginTop: 10,
-    marginBottom: 6,
+    marginTop: 8,
   },
-  /* Le titre de feuille et son bouton « Retirer » sur la même ligne : le
-     bouton se lit comme une action SUR cette feuille-là, pas sur la
-     suivante. */
-  sheetHead: {
+  carte: {
+    backgroundColor: c.surface,
+    borderRadius: radius.lg,
+    padding: 14,
+    ...shadowCard,
+    shadowOpacity: 0.06,
+  },
+  carteEteinte: { opacity: 0.86 },
+  carteTete: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  carteIcone: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: c.surfaceSunken,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  carteTexte: { flex: 1 },
+  carteLigne: { flexDirection: 'row', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' },
+  carteTitre: { color: c.ink, fontSize: 16, fontWeight: '700' },
+  cartePages: { color: c.inkFaint, fontSize: 12, fontWeight: '700' },
+  carteDit: { color: c.inkSoft, fontSize: 13, lineHeight: 18, marginTop: 2 },
+  carteCorps: { marginTop: 12, gap: 8 },
+  calques: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  calque: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 6,
+    backgroundColor: c.surfaceSunken,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  retirer: {
-    color: c.danger,
-    fontSize: 12.5,
-    fontWeight: '700',
-    marginTop: 10,
-    marginBottom: 6,
-  },
+  calqueOn: { backgroundColor: c.blue },
+  calqueMot: { color: c.ink, fontSize: 13, fontWeight: '700' },
+  calqueMotOn: { color: '#FFFFFF' },
+  calqueDit: { color: c.inkFaint, fontSize: 12.5, lineHeight: 17 },
+  vueTete: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  vueNom: { color: c.inkSoft, fontSize: 12.5, fontWeight: '700' },
+  retirer: { color: c.danger, fontSize: 12.5, fontWeight: '700' },
+  // Gouttières invisibles : les bandes latérales appartiennent au scroll,
+  // seul le centre manipule le modèle.
+  view3d: { height: 210, borderRadius: 14, overflow: 'hidden', marginHorizontal: 18 },
   ajouter: {
-    marginTop: 12,
-    paddingVertical: 13,
+    paddingVertical: 12,
     borderRadius: radius.md,
     borderWidth: 1.5,
     borderColor: c.line,
     borderStyle: 'dashed',
     alignItems: 'center',
   },
-  ajouterTexte: { color: c.blue, fontSize: 14.5, fontWeight: '700' },
-  sheetCard: {
-    backgroundColor: c.surface,
-    borderRadius: radius.lg,
-    padding: 6,
-    ...shadowCard,
-  },
-  // Gouttières invisibles : les bandes latérales appartiennent au scroll,
-  // seul le centre manipule le modèle.
-  view3d: { height: 210, borderRadius: 14, overflow: 'hidden', marginHorizontal: 32 },
-  view3dLast: { marginTop: 6 },
-  hint: {
-    color: c.inkFaint,
-    fontSize: 12,
-    lineHeight: 17,
-    textAlign: 'center',
-    marginTop: 12,
-  },
+  ajouterTexte: { color: c.blue, fontSize: 14, fontWeight: '700' },
+  segment: { flexDirection: 'row', backgroundColor: c.surfaceSunken, borderRadius: radius.pill, padding: 3 },
+  segmentCase: { flex: 1, alignItems: 'center', borderRadius: radius.pill, paddingVertical: 8 },
+  segmentCaseOn: { backgroundColor: c.surface, ...shadowCard, shadowOpacity: 0.08 },
+  segmentMot: { color: c.inkSoft, fontSize: 13, fontWeight: '700' },
+  segmentMotOn: { color: c.ink },
   exportButton: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: c.blue,
     marginBottom: 28,
     marginTop: 6,

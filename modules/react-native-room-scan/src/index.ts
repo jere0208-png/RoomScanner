@@ -603,6 +603,19 @@ export const RoomScan = {
     return NativeModules.RoomScanExport.sharePDF(base64, filename);
   },
 
+  /**
+   * iOS : chaque feuille du PDF en JPEG (base64), à la largeur demandée. Le
+   * flou et le filigrane, quand ils sont demandés, sont gravés dans l'image
+   * par le natif. `null` sans le natif : l'écran montre alors le sommaire.
+   */
+  apercuPdf: (
+    base64: string,
+    o: { largeur: number; flou: number; filigrane: string; maxPages: number },
+  ): Promise<string[] | null> => {
+    if (!NativeModules.RoomScanExport?.apercuPdf) return Promise.resolve(null);
+    return NativeModules.RoomScanExport.apercuPdf(base64, o.largeur, o.flou, o.filigrane, o.maxPages);
+  },
+
   /** iOS : écrit un texte dans un fichier temporaire et ouvre le partage. */
   shareText: (content: string, filename: string): Promise<boolean> => {
     if (!NativeModules.RoomScanExport) {

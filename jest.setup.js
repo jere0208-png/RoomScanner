@@ -37,6 +37,8 @@ jest.mock('react-native-room-scan', () => ({
     stopHeading: jest.fn(async () => false),
     heading: jest.fn(async () => null),
     sharePDF: jest.fn(async () => true),
+    // L'aperçu du dossier : sans natif, pas d'images — l'écran montre le sommaire.
+    apercuPdf: jest.fn(async () => null),
     shareText: jest.fn(async () => true),
     shareFile: jest.fn(async () => true),
     viewModel: jest.fn(async () => false),

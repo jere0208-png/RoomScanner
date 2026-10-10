@@ -105,6 +105,14 @@ RCT_EXTERN_METHOD(shareText:(NSString *)content
 RCT_EXTERN_METHOD(shareFile:(NSString *)path
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
+// L'aperçu du dossier : chaque feuille en JPEG, floutée et filigranée sans abonnement.
+RCT_EXTERN_METHOD(apercuPdf:(NSString *)base64
+                  largeur:(nonnull NSNumber *)largeur
+                  flou:(nonnull NSNumber *)flou
+                  filigrane:(NSString *)filigrane
+                  maxPages:(nonnull NSNumber *)maxPages
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 @end
 
 @interface RCT_EXTERN_MODULE(RoomScanViewManager, RCTViewManager)

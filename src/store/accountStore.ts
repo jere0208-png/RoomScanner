@@ -771,3 +771,17 @@ export const identiteDuCompte = (): Identite | null => {
     ? { identifiant: s.compte.id, jeton: s.jeton }
     : null;
 };
+
+/**
+ * L'APERÇU DU DOSSIER EST-IL NET ?
+ *
+ * Relevé du patron : « sans abonnement, donne-lui la possibilité de voir son
+ * PDF flouté, mais assez pour voir que c'est son plan, avec de gros
+ * filigranes EchoPlan ». C'est la SEULE chose que l'abonnement change à
+ * l'écran : le plan, la 3D, les cotes et la composition du dossier restent
+ * libres ; les feuilles du PDF, elles, se montrent floutées tant qu'on ne
+ * peut pas les envoyer. Et dès que l'abonnement arrive, elles se défloutent
+ * sous les yeux.
+ */
+export const useDossierNet = (): boolean =>
+  useAccountStore((a) => !!(a.compte && a.pro));

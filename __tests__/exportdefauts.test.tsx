@@ -32,11 +32,10 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Switch, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ExportScreen } from '../src/screens/ExportScreen';
 import { useScanStore } from '../src/store/scanStore';
-import { light } from '../src/theme';
 import {
   SNAPSHOT_FIXTURES,
   SNAPSHOT_OBJECTS,
@@ -101,30 +100,45 @@ function monter() {
   return t;
 }
 
-/** L'état de chaque option de la grille : cochée ou non. */
+/**
+ * L'état de chaque réglage : l'interrupteur de chaque feuille, les calques
+ * du plan, et le choix des murs de face.
+ */
 const options = (t: TestRenderer.ReactTestRenderer) => {
   const out = new Map<string, boolean>();
-  for (const n of t.root.findAllByType(TouchableOpacity)) {
-    const label = n.props.accessibilityLabel;
-    if (typeof label !== 'string') continue;
-    const st = StyleSheet.flatten(n.props.style) as { backgroundColor?: string };
-    // La pastille active prend le bleu de la maison ; les autres restent au
-    // gris du fond creusé.
-    if (!st?.backgroundColor) continue;
-    if (st.backgroundColor === light.blue) out.set(label, true);
-    else if (!out.has(label)) out.set(label, false);
+  for (const sw of t.root.findAllByType(Switch)) {
+    if (typeof sw.props.accessibilityLabel === 'string') out.set(sw.props.accessibilityLabel, !!sw.props.value);
+  }
+  for (const n of t.root.findAll(
+    (x) =>
+      typeof x.props.accessibilityLabel === 'string' &&
+      typeof x.props.onPress === 'function' &&
+      typeof x.props.accessibilityState?.selected === 'boolean',
+    { deep: false },
+  )) {
+    out.set(n.props.accessibilityLabel, n.props.accessibilityState.selected);
   }
   return out;
 };
 
 describe('les options cochées à l’ouverture de l’export', () => {
-  const COCHEES = [
-    'Vues 3D',
-    'Métré',
-    'Cotes 2D',
-    'Meubles',
-    'Élévations',
-    'Cotes Élec',
+  /*
+    LES MÊMES DÉFAUTS, DITS AUTREMENT — la grille d'icônes est devenue une
+    carte par feuille (relevé du patron : « tous ces boutons ne sont pas
+    ludiques, on ne comprend pas leur intérêt ») : « Cotes 2D » est le
+    calque Cotes du plan, « Élévations » et « Cotes Élec » sont les murs de
+    face — tous les murs.
+  */
+  const COCHEES = ['Vues 3D', 'Métré', 'Cotes', 'Meubles', 'Murs de face', 'Tous les murs'];
+  const DECOCHEES = [
+    'Cotes sur la 3D',
+    'Surfaces',
+    'Menuiseries en couleur',
+    'Couleurs relevées',
+    'Plafond',
+    'Plan des gaines',
+    'Schémas',
+    'Murs équipés',
   ];
 
   it('coche celles du dossier ordinaire', () => {
@@ -136,15 +150,12 @@ describe('les options cochées à l’ouverture de l’export', () => {
 
   it('et décoche tout le reste', () => {
     const o = options(monter());
-    for (const [nom, actif] of o) {
-      if (COCHEES.includes(nom)) continue;
-      // Les boutons qui ne sont pas des options de la grille n'ont pas de
-      // fond bleu : seules les pastilles comptent ici.
-      if (!['Cotes 3D', 'Surfaces', 'Ouvertures', 'Couleurs', 'Plafond', 'Élévations', 'Cotes Élec', 'Gaines', 'Schémas'].includes(nom)) {
-        continue;
-      }
-      expect({ [nom]: actif }).toEqual({ [nom]: false });
+    for (const nom of DECOCHEES) {
+      if (!o.has(nom)) continue;
+      expect({ [nom]: o.get(nom) }).toEqual({ [nom]: false });
     }
+    // Et l'on a bien vu des réglages éteints : le banc n'est pas vide.
+    expect(DECOCHEES.filter((n) => o.has(n)).length).toBeGreaterThanOrEqual(4);
   });
 
   it('et les options du plan suivent, pour que l’aperçu ne mente pas', () => {

@@ -14285,6 +14285,64 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## L'export PDF refait : on voit son dossier — flouté tant qu'on n'est pas Pro
+
+Relevé du patron : « refais la page export PDF ; tous ces boutons ne sont pas
+ludiques, on ne comprend pas réellement leur intérêt sur le plan PDF ; trouve
+un moyen que tout soit compréhensible et moderne. Si l'utilisateur n'a pas
+d'abonnement, donne-lui la possibilité de voir son PDF flouté, mais assez
+pour voir que c'est son plan, avec de gros filigranes EchoPlan — une
+technique de confiance ; son PDF doit donner l'envie d'acheter pour
+déflouter et télécharger. »
+
+**L'aperçu d'abord** (`ApercuDuDossier`). En tête de l'écran, les VRAIES
+feuilles du dossier : le PDF bâti pendant qu'on compose (comme avant, six
+cents millisecondes après le dernier réglage) est rendu page par page par le
+natif (`RoomScanExport.apercuPdf`, PDFKit), en carrousel — numéro, nom de la
+feuille, et la visionneuse plein écran au toucher. Le compte des feuilles
+bat quand un réglage le change ; les cartes respirent pendant qu'il se
+rebâtit.
+
+**Sans abonnement, flouté et filigrané — gravé dans l'image.** Le natif
+applique un flou gaussien (`FLOU_DE_L_APERCU` = 6 px sur une feuille de
+1100 px : on reconnaît son logement, ses pièces, la forme du plan, on ne lit
+pas une cote) et des filigranes « EchoPlan » en biais sur toute la feuille,
+AVANT que l'image ne quitte le natif : l'écran ne reçoit jamais la feuille
+nette. Le bouton du bas devient « Déflouter et télécharger » (avec la même
+offre dans la visionneuse : « C'est bien votre plan… ») et passe par la
+barrière habituelle (`exportOuvert` : compte, puis offre). Le jour où
+l'abonnement arrive, les feuilles se rebâtissent nettes et se défloutent en
+fondu, avec un choc de réussite. C'est la SEULE chose que l'abonnement change
+à l'écran, lue par une seule porte (`useDossierNet`) : le plan, la 3D, les
+cotes et la composition restent libres.
+
+**Une carte par feuille, qui dit à quoi elle sert.** La grille de treize
+icônes muettes est remplacée par des cartes : icône, nom, une phrase
+d'usage, ce qu'elle pèse (« 4 feuilles », ou « + 4 feuilles » avant qu'on
+la coche) et un interrupteur.
+- *Plan coté* (toujours inclus) et ses calques — Cotes, Meubles, Surfaces,
+  Menuiseries en couleur, Couleurs relevées, Plafond — en pastilles : le plan
+  vivant, juste dessous, les montre ou les retire, et une phrase dit ce que
+  le calque touché apporte.
+- *Métré* ; *Vues 3D* (cotes sur la 3D, recadrer, un autre angle, chaque vue
+  réglée au doigt) ; *Murs de face* — « Élévations » et « Cotes Élec » deux
+  cases qui se conditionnaient, devenues ce qu'elles voulaient dire : tous
+  les murs, ou les murs équipés ; *Plan des gaines* ; *Schémas électriques* ;
+  *Tableau existant*, inclus d'office quand il est relevé.
+Les défauts ne changent pas : plan coté avec cotes et meubles, métré, vues
+3D, tous les murs de face.
+
+**Le sommaire est celui du document** (`sommaireDuDossier`). `buildScanPdf`
+planifie désormais ses feuilles (`planifierLeDossier` : genre, titre, et de
+quoi la fabriquer une fois numérotée) avant de les fabriquer : l'écran lit la
+même liste — il ne peut pas annoncer une feuille que le PDF n'imprime pas.
+
+Bancs : `apercudossier` (8 : sommaire = feuilles du PDF, flou et filigrane
+demandés sans abonnement, « Déflouter » passe par la barrière sans rien
+envoyer, abonné net et envoyé, le métré retiré retire une feuille, le calque
+qui se dit, le flou gravé par le natif) ; `exportdefauts` et `presentation`
+réécrits pour les cartes ; `motsclairs` (le flou n'a qu'une porte).
+
 ## Le tableau existant se reconstruit organe par organe — et c'est le même au mur
 
 Relevé du patron : « revois pour une refonte plus ludique et fonctionnelle du

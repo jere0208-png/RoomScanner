@@ -6328,11 +6328,22 @@ function ctxTemporaire(scan: ScanForPdf): SheetContext {
   };
 }
 
-export function buildScanPdf(
+/** Une feuille du dossier, telle que le sommaire la nomme. */
+export interface FeuilleDuDossier {
+  genre: 'plan' | 'metre' | 'existant' | 'gaines' | 'perspective' | 'elevation' | 'unifilaire' | 'multifilaire';
+  titre: string;
+}
+
+/** Une feuille prévue, et la façon de la fabriquer une fois numérotée. */
+interface FeuillePlanifiee extends FeuilleDuDossier {
+  fabriquer: (numero: string) => ReturnType<typeof planPage>;
+}
+
+function planifierLeDossier(
   scan: ScanForPdf,
   include3D: boolean,
   opts: PdfOptions = {},
-): Uint8Array {
+): { feuilles: FeuillePlanifiee[]; images: PdfImage[] } {
   const filename = pdfFilename(scan.name);
   const withMetre = opts.metre ?? true;
   /* La feuille de l existant : seulement si un tableau a ete releve. */
@@ -6389,15 +6400,6 @@ export function buildScanPdf(
     la feuille.
   */
   const withGaines = (scan.routes?.length ?? 0) > 0;
-  const total =
-    1 +
-    (withMetre ? 1 : 0) +
-    (withGaines ? 1 : 0) +
-    (existant ? 1 : 0) +
-    (include3D ? vues.length : 0) +
-    murs.length +
-    (withSchema ? 1 : 0) +
-    (withMulti ? 1 : 0);
   const ctx: SheetContext = {
     name: scan.name,
     filename,
@@ -6428,16 +6430,15 @@ export function buildScanPdf(
     d'ensemble redevient ce qu'il est : la maçonnerie, l'appareillage et
     leurs cotes.
   */
-  const pages = [
-    planPage(
-      { ...ctx, routes: undefined },
-      `1 / ${total}`,
-      opts.plan,
-      opts.measures2D ?? true,
-    ),
+  const feuilles: FeuillePlanifiee[] = [
+    {
+      genre: 'plan',
+      titre: 'Plan coté',
+      fabriquer: (n) => planPage({ ...ctx, routes: undefined }, n, opts.plan, opts.measures2D ?? true),
+    },
   ];
   if (withMetre) {
-    pages.push(metrePage(ctx, `${pages.length + 1} / ${total}`));
+    feuilles.push({ genre: 'metre', titre: 'Métré', fabriquer: (n) => metrePage(ctx, n) });
   }
   /*
     L'EXISTANT VIENT JUSTE APRÈS LE MÉTRÉ.
@@ -6447,7 +6448,7 @@ export function buildScanPdf(
     dans cet ordre-là, et c'est dans cet ordre qu'on lui en parle.
   */
   if (existant) {
-    pages.push(existantPage(ctx, `${pages.length + 1} / ${total}`, existant));
+    feuilles.push({ genre: 'existant', titre: 'Tableau existant', fabriquer: (n) => existantPage(ctx, n, existant) });
   }
   /*
     LE CHEMINEMENT, JUSTE APRES LE METRE.
@@ -6457,36 +6458,26 @@ export function buildScanPdf(
     meme feuille — celui qui commande la couronne a tout sous les yeux.
   */
   if (withGaines) {
-    pages.push(
-      gainesPage(ctx, `${pages.length + 1} / ${total}`, schemas?.rows ?? []),
-    );
+    feuilles.push({ genre: 'gaines', titre: 'Plan des gaines', fabriquer: (n) => gainesPage(ctx, n, schemas?.rows ?? []) });
   }
   if (include3D) {
     vues.forEach((v, i) => {
-      pages.push(
-        threeDPage(
-          ctx,
-          `${pages.length + 1} / ${total}`,
-          v,
-          opts.measures3D ?? true,
-          i + 1,
-          vues.length,
-        ),
-      );
+      feuilles.push({
+        genre: 'perspective',
+        titre: vues.length > 1 ? `Perspective ${i + 1}` : 'Perspective',
+        fabriquer: (n) => threeDPage(ctx, n, v, opts.measures3D ?? true, i + 1, vues.length),
+      });
     });
   }
   // Les élévations viennent après les plans et avant les schémas : on lit
   // le logement, puis chaque mur, puis le tableau.
-  for (const w of murs) {
-    pages.push(
-      elevationPage(
-        ctx,
-        `${pages.length + 1} / ${total}`,
-        w,
-        photos.get(w.id) ?? [],
-      ),
-    );
-  }
+  murs.forEach((w, i) => {
+    feuilles.push({
+      genre: 'elevation',
+      titre: `Mur ${i + 1}`,
+      fabriquer: (n) => elevationPage(ctx, n, w, photos.get(w.id) ?? []),
+    });
+  });
   if (withSchema && schemas) {
     /**
      * LES SCHÉMAS HORS SOL : unifilaire, puis multifilaire.
@@ -6498,25 +6489,47 @@ export function buildScanPdf(
      * Le cheminement se lit sur le plan des gaines, l'architecture sur
      * l'unifilaire, le câblage sur le multifilaire.
      */
-    pages.push(
-      unifilairePage(
-        ctx,
-        `${pages.length + 1} / ${total}`,
-        schemas.rows,
-        schemas.differentials,
-        detailDesDeparts(scan, schemas.marks, schemas.rows),
-      ),
-    );
+    const sch = schemas;
+    feuilles.push({
+      genre: 'unifilaire',
+      titre: 'Schéma unifilaire',
+      fabriquer: (n) => unifilairePage(ctx, n, sch.rows, sch.differentials, detailDesDeparts(scan, sch.marks, sch.rows)),
+    });
     if (withMulti) {
-      pages.push(
-        multifilairePage(
-          ctx,
-          `${pages.length + 1} / ${total}`,
-          schemas.multi,
-          schemas.rows,
-        ),
-      );
+      feuilles.push({
+        genre: 'multifilaire',
+        titre: 'Schéma multifilaire',
+        fabriquer: (n) => multifilairePage(ctx, n, sch.multi, sch.rows),
+      });
     }
   }
+  return { feuilles, images };
+}
+
+/**
+ * LE SOMMAIRE DU DOSSIER — ses feuilles, dans l'ordre, sans en fabriquer
+ * une seule.
+ *
+ * L'écran d'export le montre : combien de feuilles, lesquelles, et ce que
+ * chaque réglage ajoute. Il vient du MÊME plan que le document
+ * (`planifierLeDossier`) : un sommaire écrit à part finirait par annoncer
+ * une feuille que le PDF n'imprime plus.
+ */
+export function sommaireDuDossier(
+  scan: ScanForPdf,
+  include3D: boolean,
+  opts: PdfOptions = {},
+): FeuilleDuDossier[] {
+  return planifierLeDossier(scan, include3D, opts).feuilles.map(({ genre, titre }) => ({ genre, titre }));
+}
+
+export function buildScanPdf(
+  scan: ScanForPdf,
+  include3D: boolean,
+  opts: PdfOptions = {},
+): Uint8Array {
+  const { feuilles, images } = planifierLeDossier(scan, include3D, opts);
+  const total = feuilles.length;
+  const pages = feuilles.map((f, i) => f.fabriquer(`${i + 1} / ${total}`));
   return buildDocument(pages, images);
 }

@@ -285,6 +285,20 @@ describe('la page Pro ne vend que ce qu’elle verrouille vraiment', () => {
     }
   });
 
+  it('seules les FEUILLES du dossier se floutent, par une seule porte', () => {
+    /*
+      LA RÈGLE A BOUGÉ, À LA DEMANDE DU PATRON : « sans abonnement, donne-lui
+      la possibilité de voir son PDF flouté, avec de gros filigranes
+      EchoPlan ». L'écran d'export lit donc l'abonnement — UNE fois, par
+      `useDossierNet`, et pour le seul aperçu des feuilles. Le plan, la 3D,
+      les cotes et la composition du dossier restent libres et nets.
+    */
+    const src = lireSource('screens/ExportScreen.tsx');
+    expect(src.match(/useDossierNet\(\)/g)?.length).toBe(1);
+    expect(src).not.toMatch(/<Iso3DView[^>]*net/);
+    expect(src).not.toMatch(/<PlanPreview[^>]*net/);
+  });
+
   it('donc elle ne promet pas la 3D ni les meubles comme un déblocage', async () => {
     /*
       C'EST LA CONSÉQUENCE DE L'ÉPREUVE DU DESSUS, et c'est elle qui compte :
