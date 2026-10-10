@@ -15,7 +15,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { castToWall, type Pt, type WallSeg } from '../geometry/floorplan';
 import { CEILINGS, type CeilingFixture } from '../geometry/ceiling';
-import { IconeBandeau } from './StripBar';
+import { CarteDuMenu, IconeBandeau } from './StripBar';
 import { haptic } from '../ui/haptic';
 import { SOLAIRES } from '../ui/solaires';
 import { DEBORD_DOIGT } from '../ui/bandeau';
@@ -165,7 +165,7 @@ export function CeilingBar({
           );
 
           return (
-            <View style={styles.bandeau}>
+            <CarteDuMenu style={styles.bandeau}>
               {/*
                 EN HAUT CE QU'ON LIT ET CE QU'ON RÈGLE, EN BAS LES GESTES.
 
@@ -367,6 +367,6 @@ export function CeilingBar({
                     <Text style={styles.bandeauMot}>Terminer</Text>
                   </View>
               </View>
-            </View>
+            </CarteDuMenu>
           );
 }

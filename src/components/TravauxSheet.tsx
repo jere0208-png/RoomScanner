@@ -90,7 +90,7 @@ export function TravauxSheet({
   ];
 
   return (
-    <SheetShell visible={visible} onClose={onClose}>
+    <SheetShell defile={false} visible={visible} onClose={onClose}>
       <Text style={s.titre}>Ce qu’il faut acheter</Text>
       <Text style={s.sous}>
         {tout

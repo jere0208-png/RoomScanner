@@ -539,15 +539,54 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     */
     alignSelf: 'flex-start',
     backgroundColor: c.surface,
-    borderRadius: 16,
+    /*
+      UN MENU FIXE, POSÉ À LA PLACE DES OUTILS — relevé du patron : « fais un
+      menu fixe qui ne gênera pas la visibilité du plan ». La carte se pose
+      désormais sur la ligne de la rangée d'outils, qu'elle remplace le temps
+      de la sélection (voir `carteOuverte`), de bord à bord jusqu'à la colonne
+      de droite : le plan ne perd que la place que les outils prenaient déjà.
+      Les coins restent ceux d'une carte, pas d'une pilule.
+    */
+    borderRadius: 20,
     /* Resserré d'un point ou deux partout : le bandeau se pose SUR le plan,
        et chaque point qu'il prend est un point de dessin en moins. */
-    paddingHorizontal: 11,
-    paddingTop: 8,
+    paddingHorizontal: 12,
+    paddingTop: 9,
     paddingBottom: 9,
     gap: 7,
     ...shadowCard,
     shadowOpacity: 0.12,
+  },
+  /* La rangée d'outils, dans son calque — et effacée sous le menu fixe. */
+  rangeeEnRetrait: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 1 },
+  rangeeCachee: { opacity: 0 },
+  /* La croix du menu : un rond discret, en bout de l'en-tête. */
+  bandeauFermer: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    marginLeft: 'auto',
+    backgroundColor: c.surfaceSunken,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /*
+    LA RANGÉE DES GESTES, D'UNE LIGNE — voir `RangeeDActions`. Le filet la
+    sépare de ce qu'on lit, comme avant ; elle glisse au lieu de passer à la
+    ligne.
+  */
+  bandeauRangee: {
+    flexGrow: 0,
+    marginTop: 9,
+    paddingTop: 9,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: c.line,
+  },
+  bandeauRangeeContenu: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+    paddingRight: 4,
   },
   /* La partie haute : elle ne contient QUE ce qu'on lit. */
   /*
@@ -558,7 +597,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     silhouette de l'élément se pose devant : porte, mur, note, ligne de
     spots se reconnaissent sans lire, comme dans la rangée d'outils.
   */
-  bandeauEntete: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  bandeauEntete: { flexDirection: 'row', alignItems: 'center', gap: 9, alignSelf: 'stretch' },
   bandeauTexte: { gap: 1, flexShrink: 1 },
   bandeauTitre: { color: c.ink, fontSize: 14.5, fontWeight: '600' },
   bandeauSous: { color: c.inkSoft, fontSize: 12, lineHeight: 15 },

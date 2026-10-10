@@ -560,3 +560,35 @@ describe('la promesse', () => {
     }
   });
 });
+
+/*
+  LES BULLES SE RESSERRENT, PAS LEURS ICÔNES — relevé du patron : « réduis les
+  flèches et leur bloc arrière arrondi des quatre bulles ; réduis très
+  légèrement le bloc arrière blanc rond des icônes, sans réduire les icônes ».
+*/
+describe('les quatre bulles', () => {
+  const ronds = (t: TestRenderer.ReactTestRenderer) =>
+    t.root
+      .findAllByType(View)
+      .map((n) => ({ n, st: StyleSheet.flatten(n.props.style) as { width?: number; borderRadius?: number } }))
+      .filter((x) => typeof x.st?.width === 'number' && x.st.borderRadius === (x.st.width as number) / 2);
+  const svgDe = (n: TestRenderer.ReactTestInstance) =>
+    n.findAll((x) => typeof x.props?.width === 'number' && typeof x.props?.viewBox === 'string')[0];
+
+  it('le rond de l’icône se resserre, l’icône garde sa taille', () => {
+    const t = monter();
+    const icones = ronds(t).filter((x) => x.st.width === 32);
+    expect(icones.length).toBeGreaterThanOrEqual(4);
+    for (const r of icones.slice(0, 4)) expect(svgDe(r.n).props.width).toBe(19);
+  });
+
+  it('la flèche et son rond se font discrets', () => {
+    const t = monter();
+    const fleches = ronds(t).filter((x) => x.st.width === 26);
+    expect(fleches.length).toBeGreaterThanOrEqual(4);
+    for (const r of fleches.slice(0, 4)) expect(svgDe(r.n).props.width).toBe(12);
+    // Plus aucun rond de 36 dans les bulles.
+    expect(ronds(t).filter((x) => x.st.width === 36 && svgDe(x.n)?.props.width === 16)).toHaveLength(0);
+  });
+});
+

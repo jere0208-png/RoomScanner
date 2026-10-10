@@ -134,7 +134,7 @@ export function DiagnosticSheet({
     replies[g.cle] === undefined ? g.alertes > 0 : !replies[g.cle];
 
   return (
-    <SheetShell visible={visible} onClose={onClose}>
+    <SheetShell defile={false} visible={visible} onClose={onClose}>
       <View style={styles.head}>
         <View style={[styles.badge, alertes > 0 ? styles.badgeKo : styles.badgeOk]}>
           <Text style={styles.badgeText}>{alertes || '✓'}</Text>

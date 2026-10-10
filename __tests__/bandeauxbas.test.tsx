@@ -32,7 +32,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { light } from '../src/theme';
 import { getStyles } from '../src/screens/result/styles';
@@ -69,11 +69,26 @@ const boutons = (t: TestRenderer.ReactTestRenderer) =>
     .filter((n) => typeof n.props.onPress === 'function');
 
 /** La rangée d'actions : le conteneur qui les porte tous. */
+/*
+  LA RANGÉE DES GESTES : une ligne qui DÉFILE (mur, menuiserie, note, spots,
+  pièce — voir `RangeeDActions`, relevé du patron : « un menu fixe qui ne
+  gênera pas la visibilité du plan »), ou une rangée qui passe à la ligne
+  (plafond, meuble, qui ont peu de gestes). Les deux rangent leurs boutons
+  sur un même axe, par le haut.
+*/
 const rangee = (t: TestRenderer.ReactTestRenderer) =>
   t.root
-    .findAllByType(View)
-    .map((n) => ({ n, st: plat(n.props.style) }))
-    .find((x) => x.st.flexWrap === 'wrap' && x.st.flexDirection === 'row');
+    .findAll((n) => n.type === View || n.type === ScrollView)
+    .map((n) => ({
+      n,
+      st: plat(n.type === ScrollView ? n.props.contentContainerStyle : n.props.style),
+      defile: n.type === ScrollView && !!n.props.horizontal,
+    }))
+    .find(
+      (x) =>
+        (x.defile && x.st.flexDirection === 'row') ||
+        (x.st.flexWrap === 'wrap' && x.st.flexDirection === 'row'),
+    );
 
 const MURS: WallSeg[] = [
   { id: 'n', type: 'wall', a: { x: 0, z: 0 }, b: { x: 5, z: 0 }, height: 2.5, yCenter: 1.25, roomId: 'r1' },
@@ -280,7 +295,7 @@ describe('la taille dessinée des bandeaux', () => {
 describe('la forme des bandeaux du bas', () => {
   for (const [nom, rendre] of CAS) {
     describe(nom, () => {
-      it('range ses boutons dans une rangée qui passe à la ligne', () => {
+      it('range ses boutons dans une rangée — qui défile, ou passe à la ligne', () => {
         const r = rangee(monter(rendre()));
         expect(r).toBeDefined();
       });

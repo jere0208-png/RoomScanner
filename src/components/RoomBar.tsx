@@ -25,7 +25,7 @@ import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
-import { IconeBandeau } from './StripBar';
+import { CarteDuMenu, FermerBandeau, IconeBandeau, RangeeDActions } from './StripBar';
 import { DEBORD_DOIGT } from '../ui/bandeau';
 
 const fr = (v: number, d = 1) => v.toFixed(d).replace('.', ',');
@@ -96,6 +96,7 @@ export function RoomBar({
   onScinder,
   onRetirer,
   onPeindre,
+  onFermer,
 }: {
   room: { id: string; name: string; neuve?: boolean };
   /** Surface au sol, quand le contour se referme. */
@@ -133,6 +134,8 @@ export function RoomBar({
    * peinture ne touche pas à la géométrie, elle habille.
    */
   onPeindre: () => void;
+  /** La croix : désélectionne la pièce. */
+  onFermer?: () => void;
 }) {
   /*
     LA HAUTEUR SE LIT, ELLE NE SE TOUCHE PAS.
@@ -153,7 +156,7 @@ export function RoomBar({
   }  ·  H ${fr(hauteur, 2)} m`;
 
   return (
-    <View style={styles.bandeau}>
+    <CarteDuMenu style={styles.bandeau}>
       {/* EN HAUT : ce qu'on lit. Le nom, puis les mesures — deux lignes qui
           ne cèdent à personne. */}
       <View style={styles.bandeauEntete}>
@@ -181,11 +184,12 @@ export function RoomBar({
             </Text>
           )}
         </View>
+        {onFermer && <FermerBandeau onPress={onFermer} styles={styles} />}
       </View>
 
       {/* EN BAS : ce qu'on touche. Une pastille par geste, sa silhouette
           et son mot dessous — la forme commune à tous les bandeaux du bas. */}
-      <View style={styles.bandeauActions}>
+      <RangeeDActions styles={styles}>
         <Geste
           nom="Nommer la pièce"
           mot="Nommer"
@@ -259,7 +263,7 @@ export function RoomBar({
             onPress={onRetirer}
           />
         )}
-      </View>
-    </View>
+      </RangeeDActions>
+    </CarteDuMenu>
   );
 }

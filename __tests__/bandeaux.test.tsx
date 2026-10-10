@@ -33,8 +33,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { PILL_CELL_H } from '../src/components/ToolPill';
-import { WALL_MENU } from '../src/components/FloorplanEditor';
 import { estUnRetour, RetourGlisse } from '../src/components/RetourGlisse';
 import { light } from '../src/theme';
 import { SOLAIRES } from '../src/ui/solaires';
@@ -692,87 +690,65 @@ describe('l’écran des résultats', () => {
     expect(longueurs().some((L) => Math.abs(L - 3.33) < 0.005)).toBe(true);
   });
 
-  /**
-   * LA POIGNÉE DE ROTATION NE SE POSE JAMAIS SUR LE MENU DU MUR.
-   *
-   * Relevé du patron, capture à l'appui : le rond bleu de rotation
-   * chevauchait la barre des quatre gestes. Les deux se posaient
-   * perpendiculairement au milieu du mur — le menu du côté de la pièce, la
-   * poignée d'un côté FIXE : dès que ces deux côtés coïncidaient, quatorze
-   * points les séparaient et ils se marchaient dessus. La poignée prend
-   * maintenant TOUJOURS le côté opposé au menu. On le prouve mur par mur,
-   * sur tout le logement de référence.
-   */
-  it('ne pose jamais la poignée de rotation sur le menu du mur', () => {
-    const tree = monter();
+  /** Le menu fixe d'un mur choisi : en édition, le premier mur entier du plan. */
+  const choisirUnMur = (tree: TestRenderer.ReactTestRenderer) => {
     act(() => bouton(tree, 'Édition')!.props.onPress());
     act(() => {
       jest.advanceTimersByTime(500);
     });
-    const prises = () =>
-      tree.root
-        .findAll((n) => typeof n.props?.onPress === 'function')
-        .filter(
-          (n) => n.findAll((x) => estCibleDeMur(x)).length > 0,
-        );
-    const nb = prises().length;
-    expect(nb).toBeGreaterThan(3);
-    let verifies = 0;
-    for (let i = 0; i < nb; i++) {
-      act(() => prises()[i].props.onPress());
-      // Un appui bref sur un mur percé prend le RETOUR : pas de poignée,
-      // donc pas de collision possible — on ne juge que les murs entiers.
-      const poignee = tree.root
-        .findAll((n) => n.props?.accessibilityLabel === 'Tourner le mur')
-        .pop();
-      if (!poignee) continue;
-      const menu = tree.root
-        .findAll((n) => {
-          const st = StyleSheet.flatten(n.props?.style) as
-            | { left?: number; top?: number }
-            | undefined;
-          if (typeof st?.left !== 'number' || typeof st?.top !== 'number') {
-            return false;
-          }
-          return (
-            n.findAll((x) => x.props?.accessibilityLabel === 'Élec').length > 0
-          );
-        })
-        .pop();
-      expect(menu).toBeDefined();
-      const m = StyleSheet.flatten(menu!.props.style) as {
-        left: number;
-        top: number;
-      };
-      const p = StyleSheet.flatten(poignee.props.style) as {
-        left: number;
-        top: number;
-      };
-      const chevauche =
-        p.left < m.left + WALL_MENU.w &&
-        p.left + 34 > m.left &&
-        p.top < m.top + WALL_MENU.h &&
-        p.top + 34 > m.top;
-      expect({ mur: i, chevauche }).toEqual({ mur: i, chevauche: false });
-      verifies++;
+    const prises = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .filter((n) => n.findAll((x) => estCibleDeMur(x)).length > 0);
+    for (const p of prises) {
+      act(() => p.props.onPress());
+      // Un appui bref sur un mur percé prend le RETOUR : on veut un mur entier.
+      if (tree.root.findAll((n) => n.props?.accessibilityLabel === 'Tourner le mur').length) return true;
     }
-    // Au moins un mur entier a bien été jugé, sinon le banc ne prouve rien.
-    expect(verifies).toBeGreaterThan(0);
+    return false;
+  };
+  const platDe = (n: TestRenderer.ReactTestInstance) => {
+    const st = n.props.style;
+    return Object.assign({}, ...(Array.isArray(st) ? st : [st]).filter(Boolean).flat(Infinity));
+  };
+  /** La carte du menu fixe : la vue absolue, ancrée à gauche à 12 points, qui porte la croix. */
+  const carteFixe = (tree: TestRenderer.ReactTestRenderer) =>
+    tree.root
+      .findAll(
+        (n) =>
+          typeof n.type === 'string' &&
+          platDe(n).position === 'absolute' &&
+          platDe(n).left === 12 &&
+          typeof platDe(n).bottom === 'number',
+      )
+      .find((n) => n.findAll((x) => x.props?.accessibilityLabel === 'Fermer la sélection').length > 0);
+
+  /*
+    PLUS AUCUN MENU NE FLOTTE SUR LE PLAN — relevé du patron, captures à
+    l'appui : « le problème concerne le placement des menus de mur sur plan
+    2D ; fais un menu fixe qui ne gênera pas la visibilité du plan ». La
+    barre d'actions se posait à côté du mur choisi, sur le dessin. Ses gestes
+    sont passés dans le menu fixe ; sur le plan ne reste que ce qui se
+    manipule au doigt : la poignée qui tourne le mur.
+  */
+  it('le mur choisi garde sa poignée, et plus aucun menu ne flotte sur le plan', () => {
+    const tree = monter();
+    expect(choisirUnMur(tree)).toBe(true);
+    const carte = carteFixe(tree);
+    expect(carte).toBeDefined();
+    // Les gestes de l'ancienne barre ne vivent plus QUE dans la carte.
+    for (const geste of ['Ouvrir le mur', 'Retirer']) {
+      const partout = tree.root.findAll(
+        (n) => n.props?.accessibilityLabel === geste && typeof n.props?.onPress === 'function',
+      );
+      expect(partout.length).toBeGreaterThan(0);
+      const dedans = carte!.findAll(
+        (n) => n.props?.accessibilityLabel === geste && typeof n.props?.onPress === 'function',
+      );
+      expect(dedans.length).toBe(partout.length);
+    }
+    expect(tree.root.findAll((n) => n.props?.accessibilityLabel === 'Tourner le mur').length).toBeGreaterThan(0);
   });
 
-  /**
-   * LA COLONNE D'ACTIONS A SA ZONE RÉSERVÉE — rien ne passe dessous.
-   *
-   * Relevé du patron, trait rouge tracé sur la capture : le bandeau du mur
-   * (« 0,65 m · Mesures · Laser · Détacher ») passait SOUS la colonne
-   * « Enregistrer / Annuler / Édition », et son dernier bouton se lisait à
-   * moitié, tranché par une pastille bleue.
-   *
-   * La réserve valait soixante-deux points, écrits en dur. C'était un pari
-   * sur la largeur de la colonne — et la colonne grandit avec ses mots :
-   * « Enregistrer » est plus long que « Édition ». On MESURE donc ce
-   * qu'elle occupe vraiment, et le bandeau s'arrête là.
-   */
   it('réserve au bandeau la largeur réelle de la colonne d’actions', () => {
     const tree = monter();
     act(() => bouton(tree, 'Édition')!.props.onPress());
@@ -828,140 +804,31 @@ describe('l’écran des résultats', () => {
     expect(garde).toBeGreaterThanOrEqual(96 + 8);
   });
 
-  /**
-   * LE MENU NE SE POSE JAMAIS SUR LE MUR QU'ON VIENT DE CHOISIR.
-   *
-   * Relevé du patron, capture à l'appui : la barre d'actions se posait EN
-   * TRAVERS du mur sélectionné. C'est le seul trait de l'écran qu'on
-   * regarde à ce moment-là — on vient de le désigner du doigt, on s'apprête
-   * à le mesurer, à le percer ou à l'effacer — et le menu qui sert à ça le
-   * cachait.
-   *
-   * Deux causes, et le banc les tient toutes les deux : un écart trop court
-   * (calculé depuis le MILIEU du mur, sans compter la demi-hauteur de la
-   * barre, qui revenait donc lécher le trait), et le rappel dans le cadre,
-   * qui ramenait la barre sur le mur dès qu'elle débordait de l'écran.
-   */
-  it('ne pose jamais le menu sur le mur sélectionné', () => {
+  it('le menu fixe porte tous les gestes du mur, sur une ligne qui défile', () => {
     const tree = monter();
-    act(() => bouton(tree, 'Édition')!.props.onPress());
-    act(() => {
-      jest.advanceTimersByTime(500);
-    });
-    const prises = () =>
-      tree.root
-        .findAll((n) => typeof n.props?.onPress === 'function')
-        .filter(
-          (n) => n.findAll((x) => estCibleDeMur(x)).length > 0,
-        );
-    const nb = prises().length;
-    expect(nb).toBeGreaterThan(3);
-    let verifies = 0;
-    for (let i = 0; i < nb; i++) {
-      const trait = prises()[i].findAll(
-        (x) => estCibleDeMur(x),
-      )[0].props as { x1: number; y1: number; x2: number; y2: number };
-      act(() => prises()[i].props.onPress());
-      const menu = tree.root
-        .findAll((n) => {
-          const st = StyleSheet.flatten(n.props?.style) as
-            | { left?: number; top?: number }
-            | undefined;
-          if (typeof st?.left !== 'number' || typeof st?.top !== 'number') {
-            return false;
-          }
-          return (
-            n.findAll((x) => x.props?.accessibilityLabel === 'Élec').length > 0
-          );
-        })
-        .pop();
-      if (!menu) continue;
-      const m = StyleSheet.flatten(menu.props.style) as {
-        left: number;
-        top: number;
-      };
-      /*
-        LE TRAIT DU MUR CONTRE LE RECTANGLE DE LA BARRE, par échantillons :
-        on marche le long du segment et l'on vérifie qu'aucun de ses points
-        ne tombe dedans. Une marge de six points s'ajoute au rectangle —
-        « ne pas toucher » n'est pas « ne pas recouvrir » : une barre posée
-        au ras du trait le mange autant, avec son ombre.
-      */
-      const MARGE = 6;
-      let dedans = false;
-      for (let k = 0; k <= 40; k++) {
-        const x = trait.x1 + ((trait.x2 - trait.x1) * k) / 40;
-        const y = trait.y1 + ((trait.y2 - trait.y1) * k) / 40;
-        if (
-          x > m.left - MARGE &&
-          x < m.left + WALL_MENU.w + MARGE &&
-          y > m.top - MARGE &&
-          y < m.top + WALL_MENU.h + MARGE
-        ) {
-          dedans = true;
-          break;
-        }
-      }
-      expect({ mur: i, surLeMur: dedans }).toEqual({ mur: i, surLeMur: false });
-      verifies++;
+    expect(choisirUnMur(tree)).toBe(true);
+    const carte = carteFixe(tree)!;
+    const gestes = carte
+      .findAll((n) => typeof n.props?.onPress === 'function' && typeof n.props?.accessibilityLabel === 'string')
+      .map((n) => n.props.accessibilityLabel as string);
+    for (const g of ['Mesures', 'Laser', 'Épaisseur', 'Cloison en T', 'Ouvrir le mur', 'Retirer']) {
+      expect(gestes).toContain(g);
     }
-    expect(verifies).toBeGreaterThan(0);
+    // Une ligne qui glisse, pas deux rangées empilées sur le plan.
+    expect(carte.findAll((n) => n.props?.horizontal === true).length).toBeGreaterThan(0);
   });
 
-  /**
-   * LE MENU DU MUR S'EST ALLÉGÉ.
-   *
-   * Relevé du patron : « trop imposant et vieillot ». Ce qui se compte :
-   * des colonnes plus étroites (la barre perd un quart de sa largeur), une
-   * pilule au lieu d'un rectangle mou, et un filet d'un cheveu qui la pose
-   * sur le plan — le contour moderne, celui des cartes de l'app.
-   */
-  it('porte un menu de mur en pilule, étroit et cerné d’un filet', () => {
+  it('sa croix referme la sélection et rend les outils', () => {
     const tree = monter();
-    act(() => bouton(tree, 'Édition')!.props.onPress());
-    act(() => {
-      jest.advanceTimersByTime(500);
-    });
-    const prise = tree.root
-      .findAll((n) => typeof n.props?.onPress === 'function')
-      .find((n) => n.findAll((x) => estCibleDeMur(x)).length > 0);
-    act(() => prise!.props.onPress());
-    const menu = tree.root
-      .findAll((n) => {
-        const st = StyleSheet.flatten(n.props?.style) as
-          | { left?: number }
-          | undefined;
-        return (
-          typeof st?.left === 'number' &&
-          n.findAll((x) => x.props?.accessibilityLabel === 'Élec').length > 0
-        );
-      })
-      .pop();
-    const st = StyleSheet.flatten(menu!.props.style) as {
-      borderRadius?: number;
-      borderWidth?: number;
-    };
-    expect(WALL_MENU.w).toBeLessThanOrEqual(210);
-    expect(st.borderRadius).toBeGreaterThanOrEqual(18);
-    expect(st.borderWidth).toBeLessThanOrEqual(StyleSheet.hairlineWidth);
-    // Et les colonnes se sont resserrées avec elle.
-    const colonne = StyleSheet.flatten(
-      tree.root
-        .findAll((n) => n.props?.accessibilityLabel === 'Élec')
-        .pop()!.props.style,
-    ) as { width?: number };
-    expect(colonne.width).toBeLessThanOrEqual(50);
+    expect(choisirUnMur(tree)).toBe(true);
+    const croix = carteFixe(tree)!.findAll(
+      (n) => n.props?.accessibilityLabel === 'Fermer la sélection' && typeof n.props?.onPress === 'function',
+    )[0];
+    act(() => croix.props.onPress());
+    expect(carteFixe(tree)).toBeUndefined();
+    expect(tree.root.findAll((n) => n.props?.accessibilityLabel === 'Tourner le mur')).toHaveLength(0);
   });
 
-  /**
-   * UN RETOUR AUSSI SE RÈGLE EN HAUTEUR.
-   *
-   * Le retour — les trente centimètres de maçonnerie entre l’angle et
-   * l’huisserie — se cotait sur le plan et recevait l’appareillage, mais
-   * n’avait pas de bandeau : la hauteur du pan qui le porte n’était écrite
-   * nulle part, alors que c’est elle qui dit la place qu’on a pour poser un
-   * interrupteur.
-   */
   it('ouvre le bandeau d’un retour, avec la hauteur de son mur', () => {
     const tree = monter();
     act(() => bouton(tree, 'Édition')!.props.onPress());
@@ -986,122 +853,68 @@ describe('l’écran des résultats', () => {
   });
 
   /**
-   * LE BANDEAU NE PASSE JAMAIS SOUS LA RANGÉE DE CALQUES.
+   * LE MENU FIXE SE POSE À LA PLACE DE LA RANGÉE D'OUTILS.
    *
-   * Relevé du chantier : « il y a des superpositions de boutons ». Le
-   * bandeau et les outils partageaient la même ligne de fond ; le bouton
-   * « Coter » finissait derrière une pastille, et on appuyait à côté.
-   * Trois étages, désormais, du bas vers le haut : l'indicateur d'accueil,
-   * la rangée des calques, puis le bandeau. On vérifie l'ordre, pas les
-   * chiffres — pour qu'il tienne quel que soit le téléphone.
+   * Il se posait AU-DESSUS d'elle : deux étages en travers du bas du plan.
+   * Il prend désormais SA ligne — celle du bouton « Édition » —, et la
+   * rangée s'efface sans prendre le doigt le temps de la sélection. Il
+   * s'arrête avant la colonne d'actions, sur sa droite.
    */
-  it('pose le bandeau AU-DESSUS de la rangée d’outils', () => {
+  it('pose le menu fixe À LA PLACE de la rangée d’outils', () => {
     const tree = monter();
-    act(() => bouton(tree, 'Édition')!.props.onPress());
-    act(() => {
-      jest.advanceTimersByTime(500);
-    });
-    const mur = tree.root
-      .findAll((n) => typeof n.props?.onPress === 'function')
-      .find((n) => n.findAll((x) => estCibleDeMur(x)).length > 0);
-    act(() => mur!.props.onPress());
-
-    const plat = (n: TestRenderer.ReactTestInstance) => {
-      const st = n.props.style;
-      return Object.assign(
-        {},
-        ...(Array.isArray(st) ? st : [st]).filter(Boolean).flat(Infinity),
-      );
-    };
-    /** La ligne de fond de la rangée de calques. */
-    const rail = tree.root
-      .findAll(
-        (n) =>
-          typeof n.type === 'string' &&
-          plat(n).position === 'absolute' &&
-          plat(n).flexDirection === 'row' &&
-          plat(n).left === 0,
-      )
-      .map(plat)[0];
-    expect(rail).toBeDefined();
-    /** Le bandeau : la barre blanche qui porte les cotes du mur. */
-    const bandeau = tree.root
-      .findAll(
-        (n) =>
-          typeof n.type === 'string' &&
-          plat(n).position === 'absolute' &&
-          typeof plat(n).bottom === 'number' &&
-          plat(n).left === 12,
-      )
-      .map(plat)[0];
-    expect(bandeau).toBeDefined();
-    // Un étage complet le sépare des pastilles : hauteur d'une cellule, et
-    // l'écart habituel.
-    expect(bandeau.bottom).toBeGreaterThanOrEqual(rail.bottom + PILL_CELL_H);
-    // Et il s'arrête avant la colonne d'actions, sur sa droite — par sa
-    // marge quand il tient toute la largeur, par sa largeur maxi depuis
-    // qu'il épouse son contenu.
-    const ecran2 = Dimensions.get('window').width;
-    expect(
-      bandeau.marginRight ?? ecran2 - bandeau.left - (bandeau.maxWidth ?? 0),
-    ).toBeGreaterThanOrEqual(50);
+    expect(choisirUnMur(tree)).toBe(true);
+    const carte = platDe(carteFixe(tree)!);
+    /** L'ancre du bouton « Édition » : la ligne des outils. */
+    const edition = tree.root
+      .findAll((n) => typeof n.type === 'string' && n.findAll((x) => x.props?.accessibilityLabel === 'Édition').length > 0)
+      .map(platDe)
+      .filter((st) => st.position === 'absolute' && typeof st.bottom === 'number')
+      .pop();
+    expect(edition).toBeDefined();
+    expect(carte.bottom).toBe(edition!.bottom);
+    // La rangée d'outils est là, effacée, et ne prend plus le doigt.
+    const rangee = tree.root
+      .findAll((n) => typeof n.type === 'string' && n.props?.pointerEvents === 'none')
+      .find((n) => n.findAll((x) => x.props?.accessibilityLabel === 'Redresser').length > 0);
+    expect(rangee).toBeDefined();
+    expect(platDe(rangee!).opacity).toBe(0);
+    // Et la carte s'arrête avant la colonne de droite.
+    expect(carte.right ?? 0).toBeGreaterThanOrEqual(50);
   });
 
   /**
-   * L'ASTUCE DU RETOUR DE MUR SE LIT.
+   * LA CONSIGNE DU RETOUR VIT DANS SA CARTE.
    *
-   * Relevé du chantier : « le message qui dit qu'on peut sélectionner tout le
-   * mur est caché derrière l'interface ». Il était en bas à gauche, c'est-à-
-   * dire, depuis la refonte, sous la rangée de calques. Et « l'appui long ne
-   * fonctionne pas bien » : neuf cents millisecondes, c'est plus long que ce
-   * qu'un doigt tient immobile sur un écran.
+   * Elle avait son bandeau en haut du plan, sous les pastilles, qui la
+   * recouvraient à moitié (capture du patron). Et l'appui long reste
+   * prenable : un tiers de seconde, au-delà le doigt a bougé.
    */
-  it('pose l’astuce en haut du plan, et rend l’appui long prenable', () => {
+  it('dit la consigne du retour dans sa carte, et rend l’appui long prenable', () => {
     const tree = monter();
     act(() => bouton(tree, 'Édition')!.props.onPress());
     act(() => {
       jest.advanceTimersByTime(500);
     });
-    // Le retour de mur se prend en touchant sa maçonnerie.
     const retour = tree.root
       .findAll((n) => typeof n.props?.onLongPress === 'function')
       .find((n) => n.props.strokeWidth === 6);
     expect(retour).toBeDefined();
-    // Un tiers de seconde : au-delà, le doigt a bougé et l'appui est perdu.
     expect(retour!.props.delayLongPress).toBeLessThanOrEqual(400);
     act(() => retour!.props.onPress());
-
-    const plat = (n: TestRenderer.ReactTestInstance) => {
-      const st = n.props.style;
-      return Object.assign(
-        {},
-        ...(Array.isArray(st) ? st : [st]).filter(Boolean).flat(Infinity),
-      );
-    };
-    const note = tree.root
-      .findAll(
-        (n) =>
-          typeof n.type === 'string' &&
-          plat(n).position === 'absolute' &&
-          typeof plat(n).top === 'number' &&
-          plat(n).maxWidth === 230,
-      )
-      .map(plat)[0];
-    expect(note).toBeDefined();
-    // En HAUT : le bas appartient aux calques et aux bandeaux.
-    expect(note.top).toBeLessThan(40);
-    expect(note.bottom).toBeUndefined();
+    const carte = carteFixe(tree);
+    expect(carte).toBeDefined();
+    const lus = carte!.findAllByType(Text).map((n) => String(n.props.children));
+    expect(lus.some((t) => /appui long/.test(t))).toBe(true);
+    // Plus de bandeau d'astuce posé en haut du plan.
+    expect(
+      tree.root.findAll(
+        (n) => typeof n.type === 'string' && platDe(n).maxWidth === 230 && typeof platDe(n).top === 'number',
+      ),
+    ).toHaveLength(0);
+    // Et la carte du retour sait prendre le mur entier, d'un appui.
+    expect(carte!.findAll((n) => n.props?.accessibilityLabel === 'Tout le mur').length).toBeGreaterThan(0);
   });
 
-  /**
-   * LES QUATRE FLÈCHES DU MEUBLE.
-   *
-   * Relevé du chantier : « au-dessus de ce bloc, affiche quatre flèches qui
-   * permettent de modifier au pixel près l'emplacement d'un meuble ». Le doigt
-   * déplace de trois centimètres quand on en voulait un, et il cache ce qu'il
-   * pousse. Les flèches poussent d'un centimètre, DANS L'AXE DE L'ÉCRAN — pas
-   * dans celui du scan, qui n'a aucun sens pour l'œil.
-   */
   it('déplace le meuble d’un centimètre à la flèche', () => {
     const tree = monter();
     // On touche le meuble sur le plan, puis on ouvre ses cotes : c'est là que

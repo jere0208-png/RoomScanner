@@ -14,7 +14,7 @@ import { DEBORD_DOIGT } from '../ui/bandeau';
 import { Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
-import { IconeBandeau } from './StripBar';
+import { CarteDuMenu, IconeBandeau } from './StripBar';
 import { frCategory } from '../geometry/furniture';
 import type { PromptData } from './Sheet';
 import type { Palette } from '../theme';
@@ -297,7 +297,7 @@ export function ObjectBar({
   );
 
   return (
-    <View style={styles.bandeau}>
+    <CarteDuMenu style={styles.bandeau}>
       {/*
         TROIS RANGÉES, ET RIEN N'EST PARTI — relevé du patron : « réduis le
         bloc d'édition de meuble comme tu peux intelligemment, il prend trop
@@ -416,7 +416,7 @@ export function ObjectBar({
           </>
         )}
       </View>
-    </View>
+    </CarteDuMenu>
   );
 
 }

@@ -52,7 +52,7 @@ import {
 import type { Pt } from '../geometry/floorplan';
 import { SidePill } from '../components/SidePill';
 import { CeilingBar } from '../components/CeilingBar';
-import { HAUTEUR_BANDEAU_MEUBLE, ObjectBar } from '../components/ObjectBar';
+import { ObjectBar } from '../components/ObjectBar';
 import { corrigerConstat, poserAuxNormes } from '../geometry/auto';
 import { ControlePastille } from '../components/ControlePastille';
 import { DevisPastille } from '../components/DevisPastille';
@@ -264,26 +264,6 @@ export function ResultScreen() {
   */
   const ligneBandeau =
     ligneOutils + Math.max(PILL_CELL_H + PILL_GAP, PEIGNE_TOTAL + 8);
-  /**
-   * LA HAUTEUR QU'UN BANDEAU PEUT PRENDRE, au pire — ET C'EST LUI QUI LE DIT.
-   *
-   * Le plan s'en sert pour ne PAS y ranger le menu d'un mur. C'était un
-   * nombre écrit à la main, 132, et le bandeau du meuble en faisait DEUX
-   * CENT DIX-SEPT : la réserve mentait de quatre-vingts points, et tout ce
-   * qu'on plaçait « juste au-dessus » atterrissait dessus. Relevé du patron,
-   * capture à l'appui : « fais en sorte qu'il soit pas sur un autre
-   * élément ».
-   *
-   * C'est la leçon du peigne « Afficher », rencontrée deux fois maintenant :
-   * **celui qui dessine annonce son encombrement, l'écran ne le devine
-   * plus.** Le plus haut des bandeaux gouverne, et c'est celui du meuble —
-   * trois rangées quand les autres en ont deux.
-   *
-   * On garde une VALEUR, pas une mesure : le plan s'en sert dès le premier
-   * rendu, et une hauteur qui arriverait après ferait sauter la barre sous
-   * les doigts.
-   */
-  const HAUTEUR_BANDEAU = HAUTEUR_BANDEAU_MEUBLE;
   const tousLesMurs = useScanStore((s) => s.walls);
   const tousLesMeubles = useScanStore((s) => s.objects);
   const scanName = useScanStore((s) => s.scanName);
@@ -463,16 +443,24 @@ export function ResultScreen() {
         du patron, « trop de marge blanche sur son bloc ») mais ne peut pas
         déborder sous la colonne.
       */
+      /*
+        SUR LA LIGNE DES OUTILS, DE BORD À BORD JUSQU'À LA COLONNE — voir
+        `carteOuverte` : la carte remplace la rangée, elle ne s'y empile plus.
+      */
       bandeau: [
         styles.bandeau,
-        { bottom: ligneBandeau, maxWidth: Math.max(200, winLargeur - 12 - garde) },
+        {
+          bottom: ligneOutils,
+          right: garde,
+          maxWidth: Math.max(200, winLargeur - 12 - garde),
+        },
       ],
       editBar: [
         styles.editBar,
-        { bottom: ligneBandeau, maxWidth: Math.max(200, winLargeur - 12 - garde) },
+        { bottom: ligneOutils, maxWidth: Math.max(200, winLargeur - 12 - garde) },
       ],
     }),
-    [styles, ligneBandeau, garde, winLargeur],
+    [styles, ligneBandeau, ligneOutils, garde, winLargeur],
   );
 
 
@@ -1231,8 +1219,22 @@ export function ResultScreen() {
       if (r.neuve && r.id !== sauf) arreterPiece(r.id);
     }
   }, [arreterPiece]);
+  /*
+    UNE SEULE SÉLECTION, NOTE ET RETOUR COMPRIS — sans quoi deux menus fixes
+    se disputeraient la même place en bas de l'écran : une note restait
+    tenue pendant qu'on choisissait un mur, un retour pendant qu'on touchait
+    une pièce. Le retour vit dans le plan : on l'efface par un jeton.
+  */
+  const [retourEfface, setRetourEfface] = useState(0);
+  /*
+    LE RETOUR S'EFFACE QUAND UNE AUTRE CHOSE EST PRISE — pas quand le plan
+    désélectionne : prendre un retour commence justement par lâcher le mur,
+    et l'effacer là le perdait dans le même geste.
+  */
+  const effacerRetour = useCallback(() => setRetourEfface((n) => n + 1), []);
   const seuleSelection = useCallback(
-    (garde?: 'mur' | 'meuble' | 'piece' | 'ouverture' | 'plafond') => {
+    (garde?: 'mur' | 'meuble' | 'piece' | 'ouverture' | 'plafond' | 'note' | 'retour') => {
+      if (garde !== 'note') setSelNote(null);
       if (garde !== 'mur') setSelectedWallId(null);
       if (garde !== 'meuble') setSelectedObjectId(null);
       if (garde !== 'piece') {
@@ -1247,6 +1249,15 @@ export function ResultScreen() {
     },
     [fermerPiecesNeuves],
   );
+  /*
+    CE QU'ON FAIT D'UN MUR — les gestes de l'ancienne barre flottante, que le
+    menu fixe porte désormais : percer, l'appareillage, retirer.
+  */
+  const percerLeMur = (wallId: string) => {
+    // On demande CE QU'ON PERCE avant de percer : voir `ChoixOuverture`.
+    murAPercer.current = wallId;
+    setChoixOuverture(true);
+  };
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState('');
   // Electricite : un seul panneau, qui montre soit le catalogue d'appareils,
@@ -2602,6 +2613,34 @@ export function ResultScreen() {
   };
 
   /*
+    LE MENU FIXE — relevé du patron, captures à l'appui : « fais un menu fixe
+    qui ne gênera pas la visibilité du plan ». La carte de ce qu'on a
+    sélectionné se posait AU-DESSUS de la rangée d'outils — deux étages en
+    travers du bas du plan —, et le mur avait en plus sa barre flottante, à
+    côté de lui, sur le dessin. Elle se pose désormais À LA PLACE de la
+    rangée d'outils, sur sa ligne, le temps de la sélection : le plan ne
+    perd que la place que les outils prenaient déjà. La croix de la carte,
+    ou un appui dans le vide, rend les outils.
+  */
+  const carteOuverte =
+    vue === '2d' &&
+    !capturing &&
+    ((!!selectedObject && showFurniture && objDims) ||
+      !!selCeiling ||
+      !!selNote ||
+      !!selRow ||
+      (editMode && !selectedObject && !selectedWall && !!selectedRoomId && !!targetRoom) ||
+      (editMode && !!selectedOpening) ||
+      (editMode && !selectedObject && !selectedOpening && !!selectedWall) ||
+      (editMode && !selectedObject && !selectedOpening && !selectedWall && !!pier));
+  /** La croix d'une carte : plus rien de sélectionné, les outils reviennent. */
+  const fermerLaCarte = () => {
+    seuleSelection();
+    effacerRetour();
+    setObjDims(false);
+  };
+
+  /*
     ---------- PLAN VIDE : DEUX SITUATIONS, DEUX RÉPONSES ----------
 
     L'écran ne disait qu'une chose — « Aucun mur détecté, balayez plus
@@ -3364,6 +3403,7 @@ export function ResultScreen() {
             }}
             onSelectObject={(id) => {
               seuleSelection('meuble');
+              if (id) effacerRetour();
               setSelectedObjectId(id);
             }}
             /*
@@ -3380,6 +3420,7 @@ export function ResultScreen() {
             selectedWallId={selectedWallId}
             onSelectWall={(id) => {
               seuleSelection('mur');
+              if (id) effacerRetour();
               setSelectedWallId(id);
               // Un appareil attendait son mur : le voici.
               if (id && pendingKind) {
@@ -3400,15 +3441,13 @@ export function ResultScreen() {
             }}
             selectedOpeningId={selectedOpeningId}
             onSelectOpening={(id) => {
-              if (id) seuleSelection('ouverture');
+              if (id) {
+                seuleSelection('ouverture');
+                effacerRetour();
+              }
               setSelectedOpeningId(id);
             }}
-            /*
-              CE QUE L'ÉCRAN POSE EN BAS — pour que le menu d'un mur ne se
-              range jamais dessous. La rangée d'outils, le bandeau
-              contextuel, et un doigt de marge.
-            */
-            reserveBas={ligneBandeau + HAUTEUR_BANDEAU}
+            retourEfface={retourEfface}
             selectedRoomId={selectedRoomId}
             /* Glisser dans la pièce choisie la déplace, avec ses meubles et
                son appareillage — et elle s'aimante aux murs voisins. */
@@ -3422,7 +3461,13 @@ export function ResultScreen() {
             selectedCeilingRow={selRow}
             notes={notes}
             selectedNoteId={selNote}
-            onSelectNote={setSelNote}
+            onSelectNote={(id) => {
+              if (id) {
+                seuleSelection('note');
+                effacerRetour();
+              }
+              setSelNote(id);
+            }}
             placing={
               !!pendingCeiling || !!pendingSpots || pendingNote || !!noteADeplacer
             }
@@ -3499,6 +3544,10 @@ export function ResultScreen() {
               setPendingCeiling(null);
             }}
             onSelectCeiling={(id) => {
+              if (id !== null) {
+                effacerRetour();
+                setSelNote(null);
+              }
               // Appui dans le vide : on lâche, comme pour un meuble.
               if (id === null) {
                 setSelCeiling(null);
@@ -3602,11 +3651,16 @@ export function ResultScreen() {
             }}
             onSelectRoom={(id) => {
               seuleSelection('piece');
+              if (id) effacerRetour();
               fermerPiecesNeuves(id);
               setSelectedRoomId(id);
             }}
             onEditRoomName={promptRoomFor}
-            onPierChange={setPier}
+            onPierChange={(p) => {
+              // Un retour pris efface tout le reste — sauf lui-même.
+              if (p) seuleSelection('retour');
+              setPier(p);
+            }}
             onSelectFixture={(id, wallId) => {
               /*
                 UN LIEN EST EN COURS : C'EST LA PAIRE QUI TRANCHE.
@@ -3682,21 +3736,6 @@ export function ResultScreen() {
               setElecView('mur');
               setElecOpen(true);
             }}
-            onWallAction={(action, wallId) => {
-              if (action === 'ouverture') {
-                // On demande CE QU'ON PERCE avant de percer : voir
-                // `ChoixOuverture`.
-                murAPercer.current = wallId;
-                setChoixOuverture(true);
-              }
-              else if (action === 'electricite') openWallElevation(wallId);
-              else if (action === 'supprimer') {
-                removeWall(wallId);
-                setSelectedWallId(null);
-              } else {
-                promptLength(wallId);
-              }
-            }}
           />
         ) : (
           <Iso3DView
@@ -3769,6 +3808,14 @@ export function ResultScreen() {
         )}
 
         {capturing ? null : vue === '2d' ? (
+          /*
+            CACHÉE, PAS DÉMONTÉE : la rangée garde ses animations en cours
+            (l'échange vue / édition) ; elle s'efface et ne prend plus le
+            doigt le temps que le menu fixe occupe sa place.
+          */
+          <View
+            style={[styles.rangeeEnRetrait, carteOuverte && styles.rangeeCachee]}
+            pointerEvents={carteOuverte ? 'none' : 'box-none'}>
           <Toolbar2D
             onSuite={setHSuite}
             anim={swap}
@@ -3810,6 +3857,7 @@ export function ResultScreen() {
             setPendingCeiling={setPendingCeiling}
             setPendingSpots={setPendingSpots}
           />
+          </View>
         ) : (
           <Toolbar3D
             onSuite={setHSuite}
@@ -4298,6 +4346,7 @@ export function ResultScreen() {
           return (
             <StripBar
               styles={stylesBarres}
+            onFermer={fermerLaCarte}
               icone={SOLAIRES.note}
               strong="Note"
               /*
@@ -4411,6 +4460,7 @@ export function ResultScreen() {
           return (
             <StripBar
               styles={stylesBarres}
+            onFermer={fermerLaCarte}
               icone={SOLAIRES.plafond}
               strong={`${ligne.length} spots`}
               note={
@@ -4494,6 +4544,7 @@ export function ResultScreen() {
               extent={targetExtent}
               hauteur={roomHeight(targetPart?.walls ?? [])}
               styles={stylesBarres}
+            onFermer={fermerLaCarte}
               onName={() => setNaming(true)}
               onHeight={promptRoomHeight}
               /* Peindre ses murs : le nuancier de douze teintes. */
@@ -4630,6 +4681,7 @@ export function ResultScreen() {
         {vue === '2d' && editMode && selectedOpening && !capturing && (
           <StripBar
             styles={stylesBarres}
+            onFermer={fermerLaCarte}
             icone={SOLAIRES.ouvertures}
             strong={`${fr(segLength(selectedOpening), 2)} × ${fr(
               selectedOpening.height,
@@ -4850,6 +4902,7 @@ export function ResultScreen() {
               2,
             )} m`}
             note={`mur · ${Math.round(epaisseurDe(selectedWall) * 100)} cm d’épaisseur`}
+            onFermer={fermerLaCarte}
             actions={[
               /*
                 UN SEUL GESTE : « MESURES », AVEC SON CRAYON.
@@ -4968,6 +5021,27 @@ export function ResultScreen() {
                   haptic('leger');
                 },
               },
+              /*
+                LES GESTES DE L'ANCIENNE BARRE FLOTTANTE — percer, poser
+                l'appareillage, retirer —, à leur place dans le menu fixe.
+              */
+              {
+                label: 'Ouvrir le mur',
+                mot: 'Ouvrir',
+                icone: SOLAIRES.ouvertures,
+                sansMot: true,
+                onPress: () => percerLeMur(selectedWall.id),
+              },
+              ...(modeElec
+                ? [
+                    {
+                      label: 'Élec',
+                      icone: SOLAIRES.elec,
+                      sansMot: true,
+                      onPress: () => openWallElevation(selectedWall.id),
+                    },
+                  ]
+                : []),
               ...(selectedWall.libre
                 ? []
                 : [
@@ -4981,6 +5055,16 @@ export function ResultScreen() {
                       },
                     },
                   ]),
+              {
+                label: 'Retirer',
+                icone: SOLAIRES.supprimer,
+                sansMot: true,
+                danger: true,
+                onPress: () => {
+                  removeWall(selectedWall.id);
+                  setSelectedWallId(null);
+                },
+              },
             ]}
           />
         )}
@@ -5014,12 +5098,47 @@ export function ResultScreen() {
                 styles={stylesBarres}
                 icone={SOLAIRES.murs}
                 strong={`${fr((pier.t1 - pier.t0) * L, 2)} m`}
-                note={`retour · ${fr(mur.height, 2)} m sous plafond`}
+                /*
+                  LA CONSIGNE DU RETOUR VIT ICI — elle avait son bandeau en
+                  haut du plan, sous les pastilles, qui la recouvraient à
+                  moitié (capture du patron). Elle tient dans la note.
+                */
+                note={`retour · ${fr(mur.height, 2)} m sous plafond · appui long : tout le mur`}
+                onFermer={fermerLaCarte}
                 actions={[
                   {
                     label: 'Hauteur',
+                    icone: SOLAIRES.flecheHaut,
+                    sansMot: true,
                     onPress: () => promptWallHeight(mur.id),
                   },
+                  {
+                    label: 'Tout le mur',
+                    mot: 'Mur entier',
+                    icone: SOLAIRES.murs,
+                    sansMot: true,
+                    onPress: () => {
+                      seuleSelection('mur');
+                      setSelectedWallId(mur.id);
+                    },
+                  },
+                  {
+                    label: 'Ouvrir le mur',
+                    mot: 'Ouvrir',
+                    icone: SOLAIRES.ouvertures,
+                    sansMot: true,
+                    onPress: () => percerLeMur(mur.id),
+                  },
+                  ...(modeElec
+                    ? [
+                        {
+                          label: 'Élec',
+                          icone: SOLAIRES.elec,
+                          sansMot: true,
+                          onPress: () => openWallElevation(mur.id),
+                        },
+                      ]
+                    : []),
                 ]}
               />
             );

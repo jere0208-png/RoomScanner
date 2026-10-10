@@ -34,7 +34,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Path } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { light } from '../src/theme';
@@ -104,9 +104,15 @@ const bandeau = (icone?: string) => (
  * avait seulement demenage. On cherche donc la rangee qui porte une bordure
  * haute, c'est-a-dire le filet lui-meme — sa nature, pas son rang.
  */
+/*
+  LA RANGÉE DÉFILE DÉSORMAIS — relevé du patron : « fais un menu fixe qui ne
+  gênera pas la visibilité du plan ». Les gestes tiennent une ligne qui
+  glisse (voir `RangeeDActions`) : le filet est porté par la vue défilante,
+  et on la cherche avec les autres.
+*/
 const rangee = (t: TestRenderer.ReactTestRenderer) =>
   t.root
-    .findAllByType(View)
+    .findAll((n) => n.type === View || n.type === ScrollView)
     .map((n) => plat(n.props.style))
     .filter((st) => Number(st.borderTopWidth) > 0)
     .pop();

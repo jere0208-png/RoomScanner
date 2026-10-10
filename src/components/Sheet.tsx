@@ -27,11 +27,13 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { CloseCross } from './CloseCross';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
@@ -288,10 +290,18 @@ export function SheetShell({
   visible,
   onClose,
   onClosed,
+  defile = true,
   children,
 }: {
   visible: boolean;
   onClose: () => void;
+  /**
+   * La feuille défile-t-elle d'elle-même quand la place manque ? Oui, sauf
+   * pour celles qui portent déjà leur propre liste défilante (contrôle,
+   * journal, travaux) : deux défilements l'un dans l'autre se disputent le
+   * doigt.
+   */
+  defile?: boolean;
   /**
    * Appelé quand la feuille est VRAIMENT partie, fenêtre native comprise.
    *
@@ -318,8 +328,18 @@ export function SheetShell({
    * téléphone. Au-delà, elle devient une carte posée, coins arrondis des
    * quatre côtés.
    */
-  const { width: largeur } = useWindowDimensions();
+  const { width: largeur, height: hauteurEcran } = useWindowDimensions();
   const carte = largeur > 620;
+  /*
+    LA FEUILLE NE MONTE JAMAIS SOUS L'HEURE — relevé du patron, capture à
+    l'appui : « le clavier remonte tout le bloc ». La feuille se posait sur
+    le clavier sans borne de hauteur : plus haute que la place qui restait,
+    elle débordait par le haut, titre coupé sous la barre d'état. Sa hauteur
+    est maintenant bornée à ce qui reste entre le haut de l'écran (zone sûre
+    comprise) et le clavier ; ce qui ne tient pas défile, dans la feuille.
+  */
+  const marges = useSafeAreaInsets();
+  const hauteurMax = Math.max(220, hauteurEcran - clavier - marges.top - 10);
   const monte = useRef(new Animated.Value(0)).current;
   /**
    * La feuille survit à sa fermeture, le temps de descendre.
@@ -379,7 +399,14 @@ export function SheetShell({
               ],
             }}>
             <Pressable
-              style={[styles.sheet, carte && styles.sheetCarte]}
+              style={[
+                styles.sheet,
+                carte && styles.sheetCarte,
+                { maxHeight: hauteurMax },
+                // Clavier ouvert, la barre d'accueil est dessous : sa marge
+                // ne sert plus à rien, et elle coûte une ligne.
+                clavier > 0 && styles.sheetSurClavier,
+              ]}
               onPress={() => {}}>
               <View style={styles.grip} />
               {/*
@@ -405,7 +432,18 @@ export function SheetShell({
                 onPress={onClose}>
                 <CloseCross size={20} color={c.inkSoft} />
               </Pressable>
-              {children}
+              {defile ? (
+                <ScrollView
+                  style={styles.defile}
+                  bounces={false}
+                  keyboardShouldPersistTaps="handled"
+                  keyboardDismissMode="none"
+                  showsVerticalScrollIndicator={false}>
+                  {children}
+                </ScrollView>
+              ) : (
+                children
+              )}
             </Pressable>
           </Animated.View>
         </View>
@@ -671,6 +709,8 @@ const getStyles = themedStyles((c: Palette) =>
       ...shadowCard,
     },
     /** Tablette : une carte centrée, bornée à la largeur d'un téléphone. */
+    sheetSurClavier: { paddingBottom: 12 },
+    defile: { flexGrow: 0, flexShrink: 1 },
     sheetCarte: {
       width: 560,
       alignSelf: 'center',

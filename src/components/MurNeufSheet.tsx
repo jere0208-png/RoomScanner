@@ -18,7 +18,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
-import { SheetShell } from './Sheet';
+import { SheetShell, useKeyboardInset } from './Sheet';
 import {
   EPAISSEURS,
   coupeParDefaut,
@@ -81,6 +81,13 @@ export function MurNeufSheet({
   const [depuisB, setDepuisB] = useState(false);
   const [epaisseur, setEpaisseur] = useState(0.07);
   const attente = useRef<null | (() => void)>(null);
+  /*
+    CLAVIER OUVERT, LE FORMULAIRE TIENT AU-DESSUS DE LUI — relevé du patron :
+    « le clavier remonte tout le bloc ». Le schéma se resserre et la phrase
+    d'aide s'efface le temps de la saisie : les deux champs, l'épaisseur et
+    « Poser le mur » restent sous le pouce, sans rien faire défiler.
+  */
+  const serre = useKeyboardInset() > 0;
 
   /*
     LES VALEURS DE DÉPART, à chaque pose touchée. Un mur qui prolonge un
@@ -153,6 +160,7 @@ export function MurNeufSheet({
         longueur={longueur}
         depuis={depuis}
         epaisseur={epaisseur}
+        echelle={serre ? 0.6 : 1}
       />
 
       <View style={s.ligne}>
@@ -233,9 +241,11 @@ export function MurNeufSheet({
         })}
       </View>
 
-      <Text style={s.note}>
-        Mesurez au mètre, d’une face à l’autre : l’épaisseur des murs est comptée.
-      </Text>
+      {!serre && (
+        <Text style={s.note}>
+          Mesurez au mètre, d’une face à l’autre : l’épaisseur des murs est comptée.
+        </Text>
+      )}
 
       <View style={s.actions}>
         <Pressable style={s.secondaire} onPress={onClose}>
@@ -267,6 +277,7 @@ function Schema({
   longueur,
   depuis,
   epaisseur,
+  echelle = 1,
 }: {
   c: Palette;
   enT: boolean;
@@ -274,6 +285,8 @@ function Schema({
   longueur: string;
   depuis: string;
   epaisseur: number;
+  /** Clavier ouvert, le schéma se resserre : voir `serre`. */
+  echelle?: number;
 }) {
   const W = 280;
   const H = 118;
@@ -301,7 +314,7 @@ function Schema({
     const y = 52;
     return (
       <View style={CADRE_SCHEMA}>
-        <Svg width={W} height={H} testID="schema-mur-neuf">
+        <Svg width={W * echelle} height={H * echelle} viewBox={`0 0 ${W} ${H}`} testID="schema-mur-neuf">
           <Rect x={10} y={y - 7} width={100} height={14} fill={gris} rx={1} />
           <Rect x={110} y={y - ep / 2} width={150} height={ep} fill={bleu} rx={1} />
           {cote(110, y + 26, 260, y + 26, longueur, 0, 16)}
@@ -314,7 +327,7 @@ function Schema({
   const x = enT ? 168 : 40;
   return (
     <View style={CADRE_SCHEMA}>
-      <Svg width={W} height={H} testID="schema-mur-neuf">
+      <Svg width={W * echelle} height={H * echelle} viewBox={`0 0 ${W} ${H}`} testID="schema-mur-neuf">
         <Rect x={enT ? 10 : 40 - ep / 2} y={yFace - 14} width={enT ? 260 : 230} height={14} fill={gris} rx={1} />
         {enT && <Rect x={10} y={yFace - 14} width={10} height={H - 12} fill={gris} rx={1} />}
         <Rect x={x - ep / 2} y={yFace} width={ep} height={H - yFace - 8} fill={bleu} rx={1} />

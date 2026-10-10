@@ -20,9 +20,19 @@
  * boutons ont la taille d'un doigt, et la rangée passe à la ligne plutôt que
  * de serrer.
  */
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import {
+  AccessibilityInfo,
+  Animated,
+  Easing,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { CloseCross } from './CloseCross';
 import { SOLAIRES } from '../ui/solaires';
 import { DEBORD_DOIGT } from '../ui/bandeau';
 
@@ -114,11 +124,116 @@ export function IconeBandeau({
   );
 }
 
+/**
+ * LA CARTE DU MENU FIXE ARRIVE, ELLE NE SURGIT PAS — un fondu et deux
+ * centimètres de montée, en moins de deux dixièmes de seconde : on voit d'où
+ * elle vient, la place qu'elle prend, et que les outils lui cèdent la leur.
+ * Mouvement réduit demandé : elle est là, tout simplement.
+ */
+export function CarteDuMenu({
+  style,
+  children,
+}: {
+  style: object;
+  children: React.ReactNode;
+}) {
+  const entree = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    let vivant = true;
+    const jouer = (reduit: boolean) => {
+      if (!vivant) return;
+      if (reduit) {
+        entree.setValue(1);
+        return;
+      }
+      Animated.timing(entree, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    };
+    Promise.resolve(AccessibilityInfo.isReduceMotionEnabled?.())
+      .then((r) => jouer(!!r))
+      .catch(() => jouer(false));
+    return () => {
+      vivant = false;
+    };
+  }, [entree]);
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: entree,
+          transform: [{ translateY: entree.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }],
+        },
+      ]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+/**
+ * LA RANGÉE DES GESTES, D'UNE SEULE LIGNE — elle défile au lieu de s'empiler.
+ *
+ * Relevé du patron : « fais un menu fixe qui ne gênera pas la visibilité du
+ * plan ». Les gestes passaient à la ligne : un mur à huit gestes faisait
+ * deux rangées, et la carte montait d'autant sur le dessin. Ils tiennent
+ * maintenant UNE ligne, qui glisse sous le pouce — la dernière pastille
+ * coupée au bord dit qu'il y en a d'autres, comme les outils de Photos.
+ */
+export function RangeeDActions({
+  styles,
+  children,
+}: {
+  styles: Record<string, object>;
+  children: React.ReactNode;
+}) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      style={styles.bandeauRangee}
+      contentContainerStyle={styles.bandeauRangeeContenu}>
+      {children}
+    </ScrollView>
+  );
+}
+
+/**
+ * LA CROIX DU MENU — on referme ce qu'on a sélectionné, d'un appui, à
+ * l'endroit même où on le lit. Toucher le vide du plan le faisait aussi ;
+ * il fallait le savoir.
+ */
+export function FermerBandeau({
+  onPress,
+  styles,
+}: {
+  onPress: () => void;
+  styles: Record<string, object>;
+}) {
+  const teinte =
+    (StyleSheet.flatten(styles.bandeauSous as never) as { color?: string })?.color ?? '#5A6472';
+  return (
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel="Fermer la sélection"
+      hitSlop={DEBORD_DOIGT}
+      style={styles.bandeauFermer}
+      onPress={onPress}>
+      <CloseCross size={12} color={teinte} weight={2.6} />
+    </TouchableOpacity>
+  );
+}
+
 export function StripBar({
   strong,
   note,
   actions,
   icone,
+  onFermer,
   styles,
 }: {
   /** La cote, en gras : c'est elle qu'on vient lire. */
@@ -138,11 +253,13 @@ export function StripBar({
    * silhouette par défaut mentirait sur ce qui est sélectionné.
    */
   icone?: string;
+  /** La croix : désélectionne. */
+  onFermer?: () => void;
   styles: Record<string, object>;
 }) {
 
   return (
-    <View style={styles.bandeau}>
+    <CarteDuMenu style={styles.bandeau}>
       {/*
         PARTIE HAUTE : CE QU'ON A TOUCHÉ.
 
@@ -165,10 +282,11 @@ export function StripBar({
             {note}
           </Text>
         </View>
+        {onFermer && <FermerBandeau onPress={onFermer} styles={styles} />}
       </View>
 
-      {/* PARTIE BASSE : CE QU'ON PEUT EN FAIRE. */}
-      <View style={styles.bandeauActions}>
+      {/* PARTIE BASSE : CE QU'ON PEUT EN FAIRE — une ligne, qui défile. */}
+      <RangeeDActions styles={styles}>
         {actions.map((a) => {
           const texte = a.ghost
             ? styles.bandeauBtnGhostTexte
@@ -236,7 +354,7 @@ export function StripBar({
             </View>
           );
         })}
-      </View>
-    </View>
+      </RangeeDActions>
+    </CarteDuMenu>
   );
 }

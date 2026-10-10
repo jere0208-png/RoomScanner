@@ -104,15 +104,6 @@ const VIDE_MEUBLES: ObjectData[] = [];
  * L'encombrement du menu du mur — partagé avec le banc, qui prouve mur par
  * mur que la poignée de rotation ne le chevauche jamais.
  */
-/*
-  LA BARRE DU MENU DE MUR, en points.
-
-  Sa hauteur sert au PLACEMENT — on l'écarte du mur et des bords en comptant
-  sa demi-hauteur. Elle est passée de 46 à 50 le jour où ses commandes ont
-  pris la taille d'un doigt : un nombre resté en arrière aurait fait poser
-  la barre à cheval sur le trait qu'elle annote.
-*/
-export const WALL_MENU = { w: 186, h: 44 };
 
 /**
  * LE CARTOUCHE GÊNE-T-IL EN CE POINT ? Obstacles : les meubles de la
@@ -234,32 +225,6 @@ export function segmentDansCadre(
   }
   return false;
 }
-
-/*
-  LES ICÔNES DU MENU VIENNENT DU JEU « SOLAR BOLD » (refonte du patron) —
-  les mêmes silhouettes que la rangée d'outils, généré dans
-  src/ui/solaires.ts. Le rendu est un plein, jamais un trait.
-*/
-const WALL_ACTIONS: {
-  action: 'longueur' | 'ouverture' | 'electricite' | 'supprimer';
-  label: string | null;
-  d: string;
-}[] = [
-  { action: 'longueur', label: 'Mesures', d: SOLAIRES.ruler },
-  { action: 'ouverture', label: 'Ouvrir', d: SOLAIRES.ouvertures },
-  { action: 'electricite', label: 'Élec', d: SOLAIRES.elec },
-  /*
-    « RETIRER », PAS « SUPPRIMER » — relevé du patron, capture à l'appui :
-    « Supprimer est coupé dans la barre à côté du mur ».
-
-    Neuf lettres dans une colonne de quarante-quatre points : le mot passait
-    à la ligne et le « r » tombait seul sous les autres. C'est le mot de
-    TOUS les autres bandeaux de l'app — le plafond, le meuble, l'appareil —
-    et il tient. Deux mots pour un même geste, c'était de toute façon un de
-    trop.
-  */
-  { action: 'supprimer', label: 'Retirer', d: SOLAIRES.supprimer },
-];
 
 interface EffMapping {
   scale: number;
@@ -535,28 +500,12 @@ interface Props {
   onPierChange?: (
     pier: { wallId: string; t0: number; t1: number } | null,
   ) => void;
-  /** Commande lancée depuis les boutons flottants du mur sélectionné. */
   /**
-   * CE QUE L'ÉCRAN POSE EN BAS, ET QUE LE PLAN NE DOIT PAS VISER.
-   *
-   * Relevé du patron, juste après la refonte des bandeaux : « les boutons
-   * lors d'un clic sur un mur pour le modifier, qui s'affichent à côté du
-   * mur, sont incliquables ».
-   *
-   * La cause n'était pas dans le menu : le bandeau du bas a doublé de
-   * hauteur en passant à deux parties, et il se peint APRÈS le plan. Un menu
-   * posé bas se retrouvait dessous — visible et sourd, le doigt touchant la
-   * carte blanche.
-   *
-   * Le plan n'a pas à connaître le bandeau ; l'écran, lui, sait ce qu'il
-   * pose. Il transmet donc la hauteur réservée, et la barre d'actions
-   * s'arrête au-dessus — comme elle s'arrête déjà au bord de l'écran.
+   * UN JETON QUI EFFACE LE RETOUR CHOISI — l'écran le fait tourner quand
+   * une autre sélection prend la main, ou quand on referme le menu : le
+   * retour vit ici, et deux sélections ne coexistent pas.
    */
-  reserveBas?: number;
-  onWallAction?: (
-    action: 'longueur' | 'ouverture' | 'electricite' | 'supprimer',
-    wallId: string,
-  ) => void;
+  retourEfface?: number;
 }
 
 /**
@@ -586,8 +535,7 @@ export function FloorplanEditor({
   onSelectRoom,
   onMoveRoom,
   onEditRoomName,
-  reserveBas = 0,
-  onWallAction,
+  retourEfface,
   onSelectFixture,
   ceiling,
   showCeiling: showCeilingDemande,
@@ -630,16 +578,6 @@ export function FloorplanEditor({
   const showCeiling = modeElec ? showCeilingDemande : false;
   const cableRoutes = modeElec ? cableRoutesDemandees : undefined;
   const circuitMarks = modeElec ? circuitMarksDemandes : undefined;
-  /*
-    ET LA BARRE D'UN MUR PERD SON ACTION « ÉLEC ». Elle se centre sur sa
-    VRAIE largeur — quarante-quatre points par action, plus son rembourrage
-    — et non sur celle de quatre : à trois actions, elle aurait glissé d'un
-    demi-bouton vers la gauche de son mur.
-  */
-  const actionsDuMur = modeElec
-    ? WALL_ACTIONS
-    : WALL_ACTIONS.filter((a) => a.action !== 'electricite');
-  const largeurBarreMur = actionsDuMur.length * 44 + 10;
   const tousLesMurs = useScanStore((s) => s.walls);
   const niveauCourant = useScanStore((s) => s.niveauCourant);
   const toutesLesOuvertures = useScanStore((s) => s.openings);
@@ -1340,6 +1278,15 @@ export function FloorplanEditor({
     // Le mur entier l'emporte : les deux sélections ne coexistent pas.
     if (selectedWallId || !editable) setPier(null);
   }, [selectedWallId, editable]);
+  // L'écran efface le retour quand une autre sélection prend la main.
+  const premierJeton = useRef(true);
+  useEffect(() => {
+    if (premierJeton.current) {
+      premierJeton.current = false;
+      return;
+    }
+    setPier(null);
+  }, [retourEfface]);
 
   // Corps des murs : onglets calculés une fois pour tout le rendu. Ils ne se
   // dessinent plus (voir le poché) : ils donnent les faces, et le toucher.
@@ -3773,256 +3720,15 @@ export function FloorplanEditor({
             })}
 
           {/*
-            Mur ou RETOUR sélectionné : les commandes viennent se poser À
-            CÔTÉ de lui, jamais dessus.
-
-            Un retour n'ouvrait aucun menu : il se surlignait, affichait sa
-            note, et c'était tout. On ne pouvait donc rien y poser — alors
-            que le retour est justement l'endroit où l'on met l'interrupteur
-            d'entrée. Il reçoit maintenant le même menu que le mur entier,
-            centré sur SA portion de maçonnerie.
+            PLUS DE MENU NI D'ASTUCE POSÉS SUR LE PLAN — relevé du patron,
+            captures à l'appui : « le problème concerne le placement des
+            menus de mur sur le plan 2D ; fais un menu fixe qui ne gênera pas
+            la visibilité du plan ». La barre d'actions flottait à côté du mur
+            choisi, et l'astuce du retour se posait sous les pastilles du
+            haut : deux blocs de plus en travers du dessin, ajoutés à la carte
+            du bas. Tout passe dans le menu fixe de l'écran (voir
+            `carteOuverte`, `ResultScreen`) — gestes, mesures et consigne.
           */}
-          {(selectedWallId || pierRun) &&
-            (() => {
-              const w = walls.find(
-                (x) => x.id === (selectedWallId ?? pier?.wallId),
-              );
-              if (!w || !onWallAction) return null;
-              // Sur un retour, le menu se centre sur le tronçon, pas sur le
-              // mur : c'est le bout de maçonnerie qu'on vise.
-              const bornes =
-                !selectedWallId && pierRun
-                  ? {
-                      a: {
-                        x: w.a.x + (w.b.x - w.a.x) * pierRun.t0,
-                        z: w.a.z + (w.b.z - w.a.z) * pierRun.t0,
-                      },
-                      b: {
-                        x: w.a.x + (w.b.x - w.a.x) * pierRun.t1,
-                        z: w.a.z + (w.b.z - w.a.z) * pierRun.t1,
-                      },
-                    }
-                  : { a: w.a, b: w.b };
-              const a2 = mapping.toPx(bornes.a);
-              const b2 = mapping.toPx(bornes.b);
-              const mid = { x: (a2.x + b2.x) / 2, y: (a2.y + b2.y) / 2 };
-              // Décalage perpendiculaire, du côté où il y a de la place.
-              const dx = b2.x - a2.x;
-              const dy = b2.y - a2.y;
-              const len = Math.hypot(dx, dy) || 1;
-              let nx = -dy / len;
-              let ny = dx / len;
-              const ctr = partOf.get(roomOf(w))?.labelAt;
-              const c2 = ctr ? mapping.toPx(ctr) : { x: layout.w / 2, y: layout.h / 2 };
-              /*
-                DEHORS D'ABORD — relevé du patron : « affiche-la en dehors de
-                la pièce si possible […] elle ne doit rien gêner et ne pas
-                être gênée ».
-
-                Elle se posait DANS la pièce, « là où l'on a de la place ».
-                C'est vrai d'un séjour, et c'est faux de tout le reste : la
-                place d'une pièce est occupée par ce qu'on y règle — les
-                meubles, les appareils, le cartouche, et le plan lui-même
-                qu'on est en train de lire. Dehors, il n'y a rien à cacher.
-
-                Le repli DANS la pièce reste : un mur de façade contre le
-                bord de l'écran n'a pas de dehors, et une barre hors cadre ne
-                se touche pas.
-              */
-              let flip: 1 | -1 = 1;
-              if (nx * (c2.x - mid.x) + ny * (c2.y - mid.y) > 0) {
-                nx = -nx;
-                ny = -ny;
-                flip = -1;
-              }
-              /*
-                LE MENU S'ÉCARTE ASSEZ POUR NE JAMAIS TOUCHER LA POIGNÉE.
-
-                La barre est LARGE : le long d'un mur vertical, son centre
-                décalé de cinquante-quatre points laisse encore une
-                demi-barre de l'AUTRE côté du mur — précisément là où la
-                poignée de rotation se pose, à la même hauteur. L'écart se
-                calcule donc sur l'encombrement RÉEL de la barre projeté
-                sur la direction du décalage (demi-largeur pour un mur
-                vertical, demi-hauteur pour un horizontal), et contre la
-                position VRAIMENT occupée par la poignée — celle que la
-                borne du cadre a pu rappeler vers le mur —, rayon dix-sept,
-                marge six.
-              */
-              /*
-                ELLE RESTE DROITE — et elle l'a été, puis couchée, puis droite
-                de nouveau.
-
-                Le relevé disait d'abord : « fais en sorte qu'elle s'affiche
-                en parallèle du mur, comme s'il suivait sa trajectoire » — un
-                rectangle horizontal à côté d'un trait oblique se lit comme un
-                objet sans rapport avec lui. Essayée sur l'appareil, la barre
-                couchée s'est révélée pire : elle penche, ses quatre mots
-                penchent avec elle, et l'œil doit tourner la tête pour lire
-                quatre commandes qu'il connaît par cœur. Relevé suivant : « ne
-                la fais plus suivre la continuité du mur mais affiche-la en
-                dehors de la pièce si possible et droite ».
-
-                Une barre de commandes n'est pas une cote : la cote APPARTIENT
-                au mur et se lit dans son axe ; la barre, elle, appartient à
-                la main.
-              */
-              const demiBarre =
-                Math.abs(nx) * (WALL_MENU.w / 2) +
-                Math.abs(ny) * (WALL_MENU.h / 2);
-              /*
-                L'ÉCART PART DU BORD DE LA BARRE, PAS DE SON CENTRE.
-
-                Il valait cinquante-quatre points, mesurés du milieu du mur
-                au CENTRE de la barre : pour un mur horizontal, la barre
-                fait quarante-six de haut, son bord arrivait donc à cinq
-                points du trait — relevé du patron, capture à l'appui :
-                « le bloc du menu ne doit pas toucher le mur ». On compte
-                désormais la demi-barre PLUS la marge, et le mur qu'on
-                vient de désigner reste entièrement visible.
-              */
-              const ECART_MUR = 22;
-              let gap = demiBarre + ECART_MUR;
-              if (selectedWallId) {
-                const p = poigneeAt(w, mapping, flip === 1 ? -1 : 1, {
-                  w: layout.w,
-                  h: layout.h,
-                });
-                const dPoignee = (p.x - mid.x) * nx + (p.y - mid.y) * ny;
-                gap = Math.max(gap, dPoignee + demiBarre + 17 + 6);
-              }
-              const demiW = WALL_MENU.w / 2 + 4;
-              const demiH = WALL_MENU.h / 2 + 4;
-              /*
-                LE RAPPEL DANS LE CADRE NE DOIT PAS RAMENER LA BARRE SUR LE
-                MUR — c'était la seconde cause, et la plus vicieuse : près
-                d'un bord, le menu poussé vers l'intérieur revenait
-                exactement en travers du trait.
-
-                On essaie donc les deux côtés du mur, et l'on garde celui
-                qui, UNE FOIS BORNÉ, laisse le mur libre. Si aucun ne
-                convient (un mur en plein bord d'écran), on glisse la barre
-                le long du mur jusqu'à le dégager : sortir du cadre n'est
-                jamais une option, cacher le mur ne l'est plus.
-              */
-              const borner = (px: number, py: number) => ({
-                x: Math.min(layout.w - demiW, Math.max(demiW, px)),
-                // Le bas utile s'arrête au-dessus de ce que l'écran réserve
-                // (voir `reserveBas`) : au-delà, la barre existe encore mais
-                // le bandeau lui prend les doigts.
-                y: Math.min(
-                  layout.h - reserveBas - demiH,
-                  Math.max(demiH, py),
-                ),
-              });
-              /*
-                LIBRE, C'EST : NI SUR LE MUR, NI SUR LA POIGNÉE.
-
-                Le mur seul suffisait tant que la barre et la poignée
-                vivaient chacune sur son flanc — la barre du côté de la
-                pièce, la poignée dehors. Depuis que la barre est SORTIE de
-                la pièce, elles peuvent se retrouver du même côté : un mur
-                de façade n'a pas de dehors, la barre est rappelée dans le
-                cadre, et elle retombe sur le rond bleu.
-
-                On teste donc les deux, et l'essai des côtés puis le
-                glissement le long du mur trouvent la place qui dégage
-                l'un ET l'autre — « elle ne doit rien gêner et ne pas être
-                gênée ».
-              */
-              /* La poignée se tient du côté de la pièce, c'est-à-dire à
-                 l'opposé de la barre : `flip` dit lequel des deux flancs la
-                 barre a pris. */
-              const rondPoignee = selectedWallId
-                ? poigneeAt(w, mapping, flip === 1 ? -1 : 1, {
-                    w: layout.w,
-                    h: layout.h,
-                  })
-                : null;
-              const libre = (p: { x: number; y: number }) => {
-                if (
-                  segmentDansCadre(a2, b2, {
-                    x: p.x,
-                    y: p.y,
-                    rx: WALL_MENU.w / 2 + ECART_MUR / 2,
-                    ry: WALL_MENU.h / 2 + ECART_MUR / 2,
-                  })
-                ) {
-                  return false;
-                }
-                if (!rondPoignee) return true;
-                /* Le rond fait trente points, plus six de marge : deux
-                   cibles qui se frôlent se disputent le doigt. */
-                return (
-                  Math.abs(rondPoignee.x - p.x) > WALL_MENU.w / 2 + 21 ||
-                  Math.abs(rondPoignee.y - p.y) > WALL_MENU.h / 2 + 21
-                );
-              };
-              let pos = borner(mid.x + nx * gap, mid.y + ny * gap);
-              if (!libre(pos)) {
-                const autre = borner(mid.x - nx * gap, mid.y - ny * gap);
-                if (libre(autre)) {
-                  pos = autre;
-                } else {
-                  // Le long du mur : on s'éloigne du milieu, par pas d'un
-                  // quart de barre, du côté où il reste de la place.
-                  const ux = (b2.x - a2.x) / len;
-                  const uy = (b2.y - a2.y) / len;
-                  for (let k = 1; k <= 12 && !libre(pos); k++) {
-                    const d = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 26;
-                    pos = borner(
-                      mid.x + nx * gap + ux * d,
-                      mid.y + ny * gap + uy * d,
-                    );
-                  }
-                }
-              }
-              const bx = pos.x;
-              const by = pos.y;
-              return (
-                <View
-                  style={[
-                    styles.wallActions,
-                    { left: bx - largeurBarreMur / 2, top: by - WALL_MENU.h / 2 },
-                  ]}
-                  pointerEvents="box-none">
-                  {actionsDuMur.map(({ action, label, d }) => {
-                    const teinte = action === 'supprimer' ? c.danger : c.ink;
-                    return (
-                      <TouchableOpacity
-                        key={action}
-                        style={styles.wallAction}
-                        accessibilityLabel={label ?? action}
-                        /* Quarante dessinés, quarante-huit sous le doigt. */
-                        hitSlop={{ top: 6, bottom: 6, left: 3, right: 3 }}
-                        onPress={() => onWallAction(action, w.id)}>
-                        <Svg width={17} height={17} viewBox="0 0 24 24">
-                          <Path d={d} fill={teinte} fillRule="evenodd" />
-                        </Svg>
-                        {label && (
-                          <Text style={styles.wallActionText}>{label}</Text>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              );
-            })()}
-
-          {/* La marche à suivre, seulement quand un retour est pris : une
-              ligne au coin du plan, qui dit ce qu'on tient et comment
-              prendre le mur entier. Rien de sélectionné, rien d'affiché. */}
-          {pierRun && (
-            <View style={styles.pierNote} pointerEvents="none">
-              <Text style={styles.pierNoteTitle}>
-                {`Retour de mur · ${(pierRun.length * 100).toFixed(0)} cm`}
-              </Text>
-              <Text style={styles.pierNoteHint}>
-                Appui long : tout le mur, ouvertures comprises
-              </Text>
-            </View>
-          )}
-
           {/* Poignées de coin, uniquement en mode édition */}
           {editable &&
             corners.map((pt) => (

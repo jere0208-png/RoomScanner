@@ -576,15 +576,22 @@ function Tuile({
           { backgroundColor: fond, height: hauteur, transform: [{ scale: appui }] },
           (desactivee || eteinte) && styles.tuileEteinte,
         ]}>
+        {/*
+          LE ROND DE L'ICÔNE SE RESSERRE, PAS L'ICÔNE ; LA FLÈCHE SE FAIT
+          DISCRÈTE — relevé du patron : « réduis les flèches et leur bloc
+          arrière arrondi des quatre bulles ; réduis très légèrement le bloc
+          blanc rond des icônes, sans réduire les icônes ». L'icône dit ce que
+          fait la bulle ; la flèche dit seulement qu'elle s'ouvre.
+        */}
         <View style={styles.tuileHaut}>
-          <View style={[styles.rond, { backgroundColor: pastille }]}>
+          <View style={[styles.rondIcone, { backgroundColor: pastille }]}>
             <Svg width={19} height={19} viewBox="0 0 24 24">
               <Path d={icone} fill={c.ink} fillRule="evenodd" />
             </Svg>
           </View>
-          <View style={[styles.rond, { backgroundColor: pastille }]}>
-            <Svg width={16} height={16} viewBox="0 0 24 24">
-              <Path d="M7 17 17 7M9 7h8v8" stroke={c.ink} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <View style={[styles.rondFleche, { backgroundColor: pastille }]}>
+            <Svg width={12} height={12} viewBox="0 0 24 24">
+              <Path d="M7 17 17 7M9 7h8v8" stroke={c.ink} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
             </Svg>
           </View>
         </View>
@@ -721,11 +728,18 @@ const getStyles = themedStyles((c: Palette) => {
       justifyContent: 'space-between',
     },
     tuileEteinte: { opacity: 0.5 },
-    tuileHaut: { flexDirection: 'row', justifyContent: 'space-between' },
-    rond: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+    tuileHaut: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+    rondIcone: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    rondFleche: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
       alignItems: 'center',
       justifyContent: 'center',
     },

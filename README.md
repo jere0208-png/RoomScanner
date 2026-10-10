@@ -14285,6 +14285,65 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Un menu fixe à la place des outils, une feuille qui ne passe plus sous l'heure, des bulles plus fines
+
+Relevés du patron, captures à l'appui : « le clavier remonte tout le bloc »
+(feuille « Nouveau mur ») ; « le problème concerne le placement des menus de
+mur sur le plan 2D : fais un menu fixe qui ne gênera pas la visibilité du
+plan, et un maximum d'améliorations, dans la continuité des dernières mises à
+jour, pour chaque menu » ; « sur l'accueil, réduis les flèches et leur bloc
+arrondi des quatre bulles, et très légèrement le rond blanc des icônes, sans
+réduire les icônes ».
+
+**La feuille et le clavier** (`SheetShell`, `Sheet.tsx`). La feuille se posait
+sur le clavier sans borne de hauteur : plus haute que la place restante, elle
+débordait par le haut, titre coupé sous la barre d'état. Sa hauteur est
+désormais bornée à ce qui reste entre la zone sûre du haut et le clavier, et
+ce qui ne tient pas défile dans la feuille (`defile`, sauf pour les feuilles
+qui ont déjà leur liste : contrôle, journal, travaux). Clavier ouvert, sa
+marge basse se resserre. « Nouveau mur » se compacte le temps de la saisie :
+schéma à 60 %, phrase d'aide effacée — les champs et « Poser le mur » restent
+sous le pouce.
+
+**Le menu fixe** (`ResultScreen`, `StripBar`, `RoomBar`, `CeilingBar`,
+`ObjectBar`). Un mur choisi portait DEUX menus : une barre flottante à côté du
+mur, sur le dessin, et une carte posée AU-DESSUS de la rangée d'outils ; un
+retour ajoutait un bandeau d'astuce en haut du plan, sous les pastilles.
+Désormais :
+
+- la carte de ce qu'on a sélectionné (mur, retour, menuiserie, note, rangée de
+  spots, pièce, appareil de plafond, meuble coté) se pose À LA PLACE de la
+  rangée d'outils, sur sa ligne (celle du bouton « Édition »), de bord à bord
+  jusqu'à la colonne de droite ; la rangée reste montée mais s'efface et ne
+  prend plus le doigt (`carteOuverte`) ; le plan ne perd que la place que les
+  outils prenaient déjà ;
+- la barre flottante et l'astuce disparaissent du plan (`FloorplanEditor`) :
+  leurs gestes passent dans la carte du mur (Mesures, Laser, Épaisseur,
+  Cloison, **Ouvrir**, **Élec** en mode Électricité, Détacher, **Retirer**), la
+  consigne dans la carte du retour, qui gagne **Mur entier**, Ouvrir et Élec ;
+  la poignée qui tourne le mur, elle, reste sur le plan ;
+- chaque carte a sa **croix** (rendre les outils) et une rangée de gestes
+  d'**une ligne qui défile** (`RangeeDActions`) au lieu de rangées empilées ;
+  elle **arrive** en fondu et montée courte (`CarteDuMenu`, rien en mouvement
+  réduit) ; coins de carte de 20 points ;
+- une seule sélection à la fois, **note et retour compris** : le retour
+  s'efface par un jeton (`retourEfface`) quand une autre chose est prise — pas
+  quand le plan désélectionne, sans quoi prendre un retour le perdait dans le
+  même geste.
+
+**Les bulles de l'accueil** : rond de l'icône 36 → 32 points (icône
+inchangée, 19), rond de la flèche 36 → 26 et flèche 16 → 12.
+
+Bancs : `clavierfeuille.test.tsx` (borne au-dessus du clavier, sous la zone
+sûre ; défilement ; une feuille à liste garde le sien ; « Nouveau mur » se
+resserre) ; `bandeaux.test.tsx` (plus aucun menu flottant, la poignée reste ;
+tous les gestes du mur dans le menu fixe, sur une ligne qui défile ; la croix
+rend les outils ; le menu à la place de la rangée, effacée ; la consigne du
+retour dans sa carte, appui long prenable) ; `bandeauxbas`, `bandeaumur`,
+`bandeaufilet` (rangée qui défile ou passe à la ligne, filet porté par la vue
+défilante) ; `accueil.test.tsx` (les quatre bulles) ; `menumur.test.tsx`
+retiré avec la barre flottante qu'il tenait.
+
 ## La maquette en rotation par la régie, et des contours de meubles discrets
 
 Relevés du patron : « corrige aussi la maquette 3D en rotation de la même

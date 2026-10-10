@@ -40,7 +40,7 @@ export function JournalSheet({
   const vider = usePannes((x) => x.vider);
 
   return (
-    <SheetShell visible={visible} onClose={fermer}>
+    <SheetShell defile={false} visible={visible} onClose={fermer}>
       <>
       <Text style={s.titre}>Diagnostic</Text>
       <Text style={s.sous}>

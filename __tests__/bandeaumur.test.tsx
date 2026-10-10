@@ -101,13 +101,9 @@ describe('le bandeau du mur tient dans son bloc', () => {
       .find((n) => n.props.children === '1,19 m')!;
     // Elle n'a plus à résister à personne : elle ne partage plus sa ligne.
     expect(cote.props.numberOfLines).toBe(1);
+    // La rangée des gestes : une ligne qui défile (voir `RangeeDActions`).
     const rangee = t.root
-      .findAll((n) => {
-        const st = StyleSheet.flatten(n.props?.style) as
-          | { flexWrap?: string }
-          | undefined;
-        return st?.flexWrap === 'wrap';
-      })
+      .findAll((n) => n.props?.horizontal === true && !!n.props?.contentContainerStyle)
       .pop();
     expect(rangee).toBeDefined();
     // La cote n'est pas DANS la rangée des boutons : c'est tout le sujet.
