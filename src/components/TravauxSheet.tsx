@@ -9,7 +9,8 @@
  * mesure qui le justifie en dessous.
  *
  * ON CHOISIT SES PIÈCES. On repeint rarement tout un logement : une coche
- * par pièce, toutes cochées au départ, et les totaux suivent. Les
+ * par pièce, toutes cochées au départ, et les totaux suivent — jusqu'au
+ * dossier PDF et au tableur, qui lisent la même coche (`horsTravaux`). Les
  * hypothèses sont écrites sous les chiffres — un nombre sans sa règle de
  * calcul ne se vérifie pas en magasin.
  *
@@ -31,11 +32,13 @@ import {
   coutDesAchats,
   euros,
   nombre,
+  piecesRetenues,
   type HypothesesTravaux,
   type PieceTravaux,
   type PrixTravaux,
 } from '../geometry/travaux';
 import { useReglagesTravaux } from '../store/reglagesTravaux';
+import { hexDePeinture, nomDeTeinte } from '../ui/peintures';
 
 const COCHE = 'M6 12.5 l4 4 l8 -9';
 
@@ -74,21 +77,38 @@ export function TravauxSheet({
   visible,
   onClose,
   pieces,
+  niveau,
 }: {
   visible: boolean;
   onClose: () => void;
   pieces: PieceTravaux[];
+  /**
+   * Le niveau compté, quand le logement en a plusieurs : la feuille ne
+   * compte que celui qu'on regarde, et le dit (correctif de l'audit).
+   */
+  niveau?: string;
 }) {
   const c = useTheme();
   const s = getStyles(c);
-  const [cochees, setCochees] = useState<Set<string>>(() => new Set(pieces.map((p) => p.roomId)));
-  // À chaque ouverture, tout le logement : c'est la question la plus courante.
-  useEffect(() => {
-    if (visible) setCochees(new Set(pieces.map((p) => p.roomId)));
-  }, [visible, pieces]);
-  const choisies = useMemo(() => pieces.filter((p) => cochees.has(p.roomId)), [pieces, cochees]);
-  const { charge, charger, hypotheses, avecPrix, prix, regler, reglerPrix, basculerPrix, reinitialiser } =
-    useReglagesTravaux();
+  const {
+    charge,
+    charger,
+    hypotheses,
+    avecPrix,
+    prix,
+    horsTravaux,
+    regler,
+    reglerPrix,
+    basculerPrix,
+    basculerPiece,
+    cocherToutes,
+    reinitialiser,
+  } = useReglagesTravaux();
+  /*
+    LA COCHE NE SE REMET PLUS À ZÉRO À L'OUVERTURE : le dossier PDF et le
+    tableur la lisent, et ce qu'on voit ici doit être ce qui part.
+  */
+  const choisies = useMemo(() => piecesRetenues(pieces, horsTravaux), [pieces, horsTravaux]);
   useEffect(() => {
     if (visible && !charge) charger();
   }, [visible, charge, charger]);
@@ -99,12 +119,7 @@ export function TravauxSheet({
 
   const basculer = (id: string) => {
     haptic('leger');
-    setCochees((avant) => {
-      const apres = new Set(avant);
-      if (apres.has(id)) apres.delete(id);
-      else apres.add(id);
-      return apres;
-    });
+    basculerPiece(id);
   };
 
   const cartes: { cle: 'murs' | 'plafonds' | 'sol' | 'plinthes'; titre: string; gros: string; detail: string; teinte: string }[] = [
@@ -143,7 +158,9 @@ export function TravauxSheet({
       <Text style={s.titre}>Ce qu’il faut acheter</Text>
       <Text style={s.sous}>
         {tout
-          ? 'Pour tout le logement.'
+          ? niveau
+            ? `Pour tout le niveau « ${niveau} ».`
+            : 'Pour tout le logement.'
           : `Pour ${choisies.length} pièce${choisies.length > 1 ? 's' : ''} sur ${pieces.length}.`}
       </Text>
 
@@ -158,6 +175,30 @@ export function TravauxSheet({
           </View>
         ))}
       </View>
+      {/*
+        LA PEINTURE, TEINTE PAR TEINTE — correctif de l'audit : les couleurs
+        choisies dans « Décorer » s'achètent chacune à part.
+      */}
+      {a.murs.parTeinte ? (
+        <View style={s.teintes}>
+          <Text style={s.teintesTitre}>Peinture des murs, par teinte</Text>
+          {a.murs.parTeinte.map((t) => (
+            <View
+              key={t.cle || 'aucune'}
+              style={s.teinte}
+              accessibilityLabel={`${nomDeTeinte(t.cle)} : ${t.pots} pot${t.pots > 1 ? 's' : ''}`}>
+              <View style={[s.teintePastille, { backgroundColor: hexDePeinture(t.cle) ?? c.line }]} />
+              <Text style={s.teinteNom} numberOfLines={1}>
+                {nomDeTeinte(t.cle)}
+              </Text>
+              <Text style={s.teinteDetail}>
+                {`${t.pots} pot${t.pots > 1 ? 's' : ''} · ${nombre(t.litres)} L pour ${nombre(t.surface)} m²`}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
       {cout ? (
         <View style={s.total}>
           <Text style={s.totalMot}>Total estimé</Text>
@@ -239,10 +280,24 @@ export function TravauxSheet({
         </View>
       ) : null}
 
-      <Text style={s.section}>Pièces</Text>
+      <View style={s.enteteSection}>
+        <Text style={s.section}>Pièces</Text>
+        {!tout && pieces.length > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Tout cocher"
+            hitSlop={10}
+            onPress={() => {
+              haptic('leger');
+              cocherToutes(pieces.map((p) => p.roomId));
+            }}>
+            <Text style={s.toutCocher}>Tout cocher</Text>
+          </Pressable>
+        ) : null}
+      </View>
       <View>
         {pieces.map((p) => {
-          const on = cochees.has(p.roomId);
+          const on = !horsTravaux.includes(p.roomId);
           return (
             <Pressable
               key={p.roomId}
@@ -388,6 +443,20 @@ const getStyles = themedStyles((c: Palette) =>
     cranSigne: { color: c.blue, fontSize: 18, fontWeight: '700', marginTop: -1 },
     cranValeur: { minWidth: 78, textAlign: 'center', color: c.ink, fontSize: 14, fontWeight: '700' },
     remise: { color: c.blue, fontSize: 13.5, fontWeight: '600', paddingVertical: 10, textAlign: 'center' },
+    enteteSection: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    teintes: { marginTop: 12, gap: 6 },
+    teintesTitre: { color: c.inkSoft, fontSize: 13, fontWeight: '600' },
+    teinte: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    teintePastille: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: c.line,
+    },
+    teinteNom: { color: c.ink, fontSize: 14, fontWeight: '600', flexShrink: 1 },
+    teinteDetail: { color: c.inkSoft, fontSize: 13, marginLeft: 'auto' },
+    toutCocher: { color: c.blue, fontSize: 13.5, fontWeight: '600', marginTop: 18, marginBottom: 6 },
     section: {
       color: c.inkSoft,
       fontSize: 13,

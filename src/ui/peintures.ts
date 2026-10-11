@@ -74,3 +74,12 @@ export function nomDePeinture(cle: string | null | undefined): string | null {
   if (!cle) return null;
   return PAR_CLE.get(cle)?.nom ?? null;
 }
+
+/**
+ * Le nom d'une teinte dans « Ce qu'il faut acheter » : celui du nuancier, ou
+ * « Sans teinte choisie » pour les murs qu'on n'a pas peints dans
+ * « Décorer » (la clé vide).
+ */
+export function nomDeTeinte(cle: string): string {
+  return nomDePeinture(cle) ?? 'Sans teinte choisie';
+}

@@ -79,7 +79,21 @@ export function cleDeTeinte(hex: string | null | undefined): string {
   return TEINTES_MEUBLES.find((t) => t.hex.toLowerCase() === hex.toLowerCase())?.cle ?? TEINTE_ORIGINE;
 }
 
-type PieceHabillee = { id: string; sol?: string; accents?: Record<string, string> };
+type PieceHabillee = { id: string; peinture?: string; sol?: string; accents?: Record<string, string> };
+
+/**
+ * La peinture choisie de chaque pièce, prête pour la scène : pièce → teinte.
+ * Une clé inconnue (un plan d'une version plus récente) ne donne rien : le
+ * mur garde le blanc du dessin plutôt qu'une couleur tirée au sort.
+ */
+export function peinturesDesPieces(rooms: PieceHabillee[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const r of rooms) {
+    const hex = hexDePeinture(r.peinture);
+    if (hex) out[r.id] = hex;
+  }
+  return out;
+}
 
 /** Le sol choisi de chaque pièce, prêt pour la scène : teinte et joints. */
 export function solsDesPieces(rooms: PieceHabillee[]): Record<string, { hex: string; motif: Sol['motif'] }> {

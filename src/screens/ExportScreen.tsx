@@ -45,7 +45,7 @@ import {
 import { fixtureMarks, multiWire, schemaRows } from '../geometry/schema';
 import { useModeElec } from '../store/usage';
 import { useReglagesTravaux } from '../store/reglagesTravaux';
-import { travauxDesPieces } from '../geometry/travaux';
+import { piecesRetenues, travauxDesPieces } from '../geometry/travaux';
 import type { Fixture } from '../geometry/electrical';
 import { planRoutes } from '../geometry/elecplan';
 import { floorsOf, useScanStore } from '../store/scanStore';
@@ -306,8 +306,11 @@ const styles = getStyles(c);
    * perçant, c'est le mur VU DE FACE avec ses retours cotés — un plan vu du
    * dessus ne dit pas à quelle hauteur poser. Les décocher reste un geste ;
    * les chercher quand on est sur l'échelle n'en est pas un.
+   *
+   * POUR L'ÉLECTRICIEN SEULEMENT — correctif de l'audit : le particulier, qui
+   * ne perce pas, recevait une feuille par mur, un dossier interminable.
    */
-  const [elevations, setElevations] = useState(true);
+  const [elevations, setElevations] = useState(modeElec);
   /*
     TOUS LES MURS, OU SEULEMENT LES ÉQUIPÉS.
 
@@ -327,7 +330,7 @@ const styles = getStyles(c);
     « Élévations » pour alléger — les murs ÉQUIPÉS restent alors dans le
     dossier, et c'est le repli que l'on veut à ce moment-là, pas le vide.
   */
-  const [cotesElec, setCotesElec] = useState(true);
+  const [cotesElec, setCotesElec] = useState(modeElec);
   /*
     LES POINTS CARDINAUX — DE SÉRIE, SUR LE PLAN 2D SEULEMENT.
 
@@ -349,13 +352,23 @@ const styles = getStyles(c);
         parts,
         openings,
         (id, rang) => rooms.find((r) => r.id === id)?.name || `Pièce ${rang + 1}`,
+        // Le décor de « Décorer » : la peinture se compte par teinte.
+        (id) => rooms.find((r) => r.id === id),
       ),
     [parts, openings, rooms],
   );
+  /*
+    LES SEULES PIÈCES COCHÉES DANS « TRAVAUX » — correctif de l'audit : une
+    pièce décochée comptait quand même au dossier.
+  */
+  const retenues = useMemo(
+    () => piecesRetenues(piecesTravaux, reglages.horsTravaux),
+    [piecesTravaux, reglages.horsTravaux],
+  );
   const achatsDuDossier = (oui: boolean) =>
-    oui && piecesTravaux.length > 0
+    oui && retenues.length > 0
       ? {
-          pieces: piecesTravaux,
+          pieces: retenues,
           hypotheses: reglages.hypotheses,
           prix: reglages.avecPrix ? reglages.prix : null,
         }

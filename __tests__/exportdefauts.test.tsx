@@ -36,6 +36,7 @@ import { Switch, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ExportScreen } from '../src/screens/ExportScreen';
 import { useScanStore } from '../src/store/scanStore';
+import { useUsage } from '../src/store/usage';
 import {
   SNAPSHOT_FIXTURES,
   SNAPSHOT_OBJECTS,
@@ -166,5 +167,29 @@ describe('les options cochées à l’ouverture de l’export', () => {
     expect(st.showSurfaces).toBe(true);
     expect(st.showTextures).toBe(false);
     expect(st.showOpeningColors).toBe(false);
+  });
+});
+
+/*
+  LE PARTICULIER N'A PAS BESOIN DE CHAQUE MUR DE FACE — correctif de l'audit :
+  une feuille par mur, un dossier interminable, pour quelqu'un qui ne perce
+  pas. L'électricien les garde cochées : c'est sur elles qu'il perce.
+*/
+describe('les murs de face, selon qui exporte', () => {
+  afterEach(() => useUsage.setState({ modeElec: true }));
+
+  it('décochés pour le particulier', () => {
+    useUsage.setState({ modeElec: false });
+    const o = options(monter());
+    expect(o.get('Murs de face')).toBe(false);
+    // Le reste du dossier ordinaire, lui, reste coché.
+    for (const nom of ['Vues 3D', 'Métré', 'Cotes', 'Meubles', 'Surfaces']) {
+      expect({ [nom]: o.get(nom) }).toEqual({ [nom]: true });
+    }
+  });
+
+  it('cochés pour l’électricien', () => {
+    useUsage.setState({ modeElec: true });
+    expect(options(monter()).get('Murs de face')).toBe(true);
   });
 });

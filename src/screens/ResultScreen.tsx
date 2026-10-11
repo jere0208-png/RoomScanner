@@ -33,7 +33,7 @@ import { FichePieceSheet } from './result/FichePieceSheet';
 import { ficheDeLaPiece, type CircuitConseille } from '../geometry/fichePiece';
 import { ancrerElec } from '../geometry/viseur';
 import { TravauxSheet } from '../components/TravauxSheet';
-import { achats as achatsDe, coutDesAchats, travauxDesPieces } from '../geometry/travaux';
+import { achats as achatsDe, coutDesAchats, piecesRetenues, travauxDesPieces } from '../geometry/travaux';
 import { surfacesHabitables } from '../geometry/habitable';
 import { accrocher, texteDeMesure } from '../geometry/regle';
 import { PEINTURES, hexDePeinture } from '../ui/peintures';
@@ -1637,16 +1637,18 @@ export function ResultScreen() {
           mursNets: travaux?.murs ?? null,
         };
       });
-      // Ce qu'il faut acheter suit le métré, aux réglages de « Travaux ».
+      // Ce qu'il faut acheter suit le métré, aux réglages de « Travaux » —
+      // et sur les seules pièces qu'on y a laissées cochées.
       const reglages = useReglagesTravaux.getState();
-      const a = achatsDe(piecesTravaux, reglages.hypotheses);
+      const retenues = piecesRetenues(piecesTravaux, reglages.horsTravaux);
+      const a = achatsDe(retenues, reglages.hypotheses);
       await RoomScan.shareText(
         // Sans le mode Électricité, le fichier s'arrête au métré des pièces.
         buildMetreCsv(
           scanName,
           metre,
           modeElec ? list : null,
-          piecesTravaux.length > 0
+          retenues.length > 0
             ? { achats: a, cout: reglages.avecPrix ? coutDesAchats(a, reglages.prix) : null }
             : null,
         ),
@@ -2006,6 +2008,8 @@ export function ResultScreen() {
         parts,
         openings,
         (id, rang) => rooms.find((r) => r.id === id)?.name || `Pièce ${rang + 1}`,
+        // Le décor de « Décorer » : la peinture se compte par teinte.
+        (id) => rooms.find((r) => r.id === id),
       ),
     [parts, openings, rooms],
   );
@@ -6078,6 +6082,7 @@ export function ResultScreen() {
         visible={travauxOuvert}
         onClose={() => setTravauxOuvert(false)}
         pieces={piecesTravaux}
+        niveau={niveaux.length > 1 ? nomDuNiveau(niveauCourant) : undefined}
       />
       <FichePieceSheet
         visible={ficheOuverte && !!targetRoom}

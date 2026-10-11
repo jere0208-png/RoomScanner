@@ -14285,6 +14285,61 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le dossier PDF qui tient ce qu'il promet
+
+Correctifs de l'audit « dans la peau d'un utilisateur », lot 2, première
+moitié.
+
+**Le métré d'un grand logement tient sur plusieurs feuilles.** Il tenait
+sur une seule page. Au-delà d'une trentaine de pièces, les lignes de trop
+et le total disparaissaient sans prévenir, ou passaient sous le cartouche.
+Désormais :
+- vingt-quatre pièces par feuille, et autant de feuilles qu'il en faut
+  (« Métré », puis « Métré (suite) » au sommaire) ;
+- le total compte toutes les pièces, une seule fois, sur la dernière
+  feuille ;
+- les feuilles précédentes disent « Suite et total sur la feuille
+  suivante ».
+
+**La mention Carrez, cadrée.** Le mot n'apparaissait nulle part, alors que
+c'est le chiffre qu'un vendeur cherche d'abord, et celui qui lui coûte cher
+s'il se trompe de plus de 5 %. Sous la surface habitable, un cadre dit que
+ce métré n'en tient pas lieu, ce que mesure la loi, et ce que risque le
+vendeur.
+
+**Les pièces décochées dans « Travaux » restent hors du dossier.** La coche
+ne vivait que dans la feuille, et se remettait à zéro à chaque ouverture.
+Le PDF comme le tableur comptaient toutes les pièces. Elle vit maintenant
+avec les réglages du calcul (`horsTravaux`), et la feuille, le dossier et
+le tableur la lisent (`piecesRetenues`). « Tout cocher » la rend.
+
+**La peinture, teinte par teinte.** « Décorer » peint le séjour en sauge
+et souligne un mur en terracotta ; « Ce qu'il faut acheter » ne donnait
+qu'un seul nombre de pots. Chaque teinte se compte à part :
+- un mur d'accent compte sa face dans la pièce, moins ses baies ;
+- le reste des murs prend la peinture de la pièce ;
+- chaque couleur s'arrondit au pot entier pour elle-même, car un pot
+  entamé de sauge ne repeint pas le mur terracotta.
+
+La feuille, le dossier et le tableur donnent les pots de chaque teinte.
+Sans couleur choisie, rien ne change.
+
+**Le décor dans les perspectives du dossier.** Elles montraient des murs
+blancs, quoi qu'on ait choisi. Elles reçoivent maintenant les peintures,
+les sols et les murs d'accent, comme la 3D de l'app.
+
+**« Murs de face » décoché pour le particulier.** Une feuille par mur, un
+dossier interminable, pour quelqu'un qui ne perce pas. L'électricien les
+garde cochés : c'est sur elles qu'il perce.
+
+**« Pour tout le logement » ne ment plus sur un logement à étages.** La
+feuille « Travaux » ne compte que le niveau affiché. Elle dit maintenant
+« Pour tout le niveau « Étage 1 » ».
+
+Bancs nouveaux : `metrepages` (4), `decordossier` (2) et
+`travauxdossier` (4). Ajouts : `travaux` (la coche partagée, le niveau,
+la peinture par teinte) et `exportdefauts` (le particulier).
+
 ## Les appartements témoins
 
 Demande du patron : « génère des appartements témoins sous plusieurs formes

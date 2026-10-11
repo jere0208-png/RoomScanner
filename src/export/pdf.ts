@@ -120,6 +120,8 @@ import {
 import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 import { ecarterLesGaines } from '../geometry/routing';
 import { matieresDesSols } from '../ui/maquette';
+import { accentsDesPieces, peinturesDesPieces, solsDesPieces } from '../ui/habillage';
+import { nomDeTeinte } from '../ui/peintures';
 
 const PAGE_W = 595;
 const PAGE_H = 842;
@@ -1112,6 +1114,15 @@ function draw3DView(
     // Le dossier montre les mêmes sols que l'app : parquet et carrelage,
     // d'après le nom des pièces.
     matieres: matieresDesSols(opts.rooms ?? []),
+    /*
+      LE DÉCOR CHOISI — correctif de l'audit : on peignait le séjour dans
+      « Décorer », et les perspectives du dossier le montraient blanc. Les
+      pièces portent leur peinture, leur sol et leurs murs d'accent ; la
+      scène les lit comme celle de l'app.
+    */
+    peintures: peinturesDesPieces(opts.rooms ?? []),
+    sols: solsDesPieces(opts.rooms ?? []),
+    accents: accentsDesPieces(opts.rooms ?? []),
   });
   const faces = scene.faces;
   if (faces.length === 0) return;
@@ -3867,9 +3878,30 @@ function planPage(
  * hors-tout pour se repérer. Le total en pied de tableau est celui qu'on
  * recopie dans un devis.
  */
-function metrePage(ctx: SheetContext, sheet: string): string {
+/**
+ * LES LIGNES D'UNE FEUILLE DE MÉTRÉ — correctif de l'audit : le métré
+ * tenait sur une seule page, et dans un grand logement les lignes de trop
+ * et le total disparaissaient sans prévenir. Vingt-quatre pièces par feuille :
+ * la dernière garde la place du total, de la surface habitable et de la
+ * mention Carrez au-dessus du cartouche.
+ */
+const LIGNES_DU_METRE = 24;
+
+/** Combien de feuilles le métré de ce logement demande. */
+function feuillesDuMetre(walls: WallSeg[], rooms: RoomShape[] | undefined): number {
+  return Math.max(1, Math.ceil(roomParts(walls, rooms).length / LIGNES_DU_METRE));
+}
+
+function metrePage(
+  ctx: SheetContext,
+  sheet: string,
+  /** La feuille du métré (à partir de 1), et combien il en a. */
+  tranche: { page: number; pages: number } = { page: 1, pages: 1 },
+): string {
   const d = new Draw();
   const parts = roomParts(ctx.walls, ctx.rooms);
+  const premiere = (tranche.page - 1) * LIGNES_DU_METRE;
+  const derniere = tranche.page >= tranche.pages;
   const x0 = FRAME.x + 24;
   const w = FRAME.w - 48;
   /**
@@ -3898,7 +3930,8 @@ function metrePage(ctx: SheetContext, sheet: string): string {
   ];
   let y = TETE - 22;
 
-  d.text('Métré par pièce', x0, y + 24, 13, INK, { bold: true, align: 'left' });
+  const titre = tranche.page > 1 ? 'Métré par pièce, suite' : 'Métré par pièce';
+  d.text(titre, x0, y + 24, 13, INK, { bold: true, align: 'left' });
   for (let i = 0; i < heads.length; i++) {
     d.text(heads[i], cols[i], y, 8.5, GREY, { align: 'left' });
   }
@@ -3916,9 +3949,10 @@ function metrePage(ctx: SheetContext, sheet: string): string {
   let totalWalls = 0;
   let totalPoints = 0;
   let totalWatts = 0;
-  for (const part of parts) {
-    if (y < FRAME.y + 90) break;
-    y -= 20;
+  // Le total compte TOUTES les pièces ; la feuille n'en dessine que sa tranche.
+  parts.forEach((part, rang) => {
+    const dessinee = rang >= premiere && rang < premiere + LIGNES_DU_METRE;
+    if (dessinee) y -= 20;
     // Jamais l'identifiant interne sur un document client : une pièce
     // sans nom prend son rang, comme partout ailleurs dans l'app.
     const name =
@@ -3943,6 +3977,7 @@ function metrePage(ctx: SheetContext, sheet: string): string {
     totalWalls += nets;
     totalPoints += eclairage.get(part.roomId)?.points ?? 0;
     totalWatts += eclairage.get(part.roomId)?.watts ?? 0;
+    if (!dessinee) return;
     const lum = eclairage.get(part.roomId);
     const cells = [
       fitText(name, 10, cols[1] - cols[0] - 6),
@@ -3973,6 +4008,23 @@ function metrePage(ctx: SheetContext, sheet: string): string {
       });
     }
     d.line(x0, y - 7, x0 + w, y - 7, 0.4, GREY_LIGHT);
+  });
+
+  if (!derniere) {
+    // Le total attend la dernière feuille : on le dit, plutôt que de le taire.
+    y -= 22;
+    d.text('Suite et total sur la feuille suivante.', x0, y, 8.5, GREY, { align: 'left' });
+    drawSheetChrome(d, {
+      project: ctx.name,
+      filename: ctx.filename,
+      client: ctx.client,
+      particulier: ctx.particulier,
+      address: ctx.address,
+      sheetTitle: 'Métré par pièce',
+      sheet,
+      scaleLabel: null,
+    });
+    return d.stream();
   }
 
   y -= 26;
@@ -4020,7 +4072,31 @@ function metrePage(ctx: SheetContext, sheet: string): string {
     );
   }
 
-  y -= 20;
+  /*
+    LA MENTION CARREZ, CADRÉE — correctif de l'audit : le mot n'apparaissait
+    nulle part, quand c'est le chiffre qu'un vendeur cherche d'abord, et
+    celui qui lui coûte cher s'il se trompe de plus de 5 %. Ce métré n'en
+    tient pas lieu : on le dit dans un cadre, pour qu'on ne le manque pas.
+  */
+  if (parts.length > 0) {
+    const lignes = wrapText(
+      'Loi Carrez : ce métré n’en tient pas lieu. La surface privative due à l’acheteur ' +
+        'd’un lot de copropriété se mesure au nu des murs, hors parties de moins de 1,80 m de ' +
+        'hauteur ; si elle est inférieure de plus de 5 % à celle de l’acte, l’acheteur peut ' +
+        'obtenir une baisse du prix. Faites-la mesurer avant de la déclarer.',
+      8,
+      w - 2 * CADRE_MARGE,
+    );
+    const haut = lignes.length * 11 + 2 * CADRE_MARGE - 3;
+    y -= 14;
+    d.rect(x0, y - haut, w, haut, '#FFF8EC', AMBER, 0.8);
+    lignes.forEach((l, i) => {
+      d.text(l, x0 + CADRE_MARGE, y - CADRE_MARGE - 7 - i * 11, 8, INK, { align: 'left' });
+    });
+    y -= haut;
+  }
+
+  y -= 16;
   d.text(
     'Surface murale nette : tour intérieur × hauteur, portes et fenêtres déduites.',
     x0,
@@ -4086,6 +4162,20 @@ function achatsPage(
         align: 'left',
         bold: i === 0 || i === 1,
       });
+    }
+    /*
+      LA PEINTURE DES MURS, TEINTE PAR TEINTE — correctif de l'audit : les
+      couleurs choisies dans « Décorer » s'achètent chacune à part.
+    */
+    if (nom === 'Peinture des murs') {
+      for (const t of a.murs.parTeinte ?? []) {
+        y -= 15;
+        d.text(fitText(`· ${nomDeTeinte(t.cle)}`, 9, cols[1] - cols[0] - 6), cols[0] + 10, y, 9, '#2A3340', { align: 'left' });
+        d.text(pluriel(t.pots, 'pot'), cols[1], y, 9, '#2A3340', { align: 'left' });
+        d.text(fitText(`${nombre(t.litres)} L pour ${nombre(t.surface)} m²`, 9, (cols[3] ?? x0 + w) - cols[2] - 6), cols[2], y, 9, '#2A3340', {
+          align: 'left',
+        });
+      }
     }
     d.line(x0, y - 8, x0 + w, y - 8, 0.4, GREY_LIGHT);
   }
@@ -6631,7 +6721,14 @@ function planifierLeDossier(
     },
   ];
   if (withMetre) {
-    feuilles.push({ genre: 'metre', titre: 'Métré', fabriquer: (n) => metrePage(ctx, n) });
+    const pages = feuillesDuMetre(scan.walls, scan.rooms);
+    for (let page = 1; page <= pages; page++) {
+      feuilles.push({
+        genre: 'metre',
+        titre: page > 1 ? 'Métré (suite)' : 'Métré',
+        fabriquer: (n) => metrePage(ctx, n, { page, pages }),
+      });
+    }
   }
   // Les achats suivent le métré : ce qu'on a mesuré, puis ce qu'on achète.
   const achats = opts.achats && opts.achats.pieces.length > 0 ? opts.achats : null;

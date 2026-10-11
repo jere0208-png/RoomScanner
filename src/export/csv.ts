@@ -27,6 +27,7 @@ import type {
   MaterialList,
 } from '../geometry/nfc15100';
 import { nombre, type Achats, type CoutAchats } from '../geometry/travaux';
+import { nomDeTeinte } from '../ui/peintures';
 
 /** Le métré d'une pièce, tel que le plan le connaît. */
 export interface RoomMetre {
@@ -161,6 +162,20 @@ export function buildMetreCsv(
     ];
     for (const [nom, qte, unite, mesure, prix] of rangs) {
       out.push(ligne([nom, qte, unite, mesure, ...(cout ? [prix] : [])]));
+      // La peinture des murs, teinte par teinte, sous son total.
+      if (nom === 'Peinture des murs') {
+        for (const t of a.murs.parTeinte ?? []) {
+          out.push(
+            ligne([
+              `Peinture des murs — ${nomDeTeinte(t.cle)}`,
+              t.pots,
+              'pots',
+              `${nombre(t.litres)} L pour ${nombre(t.surface)} m²`,
+              ...(cout ? [''] : []),
+            ]),
+          );
+        }
+      }
     }
     if (cout) out.push(ligne(['TOTAL', '', '', '', cout.total]));
   }

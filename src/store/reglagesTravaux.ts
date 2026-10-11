@@ -36,6 +36,17 @@ interface Etat {
   /** Afficher un prix estimé ? Non au départ : on ne l'impose à personne. */
   avecPrix: boolean;
   prix: PrixTravaux;
+  /**
+   * LES PIÈCES DÉCOCHÉES — leurs identifiants. Correctif de l'audit : la
+   * coche ne vivait que dans la feuille, et le dossier PDF comme le tableur
+   * comptaient toutes les pièces. Un identifiant de pièce est unique : la
+   * liste vaut pour tous les plans sans qu'ils se gênent.
+   */
+  horsTravaux: string[];
+  /** Coche ou décoche une pièce. */
+  basculerPiece: (roomId: string) => void;
+  /** Recoche ces pièces (« Tout cocher »). */
+  cocherToutes: (roomIds: string[]) => void;
   charger: () => Promise<void>;
   regler: (h: Partial<HypothesesTravaux>) => void;
   reglerPrix: (p: Partial<PrixTravaux>) => void;
@@ -44,12 +55,15 @@ interface Etat {
   reinitialiser: () => void;
 }
 
-function ecrire(e: Pick<Etat, 'hypotheses' | 'avecPrix' | 'prix'>): void {
+/** Au-delà, les plus anciennes s'oublient : la liste ne grossit pas sans fin. */
+const HORS_MAX = 200;
+
+function ecrire(e: Pick<Etat, 'hypotheses' | 'avecPrix' | 'prix' | 'horsTravaux'>): void {
   try {
     disque()
       .setItem(
         CLE_REGLAGES_TRAVAUX,
-        JSON.stringify({ hypotheses: e.hypotheses, avecPrix: e.avecPrix, prix: e.prix }),
+        JSON.stringify({ hypotheses: e.hypotheses, avecPrix: e.avecPrix, prix: e.prix, horsTravaux: e.horsTravaux }),
       )
       .catch(() => {});
   } catch {
@@ -74,6 +88,24 @@ export const useReglagesTravaux = create<Etat>((set, get) => ({
   hypotheses: HYPOTHESES,
   avecPrix: false,
   prix: PRIX_INDICATIFS,
+  horsTravaux: [],
+
+  basculerPiece: (roomId) => {
+    const avant = get().horsTravaux;
+    const horsTravaux = avant.includes(roomId)
+      ? avant.filter((id) => id !== roomId)
+      : [...avant, roomId].slice(-HORS_MAX);
+    set({ horsTravaux });
+    ecrire(get());
+  },
+
+  cocherToutes: (roomIds) => {
+    const ids = new Set(roomIds);
+    const horsTravaux = get().horsTravaux.filter((id) => !ids.has(id));
+    if (horsTravaux.length === get().horsTravaux.length) return;
+    set({ horsTravaux });
+    ecrire(get());
+  },
 
   charger: async () => {
     let brut: string | null = null;
@@ -82,7 +114,7 @@ export const useReglagesTravaux = create<Etat>((set, get) => ({
     } catch {
       brut = null;
     }
-    let lu: { hypotheses?: unknown; avecPrix?: unknown; prix?: unknown } | null = null;
+    let lu: { hypotheses?: unknown; avecPrix?: unknown; prix?: unknown; horsTravaux?: unknown } | null = null;
     try {
       lu = brut ? JSON.parse(brut) : null;
     } catch {
@@ -95,6 +127,9 @@ export const useReglagesTravaux = create<Etat>((set, get) => ({
             hypotheses: nombres(HYPOTHESES, lu.hypotheses),
             avecPrix: lu.avecPrix === true,
             prix: nombres(PRIX_INDICATIFS, lu.prix),
+            horsTravaux: Array.isArray(lu.horsTravaux)
+              ? lu.horsTravaux.filter((x): x is string => typeof x === 'string').slice(-HORS_MAX)
+              : [],
           }
         : {}),
     });

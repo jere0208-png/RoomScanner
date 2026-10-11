@@ -25,8 +25,10 @@ import {
   achats,
   baiesDeLaPiece,
   nombre,
+  piecesRetenues,
   travauxDesPieces,
 } from '../src/geometry/travaux';
+import { useReglagesTravaux } from '../src/store/reglagesTravaux';
 import { TravauxSheet } from '../src/components/TravauxSheet';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { useScanStore } from '../src/store/scanStore';
@@ -166,11 +168,103 @@ describe('ce qu’il faut acheter', () => {
   });
 });
 
+/*
+  LA PEINTURE, TEINTE PAR TEINTE — correctif de l'audit : « Décorer » peint
+  le séjour en sauge et souligne un mur en terracotta, et « Ce qu'il faut
+  acheter » ne donnait qu'un seul nombre de pots. Chaque teinte s'achète à
+  part : un pot entamé de sauge ne repeint pas le mur terracotta.
+*/
+describe('la peinture, teinte par teinte', () => {
+  // Une chambre de 4 × 3 (35 m² de murs), un séjour de 4,5 × 3 (37,5 m²).
+  const chambre = piece('Chambre', 0, 0, 4, 3);
+  const sejour = piece('Séjour', 4, 0, 8.5, 3);
+  // Le mur d'accent de la chambre : celui de 3 m, à l'est.
+  const decor: Record<string, { peinture?: string; accents?: Record<string, string> }> = {
+    Chambre: { peinture: 'sauge', accents: { [chambre.walls[1].id]: 'terracotta' } },
+    Séjour: { peinture: 'sauge' },
+  };
+  const pieces = travauxDesPieces([chambre, sejour], [], nom, (id) => decor[id]);
+
+  it('le mur d’accent se compte à part de la teinte de la pièce', () => {
+    // 3 m × 2,50 = 7,5 m² de terracotta ; le reste, 27,5 m², en sauge.
+    expect(pieces[0].teintes).toEqual([
+      { cle: 'sauge', surface: 27.5 },
+      { cle: 'terracotta', surface: 7.5 },
+    ]);
+    expect(pieces[1].teintes).toEqual([{ cle: 'sauge', surface: 37.5 }]);
+  });
+
+  it('chaque teinte a ses pots, achetés à part', () => {
+    const a = achats(pieces, HYPOTHESES);
+    // Sauge : 65 m² → 13 L → 6 pots de 2,5 L. Terracotta : 7,5 m² → 1,5 L → 1 pot.
+    expect(a.murs.parTeinte).toEqual([
+      { cle: 'sauge', surface: 65, litres: 13, pots: 6 },
+      { cle: 'terracotta', surface: 7.5, litres: 1.5, pots: 1 },
+    ]);
+    // Sept pots, quand le compte d'un seul bloc (14,5 L) en donnait six.
+    expect(a.murs.pots).toBe(7);
+    expect(a.murs.surface).toBeCloseTo(72.5, 1);
+  });
+
+  it('une baie sur le mur d’accent se déduit de son accent', () => {
+    // Une fenêtre de 1 × 1,25 m sur le mur est de la chambre.
+    const fenetre = baie('window', 4, 1, 4, 2, 1.25);
+    const [p] = travauxDesPieces([chambre], [fenetre], nom, (id) => decor[id]);
+    expect(p.teintes).toEqual([
+      { cle: 'sauge', surface: 27.5 },
+      { cle: 'terracotta', surface: 6.3 },
+    ]);
+  });
+
+  it('la feuille dit les pots de chaque teinte', () => {
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      t = TestRenderer.create(<TravauxSheet visible onClose={() => {}} pieces={pieces} />);
+    });
+    const vu = t.root
+      .findAllByType(Text)
+      .map((x) => (Array.isArray(x.props.children) ? x.props.children.join('') : String(x.props.children)))
+      .join(' | ');
+    expect(vu).toContain('Vert sauge');
+    expect(vu).toContain('Terracotta');
+    expect(vu).toContain('6 pots · 13 L pour 65 m²');
+    expect(vu).toContain('1 pot · 1,5 L pour 7,5 m²');
+    act(() => t.unmount());
+  });
+
+  it('le dossier PDF et le tableur aussi', () => {
+    const { buildMetreCsv } = require('../src/export/csv');
+    const a = achats(pieces, HYPOTHESES);
+    const csv: string = buildMetreCsv('Plan', [], null, { achats: a });
+    expect(csv).toContain('Peinture des murs — Vert sauge;6;pots;13 L pour 65 m²');
+    expect(csv).toContain('Peinture des murs — Terracotta;1;pots;1,5 L pour 7,5 m²');
+    const { buildScanPdf } = require('../src/export/pdf');
+    const pdf: Uint8Array = buildScanPdf(
+      { name: 'Plan', walls: [...chambre.walls, ...sejour.walls], openings: [], objects: [], rooms: [] },
+      false,
+      { metre: false, achats: { pieces, hypotheses: HYPOTHESES, prix: null } },
+    );
+    let src = '';
+    for (let i = 0; i < pdf.length; i++) src += String.fromCharCode(pdf[i]);
+    expect(src).toContain('Vert sauge');
+    expect(src).toContain('Terracotta');
+  });
+
+  it('sans teinte choisie, un seul compte, comme avant', () => {
+    const nues = travauxDesPieces([chambre, sejour], [], nom);
+    expect(nues[0].teintes).toBeUndefined();
+    const a = achats(nues, HYPOTHESES);
+    expect(a.murs.parTeinte).toBeUndefined();
+    expect(a.murs.pots).toBe(6);
+  });
+});
+
 describe('la feuille', () => {
   let arbre: TestRenderer.ReactTestRenderer | null = null;
   afterEach(() => {
     act(() => arbre?.unmount());
     arbre = null;
+    useReglagesTravaux.setState({ horsTravaux: [] });
   });
   const pieces = travauxDesPieces([piece('Chambre', 0, 0, 4, 3), piece('Séjour', 4, 0, 9, 4)], [], nom);
   const textes = (t: TestRenderer.ReactTestRenderer) =>
@@ -202,6 +296,61 @@ describe('la feuille', () => {
     // 12 m² + 10 % : la chambre seule.
     expect(apres).toBe('13,2 m², chute comprise');
     expect(textes(arbre!).join(' | ')).toContain('Pour 1 pièce sur 2.');
+  });
+
+  /*
+    LA COCHE SUIT JUSQU'AU DOSSIER — correctif de l'audit : les pièces
+    décochées comptaient quand même dans le PDF et le tableur. La coche vit
+    désormais avec les réglages du calcul, et ne se remet plus à zéro à
+    chaque ouverture : ce qu'on voit ici est ce qui part.
+  */
+  it('la coche tient d’une ouverture à l’autre, et « Tout cocher » la rend', () => {
+    act(() => {
+      arbre = TestRenderer.create(<TravauxSheet visible onClose={() => {}} pieces={pieces} />);
+    });
+    const sejour = () =>
+      arbre!.root.findAll((x) => x.props?.accessibilityLabel === 'Séjour' && typeof x.props?.onPress === 'function')[0];
+    act(() => sejour().props.onPress());
+    expect(useReglagesTravaux.getState().horsTravaux).toEqual(['Séjour']);
+    // Refermée, rouverte : la chambre seule, toujours.
+    act(() => arbre!.unmount());
+    act(() => {
+      arbre = TestRenderer.create(<TravauxSheet visible onClose={() => {}} pieces={pieces} />);
+    });
+    expect(textes(arbre!).join(' | ')).toContain('Pour 1 pièce sur 2.');
+    const tout = arbre!.root.findAll((x) => x.props?.accessibilityLabel === 'Tout cocher' && typeof x.props?.onPress === 'function')[0];
+    act(() => tout.props.onPress());
+    expect(textes(arbre!).join(' | ')).toContain('Pour tout le logement.');
+    expect(useReglagesTravaux.getState().horsTravaux).toEqual([]);
+  });
+
+  it('les pièces retenues : celles qui ne sont pas décochées', () => {
+    expect(piecesRetenues(pieces, ['Séjour']).map((p) => p.roomId)).toEqual(['Chambre']);
+    expect(piecesRetenues(pieces, [])).toHaveLength(2);
+  });
+
+  /*
+    SUR PLUSIEURS NIVEAUX, LA FEUILLE NE PARLE QUE DE CELUI QU'ON REGARDE —
+    correctif de l'audit : « Pour tout le logement » quand l'étage n'était
+    pas compté.
+  */
+  it('sur plusieurs niveaux, elle dit lequel elle compte', () => {
+    act(() => {
+      arbre = TestRenderer.create(
+        <TravauxSheet visible onClose={() => {}} pieces={pieces} niveau="Étage 1" />,
+      );
+    });
+    const vu = textes(arbre!).join(' | ');
+    expect(vu).not.toContain('Pour tout le logement.');
+    expect(vu).toContain('Pour tout le niveau « Étage 1 ».');
+  });
+});
+
+describe('le dossier et le tableur suivent la coche', () => {
+  it('le tableur ne chiffre que les pièces retenues', () => {
+    const src = readFileSync(join(__dirname, '..', 'src', 'screens', 'ResultScreen.tsx'), 'utf8');
+    const csv = src.slice(src.indexOf('const shareCsv = async'), src.indexOf('metreFilename(scanName)'));
+    expect(csv).toMatch(/piecesRetenues\(piecesTravaux, reglages\.horsTravaux\)/);
   });
 });
 

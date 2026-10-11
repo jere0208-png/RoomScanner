@@ -78,6 +78,19 @@ export interface PieceTravaux {
   plinthes: number;
   portes: number;
   fenetres: number;
+  /**
+   * Les murs, teinte par teinte, quand le décor est connu : la peinture de
+   * la pièce (clé de `ui/peintures`, `''` sans choix) et ses murs d'accent.
+   * La somme fait `murs`.
+   */
+  teintes?: { cle: string; surface: number }[];
+}
+
+/** Le décor d'une pièce, tel que « Décorer » l'enregistre. */
+export interface DecorDeLaPiece {
+  peinture?: string;
+  /** Identifiant de mur → clé de peinture. */
+  accents?: Record<string, string>;
 }
 
 function distanceAuSegment(p: Pt, a: Pt, b: Pt): number {
@@ -89,6 +102,8 @@ function distanceAuSegment(p: Pt, a: Pt, b: Pt): number {
 }
 
 const arrondi = (v: number, pas = 0.1) => Math.round(v / pas) * pas;
+/** Au dixième, sans traîne de virgule flottante : 27,5 et non 27,500000000000004. */
+const auDixieme = (v: number) => Math.round(v * 10) / 10;
 
 /** Le tour d'un contour fermé. */
 export function perimetre(pts: Pt[]): number {
@@ -128,11 +143,59 @@ export function mursNetsDe(contour: Pt[], hauteur: number, baies: WallSeg[]): nu
   return Math.max(0, perimetre(contour) * hauteur - trous);
 }
 
+/**
+ * LES MURS D'UNE PIÈCE, TEINTE PAR TEINTE — correctif de l'audit : la
+ * peinture ne tenait pas compte des couleurs choisies dans « Décorer ».
+ *
+ * Un mur d'accent compte sa FACE dans la pièce : les côtés du contour qui
+ * courent sur lui, sur la hauteur, moins ses baies. Le reste des murs prend
+ * la peinture de la pièce.
+ */
+function teintesDeLaPiece(
+  part: RoomPart,
+  contour: Pt[],
+  hauteur: number,
+  murs: number,
+  siennes: WallSeg[],
+  decor: DecorDeLaPiece,
+): { cle: string; surface: number }[] {
+  const parCle = new Map<string, number>();
+  let accents = 0;
+  for (const [wallId, cle] of Object.entries(decor.accents ?? {})) {
+    const w = part.walls.find((x) => x.id === wallId);
+    if (!w || !cle) continue;
+    let longueur = 0;
+    for (let i = 0; i < contour.length; i++) {
+      const a = contour[i];
+      const b = contour[(i + 1) % contour.length];
+      if (distanceAuSegment(a, w.a, w.b) < 0.15 && distanceAuSegment(b, w.a, w.b) < 0.15) {
+        longueur += Math.hypot(b.x - a.x, b.z - a.z);
+      }
+    }
+    const trous = siennes
+      .filter((o) => distanceAuSegment({ x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 }, w.a, w.b) < PRES_DU_MUR)
+      .reduce((t, o) => t + Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z) * Math.min(o.height || 0, hauteur), 0);
+    const face = Math.min(Math.max(0, longueur * hauteur - trous), Math.max(0, murs - accents));
+    if (!(face > 0)) continue;
+    accents += face;
+    parCle.set(cle, (parCle.get(cle) ?? 0) + face);
+  }
+  const fond = decor.peinture ?? '';
+  parCle.set(fond, (parCle.get(fond) ?? 0) + Math.max(0, murs - accents));
+  // La teinte de la pièce d'abord, ses accents ensuite.
+  return [...parCle.entries()]
+    .filter(([, s]) => s > 0)
+    .sort(([p], [q]) => (p === fond ? -1 : q === fond ? 1 : 0))
+    .map(([cle, s]) => ({ cle, surface: auDixieme(s) }));
+}
+
 /** Le métré des travaux, pièce par pièce. Les pièces sans contour sont laissées. */
 export function travauxDesPieces(
   parts: RoomPart[],
   baies: WallSeg[],
   nomDe: (roomId: string, rang: number) => string,
+  /** Le décor de chaque pièce (« Décorer ») : la peinture se compte par teinte. */
+  decorDe?: (roomId: string) => DecorDeLaPiece | undefined,
 ): PieceTravaux[] {
   const out: PieceTravaux[] = [];
   parts.forEach((part, rang) => {
@@ -153,6 +216,9 @@ export function travauxDesPieces(
         seuils += largeur;
       }
     }
+    // Une baie ne monte pas plus haut que le mur qui la porte.
+    const murs = mursNetsDe(surface.pts, hauteur, siennes);
+    const decor = decorDe?.(part.roomId);
     out.push({
       roomId: part.roomId,
       nom: nomDe(part.roomId, rang),
@@ -160,18 +226,38 @@ export function travauxDesPieces(
       plafond: arrondi(surface.area),
       perimetre: arrondi(tour),
       hauteur: arrondi(hauteur, 0.01),
-      // Une baie ne monte pas plus haut que le mur qui la porte.
-      murs: arrondi(mursNetsDe(surface.pts, hauteur, siennes)),
+      murs: arrondi(murs),
       plinthes: arrondi(Math.max(0, tour - seuils)),
       portes,
       fenetres,
+      ...(decor ? { teintes: teintesDeLaPiece(part, surface.pts, hauteur, murs, siennes, decor) } : {}),
     });
   });
   return out;
 }
 
+/**
+ * LES PIÈCES RETENUES — celles qu'on n'a pas décochées dans « Travaux ».
+ * La feuille, le dossier PDF et le tableur passent tous par ici (correctif
+ * de l'audit : les pièces décochées comptaient quand même au dossier).
+ */
+export function piecesRetenues<T extends { roomId: string }>(pieces: T[], horsTravaux: readonly string[]): T[] {
+  if (horsTravaux.length === 0) return pieces;
+  const hors = new Set(horsTravaux);
+  return pieces.filter((p) => !hors.has(p.roomId));
+}
+
 export interface Achats {
-  murs: { surface: number; litres: number; pots: number };
+  murs: {
+    surface: number;
+    litres: number;
+    pots: number;
+    /**
+     * Teinte par teinte, dès qu'une couleur est choisie : chacune s'achète à
+     * part, et `pots` en fait la somme. `cle` vaut `''` sans choix.
+     */
+    parTeinte?: { cle: string; surface: number; litres: number; pots: number }[];
+  };
   plafonds: { surface: number; litres: number; pots: number };
   sol: { surface: number; avecChute: number; paquets: number };
   plinthes: { metres: number; barres: number };
@@ -192,8 +278,34 @@ export function achats(pieces: PieceTravaux[], h: HypothesesTravaux = HYPOTHESES
   const sol = somme((p) => p.sol);
   const avecChute = sol * (1 + h.chute);
   const plinthes = somme((p) => p.plinthes);
+  /*
+    PAR TEINTE — un pot entamé de sauge ne repeint pas le mur terracotta :
+    chaque couleur s'arrondit au pot entier pour elle-même, et le total des
+    pots en fait la somme.
+  */
+  let murs: Achats['murs'] = peinture(somme((p) => p.murs));
+  if (pieces.some((p) => p.teintes?.some((t) => t.cle !== ''))) {
+    const parCle = new Map<string, number>();
+    for (const p of pieces) {
+      for (const t of p.teintes ?? [{ cle: '', surface: p.murs }]) {
+        parCle.set(t.cle, (parCle.get(t.cle) ?? 0) + t.surface);
+      }
+    }
+    const parTeinte = [...parCle.entries()]
+      .filter(([, s]) => s > 0)
+      .map(([cle, s]) => {
+        const litres = (s * h.couches) / h.rendement;
+        return {
+          cle,
+          surface: auDixieme(s),
+          litres: auDixieme(litres),
+          pots: litres > 0 ? Math.ceil(litres / h.pot - 1e-9) : 0,
+        };
+      });
+    murs = { ...murs, pots: parTeinte.reduce((t, x) => t + x.pots, 0), parTeinte };
+  }
   return {
-    murs: peinture(somme((p) => p.murs)),
+    murs,
     plafonds: peinture(somme((p) => p.plafond)),
     sol: {
       surface: arrondi(sol),
