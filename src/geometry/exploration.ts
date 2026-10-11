@@ -391,12 +391,17 @@ export function pointDeDepart(
   rooms: RoomShape[],
   obstacles: Obstacle[],
   rayon = RAYON_VISITEUR,
+  /**
+   * La pièce où entrer — correctif de l'audit : on ne choisissait pas la
+   * pièce de départ. Sans elle, ou introuvable : la plus grande.
+   */
+  pieceVoulue?: string | null,
 ): { at: Pt; yaw: number } | null {
   if (walls.length === 0) return null;
   const parts = roomParts(walls, rooms).filter((p) => p.surface);
-  const grande = [...parts].sort(
-    (a, b) => (b.surface?.area ?? 0) - (a.surface?.area ?? 0),
-  )[0];
+  const grande =
+    (pieceVoulue ? parts.find((p) => p.roomId === pieceVoulue) : undefined) ??
+    [...parts].sort((a, b) => (b.surface?.area ?? 0) - (a.surface?.area ?? 0))[0];
   const centre: Pt = grande
     ? grande.labelAt
     : {

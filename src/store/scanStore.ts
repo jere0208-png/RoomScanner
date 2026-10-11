@@ -88,6 +88,7 @@ import type { MurDouteux } from '../geometry/murDouteux';
 import { reunirLesCanapesDAngle } from '../geometry/canapeAngle';
 import { calerDansLaNiche, calerLesMeubles } from '../geometry/niche';
 import {
+  SUR_MESURE,
   catalogTransform,
   type CatalogItem,
 } from '../geometry/catalogue';
@@ -7047,6 +7048,8 @@ export const useScanStore = create<ScanState>((set, get) => {
             // spécialise la silhouette 3D et sa matière.
             modele: item.key,
             matiere: item.matiere,
+            // Un meuble sur mesure garde le nom qu'on lui a donné.
+            ...(item.key === SUR_MESURE ? { nom: item.label } : {}),
             // Sur LE sol du scan, pas sur l'altitude zéro : ARKit place le
             // plancher où il l'a trouvé, souvent un demi-mètre plus bas, et
             // le meuble se retrouvait sinon suspendu en l'air.

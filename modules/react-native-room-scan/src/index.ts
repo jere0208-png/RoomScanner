@@ -91,6 +91,8 @@ export interface ObjectData {
   modele?: string;
   /** La matière dominante (bois, tissu, blanc…) : elle habille la 3D. */
   matiere?: string;
+  /** Le nom donné à un meuble sur mesure (aucune entrée du catalogue ne le porte). */
+  nom?: string;
   /**
    * LA TEINTE CHOISIE pour ce meuble (#RRGGBB, voir `ui/habillage`) : elle
    * passe devant la matière et la couleur relevée. Absente : d'origine.

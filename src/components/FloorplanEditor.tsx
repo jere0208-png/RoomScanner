@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import Svg, {
   Circle,
+  ClipPath,
   Defs,
   G,
   Line,
@@ -21,6 +22,8 @@ import Svg, {
   Rect,
   Text as SvgText,
 } from 'react-native-svg';
+import { hexDePeinture } from '../ui/peintures';
+import { solSurLePlan } from '../ui/habillage';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 import {
   bounds,
@@ -1532,14 +1535,70 @@ export function FloorplanEditor({
   */
   const planElec = showFixtures || showCeiling;
   const encre = planElec ? encreElectrique(c) : undefined;
+  /*
+    LE SOL CHOISI DANS « DÉCORER » SE VOIT — correctif de l'audit : le décor
+    était invisible sur le plan 2D. Pas sur le plan de l'électricien, qui
+    met l'architecture en retrait pour lire ses circuits.
+  */
   const fillOf = useMemo(
-    () => (_roomId: string) => (planElec ? c.surface : c.surfaceSunken),
-    [c, planElec],
+    () => (roomId: string) => {
+      const fond = planElec ? c.surface : c.surfaceSunken;
+      if (planElec) return fond;
+      return solSurLePlan((roomById.get(roomId) as { sol?: string } | undefined)?.sol, fond) ?? fond;
+    },
+    [c, planElec, roomById],
   );
   const partOf = useMemo(
     () => new Map(parts.map((p) => [p.roomId, p])),
     [parts],
   );
+  /*
+    LA PEINTURE DES MURS, EN BANDE LE LONG DE LEUR NU — correctif de
+    l'audit : peindre un mur depuis la 2D ne changeait rien à l'écran. Une
+    bande de la teinte de la pièce court sous les murs, tenue DANS la pièce
+    (le voisin a la sienne) ; un mur d'accent porte la sienne par-dessus. Le
+    mur, dessiné ensuite, en couvre la moitié : il en reste quatre points.
+  */
+  const decorDesMurs = (part: RoomPart, poly: string, echelle: number) => {
+    const piece = roomById.get(part.roomId) as
+      | { peinture?: string; accents?: Record<string, string> }
+      | undefined;
+    const teinte = hexDePeinture(piece?.peinture);
+    const accents = Object.entries(piece?.accents ?? {})
+      .map(([wallId, cle]) => ({ w: part.walls.find((x) => x.id === wallId), hex: hexDePeinture(cle) }))
+      .filter((x): x is { w: WallSeg; hex: string } => !!x.w && !!x.hex);
+    if (!teinte && accents.length === 0) return null;
+    const clip = `decor-${part.roomId}`;
+    const epais = Math.max(...part.walls.map((w) => epaisseurDe(w))) * echelle + 8;
+    return (
+      <G pointerEvents="none">
+        <Defs>
+          <ClipPath id={clip}>
+            <Polygon points={poly} />
+          </ClipPath>
+        </Defs>
+        {teinte ? (
+          <Polygon points={poly} fill="none" stroke={teinte} strokeWidth={epais} clipPath={`url(#${clip})`} />
+        ) : null}
+        {accents.map(({ w, hex }) => {
+          const a = mapping!.toPx(w.a);
+          const b = mapping!.toPx(w.b);
+          return (
+            <Line
+              key={w.id}
+              x1={a.x}
+              y1={a.y}
+              x2={b.x}
+              y2={b.y}
+              stroke={hex}
+              strokeWidth={epaisseurDe(w) * echelle + 8}
+              clipPath={`url(#${clip})`}
+            />
+          );
+        })}
+      </G>
+    );
+  };
   /**
    * OÙ SE POSE LE CARTOUCHE DE CHAQUE PIÈCE — CALCULÉ AVANT LES COTES.
    *
@@ -2171,6 +2230,7 @@ export function FloorplanEditor({
                         stroke="none"
                       />
                       <Polygon points={poly} fill="url(#floorDots)" stroke="none" />
+                      {!planElec && mapping && decorDesMurs(part, poly, mapping.scale)}
                     </G>
                   );
                 })}

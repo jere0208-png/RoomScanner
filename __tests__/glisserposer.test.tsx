@@ -226,8 +226,10 @@ describe('la tuile du catalogue se prend en main', () => {
           typeof n.props.onStartShouldSetResponder === 'function' &&
           typeof n.props.onResponderRelease === 'function' &&
           n.props.accessibilityRole === 'button' &&
-          // Les puces de famille, au-dessus de la grille, ne sont pas des tuiles.
-          !String(n.props.accessibilityLabel ?? '').startsWith('Famille '),
+          // Les puces de famille, au-dessus de la grille, ne sont pas des tuiles,
+          // ni le bouton du meuble sur mesure.
+          !String(n.props.accessibilityLabel ?? '').startsWith('Famille ') &&
+          n.props.accessibilityLabel !== 'Meuble sur mesure',
       )!;
 
   /*

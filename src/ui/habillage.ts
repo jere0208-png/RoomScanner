@@ -46,6 +46,27 @@ export function solDe(cle: string | null | undefined): Sol | null {
   return SOL_PAR_CLE.get(cle) ?? null;
 }
 
+/** Deux teintes #RRGGBB mêlées : `part` de la première. Une teinte illisible rend la première. */
+function meler(a: string, b: string, part: number): string {
+  const lire = (h: string) => (/^#[0-9a-f]{6}$/i.test(h) ? [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) : null);
+  const x = lire(a);
+  const y = lire(b);
+  if (!x || !y) return a;
+  return `#${x
+    .map((v, i) => Math.round(v * part + y[i] * (1 - part)).toString(16).padStart(2, '0'))
+    .join('')}`;
+}
+
+/**
+ * LE SOL CHOISI, TEL QUE LE PLAN 2D LE PEINT — correctif de l'audit : le
+ * décor était invisible sur le plan. Sa teinte, mêlée à moitié au fond du
+ * plan, pour que les noms et les cotes restent lisibles. `null` sans choix.
+ */
+export function solSurLePlan(cle: string | null | undefined, fond: string, part = 0.5): string | null {
+  const s = solDe(cle);
+  return s ? meler(s.hex, fond, part) : null;
+}
+
 /** La clé qui rend au meuble sa couleur d'origine. */
 export const TEINTE_ORIGINE = 'origine';
 

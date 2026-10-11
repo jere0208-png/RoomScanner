@@ -21,6 +21,7 @@ import { SOLS, SOL_DEFAUT, TEINTES_MEUBLES, TEINTE_ORIGINE, cleDeTeinte, hexDeTe
 import { catalogItem } from '../geometry/catalogue';
 import { frCategory } from '../geometry/furniture';
 import { useScanStore } from '../store/scanStore';
+import { niveauDe, nomDuNiveau } from '../geometry/floorplan';
 import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from './Iso3DView';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
 
@@ -33,7 +34,7 @@ const sombre = (hex: string) => {
 
 /** Le nom d'un meuble : celui du catalogue, sinon sa catégorie. */
 export function nomDuMeuble(o: ObjectData): string {
-  return (o.modele && catalogItem(o.modele)?.label) || frCategory(o.category ?? '');
+  return o.nom || (o.modele && catalogItem(o.modele)?.label) || frCategory(o.category ?? '');
 }
 
 /*
@@ -47,7 +48,7 @@ export function nomDuMeuble(o: ObjectData): string {
 const PAS_DU_TOUR = 1.2;
 const REPOS_APRES_LE_DOIGT = 2500;
 
-function PieceTournante({ pieceId }: { pieceId: string | null }) {
+function PieceTournante({ pieceId, niveau }: { pieceId: string | null; niveau?: number }) {
   const [vue, setVue] = useState<View3DParams>({ ...DEFAULT_VIEW3D, tilt: 50 });
   const touche = useRef(0);
   useEffect(() => {
@@ -65,6 +66,7 @@ function PieceTournante({ pieceId }: { pieceId: string | null }) {
         setVue(v);
       }}
       focusRoomId={pieceId}
+      niveau={niveau}
       showMeasures={false}
       showNorth={false}
     />
@@ -85,7 +87,27 @@ export function DecorSheet({
   const s = getStyles(c);
   const rooms = useScanStore((st) => st.rooms);
   const objects = useScanStore((st) => st.objects);
-  const nommees = rooms;
+  /*
+    SUR PLUSIEURS NIVEAUX, CHAQUE PIÈCE DIT LE SIEN — correctif de l'audit :
+    deux « Chambre » ne se distinguaient pas, et l'aperçu restait celui du
+    niveau affiché. Les pièces se rangent par niveau, du rez-de-chaussée en
+    montant, puis les sous-sols.
+  */
+  const plusieursNiveaux = new Set(rooms.map((r) => niveauDe(r))).size > 1;
+  const nommees = useMemo(
+    () =>
+      plusieursNiveaux
+        ? [...rooms].sort((a, b) => {
+            const rang = (n: number) => (n >= 0 ? n : 100 - n);
+            return rang(niveauDe(a)) - rang(niveauDe(b));
+          })
+        : rooms,
+    [rooms, plusieursNiveaux],
+  );
+  const nomDeLaPiece = (r: (typeof rooms)[number], i: number) => {
+    const nom = r.name || `Pièce ${i + 1}`;
+    return plusieursNiveaux ? `${nom} · ${nomDuNiveau(niveauDe(r))}` : nom;
+  };
   const [pieceId, setPieceId] = useState<string | null>(null);
   /*
     LA PIÈCE CHOISIE NE SE PERD PLUS — relevé du patron : « lorsqu'on change
@@ -184,7 +206,7 @@ export function DecorSheet({
       </View>
       {visible && piece ? (
         <View style={s.apercu}>
-          <PieceTournante pieceId={piece.id} />
+          <PieceTournante pieceId={piece.id} niveau={niveauDe(piece)} />
         </View>
       ) : null}
       <ScrollView style={s.corps} contentContainerStyle={s.corpsFond} showsVerticalScrollIndicator={false}>
@@ -199,7 +221,7 @@ export function DecorSheet({
                   return (
                     <TouchableOpacity
                       key={r.id}
-                      accessibilityLabel={r.name || `Pièce ${i + 1}`}
+                      accessibilityLabel={nomDeLaPiece(r, i)}
                       accessibilityState={{ selected: prise }}
                       style={[s.puce, prise && { backgroundColor: c.blue, borderColor: c.blue }]}
                       onPress={() => {
@@ -207,7 +229,7 @@ export function DecorSheet({
                         setPieceId(r.id);
                       }}>
                       <Text style={[s.puceTexte, prise && { color: '#FFFFFF' }]} numberOfLines={1}>
-                        {r.name || `Pièce ${i + 1}`}
+                        {nomDeLaPiece(r, i)}
                       </Text>
                     </TouchableOpacity>
                   );

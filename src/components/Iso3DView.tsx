@@ -322,6 +322,11 @@ interface Props {
   enMarche?: boolean;
   /** Mode contrôlé (aperçu d'export) : état de caméra fourni par le parent. */
   value?: View3DParams;
+  /**
+   * Le niveau à montrer, quand ce n'est pas celui qu'on regarde — l'aperçu
+   * de « Décorer » montre la pièce choisie à SON niveau.
+   */
+  niveau?: number;
   onChange?: (v: View3DParams) => void;
   /** Cotes sur les arêtes (arêtes en noir). */
   showMeasures?: boolean;
@@ -458,6 +463,7 @@ export function Iso3DView({
   enMarche = false,
   value,
   onChange,
+  niveau,
   showMeasures,
   showElecTags: showElecTagsDemande = true,
   focusRoomId,
@@ -494,7 +500,8 @@ export function Iso3DView({
   const tousLesMurs = useScanStore((s) => s.walls);
   const toutesLesOuvertures = useScanStore((s) => s.openings);
   const tousLesMeubles = useScanStore((s) => s.objects);
-  const niveauCourant = useScanStore((s) => s.niveauCourant);
+  const niveauAffiche = useScanStore((s) => s.niveauCourant);
+  const niveauCourant = niveau ?? niveauAffiche;
   const showFurniture = useScanStore((s) => s.showFurniture);
   // Le sol, à part des surfaces (qui ne sont plus que les étiquettes).
   const showSol = useScanStore((s) => s.showSol);

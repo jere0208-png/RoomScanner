@@ -16,24 +16,26 @@
 import type { ObjectData } from 'react-native-room-scan';
 import type { RoomShape, WallSeg } from '../geometry/floorplan';
 import type { Fixture } from '../geometry/electrical';
-import { buildScene, type Face3D, type ScenePalette } from './../geometry/scene3d';
+import { buildScene, type Face3D } from './../geometry/scene3d';
+import { MAQUETTE, matieresDesSols } from '../ui/maquette';
+import { accentsDesPieces, peinturesDesPieces, solsDesPieces } from '../ui/habillage';
 
 /** Palette neutre : l'OBJ ne porte pas les couleurs, seule la forme compte. */
-const SHAPE_ONLY: ScenePalette = {
-  floor: '#FFFFFF',
-  floorStroke: '#FFFFFF',
-  wall: '#FFFFFF',
-  wallStroke: '#FFFFFF',
-  wallTop: '#FFFFFF',
-  wallTopStroke: '#FFFFFF',
-  opening: '#FFFFFF',
-  door: '#FFFFFF',
-  window: '#FFFFFF',
-  passage: '#FFFFFF',
-  object: '#FFFFFF',
-  objectTop: '#FFFFFF',
-  objectStroke: '#FFFFFF',
-};
+/**
+ * LA COULEUR D'UNE FACE, EN TROIS NOMBRES DE 0 À 1 — « #RRGGBB », « #RGB »
+ * ou « rgb(a)(…) ». Une teinte illisible rend du blanc : mieux vaut un mur
+ * blanc qu'un fichier qui ne s'ouvre pas.
+ */
+function rgbDe(c: string | null | undefined): [number, number, number] {
+  if (!c) return [1, 1, 1];
+  let m = /^#([0-9a-f]{6})$/i.exec(c);
+  if (m) return [0, 2, 4].map((i) => parseInt(m![1].slice(i, i + 2), 16) / 255) as [number, number, number];
+  m = /^#([0-9a-f]{3})$/i.exec(c);
+  if (m) return [0, 1, 2].map((i) => parseInt(m![1][i] + m![1][i], 16) / 255) as [number, number, number];
+  const r = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i.exec(c);
+  if (r) return [Number(r[1]) / 255, Number(r[2]) / 255, Number(r[3]) / 255];
+  return [1, 1, 1];
+}
 
 export interface ModelForExport {
   walls: WallSeg[];
@@ -57,15 +59,27 @@ const n3 = (v: number) => (Math.round(v * 1000) / 1000).toString();
  * la matière.
  */
 export function buildObj(model: ModelForExport, name = 'EchoPlan'): string {
+  /*
+    EN COULEURS — correctif de l'audit : le fichier partait tout blanc, sans
+    le décor. La maquette de l'app, peintures, sols et murs d'accent
+    compris ; une couleur par sommet (« v x y z r g b »), que lisent
+    Blender, MeshLab et la plupart des visionneuses. Un seul fichier : pas
+    de .mtl à égarer en chemin.
+  */
+  const pieces = (model.rooms ?? []) as (RoomShape & { peinture?: string; sol?: string; accents?: Record<string, string> })[];
   const scene = buildScene(model.walls, model.openings, model.objects, {
-    palette: SHAPE_ONLY,
+    palette: MAQUETTE,
     showSurfaces: true,
     rooms: model.rooms,
     fixtures: model.fixtures,
+    matieres: matieresDesSols(pieces),
+    peintures: peinturesDesPieces(pieces),
+    sols: solsDesPieces(pieces),
+    accents: accentsDesPieces(pieces),
   });
   const lines: string[] = [
     `# ${name} — exporté par EchoPlan`,
-    '# Unités : mètres. Y vers le haut.',
+    '# Unités : mètres. Y vers le haut. Couleur par sommet : v x y z r g b.',
   ];
   const verts: string[] = [];
   const byGroup = new Map<string, string[]>();
@@ -74,8 +88,9 @@ export function buildObj(model: ModelForExport, name = 'EchoPlan'): string {
   for (const face of scene.faces) {
     // Un contour n'est pas une surface ; une arête isolée non plus.
     if (face.fill === null || face.pts.length < 3) continue;
+    const [rouge, vert, bleu] = rgbDe(face.fill);
     for (const p of face.pts) {
-      verts.push(`v ${n3(p.x)} ${n3(p.y)} ${n3(-p.z)}`);
+      verts.push(`v ${n3(p.x)} ${n3(p.y)} ${n3(-p.z)} ${n3(rouge)} ${n3(vert)} ${n3(bleu)}`);
     }
     const idx = face.pts.map((_, i) => base + i).join(' ');
     const g = groupOf(face);

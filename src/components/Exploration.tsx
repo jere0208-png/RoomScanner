@@ -29,6 +29,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import {
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -653,6 +654,30 @@ export function Exploration({
   useEffect(() => () => arreterTout(), []);
 
   /*
+    ALLER DANS UNE PIÈCE, D'UN APPUI — correctif de l'audit : on ne
+    choisissait pas la pièce de départ. Le visiteur s'y pose comme à
+    l'entrée : au cœur de la pièce, face à sa profondeur.
+  */
+  const allerDans = (roomId: string) => {
+    const d = pointDeDepart(walls, rooms, obstacles, undefined, roomId);
+    if (!d) return;
+    haptic('leger');
+    arreterTout();
+    pose.current = { x: d.at.x, z: d.at.z, lacet: Math.PI / 2 - d.yaw, tangage: TANGAGE_DEPART };
+    setVue({ ...pose.current });
+    setCarte({ ...pose.current });
+    setEntree({ ...pose.current });
+    setSecours(null);
+  };
+  const piecesNommees = useMemo(
+    () =>
+      roomParts(walls, rooms)
+        .filter((p) => p.surface)
+        .map((p, i) => ({ id: p.roomId, nom: rooms.find((r) => r.id === p.roomId)?.name || `Pièce ${i + 1}` })),
+    [walls, rooms],
+  );
+
+  /*
     UN SEUL GESTE POUR LES DEUX POUCES.
 
     Relevé du patron : « on ne peut pas se déplacer et tourner en même
@@ -936,6 +961,28 @@ export function Exploration({
           </Pressable>
         </View>
 
+        {/* Les pièces du niveau, pour y aller d'un appui. */}
+        {piecesNommees.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={[styles.pieces, { top: marges.top + 130 }]}
+            contentContainerStyle={styles.piecesFond}>
+            {piecesNommees.map((p) => (
+              <Pressable
+                key={p.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Aller dans : ${p.nom}`}
+                style={({ pressed }) => [styles.piece, pressed && styles.enfonce]}
+                onPress={() => allerDans(p.id)}>
+                <Text style={styles.pieceTexte} numberOfLines={1}>
+                  {p.nom}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
+
         {/*
           LA CONSIGNE, TANT QU'ON N'A PAS BOUGÉ — et pas une seconde de plus.
           Le geste est celui de tous les jeux mobiles ; une phrase suffit à le
@@ -984,6 +1031,18 @@ const getStyles = themedStyles((c: Palette) =>
       ...ombreBouton,
     },
     terminerTexte: { color: c.blue, fontSize: 16, fontWeight: '600' },
+    pieces: { position: 'absolute', left: 0, right: 0 },
+    piecesFond: { paddingHorizontal: 14, gap: 8 },
+    piece: {
+      height: 34,
+      paddingHorizontal: 14,
+      borderRadius: 17,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...ombreBouton,
+    },
+    pieceTexte: { color: c.ink, fontSize: 14, fontWeight: '600' },
     enfonce: { opacity: 0.7 },
     consigne: {
       position: 'absolute',

@@ -45,7 +45,7 @@ import {
 } from 'react-native';
 import Svg, { Line as SvgLine, Rect as SvgRect } from 'react-native-svg';
 import { useTheme } from '../../theme';
-import { CATALOGUE, type CatalogItem } from '../../geometry/catalogue';
+import { CATALOGUE, SUR_MESURE, type CatalogItem } from '../../geometry/catalogue';
 import { furnKind, furnitureStrokes } from '../../geometry/furniture';
 import { vignetteDuMeuble, vignetteEnCache } from '../../geometry/vignette3d';
 import { estUnTap } from '../../ui/geste';
@@ -397,6 +397,42 @@ export function FurnitureSheet({
   */
   const [familleChoisie, setFamilleChoisie] = React.useState<string | null>(null);
   /*
+    LE MEUBLE SUR MESURE — correctif de l'audit. Quatre champs : un nom, et
+    les trois cotes au centimètre, comme on les relève au mètre ruban. Le
+    bouton ne pose que des cotes de meuble (de 5 cm à 6 m).
+  */
+  const [mesure, setMesure] = React.useState<{ ouvert: boolean; nom: string; l: string; p: string; h: string }>({
+    ouvert: false,
+    nom: '',
+    l: '',
+    p: '',
+    h: '',
+  });
+  const enMetres = (v: string) => {
+    const n = Number(v.replace(',', '.').trim());
+    return isFinite(n) && n >= 5 && n <= 600 ? Math.round(n) / 100 : null;
+  };
+  const cotesSurMesure = {
+    w: enMetres(mesure.l),
+    d: enMetres(mesure.p),
+    h: enMetres(mesure.h),
+  };
+  const surMesurePret = cotesSurMesure.w !== null && cotesSurMesure.d !== null && cotesSurMesure.h !== null;
+  const poserSurMesure = () => {
+    if (!surMesurePret) return;
+    haptic('leger');
+    onPick({
+      key: SUR_MESURE,
+      label: mesure.nom.trim() || 'Meuble sur mesure',
+      category: 'storage',
+      w: cotesSurMesure.w!,
+      d: cotesSurMesure.d!,
+      h: cotesSurMesure.h!,
+      matiere: 'bois',
+    });
+    setMesure({ ouvert: false, nom: '', l: '', p: '', h: '' });
+  };
+  /*
     LE CATALOGUE S'EFFACE, IL NE SE FERME PAS.
 
     Fermer la fenêtre romprait le toucher en cours — et le meuble tomberait
@@ -418,6 +454,7 @@ export function FurnitureSheet({
       setEnMain(null);
       setDoigt(null);
       setFamilleChoisie(null);
+      setMesure((m) => ({ ...m, ouvert: false }));
     }
   }, [visible]);
 
@@ -464,6 +501,61 @@ export function FurnitureSheet({
               autoCorrect={false}
               clearButtonMode="while-editing"
             />
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Meuble sur mesure"
+              accessibilityState={{ expanded: mesure.ouvert }}
+              activeOpacity={0.7}
+              style={surMesure.ouvrir}
+              onPress={() => {
+                haptic('leger');
+                setMesure((m) => ({ ...m, ouvert: !m.ouvert }));
+              }}>
+              <Text style={[surMesure.ouvrirTexte, { color: teinte.blue }]}>
+                {mesure.ouvert ? 'Fermer le meuble sur mesure' : '+ Meuble sur mesure, à vos cotes'}
+              </Text>
+            </TouchableOpacity>
+            {mesure.ouvert && (
+              <View style={[surMesure.cadre, { backgroundColor: teinte.surfaceSunken }]}>
+                <TextInput
+                  accessibilityLabel="Nom du meuble"
+                  style={[styles.catSearch, surMesure.nom]}
+                  value={mesure.nom}
+                  onChangeText={(nom) => setMesure((m) => ({ ...m, nom }))}
+                  placeholder="Nom (ex. : bibliothèque du salon)"
+                  placeholderTextColor={teinte.inkFaint}
+                />
+                <View style={surMesure.cotes}>
+                  {(
+                    [
+                      ['l', 'Largeur (cm)', 'Larg.'],
+                      ['p', 'Profondeur (cm)', 'Prof.'],
+                      ['h', 'Hauteur (cm)', 'Haut.'],
+                    ] as const
+                  ).map(([cle, nom, court]) => (
+                    <TextInput
+                      key={cle}
+                      accessibilityLabel={nom}
+                      style={[styles.catSearch, surMesure.cote]}
+                      value={mesure[cle]}
+                      onChangeText={(v) => setMesure((m) => ({ ...m, [cle]: v }))}
+                      placeholder={`${court} cm`}
+                      placeholderTextColor={teinte.inkFaint}
+                      keyboardType="number-pad"
+                    />
+                  ))}
+                </View>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Poser le meuble sur mesure"
+                  disabled={!surMesurePret}
+                  activeOpacity={0.8}
+                  style={[surMesure.poser, { backgroundColor: surMesurePret ? teinte.blue : teinte.line }]}
+                  onPress={poserSurMesure}>
+                  <Text style={surMesure.poserTexte}>Poser</Text>
+                </TouchableOpacity>
+              </View>
+            )}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -548,6 +640,17 @@ export function FurnitureSheet({
 }
 
 /** La rangée des familles, sous la recherche. */
+const surMesure = StyleSheet.create({
+  ouvrir: { paddingVertical: 8 },
+  ouvrirTexte: { fontSize: 14, fontWeight: '600' },
+  cadre: { borderRadius: 14, padding: 10, gap: 8, marginBottom: 6 },
+  nom: { paddingVertical: 8 },
+  cotes: { flexDirection: 'row', gap: 6 },
+  cote: { flex: 1, paddingVertical: 8, paddingHorizontal: 10 },
+  poser: { height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  poserTexte: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+});
+
 const familles = StyleSheet.create({
   rangee: { flexGrow: 0, marginTop: 8, marginBottom: 2 },
   contenu: { gap: 6, paddingRight: 8 },

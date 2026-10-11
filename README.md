@@ -14285,6 +14285,56 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le décor partout, et la visite où l'on veut
+
+Correctifs de l'audit « dans la peau d'un utilisateur », lot 4 (décor et
+3D).
+
+**Le décor se voit sur le plan 2D.** Il était invisible : peindre un mur
+depuis la 2D ne changeait rien à l'écran. Désormais :
+- le sol de la pièce prend la teinte du revêtement choisi, mêlée à moitié
+  au fond du plan pour que noms et cotes restent lisibles
+  (`solSurLePlan`) ;
+- la peinture des murs court en bande le long de leur nu, tenue dans la
+  pièce : le voisin a la sienne ;
+- un mur d'accent porte sa propre teinte.
+
+Le plan de l'électricien, calque électrique allumé, reste neutre : il met
+l'architecture en retrait pour qu'on lise les circuits.
+
+**Le fichier 3D part en couleurs.** L'OBJ partait tout blanc. Il porte
+maintenant une couleur par sommet (« v x y z r g b »), celle de la maquette
+de l'app, peintures, sols et murs d'accent compris. Blender, MeshLab et la
+plupart des visionneuses la lisent. Un seul fichier : pas de .mtl à égarer
+en chemin.
+
+**La visite commence où l'on veut.** On entrait toujours au cœur de la plus
+grande pièce. Une rangée de pièces, en haut de l'écran, emmène dans
+n'importe laquelle d'un appui : au cœur de la pièce, face à sa profondeur.
+`pointDeDepart` accepte la pièce voulue.
+
+**Le meuble sur mesure.** Le catalogue n'avait pas le meuble de chacun : la
+bibliothèque du menuisier, le buffet de famille, le meuble repéré en
+magasin. « Meuble sur mesure, à vos cotes » ouvre quatre champs : le nom,
+puis largeur, profondeur et hauteur au centimètre. Le bouton ne pose que
+des cotes de meuble, de 5 cm à 6 m. Le meuble posé garde son nom (`nom`),
+puisque aucune entrée du catalogue ne le porte.
+
+**« Décorer » sur plusieurs niveaux.** Deux « Chambre » ne se
+distinguaient pas, et l'aperçu qui tourne restait celui du niveau affiché :
+une pièce de l'étage n'y apparaissait pas. Chaque pièce dit maintenant son
+niveau (« Chambre · 1er étage »), les pièces se rangent par niveau, et
+l'aperçu montre la pièce choisie à son niveau (`niveau` de `Iso3DView`).
+
+Bancs nouveaux :
+- `decor2d` (5) ;
+- `objcouleurs` (3) ;
+- `visitepiece` (3) ;
+- `meublesurmesure` (4) ;
+- `decorniveaux` (1).
+
+`glisserposer` écarte le bouton du meuble sur mesure de ses tuiles.
+
 ## Le devis qu'on remet au client
 
 Correctifs de l'audit « dans la peau d'un utilisateur », lot 3. L'audit

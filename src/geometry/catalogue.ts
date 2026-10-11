@@ -44,6 +44,14 @@ export interface CatalogFamily {
   items: CatalogItem[];
 }
 
+/**
+ * LA CLÉ DU MEUBLE SUR MESURE — correctif de l'audit : le catalogue n'avait
+ * pas le meuble de chacun (la bibliothèque du menuisier, le buffet de
+ * famille). Il se pose à ses cotes, avec le nom qu'on lui donne ; le meuble
+ * posé garde ce nom (`nom`), puisque aucune entrée du catalogue ne le porte.
+ */
+export const SUR_MESURE = 'sur-mesure';
+
 export const CATALOGUE: CatalogFamily[] = [
   /*
     LE CATALOGUE MAISON — relevé du patron : « enlève les mobiliers aux
