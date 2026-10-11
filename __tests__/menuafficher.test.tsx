@@ -18,10 +18,11 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Animated, Switch, Text } from 'react-native';
+import { Animated, Modal, StyleSheet, Switch, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { Toolbar2D, Toolbar3D } from '../src/screens/result/ResultToolbar';
 import { ToolPill } from '../src/components/ToolPill';
+import { CalquesSheet } from '../src/components/CalquesSheet';
 import { useScanStore } from '../src/store/scanStore';
 import { useUsage } from '../src/store/usage';
 import { buildScene, type ScenePalette } from '../src/geometry/scene3d';
@@ -94,7 +95,7 @@ const rangee2D = (edition: boolean) =>
     />,
   );
 
-const rangee3D = () =>
+const rangee3D = (autres: Partial<React.ComponentProps<typeof Toolbar3D>> = {}) =>
   monter(
     <Toolbar3D
       anim={new Animated.Value(1)}
@@ -116,6 +117,7 @@ const rangee3D = () =>
       colorsAvailable={false}
       focusIdx={-1}
       setFocusIdx={jest.fn()}
+      {...autres}
     />,
   );
 
@@ -128,13 +130,13 @@ beforeEach(() => {
 });
 
 describe('le plan 2D', () => {
-  it('la rangée garde l’essentiel — cotes, meubles, surfaces, appareils — et « Plus » au bout', () => {
+  it('la rangée garde l’essentiel — cotes, meubles, surfaces, appareils — et « Autres » au bout', () => {
     const t = rangee2D(false);
     const ordre = libelles(t);
     expect(ordre).toEqual(['Cotes', 'Meubles', 'Surfaces', 'Appareils', 'Autres']);
   });
 
-  it('« Plus » ouvre le menu Afficher : nord, grille, couleurs des ouvertures, notes, photos', () => {
+  it('« Autres » ouvre le menu Afficher : nord, grille, couleurs des ouvertures, notes, photos', () => {
     const t = rangee2D(false);
     appuyer(t, 'Autres');
     const vu = textes(t);
@@ -142,9 +144,11 @@ describe('le plan 2D', () => {
     for (const mot of ['Points cardinaux', 'Grille', 'Portes et fenêtres en couleur', 'Notes', 'Photos', 'Gaines', 'Plafond']) {
       expect(vu).toContain(mot);
     }
-    // La grille s'allume d'un appui sur sa ligne.
+    // La grille s'allume d'un appui sur sa ligne, puis « Valider ».
     appuyer(t, 'Grille');
+    appuyer(t, 'Valider');
     expect(useScanStore.getState().showGrille).toBe(true);
+    appuyer(t, 'Autres');
     // Un calque vide reste dans la liste, grisé, et dit pourquoi.
     const notes = t.root.findAll((n) => n.props.accessibilityLabel === 'Notes' && n.props.accessibilityRole === 'switch')[0];
     expect(notes.props.accessibilityState).toEqual({ checked: false, disabled: true });
@@ -170,7 +174,7 @@ describe('le plan 2D', () => {
 });
 
 describe('la maquette 3D', () => {
-  it('la rangée : meubles, cotes, surfaces — et « Plus » à la place de « Pièces »', () => {
+  it('la rangée : meubles, cotes, surfaces — et « Autres » à la place de « Pièces »', () => {
     const t = rangee3D();
     const ordre = libelles(t);
     expect(ordre).toEqual(['Meubles', 'Cotes', 'Surfaces', 'Autres']);
@@ -189,7 +193,9 @@ describe('la maquette 3D', () => {
     const sol = t.root.findAll((n) => n.props.accessibilityLabel === 'Sol' && n.props.accessibilityRole === 'switch')[0];
     expect(sol.props.accessibilityState).toEqual({ checked: true, disabled: false });
     appuyer(t, 'Sol');
+    appuyer(t, 'Valider');
     expect(useScanStore.getState().showSol).toBe(false);
+    appuyer(t, 'Autres');
     // « Volumes » ne se lit plus comme le volume d'une pièce, et dit quand il est vide.
     const volumes = t.root.findAll((n) => n.props.accessibilityLabel === 'Volumes de salle d’eau' && n.props.accessibilityRole === 'switch')[0];
     expect(volumes.props.accessibilityHint).toMatch(/baignoire ni douche/);
@@ -218,5 +224,107 @@ describe('la maquette 3D', () => {
     expect(sols({ showSurfaces: true, showSol: false })).toBe(0);
     // Sans le calque Sol (export, PDF), il suit les surfaces comme avant.
     expect(sols({ showSurfaces: true })).toBeGreaterThan(0);
+  });
+});
+
+/*
+  LE MENU SE VALIDE — ou se quitte sans rien changer.
+
+  Relevé du patron : « le OK et la croix sont au même endroit sur le menu
+  Autres. Mets un bouton de validation, et si on clique hors du bloc, ça doit
+  quitter sans valider ». Le « OK » de l'en-tête tombait sous la croix de la
+  coquille commune ; et chaque interrupteur s'appliquait sur-le-champ, si bien
+  qu'il n'y avait rien à valider ni à annuler.
+*/
+describe('le menu se valide, ou se quitte sans rien changer', () => {
+  const ligne = (t: TestRenderer.ReactTestRenderer, label: string) =>
+    t.root.findAll(
+      (n) => n.props.accessibilityLabel === label && n.props.accessibilityRole === 'switch' && typeof n.props.onPress === 'function',
+      { deep: false },
+    )[0];
+  const ouvert = (t: TestRenderer.ReactTestRenderer) => t.root.findByType(CalquesSheet).props.visible;
+
+  it('une seule croix en haut — plus de « OK » dessous — et un bouton « Valider »', () => {
+    const t = rangee2D(false);
+    appuyer(t, 'Autres');
+    expect(textes(t)).not.toContain('OK');
+    const fermer = t.root.findAll((n) => n.props.accessibilityLabel === 'Fermer' && typeof n.props.onPress === 'function', { deep: false });
+    expect(fermer).toHaveLength(1);
+    const valider = t.root.findAll((n) => n.props.accessibilityLabel === 'Valider' && typeof n.props.onPress === 'function', { deep: false });
+    expect(valider).toHaveLength(1);
+  });
+
+  it('un interrupteur ne change rien tant qu’on n’a pas validé', () => {
+    const t = rangee2D(false);
+    appuyer(t, 'Autres');
+    appuyer(t, 'Grille');
+    // La ligne montre le choix…
+    expect(ligne(t, 'Grille').props.accessibilityState.checked).toBe(true);
+    // … le plan, lui, n'a pas bougé.
+    expect(useScanStore.getState().showGrille).toBe(false);
+    appuyer(t, 'Valider');
+    expect(useScanStore.getState().showGrille).toBe(true);
+    expect(ouvert(t)).toBe(false);
+  });
+
+  it('un appui hors du bloc referme SANS valider, et le brouillon est oublié', () => {
+    const t = rangee2D(false);
+    appuyer(t, 'Autres');
+    appuyer(t, 'Grille');
+    // « Cotes » est aussi une pastille de la rangée : on vise la LIGNE du menu.
+    act(() => ligne(t, 'Cotes').props.onPress());
+    expect(ligne(t, 'Cotes').props.accessibilityState.checked).toBe(true);
+    // Le voile : ce qui reçoit l'appui autour de la feuille, posée au fond.
+    const voile = t.root.findByType(Modal).findAll(
+      (x) =>
+        typeof x.props.onPress === 'function' &&
+        (StyleSheet.flatten(x.props.style) as { justifyContent?: string } | undefined)?.justifyContent === 'flex-end',
+      { deep: false },
+    )[0];
+    expect(voile).toBeDefined();
+    act(() => voile.props.onPress());
+    expect(ouvert(t)).toBe(false);
+    expect(useScanStore.getState().showGrille).toBe(false);
+    // Rouvert : les lignes disent l'état RÉEL, pas le brouillon abandonné.
+    appuyer(t, 'Autres');
+    expect(ligne(t, 'Grille').props.accessibilityState.checked).toBe(false);
+    expect(ligne(t, 'Cotes').props.accessibilityState.checked).toBe(false);
+  });
+
+  it('la croix referme sans valider, elle aussi', () => {
+    act(() => useScanStore.setState({ rooms: [{ id: 'r1', name: 'Séjour' }] as never }));
+    const t = rangee3D();
+    appuyer(t, 'Autres');
+    appuyer(t, 'Sol');
+    expect(ligne(t, 'Sol').props.accessibilityState).toEqual({ checked: false, disabled: false });
+    appuyer(t, 'Fermer');
+    expect(ouvert(t)).toBe(false);
+    expect(useScanStore.getState().showSol).toBe(true);
+  });
+
+  it('la pièce isolée attend la validation, elle aussi', () => {
+    act(() => useScanStore.setState({ rooms: [{ id: 'r1', name: 'Séjour' }, { id: 'r2', name: 'Chambre' }] as never }));
+    const setFocusIdx = jest.fn();
+    const t = rangee3D({ setFocusIdx });
+    appuyer(t, 'Autres');
+    appuyer(t, 'Chambre');
+    expect(setFocusIdx).not.toHaveBeenCalled();
+    const puce = t.root.findAll((n) => n.props.accessibilityLabel === 'Chambre' && typeof n.props.onPress === 'function', { deep: false })[0];
+    expect(puce.props.accessibilityState).toEqual({ selected: true });
+    appuyer(t, 'Valider');
+    expect(setFocusIdx).toHaveBeenCalledTimes(1);
+    const arg = setFocusIdx.mock.calls[0][0];
+    expect(typeof arg === 'function' ? arg(-1) : arg).toBe(1);
+  });
+
+  it('valider sans rien toucher ne bascule rien', () => {
+    const t = rangee2D(false);
+    appuyer(t, 'Autres');
+    const avant = useScanStore.getState();
+    appuyer(t, 'Valider');
+    const apres = useScanStore.getState();
+    for (const k of ['showGrille', 'showNotes', 'showPhotos', 'showFurniture', 'showSurfaces'] as const) {
+      expect([k, apres[k]]).toEqual([k, avant[k]]);
+    }
   });
 });

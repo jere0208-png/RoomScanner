@@ -14285,6 +14285,27 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le menu « Autres » se valide ; à côté, il se quitte sans rien changer
+
+Relevé du patron : « le OK et la croix sont au même endroit sur le menu
+Autres. Mets un bouton de validation, et si on clique hors du bloc, ça doit
+quitter sans valider ».
+
+- **Plus de « OK » dans l'en-tête** : il tombait sous la croix que la
+  coquille commune (`SheetShell`) pose sur toutes les feuilles. L'en-tête
+  laisse maintenant sa place à la croix.
+- **Un brouillon, puis « Valider »** (`CalquesSheet`). Les interrupteurs et
+  les puces « Pièce isolée » ne changent plus rien sur-le-champ : ils
+  remplissent un brouillon, que la ligne affiche. Le grand bouton bleu
+  « Valider », en bas, l'applique d'un coup et referme ; une pastille y
+  compte les changements en attente.
+- **La croix, l'appui hors du bloc, le geste retour** referment SANS
+  valider, et le brouillon est oublié : rouvert, le menu montre l'état réel.
+
+Bancs : `menuafficher` (+6 : une seule croix et un « Valider », rien ne
+change avant validation, le voile et la croix annulent, la pièce isolée
+attend, valider sans rien toucher ne bascule rien), `bandeaux` adapté.
+
 ## Le menu « Afficher » : l'essentiel dans la rangée, tout le reste derrière « … »
 
 Relevé du patron : « en mode édition, avant les icônes d'ajout, rajoute un

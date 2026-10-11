@@ -13,8 +13,15 @@
  * qui dit ce qu'il montre — « Volumes » devient « Volumes de salle d'eau »,
  * et l'on ne se demande plus si c'est le volume de la pièce. Un calque qui
  * n'a rien à montrer reste dans la liste, grisé, et dit pourquoi.
+ *
+ * ON CHOISIT, PUIS ON VALIDE. Relevé du patron : « le OK et la croix sont au
+ * même endroit ; mets un bouton de validation, et si on clique hors du bloc,
+ * ça doit quitter sans valider ». Les interrupteurs remplissent un BROUILLON ;
+ * « Valider » l'applique d'un coup et referme. La croix, le voile et le geste
+ * retour referment sans rien toucher — et le brouillon est oublié : rouvert,
+ * le menu dit l'état réel.
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SheetShell } from './Sheet';
@@ -65,16 +72,38 @@ export function CalquesSheet({
 }) {
   const c = useTheme();
   const s = getStyles(c);
+  // Le brouillon : seulement ce qu'on a touché, par clé de calque.
+  const [brouillon, setBrouillon] = useState<Record<string, boolean>>({});
+  const [vueChoisie, setVueChoisie] = useState<string | null>(null);
+  // Chaque ouverture repart de l'état réel.
+  useEffect(() => {
+    if (visible) {
+      setBrouillon({});
+      setVueChoisie(null);
+    }
+  }, [visible]);
+  const lignes = sections.flatMap((sec) => sec.lignes);
+  const allumee = (l: LigneDeCalque) => l.actif && !l.vide;
+  const voulue = (l: LigneDeCalque) => (l.cle in brouillon ? brouillon[l.cle] : allumee(l));
+  const vueActuelle = vueChoisie ?? vue?.actuel ?? null;
+  const changements =
+    lignes.filter((l) => !l.vide && voulue(l) !== allumee(l)).length +
+    (vue && vueActuelle !== vue.actuel ? 1 : 0);
+  const valider = () => {
+    haptic('succes');
+    for (const l of lignes) {
+      if (!l.vide && voulue(l) !== allumee(l)) l.onBascule();
+    }
+    if (vue && vueActuelle !== null && vueActuelle !== vue.actuel) vue.onChoix(vueActuelle);
+    onClose();
+  };
   return (
     <SheetShell visible={visible} onClose={onClose} defile={false}>
+      {/* L'en-tête laisse sa place à la croix de la coquille, en haut à
+          droite : c'est elle qui referme sans valider. */}
       <View style={s.tete}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.titre}>{titre}</Text>
-          {sousTitre ? <Text style={s.sousTitre}>{sousTitre}</Text> : null}
-        </View>
-        <TouchableOpacity accessibilityLabel="Fermer" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} onPress={onClose}>
-          <Text style={s.fermer}>OK</Text>
-        </TouchableOpacity>
+        <Text style={s.titre}>{titre}</Text>
+        {sousTitre ? <Text style={s.sousTitre}>{sousTitre}</Text> : null}
       </View>
       <ScrollView style={s.corps} contentContainerStyle={s.corpsFond} showsVerticalScrollIndicator={false}>
         {vue && vue.options.length > 1 ? (
@@ -82,7 +111,7 @@ export function CalquesSheet({
             <Text style={s.sectionTitre}>{vue.titre}</Text>
             <View style={s.puces}>
               {vue.options.map((o) => {
-                const pris = o.cle === vue.actuel;
+                const pris = o.cle === vueActuelle;
                 return (
                   <TouchableOpacity
                     key={o.cle}
@@ -91,7 +120,7 @@ export function CalquesSheet({
                     style={[s.puce, pris && { backgroundColor: c.blue, borderColor: c.blue }]}
                     onPress={() => {
                       haptic('leger');
-                      vue.onChoix(o.cle);
+                      setVueChoisie(o.cle);
                     }}>
                     <Text style={[s.puceTexte, pris && { color: '#FFFFFF' }]} numberOfLines={1}>
                       {o.libelle}
@@ -111,14 +140,14 @@ export function CalquesSheet({
               <View style={s.carte}>
                 {sec.lignes.map((l, i) => {
                   const eteint = !!l.vide;
-                  const allume = l.actif && !eteint;
+                  const allume = !eteint && voulue(l);
                   const basculer = () => {
                     if (eteint) {
                       haptic('butee');
                       return;
                     }
                     haptic('leger');
-                    l.onBascule();
+                    setBrouillon((b) => ({ ...b, [l.cle]: !voulue(l) }));
                   };
                   return (
                     <Pressable
@@ -155,18 +184,57 @@ export function CalquesSheet({
             </View>
           ))}
       </ScrollView>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Valider"
+        accessibilityHint={
+          changements === 0
+            ? 'Aucun changement : referme le menu'
+            : `Applique ${changements} changement${changements > 1 ? 's' : ''}`
+        }
+        activeOpacity={0.85}
+        style={s.valider}
+        onPress={valider}>
+        <Text style={s.validerTexte}>Valider</Text>
+        {changements > 0 ? (
+          <View style={s.compte}>
+            <Text style={s.compteTexte}>{changements}</Text>
+          </View>
+        ) : null}
+      </TouchableOpacity>
     </SheetShell>
   );
 }
 
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
-    tete: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 18, paddingTop: 4 },
+    // À droite, la place de la croix de la coquille (32 points, plus l'air).
+    tete: { paddingLeft: 4, paddingRight: 44, paddingTop: 2 },
     titre: { color: c.ink, fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
     sousTitre: { color: c.inkSoft, fontSize: 13, marginTop: 2 },
-    fermer: { color: c.blue, fontSize: 16, fontWeight: '800', paddingTop: 2 },
-    corps: { maxHeight: 560 },
-    corpsFond: { paddingHorizontal: 14, paddingBottom: 18, gap: 14, paddingTop: 12 },
+    corps: { maxHeight: 520, flexGrow: 0, flexShrink: 1 },
+    corpsFond: { paddingBottom: 14, gap: 14, paddingTop: 12 },
+    valider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      marginTop: 4,
+      minHeight: 50,
+      borderRadius: 25,
+      backgroundColor: c.blue,
+    },
+    validerTexte: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
+    compte: {
+      minWidth: 22,
+      height: 22,
+      paddingHorizontal: 6,
+      borderRadius: 11,
+      backgroundColor: 'rgba(255,255,255,0.25)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    compteTexte: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
     section: { gap: 7 },
     sectionTitre: {
       color: c.inkSoft,

@@ -269,12 +269,17 @@ describe('l’écran des résultats', () => {
         .filter((c) => c === 'N' || c === 'E' || c === 'S' || c === 'O');
     expect(lettres()).toHaveLength(0);
     // Les points cardinaux vivent dans le menu « Afficher », au bout de la rangée.
-    ouvrirAfficher(tree);
-    expect(ligne(tree, 'Points cardinaux')).toBeDefined();
-    act(() => ligne(tree, 'Points cardinaux').props.onPress());
+    // Le choix ne s'applique qu'à la validation du menu.
+    const basculerNord = () => {
+      ouvrirAfficher(tree);
+      expect(ligne(tree, 'Points cardinaux')).toBeDefined();
+      act(() => ligne(tree, 'Points cardinaux').props.onPress());
+      act(() => bouton(tree, 'Valider')!.props.onPress());
+    };
+    basculerNord();
     // Quatre lettres par vue affichée : la couronne est bien là.
     expect(lettres().length).toBeGreaterThanOrEqual(4);
-    act(() => ligne(tree, 'Points cardinaux').props.onPress());
+    basculerNord();
     expect(lettres()).toHaveLength(0);
   });
 
