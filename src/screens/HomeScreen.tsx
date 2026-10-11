@@ -42,14 +42,12 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoomScan } from 'react-native-room-scan';
 import { dark, ombreBouton as ombreBoutonDouce, radius, themedStyles, useTheme, type Palette } from '../theme';
-import { DUREE_DU_FILM } from '../data/film';
 import { GlisserPourSupprimer } from '../components/GlisserPourSupprimer';
 import { BandeauAnnuler, useSuppressionDifferee } from '../components/BandeauAnnuler';
 import { Avatar } from '../components/Avatar';
 import { LogoEcho } from '../components/LogoMark';
 import { useScanStore, type SavedScan } from '../store/scanStore';
 import { useAccountStore } from '../store/accountStore';
-import { usePremieresFois } from '../store/premieresFois';
 import { nombreNonLus, useNotifications } from '../store/notifications';
 import { CLOCHE } from './NotificationsScreen';
 import { useRoomScan } from '../native/useRoomScan';
@@ -139,7 +137,6 @@ export function HomeScreen() {
   const peutCreerPlan = useAccountStore((s) => s.peutCreerPlan);
   const ouvrirSurprise = useAccountStore((s) => s.ouvrirSurprise);
   const compte = useAccountStore((s) => s.compte);
-  const revoir = usePremieresFois((s) => s.revoir);
   const c = useTheme();
   const sombre = c === dark;
   const styles = getStyles(c);
@@ -231,6 +228,14 @@ export function HomeScreen() {
       return;
     }
     commencerAuClavier();
+  };
+  /** Un plan lu est un plan créé : le même palier que les autres. */
+  const lirePlanPapier = () => {
+    if (!peutCreerPlan()) {
+      ouvrirSurprise();
+      return;
+    }
+    setScreen('lecture');
   };
 
   /* Les plans : les derniers touchés, ou ceux que la recherche retient. */
@@ -415,15 +420,20 @@ export function HomeScreen() {
                   />
                 </Animated.View>
                 <Animated.View style={fadeIn(6, true)}>
+                  {/*
+                    LIRE UN PLAN PAPIER — relevé du patron : « à la place de
+                    "Comment ça marche" ». La feuille d'un architecte devient
+                    un plan coté ; le film, lui, se revoit depuis le profil.
+                  */}
                   <Tuile
                     c={c}
                     fond={teintes.guide}
                     hauteur={HAUTE}
-                    icone={SOLAIRES.aide}
-                    titre={'Comment\nça marche'}
-                    sous={`Le film, en ${Math.round(DUREE_DU_FILM / 1000)} secondes`}
-                    label="Comment ça marche"
-                    onPress={() => revoir('accueil')}
+                    icone={SOLAIRES.planPapier}
+                    titre={'Lire un\nplan papier'}
+                    sous="Une photo, un plan coté"
+                    label="Lire un plan papier"
+                    onPress={lirePlanPapier}
                   />
                 </Animated.View>
               </View>

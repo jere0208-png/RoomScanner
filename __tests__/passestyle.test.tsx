@@ -152,11 +152,12 @@ describe('2 — du blanc net sur les pages claires', () => {
     */
     const accueil = lire('src/screens/HomeScreen.tsx');
     const icones = [...accueil.matchAll(/icone=\{SOLAIRES\.(\w+)\}/g)].map((m) => m[1]);
-    expect(new Set(icones)).toEqual(new Set(['scanner', 'maison', 'crayon', 'aide']));
+    // La bulle « ? » a cédé sa tuile à la lecture d'un plan papier : une feuille.
+    expect(new Set(icones)).toEqual(new Set(['scanner', 'maison', 'crayon', 'planPapier']));
     const jeu = lire('src/ui/solaires.ts');
     for (const [cle, nom] of [
       ['scanner', 'scanner-bold'],
-      ['aide', 'question-circle-bold'],
+      ['planPapier', 'document-text-bold'],
       ['maison', 'home-2-bold'],
     ]) {
       expect(jeu).toContain(`/** solar:${nom} */\n  ${cle}:`);

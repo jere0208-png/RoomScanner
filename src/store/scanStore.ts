@@ -1,4 +1,5 @@
 import { NOM_EXEMPLE, appartementExemple } from '../data/exemple';
+import type { PlanLu } from '../geometry/lecturePlan';
 import type { Mesure } from '../geometry/regle';
 import { photosDesMurs } from '../geometry/photosAuto';
 import { create } from 'zustand';
@@ -146,6 +147,12 @@ export type Screen =
   | 'profil'
   | 'notifications'
   | 'confidentialite'
+  /*
+    LA LECTURE D'UN PLAN PAPIER — une page : l'invitation, le scanner, la
+    lecture, et ce qu'on a lu, à vérifier avant d'en faire un plan (voir
+    `LecturePlanScreen`).
+  */
+  | 'lecture'
   /*
     LE DIAGNOSTIC D'UN PLAN — une page, pas une feuille : une liste de
     problèmes, une liste à cocher et un champ de texte doivent défiler.
@@ -2263,6 +2270,12 @@ interface ScanState {
    * une visite, pas un plan de plus dans la bibliothèque.
    */
   ouvrirExemple: () => void;
+  /**
+   * OUVRE LE PLAN LU SUR UNE FEUILLE — comme un relevé qui vient de finir :
+   * un plan neuf, non enregistré, sous le même filet qu'un scan (le
+   * brouillon). Ce qu'il porte vient de `reconstruirePlan`.
+   */
+  ouvrirPlanLu: (plan: PlanLu, nom: string) => void;
   /**
    * Vrai quand le plan a été ouvert AU CLAVIER, sans scanner.
    *
@@ -8289,6 +8302,30 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
       // `reset` vient d'arrêter la minuterie : un plan au clavier se
       // construit sous le même filet qu'un scan.
+      armerBrouillon(() => get().ecrireBrouillon());
+    },
+
+    ouvrirPlanLu: (plan, nom) => {
+      get().reset();
+      set({
+        planVierge: false,
+        ...CALQUES_DE_BASE,
+        screen: 'result',
+        scanName: nom,
+        resultOrigin: 'scan',
+        niveauCourant: NIVEAU_RDC,
+        walls: plan.walls,
+        openings: plan.openings,
+        rooms: plan.rooms.map((r) => ({ ...r, floor: null })),
+        objects: [],
+        fixtures: plan.fixtures,
+        ceiling: plan.ceiling,
+        photos: [],
+        notes: [],
+        mesures: [],
+        currentSaveId: null,
+        dirty: true,
+      });
       armerBrouillon(() => get().ecrireBrouillon());
     },
 

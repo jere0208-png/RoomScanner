@@ -13,6 +13,7 @@ import { CameraScreen } from './src/screens/CameraScreen';
 import { SignInScreen } from './src/screens/SignInScreen';
 import { ProfilScreen } from './src/screens/ProfilScreen';
 import { ConfidentialiteScreen } from './src/screens/ConfidentialiteScreen';
+import { LecturePlanScreen } from './src/screens/LecturePlanScreen';
 import { PaywallScreen } from './src/screens/PaywallScreen';
 import { EcranChargement } from './src/components/EcranChargement';
 import { MagasinScreen } from './src/screens/MagasinScreen';
@@ -316,6 +317,11 @@ function Application() {
       {screen === 'confidentialite' && (
         <Scene entree="poussee">
           <ConfidentialiteScreen />
+        </Scene>
+      )}
+      {screen === 'lecture' && (
+        <Scene entree="poussee">
+          <LecturePlanScreen />
         </Scene>
       )}
       {screen === 'scan' && <ScanScreen />}

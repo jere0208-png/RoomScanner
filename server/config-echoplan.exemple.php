@@ -34,3 +34,13 @@ const EMAIL_EXPEDITEUR = 'no-reply@VOTRE-DOMAINE';
 // jetons de connexion. Vide : on vérifie la signature d'Apple, l'utilisateur
 // et l'expiration, mais pas l'application destinataire.
 const APPLE_BUNDLE_ID = '';
+
+// ---- LA LECTURE DE PLANS PAPIER (Claude, d'Anthropic) — console.anthropic.com
+// → API Keys. La clé ne quitte jamais le serveur. Vide : la lecture se dit
+// « pas encore activée ».
+const ANTHROPIC_CLE = 'À_REMPLIR';
+// Le modèle qui lit : Sonnet coûte quelques centimes par plan ; Opus lit
+// mieux les plans chargés, pour cinq fois plus.
+const ANTHROPIC_MODELE = 'claude-sonnet-5-5';
+// Le plafond de lectures par compte et par jour (chaque lecture est payée).
+const LECTURES_PAR_JOUR = 20;

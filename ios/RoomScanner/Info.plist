@@ -54,7 +54,7 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>La caméra est nécessaire pour scanner votre pièce en 3D.</string>
+	<string>La caméra sert à scanner vos pièces en 3D et à photographier vos plans papier.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Pour lire les mesures de votre télémètre laser (Leica DISTO) et les reporter directement sur le plan.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

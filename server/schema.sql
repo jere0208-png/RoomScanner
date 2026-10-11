@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS comptes (
   -- Plans consommés sur le palier gratuit (le trousseau du téléphone
   -- garde le même compteur ; le serveur fait foi quand les deux divergent).
   plans INT NOT NULL DEFAULT 0,
+  -- Plans papier lus par l'IA : l'essai (1), puis le Pro ; et le plafond du jour.
+  lectures INT NOT NULL DEFAULT 0,
+  lectures_jour INT NOT NULL DEFAULT 0,
+  jour_lecture DATE NULL,
   cree_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   vu_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;

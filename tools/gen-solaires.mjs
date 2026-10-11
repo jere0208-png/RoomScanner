@@ -230,6 +230,8 @@ const CHOIX = {
   */
   scanner: ['scanner-bold'],
   aide: ['question-circle-bold'],
+  // La lecture d'un plan papier : une feuille, et son texte.
+  planPapier: ['document-text-bold', 'document-bold'],
   maison: ['home-2-bold', 'home-bold'],
   /*
     LE MENU « … » PARLE ENFIN LA LANGUE DE L'APP — relevé du patron :

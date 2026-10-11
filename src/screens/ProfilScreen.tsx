@@ -38,6 +38,7 @@ import { ThemeGlyph } from '../components/ThemeGlyph';
 import { ContourVif, TexteVif } from '../components/ContourVif';
 import { SOLAIRES } from '../ui/solaires';
 import { useAccountStore } from '../store/accountStore';
+import { usePremieresFois } from '../store/premieresFois';
 import { useScanStore, type ThemePref } from '../store/scanStore';
 import { ombreBouton, dark, radius, shadowCard, useTheme, type Palette } from '../theme';
 import { ACCENTS } from '../ui/accents';
@@ -94,6 +95,7 @@ export function ProfilScreen() {
   const s = themed(c);
   const insets = useSafeAreaInsets();
   const setScreen = useScanStore((st) => st.setScreen);
+  const revoir = usePremieresFois((st) => st.revoir);
   const themePref = useScanStore((st) => st.themePref);
   const accentPref = useScanStore((st) => st.accentPref);
   const iconePref = useScanStore((st) => st.iconePref);
@@ -530,6 +532,21 @@ export function ProfilScreen() {
           icone="bouclier"
           label="Confidentialité des données"
           onPress={() => setScreen('confidentialite')}
+        />
+        {/*
+          LE FILM DE LA PRÉSENTATION — il avait sa tuile sur l'accueil, que la
+          lecture des plans papier a prise. Il se revoit d'ici : on le
+          rejoue, et l'on revient à l'accueil, où il se joue.
+        */}
+        <Rangee
+          s={s}
+          c={c}
+          icone="aide"
+          label="Revoir la présentation"
+          onPress={() => {
+            revoir('accueil');
+            setScreen('home');
+          }}
         />
         {/*
           LE DIAGNOSTIC — ce qui s'est passé quand l'application s'est arrêtée.

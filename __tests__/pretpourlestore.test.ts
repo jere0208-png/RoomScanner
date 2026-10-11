@@ -45,7 +45,9 @@ describe('Info.plist', () => {
 
   it('parle français à qui accorde la caméra', () => {
     expect(plist).toMatch(/NSCameraUsageDescription/);
-    expect(plist).toContain('scanner votre pièce');
+    // Et elle dit les deux usages : le scan des pièces, la photo des plans papier.
+    expect(plist).toContain('scanner vos pièces');
+    expect(plist).toContain('plans papier');
   });
 
   it('affirme son chiffrement exempté, une fois pour toutes', () => {

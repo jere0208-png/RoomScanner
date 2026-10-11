@@ -22,6 +22,9 @@
  *
  *   supprimer  {identifiant, jeton}          → {ok}  le compte ET ses plans
  *   retirer    {identifiant, jeton, scan}    → {ok}  un plan déposé
+ *   lire_plan  {identifiant, jeton, image, media, textes, abonne}
+ *              → {ok, lecture, essai}  un plan papier lu par Claude
+ *              (voir lecture-plan.php) — une lecture d'essai, puis le Pro.
  *
  * Le jeton est un HMAC de l'identifiant : sans état côté serveur, il prouve
  * que l'appelant est bien passé par `connecter`.
@@ -538,6 +541,61 @@ if ($action === 'retirer') {
   mysqli_stmt_bind_param($req, 'ss', $identifiant, $scan);
   mysqli_stmt_execute($req);
   sortir(['ok' => true]);
+}
+
+/*
+  LIRE UN PLAN PAPIER — relevé du patron : « une lecture de plan papier, à la
+  place de "Comment ça marche" ; réservée au Pro, avec un essai offert ».
+
+  QUI A DROIT À UNE LECTURE :
+    — le Pro par code (enregistré ici) ou par abonnement (que l'app déclare :
+      le serveur ne voit pas les reçus de l'App Store) ;
+    — tout compte, une fois : la lecture d'essai.
+  Et personne plus de LECTURES_PAR_JOUR fois par jour : chaque lecture coûte
+  un appel à l'IA, et une déclaration d'abonnement ne se vérifie pas ici.
+
+  Une photo qui n'est pas un plan ne consomme pas l'essai. Rien n'est gardé :
+  ni l'image, ni la lecture — seulement le compte des lectures.
+*/
+if ($action === 'lire_plan') {
+  @set_time_limit(190);
+  $req = mysqli_prepare($db, 'SELECT lectures, lectures_jour, jour_lecture FROM comptes WHERE id = ?');
+  if (!$req) {
+    sortir(['ok' => false, 'raison' => 'La base n’est pas à jour : importez migration-lecture.sql.']);
+  }
+  mysqli_stmt_bind_param($req, 'i', $compte['id']);
+  mysqli_stmt_execute($req);
+  $l = mysqli_fetch_assoc(mysqli_stmt_get_result($req)) ?: ['lectures' => 0, 'lectures_jour' => 0, 'jour_lecture' => null];
+  $estPro = $compte['pro'] !== '' || !empty($corps['abonne']);
+  if (!$estPro && (int) $l['lectures'] >= 1) {
+    sortir(['ok' => false, 'raison' => 'pro', 'message' => 'Votre lecture d’essai est utilisée : la lecture de plans papier est réservée au Pro.']);
+  }
+  $parJour = defined('LECTURES_PAR_JOUR') ? (int) LECTURES_PAR_JOUR : 20;
+  $duJour = ($l['jour_lecture'] ?? '') === date('Y-m-d') ? (int) $l['lectures_jour'] : 0;
+  if ($duJour >= $parJour) {
+    sortir(['ok' => false, 'raison' => 'quota', 'message' => 'Vous avez lu ' . $parJour . ' plans aujourd’hui : la lecture reprend demain.']);
+  }
+  require __DIR__ . '/lecture-plan.php';
+  $r = lirePlanPapier(
+    (string) ($corps['image'] ?? ''),
+    (string) ($corps['media'] ?? 'image/jpeg'),
+    is_array($corps['textes'] ?? null) ? $corps['textes'] : [],
+  );
+  if (!$r['ok']) {
+    sortir($r);
+  }
+  // Une lecture comptée seulement si c'était un plan.
+  if (!empty($r['lecture']['est_un_plan'])) {
+    $req = mysqli_prepare(
+      $db,
+      'UPDATE comptes SET lectures = lectures + 1, '
+        . 'lectures_jour = IF(jour_lecture = CURDATE(), lectures_jour + 1, 1), '
+        . 'jour_lecture = CURDATE() WHERE id = ?',
+    );
+    mysqli_stmt_bind_param($req, 'i', $compte['id']);
+    mysqli_stmt_execute($req);
+  }
+  sortir(['ok' => true, 'lecture' => $r['lecture'], 'essai' => !$estPro]);
 }
 
 sortir(['ok' => false, 'raison' => 'Action inconnue.']);

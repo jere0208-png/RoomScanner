@@ -88,6 +88,16 @@ RCT_EXTERN_METHOD(restorePhoto:(NSString *)assetId
                   reject:(RCTPromiseRejectBlock)reject)
 @end
 
+/*
+  LE PLAN PAPIER — le scanner de documents d'iOS, la photothèque, et la
+  lecture des textes de la page (voir RoomScanLecturePlan.swift).
+*/
+@interface RCT_EXTERN_MODULE(RoomScanLecturePlan, NSObject)
+RCT_EXTERN_METHOD(disponible:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(scanner:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(importer:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+@end
+
 @interface RCT_EXTERN_MODULE(RoomScanHeading, NSObject)
 RCT_EXTERN_METHOD(start:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(stop:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)

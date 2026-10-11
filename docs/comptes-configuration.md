@@ -71,6 +71,27 @@ qu'une feuille web sécurisée.
    (HMAC) par le schéma `echoplan://google`, livrée uniquement à la feuille
    web qui l'a demandée.
 
+## 4. Lecture des plans papier (10 min, après le 2)
+
+La photo d'un plan papier est lue par Claude (Anthropic) au travers de votre
+serveur : la clé reste sur le serveur, jamais dans l'app.
+
+1. **Créer la clé** : console.anthropic.com → API Keys → Create Key. Ajouter un
+   moyen de paiement (Billing) : une lecture coûte quelques centimes avec
+   Sonnet.
+2. **La poser** dans `config-echoplan.php`, sur le serveur :
+   `const ANTHROPIC_CLE = 'sk-ant-…';` — avec, au besoin,
+   `ANTHROPIC_MODELE` (`claude-sonnet-5-5` par défaut, `claude-opus-5-5` lit
+   mieux les plans chargés pour cinq fois plus) et `LECTURES_PAR_JOUR` (20).
+3. **Mettre la base à jour** : phpMyAdmin → Importer → `migration-lecture.sql`
+   (trois colonnes sur `comptes` : le compte des lectures et le plafond du
+   jour).
+4. **Téléverser** `lecture-plan.php` à côté de `api.php`, et le nouvel
+   `api.php`.
+
+Sans clé, l'app dit « La lecture de plans n'est pas encore activée sur le
+serveur » : rien ne casse.
+
 ## La page vitrine (2 min)
 
 `server/echoplan.html` est la page de présentation de l'app : une seule

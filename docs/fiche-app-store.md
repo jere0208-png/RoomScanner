@@ -126,6 +126,10 @@ des trous de configuration. À cocher un par un.
 - [ ] **L'adresse de la politique de confidentialité** : App Store Connect exige
       une URL publique. Publier le texte de l'écran « Confidentialité des
       données » sur bourseur.fr/echoplan/, et renseigner l'adresse.
+- [ ] **La lecture des plans papier** dans les étiquettes : la photo d'une
+      feuille part sur le serveur, puis chez Anthropic, qui la garde un temps
+      limité (contrôles de sécurité) — à déclarer en « Photos ou vidéos »,
+      usage « Fonctionnalités de l'app », non liée à l'identité, sans pistage.
 - [ ] **Les étiquettes de confidentialité** (« App Privacy ») : l'e-mail et le
       prénom du compte, l'identifiant Apple si l'on se connecte avec Apple —
       ET **les plans** (« Contenu utilisateur », lié à l'identité) : quand on

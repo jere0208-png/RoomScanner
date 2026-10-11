@@ -14285,6 +14285,115 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Lire un plan papier
+
+Relevé du patron : « une grosse mise à jour strictement fonctionnelle :
+lecture de plan papier, à la place de "Comment ça marche" dans l'accueil. On
+ouvre une page photo qui demande de scanner un plan papier de manière
+moderne. Si la vision détecte le plan, il le scanne, et crée à partir de
+celui-ci un plan 2D. Les symboles, les cotes, etc. : tout doit être lu
+parfaitement. Le système doit être fiable et facilement utilisable. Si les
+symboles reconnus ne sont pas les nôtres, on les convertit à notre manière. »
+
+Décidé avec lui : la lecture se fait par Claude (vision) au travers du
+serveur, et elle est réservée au Pro, avec une lecture d'essai offerte.
+
+**La chaîne, de la feuille au plan.**
+
+1. **L'accueil** : la tuile « Lire un plan papier » remplace « Comment ça
+   marche ». Le film se revoit depuis le profil (« Revoir la
+   présentation »).
+2. **La page** (`LecturePlanScreen`) : quatre conseils en images (éclairage,
+   feuille entière, cotes lisibles, symboles), puis deux portes.
+   - **« Scanner le plan »** ouvre le scanner de documents d'iOS
+     (`VNDocumentCameraViewController`) : il détecte la feuille, déclenche
+     seul quand elle est nette, et la rend redressée.
+   - **« Importer une photo »** prend un plan déjà photographié.
+3. **Sur le téléphone** (`RoomScanLecturePlan.swift`) :
+   - la page est réduite à 2000 pixels, en JPEG 82 % ;
+   - ses textes sont lus par Apple Vision (`VNRecognizeTextRequest`, sans
+     correction de langue), avec leur position.
+4. **Sur le serveur** (`api.php` → `lire_plan`, `lecture-plan.php`) :
+   - Claude reçoit l'image et les textes de l'iPhone, avec la consigne de
+     lecture : murs sur leur axe, ouvertures, cotes avec ce qu'elles
+     mesurent, pièces, symboles, liens de commande ;
+   - il répond par l'outil `plan_lu`, au schéma imposé : toujours un JSON
+     valide ;
+   - la clé n'est que sur le serveur, et ni l'image ni la lecture n'y sont
+     gardées.
+5. **La reconstruction** (`geometry/lecturePlan`) : voir plus bas.
+6. **Ce qu'on a lu**, avant de rien créer :
+   - le plan dessiné, et sa confiance (« Lecture sûre », « à vérifier »,
+     « fragile ») ;
+   - les cotes qui le tiennent, celles qui ont été écartées, les murs sans
+     cote qui les confirme (en orange) ;
+   - les symboles convertis (« socket → Prise 16 A ») et ceux qu'on n'a pas
+     reconnus ;
+   - « Créer le plan » l'ouvre comme un relevé qui vient de finir
+     (`ouvrirPlanLu`) : non enregistré, sous le filet du brouillon.
+
+**La reconstruction : les cotes font le plan, pas le dessin.** Une vision
+situe les choses à quelques millièmes près, soit cinq centimètres sur dix
+mètres. Ce qui est juste sur une feuille, ce sont ses cotes.
+- **L'orientation** : la photo se redresse sur la direction dominante des
+  murs.
+- **L'échelle** : la médiane des cotes lues. Une cote sans unité prend celle
+  qui colle au dessin (« 320 » se lit en centimètres), et une cote que le
+  dessin dément s'écarte.
+- **La trame** : les murs se rangent sur des axes. Un mur dessiné par ses
+  deux nus redevient un mur.
+- **Les cotes deviennent des équations** entre axes ET épaisseurs :
+  `(X_j + σj·T_j) − (X_i + σi·T_i) = d`. Une cote de pièce va de nu
+  intérieur à nu intérieur, un hors-tout d'un nu extérieur à l'autre, une
+  chaîne d'axe en axe — selon ce que l'IA a dit, sinon selon l'usage de
+  l'architecte (dans une pièce, de nu à nu). Les épaisseurs se trouvent
+  avec les positions.
+- **Les moindres carrés** placent tout. Une cote qui contredit les autres est
+  relue (ce qu'elle mesure), sinon écartée : à chaque tour, on garde la trame
+  la plus vraisemblable (épaisseurs de 3 à 65 cm, axes près du dessin).
+- **Les ouvertures** se posent sur leur mur, à leur largeur cotée ou à la
+  largeur de vantail du commerce la plus proche. **Les pièces** se
+  referment et prennent leur nom (« SÉJOUR » → « Séjour », « WC » reste
+  « WC »).
+- **Les symboles se convertissent aux nôtres** (`convertirSymbole`) : une
+  table d'équivalences pour les conventions françaises, anglaises et
+  abrégées (« PC », « S », « VV », « DA », « socket », « downlight »,
+  « smoke detector », « TGBT »…). Le nombre de postes compose les
+  ensembles (deux prises : une double ; une RJ45 et sa prise : « RJ45 +
+  prise »). Ce qui n'est l'un d'aucun de nos appareils est dit, jamais
+  inventé.
+
+**Le banc : six cents plans** (`lectureplan.test.ts`). Des logements
+générés, lus comme une vision les lirait :
+- une photo de 40 à 110 pixels par mètre, de travers, parfois tournée d'un
+  quart de tour ;
+- des positions bruitées ;
+- des cotes dans toutes les écritures et toutes les références,
+  quelques-unes à l'unité mal comprise, d'autres mal lues ;
+- des murs rendus par leurs deux nus ;
+- des symboles nommés à la façon des autres.
+
+Ce qu'il exige :
+- 95 % des plans à 2 cm près en lecture propre ;
+- 90 % en lecture bruitée avec des cotes fausses ;
+- une confiance qui ne ment pas : un plan annoncé « sûr » est juste à 3 cm
+  près 98 fois sur 100 au moins.
+
+Aujourd'hui, 97 % et 92 %, et 99 % des plans « sûrs » sont justes.
+
+**Ce qui reste à faire côté serveur** (voir `docs/comptes-configuration.md`,
+point 4) : la clé Anthropic dans `config-echoplan.php`, la migration
+`migration-lecture.sql`, et `lecture-plan.php` à côté d'`api.php`.
+
+**La limite à connaître** : le serveur ne voit pas les reçus de l'App Store.
+Un abonné se déclare, et la lecture est plafonnée à 20 par compte et par
+jour (`LECTURES_PAR_JOUR`). L'essai, lui, est compté par le serveur.
+
+La confidentialité le dit : la photo d'un plan papier, et elle seule, part
+sur le serveur puis chez Anthropic.
+
+`lectureplan.test.ts`, `lectureplanecran.test.tsx`.
+
 ## La vue 3D de l'export, sans repères
 
 Relevé du patron : « dans la page export PDF, le bloc vue 3D, enlève les

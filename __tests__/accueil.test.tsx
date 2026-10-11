@@ -243,7 +243,7 @@ describe('le moulinet', () => {
     'Commencer le scan',
     'Dessiner un plan sans scanner',
     'Voir un exemple',
-    'Comment ça marche',
+    'Lire un plan papier',
   ];
   /** La carte colorée d'une tuile : la vue qui porte son fond. */
   const carte = (t: TestRenderer.ReactTestRenderer, label: string) =>
@@ -266,7 +266,7 @@ describe('le moulinet', () => {
     const t = monter();
     const h = (g: string) => style(carte(t, g)).height;
     const gauche = [h('Commencer le scan'), h('Voir un exemple')];
-    const droite = [h('Dessiner un plan sans scanner'), h('Comment ça marche')];
+    const droite = [h('Dessiner un plan sans scanner'), h('Lire un plan papier')];
     expect(gauche[0] + gauche[1]).toBe(droite[0] + droite[1]);
     expect(gauche[0]).not.toBe(droite[0]);
     // Le scan, geste principal, prend la grande tuile.
@@ -342,11 +342,16 @@ describe('le moulinet', () => {
     expect(st.saves).toHaveLength(0);
   });
 
-  it('« Comment ça marche » rejoue la présentation du premier lancement', () => {
-    usePremieresFois.setState({ charge: true, vues: ['accueil', 'allumer'] });
+  /*
+    LE FILM A QUITTÉ L'ACCUEIL — sa tuile est devenue « Lire un plan papier »
+    (relevé du patron) ; il se revoit depuis le profil (voir
+    `lectureplanecran.test.tsx`).
+  */
+  it('« Lire un plan papier » ouvre sa page', () => {
     const t = monter();
-    act(() => bouton(t, 'Comment ça marche').props.onPress());
-    expect(usePremieresFois.getState().vues).toEqual(['allumer']);
+    act(() => bouton(t, 'Lire un plan papier').props.onPress());
+    expect(useScanStore.getState().screen).toBe('lecture');
+    expect(usePremieresFois.getState()).toBeDefined();
   });
 });
 
