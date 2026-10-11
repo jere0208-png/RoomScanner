@@ -25,6 +25,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useScanStore, type SavedScan } from '../store/scanStore';
+import { useUsage } from '../store/usage';
 import { astuce } from './astuce';
 
 const deux = (n: number) => String(n).padStart(2, '0');
@@ -92,9 +93,17 @@ export function useMaintenant(pas = 60000): number {
   return maintenant;
 }
 
-/** Range le travail de l'écran, et le dit quand il faut le dire. */
+/**
+ * Range le travail de l'écran, et le dit quand il faut le dire.
+ *
+ * LE PARTICULIER N'A RIEN À RANGER : son plan s'enregistre tout seul —
+ * relevé du patron, point 4 de la réflexion « grand public ». La mise de
+ * côté reste l'outil de l'électricien, qui retouche le dossier d'un client
+ * et décide, lui, quand la retouche devient le plan remis.
+ */
 export function rangerLeTravail(): void {
   const st = useScanStore.getState();
+  if (!useUsage.getState().modeElec && st.enregistrerAuto()) return;
   const id = st.currentSaveId;
   const sorte = st.mettreDeCote();
   if (sorte !== 'retouche' || !id) return;

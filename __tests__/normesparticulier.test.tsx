@@ -109,6 +109,15 @@ describe('le contrôle du plan', () => {
       .findAll((n) => typeof n.props.accessibilityLabel === 'string')
       .map((n) => n.props.accessibilityLabel as string);
     expect(etiquettes.some((l) => /devis|contr[ôo]le|NF C|norme/i.test(l))).toBe(false);
+    /*
+      MAIS LES DÉFAUTS DU RELEVÉ, OUI — relevé du patron, point 1 de la
+      réflexion « grand public » : le plan d'essai porte des alertes de
+      relevé ; le particulier les voit, sous un nom qui ne parle pas de
+      normes.
+    */
+    const alertesDeReleve = constatsDuControle(t).filter((c) => c.severity === 'alerte').length;
+    expect(alertesDeReleve).toBeGreaterThan(0);
+    expect(etiquettes).toContain(`Défauts du relevé — ${alertesDeReleve} à corriger`);
   });
 });
 

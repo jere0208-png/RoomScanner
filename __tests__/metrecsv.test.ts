@@ -94,22 +94,24 @@ describe('le métré en tableur', () => {
     expect(sejour).toBeDefined();
     const cases = sejour.split(';');
     expect(cases[1]).toBe('21,35');
-    expect(cases[2]).toBe('18,4');
-    expect(cases[3]).toBe('2,5');
-    // La surface murale se calcule : périmètre × hauteur, arrondie.
-    expect(cases[5]).toBe('46');
+    // La surface habitable n'est pas fournie : sa case reste vide.
+    expect(cases[2]).toBe('');
+    expect(cases[3]).toBe('18,4');
+    expect(cases[4]).toBe('2,5');
+    // Sans surface nette fournie, la murale retombe sur périmètre × hauteur.
+    expect(cases[6]).toBe('46');
     // Et jamais un point décimal nulle part dans le fichier.
     expect(csv()).not.toMatch(/\d\.\d/);
   });
 
   it('laisse vide ce qu’il ne sait pas, plutôt que d’écrire zéro', () => {
     const l = lignes().find((x) => x.startsWith('Dégagement;'))!;
-    expect(l).toBe('Dégagement;;;;2;');
+    expect(l).toBe('Dégagement;;;;;2;');
   });
 
   it('totalise les surfaces et le câble', () => {
     const l = lignes();
-    expect(l.some((x) => x === 'TOTAL;29,55;;;;')).toBe(true);
+    expect(l.some((x) => x === 'TOTAL;29,55;;;;;75')).toBe(true);
     expect(l.some((x) => x.startsWith('TOTAL;;;;;42,5'))).toBe(true);
   });
 
@@ -149,7 +151,7 @@ describe('le métré en tableur', () => {
       { name: 'Chambre "bleue"', area: 9, perimeter: 12, height: 2.5, walls: 4 },
     ];
     const l = buildMetreCsv('X', piege, LISTE).split('\r\n');
-    expect(l.some((x) => x.startsWith('"Cave ; réserve";4;8;2;4;16'))).toBe(true);
+    expect(l.some((x) => x.startsWith('"Cave ; réserve";4;;8;2;4;16'))).toBe(true);
     expect(l.some((x) => x.startsWith('"Chambre ""bleue""";9;'))).toBe(true);
   });
 

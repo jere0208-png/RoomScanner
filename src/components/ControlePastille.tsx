@@ -29,9 +29,16 @@ const D = 30;
 export function ControlePastille({
   alertes,
   commence = true,
+  releve = false,
   onPress,
 }: {
   alertes: number;
+  /**
+   * LE PARTICULIER NE PASSE PAS UN CONTRÔLE DE NORMES — relevé du patron,
+   * point 1 de la réflexion « grand public ». Pour lui, la pastille ne dit
+   * que les défauts du RELEVÉ : un contour ouvert, des murs en double.
+   */
+  releve?: boolean;
   /*
     L'INSTALLATION A-T-ELLE COMMENCÉ ?
 
@@ -113,7 +120,9 @@ export function ControlePastille({
       )}
       <TouchableOpacity
         accessibilityLabel={
-          !commence
+          releve
+            ? `Défauts du relevé — ${alertes} à corriger`
+            : !commence
             ? // Rien n'est encore posé : la pastille INVITE, elle ne juge
               // pas. Elle ouvre le même écran, qui dira quoi poser.
               'Contrôle des normes'

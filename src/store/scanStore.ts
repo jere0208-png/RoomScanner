@@ -1929,6 +1929,13 @@ interface ScanState {
    * gardées à côté de lui (`retouche`). Rien à perdre : `rien`.
    */
   mettreDeCote: () => 'rien' | 'nouveau' | 'retouche';
+  /**
+   * LE PLAN S'ENREGISTRE TOUT SEUL — relevé du patron, point 4 de la
+   * réflexion « grand public ». Écrit le plan dans la bibliothèque, comme
+   * « Enregistrer », s'il y a quelque chose à écrire ; rend `true` s'il l'a
+   * fait. Ni un plan vide, ni l'appartement d'exemple qu'on visite.
+   */
+  enregistrerAuto: () => boolean;
   /** Écrit dans le plan les modifications qui l'attendaient. */
   enregistrerRetouche: (id: string) => void;
   /** Laisse le plan tel qu'il a été enregistré. */
@@ -6394,6 +6401,16 @@ export const useScanStore = create<ScanState>((set, get) => {
       // Rangé : le filet des trente secondes n'a plus rien à tenir.
       get().ecrireBrouillon();
       return sorte;
+    },
+
+    enregistrerAuto: () => {
+      const st = get();
+      if (!st.dirty || st.walls.length === 0) return false;
+      // L'exemple se visite : on n'en remplit pas la bibliothèque. Renommé,
+      // il est devenu le plan de quelqu'un — il s'enregistre alors.
+      if (!st.currentSaveId && st.scanName === NOM_EXEMPLE) return false;
+      get().commitCurrent();
+      return !get().dirty;
     },
 
     enregistrerRetouche: (id) => {

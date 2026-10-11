@@ -83,7 +83,7 @@ const RIEN = {
   plafond: 'Aucun appareil au plafond — posez-en en mode édition.',
   gaines: 'Posez le tableau sur le plan pour tracer les gaines.',
   notes: 'Aucune note — écrivez-en en mode édition.',
-  photos: 'Aucune photo — prenez-en depuis un mur.',
+  photos: 'Aucune photo — en édition, touchez un mur puis « Photo ».',
   couleurs: 'Aucune couleur relevée sur ce plan.',
   reperes: 'Aucun appareil posé — passez en mode édition, sur le plan.',
   volumes: 'Aucune baignoire ni douche relevée.',

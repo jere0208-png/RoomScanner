@@ -44,6 +44,8 @@ import {
 } from '../geometry/nfc15100';
 import { fixtureMarks, multiWire, schemaRows } from '../geometry/schema';
 import { useModeElec } from '../store/usage';
+import { useReglagesTravaux } from '../store/reglagesTravaux';
+import { travauxDesPieces } from '../geometry/travaux';
 import type { Fixture } from '../geometry/electrical';
 import { planRoutes } from '../geometry/elecplan';
 import { floorsOf, useScanStore } from '../store/scanStore';
@@ -187,6 +189,7 @@ export function ExportScreen() {
 const EXPORT_ICONS = {
   vues3d: SOLAIRES.vues3d,
   metre: SOLAIRES.metre,
+  achats: SOLAIRES.panier,
   plafond: SOLAIRES.plafond,
   cotes2d: SOLAIRES.cotes2d,
   cotes3d: SOLAIRES.cotes3d,
@@ -204,6 +207,18 @@ const styles = getStyles(c);
 
   const [include3D, setInclude3D] = useState(true);
   const [includeMetre, setIncludeMetre] = useState(true);
+  /*
+    « CE QU'IL FAUT ACHETER » DANS LE DOSSIER — relevé du patron, point 3 de
+    la réflexion « grand public ». Coché d'office pour le particulier, qui
+    refait son logement ; pas pour l'électricien, dont le client ne lui a
+    pas demandé de compter les pots de peinture.
+  */
+  const [includeAchats, setIncludeAchats] = useState(!modeElec);
+  const reglages = useReglagesTravaux();
+  useEffect(() => {
+    if (!reglages.charge) reglages.charger();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [measures2D, setMeasures2D] = useState(true);
   /**
    * Plan des gaines : le tracé du tableau à chaque appareil, celui-là même
@@ -324,6 +339,24 @@ const styles = getStyles(c);
   */
 
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
+  /** Les pièces des achats : le même calcul que la feuille « Travaux ». */
+  const piecesTravaux = useMemo(
+    () =>
+      travauxDesPieces(
+        parts,
+        openings,
+        (id, rang) => rooms.find((r) => r.id === id)?.name || `Pièce ${rang + 1}`,
+      ),
+    [parts, openings, rooms],
+  );
+  const achatsDuDossier = (oui: boolean) =>
+    oui && piecesTravaux.length > 0
+      ? {
+          pieces: piecesTravaux,
+          hypotheses: reglages.hypotheses,
+          prix: reglages.avecPrix ? reglages.prix : null,
+        }
+      : null;
   const placement = useMemo(
     () => fixturePlacement(fixtures, walls, roomInputsOf(rooms, parts)),
     [fixtures, walls, rooms, parts],
@@ -501,6 +534,8 @@ const styles = getStyles(c);
         deviceNames: noms,
         client,
         address,
+        // Le particulier relève son propre logement : le cartouche le dit.
+        particulier: !modeElec,
       },
       include3D,
       {
@@ -522,6 +557,7 @@ const styles = getStyles(c);
         surfaces: showSurfaces,
         textures: showTextures,
         metre: includeMetre,
+        achats: achatsDuDossier(includeAchats),
         ...feuillesElevations(elevations, cotesElec),
       },
     ] as const;
@@ -556,6 +592,10 @@ const styles = getStyles(c);
     measures2D,
     measures3D,
     includeMetre,
+    includeAchats,
+    reglages.hypotheses,
+    reglages.avecPrix,
+    reglages.prix,
     elevations,
     cotesElec,
     gaines,
@@ -579,6 +619,7 @@ const styles = getStyles(c);
     return sommaireDuDossier(scan, true, {
       ...opts,
       metre: true,
+      achats: achatsDuDossier(true),
       schemas: schemas ?? null,
       ...feuillesElevations(true, true),
     });
@@ -771,8 +812,19 @@ const styles = getStyles(c);
           <View style={styles.dossier}>
             {(
               [
-                ['Client', client, 'Nom du client', (t: string) => setClientInfo(t, address)],
-                ['Chantier', address, 'Adresse du chantier', (t: string) => setClientInfo(client, t)],
+                /*
+                  LE PARTICULIER N'A NI CLIENT NI CHANTIER — relevé du patron,
+                  point 1 de la réflexion « grand public ».
+                */
+                ...(modeElec
+                  ? [
+                      ['Client', client, 'Nom du client', (t: string) => setClientInfo(t, address)],
+                      ['Chantier', address, 'Adresse du chantier', (t: string) => setClientInfo(client, t)],
+                    ]
+                  : [
+                      ['Propriétaire', client, 'Nom du propriétaire', (t: string) => setClientInfo(t, address)],
+                      ['Adresse', address, 'Adresse du logement', (t: string) => setClientInfo(client, t)],
+                    ]),
               ] as [string, string, string, (t: string) => void][]
             ).map(([titre, valeur, invite, poser]) => (
               <TouchableOpacity
@@ -845,11 +897,32 @@ const styles = getStyles(c);
             onChange={(v) => basculer(() => setIncludeMetre(v))}
           />
 
+          {/* -------------------------------------- ce qu'il faut acheter */}
+          {piecesTravaux.length > 0 && (
+            <Carte
+              icone={EXPORT_ICONS.achats}
+              titre="Ce qu’il faut acheter"
+              dit={
+                reglages.avecPrix
+                  ? 'Peinture, sol et plinthes, pièce par pièce — avec le prix estimé.'
+                  : 'Peinture, sol et plinthes, pièce par pièce — aux réglages de « Travaux ».'
+              }
+              pages={pagesDe(includeAchats, combien(sommaire, 'achats'), combien(avecTout, 'achats'))}
+              actif={includeAchats}
+              label="Ce qu’il faut acheter"
+              onChange={(v) => basculer(() => setIncludeAchats(v))}
+            />
+          )}
+
           {/* ---------------------------------------------- les vues 3D */}
           <Carte
             icone={EXPORT_ICONS.vues3d}
             titre="Vues 3D"
-            dit="Le logement en perspective : le client s’y projette d’un regard."
+            dit={
+              modeElec
+                ? 'Le logement en perspective : le client s’y projette d’un regard.'
+                : 'Le logement en perspective : on s’y projette d’un regard.'
+            }
             pages={pagesDe(include3D, combien(sommaire, 'perspective'), Math.max(1, vues.length))}
             actif={include3D}
             label="Vues 3D"
@@ -924,7 +997,11 @@ const styles = getStyles(c);
           <Carte
             icone={EXPORT_ICONS.elevations}
             titre="Murs de face"
-            dit="Chaque mur vu de face, coté : là où l’on perce, à la bonne hauteur."
+            dit={
+              modeElec
+                ? 'Chaque mur vu de face, coté : là où l’on perce, à la bonne hauteur.'
+                : 'Chaque mur vu de face, coté, avec ses portes et ses fenêtres.'
+            }
             pages={pagesDe(murs !== null, combien(sommaire, 'elevation'), combien(avecTout, 'elevation'))}
             actif={murs !== null}
             label="Murs de face"

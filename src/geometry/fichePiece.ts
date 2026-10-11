@@ -26,6 +26,7 @@ import { pointInPolygon } from './appearance';
 import { FIXTURES, type Fixture } from './electrical';
 import { frCategory } from './furniture';
 import { bearingName } from './naming';
+import { baiesDeLaPiece, mursNetsDe } from './travaux';
 import {
   murDeLOuverture,
   pointOnSeg,
@@ -283,8 +284,16 @@ export function ficheDeLaPiece(p: {
   const fenetres = siennes.filter((o) => o.type === 'window');
   const aireOuv = (o: WallSeg) => segLength(o) * o.height;
   const surfaceVitree = fenetres.reduce((s, o) => s + aireOuv(o), 0);
+  /*
+    LES MURS À PEINDRE, LE MÊME CHIFFRE QU'AILLEURS — relevé du patron, point
+    5 de la réflexion « grand public » : le tour intérieur sur la hauteur,
+    baies déduites (`mursNetsDe`). Sans contour fermé, la somme des murs.
+  */
   const mursBruts = p.murs.reduce((s, w) => s + segLength(w) * w.height, 0);
-  const mursNets = Math.max(0, mursBruts - siennes.reduce((s, o) => s + aireOuv(o), 0));
+  const mursNets =
+    p.contour.length >= 3
+      ? mursNetsDe(p.contour, hauteur, baiesDeLaPiece({ walls: p.murs }, p.ouvertures))
+      : Math.max(0, mursBruts - siennes.reduce((s, o) => s + aireOuv(o), 0));
   const perimetre =
     p.contour.length >= 3
       ? p.contour.reduce((s, q, i) => {

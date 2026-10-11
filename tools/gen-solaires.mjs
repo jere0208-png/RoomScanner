@@ -271,6 +271,7 @@ const CHOIX = {
   grille: ['widget-4-bold', 'widget-5-bold'],
   goutte: ['waterdrop-bold'],
   oeil: ['eye-bold'],
+  panier: ['cart-large-2-bold', 'cart-3-bold'],
 };
 
 /*

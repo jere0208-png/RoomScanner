@@ -48,6 +48,7 @@ const CADENAS =
 const ICONE: Record<FeuilleDuDossier['genre'], string> = {
   plan: SOLAIRES.cotes2d,
   metre: SOLAIRES.metre,
+  achats: SOLAIRES.panier,
   existant: SOLAIRES.elec,
   gaines: SOLAIRES.gaines,
   perspective: SOLAIRES.vues3d,
@@ -65,6 +66,7 @@ export function resumeDuDossier(sommaire: FeuilleDuDossier[]): string {
   };
   dire(n('plan'), 'plan', 'plans');
   dire(n('metre'), 'métré', 'métrés');
+  dire(n('achats'), 'liste d’achats', 'listes d’achats');
   dire(n('perspective'), 'vue 3D', 'vues 3D');
   dire(n('elevation'), 'mur de face', 'murs de face');
   dire(n('gaines'), 'plan des gaines', 'plans des gaines');

@@ -24,6 +24,7 @@ import { HAUTEUR_HABITABLE } from '../../geometry/fichePiece';
 import { radius, shadowCard, useTheme, type Palette } from '../../theme';
 import { SOLAIRES } from '../../ui/solaires';
 import { haptic } from '../../ui/haptic';
+import { useModeElec } from '../../store/usage';
 
 const fr = (v: number, d = 2) => v.toFixed(d).replace('.', ',');
 const CHECK = 'M9.5 16.2 5.8 12.5l-1.4 1.4 5.1 5.1 10.6-10.6-1.4-1.4z';
@@ -44,7 +45,8 @@ export function FichePieceSheet({
 }) {
   const c = useTheme();
   const s = getStyles(c);
-  const aPoser = fiche ? fiche.circuits.filter((k) => !k.deja && k.pose) : [];
+  const modeElec = useModeElec();
+  const aPoser = fiche ?fiche.circuits.filter((k) => !k.deja && k.pose) : [];
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={s.fond} onPress={onClose}>
@@ -152,7 +154,13 @@ export function FichePieceSheet({
                 </>
               )}
 
-              {fiche.circuits.length > 0 && (
+              {/*
+                LES CIRCUITS, POUR L'ÉLECTRICIEN SEULEMENT — relevé du patron,
+                point 1 de la réflexion « grand public » : un particulier
+                lisait « Circuits à prévoir » et un bouton « Poser » sous la
+                fiche de son salon.
+              */}
+              {modeElec && fiche.circuits.length > 0 && (
                 <>
                   <Text style={s.section}>Circuits à prévoir</Text>
                   <View style={s.bloc} testID="circuits-a-prevoir">

@@ -102,11 +102,30 @@ export function perimetre(pts: Pt[]): number {
 }
 
 /** Les baies d'une pièce : celles posées sur l'un de SES murs. */
-export function baiesDeLaPiece(part: RoomPart, baies: WallSeg[]): WallSeg[] {
+export function baiesDeLaPiece(part: Pick<RoomPart, 'walls'>, baies: WallSeg[]): WallSeg[] {
   return baies.filter((o) => {
     const milieu = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
     return part.walls.some((w) => distanceAuSegment(milieu, w.a, w.b) < PRES_DU_MUR);
   });
+}
+
+/**
+ * LA SURFACE MURALE NETTE D'UNE PIÈCE — UN SEUL CALCUL.
+ *
+ * Relevé du patron, point 5 de la réflexion « grand public » : le même plan
+ * donnait trois surfaces de murs — le tableur ne déduisait pas les baies, le
+ * PDF sommait les axes des murs, la fiche et « Travaux » le contour. Ce que
+ * l'on peint, c'est le TOUR INTÉRIEUR de la pièce sur sa hauteur, moins
+ * chaque baie à sa hauteur (jamais plus haute que le mur). L'écran, la
+ * fiche, le PDF et le tableur passent tous par ici.
+ */
+export function mursNetsDe(contour: Pt[], hauteur: number, baies: WallSeg[]): number {
+  if (contour.length < 3 || !(hauteur > 0)) return 0;
+  const trous = baies.reduce(
+    (t, o) => t + Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z) * Math.min(o.height || 0, hauteur),
+    0,
+  );
+  return Math.max(0, perimetre(contour) * hauteur - trous);
 }
 
 /** Le métré des travaux, pièce par pièce. Les pièces sans contour sont laissées. */
@@ -122,14 +141,11 @@ export function travauxDesPieces(
     const hauteur = roomHeight(part.walls) || HAUTEUR_PAR_DEFAUT;
     const tour = perimetre(surface.pts);
     const siennes = baiesDeLaPiece(part, baies);
-    let trous = 0;
     let seuils = 0;
     let portes = 0;
     let fenetres = 0;
     for (const o of siennes) {
       const largeur = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z);
-      // Une baie ne monte pas plus haut que le mur qui la porte.
-      trous += largeur * Math.min(o.height || 0, hauteur);
       if (o.type === 'window') fenetres += 1;
       else {
         // Porte ou passage : on y marche, la plinthe s'arrête.
@@ -144,7 +160,8 @@ export function travauxDesPieces(
       plafond: arrondi(surface.area),
       perimetre: arrondi(tour),
       hauteur: arrondi(hauteur, 0.01),
-      murs: arrondi(Math.max(0, tour * hauteur - trous)),
+      // Une baie ne monte pas plus haut que le mur qui la porte.
+      murs: arrondi(mursNetsDe(surface.pts, hauteur, siennes)),
       plinthes: arrondi(Math.max(0, tour - seuils)),
       portes,
       fenetres,
@@ -188,6 +205,56 @@ export function achats(pieces: PieceTravaux[], h: HypothesesTravaux = HYPOTHESES
       barres: plinthes > 0 ? Math.ceil(plinthes / h.barre - 1e-9) : 0,
     },
   };
+}
+
+/**
+ * LES PRIX, QUAND ON VEUT UN ORDRE D'IDÉE — relevé du patron : « un prix
+ * estimé si on le souhaite ». Des prix d'unité, pas de m² : c'est ce qu'on
+ * lit sur l'étiquette en magasin, et ce qu'on corrige d'un coup d'œil.
+ */
+export interface PrixTravaux {
+  /** Un pot de peinture murale (€). */
+  potMurs: number;
+  /** Un pot de peinture de plafond (€). */
+  potPlafond: number;
+  /** Un paquet de revêtement de sol (€). */
+  paquetSol: number;
+  /** Une barre de plinthe (€). */
+  barrePlinthe: number;
+}
+
+/**
+ * Des prix courants d'entrée de gamme en grande surface de bricolage, en
+ * 2026 — un ordre d'idée, que chacun remplace par les siens.
+ */
+export const PRIX_INDICATIFS: PrixTravaux = {
+  potMurs: 35,
+  potPlafond: 30,
+  paquetSol: 30,
+  barrePlinthe: 6,
+};
+
+export interface CoutAchats {
+  murs: number;
+  plafonds: number;
+  sol: number;
+  plinthes: number;
+  total: number;
+}
+
+/** Ce que coûtent ces achats, à ces prix d'unité. */
+export function coutDesAchats(a: Achats, prix: PrixTravaux): CoutAchats {
+  const murs = a.murs.pots * prix.potMurs;
+  const plafonds = a.plafonds.pots * prix.potPlafond;
+  const sol = a.sol.paquets * prix.paquetSol;
+  const plinthes = a.plinthes.barres * prix.barrePlinthe;
+  return { murs, plafonds, sol, plinthes, total: murs + plafonds + sol + plinthes };
+}
+
+/** « 1 245 € » — un montant à la française, à l'euro près. */
+export function euros(v: number): string {
+  const entier = String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
+  return `${entier}\u00A0€`;
 }
 
 /** « 12,4 » — un nombre à la française, une décimale au plus. */

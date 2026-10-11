@@ -33,7 +33,9 @@ import { FichePieceSheet } from './result/FichePieceSheet';
 import { ficheDeLaPiece, type CircuitConseille } from '../geometry/fichePiece';
 import { ancrerElec } from '../geometry/viseur';
 import { TravauxSheet } from '../components/TravauxSheet';
-import { travauxDesPieces } from '../geometry/travaux';
+import { achats as achatsDe, coutDesAchats, travauxDesPieces } from '../geometry/travaux';
+import { surfacesHabitables } from '../geometry/habitable';
+import { useReglagesTravaux } from '../store/reglagesTravaux';
 import { LaserSheet } from './result/LaserSheet';
 import { ExportSheet } from './result/ExportSheet';
 import { FurnitureSheet } from './result/FurnitureSheet';
@@ -206,6 +208,12 @@ const SAUT = String.fromCharCode(10);
 /** Des listes vides STABLES : un `[]` écrit dans le rendu redessinerait le plan à chaque fois. */
 const SANS_PHOTOS: never[] = [];
 const SANS_NOTES: never[] = [];
+/**
+ * Le temps de calme après la dernière retouche avant d'enregistrer : assez
+ * pour qu'un glissé de mur ne s'écrive pas à chaque image, assez court pour
+ * qu'on ne perde rien en quittant l'app sur-le-champ.
+ */
+const ENREGISTREMENT_AUTO_MS = 1500;
 
 export function ResultScreen() {
   /**
@@ -1388,6 +1396,31 @@ export function ResultScreen() {
   useEffect(() => {
     if (rienACocher) useScanStore.getState().oublierArrivage();
   }, [rienACocher]);
+  /*
+    LE PLAN S'ENREGISTRE TOUT SEUL — relevé du patron, point 4 de la
+    réflexion « grand public ». Un plan neuf, jamais enregistré, s'effaçait
+    douze heures après qu'on l'avait quitté : le particulier, qui n'a jamais
+    vu un « Enregistrer » ailleurs que dans un traitement de texte, perdait
+    son relevé. Chaque retouche s'écrit maintenant dans la bibliothèque,
+    après un temps de calme. L'électricien garde sa mise de côté : il
+    retouche le dossier d'un client, et décide lui-même du plan remis.
+  */
+  useEffect(() => {
+    if (modeElec) return;
+    let minuterie: ReturnType<typeof setTimeout> | null = null;
+    const desabonner = useScanStore.subscribe((st) => {
+      if (!st.dirty) return;
+      if (minuterie) clearTimeout(minuterie);
+      minuterie = setTimeout(() => {
+        minuterie = null;
+        useScanStore.getState().enregistrerAuto();
+      }, ENREGISTREMENT_AUTO_MS);
+    });
+    return () => {
+      desabonner();
+      if (minuterie) clearTimeout(minuterie);
+    };
+  }, [modeElec]);
   /** L'exploration à la première personne est ouverte. */
   const [explorant, setExplorant] = useState(false);
   /* Le bilan du relevé qui vient d'aboutir : voir `BilanDuReleve`. */
@@ -1577,17 +1610,31 @@ export function ResultScreen() {
           const b = pts[(i + 1) % pts.length];
           tour += Math.hypot(b.x - a.x, b.z - a.z);
         }
+        const travaux = piecesTravaux.find((x) => x.roomId === p.roomId);
         return {
           name: nom || `Pièce ${parts.indexOf(p) + 1}`,
           area: p.surface?.area ?? null,
+          habitable: habitable.pieces.find((x) => x.roomId === p.roomId)?.habitable ?? null,
           perimeter: pts.length > 0 ? tour : null,
           height: roomHeight(p.walls),
           walls: p.walls.length,
+          // La surface murale de « Travaux » : la même qu'au PDF et à l'écran.
+          mursNets: travaux?.murs ?? null,
         };
       });
+      // Ce qu'il faut acheter suit le métré, aux réglages de « Travaux ».
+      const reglages = useReglagesTravaux.getState();
+      const a = achatsDe(piecesTravaux, reglages.hypotheses);
       await RoomScan.shareText(
         // Sans le mode Électricité, le fichier s'arrête au métré des pièces.
-        buildMetreCsv(scanName, metre, modeElec ? list : null),
+        buildMetreCsv(
+          scanName,
+          metre,
+          modeElec ? list : null,
+          piecesTravaux.length > 0
+            ? { achats: a, cout: reglages.avecPrix ? coutDesAchats(a, reglages.prix) : null }
+            : null,
+        ),
         metreFilename(scanName),
       );
     } catch (e: any) {
@@ -1944,6 +1991,11 @@ export function ResultScreen() {
     [parts, openings, rooms],
   );
   const surface = totalArea(parts);
+  /*
+    LA SURFACE HABITABLE DU LOGEMENT — relevé du patron, point 2 de la
+    réflexion « grand public » : le chiffre qu'on écrit dans une annonce.
+  */
+  const habitable = useMemo(() => surfacesHabitables(rooms, parts), [rooms, parts]);
   // Une seule pièce : l'outil de nommage n'a pas besoin de sélection.
   const targetRoomId =
     selectedRoomId ?? (rooms.length === 1 ? rooms[0].id : null);
@@ -2672,6 +2724,21 @@ export function ResultScreen() {
     setSelectedRoomId(null);
   };
 
+  /**
+   * PHOTOGRAPHIE UN MUR, SANS PASSER PAR L'ÉTABLI — relevé du patron, point
+   * 1 de la réflexion « grand public » : la photo d'un mur ne s'atteignait
+   * que par « Élec », que le particulier n'a pas. Elle se pose au milieu du
+   * mur, comme depuis l'établi.
+   */
+  const photographierLeMur = async (wallId: string) => {
+    const w = walls.find((x) => x.id === wallId);
+    if (!w) return;
+    const prise = await RoomScan.takePhoto();
+    if (!prise) return;
+    useScanStore.getState().addPhoto(wallId, segLength(w) / 2, prise.path, prise.asset);
+    haptic('succes');
+  };
+
   /** Ouvre un mur vu de face, sans rien y poser. */
   const openWallElevation = (wallId: string) => {
     setElecWallId(wallId);
@@ -2905,11 +2972,21 @@ export function ResultScreen() {
           },
         ]
       : []),
+    /*
+      LE CHIFFRE D'UNE ANNONCE, À CÔTÉ DU SOL — toujours pour le particulier,
+      et pour l'électricien dès qu'il diffère (un rampant, un garage).
+    */
+    ...(habitable.pieces.length > 0 &&
+    (!modeElec || Math.abs(habitable.total - habitable.sol) >= 0.5)
+      ? [{ value: fr(habitable.total), label: 'm² hab.' }]
+      : []),
     { value: fr(perimeter), label: 'm périm.' },
     ...(objects.length > 0
       ? [{ value: `${objects.length}`, label: 'meubles' }]
       : []),
-    ...(fixtures.length > 0
+    // L'appareillage ne se compte que pour l'électricien : le particulier
+    // ouvrant l'exemple lisait « 23 élec. » sans savoir de quoi.
+    ...(modeElec && fixtures.length > 0
       ? [{ value: `${fixtures.length}`, label: 'élec.' }]
       : []),
   ];
@@ -4191,6 +4268,17 @@ export function ResultScreen() {
               </>
             )}
             {/*
+              LE CONTRÔLE DU PLAN, AUSSI POUR LE PARTICULIER — relevé du
+              patron, point 1 de la réflexion « grand public » : un contour
+              ouvert, des murs en double, une hauteur aberrante ne se
+              disaient que par la pastille du contrôle électrique. Elle
+              paraît ici dès qu'un défaut de RELEVÉ est à corriger, et se tait
+              sinon : un plan juste n'a pas à porter un bouclier.
+            */}
+            {!modeElec && alertesDePlan > 0 && (
+              <ControlePastille releve alertes={alertesDePlan} onPress={() => setChecking(true)} />
+            )}
+            {/*
               L'ÉTAGE, contre le contrôle et le 2D/3D.
 
               La pastille n'apparaît QUE s'il y a plusieurs niveaux : un
@@ -5323,7 +5411,14 @@ export function ResultScreen() {
                       onPress: () => openWallElevation(selectedWall.id),
                     },
                   ]
-                : []),
+                : [
+                    {
+                      label: 'Photo',
+                      icone: SOLAIRES.image,
+                      sansMot: true,
+                      onPress: () => photographierLeMur(selectedWall.id),
+                    },
+                  ]),
               ...(selectedWall.libre
                 ? []
                 : [

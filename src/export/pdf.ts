@@ -42,6 +42,20 @@ import {
 } from './echelle';
 import { type Boite } from '../ui/ecarter';
 import { mixHex } from '../geometry/appearance';
+import {
+  achats as achatsDe,
+  baiesDeLaPiece,
+  coutDesAchats,
+  euros,
+  mursNetsDe,
+  nombre,
+  perimetre as perimetreDe,
+  type HypothesesTravaux,
+  type PieceTravaux,
+  type PrixTravaux,
+} from '../geometry/travaux';
+import { surfacesHabitables } from '../geometry/habitable';
+import type { PlafondDeLaPiece } from '../geometry/fichePiece';
 import { wallLabel, type DeviceName } from '../geometry/naming';
 import {
   FIXTURES,
@@ -306,6 +320,17 @@ export interface PdfOptions {
    * de schéma commande les PAGES, pas ce que le plan sait dire.
    */
   marks?: Map<string, string> | null;
+  /**
+   * « CE QU'IL FAUT ACHETER », sur sa feuille — relevé du patron, point 3 de
+   * la réflexion « grand public » : le calcul vivait à l'écran et n'allait
+   * nulle part. Les pièces retenues, les hypothèses du calcul et, quand on
+   * l'a demandé, les prix d'unité. Absent : pas de feuille.
+   */
+  achats?: {
+    pieces: PieceTravaux[];
+    hypotheses: HypothesesTravaux;
+    prix?: PrixTravaux | null;
+  } | null;
 }
 
 function bytesOf(s: string): Uint8Array {
@@ -913,6 +938,8 @@ function drawSheetChrome(
     /** À qui est le dossier : à défaut, on retombe sur le nom du fichier. */
     client?: string;
     address?: string;
+    /** Un particulier : son dossier est à un PROPRIÉTAIRE, pas à un client. */
+    particulier?: boolean;
   },
 ) {
   // Cadre de feuille
@@ -958,7 +985,12 @@ function drawSheetChrome(
    * renseigné, on garde le fichier plutôt qu'une ligne vide.
    */
   const aQui = [info.client, info.address].filter(Boolean).join(' · ');
-  d.text(aQui ? 'CLIENT' : 'FICHIER', cols[0] + 12, ty + 24, 6.5, GREY_LIGHT, {
+  /*
+    LE PARTICULIER N'A PAS DE CLIENT — relevé du patron, point 1 de la
+    réflexion « grand public » : le dossier parlait métier (« Client »,
+    « Chantier ») à quelqu'un qui relève son propre logement.
+  */
+  d.text(aQui ? (info.particulier ? 'PROPRIÉTAIRE' : 'CLIENT') : 'FICHIER', cols[0] + 12, ty + 24, 6.5, GREY_LIGHT, {
     align: 'left',
   });
   d.text(fitText(aQui || info.filename, 8, width(0)), cols[0] + 12, ty + 12, 8, GREY, {
@@ -1356,6 +1388,8 @@ interface SheetContext {
   /** Client et chantier, pour le cartouche. */
   client?: string;
   address?: string;
+  /** Un particulier : le cartouche dit « Propriétaire ». */
+  particulier?: boolean;
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
@@ -1508,6 +1542,7 @@ function planPage(
       project: name,
       filename,
       client: ctx.client,
+      particulier: ctx.particulier,
       address: ctx.address,
       sheetTitle: extra?.title ?? 'Plan d’ensemble coté',
       sheet,
@@ -3812,6 +3847,7 @@ function planPage(
     project: name,
     filename,
     client: ctx.client,
+    particulier: ctx.particulier,
     address: ctx.address,
     sheetTitle: titre,
     sheet,
@@ -3889,9 +3925,19 @@ function metrePage(ctx: SheetContext, sheet: string): string {
     const ext = part.surface
       ? roomExtent(part.surface.pts)
       : { width: 0, depth: 0 };
-    const perim = part.walls.reduce((s, x) => s + segLength(x), 0);
+    /*
+      UNE SEULE SURFACE DE MURS — relevé du patron, point 5 de la réflexion
+      « grand public » : le PDF sommait les AXES des murs quand l'écran et
+      le tableur prenaient le tour intérieur. Même calcul partout
+      (`mursNetsDe`), et le périmètre du contour, comme au tableur.
+    */
     const h = roomHeight(part.walls);
-    const nets = wallAreaM2(part.walls, ctx.openings);
+    const perim = part.surface
+      ? perimetreDe(part.surface.pts)
+      : part.walls.reduce((s, x) => s + segLength(x), 0);
+    const nets = part.surface
+      ? mursNetsDe(part.surface.pts, h, baiesDeLaPiece(part, ctx.openings))
+      : wallAreaM2(part.walls, ctx.openings);
     totalArea2 += part.surface?.area ?? 0;
     totalWalls += nets;
     totalPoints += eclairage.get(part.roomId)?.points ?? 0;
@@ -3944,9 +3990,38 @@ function metrePage(ctx: SheetContext, sheet: string): string {
     );
   }
 
-  y -= 26;
+  /*
+    LA SURFACE HABITABLE DU LOGEMENT — relevé du patron, point 2 de la
+    réflexion « grand public » : le chiffre d'une annonce, sous le total.
+  */
+  const hab = surfacesHabitables(
+    (ctx.rooms ?? []).map((r) => ({
+      id: r.id,
+      name: ctx.roomNames[r.id],
+      releve: (r as { releve?: { plafond?: PlafondDeLaPiece | null } | null }).releve,
+    })),
+    parts,
+  );
+  if (hab.pieces.length > 0) {
+    y -= 22;
+    d.text(`Surface habitable estimée : ${fr1(hab.total)} m²`, x0, y, 10, INK, { align: 'left', bold: true });
+    const exclues = hab.pieces.filter((p) => p.raison).length;
+    y -= 13;
+    d.text(
+      exclues > 0
+        ? 'Hors garage, cave, balcon et annexes, et hors hauteur sous 1,80 m. Estimation tirée du relevé, pas un mesurage certifié.'
+        : 'Estimation tirée du relevé (hauteur sous plafond d’au moins 1,80 m), pas un mesurage certifié.',
+      x0,
+      y,
+      8,
+      GREY,
+      { align: 'left' },
+    );
+  }
+
+  y -= 20;
   d.text(
-    'Surface murale nette : périmètre × hauteur, portes et fenêtres déduites.',
+    'Surface murale nette : tour intérieur × hauteur, portes et fenêtres déduites.',
     x0,
     y,
     8,
@@ -3958,8 +4033,112 @@ function metrePage(ctx: SheetContext, sheet: string): string {
     project: ctx.name,
     filename: ctx.filename,
     client: ctx.client,
+    particulier: ctx.particulier,
     address: ctx.address,
     sheetTitle: 'Métré par pièce',
+    sheet,
+    scaleLabel: null,
+  });
+  return d.stream();
+}
+
+/**
+ * « CE QU'IL FAUT ACHETER » — la feuille du particulier.
+ *
+ * Relevé du patron, point 3 de la réflexion « grand public » : le calcul de
+ * la peinture, du sol et des plinthes ne quittait pas l'écran. Il se remet
+ * ici comme une liste de courses : ce qu'on met dans le chariot, la mesure
+ * qui le justifie, le prix quand on l'a demandé — puis le détail pièce par
+ * pièce et les hypothèses, pour que le vendeur puisse refaire le compte.
+ */
+function achatsPage(
+  ctx: SheetContext,
+  sheet: string,
+  donnees: NonNullable<PdfOptions['achats']>,
+): string {
+  const d = new Draw();
+  const x0 = FRAME.x + 24;
+  const w = FRAME.w - 48;
+  const { pieces, hypotheses: h, prix } = donnees;
+  const a = achatsDe(pieces, h);
+  const cout = prix ? coutDesAchats(a, prix) : null;
+  let y = TETE - 22;
+  d.text('Ce qu’il faut acheter', x0, y + 24, 13, INK, { bold: true, align: 'left' });
+
+  const cols = (cout ? [0, 0.34, 0.52, 0.82] : [0, 0.4, 0.6]).map((f) => x0 + f * w);
+  const heads = ['Achat', 'Quantité', 'Mesure', ...(cout ? ['Prix estimé'] : [])];
+  for (let i = 0; i < heads.length; i++) d.text(heads[i], cols[i], y, 8.5, GREY, { align: 'left' });
+  y -= 6;
+  d.line(x0, y, x0 + w, y, 0.8, INK);
+  const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+  const rangs: [string, string, string, number][] = [
+    ['Peinture des murs', pluriel(a.murs.pots, 'pot'), `${nombre(a.murs.litres)} L pour ${nombre(a.murs.surface)} m²`, cout?.murs ?? 0],
+    ['Peinture des plafonds', pluriel(a.plafonds.pots, 'pot'), `${nombre(a.plafonds.litres)} L pour ${nombre(a.plafonds.surface)} m²`, cout?.plafonds ?? 0],
+    ['Revêtement de sol', pluriel(a.sol.paquets, 'paquet'), `${nombre(a.sol.avecChute)} m², chute comprise`, cout?.sol ?? 0],
+    ['Plinthes', pluriel(a.plinthes.barres, 'barre'), `${nombre(a.plinthes.metres)} m, seuils déduits`, cout?.plinthes ?? 0],
+  ];
+  for (const [nom, qte, mesure, euro] of rangs) {
+    y -= 22;
+    const cells = [nom, qte, mesure, ...(cout ? [`≈ ${euros(euro)}`] : [])];
+    for (let i = 0; i < cells.length; i++) {
+      d.text(fitText(cells[i], 10, (cols[i + 1] ?? x0 + w) - cols[i] - 6), cols[i], y, i === 0 ? 10 : 9.5, i === 0 ? INK : '#2A3340', {
+        align: 'left',
+        bold: i === 0 || i === 1,
+      });
+    }
+    d.line(x0, y - 8, x0 + w, y - 8, 0.4, GREY_LIGHT);
+  }
+  if (cout) {
+    y -= 26;
+    d.line(x0, y + 12, x0 + w, y + 12, 0.8, INK);
+    d.text('Total estimé', cols[0], y, 10.5, INK, { align: 'left', bold: true });
+    d.text(`≈ ${euros(cout.total)}`, cols[3], y, 10.5, INK, { align: 'left', bold: true });
+  }
+  y -= 22;
+  d.text(
+    fitText(
+      `${pluriel(h.couches, 'couche')} à ${nombre(h.rendement)} m²/L, pots de ${nombre(h.pot)} L · ` +
+        `${Math.round(h.chute * 100)} % de chute, paquets de ${nombre(h.paquet)} m² · plinthes de ${nombre(h.barre)} m.` +
+        (cout ? ' Prix indicatifs.' : ''),
+      8,
+      w,
+    ),
+    x0,
+    y,
+    8,
+    GREY,
+    { align: 'left' },
+  );
+
+  // Le détail, pièce par pièce.
+  y -= 34;
+  d.text('Pièce par pièce', x0, y, 11, INK, { bold: true, align: 'left' });
+  y -= 18;
+  const pc = [0, 0.3, 0.45, 0.62, 0.77, 0.9].map((f) => x0 + f * w);
+  const ph = ['Pièce', 'Sol (m²)', 'Murs nets (m²)', 'Plafond (m²)', 'Plinthes (m)', 'Baies'];
+  for (let i = 0; i < ph.length; i++) d.text(ph[i], pc[i], y, 8.5, GREY, { align: 'left' });
+  y -= 6;
+  d.line(x0, y, x0 + w, y, 0.8, INK);
+  for (const p of pieces) {
+    if (y < FRAME.y + 90) break;
+    y -= 19;
+    const cells = [p.nom, nombre(p.sol), nombre(p.murs), nombre(p.plafond), nombre(p.plinthes), String(p.portes + p.fenetres)];
+    for (let i = 0; i < cells.length; i++) {
+      d.text(i === 0 ? fitText(cells[i], 10, pc[1] - pc[0] - 6) : cells[i], pc[i], y, i === 0 ? 10 : 9.5, i === 0 ? INK : '#2A3340', {
+        align: 'left',
+        bold: i === 0,
+      });
+    }
+    d.line(x0, y - 7, x0 + w, y - 7, 0.4, GREY_LIGHT);
+  }
+
+  drawSheetChrome(d, {
+    project: ctx.name,
+    filename: ctx.filename,
+    client: ctx.client,
+    particulier: ctx.particulier,
+    address: ctx.address,
+    sheetTitle: 'Ce qu’il faut acheter',
     sheet,
     scaleLabel: null,
   });
@@ -4100,6 +4279,7 @@ function existantPage(
     project: ctx.name,
     filename: ctx.filename,
     client: ctx.client,
+    particulier: ctx.particulier,
     address: ctx.address,
     sheetTitle: 'Installation existante',
     sheet,
@@ -4461,6 +4641,7 @@ function unifilairePage(
     project: ctx.name,
     filename: ctx.filename,
     client: ctx.client,
+    particulier: ctx.particulier,
     address: ctx.address,
     sheetTitle: 'Schéma unifilaire',
     sheet,
@@ -4589,6 +4770,7 @@ function multifilairePage(
     project: ctx.name,
     filename: ctx.filename,
     client: ctx.client,
+    particulier: ctx.particulier,
     address: ctx.address,
     sheetTitle: 'Schéma multifilaire',
     sheet,
@@ -5193,6 +5375,7 @@ function elevationPage(
     project: ctx.name,
     filename: ctx.filename,
     client: ctx.client,
+    particulier: ctx.particulier,
     address: ctx.address,
     sheetTitle: `Élévation — ${quoi}`,
     sheet,
@@ -5530,6 +5713,7 @@ function threeDPage(
     project: ctx.name,
     filename: ctx.filename,
     client: ctx.client,
+    particulier: ctx.particulier,
     address: ctx.address,
     sheetTitle: showDims ? `${titre} cotée` : titre,
     sheet,
@@ -5575,6 +5759,8 @@ export interface ScanForPdf {
   /** À qui est ce dossier : le client, et l'adresse du chantier. */
   client?: string;
   address?: string;
+  /** Un particulier : le cartouche dit « Propriétaire », pas « Client ». */
+  particulier?: boolean;
   /**
    * Le nom de chaque appareil : « Prise plinthe 2 », sa pièce, son mur.
    * Calculé par l'écran d'export, qui connaît le placement et la boussole.
@@ -6330,7 +6516,7 @@ function ctxTemporaire(scan: ScanForPdf): SheetContext {
 
 /** Une feuille du dossier, telle que le sommaire la nomme. */
 export interface FeuilleDuDossier {
-  genre: 'plan' | 'metre' | 'existant' | 'gaines' | 'perspective' | 'elevation' | 'unifilaire' | 'multifilaire';
+  genre: 'plan' | 'metre' | 'achats' | 'existant' | 'gaines' | 'perspective' | 'elevation' | 'unifilaire' | 'multifilaire';
   titre: string;
 }
 
@@ -6405,6 +6591,7 @@ function planifierLeDossier(
     filename,
     client: scan.client,
     address: scan.address,
+    particulier: scan.particulier,
     walls: scan.walls,
     openings: scan.openings,
     objects: scan.objects,
@@ -6439,6 +6626,11 @@ function planifierLeDossier(
   ];
   if (withMetre) {
     feuilles.push({ genre: 'metre', titre: 'Métré', fabriquer: (n) => metrePage(ctx, n) });
+  }
+  // Les achats suivent le métré : ce qu'on a mesuré, puis ce qu'on achète.
+  const achats = opts.achats && opts.achats.pieces.length > 0 ? opts.achats : null;
+  if (achats) {
+    feuilles.push({ genre: 'achats', titre: 'Ce qu’il faut acheter', fabriquer: (n) => achatsPage(ctx, n, achats) });
   }
   /*
     L'EXISTANT VIENT JUSTE APRÈS LE MÉTRÉ.

@@ -26,6 +26,7 @@ import type {
   Differential,
   MaterialList,
 } from '../geometry/nfc15100';
+import { nombre, type Achats, type CoutAchats } from '../geometry/travaux';
 
 /** Le métré d'une pièce, tel que le plan le connaît. */
 export interface RoomMetre {
@@ -37,6 +38,16 @@ export interface RoomMetre {
   /** Hauteur sous plafond (m). */
   height: number | null;
   walls: number;
+  /**
+   * Surface habitable (m²) : sans garage ni annexe, sans ce qui est sous
+   * 1,80 m — voir `geometry/habitable`. Absente : la colonne reste vide.
+   */
+  habitable?: number | null;
+  /**
+   * Surface murale NETTE (m²), portes et fenêtres déduites — le chiffre de
+   * l'écran et du PDF (`mursNetsDe`). Absente : périmètre × hauteur.
+   */
+  mursNets?: number | null;
 }
 
 /** Une valeur de cellule : nombre à la française, ou texte échappé. */
@@ -86,6 +97,11 @@ export function buildMetreCsv(
    * son relevé est incomplet.
    */
   list: MaterialList | null,
+  /**
+   * « Ce qu'il faut acheter », avec son prix quand on l'a demandé : la
+   * section suit le métré, pour chiffrer ses travaux dans le même fichier.
+   */
+  travaux?: { achats: Achats; cout?: CoutAchats | null } | null,
 ): string {
   const out: string[] = [];
   const section = (titre: string, entete: string[]) => {
@@ -100,23 +116,54 @@ export function buildMetreCsv(
   section('MÉTRÉ PAR PIÈCE', [
     'Pièce',
     'Surface (m²)',
+    'Surface habitable (m²)',
     'Périmètre (m)',
     'Hauteur (m)',
     'Murs',
-    'Surface murale (m²)',
+    'Surface murale nette (m²)',
   ]);
+  /*
+    LA SURFACE MURALE EST NETTE, comme partout ailleurs — relevé du patron,
+    point 5 de la réflexion « grand public ». Elle ne déduisait pas les
+    menuiseries, quand le PDF, la fiche et « Travaux » les déduisaient : le
+    même plan donnait deux chiffres, et l'on ne savait plus lequel croire.
+  */
+  const murale = (p: RoomMetre) =>
+    p.mursNets ?? (p.perimeter !== null && p.height !== null ? p.perimeter * p.height : null);
   for (const p of pieces) {
-    // La surface murale : ce qu'on peint, ce qu'on saigne, ce qu'on doublage.
-    // Elle ne déduit pas les menuiseries — un devis les reprend à part, et
-    // les déduire ici donnerait un chiffre qu'on ne sait pas d'où il sort.
-    const murale =
-      p.perimeter !== null && p.height !== null ? p.perimeter * p.height : null;
     out.push(
-      ligne([p.name, p.area, p.perimeter, p.height, p.walls, murale]),
+      ligne([p.name, p.area, p.habitable ?? null, p.perimeter, p.height, p.walls, murale(p)]),
     );
   }
   const totalSol = pieces.reduce((t, p) => t + (p.area ?? 0), 0);
-  out.push(ligne(['TOTAL', totalSol, '', '', '', '']));
+  const avecHabitable = pieces.some((p) => typeof p.habitable === 'number');
+  const totalHabitable = pieces.reduce((t, p) => t + (p.habitable ?? 0), 0);
+  const totalMurs = pieces.reduce((t, p) => t + (murale(p) ?? 0), 0);
+  out.push(
+    ligne(['TOTAL', totalSol, avecHabitable ? totalHabitable : '', '', '', '', totalMurs > 0 ? totalMurs : '']),
+  );
+
+  // ------------------------------------------------- ce qu'il faut acheter
+  if (travaux) {
+    const { achats: a, cout } = travaux;
+    section('CE QU’IL FAUT ACHETER', [
+      'Achat',
+      'Quantité',
+      'Unité',
+      'Mesure',
+      ...(cout ? ['Prix estimé (€)'] : []),
+    ]);
+    const rangs: [string, number, string, string, number][] = [
+      ['Peinture des murs', a.murs.pots, 'pots', `${nombre(a.murs.litres)} L pour ${nombre(a.murs.surface)} m²`, cout?.murs ?? 0],
+      ['Peinture des plafonds', a.plafonds.pots, 'pots', `${nombre(a.plafonds.litres)} L pour ${nombre(a.plafonds.surface)} m²`, cout?.plafonds ?? 0],
+      ['Revêtement de sol', a.sol.paquets, 'paquets', `${nombre(a.sol.avecChute)} m², chute comprise`, cout?.sol ?? 0],
+      ['Plinthes', a.plinthes.barres, 'barres', `${nombre(a.plinthes.metres)} m`, cout?.plinthes ?? 0],
+    ];
+    for (const [nom, qte, unite, mesure, prix] of rangs) {
+      out.push(ligne([nom, qte, unite, mesure, ...(cout ? [prix] : [])]));
+    }
+    if (cout) out.push(ligne(['TOTAL', '', '', '', cout.total]));
+  }
   // Sans le mode : le métré des pièces, et rien d'autre. Même sortie que le
   // fichier complet — BOM compris, sans quoi Excel lit mal les accents.
   if (!list) return `﻿${out.join('\r\n')}\r\n`;

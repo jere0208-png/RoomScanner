@@ -14285,6 +14285,63 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le plan du particulier : surface habitable, achats chiffrés, enregistrement automatique
+
+Relevé du patron, après l'analyse du système de plans vu par un utilisateur
+lambda : « fais les points 1 à 5 ».
+
+**1. Le particulier ne voit plus l'établi de l'électricien.**
+- La fiche d'une pièce ne propose « Circuits à prévoir » qu'en mode
+  électricité (`FichePieceSheet`).
+- Le bandeau ne compte plus les appareils (« élec. ») hors mode électricité.
+- **Photo d'un mur** : en édition, un mur porte « Photo » à la place
+  d'« Élec » ; la photo se pose au milieu du mur (`photographierLeMur`). Le
+  calque Photos vide renvoie à ce geste.
+- **Défauts du relevé** : quand le relevé a un défaut (contour ouvert, murs
+  en double…), une pastille bouclier « Défauts du relevé — N à corriger »
+  ouvre le même contrôle, sans rien d'électrique (`ControlePastille`,
+  propriété `releve`). Plan juste : pas de pastille.
+- **Dossier PDF** : « Propriétaire » et « Adresse du logement » au lieu de
+  « Client » et « Chantier » ; le cartouche dit PROPRIÉTAIRE ; les vues 3D et
+  les murs de face ne parlent plus de client ni de perçage.
+
+**2. La surface habitable du logement** (`geometry/habitable.ts`) : pièce par
+pièce, garage, cave, cellier, balcon, terrasse, véranda et combles exclus ;
+sous un rampant relevé au LiDAR, seule la part à 1,80 m ou plus ; une pièce
+plus basse que 1,80 m, exclue. Elle s'affiche :
+- au bandeau, cellule « m² hab. » (toujours pour le particulier ; pour
+  l'électricien quand elle diffère du sol) ;
+- au métré du PDF, sous le total, avec la mention « estimation tirée du
+  relevé, pas un mesurage certifié » ;
+- au tableur, colonne « Surface habitable (m²) » et son total.
+
+**3. « Ce qu'il faut acheter », réglé, chiffré et exporté.**
+- La feuille « Travaux » ouvre **Régler le calcul** : couches, rendement,
+  pot, chute, paquet, plinthe, par crans pris en rayon ; **Estimer le
+  prix** ajoute un prix par achat et un **total estimé**, à des prix d'unité
+  réglables (35 € le pot, 30 € le pot de plafond, 30 € le paquet, 6 € la
+  plinthe au départ). Réglages gardés sur l'appareil
+  (`store/reglagesTravaux`).
+- Le **PDF** a sa feuille « Ce qu'il faut acheter » après le métré : la
+  liste de courses, le total, les hypothèses, puis pièce par pièce
+  (carte d'export cochée d'office pour le particulier, icône panier).
+- Le **tableur** porte la section « CE QU'IL FAUT ACHETER ».
+
+**4. Le plan s'enregistre tout seul** (particulier) : 1,5 s après la
+dernière retouche (`enregistrerAuto`), et en quittant le plan — plus de
+plan neuf effacé au bout de 12 h. Ni plan vide, ni l'appartement d'exemple.
+L'électricien garde sa mise de côté et son « Enregistrer » : il retouche le
+dossier d'un client et décide lui-même du plan remis.
+
+**5. Une seule surface de murs** (`mursNetsDe`) : tour intérieur × hauteur,
+portes et fenêtres déduites — la même dans « Travaux », la fiche, le PDF
+(qui sommait les axes des murs) et le tableur (qui ne déduisait pas les
+baies). Le métré du PDF prend aussi le périmètre du contour, comme le
+tableur.
+
+Bancs : `grandpublic` (17), `metrecsv` (colonnes), `normesparticulier` (la
+pastille « Défauts du relevé »). Icône Solar ajoutée : panier.
+
 ## L'appartement d'exemple reçoit son installation électrique
 
 Relevé du patron : « ajoute sur le plan d'exemple des éléments électriques
