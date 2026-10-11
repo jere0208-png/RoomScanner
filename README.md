@@ -14285,6 +14285,64 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les appartements témoins
+
+Demande du patron : « génère des appartements témoins sous plusieurs formes
+et étages, vérifie si tu rencontres des problèmes, analyse le diagnostic et
+fais des correctifs adaptés ».
+
+**Le banc.** `appartementstemoins` fabrique des relevés comme RoomPlan les
+rend, avec ses défauts : coins qui ne se rejoignent pas, murs de travers
+d'un degré, éclats de quelques centimètres, mur rendu en deux morceaux,
+cloison vue des deux côtés, baie vitrée prise pour une porte, canapé
+d'angle coupé en deux, frigo mal mesuré dans sa niche. Les témoins :
+- un T2 ;
+- un studio en L ;
+- une pièce à pan coupé avec une baie sous son coffre ;
+- une enfilade de quatre chambres sur un couloir ;
+- un relevé bruité, rejoué sous dix graines ;
+- deux pièces dont la cloison est vue des deux côtés ;
+- une pièce avec une niche et un canapé d'angle ;
+- un duplex avec un sous-sol.
+
+Chaque témoin passe par toute la chaîne de fin de scan. On vérifie ensuite
+ce qu'un utilisateur constaterait :
+- les pièces trouvées et fermées ;
+- la surface, à 3 % près ;
+- aucune alerte au diagnostic ;
+- aucun meuble sans pièce ;
+- la 3D, le dossier PDF avec son métré, le DXF et l'OBJ.
+
+**Ce que le banc a trouvé, et ce qui est corrigé** :
+- **Une fausse alerte « baie rabotée » sur presque tous les logements.**
+  La porte palière donne hors du logement, comme une porte-fenêtre. À
+  2,05 m, comparée à des fenêtres à 2,25 m, elle passait pour rabotée par
+  son volet. La baie coulissante rendue aux fenêtres (`baiesVitrees`)
+  aussi. Désormais, une porte, ou une baie qui descend au sol, haute d'au
+  moins deux mètres, est à une hauteur du commerce : elle n'est plus
+  comparée. Sous deux mètres, c'est toujours un tablier qui l'a coupée, et
+  l'alerte demeure.
+- **L'alerte parlait dans le repère du scan** : « une baie s'arrête à
+  75 cm, les autres à 95 », pour des linteaux à 2,05 et 2,25 m. Le sol de
+  RoomPlan est à −1,30 m. Le message dit maintenant « à 205 cm du sol ». Le
+  geste qui remonte la baie reste, lui, dans le repère du scan.
+- **La cloison vue des deux côtés, dans un scan d'un seul tenant.** Les
+  deux pièces ressortaient en une seule, ouverte, avec « deux murs se
+  superposent ». Seules la fusion de scans et l'ajout d'un étage
+  réunissaient les deux faces (`fusionnerMursDoubles`). La fin de scan
+  simple le fait aussi.
+
+**Ce que le banc confirme** : la baie coulissante redevient une baie, avec
+son coffre lu dans le maillage. Le frigo remplit sa niche d'un nu de mur à
+l'autre. Le canapé d'angle ressort en un seul. Les éclats disparaissent.
+
+**Reste à savoir** : la cloison réunie garde la face du mur le plus long,
+pas l'axe entre les deux faces. L'écart de surface reste sous 3 %.
+
+Banc : `appartementstemoins` (13). Ajouts :
+- `floorplan` : la porte d'entrée et la baie au sol à hauteur de commerce ;
+- `menage` : les hauteurs dites depuis le sol.
+
 ## Le plan qui parle dès l'ouverture, et plus de pièges
 
 Correctifs de l'audit « dans la peau d'un utilisateur », premier lot.

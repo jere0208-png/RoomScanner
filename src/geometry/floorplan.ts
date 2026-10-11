@@ -2224,6 +2224,8 @@ export function linteauxRabotes(
    * baie donne dehors. Sans eux, seules les fenêtres comptent.
    */
   contours: Pt[][] = [],
+  /** Le niveau du sol (celui de RoomPlan est à −1,30 m ; voir `solDesMurs`). */
+  sol = 0,
 ): { id: string; linteau: number; actuel: number }[] {
   const dedans = (p: Pt) => contours.some((c) => c.length >= 3 && insidePoly(p, c));
   /** Un côté de la baie est-il hors de toute pièce ? */
@@ -2239,9 +2241,22 @@ export function linteauxRabotes(
       !dedans({ x: m.x - n.x * d, z: m.z - n.z * d })
     );
   };
+  /*
+    UNE PORTE À HAUTEUR DE PORTE EST UNE PORTE — appartements témoins : la
+    porte palière donne hors du logement comme une porte-fenêtre, et à
+    2,05 m elle passait pour rabotée face à des fenêtres à 2,25 m. Une
+    porte part du sol : sa hauteur est celle de son linteau, quel que soit
+    le repère. Sous deux mètres, aucune porte ne se fabrique ainsi — c'est
+    un tablier qui l'a coupée. Il en va de même de la baie vitrée qui
+    descend au sol (la coulissante que `baiesVitrees` a rendue aux
+    fenêtres) : à 2,05 m, c'est une porte-fenêtre du commerce.
+  */
+  const HAUTEUR_DE_PORTE = 2.0;
+  const aHauteurDePorte = (o: WallSeg) =>
+    o.yCenter - o.height / 2 - sol < 0.1 && o.height >= HAUTEUR_DE_PORTE - 1e-9;
   const baies = openings.filter((o) => {
-    if (o.type === 'window') return enFacade(o) !== false;
-    if (o.type === 'door') return enFacade(o) === true;
+    if (o.type === 'window') return enFacade(o) !== false && !aHauteurDePorte(o);
+    if (o.type === 'door') return enFacade(o) === true && o.height < HAUTEUR_DE_PORTE - 1e-9;
     return false;
   });
   if (baies.length < 2) return [];

@@ -17,6 +17,7 @@ import {
   pointOnSeg,
   roomParts,
   segLength,
+  solDesMurs,
   type RoomShape,
   type WallSeg,
 } from './floorplan';
@@ -133,15 +134,17 @@ export function checkPlan(
   const contours = parts
     .map((p) => p.surface?.pts)
     .filter((c): c is NonNullable<typeof c> => !!c && c.length >= 3);
-  for (const r of linteauxRabotes(openings, undefined, contours)) {
+  // Les hauteurs se disent depuis le sol : celui de RoomPlan est à −1,30 m.
+  const sol = solDesMurs(walls);
+  for (const r of linteauxRabotes(openings, undefined, contours, sol)) {
     issues.push({
       kind: 'linteau',
       severity: 'alerte',
       openingId: r.id,
       linteau: r.linteau,
       message: `Une baie s’arrête à ${Math.round(
-        r.actuel * 100,
-      )} cm, les autres à ${Math.round(r.linteau * 100)}`,
+        (r.actuel - sol) * 100,
+      )} cm du sol, les autres à ${Math.round((r.linteau - sol) * 100)}`,
       hint:
         'Le volet devait pendre sous son coffre pendant le scan : la baie ' +
         'a été cadrée sous le tablier. Un appui la remonte au niveau ' +

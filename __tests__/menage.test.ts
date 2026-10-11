@@ -382,4 +382,25 @@ describe('la baie rabotée par son volet', () => {
     expect(apres.yCenter + apres.height / 2).toBeCloseTo(2.15, 2);
     expect(apres.yCenter - apres.height / 2).toBeCloseTo(allege, 3);
   });
+
+  /*
+    LE MESSAGE PARLE DEPUIS LE SOL — appartements témoins : le sol de
+    RoomPlan est à −1,30 m, et le contrôle annonçait « une baie s'arrête à
+    75 cm, les autres à 95 » pour des linteaux à 2,05 et 2,25 m.
+  */
+  it('dit les hauteurs au-dessus du sol, pas dans le repère du scan', () => {
+    const { checkPlan } = require('../src/geometry/diagnostics');
+    const SOL = -1.3;
+    const mur: WallSeg = { ...MUR, height: 2.5, yCenter: SOL + 1.25 };
+    const bas = (o: WallSeg): WallSeg => ({ ...o, yCenter: o.yCenter + SOL });
+    const openings = [baie('a', 2.25, 0.9), baie('b', 2.25, 0.9), baie('d', 2.05, 0.9)].map(bas);
+    const raboté = checkPlan([mur], [], openings).find(
+      (i: { kind: string }) => i.kind === 'linteau',
+    );
+    expect(raboté).toBeDefined();
+    expect(raboté.message).toContain('205 cm');
+    expect(raboté.message).toContain('225');
+    // Le geste, lui, reste dans le repère du scan.
+    expect(raboté.linteau).toBeCloseTo(2.25 + SOL, 2);
+  });
 });

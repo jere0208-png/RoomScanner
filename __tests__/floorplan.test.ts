@@ -2113,6 +2113,45 @@ describe('les linteaux rabotés', () => {
     expect(r[0].linteau).toBeCloseTo(2.15, 2);
   });
 
+  /*
+    LA PORTE D'ENTRÉE N'EST PAS UNE BAIE RABOTÉE — appartements témoins :
+    la porte palière donne hors du logement, comme une porte-fenêtre ;
+    à 2,05 m, comparée à des fenêtres à 2,25 m, elle passait pour rabotée.
+    Une porte à hauteur de porte est une porte : seule celle qui tombe
+    sous les deux mètres a été cadrée sous un tablier.
+  */
+  it('une porte d’entrée à hauteur de porte ne passe pas pour rabotée', () => {
+    const baies = [
+      baie('a', 2.25, 0.9),
+      baie('b', 2.25, 0.9),
+      // La porte palière, sur la façade ouest (x = 0).
+      porte('entree', 0, 1, 0, 1.9, 2.05),
+      // Une baie coulissante prise pour une porte, sur la façade nord.
+      porte('coulissant', 5, 0, 7.4, 0, 2.05),
+    ];
+    expect(linteauxRabotes(baies, 0.15, CONTOURS)).toHaveLength(0);
+    // Le même logement posé à −1,30 m, comme RoomPlan le rend : rien non plus.
+    const bas = baies.map((o) => ({ ...o, yCenter: o.yCenter - 1.3 }));
+    expect(linteauxRabotes(bas, 0.15, CONTOURS)).toHaveLength(0);
+  });
+
+  /*
+    LA BAIE VITRÉE QUI DESCEND AU SOL non plus — la baie coulissante que
+    RoomPlan avait prise pour une porte redevient une fenêtre sans allège
+    (`baiesVitrees`) : à 2,05 m, c'est une hauteur de porte-fenêtre du
+    commerce, pas un linteau raboté.
+  */
+  it('une baie au sol à hauteur de porte-fenêtre ne passe pas pour rabotée', () => {
+    const baies = [baie('a', 2.25, 0.9), baie('b', 2.25, 0.9), baie('vitree', 2.05, 0)];
+    expect(linteauxRabotes(baies)).toHaveLength(0);
+    // Posée à −1,30 m : le sol se dit, et la baie y descend toujours.
+    const bas = baies.map((o) => ({ ...o, yCenter: o.yCenter - 1.3 }));
+    expect(linteauxRabotes(bas, 0.15, [], -1.3)).toHaveLength(0);
+    // Mais sous deux mètres, le tablier l'a coupée.
+    const coupee = [...baies.slice(0, 2), baie('vitree', 1.75, 0)];
+    expect(linteauxRabotes(coupee).map((x) => x.id)).toEqual(['vitree']);
+  });
+
   it('une seule grande baie vitrée ne fait pas la référence', () => {
     // Une baie à 2,30 m, trois fenêtres à 2,15 : rien n'est raboté.
     const baies = [baie('vitree', 2.3, 0), baie('a', 2.15, 0.9), baie('b', 2.15, 0.9), baie('c', 2.15, 0.9)];

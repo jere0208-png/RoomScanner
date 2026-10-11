@@ -5919,8 +5919,17 @@ export const useScanStore = create<ScanState>((set, get) => {
       // (sans ça aucun cycle ne passe par elle et tout l'appartement ressort
       // en une seule pièce), recoller les morceaux alignés, PUIS chercher les
       // pièces : le graphe doit être propre avant d'y chercher des faces.
+      /*
+        LA CLOISON VUE DES DEUX CÔTÉS, AUSSI DANS UN SCAN D'UN SEUL TENANT —
+        appartements témoins : RoomPlan rend parfois les deux faces d'une
+        cloison, à son épaisseur l'une de l'autre. Seules la fusion et
+        l'étage les réunissaient ; ici, les deux pièces ressortaient en une
+        seule, ouverte, « deux murs se superposent ».
+      */
       const walls = sansEclats(
-        mergeColinear(splitAtJunctions(weldCorners(segments.filter((s) => s.type === 'wall')))),
+        mergeColinear(
+          splitAtJunctions(weldCorners(fusionnerMursDoubles(segments.filter((s) => s.type === 'wall')))),
+        ),
         [],
       ).walls;
       // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`).
