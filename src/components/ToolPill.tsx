@@ -56,6 +56,8 @@ export type ToolIcon =
   | 'reperes'
   | 'plus'
   | 'points'
+  /* « Décorer » : le rouleau du peintre — murs, sol, meubles. */
+  | 'rouleau'
   | 'etiquette';
 
 /*

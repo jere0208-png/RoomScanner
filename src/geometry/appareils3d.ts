@@ -793,6 +793,21 @@ function spot(a: Atelier) {
   a.tour([[0, -0.2], [3.1, -0.2]], 0, 0, 'lumiere', T.lumiere, { seg: 32 });
 }
 
+/**
+ * D'OÙ PART LA LUMIÈRE, SOUS LE PLAFOND (m) — relevé du patron : « le point
+ * lumineux des DCL est mal placé, il doit émettre à partir de l'ampoule et
+ * pas de son support ». L'ampoule de la DCL pend au bout de son câble : son
+ * centre est à 59 cm sous la rosace (voir `dcl`, en centimètres) ; un spot
+ * et un plafonnier rayonnent au ras du plafond ; un ventilateur sous son
+ * moteur. Le halo de la maquette et la lumière du natif partent de là.
+ */
+export const DESCENTE_DE_LA_LUMIERE: Partial<Record<CeilingKind, number>> = {
+  dcl: 0.59,
+  spot: 0.03,
+  applique: 0.08,
+  ventilateur: 0.37,
+};
+
 function dcl(a: Atelier) {
   // La rosace, le câble textile, la douille, l'ampoule.
   a.tour(

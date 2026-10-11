@@ -14285,6 +14285,38 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## La lumière part de l'ampoule, les meubles gardent leur couleur ; « Décorer » sur la maquette
+
+Relevé du patron : « les meubles dans le nouvel appartement témoin deviennent
+blancs lorsque la lumière est allumée. Le point lumineux des DCL est mal
+placé, il doit émettre à partir de l'ampoule et pas de son support. […] Je
+ne vois pas la possibilité de changer la couleur des meubles ou du sol. »
+
+**La lumière à l'ampoule.** Le halo d'une lampe de plafond se posait à 8 cm
+sous le plafond — au support. Il part maintenant de là où la lumière naît
+(`DESCENTE_DE_LA_LUMIERE`, `appareils3d`) : 59 cm sous la rosace pour
+l'ampoule d'une DCL, sous le moteur d'un ventilateur, au ras du plafond pour
+un spot ou un plafonnier. La vraie lumière du natif part du même point.
+
+**Les meubles ne blanchissent plus.** Deux causes, deux corrections :
+- le halo se posait PAR-DESSUS la maquette, jusqu'à 78 % d'un jaune très
+  pâle : il couvrait la table et ses chaises d'un voile crème. C'est
+  maintenant une lueur chaude et légère (`ECLAT_LAMPE`, nappe de 10 à 32 %) ;
+- la maquette gardait son plein jour quand on allumait, et les lampes s'y
+  ajoutaient : un meuble clair saturait. Elle baisse maintenant le jour comme
+  la visite (`reglerLeJour`, natif), et la lumière d'une DCL est plus douce
+  (420 au lieu de 640).
+
+**« Décorer »** (`DecorSheet`) : un bouton rouleau sur la barre de la
+maquette, et une entrée du menu « … » du plan (qui passe en 3D). Une
+feuille pour tout : la pièce (puces), ses **murs** (douze teintes), son
+**sol** (huit revêtements, ou selon la pièce), et **chacun de ses meubles**
+(douze teintes, ou d'origine ; deux chaises se nomment « Chaise 1 »,
+« Chaise 2 »). Un appui s'applique aussitôt : la maquette se repeint
+au-dessus. Le mur d'accent reste dans la barre d'un mur, en édition.
+
+Bancs : `lumieresjustes` (5), `decorer` (3).
+
 ## Les points à corriger, version ludique ; le nord en clair ; des fenêtres qu'on traverse du regard
 
 Relevé du patron : « dans le mode édition, je vois un "N?" à côté du bouton

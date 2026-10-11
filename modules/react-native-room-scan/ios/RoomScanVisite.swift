@@ -76,6 +76,8 @@ final class RoomScanVisite: UIView {
   private var diffuseurs: [Int: [SCNNode]] = [:]
   /// L'état des lampes, par rang, tel que le JavaScript l'a posé.
   private var lampesPosees: [Float] = []
+  /// Une lampe au moins est allumée : le jour baisse, dans la visite comme dans la maquette.
+  private var nuitAllumee = false
 
   /*
     CHAQUE PROPRIÉTÉ NE REBÂTIT QUE SI ELLE A CHANGÉ. La couche de
@@ -330,20 +332,32 @@ final class RoomScanVisite: UIView {
       }
       i += 9
     }
-    /*
-      LE SOIR TOMBE QUAND ON ALLUME. Une lampe en plein jour ne se voit pas :
-      le jour baisse, le contre-jour se retire — il libère sa place parmi les
-      huit lumières que la carte graphique tient à la fois — et l'ambiance
-      garde de quoi lire la pièce.
-    */
-    guard orbite.count < 10 else { return }
-    if nuit {
-      ambiante.intensity = 300
-      jour.intensity = 110
+    nuitAllumee = nuit
+    reglerLeJour()
+  }
+
+  /*
+    LE SOIR TOMBE QUAND ON ALLUME. Une lampe en plein jour ne se voit pas :
+    le jour baisse, le contre-jour se retire — il libère sa place parmi les
+    huit lumières que la carte graphique tient à la fois — et l'ambiance
+    garde de quoi lire la pièce.
+
+    ET DANS LA MAQUETTE AUSSI — relevé du patron : « les meubles deviennent
+    blancs lorsque la lumière est allumée ». La maquette gardait son plein
+    jour, et les lampes s'y ajoutaient : un meuble clair sous une DCL
+    saturait en blanc. Elle baisse maintenant comme la visite, un peu moins
+    — vue de dessus, il faut encore lire le plan.
+  */
+  private func reglerLeJour() {
+    let maquette = orbite.count >= 10
+    if nuitAllumee {
+      ambiante.intensity = maquette ? 380 : 300
+      jour.intensity = maquette ? 160 : 110
       noeudDuContre?.light = nil
     } else {
-      ambiante.intensity = 620
-      jour.intensity = 420
+      ambiante.intensity = maquette ? 640 : 620
+      jour.intensity = maquette ? 380 : 420
+      contre.intensity = maquette ? 160 : 200
       noeudDuContre?.light = contre
     }
   }
@@ -401,14 +415,16 @@ final class RoomScanVisite: UIView {
       let l = SCNLight()
       l.type = .omni
       l.color = chaud
-      l.intensity = 640
-      l.attenuationStartDistance = 0.4
-      l.attenuationEndDistance = 6
+      // Plus douce qu'avant : à 640, un meuble clair sous elle saturait.
+      l.intensity = 420
+      l.attenuationStartDistance = 0.2
+      l.attenuationEndDistance = 5
       l.attenuationFalloffExponent = 2
       l.castsShadow = false
       let n = SCNNode()
       n.light = l
-      n.position = SCNVector3(x: p.x, y: p.y - 0.6, z: p.z)
+      // Au centre de l'ampoule (`DESCENTE_DE_LA_LUMIERE.dcl`), pas à la rosace.
+      n.position = SCNVector3(x: p.x, y: p.y - 0.59, z: p.z)
       return [n]
     case 4:
       return [faisceau(
@@ -663,9 +679,7 @@ final class RoomScanVisite: UIView {
       cassé des murs. On rend au dessus SA couleur, et les flancs gardent
       assez d'écart pour qu'un angle se lise.
     */
-    ambiante.intensity = 640
-    jour.intensity = 380
-    contre.intensity = 160
+    reglerLeJour()
     oeil.position = SCNVector3(
       x: cible.x + vers.x * recul, y: cible.y + vers.y * recul, z: cible.z + vers.z * recul)
     oeil.look(at: cible, up: haut, localFront: SCNVector3(x: 0, y: 0, z: -1))

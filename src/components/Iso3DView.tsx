@@ -73,6 +73,7 @@ import {
   type WetZone,
 } from '../geometry/volumes';
 import { DUREE_LEVEE, hauteurLevee } from '../ui/levee';
+import { DESCENTE_DE_LA_LUMIERE } from '../geometry/appareils3d';
 import { ECLAT_LAMPE,
   MAQUETTE,
   crepuscule,
@@ -2341,7 +2342,8 @@ export function Iso3DView({
         0,
       );
       if (!(haut > 0.5)) continue;
-      const q = project({ x: cl.at.x, y: haut - 0.08, z: cl.at.z });
+      // À L'AMPOULE, pas au support : une DCL pend sous sa rosace.
+      const q = project({ x: cl.at.x, y: haut - (DESCENTE_DE_LA_LUMIERE[cl.kind] ?? 0.08), z: cl.at.z });
       // Le rayon se calcule ICI, avec l'échelle du dessin : le rendu n'a plus
       // qu'à le poser, et il ne peut plus le deviner de travers.
       posLampes.push({
@@ -2807,7 +2809,9 @@ export function Iso3DView({
                     cx={l.cx}
                     cy={l.cy}
                     r={l.r}
-                    fill="#FFE9A8"
+                    /* Une lueur chaude, pas un voile pâle : posée PAR-DESSUS
+                       la maquette, elle blanchissait les meubles dessous. */
+                    fill="#FFC96B"
                     opacity={scintille}
                   />
                   <AnimatedCircle

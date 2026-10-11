@@ -549,7 +549,14 @@ export function Toolbar3D({
   colorsAvailable,
   focusIdx,
   setFocusIdx,
+  onDecorer,
 }: Cadre & {
+  /**
+   * DÉCORER — relevé du patron : « je ne vois pas la possibilité de changer
+   * la couleur des meubles ou du sol ». C'est ici, sur la maquette, qu'on
+   * voit ce qu'on change : le bouton y vit.
+   */
+  onDecorer?: () => void;
   showMeasures: boolean;
   setShowMeasures: (f: (v: boolean) => boolean) => void;
   showNorth: boolean;
@@ -661,6 +668,9 @@ export function Toolbar3D({
         active={showElecTags}
         onPress={() => setShowElecTags((v) => !v)}
       />
+    ) : null,
+    onDecorer ? (
+      <ToolPill key="decorer" icon="rouleau" label="Décorer" active={false} onPress={onDecorer} />
     ) : null,
     <ToolPill
       key="afficher"

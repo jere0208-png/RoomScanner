@@ -117,8 +117,12 @@ export function crepuscule(pal: ScenePalette): ScenePalette {
  * qu'une paire de nombres perdus dans un rendu ne garantirait pas.
  */
 export const ECLAT_LAMPE = {
-  jour: { nappe: [0.28, 0.5] as [number, number], coeur: [0.55, 0.8] as [number, number] },
-  nuit: { nappe: [0.5, 0.78] as [number, number], coeur: [0.8, 0.98] as [number, number] },
+  // UNE LUEUR, PAS UN VOILE — relevé du patron : « les meubles deviennent
+  // blancs lorsque la lumière est allumée ». La nappe se pose par-dessus la
+  // maquette : à 78 %, elle couvrait la table et ses chaises d'un blanc
+  // crème. La vraie lumière vient du natif ; le halo ne fait que la signaler.
+  jour: { nappe: [0.1, 0.2] as [number, number], coeur: [0.5, 0.75] as [number, number] },
+  nuit: { nappe: [0.18, 0.32] as [number, number], coeur: [0.75, 0.95] as [number, number] },
 };
 
 /**

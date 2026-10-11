@@ -38,6 +38,7 @@ import { surfacesHabitables } from '../geometry/habitable';
 import { accrocher, texteDeMesure } from '../geometry/regle';
 import { PEINTURES, hexDePeinture } from '../ui/peintures';
 import { TEINTES_MEUBLES, TEINTE_ORIGINE, cleDeTeinte, hexDeTeinte } from '../ui/habillage';
+import { DecorSheet } from '../components/DecorSheet';
 import { useReglagesTravaux } from '../store/reglagesTravaux';
 import { LaserSheet } from './result/LaserSheet';
 import { ExportSheet } from './result/ExportSheet';
@@ -1446,6 +1447,8 @@ export function ResultScreen() {
   */
   const [murAPeindre, setMurAPeindre] = useState<{ roomId: string; wallId: string } | null>(null);
   const [meubleATeinter, setMeubleATeinter] = useState<string | null>(null);
+  /** La feuille « Décorer » : murs, sol et meubles d'une pièce, en 3D. */
+  const [decorant, setDecorant] = useState(false);
   const toutesLesMesures = useScanStore((st) => st.mesures);
   /* Le bilan du relevé qui vient d'aboutir : voir `BilanDuReleve`. */
   const bilan = useBilanStore((st) => st.bilan);
@@ -3315,6 +3318,19 @@ export function ResultScreen() {
                     onPress: () => setTravauxOuvert(true),
                   },
                   {
+                    /*
+                      DÉCORER — les couleurs des murs, le sol, les meubles. On
+                      passe en 3D : c'est là qu'on voit ce qu'on change.
+                    */
+                    label: 'Décorer',
+                    icon: 'rouleau' as const,
+                    hint: 'Murs, sol et couleur des meubles, vus en 3D.',
+                    onPress: () => {
+                      if (vue === '2d') basculerVue();
+                      setDecorant(true);
+                    },
+                  },
+                  {
                     /**
                      * SCANNER UNE PIÈCE DE PLUS — la vraie version.
                      *
@@ -4273,6 +4289,7 @@ export function ResultScreen() {
             colorsAvailable={colorsAvailable}
             focusIdx={focusIdx}
             setFocusIdx={setFocusIdx}
+            onDecorer={() => setDecorant(true)}
           />
         )}
 
@@ -6233,6 +6250,13 @@ export function ResultScreen() {
             setPeignant(false);
           },
         }}
+      />
+
+      {/* ---------- Décorer : murs, sol, meubles d'une pièce ---------- */}
+      <DecorSheet
+        visible={decorant}
+        onClose={() => setDecorant(false)}
+        pieceInitiale={(focusIdx >= 0 ? rooms[focusIdx]?.id : null) ?? selectedRoomId}
       />
 
       {/* ---------- Un mur d'accent, côté pièce ---------- */}
