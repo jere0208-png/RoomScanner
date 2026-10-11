@@ -22,7 +22,7 @@
  * les coordonnées du client, qui ne regardent que l'artisan.
  */
 import { checkPlan } from './diagnostics';
-import { roomParts, segLength, type Pt, type RoomShape, type WallSeg } from './floorplan';
+import { ECLAT, roomParts, segLength, type Pt, type RoomShape, type WallSeg } from './floorplan';
 
 export interface PlanADiagnostiquer {
   name?: string;
@@ -124,7 +124,14 @@ export function pourquoiOuverte(
   } else if (absents.length > 1) {
     raisons.push(`Elle cite ${absents.length} murs qui n’existent plus (supprimés, ou fusionnés).`);
   }
-  const pleins = murs.filter((w) => w.type === 'wall' && segLength(w) > 1e-3);
+  // Un éclat de 0 cm sur un coin : la cause la plus sournoise (voir `ECLAT`).
+  const eclats = murs.filter((w) => w.type === 'wall' && segLength(w) < ECLAT).length;
+  if (eclats > 0) {
+    raisons.push(
+      `${eclats === 1 ? 'Un éclat de mur de 0 cm est posé' : `${eclats} éclats de mur de 0 cm sont posés`} sur un coin : ce coin compte trop de murs pour que la boucle se referme.`,
+    );
+  }
+  const pleins = murs.filter((w) => w.type === 'wall' && segLength(w) >= ECLAT);
   if (pleins.length < 3) {
     raisons.push(
       `Elle n’a que ${pleins.length} mur${pleins.length > 1 ? 's' : ''} : il en faut trois au moins pour fermer une pièce.`,

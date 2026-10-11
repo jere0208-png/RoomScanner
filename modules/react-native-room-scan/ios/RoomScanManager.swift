@@ -1145,26 +1145,83 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     let vus = VuDuTrajet.filtrer(room, chemin: trajet)
     // « medium » compte autant que « low » : un mur moyen est un mur qu'on
     // ferait mieux de repasser, et c'est gratuit tant qu'on est devant.
-    let douteux = vus.murs.filter { s in
+    let doutes = vus.murs.filter { s in
       if case .high = s.confidence { return false }
       return true
-    }.count
+    }
+    let douteux = doutes.count
+    /*
+      LEQUEL — relevé du patron : « il est dit qu'un mur a été mal détecté,
+      mais on n'informe pas lequel ». Le plus proche des murs douteux, vu du
+      téléphone : son côté, sa distance, sa longueur.
+    */
+    let lequel: [String: Any]? = session.arSession.currentFrame.flatMap {
+      Self.murDouteuxLePlusProche(doutes, camera: $0.camera.transform)
+    }
     // Le plus grand trou du contour, au centimètre (voir `trouDuContour`).
     let trou = Self.trouDuContour(vus.murs)
     let apercu = [
       vus.murs.count, vus.objets, vus.portes, vus.fenetres, douteux,
       Int((trou * 100).rounded()),
+      // Le mur nommé change de côté, ou d'un demi-mètre : on le redit.
+      (lequel?["code"] as? Int) ?? -1,
+      Int((((lequel?["distance"] as? Float) ?? 0) * 2).rounded()),
     ]
     guard apercu != dernierApercu else { return }
     dernierApercu = apercu
-    RoomScanEvents.shared?.emit(name: "onScanUpdate", body: [
+    var corps: [String: Any] = [
       "wallCount": vus.murs.count,
       "objectCount": vus.objets,
       "doorCount": vus.portes,
       "windowCount": vus.fenetres,
       "mursDouteux": douteux,
       "trouContour": trou,
-    ])
+    ]
+    if let l = lequel { corps["murDouteux"] = l.filter { $0.key != "code" } }
+    RoomScanEvents.shared?.emit(name: "onScanUpdate", body: corps)
+  }
+
+  /**
+   OÙ EST LE MUR DOUTEUX LE PLUS PROCHE, VU DU TÉLÉPHONE — devant, derrière,
+   à gauche ou à droite (le cap de la caméra, à plat), sa distance au point
+   le plus proche du mur, sa longueur. `code` ne sert qu'à savoir s'il a
+   changé.
+   */
+  static func murDouteuxLePlusProche(
+    _ murs: [CapturedRoom.Surface], camera: simd_float4x4
+  ) -> [String: Any]? {
+    let oeil = SIMD2<Float>(camera.columns.3.x, camera.columns.3.z)
+    var avant = SIMD2<Float>(-camera.columns.2.x, -camera.columns.2.z)
+    var droite = SIMD2<Float>(camera.columns.0.x, camera.columns.0.z)
+    guard simd_length(avant) > 1e-4, simd_length(droite) > 1e-4 else { return nil }
+    avant = simd_normalize(avant)
+    droite = simd_normalize(droite)
+    var mieux: (d: Float, p: SIMD2<Float>, l: Float)? = nil
+    for m in murs {
+      let t = m.transform
+      let c = SIMD2<Float>(t.columns.3.x, t.columns.3.z)
+      var u = SIMD2<Float>(t.columns.0.x, t.columns.0.z)
+      guard simd_length(u) > 1e-4 else { continue }
+      u = simd_normalize(u)
+      let demi = m.dimensions.x / 2
+      let s = max(-demi, min(demi, simd_dot(oeil - c, u)))
+      let p = c + u * s
+      let d = simd_length(p - oeil)
+      if mieux == nil || d < mieux!.d { mieux = (d: d, p: p, l: m.dimensions.x) }
+    }
+    guard let m = mieux else { return nil }
+    let vers = m.p - oeil
+    let l = simd_length(vers)
+    let dir = l > 1e-4 ? vers / l : avant
+    let f = simd_dot(dir, avant)
+    let r = simd_dot(dir, droite)
+    let cote: String
+    let code: Int
+    if f > 0.7 { cote = "devant"; code = 0 }
+    else if f < -0.7 { cote = "derriere"; code = 1 }
+    else if r > 0 { cote = "droite"; code = 2 }
+    else { cote = "gauche"; code = 3 }
+    return ["cote": cote, "distance": m.d, "longueur": m.l, "code": code]
   }
 
   func captureSession(_ session: RoomCaptureSession,

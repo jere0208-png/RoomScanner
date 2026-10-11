@@ -106,6 +106,31 @@ describe('la méridienne rejoint son canapé', () => {
   });
 });
 
+describe('la rallonge que RoomPlan nomme lui-même', () => {
+  /*
+    Le canapé d'un vrai relevé du patron (diagnostic du 11/10) : RoomPlan
+    l'avait bien vu en L — `SofaType:lShaped` pour le grand côté, et
+    `SofaType:lShapedExtension` pour la rallonge, rendue à part.
+  */
+  const grand = objet('EA55', 'sofa', 0.74, 0.05, 2.5, 1.0, 0.88, (-1 * Math.PI) / 180, ['SofaType:lShaped']);
+  const rallonge = objet('320D', 'sofa', -0.06, -0.78, 0.65, 0.88, 0.88, (89 * Math.PI) / 180, ['SofaType:lShapedExtension']);
+
+  it('le canapé du relevé se réunit, méridienne à gauche', () => {
+    const r = reunirLesCanapesDAngle([grand, rallonge]);
+    expect(r).toHaveLength(1);
+    expect(attr(r[0])).toEqual(expect.arrayContaining(['SofaType:lShaped', 'SofaAngle:gauche']));
+    expect(attr(r[0])).not.toContain('SofaType:lShapedExtension');
+  });
+
+  it('une rallonge nommée se réunit même un peu décollée ; une chaise, non', () => {
+    const decollee = { ...rallonge, transform: [...rallonge.transform] };
+    decollee.transform[14] -= 0.2;
+    expect(reunirLesCanapesDAngle([grand, decollee])).toHaveLength(1);
+    const chaise = { ...decollee, category: 'chair', attributes: undefined } as ObjectData;
+    expect(reunirLesCanapesDAngle([grand, chaise])).toHaveLength(2);
+  });
+});
+
 describe('ce qui n’est pas un L reste à sa place', () => {
   it('un fauteuil à un mètre du canapé', () => {
     const loin = objet('fauteuil', 'chair', 2.4, -0.9, 0.85, 0.85, 0.8);

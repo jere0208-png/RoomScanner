@@ -10,7 +10,7 @@
  * raison qu'un meuble se règle autrement qu'un point lumineux.
  */
 import React, { useCallback, useEffect, useRef } from 'react';
-import { DEBORD_DOIGT } from '../ui/bandeau';
+import { DEBORD_COTE, DEBORD_DOIGT } from '../ui/bandeau';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
@@ -177,6 +177,8 @@ export function ObjectBar({
   onPlacer,
   onDupliquer,
   passage,
+  sol,
+  onCaler,
   bloque,
   onPassage,
   teinte,
@@ -221,6 +223,18 @@ export function ObjectBar({
    * court se lit sur la barre ; l'appui donne l'explication (`onPassage`).
    */
   passage?: VerdictDePassage | null;
+  /**
+   * LE MEUBLE PEUT SE CALER DANS SA NICHE — relevé du patron : « mon frigo
+   * ne veut pas se caler dans son coin, entre trois murs ». Une puce, là où
+   * l'on prévient : elle n'apparaît que si le calage change quelque chose.
+   */
+  onCaler?: () => void;
+  /**
+   * LE NIVEAU DU SOL DU PLAN, dans le repère du scan (voir `solDesMurs`).
+   * RoomPlan ne met pas le sol à zéro : sans lui, un frigo posé par terre se
+   * lisait « posé à −0,85 m ».
+   */
+  sol?: number;
   /** Le meuble heurte le battant d'une porte : la phrase qui le dit. */
   bloque?: string | null;
   onPassage?: () => void;
@@ -233,7 +247,7 @@ export function ObjectBar({
   onTeinte?: () => void;
 }) {
   /** Le dessous du meuble, au-dessus du sol. */
-  const pose = object.transform[13] - object.height / 2;
+  const pose = object.transform[13] - object.height / 2 - (sol ?? 0);
 
   /**
    * Une cote qu'on touche : elle ouvre la feuille, qui suit le clavier.
@@ -256,7 +270,7 @@ export function ObjectBar({
     mot?: string,
   ) => (
     <TouchableOpacity
-      hitSlop={DEBORD_DOIGT}
+      hitSlop={DEBORD_COTE}
       style={styles.clChamp}
       accessibilityLabel={titre}
       onPress={() =>
@@ -387,9 +401,14 @@ export function ObjectBar({
           )}
         </View>
       </View>
-      {(passage || bloque) && (
+      {/*
+        « ÇA PASSE » NE PARLE QUE POUR PRÉVENIR — relevé du patron : « l'info
+        “passe par les portes” n'est pas importante ; elle l'est si un meuble
+        ne passe PAS par les portes ». Un meuble qui passe n'a rien à dire.
+      */}
+      {((passage && !passage.ok) || bloque || onCaler) && (
         <View style={[local.verdicts, styles.bandeauFilet]}>
-          {passage && (
+          {passage && !passage.ok && (
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Ça passe ?"
@@ -405,6 +424,21 @@ export function ObjectBar({
               </Text>
             </TouchableOpacity>
           )}
+          {onCaler ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Caler dans sa niche"
+              hitSlop={6}
+              style={[local.puce, { backgroundColor: `${palette.blue}1F` }]}
+              onPress={onCaler}>
+              <Svg width={14} height={14} viewBox="0 0 24 24">
+                <Path d={SOLAIRES.centrer} fill={palette.blue} fillRule="evenodd" />
+              </Svg>
+              <Text style={[local.puceTexte, { color: palette.ink }]} numberOfLines={1}>
+                Caler dans sa niche
+              </Text>
+            </TouchableOpacity>
+          ) : null}
           {bloque ? (
             <Text style={[local.bloque, { color: palette.danger }]} numberOfLines={1}>
               {bloque}

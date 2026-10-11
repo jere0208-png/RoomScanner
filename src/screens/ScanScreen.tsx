@@ -10,6 +10,7 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { RoomScan, RoomScanView, scanEvents, type EtatDeVisee } from 'react-native-room-scan';
 import { themedStyles, useTheme, type Palette } from '../theme';
+import { phraseDuMurDouteux } from '../geometry/murDouteux';
 import { useScanStore } from '../store/scanStore';
 import { useModeElec } from '../store/usage';
 import { useRoomScan } from '../native/useRoomScan';
@@ -67,6 +68,7 @@ export function ScanScreen() {
   const paused = useScanStore((s) => s.paused);
   /* Ce que RoomPlan voit mal, tant qu'on peut encore y retourner. */
   const mursDouteux = useScanStore((s) => s.mursDouteux);
+  const murDouteux = useScanStore((s) => s.murDouteux);
   /* Le mur qui manque : on le dit en terminant, pas pendant qu'on balaie. */
   const trouContour = useScanStore((s) => s.trouContour);
   const processing = useScanStore((s) => s.processing);
@@ -464,9 +466,8 @@ export function ScanScreen() {
           <View style={[styles.instructionPill, styles.douteuxPill]}>
             <View style={styles.instructionDot} />
             <Text style={styles.instructionText}>
-              {`${mursDouteux} mur${mursDouteux > 1 ? 's' : ''} mal vu${
-                mursDouteux > 1 ? 's' : ''
-              } · repassez lentement dessus`}
+              {/* LEQUEL — relevé du patron : « on n'informe pas lequel ». */}
+              {phraseDuMurDouteux(mursDouteux, murDouteux)}
             </Text>
           </View>
         )}

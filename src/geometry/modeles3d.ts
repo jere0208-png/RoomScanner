@@ -1347,10 +1347,12 @@ function rangement(a: Atelier, g: Gabarit, c: Commande) {
   const sorte = attribut(c, 'StorageType');
   if (m.startsWith('casiers') || m.startsWith('kallax')) return casiers(a, g, c);
   if (m.startsWith('biblio') || m.startsWith('billy') || sorte === 'shelf' || (!m && H >= 1.3 && D <= 0.42)) return bibliotheque(a, g, c);
-  if (m.startsWith('etagerebureau')) return etagereMurale(a, g, c);
+  if (m.startsWith('etagere')) return etagereMurale(a, g, c);
   if (m.startsWith('hotte')) return hotte(a, g);
-  if (m.startsWith('meublehaut')) return meubleHaut(a, g);
+  if (m.startsWith('meublehaut')) return meubleHaut(a, g, c);
   if (m.startsWith('colonnesdb')) return armoire(a, g, c, 1);
+  // Avant « armoire » : l'armoire de toilette n'est pas une penderie.
+  if (m.startsWith('armoiretoilette')) return armoireDeToilette(a, g, c);
   if (m.startsWith('armoire') || m.startsWith('dressing') || m.startsWith('pax') || H >= 1.5) return armoire(a, g, c);
   if (m.startsWith('meublebas') || m.startsWith('ilot') || (!m && H >= 0.78 && H <= 1.0 && D >= 0.5)) return cuisineBas(a, g, c);
   if (m.startsWith('meubletv')) return meubleTv(a, g, c);
@@ -1425,10 +1427,68 @@ function cuisineBas(a: Atelier, { W, D, H }: Gabarit, c: Commande, sansPlan = fa
   }
 }
 
-function meubleHaut(a: Atelier, { W, D, H }: Gabarit) {
+function meubleHaut(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  // Il se repeint, comme les autres meubles (voir « Décorer »).
+  const corps = c.teinte ?? TEINTES.laque;
+  const n = Math.max(1, Math.round(W / 0.45));
+  if (c.modele.startsWith('meublehautvitre')) {
+    /*
+      LE MEUBLE HAUT VITRÉ — un caisson ouvert, une étagère, ce qu'on y
+      range, et des portes de verre à cadre : on voit au travers.
+    */
+    const e = 0.016;
+    const zF = -D / 2 + 0.004;
+    a.boite(-W / 2, W / 2, 0, H, D / 2 - e, D / 2, 'laque', corps, { r: 0.002 });
+    a.boite(-W / 2, -W / 2 + e, 0, H, zF + 0.02, D / 2 - e, 'laque', corps, { r: 0.002 });
+    a.boite(W / 2 - e, W / 2, 0, H, zF + 0.02, D / 2 - e, 'laque', corps, { r: 0.002 });
+    a.boite(-W / 2 + e, W / 2 - e, H - e, H, zF + 0.02, D / 2 - e, 'laque', corps);
+    a.boite(-W / 2 + e, W / 2 - e, 0, e, zF + 0.02, D / 2 - e, 'laque', corps);
+    a.boite(-W / 2 + e, W / 2 - e, H / 2 - e / 2, H / 2 + e / 2, zF + 0.03, D / 2 - e, 'laque', corps);
+    // Les tasses, sur l'étagère et au fond.
+    for (const y of [e, H / 2 + e / 2]) {
+      const nb = Math.max(2, Math.floor((W - 2 * e) / 0.12));
+      for (let k = 0; k < nb; k++) {
+        const x = -W / 2 + e + ((k + 0.5) * (W - 2 * e)) / nb;
+        a.tour([[0, y], [0.035, y, true], [0.04, y + 0.09, true], [0, y + 0.09]], x, 0, 'ceramique', TEINTES.ceramique, { seg: 14 });
+      }
+    }
+    // Les portes : un cadre, et le verre.
+    const jeu = 0.003;
+    const lp = (W - jeu * (n + 1)) / n;
+    const b = 0.045;
+    for (let k = 0; k < n; k++) {
+      const x0 = -W / 2 + jeu + k * (lp + jeu);
+      const x1 = x0 + lp;
+      a.boite(x0, x1, jeu, jeu + b, zF, zF + 0.019, 'laque', corps, { r: 0.002 });
+      a.boite(x0, x1, H - jeu - b, H - jeu, zF, zF + 0.019, 'laque', corps, { r: 0.002 });
+      a.boite(x0, x0 + b, jeu + b, H - jeu - b, zF, zF + 0.019, 'laque', corps, { r: 0.002 });
+      a.boite(x1 - b, x1, jeu + b, H - jeu - b, zF, zF + 0.019, 'laque', corps, { r: 0.002 });
+      a.boite(x0 + b, x1 - b, jeu + b, H - jeu - b, zF + 0.007, zF + 0.011, 'verre', TEINTES.verre);
+    }
+    return;
+  }
   const zF = -D / 2 + SAILLIE_POIGNEE;
-  a.boite(-W / 2, W / 2, 0, H, zF + 0.019, D / 2, 'laque', TEINTES.laque, { r: 0.002 });
-  portes(a, -W / 2, W / 2, 0, H, zF, Math.max(1, Math.round(W / 0.45)), TEINTES.laque, 'laque', Math.min(0.16, H * 0.25));
+  a.boite(-W / 2, W / 2, 0, H, zF + 0.019, D / 2, 'laque', corps, { r: 0.002 });
+  portes(a, -W / 2, W / 2, 0, H, zF, n, corps, 'laque', Math.min(0.16, H * 0.25));
+}
+
+/**
+ * L'ARMOIRE DE TOILETTE — un caisson peu profond, accroché au-dessus du
+ * lavabo, ses portes en miroir.
+ */
+function armoireDeToilette(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const corps = c.teinte ?? TEINTES.laque;
+  a.boite(-W / 2, W / 2, 0, H, -D / 2 + 0.02, D / 2, 'laque', corps, { r: 0.004, seg: 1 });
+  const n = W > 0.5 ? 2 : 1;
+  const jeu = 0.004;
+  const lp = (W - jeu * (n + 1)) / n;
+  for (let k = 0; k < n; k++) {
+    const x0 = -W / 2 + jeu + k * (lp + jeu);
+    a.boite(x0, x0 + lp, jeu, H - jeu, -D / 2 + 0.003, -D / 2 + 0.02, 'laque', corps, { r: 0.002, sans: ['arriere'] });
+    a.boite(x0 + 0.008, x0 + lp - 0.008, jeu + 0.008, H - jeu - 0.008, -D / 2, -D / 2 + 0.003, 'miroir', TEINTES.chrome, {
+      sans: ['arriere'],
+    });
+  }
 }
 
 function hotte(a: Atelier, { W, D, H }: Gabarit) {
@@ -1499,8 +1559,10 @@ function meubleChaussures(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
 }
 
 function meubleTv(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
-  const hPied = Math.min(0.12, H * 0.3);
-  pieds(a, [-W / 2 + 0.05, W / 2 - 0.05], [-D / 2 + 0.05, D / 2 - 0.05], 0, hPied, 0.017, 0.012, 'bois', c.cotes ?? TEINTES.chene);
+  // Suspendu, il n'a pas de pieds : il tient au mur.
+  const suspendu = c.modele.startsWith('meubletvsuspendu');
+  const hPied = suspendu ? 0 : Math.min(0.12, H * 0.3);
+  if (!suspendu) pieds(a, [-W / 2 + 0.05, W / 2 - 0.05], [-D / 2 + 0.05, D / 2 - 0.05], 0, hPied, 0.017, 0.012, 'bois', c.cotes ?? TEINTES.chene);
   const zF = -D / 2 + SAILLIE_BOUTON;
   const e = 0.018;
   a.boite(-W / 2, W / 2, H - e, H, -D / 2, D / 2, 'bois', c.dessus ?? c.cotes ?? TEINTES.chene, { r: 0.004 });
@@ -1593,6 +1655,22 @@ function bibliotheque(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
 }
 
 function etagereMurale(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  if (c.modele.startsWith('etagerecuisine')) {
+    // L'ÉTAGÈRE DE CUISINE : la planche, et des bocaux de verre, pleins.
+    a.boite(-W / 2, W / 2, 0, 0.025, -D / 2, D / 2, 'bois', c.teinte ?? TEINTES.chene, { r: 0.003 });
+    const n = Math.max(3, Math.floor((W - 0.06) / 0.13));
+    const contenus = ['#E9D9A6', '#5A3B28', '#B4743F', '#D8C9B0', '#8C5A3C'];
+    for (let k = 0; k < n; k++) {
+      const x = -W / 2 + 0.065 + (k * (W - 0.13)) / (n - 1);
+      const r = Math.min(D / 2 - 0.015, 0.04 + c.hasard() * 0.015);
+      const h = k === 0 ? H - 0.04 : (H - 0.04) * (0.55 + c.hasard() * 0.45);
+      const y0 = 0.025;
+      a.tour([[0, y0], [r, y0, true], [r, y0 + h * 0.86], [r * 0.8, y0 + h * 0.9], [r * 0.82, y0 + h, true], [0, y0 + h]], x, 0, 'verre', TEINTES.verre, { seg: 16 });
+      a.tour([[0, y0 + 0.004], [r - 0.006, y0 + 0.004, true], [r - 0.006, y0 + h * 0.6, true], [0, y0 + h * 0.6]], x, 0, 'linge', contenus[k % contenus.length], { seg: 14 });
+      a.tour([[0, y0 + h], [r * 0.86, y0 + h, true], [r * 0.86, y0 + h + 0.012, true], [0, y0 + h + 0.012]], x, 0, 'bois', TEINTES.chene, { seg: 14 });
+    }
+    return;
+  }
   a.boite(-W / 2, W / 2, 0, 0.025, -D / 2, D / 2, 'bois', TEINTES.chene, { r: 0.003 });
   livres(a, -W / 2, W / 2 - 0.15, 0.025, H - 0.03, D / 2, D - 0.02, c.hasard);
   // Une plante en pot au bout.
@@ -2437,6 +2515,25 @@ function cadre(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   const aplat = (x0: number, x1: number, y0: number, y1: number, teinte: string) =>
     a.boite(x0, x1, y0, y1, zf - 0.002, zf, 'papier', teinte, { sans: ['arriere'] });
 
+  if (c.modele.startsWith('triptyque')) {
+    // TROIS TOILES QUI SE RÉPONDENT, côte à côte.
+    const jeu = W * 0.04;
+    const lw = (W - 2 * jeu) / 3;
+    const teintes: [string, string][] = [
+      [TEINTES.sauge, TEINTES.bleu],
+      [TEINTES.argile, TEINTES.sauge],
+      [TEINTES.bleu, TEINTES.argile],
+    ];
+    teintes.forEach(([bas, haut], k) => {
+      const x0 = -W / 2 + k * (lw + jeu);
+      const f = unCadre(x0, x0 + lw, 0, H, c.teinte ?? TEINTES.noir, '#F1ECE2');
+      const lx = f.x1 - f.x0;
+      const ly = f.y1 - f.y0;
+      aplat(f.x0, f.x1, f.y0, f.y0 + ly * 0.4, bas);
+      aplat(f.x0 + lx * 0.2, f.x1 - lx * 0.2, f.y0 + ly * 0.55, f.y0 + ly * 0.85, haut);
+    });
+    return;
+  }
   if (c.modele.startsWith('cadresphotos')) {
     const teintes = [TEINTES.bleu, TEINTES.argile, TEINTES.sauge];
     const cadres: [number, number, number, number][] = [

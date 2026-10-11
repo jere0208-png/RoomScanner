@@ -18,7 +18,7 @@ import { CEILINGS, type CeilingFixture } from '../geometry/ceiling';
 import { CarteDuMenu, IconeBandeau } from './StripBar';
 import { haptic } from '../ui/haptic';
 import { SOLAIRES } from '../ui/solaires';
-import { DEBORD_DOIGT } from '../ui/bandeau';
+import { DEBORD_COTE, DEBORD_DOIGT } from '../ui/bandeau';
 import type { PromptData } from './Sheet';
 import type { Palette } from '../theme';
 
@@ -123,7 +123,7 @@ export function CeilingBar({
             <TouchableOpacity
               style={styles.clChamp}
               accessibilityLabel={titre}
-              hitSlop={DEBORD_DOIGT}
+              hitSlop={DEBORD_COTE}
               onPress={() => {
                 const actuel = ecart(k);
                 if (actuel === null) return;

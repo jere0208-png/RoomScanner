@@ -322,7 +322,9 @@ export function toFootprint(o: ObjectData): ObjectFootprint {
  * deux murs), renvoie les coins ordonnés le long de la boucle — sinon null.
  * Sert au calcul de surface et au sol de la vue 3D.
  */
-export function closedLoop(walls: WallSeg[]): { x: number; z: number }[] | null {
+export function closedLoop(tous: WallSeg[]): { x: number; z: number }[] | null {
+  // Un éclat de 0 cm sur un coin n'est pas un mur : il ne compte pas.
+  const walls = tous.filter((w) => segLength(w) >= ECLAT);
   if (walls.length < 3) return null;
   const key = (p: { x: number; z: number }) => `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
   const adj = new Map<string, { wallId: string; to: { x: number; z: number } }[]>();
@@ -367,6 +369,32 @@ export function loopAreaM2(pts: { x: number; z: number }[]): number {
 
 export function segLength(w: WallSeg): number {
   return Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z);
+}
+
+/**
+ * EN DESSOUS, UN « MUR » EST UN ÉCLAT (m).
+ *
+ * Relevé du patron, diagnostic à l'appui : une pièce qui ne se fermait pas,
+ * et deux « murs » de 0 cm posés sur un même coin. Un mur de moins de quinze
+ * centimètres dont les deux bouts sont soudés au même coin (`weldCorners`)
+ * devient un point ; ce coin portait six bouts de mur au lieu de deux, et
+ * aucune boucle ne passait plus.
+ */
+export const ECLAT = 0.005;
+
+/** Le plan sans ses éclats — ni dans les murs, ni dans les listes des pièces. */
+export function sansEclats<W extends WallSeg, R extends { wallIds?: string[] }>(
+  walls: W[],
+  rooms: R[],
+): { walls: W[]; rooms: R[] } {
+  const eclats = new Set(walls.filter((w) => w.type === 'wall' && segLength(w) < ECLAT).map((w) => w.id));
+  if (eclats.size === 0) return { walls, rooms };
+  return {
+    walls: walls.filter((w) => !eclats.has(w.id)),
+    rooms: rooms.map((r) =>
+      r.wallIds?.some((id) => eclats.has(id)) ? { ...r, wallIds: r.wallIds.filter((id) => !eclats.has(id)) } : r,
+    ),
+  };
 }
 
 // ------------------------------------------------------ jonctions de murs
@@ -2273,6 +2301,44 @@ export function fusionnerMursDoubles(
     out.push({ ...w, a: A, b: B });
   }
   return out;
+}
+
+/**
+ * LA BAIE VITRÉE N'EST PAS UNE PORTE — relevé du patron : « ma baie vitrée a
+ * été détectée comme une porte, et à l'ouverture du plan elle est rouge car
+ * dans son ouverture se trouve le canapé ». RoomPlan range souvent une baie
+ * coulissante parmi les portes ; le plan lui dessinait un vantail de 2,40 m,
+ * un quart de cercle qui balaie la moitié du séjour.
+ *
+ * Une « porte » de 1,60 m et plus percée dans un mur de FAÇADE (un de ses
+ * côtés hors de toute pièce) est une baie : elle devient une fenêtre — une
+ * porte-fenêtre qui descend au sol — sans battant. Une porte intérieure, si
+ * large soit-elle, reste une porte. Sans pièce refermée pour le dire, il
+ * faut 1,80 m. `contours` : ceux des pièces, quand l'appelant les a ; sinon
+ * on les cherche dans le graphe des murs.
+ */
+export const LARGEUR_DE_BAIE = 1.6;
+
+export function baiesVitrees<O extends WallSeg>(openings: O[], walls: WallSeg[], contours?: Pt[][]): O[] {
+  if (!openings.some((o) => o.type === 'door' && segLength(o) >= LARGEUR_DE_BAIE)) return openings;
+  const lesContours = (contours ?? detectRooms(walls, undefined, openings).map((r) => r.outline)).filter(
+    (c) => c.length >= 3,
+  );
+  const dehors = (p: Pt) => !lesContours.some((c) => insidePoly(p, c));
+  return openings.map((o) => {
+    const l = segLength(o);
+    if (o.type !== 'door' || l < LARGEUR_DE_BAIE) return o;
+    let facade: boolean;
+    if (lesContours.length === 0) {
+      facade = l >= 1.8;
+    } else {
+      const n = { x: -(o.b.z - o.a.z) / l, z: (o.b.x - o.a.x) / l };
+      const m = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+      const d = WALL_T / 2 + 0.25;
+      facade = dehors({ x: m.x + n.x * d, z: m.z + n.z * d }) || dehors({ x: m.x - n.x * d, z: m.z - n.z * d });
+    }
+    return facade ? { ...o, type: 'window', open: undefined, pivot: undefined, versExterieur: undefined } : o;
+  });
 }
 
 /** Hauteur par défaut d'un coffre de volet — le tunnel courant, 25 cm. */

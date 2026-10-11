@@ -70,6 +70,15 @@ function enL(canape: ObjectData, piece: ObjectData): Reunion | null {
   const ex = { x: t[0] / lx, z: t[2] / lx };
   const ez = { x: t[8] / lz, z: t[10] / lz };
 
+  /*
+    LA RALLONGE QUE ROOMPLAN NOMME — il étiquette parfois lui-même la
+    seconde pièce `SofaType:lShapedExtension`. On le croit : un peu décollée
+    ou un peu plus basse, c'est la rallonge du L quand même.
+  */
+  const nommee = ((piece as Attribue).attributes ?? []).some((a) => /^SofaType:lShapedExtension$/i.test(a));
+  const colle = nommee ? 0.3 : 0.12;
+  const avance = nommee ? 0.1 : 0.25;
+
   // D'équerre : alignée ou à angle droit, à 7° près.
   const p = piece.transform;
   const pl = Math.hypot(p[0], p[2]) || 1;
@@ -80,7 +89,7 @@ function enL(canape: ObjectData, piece: ObjectData): Reunion | null {
   // De hauteur voisine : une assise, pas un pouf sous la fenêtre.
   const hC = canape.height ?? 0.85;
   const hP = piece.height ?? 0;
-  if (hP < 0.35 || Math.abs(hC - hP) > 0.35) return null;
+  if (hP < 0.35 || Math.abs(hC - hP) > (nommee ? 0.5 : 0.35)) return null;
 
   const W = (canape.width ?? 0) / 2;
   const D = (canape.depth ?? 0) / 2;
@@ -98,13 +107,13 @@ function enL(canape: ObjectData, piece: ObjectData): Reunion | null {
     const z0 = Math.min(...zs);
     const z1 = Math.max(...zs);
     // Elle avance devant le canapé, et elle le touche.
-    if (!(z0 < -D - 0.25 && z1 >= -D - 0.12)) continue;
+    if (!(z0 < -D - avance && z1 >= -D - colle)) continue;
     // À l'un de ses bouts, pas au milieu.
     const s = Math.sign(x0 + x1);
     if (s === 0) continue;
     const dehors = Math.max(s * x0, s * x1);
     const dedans = Math.min(s * x0, s * x1);
-    if (dehors < W - 0.25 || dedans < W - 1.3 || dedans > W + 0.12) continue;
+    if (dehors < W - 0.25 || dedans < W - 1.3 || dedans > W + colle) continue;
     // Une méridienne, pas un second canapé entier.
     if (dehors - dedans > 1.3) continue;
     return {

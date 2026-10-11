@@ -39,6 +39,10 @@ import {
   DEFAULT_ROOM_ID,
   detectRooms,
   mergeColinear,
+  sansEclats,
+  baiesVitrees,
+  LARGEUR_DE_BAIE,
+  solDesMurs,
   openingsOn,
   pointOnSeg,
   pushOutOfObjects,
@@ -85,7 +89,9 @@ import {
   type WallSeg,
 } from '../geometry/floorplan';
 import { avecCoffresDuLidar } from '../geometry/coffreLidar';
+import type { MurDouteux } from '../geometry/murDouteux';
 import { reunirLesCanapesDAngle } from '../geometry/canapeAngle';
+import { calerDansLaNiche, calerLesMeubles } from '../geometry/niche';
 import {
   catalogTransform,
   type CatalogItem,
@@ -733,7 +739,33 @@ function separerLeMobilier(objects: ObjectData[]): ObjectData[] {
   return suite;
 }
 
-function migrateSave(s: SavedScan): SavedScan {
+function migrateSave(brut: SavedScan): SavedScan {
+  /*
+    LES ÉCLATS D'UN PLAN D'AVANT S'EN VONT À L'OUVERTURE — un « mur » de
+    0 cm sur un coin empêchait sa pièce de se fermer (voir `ECLAT`). Le
+    plan et ses retouches en attente.
+  */
+  const propre = sansEclats(brut.walls ?? [], brut.rooms ?? []);
+  let s: SavedScan =
+    propre.walls === (brut.walls ?? []) ? brut : { ...brut, walls: propre.walls, rooms: propre.rooms };
+  /*
+    LA BAIE VITRÉE D'UN PLAN D'AVANT, rangée parmi les portes : elle balayait
+    le séjour d'un vantail de 2,40 m (voir `baiesVitrees`). Les contours sont
+    ceux des pièces du plan.
+  */
+  if ((s.openings ?? []).some((o) => o.type === 'door' && segLength(o) >= LARGEUR_DE_BAIE)) {
+    const contours = roomParts(s.walls ?? [], s.rooms ?? [])
+      .map((p) => p.surface?.pts ?? [])
+      .filter((c) => c.length >= 3);
+    const ouvertures = baiesVitrees(s.openings, s.walls ?? [], contours);
+    if (ouvertures !== s.openings) s = { ...s, openings: ouvertures };
+  }
+  if (s.retouche?.plan?.walls) {
+    const r = sansEclats(s.retouche.plan.walls, s.retouche.plan.rooms ?? []);
+    if (r.walls !== s.retouche.plan.walls) {
+      s = { ...s, retouche: { ...s.retouche, plan: { ...s.retouche.plan, walls: r.walls, rooms: r.rooms } } };
+    }
+  }
   const fixtures = Array.isArray(s.fixtures) ? s.fixtures : [];
   if (Array.isArray(s.rooms) && s.rooms.length > 0) {
     return s.fixtures === fixtures ? s : { ...s, fixtures };
@@ -1239,6 +1271,8 @@ interface ScanState {
    * pièces qui ne se referment pas).
    */
   mursDouteux: number;
+  /** Le plus proche des murs mal vus, nommé (voir `murDouteux`). */
+  murDouteux: MurDouteux | null;
   /**
    * LE MUR QUI MANQUE, en direct — le plus grand trou du contour (m), zéro
    * quand la pièce est fermée. On le dit au moment de terminer, pendant
@@ -2106,6 +2140,8 @@ interface ScanState {
    * de dix centimètres ne doit pas le rendre plus grand. Omettre l'une la
    * laisse telle quelle.
    */
+  /** Cale le meuble dans sa niche (voir `calerDansLaNiche`). */
+  calerMeuble: (id: string) => void;
   setObjectHeight: (id: string, height?: number, base?: number) => void;
   /**
    * ÉTIRE UN MEUBLE PAR UN DE SES CÔTÉS, le côté opposé restant en place.
@@ -2735,6 +2771,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     error: null,
     instruction: '',
     mursDouteux: 0,
+    murDouteux: null,
     trouContour: 0,
     complementEnCours: false,
     wallCount: 0,
@@ -3462,7 +3499,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const olds = roomParts(st.walls, st.rooms);
       // Le graphe a pu changer (cloison ajoutée, coin déplacé) : on le
       // renettoie avant d'y rechercher les faces.
-      const walls = mergeColinear(splitAtJunctions(weldCorners(st.walls)));
+      const walls = sansEclats(mergeColinear(splitAtJunctions(weldCorners(st.walls))), []).walls;
       // Les menuiseries départagent une petite PIÈCE d'une gaine technique :
       // ce qui s'ouvre est une pièce, si petit soit-il.
       const shapes = detectRooms(walls, undefined, st.openings);
@@ -5310,6 +5347,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         // entières, deux fois par seconde) ; un natif ancien les envoie
         // encore, et l'on sait toujours compter.
         trouContour: typeof u.trouContour === 'number' ? u.trouContour : 0,
+        // Le plus proche des murs mal vus, nommé par le natif.
+        murDouteux: u.murDouteux ?? null,
         mursDouteux:
           typeof u.mursDouteux === 'number'
             ? u.mursDouteux
@@ -5344,15 +5383,20 @@ export const useScanStore = create<ScanState>((set, get) => {
         pièce. Sans les réunir, chaque arête doublée fausse le parcours des
         faces, et le logement ressort en une seule pièce, ou en aucune.
       */
-      const walls = mergeColinear(
-        splitAtJunctions(
-          weldCorners(
-            fusionnerMursDoubles(segments.filter((x) => x.type === 'wall')),
+      // Les éclats de 0 cm que la soudure des coins laisse s'en vont (voir `ECLAT`).
+      const walls = sansEclats(
+        mergeColinear(
+          splitAtJunctions(
+            weldCorners(
+              fusionnerMursDoubles(segments.filter((x) => x.type === 'wall')),
+            ),
           ),
         ),
-      );
+        [],
+      ).walls;
       if (walls.length === 0) return;
-      const openings = segments.filter((x) => x.type !== 'wall');
+      // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`).
+      const openings = baiesVitrees(segments.filter((x) => x.type !== 'wall'), walls);
       pushHistory('completerReleve');
 
       const detected = detectRooms(walls, undefined, openings);
@@ -5374,7 +5418,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
       const floor = r.floor ?? r.rooms?.[0]?.floor ?? st.rooms[0]?.floor ?? null;
       // Les sièges regardent la pièce, pas le mur : voir `orienterLesSieges`.
-      const objects: ObjectData[] = orienterLesSieges(
+      const objects: ObjectData[] = calerLesMeubles(orienterLesSieges(
         separerLeMobilier(
           // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
           reunirLesCanapesDAngle(entrants).map((o) => ({
@@ -5386,7 +5430,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           })),
         ),
         walls,
-      );
+      ), walls);
       // Ce que RoomPlan dit de chaque pièce d'abord, le mobilier ensuite.
       const kinds = shapes.map((sh, i) =>
         deduireLaPiece(
@@ -5717,13 +5761,16 @@ export const useScanStore = create<ScanState>((set, get) => {
         : r.objects ?? [];
       // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR.
       const segments = avecCoffresDuLidar(surfaces.map((s) => toSegment(s)), r.dessus);
-      const bruts = mergeColinear(
-        splitAtJunctions(
-          weldCorners(
-            fusionnerMursDoubles(segments.filter((s) => s.type === 'wall')),
+      const bruts = sansEclats(
+        mergeColinear(
+          splitAtJunctions(
+            weldCorners(
+              fusionnerMursDoubles(segments.filter((s) => s.type === 'wall')),
+            ),
           ),
         ),
-      );
+        [],
+      ).walls;
       if (bruts.length === 0) {
         set({ processing: false, scanning: false, etageEnCours: null });
         return;
@@ -5758,7 +5805,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           niveau: n,
         }));
       const walls = pose(bruts);
-      const openings = pose(ouverturesBrutes);
+      const openings = baiesVitrees(pose(ouverturesBrutes), walls);
 
       const detected = detectRooms(walls, undefined, openings);
       const shapes =
@@ -5767,7 +5814,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           : [{ outline: [], wallIds: walls.map((w) => w.id), area: 0 }];
       const idPiece = (i: number) => `room-${n}-${i + 1}`;
 
-      const objects: ObjectData[] = orienterLesSieges(
+      const objects: ObjectData[] = calerLesMeubles(orienterLesSieges(
         separerLeMobilier(
           // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
           reunirLesCanapesDAngle(entrants).map((o) => {
@@ -5788,7 +5835,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           }),
         ),
         walls,
-      );
+      ), walls);
       const kinds = shapes.map((sh, i) =>
         deduireLaPiece(
           // Les sections arrivent brutes : elles se décalent comme les murs.
@@ -5861,10 +5908,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       // (sans ça aucun cycle ne passe par elle et tout l'appartement ressort
       // en une seule pièce), recoller les morceaux alignés, PUIS chercher les
       // pièces : le graphe doit être propre avant d'y chercher des faces.
-      const walls = mergeColinear(
-        splitAtJunctions(weldCorners(segments.filter((s) => s.type === 'wall'))),
-      );
-      const openings = segments.filter((s) => s.type !== 'wall');
+      const walls = sansEclats(
+        mergeColinear(splitAtJunctions(weldCorners(segments.filter((s) => s.type === 'wall')))),
+        [],
+      ).walls;
+      // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`).
+      const openings = baiesVitrees(segments.filter((s) => s.type !== 'wall'), walls);
 
       // Détection automatique : les pièces sont les faces du graphe des murs.
       // Si rien ne se referme (scan trop partiel), tout tient en une pièce.
@@ -5878,7 +5927,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       // À la sortie du scan comme à l'ouverture d'un dossier : deux meubles que
       // la caméra a fait se traverser sont écartés du strict nécessaire.
       // Les sièges regardent la pièce, pas le mur : voir `orienterLesSieges`.
-      const objects: ObjectData[] = orienterLesSieges(
+      const objects: ObjectData[] = calerLesMeubles(orienterLesSieges(
         separerLeMobilier(
           // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
           reunirLesCanapesDAngle(incomingObjects).map((o) => ({
@@ -5890,7 +5939,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           })),
         ),
         walls,
-      );
+      ), walls);
 
       /*
         LE TYPE DE CHAQUE PIÈCE : ce que RoomPlan en dit (iOS 17), puis le
@@ -7592,6 +7641,17 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
     },
 
+    calerMeuble: (id) => {
+      const st = get();
+      const o = st.objects.find((x) => x.id === id);
+      if (!o) return;
+      const cale = calerDansLaNiche(o, st.walls);
+      // La garde AVANT le point de reprise : voir `annulerunefois`.
+      if (!cale) return;
+      pushHistory(`caler:${id}`);
+      set({ objects: st.objects.map((x) => (x.id === id ? cale : x)), dirty: true });
+    },
+
     setObjectHeight: (id, height, base) => {
       const o = get().objects.find((x) => x.id === id);
       if (!o) return;
@@ -7602,7 +7662,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (base !== undefined && !(base >= 0 && base <= 6)) return;
       if (height === undefined && base === undefined) return;
       const h = height ?? o.height;
-      const b = base ?? o.transform[13] - o.height / 2;
+      /*
+        LA POSE SE COMPTE DEPUIS LE SOL DU PLAN — RoomPlan ne le met pas à
+        zéro (voir `solDesMurs`). « 0 » pose le meuble par terre, pas à
+        quatre-vingts centimètres au-dessus.
+      */
+      const b = base !== undefined ? base + solDesMurs(get().walls) : o.transform[13] - o.height / 2;
       pushHistory(`objectHeight:${id}`);
       set({
         objects: get().objects.map((x) => {
@@ -8145,6 +8210,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         error: null,
         instruction: '',
         mursDouteux: 0,
+        murDouteux: null,
         trouContour: 0,
         complementEnCours: false,
         wallCount: 0,

@@ -821,13 +821,19 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
       l'application : « je veux une continuité parfaite des éléments de
       l'interface ». Elles en faisaient trente-huit, pour rien.
     */
-    paddingHorizontal: 8,
-    minHeight: 34,
+    paddingHorizontal: 7,
+    /*
+      PLUS BASSES, ET LEURS CHIFFRES PLUS PETITS — relevé du patron : « les
+      chiffres de positionnement sont trop gros et prennent trop de place ».
+      Une cote se relit, elle ne se proclame pas : vingt-huit points de haut
+      suffisent à la toucher.
+    */
+    minHeight: 28,
     // Elle ne cède plus : depuis que les boutons ont leur propre rangée,
     // la ligne des cotes n'a plus personne à qui céder la place.
     flexShrink: 0,
   },
-  clValeur: { color: c.ink, fontSize: 15.5, fontWeight: '600' },
+  clValeur: { color: c.ink, fontSize: 13.5, fontWeight: '600' },
   /**
    * LE MOT D'UNE COTE, ÉCRIT DANS SA PASTILLE.
    *
@@ -839,7 +845,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    * Il se lit EN RETRAIT : c'est une étiquette, pas une valeur. Le chiffre
    * reste ce qu'on vient lire.
    */
-  clMot: { color: c.inkFaint, fontSize: 10.5, fontWeight: '700' },
+  clMot: { color: c.inkFaint, fontSize: 9.5, fontWeight: '700' },
   /*
     LES DEUX GESTES, POUSSÉS À DROITE DE LA LIGNE DU TITRE.
 

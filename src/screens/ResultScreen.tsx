@@ -66,6 +66,7 @@ import type { Pt } from '../geometry/floorplan';
 import { SidePill } from '../components/SidePill';
 import { CeilingBar } from '../components/CeilingBar';
 import { ObjectBar } from '../components/ObjectBar';
+import { calerDansLaNiche } from '../geometry/niche';
 import { corrigerConstat, poserAuxNormes } from '../geometry/auto';
 import { ControlePastille } from '../components/ControlePastille';
 import { DevisPastille } from '../components/DevisPastille';
@@ -2035,6 +2036,9 @@ export function ResultScreen() {
   const battants = useMemo(() => battantsDesPortes(openings, walls, rooms), [openings, walls, rooms]);
   const bloquages = useMemo(() => meublesQuiBloquent(battants, objects), [battants, objects]);
   const portesBloquees = useMemo(() => new Set(bloquages.keys()), [bloquages]);
+  // Le meuble choisi est-il logé entre des murs, un peu plus petit que sa place ?
+  const calage = useMemo(() => (selectedObject ? calerDansLaNiche(selectedObject, walls) : null), [selectedObject, walls]);
+  const calerMeuble = useScanStore((st) => st.calerMeuble);
   // Le verdict suit le meuble et ses cotes, pas chaque image d'un glissé.
   const verdictDePassage = useMemo(
     () => (selectedObject ? passageDuMeuble(selectedObject, { walls, openings, rooms }) : null),
@@ -4590,6 +4594,8 @@ export function ResultScreen() {
           <ObjectBar
             key={selectedObject.id}
             object={selectedObject}
+            sol={solDesMurs(walls)}
+            onCaler={calage ? () => calerMeuble(selectedObject.id) : undefined}
             styles={stylesBarres}
             palette={teinte}
             onPrompt={setPrompt}

@@ -96,6 +96,10 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'colonneFour', label: 'Colonne four', category: 'oven', w: 0.6, d: 0.6, h: 2.1 },
       { key: 'tabouret', label: 'Tabouret de bar', category: 'chair', w: 0.4, d: 0.4, h: 0.75 },
       { key: 'tableHaute', label: 'Table haute', category: 'table', w: 1.2, d: 0.6, h: 1.05 },
+      { key: 'meubleHaut40', label: 'Meuble haut 40', category: 'storage', w: 0.4, d: 0.35, h: 0.7, base: 1.4 },
+      { key: 'meubleHaut120', label: 'Meuble haut 120', category: 'storage', w: 1.2, d: 0.35, h: 0.7, base: 1.4 },
+      { key: 'meubleHautVitre', label: 'Meuble haut vitré', category: 'storage', w: 0.8, d: 0.35, h: 0.7, base: 1.4 },
+      { key: 'etagereCuisine', label: 'Étagère à bocaux', category: 'storage', w: 0.8, d: 0.22, h: 0.3, base: 1.5 },
     ],
   },
   {
@@ -124,6 +128,8 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'piano', label: 'Piano droit', category: 'piano', w: 1.5, d: 0.6, h: 1.25 },
       { key: 'aquarium', label: 'Aquarium', category: 'aquarium', w: 1.0, d: 0.4, h: 1.3 },
       { key: 'poeleBois', label: 'Poêle à bois', category: 'poele', w: 0.5, d: 0.45, h: 1.1 },
+      { key: 'meubleTvSuspendu', label: 'Meuble TV suspendu', category: 'storage', w: 1.6, d: 0.38, h: 0.35, base: 0.3 },
+      { key: 'etagereFlottante', label: 'Étagère flottante', category: 'storage', w: 1.0, d: 0.22, h: 0.25, base: 1.3 },
     ],
   },
   /*
@@ -144,6 +150,10 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'planteHaute', label: 'Grande plante', category: 'plante', w: 0.7, d: 0.7, h: 1.9 },
       { key: 'planteSuspendue', label: 'Plante suspendue', category: 'plante', w: 0.4, d: 0.4, h: 0.8, base: 1.4 },
       { key: 'rideaux', label: 'Rideaux', category: 'rideau', w: 1.4, d: 0.12, h: 2.4 },
+      { key: 'tableauPortrait', label: 'Tableau vertical', category: 'cadre', w: 0.5, d: 0.03, h: 0.7, base: 1.3 },
+      { key: 'grandeToile', label: 'Grande toile', category: 'cadre', w: 1.2, d: 0.03, h: 0.8, base: 1.1 },
+      { key: 'affiche', label: 'Affiche encadrée', category: 'cadre', w: 0.5, d: 0.02, h: 0.7, base: 1.35 },
+      { key: 'triptyque', label: 'Triptyque', category: 'cadre', w: 1.2, d: 0.03, h: 0.5, base: 1.3 },
     ],
   },
   {
@@ -158,6 +168,7 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'doucheItalienne', label: 'Douche à l’italienne', category: 'bathtub', w: 1.2, d: 0.9, h: 2.0 },
       { key: 'doubleVasque', label: 'Double vasque', category: 'sink', w: 1.2, d: 0.5, h: 0.85 },
       { key: 'colonneSdb', label: 'Colonne de rangement', category: 'storage', w: 0.4, d: 0.35, h: 1.8 },
+      { key: 'armoireToilette', label: 'Armoire de toilette', category: 'storage', w: 0.6, d: 0.15, h: 0.7, base: 1.2 },
       { key: 'wc', label: 'WC', category: 'toilet', w: 0.4, d: 0.7, h: 0.8 },
       { key: 'll', label: 'Lave-linge', category: 'washer', w: 0.6, d: 0.6, h: 0.85 },
       { key: 'sl', label: 'Sèche-linge', category: 'dryer', w: 0.6, d: 0.6, h: 0.85 },

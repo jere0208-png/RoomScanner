@@ -100,6 +100,43 @@ describe('les nouveaux articles', () => {
   });
 });
 
+describe('les meubles hauts et les tableaux — « ajoute des meubles hauts, comme ceux de cuisine, des tableaux »', () => {
+  const MURAUX = [
+    'meubleHaut40',
+    'meubleHaut120',
+    'meubleHautVitre',
+    'etagereCuisine',
+    'armoireToilette',
+    'meubleTvSuspendu',
+    'etagereFlottante',
+    'tableauPortrait',
+    'grandeToile',
+    'affiche',
+    'triptyque',
+  ];
+
+  it('tous au catalogue, accrochés à leur hauteur', () => {
+    for (const k of MURAUX) {
+      const it = catalogItem(k);
+      expect([k, !!it, (it?.base ?? 0) >= 0.25]).toEqual([k, true, true]);
+    }
+  });
+
+  it('chacun sa silhouette', () => {
+    expect(matieres(modele('meubleHautVitre')).has('verre')).toBe(true);
+    expect(matieres(modele('armoireToilette')).has('miroir')).toBe(true);
+    // Le triptyque : trois toiles, donc trois fonds de papier de plus qu'un tableau.
+    const papier = (m: ModeleLocal) => m.groupes.filter((g) => g.mat === 'papier').reduce((n, g) => n + g.i.length, 0);
+    expect(papier(modele('triptyque'))).toBeGreaterThan(papier(modele('tableauMural')));
+    // L'étagère de cuisine porte des bocaux, pas des livres.
+    expect(matieres(modele('etagereCuisine')).has('papier')).toBe(false);
+    // Un meuble haut se repeint.
+    const it = catalogItem('meubleHaut40')!;
+    const rouge = fabriquer(it.category, { W: it.w, D: it.d, H: it.h }, { modele: it.key, teinte: '#AA3322', attributs: [], hasard: graineDe('r') });
+    expect(rouge.groupes.some((g) => g.couleur === '#AA3322')).toBe(true);
+  });
+});
+
 describe('la feuille « Ajouter un meuble » se range par familles', () => {
   const monter = () => {
     let t!: TestRenderer.ReactTestRenderer;

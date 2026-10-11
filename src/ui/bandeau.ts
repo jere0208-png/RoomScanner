@@ -19,3 +19,10 @@
  * débord est un bouton qu'on rate.
  */
 export const DEBORD_DOIGT = { top: 6, bottom: 6, left: 6, right: 6 };
+
+/**
+ * LE DÉBORD D'UNE PASTILLE DE COTE — elle est plus basse (vingt-huit points,
+ * voir `clChamp`) : le doigt garde ses quarante-quatre points par un débord
+ * plus haut, sans que le chiffre prenne la place.
+ */
+export const DEBORD_COTE = { top: 8, bottom: 8, left: 5, right: 5 };

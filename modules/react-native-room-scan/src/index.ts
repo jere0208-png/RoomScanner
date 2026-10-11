@@ -134,6 +134,11 @@ export interface ScanUpdate {
   /** Les murs que RoomPlan voit mal (confiance basse ou moyenne), comptés en natif. */
   mursDouteux?: number;
   /**
+   * LE PLUS PROCHE DES MURS MAL VUS, vu du téléphone : de quel côté, à
+   * quelle distance (m), et sa longueur (m) — de quoi le retrouver.
+   */
+  murDouteux?: { cote: 'gauche' | 'droite' | 'devant' | 'derriere'; distance: number; longueur: number };
+  /**
    * Le plus grand trou du contour (m) : deux bouts de mur libres qui se font
    * face — presque toujours un mur qui n'a pas été balayé. Zéro : fermé.
    */

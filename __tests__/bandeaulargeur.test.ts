@@ -24,7 +24,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import { getStyles } from '../src/screens/result/styles';
-import { DEBORD_DOIGT } from '../src/ui/bandeau';
+import { DEBORD_COTE, DEBORD_DOIGT } from '../src/ui/bandeau';
 import { light } from '../src/theme';
 
 /**
@@ -112,7 +112,8 @@ describe('le bandeau du meuble', () => {
     expect(cible(s.iconBtn.width)).toBeGreaterThanOrEqual(44);
     expect(cible(s.iconBtnOk.width)).toBeGreaterThanOrEqual(44);
     expect(cible(s.nudgeBtn.width)).toBeGreaterThanOrEqual(44);
-    expect(cible(s.clChamp.minHeight)).toBeGreaterThanOrEqual(44);
+    // Les pastilles de cotes, plus basses encore, ont leur débord à elles.
+    expect(s.clChamp.minHeight + DEBORD_COTE.top + DEBORD_COTE.bottom).toBeGreaterThanOrEqual(44);
     // Et le dessin, lui, s'est bien resserré : sinon rien n'a été gagné.
     expect(s.clChamp.minHeight).toBeLessThan(44);
   });

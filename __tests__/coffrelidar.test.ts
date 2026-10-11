@@ -18,6 +18,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { avecCoffresDuLidar, coffreDuProfil, type ProfilDessus } from '../src/geometry/coffreLidar';
 import type { WallSeg } from '../src/geometry/floorplan';
+import { buildScene } from '../src/geometry/scene3d';
+import { MAQUETTE } from '../src/ui/maquette';
 
 const lire = (p: string) => readFileSync(join(__dirname, '..', p), 'utf8');
 
@@ -152,6 +154,57 @@ describe('le coffre trouvé se pose sur sa baie', () => {
     const l = [baie('f1')];
     expect(avecCoffresDuLidar(l, undefined)).toBe(l);
   });
+});
+
+describe('le coffre est une vraie boîte, de quelque sens qu’on trace le mur', () => {
+  /*
+    Relevé du patron : « le coffrage au-dessus de ma baie est ouvert, on
+    voit le bleu ciel de l'extérieur ; il faut former un vrai coffrage 3D ».
+    Un mur tracé dans un sens a la pièce du côté +n ; dans l'autre, du côté
+    −n. Le coffre se bâtissait comme si la pièce était toujours du côté +n :
+    dans l'autre cas, ses faces regardaient vers le dedans de la boîte, et la
+    carte graphique — qui ne dessine pas une face vue de dos — l'ouvrait.
+  */
+  const coffreDe = (sens: 1 | -1) => {
+    const a = sens > 0 ? { x: 0, z: 0 } : { x: 4, z: 0 };
+    const b = sens > 0 ? { x: 4, z: 0 } : { x: 0, z: 0 };
+    const mur = (id: string, p: { x: number; z: number }, q: { x: number; z: number }): WallSeg => ({
+      id, type: 'wall', a: p, b: q, height: 2.5, yCenter: 1.25, roomId: 'r1',
+    });
+    const murs = [mur('n', a, b), mur('e', { x: 4, z: 0 }, { x: 4, z: 3 }), mur('s', { x: 4, z: 3 }, { x: 0, z: 3 }), mur('o', { x: 0, z: 3 }, { x: 0, z: 0 })];
+    const fenetre: WallSeg = {
+      id: 'f1', type: 'window', a: { x: 1, z: 0 }, b: { x: 2.2, z: 0 }, height: 1.35, yCenter: 1.4,
+      coffre: 0.25, coffreSaillie: 0.18, roomId: 'r1',
+    };
+    const sc = buildScene(murs, [fenetre], [], {
+      palette: MAQUETTE,
+      showSurfaces: true,
+      rooms: [{ id: 'r1', wallIds: ['n', 'e', 's', 'o'] }],
+    });
+    const haut = 1.4 + 1.35 / 2;
+    return sc.faces.filter(
+      (f) =>
+        f.pts.length >= 3 &&
+        f.pts.every((p) => p.x > 0.9 && p.x < 2.3 && p.y >= haut - 1e-3 && p.y <= haut + 0.25 + 1e-3 && p.z > 0) &&
+        f.pts.some((p) => p.z > 0.15),
+    );
+  };
+
+  for (const sens of [1, -1] as const) {
+    it(`mur tracé ${sens > 0 ? 'dans un sens' : 'dans l’autre'} : la face avant regarde la pièce, toutes regardent dehors`, () => {
+      const faces = coffreDe(sens);
+      expect(faces.length).toBeGreaterThanOrEqual(4);
+      const centre = { x: 1.6, y: 1.4 + 1.35 / 2 + 0.125, z: 0.15 };
+      for (const f of faces) {
+        const n = f.normal!;
+        const c = f.pts.reduce((m, p) => ({ x: m.x + p.x / f.pts.length, y: m.y + p.y / f.pts.length, z: m.z + p.z / f.pts.length }), { x: 0, y: 0, z: 0 });
+        expect(n.x * (c.x - centre.x) + n.y * (c.y - centre.y) + n.z * (c.z - centre.z)).toBeGreaterThan(0);
+      }
+      // Sa face avant, tournée vers la pièce (+z), et son dessous, tourné vers le bas.
+      expect(faces.some((f) => f.normal!.z > 0.9)).toBe(true);
+      expect(faces.some((f) => f.normal!.y < -0.9)).toBe(true);
+    });
+  }
 });
 
 describe('le fil du natif au plan', () => {

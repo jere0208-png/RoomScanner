@@ -2738,8 +2738,20 @@ export function buildScene(
         const nuB = plusIsInner ? q.b1 : q.b2;
         const devant = (p: Pt) => ({ x: p.x + versLaPiece.x * saillie, z: p.z + versLaPiece.z * saillie });
         const marge = 0.05 / len;
+        /*
+          LA BOÎTE DANS LE BON SENS — relevé du patron : « le coffrage est
+          ouvert, on voit le bleu ciel de l'extérieur ». Un bloc oriente ses
+          faces d'après le sens du mur : son côté « 1 » est le côté +n. Quand
+          la pièce est du côté −n, la face avant du coffre doit donc être
+          son côté « 2 » — sinon toutes ses faces regardent vers le dedans,
+          et la carte graphique, qui ne dessine pas une face vue de dos,
+          ouvre la boîte.
+        */
+        const boite = plusIsInner
+          ? { a1: devant(nuA), b1: devant(nuB), b2: nuB, a2: nuA }
+          : { a1: nuA, b1: nuB, b2: devant(nuB), a2: devant(nuA) };
         pushWallBlock(
-          { a1: devant(nuA), b1: devant(nuB), b2: nuB, a2: nuA },
+          boite,
           Math.max(0, hole.t0 - marge),
           Math.min(1, hole.t1 + marge),
           hole.y1,

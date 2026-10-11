@@ -14285,6 +14285,108 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Retours de chantier : la pièce qui ne se fermait pas, la baie prise pour une porte, le coffre ouvert, le frigo dans sa niche, le mur douteux nommé
+
+Relevés du patron, captures et diagnostic à l'appui :
+- « une pièce n'est pas fermée et ne veut pas se fermer ; quand j'essaye de
+  la fermer, une forme de triangle coupe tout l'appartement » ;
+- « lors d'un scan, il est dit qu'un mur a été mal détecté, mais on
+  n'informe pas lequel » ;
+- « ma baie vitrée a été détectée comme une porte : à l'ouverture du plan,
+  elle est rouge car dans son ouverture se trouve le canapé » ;
+- « le coffrage au-dessus de ma baie est ouvert, on voit le bleu ciel de
+  l'extérieur » ;
+- « mon frigo ne veut pas se caler dans le coin, entre trois murs : on doit
+  adapter la taille des meubles à leur espace » ;
+- « l'info “passe par les portes” n'est importante que si le meuble ne
+  passe PAS ; les chiffres de positionnement sont trop gros » ;
+- « ajoute des meubles hauts, comme ceux de cuisine, des tableaux ».
+
+**Les éclats de mur** (`ECLAT`, `sansEclats`). Le diagnostic envoyé par le
+patron disait tout : neuf murs en boucle parfaite, et deux « murs » de 0 cm
+sur un même coin. Un mur de moins de quinze centimètres dont les deux bouts
+sont soudés au même coin (`weldCorners`) devient un point. Ce coin portait
+six bouts de mur au lieu de deux : aucune boucle ne passait, et le parcours
+des pièces traçait n'importe quoi (le « triangle »). Les éclats s'en vont :
+- à la fin du scan, après le nettoyage du graphe ;
+- à « Redétecter les pièces » ;
+- à l'ouverture d'un plan, retouches en attente comprises.
+
+`closedLoop` ne les compte plus, et le diagnostic les nomme s'il en reste.
+
+**Le mur mal vu, nommé** (`murDouteuxLePlusProche`, `phraseDuMurDouteux`).
+Le natif dit, pour le plus proche des murs douteux :
+- de quel côté du téléphone il se trouve (devant, derrière, à gauche ou à
+  droite) ;
+- à quelle distance ;
+- sa longueur.
+
+Le bandeau du scan dit « Le mur à votre gauche (3,40 m, à 2 m) est mal vu »,
+ou « 3 murs mal vus · le plus proche à votre droite… ».
+
+**La baie vitrée n'est pas une porte** (`baiesVitrees`). Une « porte » de
+1,60 m et plus percée dans un mur de façade devient une fenêtre (une
+porte-fenêtre qui descend au sol), sans battant. Il n'y a plus de quart de
+cercle de 2,40 m qui balaie le séjour et déclare « gêné » le canapé. Une
+porte intérieure reste une porte ; sans pièce refermée, il faut 1,80 m.
+Cela se fait à la fin du scan et à l'ouverture d'un plan.
+
+Le plan qui « bugue » ensuite n'a pas pu être reproduit au banc : une baie
+de 2,40 m prise pour une porte, son coffre et un canapé d'angle dans le
+battant s'ouvrent sans erreur, en 2D comme en 3D. Le déclencheur est retiré ;
+le diagnostic du plan concerné dira le reste.
+
+**Le coffre est une vraie boîte.** Un bloc oriente ses faces d'après le sens
+du mur, sa pièce du côté +n. Quand la pièce est du côté −n, toutes les faces
+du coffre regardaient vers le dedans : la carte graphique, qui ne dessine pas
+une face vue de dos, l'ouvrait, et l'on voyait au travers. Il se bâtit
+maintenant dans le bon sens, quel que soit celui du mur.
+
+**Le meuble prend sa place dans sa niche** (`geometry/niche.ts`). RoomPlan
+rend une boîte un peu plus petite que le meuble : 46 × 42 cm pour un frigo
+logé dans 62 cm. Côté par côté, on lit l'écart au nu du mur qui lui fait
+face (à 10° près parallèle, couvrant au moins la moitié du côté) :
+- entre deux murs qui se font face, à moins de 20 cm de chacun, le meuble
+  remplit l'intervalle, ou y est ramené s'il mordait dans le mur ;
+- s'il y a aussi un mur dans son dos, il s'y adosse.
+
+Un meuble contre un seul mur, ou dans un angle, ne bouge pas ; ni un tapis,
+ni ce qui est suspendu ; ni un meuble qui chevaucherait alors un voisin.
+C'est fait à la fin du scan. Pour un plan déjà relevé, la barre du meuble
+propose « Caler dans sa niche » quand le calage change quelque chose.
+
+**La barre du meuble.**
+- La puce « Ça passe ? » ne parle plus que si le meuble ne passe PAS.
+- Les pastilles de cotes rapetissent (28 points de haut, chiffres en 13,5) ;
+  le doigt garde ses 44 points par un débord plus haut (`DEBORD_COTE`).
+- **La pose se compte depuis le sol du plan** (`solDesMurs`). Elle se
+  lisait dans le repère de RoomPlan, où le sol n'est pas à zéro : un frigo
+  par terre affichait « −0,85 m ». Taper « 0 » le faisait d'ailleurs
+  flotter à 85 cm.
+
+**Le canapé d'angle du relevé.** RoomPlan l'avait bien vu en L :
+`SofaType:lShaped` pour le grand côté, et `SofaType:lShapedExtension` pour
+la rallonge, rendue à part. Une rallonge ainsi nommée se réunit même un peu
+décollée (30 cm) ou plus basse.
+
+**Des meubles hauts et des tableaux** :
+- en cuisine : meubles hauts de 40 et 120, meuble haut vitré (caisson
+  ouvert, étagère, tasses, portes de verre à cadre), étagère à bocaux ;
+- en salle d'eau : armoire de toilette à portes miroir ;
+- au séjour : meuble TV suspendu (sans pieds), étagère flottante ;
+- en décoration : tableau vertical, grande toile, affiche encadrée,
+  triptyque.
+
+Les meubles hauts se repeignent.
+
+Bancs : `eclatsdemur` (5), `murdouteuxnomme` (5), `baievitree` (5),
+`meubleenniche` (9), `barredumeuble` (5). Ajouts :
+- `coffrelidar` : le coffre fermé, dans les deux sens de mur ;
+- `canapedangle` : la rallonge nommée ;
+- `catalogueenrichi` : les meubles muraux.
+
+Mis à jour : `bandeaulargeur` (le débord des cotes).
+
 ## Le canapé d'angle scanné reste un canapé d'angle ; un catalogue pour chacun, rangé par familles
 
 Relevés du patron : « le canapé d'angle scanné détecte un canapé standard +
