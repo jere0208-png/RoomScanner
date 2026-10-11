@@ -281,8 +281,18 @@ export function frCategory(category: string): string {
     if (/dryer/i.test(category) && !/washer/i.test(category)) return 'Sèche-linge';
   }
   if (/oven/i.test(category)) return 'Four';
-  return kind === 'other' ? category : FR[kind];
+  if (kind === 'other') return AUTRES[category.toLowerCase()] ?? category;
+  return FR[kind];
 }
+
+/** Les catégories du catalogue que RoomPlan ne connaît pas, nommées. */
+const AUTRES: Record<string, string> = {
+  lampe: 'Lampe',
+  pouf: 'Pouf',
+  radiateur: 'Radiateur',
+  climatiseur: 'Climatiseur',
+  chauffeeau: 'Chauffe-eau',
+};
 
 /**
  * Symbole 2D d'un meuble, en coordonnées locales centrées (x le long de la

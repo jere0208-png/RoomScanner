@@ -14285,6 +14285,42 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les meubles d'aujourd'hui, et leur vignette en vraie 3D
+
+Relevé du patron : « ajoute de nouveaux meubles, miroirs éclairés, etc., tout
+ce qu'on peut trouver aujourd'hui dans un appartement. Change l'affichage des
+icônes des meubles lors du choix par ce que l'on voit réellement dans le plan
+3D ».
+
+**Dix-huit meubles de plus** (`catalogue.ts`), chacun avec son modèle 3D
+(`modeles3d.ts`) :
+- Chambre : coiffeuse (et son miroir), lampe de chevet ;
+- Cuisine : réfrigérateur américain (deux portes inox, distributeur), cave à
+  vin (porte vitrée, clayettes et bouteilles), colonne four (four et
+  micro-ondes encastrés), tabouret de bar ;
+- Séjour : canapé d'angle (le modèle en L), pouf, lampadaire, console ;
+- Salle d'eau : **miroir éclairé** (ruban de lumière autour de la glace),
+  sèche-serviettes, douche à l'italienne ;
+- Bureau : écran d'ordinateur, lampe de bureau ;
+- une famille **Confort** : radiateur, climatiseur, chauffe-eau.
+Ce qui éclaire — l'ampoule sous l'abat-jour, le ruban du miroir — est de la
+matière `lumiere`. Les catégories nouvelles se nomment en français
+(`frCategory` : Lampe, Pouf, Radiateur, Climatiseur, Chauffe-eau).
+
+**La vignette en vraie 3D** (`geometry/vignette3d.ts`). Le catalogue montrait
+le symbole du meuble vu de dessus ; il montre maintenant LE MÊME MODÈLE que
+la maquette, de trois quarts et éclairé. La vignette se calcule comme le
+ferait une carte graphique — tampon de profondeur, teintes lissées d'un
+sommet à l'autre, verre translucide —, sur une image deux fois plus fine
+ramenée à sa taille, puis s'encode en PNG (sans dépendance). Un premier essai
+en tracés SVG triés « à la manière du peintre » faisait mille tracés pour un
+lit et entaillait les plateaux : abandonné. Les vignettes passent dans une
+file, une par tour de boucle : le catalogue s'ouvre aussitôt sur les
+symboles, et chaque tuile prend sa vignette dès qu'elle est prête ; elles
+restent en mémoire.
+
+Bancs : `meublesdaujourdhui` (8).
+
 ## La lumière part de l'ampoule, les meubles gardent leur couleur ; « Décorer » sur la maquette
 
 Relevé du patron : « les meubles dans le nouvel appartement témoin deviennent

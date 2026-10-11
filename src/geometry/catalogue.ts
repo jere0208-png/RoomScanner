@@ -70,6 +70,8 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'armoire2p', label: 'Armoire 2 portes', category: 'storage', w: 1.0, d: 0.58, h: 2.01 },
       { key: 'armoire', label: 'Armoire 3 portes', category: 'storage', w: 1.5, d: 0.58, h: 2.2 },
       { key: 'dressing', label: 'Dressing', category: 'storage', w: 1.8, d: 0.6, h: 2.2 },
+      { key: 'coiffeuse', label: 'Coiffeuse', category: 'table', w: 1.0, d: 0.45, h: 1.4 },
+      { key: 'lampeChevet', label: 'Lampe de chevet', category: 'lampe', w: 0.26, d: 0.26, h: 0.45, base: 0.55 },
     ],
   },
   {
@@ -86,6 +88,10 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'frigo', label: 'Réfrigérateur', category: 'refrigerator', w: 0.6, d: 0.65, h: 1.85 },
       { key: 'lv', label: 'Lave-vaisselle', category: 'dishwasher', w: 0.6, d: 0.6, h: 0.85 },
       { key: 'hotte', label: 'Hotte', category: 'storage', w: 0.6, d: 0.5, h: 0.4, base: 1.7 },
+      { key: 'frigoUs', label: 'Réfrigérateur américain', category: 'refrigerator', w: 0.91, d: 0.72, h: 1.78 },
+      { key: 'caveVin', label: 'Cave à vin', category: 'refrigerator', w: 0.6, d: 0.6, h: 0.85 },
+      { key: 'colonneFour', label: 'Colonne four', category: 'oven', w: 0.6, d: 0.6, h: 2.1 },
+      { key: 'tabouret', label: 'Tabouret de bar', category: 'chair', w: 0.4, d: 0.4, h: 0.75 },
     ],
   },
   {
@@ -93,6 +99,10 @@ export const CATALOGUE: CatalogFamily[] = [
     items: [
       { key: 'canape2', label: 'Canapé 2 places', category: 'sofa', w: 1.8, d: 0.88, h: 0.8 },
       { key: 'canape3', label: 'Canapé 3 places', category: 'sofa', w: 2.28, d: 0.95, h: 0.83 },
+      { key: 'canapeAngle', label: 'Canapé d’angle', category: 'sofa', w: 2.6, d: 1.6, h: 0.85 },
+      { key: 'pouf', label: 'Pouf', category: 'pouf', w: 0.5, d: 0.5, h: 0.42 },
+      { key: 'lampadaire', label: 'Lampadaire', category: 'lampe', w: 0.4, d: 0.4, h: 1.65 },
+      { key: 'console', label: 'Console', category: 'table', w: 1.0, d: 0.35, h: 0.8 },
       { key: 'fauteuil', label: 'Fauteuil', category: 'chair', w: 0.8, d: 0.85, h: 0.95 },
       { key: 'tableBasse', label: 'Table basse', category: 'table', w: 1.18, d: 0.78, h: 0.45 },
       { key: 'boutCanape', label: 'Bout de canapé', category: 'table', w: 0.55, d: 0.55, h: 0.45 },
@@ -116,6 +126,9 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'douche', label: 'Douche', category: 'bathtub', w: 0.9, d: 0.9, h: 2.0 },
       { key: 'lavabo', label: 'Lavabo', category: 'sink', w: 0.6, d: 0.45, h: 0.85 },
       { key: 'meubleVasque', label: 'Meuble vasque', category: 'sink', w: 0.8, d: 0.5, h: 0.85 },
+      { key: 'miroirLed', label: 'Miroir éclairé', category: 'miroir', w: 0.8, d: 0.04, h: 0.6, base: 1.1 },
+      { key: 'secheServiettes', label: 'Sèche-serviettes', category: 'radiateur', w: 0.5, d: 0.1, h: 1.2, base: 0.3 },
+      { key: 'doucheItalienne', label: 'Douche à l’italienne', category: 'bathtub', w: 1.2, d: 0.9, h: 2.0 },
       { key: 'doubleVasque', label: 'Double vasque', category: 'sink', w: 1.2, d: 0.5, h: 0.85 },
       { key: 'colonneSdb', label: 'Colonne de rangement', category: 'storage', w: 0.4, d: 0.35, h: 1.8 },
       { key: 'wc', label: 'WC', category: 'toilet', w: 0.4, d: 0.7, h: 0.8 },
@@ -131,6 +144,8 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'fauteuilBureau', label: 'Fauteuil de bureau', category: 'chair', w: 0.6, d: 0.6, h: 1.1 },
       { key: 'caisson', label: 'Caisson', category: 'storage', w: 0.42, d: 0.55, h: 0.6 },
       { key: 'etagereBureau', label: 'Étagère murale', category: 'storage', w: 0.8, d: 0.25, h: 0.25, base: 1.5 },
+      { key: 'ecran', label: 'Écran d’ordinateur', category: 'television', w: 0.6, d: 0.2, h: 0.45, base: 0.75 },
+      { key: 'lampeBureau', label: 'Lampe de bureau', category: 'lampe', w: 0.2, d: 0.2, h: 0.45, base: 0.75 },
     ],
   },
   {
@@ -140,6 +155,19 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'portemanteau', label: 'Portemanteau', category: 'portemanteau', w: 0.45, d: 0.45, h: 1.75 },
       { key: 'bancEntree', label: 'Banc', category: 'chair', w: 0.9, d: 0.35, h: 0.45 },
       { key: 'miroir', label: 'Miroir', category: 'miroir', w: 0.6, d: 0.04, h: 1.6, base: 0.2 },
+    ],
+  },
+  /*
+    LE CONFORT — ce qu'on trouve aujourd'hui dans un logement sans y penser :
+    de quoi chauffer, rafraîchir, avoir de l'eau chaude. Relevé du patron :
+    « tout ce qu'on peut trouver aujourd'hui dans un appartement ».
+  */
+  {
+    name: 'Confort',
+    items: [
+      { key: 'radiateur', label: 'Radiateur', category: 'radiateur', w: 0.8, d: 0.1, h: 0.6, base: 0.15 },
+      { key: 'clim', label: 'Climatiseur', category: 'climatiseur', w: 0.8, d: 0.22, h: 0.3, base: 2.0 },
+      { key: 'cumulus', label: 'Chauffe-eau', category: 'chauffeEau', w: 0.56, d: 0.56, h: 1.4, base: 0.6 },
     ],
   },
 ];

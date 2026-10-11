@@ -30,9 +30,11 @@
 import React from 'react';
 import {
   Animated,
+  Image,
   Keyboard,
   Modal,
   PanResponder,
+  PixelRatio,
   Pressable,
   ScrollView,
   Text,
@@ -43,6 +45,7 @@ import Svg, { Line as SvgLine, Rect as SvgRect } from 'react-native-svg';
 import { useTheme } from '../../theme';
 import { CATALOGUE, type CatalogItem } from '../../geometry/catalogue';
 import { furnKind, furnitureStrokes } from '../../geometry/furniture';
+import { vignetteDuMeuble, vignetteEnCache } from '../../geometry/vignette3d';
 import { estUnTap } from '../../ui/geste';
 import { haptic } from '../../ui/haptic';
 import { fr } from './format';
@@ -67,7 +70,39 @@ export function matchItem(item: CatalogItem, quete: string): boolean {
  */
 export const ATTENTE_LEVEE = 320;
 
-/** La silhouette du meuble, vue de dessus : on le reconnaît sans lire. */
+/*
+  LES VIGNETTES SE CALCULENT UNE À UNE, ENTRE DEUX IMAGES.
+
+  Une vignette en vraie 3D coûte une vingtaine de millisecondes ; soixante-dix
+  d'un coup gèleraient l'ouverture du catalogue. Elles passent donc dans une
+  file, une par tour de boucle : le catalogue s'ouvre aussitôt, sur les
+  symboles, et chaque tuile prend sa vignette dès qu'elle est prête.
+*/
+const file: (() => void)[] = [];
+let fileEnCours = false;
+function planifier(tache: () => void) {
+  file.push(tache);
+  if (fileEnCours) return;
+  fileEnCours = true;
+  const suivante = () => {
+    const t = file.shift();
+    if (!t) {
+      fileEnCours = false;
+      return;
+    }
+    t();
+    setTimeout(suivante, 0);
+  };
+  setTimeout(suivante, 0);
+}
+
+/**
+ * LE MEUBLE TEL QU'ON LE VERRA EN 3D — relevé du patron : « change
+ * l'affichage des icônes des meubles lors du choix par ce que l'on voit
+ * réellement dans le plan 3D ». Le même modèle que la maquette, de trois
+ * quarts (`vignette3d`). En attendant qu'elle soit prête : le symbole du
+ * plan, vu de dessus.
+ */
 export function FurnitureThumb({
   item,
   echelle = 1,
@@ -75,9 +110,43 @@ export function FurnitureThumb({
   item: CatalogItem;
   echelle?: number;
 }) {
-  const c = useTheme();
   const W = 74 * echelle;
   const H = 52 * echelle;
+  const finesse = Math.min(2, PixelRatio.get() || 1);
+  const lw = Math.round(W * finesse);
+  const lh = Math.round(H * finesse);
+  const meuble = { key: item.key, category: item.category, w: item.w, d: item.d, h: item.h };
+  const [image, setImage] = React.useState<string | null>(() => vignetteEnCache(meuble, lw, lh));
+  React.useEffect(() => {
+    if (image) return;
+    let vivant = true;
+    planifier(() => {
+      if (!vivant) return;
+      const uri = vignetteDuMeuble(meuble, lw, lh);
+      if (vivant) setImage(uri);
+    });
+    return () => {
+      vivant = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.key, lw, lh]);
+  if (image) {
+    return (
+      <Image
+        source={{ uri: image }}
+        style={{ width: W, height: H }}
+        resizeMode="contain"
+        accessibilityIgnoresInvertColors
+        testID={`vignette-${item.key}`}
+      />
+    );
+  }
+  return <SymboleDuMeuble item={item} W={W} H={H} echelle={echelle} />;
+}
+
+/** La silhouette du meuble, vue de dessus : on le reconnaît sans lire. */
+function SymboleDuMeuble({ item, W, H, echelle }: { item: CatalogItem; W: number; H: number; echelle: number }) {
+  const c = useTheme();
   // Emprise mise à l'échelle de la vignette, marges comprises.
   const k = Math.min((W - 14 * echelle) / item.w, (H - 14 * echelle) / item.d);
   const w = item.w * k;

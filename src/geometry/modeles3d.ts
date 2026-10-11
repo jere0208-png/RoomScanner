@@ -1109,11 +1109,13 @@ function tabouret(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
     { seg: 32 },
   );
   const e = r * 0.78;
+  // Deux millimètres et demi au-dessus du sol : le bout d'un pied INCLINÉ est
+  // un disque penché, qui passait sous le sol d'autant.
   const coins: V3[] = [
-    [-e, 0, -e],
-    [e, 0, -e],
-    [e, 0, e],
-    [-e, 0, e],
+    [-e, 0.0025, -e],
+    [e, 0.0025, -e],
+    [e, 0.0025, e],
+    [-e, 0.0025, e],
   ];
   for (const p of coins) {
     a.tube(p, [p[0] * 0.55, H - 0.04, p[2] * 0.55], 0.013, 0.016, 'bois', TEINTES.chene, { seg: 8, bouts: 'bas' });
@@ -1611,6 +1613,18 @@ function casiers(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
 function refrigerateur(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   const corps = c.teinte ?? TEINTES.laque;
   const zF = -D / 2 + 0.035;
+  if (W > 0.8) {
+    // L'AMÉRICAIN : deux portes pleine hauteur, le distributeur sur la gauche.
+    const inox = c.teinte ?? TEINTES.inox;
+    a.boite(-W / 2, W / 2, 0.02, H, zF + 0.045, D / 2, 'inox', inox, { r: 0.012, seg: 1, sans: ['bas'] });
+    a.boite(-W / 2 + 0.01, W / 2 - 0.01, 0, 0.06, zF + 0.05, D / 2 - 0.02, 'noir', TEINTES.anthracite);
+    a.boite(-W / 2, -0.004, 0.06, H, zF, zF + 0.045, 'inox', inox, { r: 0.012, seg: 1, sans: ['arriere'] });
+    a.boite(0.004, W / 2, 0.06, H, zF, zF + 0.045, 'inox', inox, { r: 0.012, seg: 1, sans: ['arriere'] });
+    a.boite(-W / 4 - 0.1, -W / 4 + 0.1, H * 0.52, H * 0.72, zF - 0.004, zF, 'noir', TEINTES.noir, { r: 0.01 });
+    poignee(a, -0.04, H * 0.55, zF, Math.min(0.9, H * 0.5), true);
+    poignee(a, 0.04, H * 0.55, zF, Math.min(0.9, H * 0.5), true);
+    return;
+  }
   a.boite(-W / 2, W / 2, 0.02, H, zF + 0.045, D / 2, 'laque', corps, { r: 0.01, seg: 1, sans: ['bas'] });
   a.boite(-W / 2 + 0.01, W / 2 - 0.01, 0, 0.06, zF + 0.05, D / 2 - 0.02, 'noir', TEINTES.anthracite);
   const hb = Math.min(0.75, H * 0.36);
@@ -2106,11 +2120,218 @@ function portemanteau(a: Atelier, { W, D, H }: Gabarit) {
   }
 }
 
-function miroir(a: Atelier, { W, D, H }: Gabarit) {
+function miroir(a: Atelier, { W, D, H }: Gabarit, c?: Commande) {
   const ep = Math.min(D, 0.03);
   const z1 = D / 2;
+  if (c?.modele.startsWith('miroirled')) {
+    // LE MIROIR ÉCLAIRÉ : la glace bord à bord, un ruban de lumière tout
+    // autour, en retrait du bord — celui des salles d'eau d'aujourd'hui.
+    a.boite(-W / 2, W / 2, 0, H, z1 - ep, z1, 'noir', TEINTES.anthracite, { r: 0.012, seg: 1 });
+    a.boite(-W / 2 + 0.004, W / 2 - 0.004, 0.004, H - 0.004, z1 - ep - 0.002, z1 - ep + 0.001, 'miroir', TEINTES.chrome, { sans: ['arriere'] });
+    const b = Math.min(0.05, W * 0.08, H * 0.08);
+    const l = 0.012;
+    const zl = z1 - ep - 0.004;
+    a.boite(-W / 2 + b, W / 2 - b, b, b + l, zl, zl + 0.002, 'lumiere', LUEUR);
+    a.boite(-W / 2 + b, W / 2 - b, H - b - l, H - b, zl, zl + 0.002, 'lumiere', LUEUR);
+    a.boite(-W / 2 + b, -W / 2 + b + l, b, H - b, zl, zl + 0.002, 'lumiere', LUEUR);
+    a.boite(W / 2 - b - l, W / 2 - b, b, H - b, zl, zl + 0.002, 'lumiere', LUEUR);
+    return;
+  }
   a.boite(-W / 2, W / 2, 0, H, z1 - ep, z1, 'bois', TEINTES.chene, { r: 0.008, seg: 1 });
   a.boite(-W / 2 + 0.03, W / 2 - 0.03, 0.03, H - 0.03, z1 - ep - 0.002, z1 - ep + 0.001, 'miroir', TEINTES.chrome, { sans: ['arriere'] });
+}
+
+/** Ce qui éclaire, dans un meuble : l'abat-jour allumé, le ruban d'un miroir. */
+const LUEUR = '#FFF2D6';
+
+/*
+  LES MEUBLES D'AUJOURD'HUI — relevé du patron : « ajoute de nouveaux
+  meubles, miroirs éclairés, etc., tout ce qu'on peut trouver aujourd'hui
+  dans un appartement ». Chacun a sa silhouette, à ses cotes, dans les
+  matières de la mise en ambiance ; ce qui éclaire (l'abat-jour d'une lampe,
+  le ruban d'un miroir) est de la matière `lumiere`.
+*/
+
+/** Une lampe : lampadaire, lampe de chevet, lampe de bureau. */
+function lampe(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const R = Math.min(W, D) / 2;
+  const abat = c.teinte ?? TEINTES.linge;
+  if (c.modele.startsWith('lampebureau')) {
+    // Le pied, le bras en deux temps, la tête orientée vers le plan.
+    a.tour([[0, 0], [R * 0.9, 0, true], [R * 0.9, 0.018], [R * 0.72, 0.026], [0, 0.028]], 0, 0, 'noir', TEINTES.anthracite, { seg: 24 });
+    const coude: V3 = [0, H * 0.62, D * 0.12];
+    a.tube([0, 0.026, 0], coude, 0.007, 0.007, 'noir', TEINTES.anthracite, { seg: 8 });
+    const tete: V3 = [0, H * 0.9, -D * 0.22];
+    a.tube(coude, tete, 0.007, 0.007, 'noir', TEINTES.anthracite, { seg: 8 });
+    a.tour([[R * 0.45, H * 0.8], [R * 0.25, H * 0.98], [0.01, H]], 0, -D * 0.25, 'noir', TEINTES.anthracite, { seg: 20 });
+    a.tour([[0, H * 0.8], [R * 0.4, H * 0.805]], 0, -D * 0.25, 'lumiere', LUEUR, { seg: 20 });
+    return;
+  }
+  if (c.modele.startsWith('lampechevet')) {
+    // Un pied de céramique galbé, un abat-jour droit.
+    const hp = H * 0.52;
+    a.tour(
+      [[0, 0], [R * 0.4, 0, true], [R * 0.55, hp * 0.35], [R * 0.48, hp * 0.75], [R * 0.16, hp * 0.95], [R * 0.12, hp], [0, hp]],
+      0,
+      0,
+      'ceramique',
+      TEINTES.argile,
+      { seg: 24 },
+    );
+    a.tube([0, hp, 0], [0, H * 0.62, 0], 0.006, 0.006, 'chrome', TEINTES.chrome, { seg: 8 });
+    a.tour([[R, H * 0.5], [R * 0.72, H], [R * 0.7, H - 0.002], [R * 0.97, H * 0.5 + 0.002]], 0, 0, 'tissu', abat, { seg: 28 });
+    a.tour([[0, H * 0.58], [R * 0.2, H * 0.6], [0, H * 0.68]], 0, 0, 'lumiere', LUEUR, { seg: 14 });
+    return;
+  }
+  // Le lampadaire : un socle lourd, une tige, un abat-jour.
+  a.tour([[0, 0], [R * 0.7, 0, true], [R * 0.7, 0.02], [R * 0.55, 0.03], [0, 0.032]], 0, 0, 'noir', TEINTES.anthracite, { seg: 28 });
+  a.tube([0, 0.03, 0], [0, H - 0.3, 0], 0.011, 0.011, 'noir', TEINTES.anthracite, { seg: 10 });
+  a.tour([[R, H - 0.34], [R * 0.74, H], [R * 0.72, H - 0.002], [R * 0.98, H - 0.338]], 0, 0, 'tissu', abat, { seg: 32 });
+  a.tour([[0, H - 0.3], [R * 0.16, H - 0.27], [0, H - 0.2]], 0, 0, 'lumiere', LUEUR, { seg: 14 });
+}
+
+/** Le pouf : un tambour de tissu, aux bords adoucis. */
+function pouf(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const R = Math.min(W, D) / 2;
+  a.tour(
+    [[0, 0], [R * 0.94, 0], [R, 0.03], [R, H - 0.05], [R * 0.95, H - 0.01], [R * 0.85, H], [0, H]],
+    0,
+    0,
+    'tissu',
+    c.teinte ?? TEINTES.lin,
+    { seg: 32, sx: W / (2 * R), sz: D / (2 * R) },
+  );
+}
+
+/** La cave à vin : un caisson sombre, une porte vitrée, les clayettes derrière. */
+function caveVin(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const corps = c.teinte ?? TEINTES.noir;
+  // La poignée dépasse de la porte : la façade se pose en retrait d'autant.
+  const zF = -D / 2 + 0.06;
+  a.boite(-W / 2, W / 2, 0, H, zF, D / 2, 'laque', corps, { r: 0.008, seg: 1 });
+  // Les clayettes de bois, chacune avec sa rangée de goulots.
+  const n = Math.max(3, Math.round(H / 0.16));
+  for (let k = 1; k < n; k++) {
+    const y = (H * k) / n;
+    a.boite(-W / 2 + 0.04, W / 2 - 0.04, y - 0.012, y, zF + 0.01, D / 2 - 0.04, 'bois', TEINTES.chene);
+    for (let b = 0; b < 5; b++) {
+      const x = -W / 2 + 0.07 + ((W - 0.14) * b) / 4;
+      a.tube([x, y + 0.025, zF + 0.02], [x, y + 0.025, zF + 0.2], 0.03, 0.03, 'verre', '#3E5A3A', { seg: 10 });
+    }
+  }
+  // La porte : un cadre inox et son verre fumé.
+  a.boite(-W / 2, W / 2, 0.02, H - 0.02, zF - 0.02, zF, 'inox', TEINTES.inox, { r: 0.006, sans: ['arriere'] });
+  a.boite(-W / 2 + 0.035, W / 2 - 0.035, 0.06, H - 0.05, zF - 0.024, zF - 0.018, 'verre', TEINTES.hublot);
+  poignee(a, W / 2 - 0.05, H * 0.6, zF - 0.02, Math.min(0.4, H * 0.4), true);
+}
+
+/** La colonne four : le four, le micro-ondes au-dessus, un placard en tête. */
+function colonneFour(a: Atelier, g: Gabarit, c: Commande) {
+  const { W, D, H } = g;
+  const corps = c.teinte ?? TEINTES.laque;
+  const zF = -D / 2 + 0.05;
+  a.boite(-W / 2, W / 2, 0, H, zF, D / 2, 'laque', corps, { r: 0.004, seg: 1 });
+  a.boite(-W / 2 + 0.005, W / 2 - 0.005, 0, 0.1, zF - 0.005, zF, 'noir', TEINTES.anthracite);
+  // Le four, à hauteur d'yeux baissés.
+  const f0 = Math.min(0.78, H * 0.37);
+  const f1 = f0 + 0.6;
+  a.boite(-W / 2 + 0.01, W / 2 - 0.01, f0, f1, zF - 0.02, zF, 'inox', TEINTES.inox, { r: 0.004, sans: ['arriere'] });
+  a.boite(-W / 2 + 0.03, W / 2 - 0.03, f0 + 0.03, f1 - 0.1, zF - 0.022, zF - 0.02, 'ecran', TEINTES.ecran);
+  a.tube([-W / 2 + 0.06, f1 - 0.05, zF - 0.035], [W / 2 - 0.06, f1 - 0.05, zF - 0.035], 0.008, 0.008, 'chrome', TEINTES.chrome, { seg: 10 });
+  // Le micro-ondes, juste au-dessus.
+  const m0 = f1 + 0.02;
+  const m1 = Math.min(H - 0.25, m0 + 0.38);
+  if (m1 - m0 > 0.2) {
+    a.boite(-W / 2 + 0.01, W / 2 - 0.01, m0, m1, zF - 0.02, zF, 'inox', TEINTES.inox, { r: 0.004, sans: ['arriere'] });
+    a.boite(-W / 2 + 0.03, W / 2 - 0.14, m0 + 0.03, m1 - 0.03, zF - 0.022, zF - 0.02, 'ecran', TEINTES.hublot);
+  }
+  // Les portes de placard, en bas et en haut.
+  a.boite(-W / 2 + 0.003, W / 2 - 0.003, 0.11, f0 - 0.01, zF - 0.018, zF, 'laque', corps, { r: 0.003, sans: ['arriere'] });
+  if (H - m1 > 0.12) a.boite(-W / 2 + 0.003, W / 2 - 0.003, m1 + 0.02, H - 0.005, zF - 0.018, zF, 'laque', corps, { r: 0.003, sans: ['arriere'] });
+}
+
+/** Le radiateur à ailettes, ou le sèche-serviettes à barreaux. */
+function radiateur(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const blanc = c.teinte ?? TEINTES.laque;
+  const z1 = D / 2;
+  if (c.modele.startsWith('secheserviettes')) {
+    // Deux montants, des barreaux serrés en groupes.
+    const r = Math.min(0.016, D / 3);
+    const zc = z1 - Math.max(r * 2, D * 0.7);
+    for (const x of [-W / 2 + r, W / 2 - r]) a.tube([x, 0, zc], [x, H, zc], r, r, 'laque', blanc, { seg: 10 });
+    // Les pattes qui le tiennent au mur, en haut et en bas.
+    for (const x of [-W / 2 + r, W / 2 - r]) {
+      for (const y of [0.12, H - 0.12]) a.boite(x - 0.01, x + 0.01, y - 0.015, y + 0.015, zc, z1, 'laque', blanc, { r: 0.004 });
+    }
+    let y = 0.05;
+    while (y < H - 0.03) {
+      a.tube([-W / 2 + r, y, zc], [W / 2 - r, y, zc], r * 0.6, r * 0.6, 'laque', blanc, { seg: 8, bouts: 'aucun' });
+      y += y < H * 0.45 ? 0.05 : 0.075;
+    }
+    return;
+  }
+  // Le panneau : une face à cannelures, un dessus à grille, des pattes au mur.
+  const zAv = -D / 2 + 0.006;
+  const zAr = D / 2 - 0.025;
+  a.boite(-W / 2, W / 2, 0, H, zAv, zAr, 'laque', blanc, { r: 0.008, seg: 1 });
+  const n = Math.max(6, Math.round(W / 0.05));
+  for (let k = 0; k < n; k++) {
+    const x = -W / 2 + 0.03 + ((W - 0.06) * (k + 0.5)) / n;
+    a.boite(x - 0.006, x + 0.006, 0.04, H - 0.04, -D / 2, zAv, 'laque', blanc);
+  }
+  a.boite(-W / 2 + 0.02, W / 2 - 0.02, H - 0.004, H, zAv + 0.01, zAr - 0.01, 'noir', TEINTES.anthracite);
+  for (const x of [-W / 2 + 0.08, W / 2 - 0.08]) a.boite(x - 0.015, x + 0.015, H * 0.4, H * 0.6, zAr, z1, 'noir', TEINTES.anthracite);
+}
+
+/** Le climatiseur mural : un caisson blanc, sa grille de soufflage. */
+function climatiseur(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const blanc = c.teinte ?? TEINTES.laque;
+  const zF = -D / 2 + 0.008;
+  a.boite(-W / 2, W / 2, 0, H, zF, D / 2, 'laque', blanc, { r: [0.03, 0.05, 0.05], seg: 3 });
+  a.boite(-W / 2 + 0.05, W / 2 - 0.05, 0.03, 0.075, zF - 0.004, zF + 0.03, 'noir', TEINTES.anthracite);
+  a.boite(-W / 2 + 0.06, W / 2 - 0.06, 0.05, 0.056, -D / 2, zF + 0.01, 'laque', blanc);
+  a.boite(W / 2 - 0.1, W / 2 - 0.07, H * 0.6, H * 0.6 + 0.012, zF - 0.004, zF + 0.01, 'lumiere', '#7BE0A6');
+}
+
+/** Le chauffe-eau : une cuve blanche, son boîtier, ses deux tubes. */
+function chauffeEau(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const R = Math.min(W, D) / 2;
+  const Rc = R * 0.9;
+  const blanc = c.teinte ?? TEINTES.laque;
+  const bas = Math.min(0.2, H * 0.12);
+  a.tour(
+    [[0, bas], [Rc * 0.8, bas], [Rc * 0.97, bas + 0.04], [Rc, bas + 0.1], [Rc, H - 0.1], [Rc * 0.97, H - 0.04], [Rc * 0.8, H], [0, H]],
+    0,
+    0,
+    'laque',
+    blanc,
+    { seg: 32 },
+  );
+  // Le boîtier du thermostat, en saillie sur le devant de la cuve.
+  a.boite(-R * 0.35, R * 0.35, bas + 0.06, bas + 0.2, -R, -Rc * 0.6, 'laque', '#E4E6E8', { r: 0.01 });
+  for (const x of [-R * 0.3, R * 0.3]) a.tube([x, bas + 0.02, 0], [x, 0, 0], 0.011, 0.011, 'chrome', TEINTES.chrome, { seg: 10 });
+}
+
+/** La coiffeuse : une table à tiroir, et son miroir posé dessus. */
+function coiffeuse(a: Atelier, g: Gabarit, c: Commande) {
+  const { W, D, H } = g;
+  const ht = Math.min(0.76, H * 0.6);
+  table(a, { W, D, H: ht }, { ...c, modele: 'bureau' });
+  const mx = Math.min(W * 0.32, 0.35);
+  const z1 = D / 2 - 0.02;
+  a.boite(-mx - 0.02, mx + 0.02, ht + 0.02, H, z1 - 0.025, z1, 'bois', TEINTES.chene, { r: 0.01, seg: 1 });
+  a.boite(-mx, mx, ht + 0.04, H - 0.02, z1 - 0.027, z1 - 0.024, 'miroir', TEINTES.chrome, { sans: ['arriere'] });
+}
+
+/** L'écran d'ordinateur : un pied plat, un col, la dalle et son cadre fin. */
+function ecranPc(a: Atelier, { W, D, H }: Gabarit) {
+  const pied = Math.min(0.22, W * 0.4);
+  // Un arrondi égal sur les trois axes : inégal, il retournait les faces des coins.
+  a.boite(-pied / 2, pied / 2, 0, 0.012, -D / 2, D / 2, 'noir', TEINTES.anthracite, { r: 0.004 });
+  a.boite(-0.025, 0.025, 0.012, H * 0.45, D / 2 - 0.06, D / 2 - 0.03, 'noir', TEINTES.anthracite, { r: 0.006 });
+  const zd = -0.01;
+  a.boite(-W / 2, W / 2, H * 0.22, H, zd, zd + 0.025, 'noir', TEINTES.noir, { r: 0.006 });
+  a.boite(-W / 2 + 0.008, W / 2 - 0.008, H * 0.22 + 0.02, H - 0.008, zd - 0.002, zd, 'ecran', TEINTES.ecran);
 }
 
 /** Ce qu'on ne sait pas nommer : un volume net, sans prétendre à rien. */
@@ -2131,7 +2352,16 @@ export function fabriquer(categorie: string, g: Gabarit, c: Omit<Commande, 'cate
   else if (cat === 'fenetre3d') fenetre3d(a, gab, cmd);
   else if (m.startsWith('tapis') || cat.includes('tapis') || cat.includes('rug')) tapis(a, gab, cmd);
   else if (m.startsWith('portemanteau') || cat.includes('portemanteau')) portemanteau(a, gab);
-  else if (m.startsWith('miroir') || cat.includes('miroir') || cat.includes('mirror')) miroir(a, gab);
+  else if (m.startsWith('miroir') || cat.includes('miroir') || cat.includes('mirror')) miroir(a, gab, cmd);
+  else if (m.startsWith('lampe') || m.startsWith('lampadaire') || cat.includes('lampe') || cat.includes('lamp')) lampe(a, gab, cmd);
+  else if (m.startsWith('pouf') || cat.includes('pouf')) pouf(a, gab, cmd);
+  else if (m.startsWith('cavevin')) caveVin(a, gab, cmd);
+  else if (m.startsWith('colonnefour')) colonneFour(a, gab, cmd);
+  else if (m.startsWith('coiffeuse')) coiffeuse(a, gab, cmd);
+  else if (m.startsWith('radiateur') || m.startsWith('secheserviettes') || cat.includes('radiateur')) radiateur(a, gab, cmd);
+  else if (m.startsWith('clim') || cat.includes('climatiseur')) climatiseur(a, gab, cmd);
+  else if (m.startsWith('ecran')) ecranPc(a, gab);
+  else if (m.startsWith('cumulus') || cat.includes('chauffeeau')) chauffeEau(a, gab, cmd);
   else if (m.startsWith('plante') || cat.includes('plant')) plante(a, gab, cmd);
   else if (cat.includes('bed')) lit(a, gab, cmd);
   else if (cat.includes('sofa') || cat.includes('couch')) canape(a, gab, cmd);
