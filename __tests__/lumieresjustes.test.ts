@@ -39,9 +39,15 @@ describe('les meubles gardent leur couleur', () => {
     expect(ECLAT_LAMPE.jour.nappe[1]).toBeLessThanOrEqual(0.25);
   });
 
-  it('la maquette baisse le jour quand on allume, comme la visite', () => {
+  /*
+    ALLUMER N'ÉTEINT PAS LE JOUR — relevé du patron, plus tard : « sur la
+    visite, allumer une pièce rend les murs plus sombres, ce devrait être
+    l'inverse ». La lampe AJOUTE sa lumière ; le jour ne dépend plus d'elle.
+  */
+  it('allumer ajoute de la lumière : le jour ne baisse plus quand une lampe s’allume', () => {
     const natif = lire('modules/react-native-room-scan/ios/RoomScanVisite.swift');
-    expect(natif).toContain('private var nuitAllumee = false');
-    expect(natif).not.toContain('guard orbite.count < 10 else { return }\n    if nuit {');
+    expect(natif).not.toContain('nuitAllumee');
+    expect(natif).not.toContain('if allume { nuit = true }');
+    expect(natif).not.toContain('noeudDuContre?.light = nil');
   });
 });

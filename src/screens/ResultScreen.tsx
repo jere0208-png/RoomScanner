@@ -1244,20 +1244,6 @@ export function ResultScreen() {
   const hCommandes = vue === '2d' ? hActions : 0;
   const etageSauvegarde =
     etageCommandes + (hCommandes > 0 ? hCommandes + PILL_GAP : 0);
-  /**
-   * Les points cardinaux : un calque, lui aussi — ÉTEINT au départ.
-   *
-   * Ils disent de quel mur on parle, et c'est précieux au moment de
-   * désigner un mur dans le dossier. Mais on ouvre un plan pour lire des
-   * cotes, pas une boussole : quatre pastilles au bord du cadre prennent
-   * la place de ce qu'on est venu voir, à chaque ouverture, alors qu'on ne
-   * s'en sert qu'à l'occasion. Le bouton les rallume en un geste, et le
-   * dossier imprimé, lui, porte toujours sa rose des vents.
-   */
-  const [showNorth, setShowNorth] = useState(false);
-  /* Le nord est-il connu ? Sans lui, la pastille « Nord » ne s'allume pas
-     (voir `ResultToolbar`) : c'est en édition qu'on oriente le plan. */
-  const nordConnu = useScanStore((s) => s.north !== null && s.north !== undefined);
   const showPhotos = useScanStore((s) => s.showPhotos);
   const showNotes = useScanStore((s) => s.showNotes);
   const [editMode, setEditMode] = useState(false);
@@ -3865,7 +3851,9 @@ export function ResultScreen() {
             showCeiling={showCeiling}
             /* Sans nord, l'édition propose d'orienter le plan (le badge de
                la boussole) : la pastille « Nord » y renvoie. */
-            showNorth={showNorth || (editMode && !nordConnu)}
+            /* Plus d'option « Nord » : le nord relevé au scan ne sert plus
+               qu'au dossier PDF (relevé du patron). */
+            showNorth={false}
             selectedCeilingId={selCeiling}
             selectedCeilingRow={selRow}
             notes={editMode || showNotes ? notes : SANS_NOTES}
@@ -4155,7 +4143,7 @@ export function ResultScreen() {
                dessin-là qu'on emporte sur le chantier. */
             cableRoutes={showRoutes ? cheminements?.traces : undefined}
             routeHeights={showRoutes ? hauteursDesservies : undefined}
-            showNorth={showNorth}
+            showNorth={false}
             showCeiling={showCeiling}
             showVolumes={showVolumes}
             nuit={nuit}
@@ -4247,8 +4235,6 @@ export function ResultScreen() {
             setShowFixtures={setShowFixtures}
             setShowRoutes={setShowRoutes}
             hasRoutes={!!cheminements}
-            showNorth={showNorth}
-            setShowNorth={setShowNorth}
             showCeiling={showCeiling}
             setShowCeiling={setShowCeiling}
             onFixture={startFixture}
@@ -4275,8 +4261,6 @@ export function ResultScreen() {
             bas={ligneOutils}
             showMeasures={show3DMeasures}
             setShowMeasures={setShow3DMeasures}
-            showNorth={showNorth}
-            setShowNorth={setShowNorth}
             showCeiling={showCeiling}
             setShowCeiling={setShowCeiling}
             showVolumes={showVolumes}

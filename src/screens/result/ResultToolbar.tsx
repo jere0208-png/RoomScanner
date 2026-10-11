@@ -76,8 +76,6 @@ const RIEN = {
   meubles3D: 'Aucun meuble à afficher — ajoutez-en en mode édition, sur le plan.',
   appareils: 'Aucun appareil à afficher — passez en mode édition pour en poser.',
   surfaces: 'Aucune pièce refermée : pas de surface à afficher.',
-  nord2D: 'Nord inconnu — passez en mode édition pour orienter le plan.',
-  nord3D: 'Nord inconnu — orientez le plan en mode édition, sur le plan 2D.',
   nuit: 'Aucun luminaire à allumer — posez-en en mode édition, sur le plan.',
   murs: 'Aucun mur à afficher : scannez ou dessinez une pièce.',
   plafond: 'Aucun appareil au plafond — posez-en en mode édition.',
@@ -148,8 +146,6 @@ export function Toolbar2D({
   setShowFixtures,
   setShowRoutes,
   hasRoutes,
-  showNorth,
-  setShowNorth,
   showCeiling,
   setShowCeiling,
   onFixture,
@@ -178,8 +174,12 @@ export function Toolbar2D({
   setShowRoutes: (f: (v: boolean) => boolean) => void;
   /** Un tableau est posé : on sait d'où part le câble. */
   hasRoutes: boolean;
-  showNorth: boolean;
-  setShowNorth: (f: (v: boolean) => boolean) => void;
+  /*
+    PLUS D'OPTION « NORD » — relevé du patron : « enlève l'option Nord,
+    affiche-la que si elle a été calculée lors du scan, pour l'export PDF ».
+    Le dossier PDF porte la rose des vents quand le scan a relevé le nord ;
+    l'application ne la propose plus.
+  */
   showCeiling: boolean;
   setShowCeiling: (v: boolean) => void;
   onFixture: () => void;
@@ -500,7 +500,6 @@ export function Toolbar2D({
         {
           titre: 'Repères',
           lignes: [
-            { cle: 'nord', icone: 'boussole', libelle: 'Points cardinaux', aide: 'La rose des vents autour du plan', actif: showNorth, vide: contenu.nord ? null : RIEN.nord2D, onBascule: () => setShowNorth((v) => !v) },
             { cle: 'grille', icone: 'grille', libelle: 'Grille', aide: 'Un trait tous les 50 cm, pour estimer d’un coup d’œil', actif: showGrille, vide: contenu.murs === 0 ? RIEN.murs : null, onBascule: () => setShowGrille(!showGrille) },
             { cle: 'ouvertures', icone: 'ouvertures', libelle: 'Portes et fenêtres en couleur', aide: 'Les portes en ambre, les fenêtres en bleu', actif: showOpeningColors, onBascule: () => setShowOpeningColors(!showOpeningColors) },
             { cle: 'notes', icone: 'note', libelle: 'Notes', aide: 'Les mots écrits sur le plan', actif: showNotes, vide: contenu.notes === 0 ? RIEN.notes : null, onBascule: () => setShowNotes(!showNotes) },
@@ -535,8 +534,6 @@ export function Toolbar3D({
   bas,
   showMeasures,
   setShowMeasures,
-  showNorth,
-  setShowNorth,
   showCeiling,
   setShowCeiling,
   showVolumes,
@@ -559,8 +556,12 @@ export function Toolbar3D({
   onDecorer?: () => void;
   showMeasures: boolean;
   setShowMeasures: (f: (v: boolean) => boolean) => void;
-  showNorth: boolean;
-  setShowNorth: (f: (v: boolean) => boolean) => void;
+  /*
+    PLUS D'OPTION « NORD » — relevé du patron : « enlève l'option Nord,
+    affiche-la que si elle a été calculée lors du scan, pour l'export PDF ».
+    Le dossier PDF porte la rose des vents quand le scan a relevé le nord ;
+    l'application ne la propose plus.
+  */
   showCeiling: boolean;
   setShowCeiling: (v: boolean) => void;
   /**
@@ -730,7 +731,6 @@ export function Toolbar3D({
           lignes: [
             { cle: 'couleurs', icone: 'colors', libelle: 'Couleurs relevées', aide: 'Les vraies images des murs et du sol', actif: showTextures, vide: colorsAvailable ? null : RIEN.couleurs, onBascule: () => setShowTextures(!showTextures) },
             { cle: 'ouvertures', icone: 'ouvertures', libelle: 'Portes et fenêtres en couleur', aide: 'Les portes en ambre, les fenêtres en bleu', actif: showOpeningColors, onBascule: () => setShowOpeningColors(!showOpeningColors) },
-            { cle: 'nord', icone: 'boussole', libelle: 'Points cardinaux', aide: 'Nord, sud, est et ouest autour de la maquette', actif: showNorth, vide: contenu.nord ? null : RIEN.nord3D, onBascule: () => setShowNorth((v) => !v) },
             ...(modeElec
               ? [{ cle: 'nuit', icone: 'lune' as const, libelle: 'Nuit', aide: 'La maquette s’éteint : touchez un interrupteur', actif: nuit, vide: contenu.luminaires ? null : RIEN.nuit, onBascule: () => setNuit((v) => !v) }]
               : []),

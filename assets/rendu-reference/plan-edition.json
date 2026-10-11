@@ -1057,6 +1057,22 @@
              "fill",
              "stroke"
             ],
+            "d": "M252 223.65 483 223.65 483 215.95 252 215.95z"
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 0
+            },
+            "stroke": null,
+            "propList": [
+             "fill",
+             "stroke"
+            ],
             "d": "M261.35 231.35 473.65 231.35 477.5 223.65 253.65 223.65z"
            },
            "children": null
@@ -1134,6 +1150,22 @@
           }
          },
          "children": [
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 0
+            },
+            "stroke": null,
+            "propList": [
+             "fill",
+             "stroke"
+            ],
+            "d": "M472 223.65 648 223.65 648 215.95 472 215.95z"
+           },
+           "children": null
+          },
           {
            "type": "RNSVGPath",
            "props": {
@@ -1235,6 +1267,22 @@
              "fill",
              "stroke"
             ],
+            "d": "M646.35 222 646.35 398 654.05 398 654.05 222z"
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 0
+            },
+            "stroke": null,
+            "propList": [
+             "fill",
+             "stroke"
+            ],
             "d": "M638.65 231.35 638.65 388.65 646.35 396.35 646.35 223.65z"
            },
            "children": null
@@ -1312,6 +1360,22 @@
           }
          },
          "children": [
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 0
+            },
+            "stroke": null,
+            "propList": [
+             "fill",
+             "stroke"
+            ],
+            "d": "M648 396.35 472 396.35 472 404.05 648 404.05z"
+           },
+           "children": null
+          },
           {
            "type": "RNSVGPath",
            "props": {
@@ -1413,6 +1477,22 @@
              "fill",
              "stroke"
             ],
+            "d": "M483 396.35 252 396.35 252 404.05 483 404.05z"
+           },
+           "children": null
+          },
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 0
+            },
+            "stroke": null,
+            "propList": [
+             "fill",
+             "stroke"
+            ],
             "d": "M473.65 388.65 261.35 388.65 253.65 396.35 477.5 396.35z"
            },
            "children": null
@@ -1490,6 +1570,22 @@
           }
          },
          "children": [
+          {
+           "type": "RNSVGPath",
+           "props": {
+            "fill": {
+             "type": 0,
+             "payload": 0
+            },
+            "stroke": null,
+            "propList": [
+             "fill",
+             "stroke"
+            ],
+            "d": "M253.65 398 253.65 222 245.95 222 245.95 398z"
+           },
+           "children": null
+          },
           {
            "type": "RNSVGPath",
            "props": {
@@ -2489,11 +2585,12 @@
                "type": 0,
                "payload": 4292290109
               },
-              "strokeWidth": 1.2,
+              "strokeWidth": 0.9,
               "propList": [
                "stroke",
                "strokeWidth"
               ],
+              "opacity": 0.8,
               "x1": 472.55,
               "y1": 348.5,
               "x2": 465.95,
@@ -2510,8 +2607,8 @@
               },
               "matrix": [
                0,
-               -0.636,
-               0.636,
+               -0.5,
+               0.5,
                0,
                465.95,
                348.5
@@ -2526,7 +2623,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -2536,7 +2633,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M-8 2 H8"
                },
                "children": null
@@ -2549,7 +2646,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -2559,7 +2656,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M-8 2 A8 8 0 0 1 8 2"
                },
                "children": null
@@ -2572,7 +2669,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -2582,7 +2679,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M0 2 V10"
                },
                "children": null
@@ -2595,7 +2692,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -2617,7 +2714,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -2639,7 +2736,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -2705,11 +2802,12 @@
                "type": 0,
                "payload": 4292290109
               },
-              "strokeWidth": 1.2,
+              "strokeWidth": 0.9,
               "propList": [
                "stroke",
                "strokeWidth"
               ],
+              "opacity": 0.8,
               "x1": 482.45,
               "y1": 348.5,
               "x2": 489.05,
@@ -2726,8 +2824,8 @@
               },
               "matrix": [
                0,
-               0.636,
-               -0.636,
+               0.5,
+               -0.5,
                0,
                489.05,
                348.5
@@ -2745,7 +2843,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -2755,7 +2853,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M0 8 m-2.4 0 a2.4 2.4 0 1 0 4.8 0 a2.4 2.4 0 1 0 -4.8 0"
                },
                "children": null
@@ -2768,7 +2866,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -2778,7 +2876,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M0 8 L6 -4"
                },
                "children": null
@@ -2791,7 +2889,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -2801,7 +2899,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M2.6 -5.6 L9.6 -2.2"
                },
                "children": null
@@ -2817,7 +2915,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -2839,7 +2937,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -2861,7 +2959,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -2927,11 +3025,12 @@
                "type": 0,
                "payload": 4292290109
               },
-              "strokeWidth": 1.2,
+              "strokeWidth": 0.9,
               "propList": [
                "stroke",
                "strokeWidth"
               ],
+              "opacity": 0.8,
               "x1": 312.5,
               "y1": 232.45,
               "x2": 312.5,
@@ -2947,10 +3046,10 @@
                "payload": 4278190080
               },
               "matrix": [
-               -0.636,
+               -0.5,
                0,
                0,
-               -0.636,
+               -0.5,
                312.5,
                239.05
               ]
@@ -2964,7 +3063,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -2974,8 +3073,8 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
-                "d": "M-17.52 2 H-1.52"
+                "opacity": 0.55,
+                "d": "M-8 2 H8"
                },
                "children": null
               },
@@ -2987,7 +3086,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -2997,8 +3096,8 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
-                "d": "M-17.52 2 A8 8 0 0 1 -1.52 2"
+                "opacity": 0.55,
+                "d": "M-8 2 A8 8 0 0 1 8 2"
                },
                "children": null
               },
@@ -3010,7 +3109,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3020,8 +3119,8 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
-                "d": "M-9.52 2 V10"
+                "opacity": 0.55,
+                "d": "M0 2 V10"
                },
                "children": null
               },
@@ -3030,201 +3129,141 @@
                "props": {
                 "fill": null,
                 "stroke": {
+                 "type": 0,
+                 "payload": 4292290109
+                },
+                "strokeWidth": 1.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "d": "M-8 2 H8"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4292290109
+                },
+                "strokeWidth": 1.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "d": "M-8 2 A8 8 0 0 1 8 2"
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGPath",
+               "props": {
+                "fill": null,
+                "stroke": {
+                 "type": 0,
+                 "payload": 4292290109
+                },
+                "strokeWidth": 1.4,
+                "strokeLinecap": 1,
+                "strokeLinejoin": 1,
+                "propList": [
+                 "fill",
+                 "stroke",
+                 "strokeWidth",
+                 "strokeLinecap",
+                 "strokeLinejoin"
+                ],
+                "d": "M0 2 V10"
+               },
+               "children": null
+              }
+             ]
+            },
+            {
+             "type": "RNSVGGroup",
+             "props": {
+              "fill": {
+               "type": 0,
+               "payload": 4278190080
+              }
+             },
+             "children": [
+              {
+               "type": "RNSVGRect",
+               "props": {
+                "fill": {
+                 "type": 0,
+                 "payload": 4292290109
+                },
+                "propList": [
+                 "fill"
+                ],
+                "x": 316.625,
+                "y": 232.175,
+                "width": 10,
+                "height": 8,
+                "rx": 4
+               },
+               "children": null
+              },
+              {
+               "type": "RNSVGText",
+               "props": {
+                "fill": {
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
-                "strokeLinecap": 1,
-                "strokeLinejoin": 1,
                 "propList": [
-                 "fill",
-                 "stroke",
-                 "strokeWidth",
-                 "strokeLinecap",
-                 "strokeLinejoin"
+                 "fill"
                 ],
-                "opacity": 0.6,
-                "d": "M1.52 2 H17.52"
-               },
-               "children": null
-              },
-              {
-               "type": "RNSVGPath",
-               "props": {
-                "fill": null,
-                "stroke": {
-                 "type": 0,
-                 "payload": 4294967295
+                "content": null,
+                "font": {
+                 "fontWeight": "800",
+                 "fontSize": 6,
+                 "textAnchor": "middle"
                 },
-                "strokeWidth": 4.4,
-                "strokeLinecap": 1,
-                "strokeLinejoin": 1,
-                "propList": [
-                 "fill",
-                 "stroke",
-                 "strokeWidth",
-                 "strokeLinecap",
-                 "strokeLinejoin"
+                "x": [
+                 321.625
                 ],
-                "opacity": 0.6,
-                "d": "M1.52 2 A8 8 0 0 1 17.52 2"
-               },
-               "children": null
-              },
-              {
-               "type": "RNSVGPath",
-               "props": {
-                "fill": null,
-                "stroke": {
-                 "type": 0,
-                 "payload": 4294967295
-                },
-                "strokeWidth": 4.4,
-                "strokeLinecap": 1,
-                "strokeLinejoin": 1,
-                "propList": [
-                 "fill",
-                 "stroke",
-                 "strokeWidth",
-                 "strokeLinecap",
-                 "strokeLinejoin"
+                "y": [
+                 238.255
                 ],
-                "opacity": 0.6,
-                "d": "M9.52 2 V10"
+                "dx": [],
+                "dy": [],
+                "rotate": []
                },
-               "children": null
-              },
-              {
-               "type": "RNSVGPath",
-               "props": {
-                "fill": null,
-                "stroke": {
-                 "type": 0,
-                 "payload": 4292290109
-                },
-                "strokeWidth": 1.6,
-                "strokeLinecap": 1,
-                "strokeLinejoin": 1,
-                "propList": [
-                 "fill",
-                 "stroke",
-                 "strokeWidth",
-                 "strokeLinecap",
-                 "strokeLinejoin"
-                ],
-                "d": "M-17.52 2 H-1.52"
-               },
-               "children": null
-              },
-              {
-               "type": "RNSVGPath",
-               "props": {
-                "fill": null,
-                "stroke": {
-                 "type": 0,
-                 "payload": 4292290109
-                },
-                "strokeWidth": 1.6,
-                "strokeLinecap": 1,
-                "strokeLinejoin": 1,
-                "propList": [
-                 "fill",
-                 "stroke",
-                 "strokeWidth",
-                 "strokeLinecap",
-                 "strokeLinejoin"
-                ],
-                "d": "M-17.52 2 A8 8 0 0 1 -1.52 2"
-               },
-               "children": null
-              },
-              {
-               "type": "RNSVGPath",
-               "props": {
-                "fill": null,
-                "stroke": {
-                 "type": 0,
-                 "payload": 4292290109
-                },
-                "strokeWidth": 1.6,
-                "strokeLinecap": 1,
-                "strokeLinejoin": 1,
-                "propList": [
-                 "fill",
-                 "stroke",
-                 "strokeWidth",
-                 "strokeLinecap",
-                 "strokeLinejoin"
-                ],
-                "d": "M-9.52 2 V10"
-               },
-               "children": null
-              },
-              {
-               "type": "RNSVGPath",
-               "props": {
-                "fill": null,
-                "stroke": {
-                 "type": 0,
-                 "payload": 4292290109
-                },
-                "strokeWidth": 1.6,
-                "strokeLinecap": 1,
-                "strokeLinejoin": 1,
-                "propList": [
-                 "fill",
-                 "stroke",
-                 "strokeWidth",
-                 "strokeLinecap",
-                 "strokeLinejoin"
-                ],
-                "d": "M1.52 2 H17.52"
-               },
-               "children": null
-              },
-              {
-               "type": "RNSVGPath",
-               "props": {
-                "fill": null,
-                "stroke": {
-                 "type": 0,
-                 "payload": 4292290109
-                },
-                "strokeWidth": 1.6,
-                "strokeLinecap": 1,
-                "strokeLinejoin": 1,
-                "propList": [
-                 "fill",
-                 "stroke",
-                 "strokeWidth",
-                 "strokeLinecap",
-                 "strokeLinejoin"
-                ],
-                "d": "M1.52 2 A8 8 0 0 1 17.52 2"
-               },
-               "children": null
-              },
-              {
-               "type": "RNSVGPath",
-               "props": {
-                "fill": null,
-                "stroke": {
-                 "type": 0,
-                 "payload": 4292290109
-                },
-                "strokeWidth": 1.6,
-                "strokeLinecap": 1,
-                "strokeLinejoin": 1,
-                "propList": [
-                 "fill",
-                 "stroke",
-                 "strokeWidth",
-                 "strokeLinecap",
-                 "strokeLinejoin"
-                ],
-                "d": "M9.52 2 V10"
-               },
-               "children": null
+               "children": [
+                {
+                 "type": "RNSVGTSpan",
+                 "props": {
+                  "fill": {
+                   "type": 0,
+                   "payload": 4278190080
+                  },
+                  "content": "×2",
+                  "font": {},
+                  "x": [],
+                  "y": [],
+                  "dx": [],
+                  "dy": [],
+                  "rotate": []
+                 },
+                 "children": null
+                }
+               ]
               }
              ]
             }
@@ -3278,11 +3317,12 @@
                "type": 0,
                "payload": 4292290109
               },
-              "strokeWidth": 1.2,
+              "strokeWidth": 0.9,
               "propList": [
                "stroke",
                "strokeWidth"
               ],
+              "opacity": 0.8,
               "x1": 345.5,
               "y1": 232.45,
               "x2": 345.5,
@@ -3298,10 +3338,10 @@
                "payload": 4278190080
               },
               "matrix": [
-               -0.636,
+               -0.5,
                0,
                0,
-               -0.636,
+               -0.5,
                345.5,
                239.05
               ]
@@ -3315,7 +3355,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3325,7 +3365,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M-8 2 H8"
                },
                "children": null
@@ -3338,7 +3378,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3348,7 +3388,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M-8 2 A8 8 0 0 1 8 2"
                },
                "children": null
@@ -3361,7 +3401,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3371,7 +3411,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M0 2 V10"
                },
                "children": null
@@ -3384,7 +3424,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3394,7 +3434,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M-4.5 -2.5 H4.5"
                },
                "children": null
@@ -3407,7 +3447,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3429,7 +3469,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3451,7 +3491,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3473,7 +3513,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3539,11 +3579,12 @@
                "type": 0,
                "payload": 4292290109
               },
-              "strokeWidth": 1.2,
+              "strokeWidth": 0.9,
               "propList": [
                "stroke",
                "strokeWidth"
               ],
+              "opacity": 0.8,
               "x1": 378.5,
               "y1": 232.45,
               "x2": 378.5,
@@ -3559,10 +3600,10 @@
                "payload": 4278190080
               },
               "matrix": [
-               -0.636,
+               -0.5,
                0,
                0,
-               -0.636,
+               -0.5,
                378.5,
                239.05
               ]
@@ -3576,7 +3617,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3586,7 +3627,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M-8 2 H8"
                },
                "children": null
@@ -3599,7 +3640,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3609,7 +3650,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M-8 2 A8 8 0 0 1 8 2"
                },
                "children": null
@@ -3622,7 +3663,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3632,7 +3673,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M0 2 V10"
                },
                "children": null
@@ -3645,7 +3686,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3655,7 +3696,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M-4.5 -2.5 H4.5"
                },
                "children": null
@@ -3668,7 +3709,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3678,7 +3719,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M-4.5 -5 H4.5"
                },
                "children": null
@@ -3691,7 +3732,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3713,7 +3754,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3735,7 +3776,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3757,7 +3798,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3779,7 +3820,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3845,11 +3886,12 @@
                "type": 0,
                "payload": 4292290109
               },
-              "strokeWidth": 1.2,
+              "strokeWidth": 0.9,
               "propList": [
                "stroke",
                "strokeWidth"
               ],
+              "opacity": 0.8,
               "x1": 411.5,
               "y1": 232.45,
               "x2": 411.5,
@@ -3865,10 +3907,10 @@
                "payload": 4278190080
               },
               "matrix": [
-               -0.636,
+               -0.5,
                0,
                0,
-               -0.636,
+               -0.5,
                411.5,
                239.05
               ]
@@ -3882,7 +3924,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3892,7 +3934,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M-8 2 H8"
                },
                "children": null
@@ -3905,7 +3947,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3915,7 +3957,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M-8 2 A8 8 0 0 1 8 2"
                },
                "children": null
@@ -3928,7 +3970,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3938,7 +3980,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M0 2 V10"
                },
                "children": null
@@ -3951,7 +3993,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3961,7 +4003,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M0 2 V-5"
                },
                "children": null
@@ -3974,7 +4016,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -3996,7 +4038,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -4018,7 +4060,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -4040,7 +4082,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -4106,11 +4148,12 @@
                "type": 0,
                "payload": 4292290109
               },
-              "strokeWidth": 1.2,
+              "strokeWidth": 0.9,
               "propList": [
                "stroke",
                "strokeWidth"
               ],
+              "opacity": 0.8,
               "x1": 444.5,
               "y1": 232.45,
               "x2": 444.5,
@@ -4126,10 +4169,10 @@
                "payload": 4278190080
               },
               "matrix": [
-               -0.636,
+               -0.5,
                0,
                0,
-               -0.636,
+               -0.5,
                444.5,
                239.05
               ]
@@ -4143,7 +4186,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -4153,7 +4196,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M-8 2 H8"
                },
                "children": null
@@ -4166,7 +4209,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -4176,7 +4219,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M-8 2 A8 8 0 0 1 8 2"
                },
                "children": null
@@ -4189,7 +4232,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -4199,7 +4242,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M0 2 V10"
                },
                "children": null
@@ -4212,7 +4255,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -4222,7 +4265,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M0 2 V-5"
                },
                "children": null
@@ -4235,7 +4278,7 @@
                  "type": 0,
                  "payload": 4294967295
                 },
-                "strokeWidth": 4.4,
+                "strokeWidth": 3.6,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -4245,7 +4288,7 @@
                  "strokeLinecap",
                  "strokeLinejoin"
                 ],
-                "opacity": 0.6,
+                "opacity": 0.55,
                 "d": "M-3.5 -5 L0 -8 L3.5 -5"
                },
                "children": null
@@ -4258,7 +4301,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -4280,7 +4323,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -4302,7 +4345,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -4324,7 +4367,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [
@@ -4346,7 +4389,7 @@
                  "type": 0,
                  "payload": 4292290109
                 },
-                "strokeWidth": 1.6,
+                "strokeWidth": 1.4,
                 "strokeLinecap": 1,
                 "strokeLinejoin": 1,
                 "propList": [

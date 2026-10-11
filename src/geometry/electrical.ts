@@ -1052,6 +1052,29 @@ export function postsSymbol(
   return out;
 }
 
+/**
+ * LE SYMBOLE COMPACT D'UN ENSEMBLE — relevé du patron : « si 3 prises en bloc
+ * de 3, mettre l'icône prise avec un "x3" en petit à côté ; des icônes
+ * légèrement plus petites, moins intrusives ».
+ *
+ * Trois socles côte à côte faisaient un symbole trois fois plus large, posé
+ * contre le mur : sur une crédence de cuisine, une frise qui mangeait la
+ * maçonnerie. Un ensemble de postes IDENTIQUES se dessine donc une fois, et
+ * dit son nombre (`fois`) ; un ensemble MÊLÉ (RJ45 et deux prises) garde
+ * chaque nature une fois, et compte celle qui se répète.
+ */
+export function symboleCompact(
+  posts: FixtureKind[],
+  fallback?: FixtureKind,
+): { symbole: SymbolStroke[]; fois: number | null } {
+  if (posts.length < 2) return { symbole: postsSymbol(posts, fallback), fois: null };
+  const uniques = posts.filter((p, i) => posts.indexOf(p) === i);
+  const repete = uniques
+    .map((k) => posts.filter((p) => p === k).length)
+    .reduce((m, n) => Math.max(m, n), 1);
+  return { symbole: postsSymbol(uniques, fallback), fois: repete > 1 ? repete : null };
+}
+
 /** Décale les abscisses d'un chemin. Les arcs gardent leurs rayons. */
 function shiftPath(d: string, dx: number): string {
   const toks = d.match(/[MmHVLAaZz]|-?\d*\.?\d+/g) ?? [];

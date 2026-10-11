@@ -68,7 +68,7 @@ import {
   masonryRuns,
   postsOf,
   retourALaCote,
-  postsSymbol,
+  symboleCompact,
   stackRanks,
   wallFace,
   ENTRAXE,
@@ -328,6 +328,12 @@ export interface PdfOptions {
    * nulle part. Les pièces retenues, les hypothèses du calcul et, quand on
    * l'a demandé, les prix d'unité. Absent : pas de feuille.
    */
+  /**
+   * LES REPÈRES SUR LES VUES 3D — relevé du patron : « donne la possibilité
+   * d'enlever les repères sur plan 3D lors de la fiche d'export PDF ». Faux :
+   * les perspectives montrent le logement seul, sans ses appareils.
+   */
+  reperes3D?: boolean;
   achats?: {
     pieces: PieceTravaux[];
     hypotheses: HypothesesTravaux;
@@ -1392,6 +1398,8 @@ interface SheetContext {
   address?: string;
   /** Un particulier : le cartouche dit « Propriétaire ». */
   particulier?: boolean;
+  /** Les perspectives portent-elles les repères d'appareillage ? */
+  reperes3D?: boolean;
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
@@ -1628,45 +1636,13 @@ function planPage(
    * devine plus. C'est la même leçon que le bandeau du meuble et que la
    * fenêtre de découpe.
    */
-  const lignesDuPlan: LegendLine[] = [];
-  if (wallNumbers(ctx).size > 0) {
-    lignesDuPlan.push({
-      /*
-        PAS DE PARENTHÈSES DANS UN LIBELLÉ DE LÉGENDE. Elles sont ÉCHAPPÉES
-        dans le flux PDF (« \( »), donc comptées double par la mesure de
-        largeur : le libellé tenait au calcul et sortait tronqué au dessin.
-        Un tiret dit la même chose et ne ment pas sur sa longueur.
-      */
-      texte: 'Repère de mur — élévation',
-      /*
-        UN BOUT DE MUR, ET SON CHIFFRE EN RÉSERVE — comme sur le plan. Le
-        « 1 » est le blanc laissé entre deux blocs de poché : le dessin des
-        symboles remplit chaque tracé à part, un trou n'y survivrait pas.
-      */
-      symbole: {
-        paths: [
-          { d: 'M-12 -4.6 H-1.5 V4.6 H-12 Z', fill: true },
-          { d: 'M1.5 -4.6 H12 V4.6 H1.5 Z', fill: true },
-        ],
-        color: INK,
-      },
-    });
-  }
-  if (openings.some((o) => o.type !== 'window')) {
-    lignesDuPlan.push({
-      texte: 'Porte',
-      symbole: {
-        paths: [{ d: 'M-4 3 v-6' }, { d: 'M-4 -3 a6 6 0 0 1 6 6 H-4' }],
-        color: GREY,
-      },
-    });
-  }
-  if (openings.some((o) => o.type === 'window')) {
-    lignesDuPlan.push({
-      texte: 'Fenêtre',
-      symbole: { paths: [{ d: 'M-5 -1.2 H5' }, { d: 'M-5 1.2 H5' }], color: BLEU_FENETRE },
-    });
-  }
+  /*
+    PLUS DE SECTION « PLAN » DANS LA LÉGENDE — relevé du patron : « sur le plan
+    PDF, enlève les icônes présentant les portes, fenêtres et élévation, c'est
+    logique ». Un battant de porte, un double trait de fenêtre, un numéro dans
+    l'épaisseur d'un mur se lisent d'eux-mêmes ; la légende garde ce qui a
+    besoin d'elle : l'appareillage et le plafond.
+  */
   const colonnesLegende: LegendSection[][] = [];
   if (kindsLegende.length > 0) {
     colonnesLegende.push([
@@ -1690,9 +1666,6 @@ function planPage(
         })),
       });
       seconde.push({ lignes: [{ couleur: GREY, texte: 'Lien de commande' }] });
-    }
-    if (lignesDuPlan.length > 0) {
-      seconde.push({ titre: 'PLAN', lignes: lignesDuPlan });
     }
     if (seconde.length > 0) colonnesLegende.push(seconde);
   }
@@ -3325,15 +3298,18 @@ function planPage(
           est venu lire. Le symbole se pose au nu du mur, du côté de la
           pièce, où le fond est clair de toute façon.
         */
-        drawSymbol(
-          d,
-          postsSymbol(postes, f.kind),
-          q.x,
-          q.y,
-          ECHELLE_SYMBOLE,
-          ENCRE_ELEC,
-          0.9,
-        );
+        /*
+          UN SYMBOLE, ET SON NOMBRE — relevé du patron : « si 3 prises en
+          bloc de 3, mettre l'icône prise avec un "x3" en petit à côté ».
+        */
+        const { symbole, fois } = symboleCompact(postes, f.kind);
+        drawSymbol(d, symbole, q.x, q.y, ECHELLE_SYMBOLE, ENCRE_ELEC, 0.9);
+        if (fois) {
+          d.text(`×${fois}`, q.x + SYMBOL_SPAN * ECHELLE_SYMBOLE * 0.45, q.y + SYMBOL_SPAN * ECHELLE_SYMBOLE * 0.3, 5.5, ENCRE_ELEC, {
+            align: 'left',
+            bold: true,
+          });
+        }
       }
       /*
         ET LES MOTS PAR-DESSUS, aux places retenues avant les cotes.
@@ -5701,7 +5677,8 @@ function threeDPage(
     floors: ctx.floors,
     roomNames: ctx.roomNames,
     rooms: ctx.rooms,
-    fixtures: ctx.fixtures,
+    // Les repères d'appareillage se retirent des perspectives à la demande.
+    fixtures: ctx.reperes3D === false ? [] : ctx.fixtures,
     showDims,
   };
   const titre = combien > 1 ? `Perspective ${rang}` : 'Perspective';
@@ -6619,6 +6596,7 @@ function planifierLeDossier(
     client: scan.client,
     address: scan.address,
     particulier: scan.particulier,
+    reperes3D: opts.reperes3D ?? true,
     walls: scan.walls,
     openings: scan.openings,
     objects: scan.objects,

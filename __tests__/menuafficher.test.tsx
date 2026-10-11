@@ -81,8 +81,6 @@ const rangee2D = (edition: boolean) =>
       setShowFixtures={jest.fn()}
       setShowRoutes={jest.fn()}
       hasRoutes={false}
-      showNorth={false}
-      setShowNorth={jest.fn()}
       showCeiling={false}
       setShowCeiling={jest.fn()}
       onFixture={jest.fn()}
@@ -103,8 +101,6 @@ const rangee3D = (autres: Partial<React.ComponentProps<typeof Toolbar3D>> = {}) 
       bas={0}
       showMeasures={false}
       setShowMeasures={jest.fn()}
-      showNorth={false}
-      setShowNorth={jest.fn()}
       showCeiling={false}
       setShowCeiling={jest.fn()}
       showVolumes={false}
@@ -136,14 +132,16 @@ describe('le plan 2D', () => {
     expect(ordre).toEqual(['Cotes', 'Meubles', 'Surfaces', 'Appareils', 'Autres']);
   });
 
-  it('« Autres » ouvre le menu Afficher : nord, grille, couleurs des ouvertures, notes, photos', () => {
+  it('« Autres » ouvre le menu Afficher : grille, couleurs des ouvertures, notes, photos', () => {
     const t = rangee2D(false);
     appuyer(t, 'Autres');
     const vu = textes(t);
     expect(vu).toContain('Afficher sur le plan');
-    for (const mot of ['Points cardinaux', 'Grille', 'Portes et fenêtres en couleur', 'Notes', 'Photos', 'Gaines', 'Plafond']) {
+    for (const mot of ['Grille', 'Portes et fenêtres en couleur', 'Notes', 'Photos', 'Gaines', 'Plafond']) {
       expect(vu).toContain(mot);
     }
+    // Plus d'option « Nord » : la rose des vents ne vit plus que dans le PDF.
+    expect(vu).not.toContain('Points cardinaux');
     // La grille s'allume d'un appui sur sa ligne, puis « Valider ».
     appuyer(t, 'Grille');
     appuyer(t, 'Valider');
@@ -207,9 +205,10 @@ describe('la maquette 3D', () => {
     appuyer(t, 'Autres');
     const vu = textes(t);
     expect(vu).toContain('Afficher sur la maquette');
-    for (const mot of ['Sol', 'Murs pleins', 'Volumes de salle d’eau', 'Points cardinaux', 'Nuit', 'Pièce isolée', 'Tout le logement', 'Séjour']) {
+    for (const mot of ['Sol', 'Murs pleins', 'Volumes de salle d’eau', 'Nuit', 'Pièce isolée', 'Tout le logement', 'Séjour']) {
       expect(vu).toContain(mot);
     }
+    expect(vu).not.toContain('Points cardinaux');
     const sol = t.root.findAll((n) => n.props.accessibilityLabel === 'Sol' && n.props.accessibilityRole === 'switch')[0];
     expect(sol.props.accessibilityState).toEqual({ checked: true, disabled: false });
     appuyer(t, 'Sol');

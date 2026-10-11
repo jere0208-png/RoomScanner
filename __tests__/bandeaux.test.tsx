@@ -253,14 +253,14 @@ describe('l’écran des résultats', () => {
   });
 
   /**
-   * LA BOUSSOLE SE DEMANDE, ELLE NE S'IMPOSE PAS.
+   * LA BOUSSOLE NE VIT PLUS QUE DANS LE DOSSIER.
    *
-   * On ouvre un plan pour lire des cotes. Les quatre lettres au bord du
-   * cadre servent à désigner un mur — un besoin ponctuel, pas permanent —
-   * et elles occupent justement la place où tombent les cotes de rive. Le
-   * calque part donc éteint, et le bouton le rallume en un appui.
+   * Elle s'était d'abord faite discrète (éteinte au départ, rallumée depuis
+   * le menu « Afficher »). Relevé du patron, plus tard : « enlève l'option
+   * Nord, affiche-la que si elle a été calculée lors du scan, pour l'export
+   * PDF ». L'écran n'en montre plus rien, et le menu ne la propose plus.
    */
-  it('s’ouvre SANS les points cardinaux, et le bouton les rallume', () => {
+  it('s’ouvre SANS les points cardinaux, et le menu ne les propose plus', () => {
     const tree = monter();
     const lettres = () =>
       tree.root
@@ -268,19 +268,8 @@ describe('l’écran des résultats', () => {
         .map((n) => n.props.children)
         .filter((c) => c === 'N' || c === 'E' || c === 'S' || c === 'O');
     expect(lettres()).toHaveLength(0);
-    // Les points cardinaux vivent dans le menu « Afficher », au bout de la rangée.
-    // Le choix ne s'applique qu'à la validation du menu.
-    const basculerNord = () => {
-      ouvrirAfficher(tree);
-      expect(ligne(tree, 'Points cardinaux')).toBeDefined();
-      act(() => ligne(tree, 'Points cardinaux').props.onPress());
-      act(() => bouton(tree, 'Valider')!.props.onPress());
-    };
-    basculerNord();
-    // Quatre lettres par vue affichée : la couronne est bien là.
-    expect(lettres().length).toBeGreaterThanOrEqual(4);
-    basculerNord();
-    expect(lettres()).toHaveLength(0);
+    ouvrirAfficher(tree);
+    expect(ligne(tree, 'Points cardinaux')).toBeUndefined();
   });
 
   it('porte ses calques et son bouton d’édition', () => {
@@ -292,17 +281,8 @@ describe('l’écran des résultats', () => {
     ouvrirAfficher(tree);
     expect(ligne(tree, 'Plafond')).toBeDefined();
     expect(ligne(tree, 'Plafond').props.accessibilityState.disabled).toBe(false);
-    /*
-      LA BOUSSOLE DU NORD est passée dans le menu, sous « Points
-      cardinaux » : une silhouette Solar PLEINE, comme ses voisines — plus
-      de dessin maison au trait (relevé du patron : il faisait maigrelet).
-    */
-    const nord = ligne(tree, 'Points cardinaux');
-    expect(nord).toBeDefined();
-    const pleines = nord.findAll(
-      (n) => n.props?.d === SOLAIRES.boussole && n.props?.fillRule === 'evenodd',
-    );
-    expect(pleines.length).toBeGreaterThan(0);
+    // La boussole du nord n'y est plus : le dossier PDF seul la porte.
+    expect(ligne(tree, 'Points cardinaux')).toBeUndefined();
   });
 
   it('le cartouche esquive les spots et laisse voir au travers', () => {
@@ -1571,7 +1551,8 @@ describe('la rangée d’outils', () => {
     // Le bouton d'édition, lui, n'existe PAS en 3D : on n'y retouche rien.
     expect(bouton(tree, 'Édition')).toBeUndefined();
     ouvrirAfficher(tree);
-    for (const l of ['Sol', 'Murs pleins', 'Points cardinaux', 'Plafond']) expect([l, !!ligne(tree, l)]).toEqual([l, true]);
+    for (const l of ['Sol', 'Murs pleins', 'Plafond']) expect([l, !!ligne(tree, l)]).toEqual([l, true]);
+    expect(ligne(tree, 'Points cardinaux')).toBeUndefined();
     // Deux pièces au moins : on peut en isoler une.
     expect(bouton(tree, 'Tout le logement')).toBeDefined();
   });

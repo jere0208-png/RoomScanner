@@ -66,6 +66,7 @@ import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 import { markColor } from '../geometry/schema';
 import { bleuFenetre, encreElectrique } from '../ui/encreElec';
 import { cheminDuPoche, pocheDesMurs } from '../geometry/poche';
+import { cibleDeFacade, cotesExterieurs } from '../geometry/cibleMur';
 import { CeilingLayer } from './CeilingLayer';
 import { FixtureLayer } from './FixtureLayer';
 import { OndeePose, useNaissances } from './Vivant';
@@ -1436,6 +1437,8 @@ export function FloorplanEditor({
   );
   // Pièces du plan : chacune a son contour, son centre et sa teinte de sol.
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
+  /** Le côté du dehors de chaque façade : sa surépaisseur se touche aussi. */
+  const dehorsDesMurs = useMemo(() => cotesExterieurs(walls, parts), [walls, parts]);
   /*
     Les trous du relevé : deux bouts de mur qui se font face sans se
     toucher. On les cherche à chaque changement de murs — c'est une
@@ -2490,6 +2493,7 @@ export function FloorplanEditor({
                 quad={quads.get(w.id)}
                 mapping={mapping}
                 sansCorps
+                exterieur={dehorsDesMurs.get(w.id)}
                 /* Une piece qu'on vient de poser et qu'on n'a pas encore
                    lachee : son trait reste ouvert. Voir `WallBody`. */
                 neuve={!!roomById.get(roomOf(w) ?? '')?.neuve}
@@ -4016,10 +4020,16 @@ function WallBody({
   neuve,
   sansCorps,
   couche = 'trait',
+  exterieur,
   onPress,
 }: {
   wall: WallSeg;
   quad?: WallQuad;
+  /**
+   * LE CÔTÉ DU DEHORS, pour un mur de façade : la surépaisseur que le poché
+   * y dessine se touche aussi (voir `cibleDeFacade`).
+   */
+  exterieur?: 1 | -1;
   mapping: EffMapping;
   showMeasure: boolean;
   /**
@@ -4160,8 +4170,22 @@ function WallBody({
     );
   }
 
+  /*
+    TOUT LE TRAIT NOIR SE TOUCHE — relevé du patron : « on doit cliquer sur la
+    partie intérieure de la largeur du mur ». La façade est dessinée plus
+    épaisse vers le dehors ; cette part-là répond maintenant aussi.
+  */
+  const facade =
+    exterieur && onPress && !neuve
+      ? cibleDeFacade(wall, exterieur)
+          .map((p) => mapping.toPx(p))
+          .map((p) => `${p.x},${p.y}`)
+          .join(' ')
+      : null;
+
   return (
     <G onPress={onPress}>
+      {facade ? <Polygon points={facade} fill="transparent" stroke="none" /> : null}
       {/*
         ICI, PLUS DE HALO : la cible de cette couche, c'est le poché
         lui-même — ce qu'on voit et ce qu'on vise. La tolérance est passée

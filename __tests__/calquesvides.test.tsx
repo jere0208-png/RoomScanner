@@ -83,25 +83,27 @@ describe('la pastille d’un calque vide', () => {
 describe('les rangées du plan et de la 3D', () => {
   const barre = lire('src/screens/result/ResultToolbar.tsx');
 
-  it('en plan : Cotes, Meubles, Appareils, Surfaces et Nord jugent ce qu’ils ont à montrer', () => {
+  it('en plan : Cotes, Meubles, Appareils et Surfaces jugent ce qu’ils ont à montrer', () => {
     expect(barre).toContain("vide={contenu.murs === 0 ? RIEN.cotes : null}");
     expect(barre).toContain("vide={contenu.meubles === 0 ? RIEN.meubles2D : null}");
     expect(barre).toContain("vide={contenu.appareils === 0 ? RIEN.appareils : null}");
     expect(barre).toContain("vide={contenu.pieces === 0 ? RIEN.surfaces : null}");
-    // Le nord est passé au menu « Afficher » : même règle, dans sa ligne.
-    expect(barre).toContain('vide: contenu.nord ? null : RIEN.nord2D');
+    // Le nord n'est plus une option de l'écran : il ne vit que dans le PDF.
+    expect(barre).not.toContain('RIEN.nord2D');
     expect(barre).toContain('Aucun appareil à afficher — passez en mode édition pour en poser.');
   });
 
-  it('en 3D aussi : Meubles, Nord, Nuit et Murs', () => {
+  it('en 3D aussi : Meubles, Nuit et Murs', () => {
     expect(barre).toContain("vide={contenu.meubles === 0 ? RIEN.meubles3D : null}");
-    expect(barre).toContain('vide: contenu.nord ? null : RIEN.nord3D');
+    expect(barre).not.toContain('RIEN.nord3D');
     expect(barre).toContain('vide: contenu.luminaires ? null : RIEN.nuit');
     expect(barre).toContain('vide: contenu.murs === 0 ? RIEN.murs : null');
   });
 
-  it('sans nord, l’édition propose d’orienter le plan ; la bulle vit à la racine', () => {
-    expect(lire('src/screens/ResultScreen.tsx')).toContain('showNorth={showNorth || (editMode && !nordConnu)}');
+  it('l’écran ne montre plus le nord ; la bulle vit à la racine', () => {
+    const ecran = lire('src/screens/ResultScreen.tsx');
+    expect(ecran).not.toContain('showNorth={showNorth');
+    expect(ecran).not.toContain('nordConnu');
     expect(lire('App.tsx')).toContain('<BulleHote />');
   });
 });

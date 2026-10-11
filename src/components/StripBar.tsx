@@ -32,11 +32,12 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { CloseCross } from './CloseCross';
 import { useTheme } from '../theme';
 import { SOLAIRES } from '../ui/solaires';
 import { DEBORD_DOIGT } from '../ui/bandeau';
+import { haptic } from '../ui/haptic';
 
 export interface StripAction {
   label: string;
@@ -268,6 +269,14 @@ const bulle = StyleSheet.create({
  * maintenant UNE ligne, qui glisse sous le pouce — la dernière pastille
  * coupée au bord dit qu'il y en a d'autres, comme les outils de Photos.
  */
+/*
+  ET QUAND ELLE DÉBORDE, ELLE LE DIT — relevé du patron : « le menu de mur a
+  des boutons qu'il faut faire glisser pour défiler, mais l'utilisateur ne
+  comprend pas forcément qu'on peut voir le reste ». La pastille coupée au
+  bord ne suffisait pas : on la prenait pour la dernière. Le bord s'estompe
+  maintenant, et une flèche « › » s'y pose — un appui fait défiler d'un
+  écran ; au bout, la flèche passe à gauche, « ‹ », pour revenir.
+*/
 export function RangeeDActions({
   styles,
   children,
@@ -275,17 +284,93 @@ export function RangeeDActions({
   styles: Record<string, object>;
   children: React.ReactNode;
 }) {
+  const c = useTheme();
+  const defile = useRef<ScrollView>(null);
+  const [largeur, setLargeur] = useState(0);
+  const [contenu, setContenu] = useState(0);
+  const [x, setX] = useState(0);
+  const deborde = largeur > 0 && contenu > largeur + 4;
+  const auDebut = x <= 4;
+  const aLaFin = x >= contenu - largeur - 4;
+  const aller = (vers: 1 | -1) => {
+    haptic('leger');
+    const cible = Math.max(0, Math.min(contenu - largeur, x + vers * largeur * 0.8));
+    defile.current?.scrollTo({ x: cible, animated: true });
+  };
+  const fleche = (cote: 'gauche' | 'droite') => (
+    <View pointerEvents="box-none" style={[rangee.bord, cote === 'droite' ? rangee.aDroite : rangee.aGauche]}>
+      {/* Le fondu : les pastilles s'effacent sous la flèche, sans s'arrêter net. */}
+      <Svg width={34} height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          <LinearGradient id={`fondu-${cote}`} x1={cote === 'droite' ? '0' : '1'} y1="0" x2={cote === 'droite' ? '1' : '0'} y2="0">
+            <Stop offset="0" stopColor={c.surface} stopOpacity={0} />
+            <Stop offset="0.55" stopColor={c.surface} stopOpacity={0.92} />
+            <Stop offset="1" stopColor={c.surface} stopOpacity={1} />
+          </LinearGradient>
+        </Defs>
+        <Rect x={0} y={0} width={34} height="100%" fill={`url(#fondu-${cote})`} />
+      </Svg>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel={cote === 'droite' ? 'Voir les autres gestes' : 'Revenir aux premiers gestes'}
+        hitSlop={DEBORD_DOIGT}
+        style={[rangee.fleche, { backgroundColor: c.surface, borderColor: c.line }, cote === 'droite' ? rangee.flecheDroite : rangee.flecheGauche]}
+        onPress={() => aller(cote === 'droite' ? 1 : -1)}>
+        <Svg width={14} height={14} viewBox="0 0 24 24">
+          <Path
+            d={cote === 'droite' ? 'M9 5 l7 7 l-7 7' : 'M15 5 l-7 7 l7 7'}
+            stroke={c.blue}
+            strokeWidth={2.6}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        </Svg>
+      </TouchableOpacity>
+    </View>
+  );
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-      style={styles.bandeauRangee}
-      contentContainerStyle={styles.bandeauRangeeContenu}>
-      {children}
-    </ScrollView>
+    <View>
+      <ScrollView
+        ref={defile}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        style={styles.bandeauRangee}
+        contentContainerStyle={styles.bandeauRangeeContenu}
+        onLayout={(e) => setLargeur(e.nativeEvent.layout.width)}
+        onContentSizeChange={(w) => setContenu(w)}
+        scrollEventThrottle={32}
+        onScroll={(e) => setX(e.nativeEvent.contentOffset.x)}>
+        {children}
+      </ScrollView>
+      {deborde && !aLaFin && fleche('droite')}
+      {deborde && !auDebut && fleche('gauche')}
+    </View>
   );
 }
+
+const rangee = StyleSheet.create({
+  bord: { position: 'absolute', top: 0, bottom: 0, width: 34, justifyContent: 'center' },
+  aDroite: { right: 0 },
+  aGauche: { left: 0 },
+  flecheDroite: { right: 2 },
+  flecheGauche: { left: 2 },
+  fleche: {
+    position: 'absolute',
+    top: 8,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOpacity: 0.12,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+  },
+});
 
 /**
  * LA CROIX DU MENU — on referme ce qu'on a sélectionné, d'un appui, à

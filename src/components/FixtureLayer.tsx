@@ -11,7 +11,7 @@
  * élément, et il est resté vert — l'extraction n'a pas bougé un point.
  */
 import React from 'react';
-import { Circle, G, Line, Path, Polyline, Text as SvgText } from 'react-native-svg';
+import { Circle, G, Line, Path, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 import type { Palette } from '../theme';
 import {
   FIXTURES,
@@ -19,7 +19,7 @@ import {
   faceX,
   facePoint,
   postsOf,
-  postsSymbol,
+  symboleCompact,
   stackRanks,
   wallFace,
   type Fixture,
@@ -232,9 +232,15 @@ export function FixtureLayer({
          * désormais sur l'échelle, entre deux bornes — assez petite
          * pour laisser voir le plan, assez grande pour se viser.
          */
+        /*
+          PLUS PETIT, ET MOINS INTRUSIF — relevé du patron : « des icônes
+          légèrement plus petites et plus travaillées ». Le symbole se
+          resserre (de 7–13 à 5,5–10 points de rayon), son trait s'affine, et
+          un ensemble ne s'étale plus : un symbole, et son nombre.
+        */
         const rayon = Math.max(
-          7,
-          Math.min(13, 7 + (mapping.scale - 60) * 0.07),
+          5.5,
+          Math.min(10, 5.5 + (mapping.scale - 60) * 0.06),
         );
         const taillePolice = Math.max(6.5, Math.min(9, rayon * 0.72));
 
@@ -282,7 +288,7 @@ export function FixtureLayer({
 
         return unites.map(({ f, face, x, postes }) => {
           const spec = FIXTURES[f.kind];
-          const symbol = postsSymbol(postes, f.kind);
+          const { symbole: symbol, fois } = symboleCompact(postes, f.kind);
           const tag = assemblyTag(postes);
           // Échelonnement : le deuxième appareil du même point se pose
           // plus loin du mur, sur le même filet.
@@ -344,7 +350,8 @@ export function FixtureLayer({
                     x2={p.x}
                     y2={p.y}
                     stroke={(encre ?? spec.color)}
-                    strokeWidth={1.2}
+                    strokeWidth={0.9}
+                    opacity={0.8}
                   />
                   {/*
                     LE HALO SUIT LA FORME DU SYMBOLE — relevé du patron :
@@ -380,11 +387,11 @@ export function FixtureLayer({
                         key={`halo-${si}`}
                         d={seg.d}
                         stroke="#FFFFFF"
-                        strokeWidth={4.4}
+                        strokeWidth={3.6}
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         fill={seg.fill ? '#FFFFFF' : 'none'}
-                        opacity={0.6}
+                        opacity={0.55}
                       />
                     ))}
                     {symbol.map((seg, si) => (
@@ -392,13 +399,35 @@ export function FixtureLayer({
                         key={si}
                         d={seg.d}
                         stroke={(encre ?? spec.color)}
-                        strokeWidth={1.6}
+                        strokeWidth={1.4}
                         strokeLinecap="round"
                         strokeLinejoin="round"
                         fill={seg.fill ? (encre ?? spec.color) : 'none'}
                       />
                     ))}
                   </G>
+                  {/* « ×3 » : le nombre de postes, en petit, contre le symbole. */}
+                  {fois ? (
+                    <G>
+                      <Rect
+                        x={p.x + rayon * 0.75}
+                        y={p.y - rayon * 1.25}
+                        width={Math.max(10, rayon * 1.25) + (fois > 9 ? 4 : 0)}
+                        height={Math.max(8, rayon * 0.95)}
+                        rx={Math.max(4, rayon * 0.47)}
+                        fill={(encre ?? spec.color)}
+                      />
+                      <SvgText
+                        x={p.x + rayon * 0.75 + (Math.max(10, rayon * 1.25) + (fois > 9 ? 4 : 0)) / 2}
+                        y={p.y - rayon * 1.25 + Math.max(8, rayon * 0.95) * 0.76}
+                        fill="#FFFFFF"
+                        fontSize={Math.max(6, rayon * 0.72)}
+                        fontWeight="800"
+                        textAnchor="middle">
+                        {`×${fois}`}
+                      </SvgText>
+                    </G>
+                  ) : null}
                   {(() => {
                     // Le mot vient AVEC LE ZOOM : sous 60 % du détail, il
                     // n'y a pas la place de l'écrire sans recouvrir le

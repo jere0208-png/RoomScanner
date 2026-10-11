@@ -206,6 +206,8 @@ const EXPORT_ICONS = {
 const styles = getStyles(c);
 
   const [include3D, setInclude3D] = useState(true);
+  /** Les repères d'appareillage sur les perspectives : ôtables. */
+  const [reperes3D, setReperes3D] = useState(true);
   const [includeMetre, setIncludeMetre] = useState(true);
   /*
     « CE QU'IL FAUT ACHETER » DANS LE DOSSIER — relevé du patron, point 3 de
@@ -560,6 +562,7 @@ const styles = getStyles(c);
         surfaces: showSurfaces,
         textures: showTextures,
         metre: includeMetre,
+        reperes3D,
         achats: achatsDuDossier(includeAchats),
         ...feuillesElevations(elevations, cotesElec),
       },
@@ -595,6 +598,7 @@ const styles = getStyles(c);
     measures2D,
     measures3D,
     includeMetre,
+    reperes3D,
     includeAchats,
     reglages.hypotheses,
     reglages.avecPrix,
@@ -943,6 +947,20 @@ const styles = getStyles(c);
                     </Svg>
                     <Text style={[styles.calqueMot, measures3D && styles.calqueMotOn]}>Cotes sur la 3D</Text>
                   </TouchableOpacity>
+                  {/* Les repères d'appareillage : utiles au chantier, de trop
+                      sur une perspective qu'on montre au client. */}
+                  {modeElec && toutLAppareillage.length > 0 && (
+                    <TouchableOpacity
+                      accessibilityLabel="Repères sur la 3D"
+                      accessibilityState={{ selected: reperes3D }}
+                      style={[styles.calque, reperes3D && styles.calqueOn]}
+                      onPress={() => basculer(() => setReperes3D(!reperes3D))}>
+                      <Svg width={15} height={15} viewBox="0 0 24 24">
+                        <Path d={SOLAIRES.reperes} fill={reperes3D ? '#FFFFFF' : c.ink} fillRule="evenodd" />
+                      </Svg>
+                      <Text style={[styles.calqueMot, reperes3D && styles.calqueMotOn]}>Repères</Text>
+                    </TouchableOpacity>
+                  )}
                   <TouchableOpacity accessibilityLabel="Remettre les cadrages à zéro" style={styles.calque} onPress={reset}>
                     <Text style={styles.calqueMot}>↻ Recadrer</Text>
                   </TouchableOpacity>

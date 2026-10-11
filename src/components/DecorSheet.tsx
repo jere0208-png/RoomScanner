@@ -9,7 +9,7 @@
  * la pièce, puis ses murs, son sol, et chacun de ses meubles. Un appui
  * s'applique aussitôt — la maquette, au-dessus, se repeint sous les yeux.
  */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import type { ObjectData } from 'react-native-room-scan';
@@ -21,6 +21,7 @@ import { SOLS, SOL_DEFAUT, TEINTES_MEUBLES, TEINTE_ORIGINE, cleDeTeinte, hexDeTe
 import { catalogItem } from '../geometry/catalogue';
 import { frCategory } from '../geometry/furniture';
 import { useScanStore } from '../store/scanStore';
+import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from './Iso3DView';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
 
 /** Une teinte foncée : la coche s'y pose en blanc. */
@@ -33,6 +34,41 @@ const sombre = (hex: string) => {
 /** Le nom d'un meuble : celui du catalogue, sinon sa catégorie. */
 export function nomDuMeuble(o: ObjectData): string {
   return (o.modele && catalogItem(o.modele)?.label) || frCategory(o.category ?? '');
+}
+
+/*
+  LA PIÈCE TOURNE SOUS LES YEUX — relevé du patron : « améliore cette option
+  décorer pour voir en temps réel les changements avec une vue 3D
+  tournante ». La maquette elle-même, réduite à la pièce qu'on décore
+  (`focusRoomId`), qui tourne d'un tour lent ; un doigt la reprend, et elle
+  repart seule deux secondes et demie après. Elle vit à part : vingt images
+  par seconde n'ont pas à redessiner tout le nuancier.
+*/
+const PAS_DU_TOUR = 1.2;
+const REPOS_APRES_LE_DOIGT = 2500;
+
+function PieceTournante({ pieceId }: { pieceId: string | null }) {
+  const [vue, setVue] = useState<View3DParams>({ ...DEFAULT_VIEW3D, tilt: 50 });
+  const touche = useRef(0);
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (Date.now() - touche.current < REPOS_APRES_LE_DOIGT) return;
+      setVue((v) => ({ ...v, theta: (v.theta + PAS_DU_TOUR) % 360 }));
+    }, 50);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <Iso3DView
+      value={vue}
+      onChange={(v) => {
+        touche.current = Date.now();
+        setVue(v);
+      }}
+      focusRoomId={pieceId}
+      showMeasures={false}
+      showNorth={false}
+    />
+  );
 }
 
 export function DecorSheet({
@@ -51,9 +87,18 @@ export function DecorSheet({
   const objects = useScanStore((st) => st.objects);
   const nommees = rooms;
   const [pieceId, setPieceId] = useState<string | null>(null);
+  /*
+    LA PIÈCE CHOISIE NE SE PERD PLUS — relevé du patron : « lorsqu'on change
+    de pièce, on revient à la première pièce si on change de couleur ». La
+    pièce se reprenait à CHAQUE changement des pièces du plan — et peindre
+    un mur en est un. Elle ne se reprend plus qu'à l'ouverture de la feuille.
+  */
+  const etaitVisible = useRef(false);
   useEffect(() => {
-    if (visible) setPieceId(pieceInitiale ?? nommees[0]?.id ?? null);
-  }, [visible, pieceInitiale, nommees]);
+    if (visible && !etaitVisible.current) setPieceId(pieceInitiale ?? nommees[0]?.id ?? null);
+    etaitVisible.current = visible;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
   const piece = nommees.find((r) => r.id === pieceId) ?? nommees[0] ?? null;
   const meubles = useMemo(
     () => (piece ? objects.filter((o) => o.roomId === piece.id && !/tapis/i.test(o.category ?? '')) : []),
@@ -137,6 +182,11 @@ export function DecorSheet({
         <Text style={s.titre}>Décorer</Text>
         <Text style={s.sous}>Murs, sol et meubles : la maquette change sous vos yeux. Le relevé, lui, ne bouge pas.</Text>
       </View>
+      {visible && piece ? (
+        <View style={s.apercu}>
+          <PieceTournante pieceId={piece.id} />
+        </View>
+      ) : null}
       <ScrollView style={s.corps} contentContainerStyle={s.corpsFond} showsVerticalScrollIndicator={false}>
         {nommees.length === 0 ? (
           <Text style={s.vide}>Aucune pièce sur ce plan : tracez ou redétectez les pièces pour les décorer.</Text>
@@ -219,7 +269,14 @@ const getStyles = themedStyles((c: Palette) =>
     tete: { paddingRight: 44, paddingLeft: 2 },
     titre: { color: c.ink, fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
     sous: { color: c.inkSoft, fontSize: 13, lineHeight: 18, marginTop: 3 },
-    corps: { maxHeight: 520, marginTop: 10 },
+    apercu: {
+      height: 200,
+      marginTop: 10,
+      borderRadius: radius.md,
+      overflow: 'hidden',
+      backgroundColor: c.surfaceSunken,
+    },
+    corps: { maxHeight: 340, marginTop: 10 },
     corpsFond: { paddingBottom: 14 },
     puces: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
     puce: {

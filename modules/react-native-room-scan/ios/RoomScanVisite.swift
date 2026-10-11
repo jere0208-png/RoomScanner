@@ -76,8 +76,6 @@ final class RoomScanVisite: UIView {
   private var diffuseurs: [Int: [SCNNode]] = [:]
   /// L'état des lampes, par rang, tel que le JavaScript l'a posé.
   private var lampesPosees: [Float] = []
-  /// Une lampe au moins est allumée : le jour baisse, dans la visite comme dans la maquette.
-  private var nuitAllumee = false
 
   /*
     CHAQUE PROPRIÉTÉ NE REBÂTIT QUE SI ELLE A CHANGÉ. La couche de
@@ -309,9 +307,20 @@ final class RoomScanVisite: UIView {
     return m
   }
 
+  /*
+    ALLUMER AJOUTE DE LA LUMIÈRE — relevé du patron : « sur la visite, allumer
+    une pièce rend les murs plus sombres, ce devrait être l'inverse ; revois
+    tout le système de lumière et son impact sur les pièces et les meubles ».
+
+    La moindre lampe allumée faisait « tomber le soir » : le jour baissait de
+    moitié, le contre-jour se retirait — et toute la pièce, sauf le cercle
+    sous la lampe, s'assombrissait au moment même où l'on allumait. Le jour ne
+    bouge plus : une lampe AJOUTE sa lumière à celle qui est là, comme chez
+    soi. Le contre-jour reste à sa place — cinq lampes, le jour, le contre-jour
+    et l'ambiance tiennent dans les huit lumières de la carte graphique.
+  */
   private func appliquerLampes() {
     for enfant in eclairage.childNodes { enfant.removeFromParentNode() }
-    var nuit = false
     var i = 0
     let v = lampesPosees
     while i + 9 <= v.count {
@@ -319,7 +328,6 @@ final class RoomScanVisite: UIView {
       let genre = Int(v[i + 1])
       let allume = v[i + 2] > 0.5
       let source = v[i + 3] > 0.5
-      if allume { nuit = true }
       let matiere = materiauDeDiffuseur(allume: allume)
       for n in diffuseurs[rang] ?? [] where n.geometry?.firstMaterial !== matiere {
         n.geometry?.materials = [matiere]
@@ -332,63 +340,53 @@ final class RoomScanVisite: UIView {
       }
       i += 9
     }
-    nuitAllumee = nuit
-    reglerLeJour()
   }
 
-  /*
-    LE SOIR TOMBE QUAND ON ALLUME. Une lampe en plein jour ne se voit pas :
-    le jour baisse, le contre-jour se retire — il libère sa place parmi les
-    huit lumières que la carte graphique tient à la fois — et l'ambiance
-    garde de quoi lire la pièce.
-
-    ET DANS LA MAQUETTE AUSSI — relevé du patron : « les meubles deviennent
-    blancs lorsque la lumière est allumée ». La maquette gardait son plein
-    jour, et les lampes s'y ajoutaient : un meuble clair sous une DCL
-    saturait en blanc. Elle baisse maintenant comme la visite, un peu moins
-    — vue de dessus, il faut encore lire le plan.
-  */
+  /// Le jour de la vue : celui de la maquette, ou celui de la visite. Il ne
+  /// dépend plus des lampes.
   private func reglerLeJour() {
     let maquette = orbite.count >= 10
-    if nuitAllumee {
-      ambiante.intensity = maquette ? 380 : 300
-      jour.intensity = maquette ? 160 : 110
-      noeudDuContre?.light = nil
-    } else {
-      ambiante.intensity = maquette ? 640 : 620
-      jour.intensity = maquette ? 380 : 420
-      contre.intensity = maquette ? 160 : 200
-      noeudDuContre?.light = contre
-    }
+    ambiante.intensity = maquette ? 640 : 620
+    jour.intensity = maquette ? 380 : 420
+    contre.intensity = maquette ? 160 : 200
+    noeudDuContre?.light = contre
   }
 
   /**
-   LA LUMIÈRE D'UN LUMINAIRE, selon sa forme et son usage.
+   LA LUMIÈRE D'UN LUMINAIRE, selon sa forme, son usage — et sa teinte.
 
    1 — l'applique murale : deux faisceaux larges, l'un vers le plafond,
        l'autre vers le sol — le mur se lave de lumière au-dessus et
-       au-dessous d'elle ;
-   2 — le spot encastré : un cône net vers le sol ;
-   3 — l'ampoule de la DCL : elle rayonne tout autour, sous sa douille ;
-   4 — le plafonnier : une nappe large et douce ;
-   5 — le ventilateur : sous son moteur.
+       au-dessous d'elle ; blanc chaud (2 700 K) ;
+   2 — le spot encastré : un cône net vers le sol ; blanc (3 000 K) ;
+   3 — l'ampoule de la DCL : elle rayonne tout autour, à l'ampoule ;
+       blanc chaud ;
+   4 — le plafonnier : une nappe large et douce ; blanc neutre (3 500 K) ;
+   5 — le ventilateur : sous son moteur ; blanc chaud.
 
-   Une teinte chaude (2 700 K) et une portée de pièce : au-delà, la lumière
-   s'éteint d'elle-même, sans éclairer la chambre d'à côté au travers.
+   DES TEINTES ADOUCIES ET DES INTENSITÉS MESURÉES — relevé du patron :
+   « l'éclairage en visite agit trop sur les meubles, cassant leurs
+   couleurs ». Le 2 700 K saturé d'avant (un orange franc) teintait tout ce
+   qu'il touchait, à des intensités qui délavaient un meuble clair : le
+   bois virait au roux, le blanc au crème. La lumière garde sa chaleur, sans
+   repeindre la pièce. Une portée de pièce : au-delà, elle s'éteint d'elle-
+   même, sans éclairer la chambre d'à côté au travers.
    */
   private func lumieres(genre: Int, a p: SCNVector3, nx: Float, nz: Float) -> [SCNNode] {
-    let chaud = UIColor(red: 1.0, green: 0.83, blue: 0.62, alpha: 1)
+    let chaud = UIColor(red: 1.0, green: 0.91, blue: 0.79, alpha: 1)
+    let blanc = UIColor(red: 1.0, green: 0.94, blue: 0.86, alpha: 1)
+    let neutre = UIColor(red: 1.0, green: 0.97, blue: 0.92, alpha: 1)
     func faisceau(
       versLeHaut: Bool, interieur: CGFloat, exterieur: CGFloat, intensite: CGFloat,
-      portee: CGFloat, en q: SCNVector3
+      portee: CGFloat, teinte: UIColor, en q: SCNVector3
     ) -> SCNNode {
       let l = SCNLight()
       l.type = .spot
-      l.color = chaud
+      l.color = teinte
       l.intensity = intensite
       l.spotInnerAngle = interieur
       l.spotOuterAngle = exterieur
-      l.attenuationStartDistance = 0.15
+      l.attenuationStartDistance = 0.3
       l.attenuationEndDistance = portee
       l.attenuationFalloffExponent = 2
       l.castsShadow = false
@@ -404,21 +402,20 @@ final class RoomScanVisite: UIView {
     case 1:
       let q = SCNVector3(x: p.x + nx * 0.06, y: p.y, z: p.z + nz * 0.06)
       return [
-        faisceau(versLeHaut: true, interieur: 35, exterieur: 125, intensite: 560, portee: 3.2, en: q),
-        faisceau(versLeHaut: false, interieur: 35, exterieur: 125, intensite: 460, portee: 3.0, en: q),
+        faisceau(versLeHaut: true, interieur: 40, exterieur: 130, intensite: 300, portee: 3.2, teinte: chaud, en: q),
+        faisceau(versLeHaut: false, interieur: 40, exterieur: 130, intensite: 240, portee: 3.0, teinte: chaud, en: q),
       ]
     case 2:
       return [faisceau(
-        versLeHaut: false, interieur: 22, exterieur: 70, intensite: 700, portee: 4.5,
+        versLeHaut: false, interieur: 24, exterieur: 72, intensite: 380, portee: 4.5, teinte: blanc,
         en: SCNVector3(x: p.x, y: p.y - 0.02, z: p.z))]
     case 3:
       let l = SCNLight()
       l.type = .omni
       l.color = chaud
-      // Plus douce qu'avant : à 640, un meuble clair sous elle saturait.
-      l.intensity = 420
-      l.attenuationStartDistance = 0.2
-      l.attenuationEndDistance = 5
+      l.intensity = 320
+      l.attenuationStartDistance = 0.3
+      l.attenuationEndDistance = 4.5
       l.attenuationFalloffExponent = 2
       l.castsShadow = false
       let n = SCNNode()
@@ -428,11 +425,11 @@ final class RoomScanVisite: UIView {
       return [n]
     case 4:
       return [faisceau(
-        versLeHaut: false, interieur: 75, exterieur: 165, intensite: 720, portee: 5.5,
+        versLeHaut: false, interieur: 80, exterieur: 165, intensite: 400, portee: 5.5, teinte: neutre,
         en: SCNVector3(x: p.x, y: p.y - 0.07, z: p.z))]
     case 5:
       return [faisceau(
-        versLeHaut: false, interieur: 60, exterieur: 155, intensite: 620, portee: 5,
+        versLeHaut: false, interieur: 60, exterieur: 155, intensite: 340, portee: 5, teinte: chaud,
         en: SCNVector3(x: p.x, y: p.y - 0.37, z: p.z))]
     default:
       return []

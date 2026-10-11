@@ -88,21 +88,20 @@ const dossier = (opts: Record<string, unknown> = {}) =>
     ),
   );
 
-describe('la légende explique le plan, pas seulement l’appareillage', () => {
-  it('elle dit ce qu’est une porte et ce qu’est une fenêtre', () => {
+/*
+  LA LÉGENDE NE PRÉSENTE PLUS LES PORTES, LES FENÊTRES NI LES REPÈRES DE MUR —
+  relevé du patron, plus tard : « sur plan PDF, enlève les icônes présentant
+  les portes, fenêtres et élévation, c'est logique ». Elle les avait gagnées
+  un temps ; un battant, un double trait, un numéro dans l'épaisseur d'un mur
+  se lisent d'eux-mêmes.
+*/
+describe('la légende explique ce qui a besoin d’elle', () => {
+  it('ni porte, ni fenêtre, ni repère de mur', () => {
     const lus = dossier();
-    expect(lus).toContain('Porte');
-    expect(lus).toContain('Fenêtre');
-  });
-
-  it('et elle dit à quoi sert le numéro d’un mur', () => {
-    /*
-      C'est le renvoi vers la feuille d'élévation. Sans un mot d'explication,
-      ce sont des chiffres au milieu de la maçonnerie.
-    */
-    const lus = dossier().join(' | ');
-    expect(lus).toMatch(/Rep[èe]re de mur/);
-    expect(lus).toMatch(/[ée]l[ée]vation/i);
+    expect(lus).not.toContain('Porte');
+    expect(lus).not.toContain('Fenêtre');
+    expect(lus.join(' | ')).not.toMatch(/Rep[èe]re de mur/);
+    expect(lus).not.toContain('PLAN');
   });
 
   it('sans oublier ce qu’elle expliquait déjà', () => {
@@ -143,7 +142,7 @@ describe('et elle ne parle que de ce qui est sur la feuille', () => {
     expect(sansMenuiserie).not.toContain('Fenêtre');
   });
 
-  it('et une porte seule ne fait pas parler de fenêtre', () => {
+  it('et une porte seule ne la fait pas parler non plus', () => {
     const porteSeule = motsDuPlan(
       latin1(
         buildScanPdf(
@@ -161,7 +160,7 @@ describe('et elle ne parle que de ce qui est sur la feuille', () => {
         ),
       ),
     );
-    expect(porteSeule).toContain('Porte');
+    expect(porteSeule).not.toContain('Porte');
     expect(porteSeule).not.toContain('Fenêtre');
   });
 });

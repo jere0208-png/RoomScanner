@@ -133,16 +133,35 @@ describe('les repères d’appareils, vus de loin', () => {
   });
 
   it('grossissent avec le zoom, sans jamais devenir un point', () => {
+    /*
+      On mesure ce qui SE VOIT. Le symbole n'a plus de disque de fond (son
+      halo suit ses traits) : sa taille, c'est l'échelle de son dessin,
+      `scale(rayon / 11)`. La cible tactile, elle, transparente, garde ses
+      18 px quel que soit le zoom — le doigt ne rapetisse pas.
+    */
+    const echelles = (t: TestRenderer.ReactTestRenderer) =>
+      t.root
+        .findAll((n) => typeof n.props.transform === 'string' && /scale\(/.test(n.props.transform), { deep: false })
+        .map((n) => Number(/scale\(([\d.]+)\)/.exec(n.props.transform)![1]) * 11);
+    const cibles = (t: TestRenderer.ReactTestRenderer) =>
+      t.root
+        .findAllByType(Circle)
+        .filter((n) => n.props.fill === 'transparent')
+        .map((n) => Number(n.props.r));
     const loin = rendre(45, 0);
-    const petit = loin.root.findAllByType(Circle).map((n) => Number(n.props.r));
+    const petit = echelles(loin);
+    const cibleLoin = cibles(loin);
     act(() => loin.unmount());
     const pres = rendre(140, 1);
-    const grand = pres.root.findAllByType(Circle).map((n) => Number(n.props.r));
+    const grand = echelles(pres);
     act(() => pres.unmount());
-    // Le fond du symbole grandit : de loin il reste lisible, de près il a la
-    // place de porter son dessin.
+    expect(petit.length).toBeGreaterThan(0);
+    // Le symbole grandit : de loin il reste lisible, de près il a la place
+    // de porter son dessin.
     expect(Math.max(...grand)).toBeGreaterThan(Math.max(...petit));
-    expect(Math.min(...petit.filter((r) => r > 0))).toBeGreaterThan(3);
+    expect(Math.min(...petit)).toBeGreaterThan(3);
+    // Plus petit, mais pas plus dur à toucher.
+    expect(Math.min(...cibleLoin)).toBeGreaterThanOrEqual(18);
   });
 
   /** De près, la dénomination paraît : c'est là qu'on a la place de lire. */

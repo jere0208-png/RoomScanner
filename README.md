@@ -14285,6 +14285,82 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Allumer éclaire ; plus d'option Nord ; « Décorer » qui tourne ; symboles « ×3 » ; murs qui se touchent partout
+
+Relevés du patron : « l'éclairage en visite agit trop sur les meubles,
+cassant leurs couleurs » ; « sur la visite, allumer une pièce rend les murs
+plus sombres, ce devrait être l'inverse » ; « enlève l'option Nord, affiche-la
+que si elle a été calculée lors du scan pour l'export PDF » ; « l'option
+décorer revient à la première pièce si on change de couleur » ; « donne la
+possibilité d'enlever les repères sur plan 3D de la fiche d'export » ; « sur
+plan PDF, enlève les icônes présentant les portes, fenêtres et élévation » ;
+« des icônes d'appareillage plus petites, plus travaillées, moins
+intrusives : trois prises en bloc, l'icône prise avec un “x3” » ; « la
+sélection d'un mur au doigt est parfois compliquée » ; « le menu de mur a des
+boutons qu'il faut faire glisser, l'utilisateur ne comprend pas qu'on peut
+voir le reste ».
+
+**Allumer ajoute de la lumière, jamais l'inverse** (`RoomScanVisite.swift`).
+La première lampe allumée faisait passer la scène « en nuit » : le jour
+tombait d'un coup, et une lampe ne rendait pas ce que le jour avait repris —
+d'où des murs plus sombres une fois allumé. Ce passage en nuit est supprimé
+(`nuitAllumee`, et la coupure du contre-jour) : le jour reste réglé une fois
+pour toutes (`reglerLeJour`, un peu plus doux qu'avant), et chaque lampe
+s'y ajoute. Elles éclairent avec une teinte d'ampoule réelle au lieu d'un
+jaune franc — chaude pour une applique ou un ventilateur, blanc chaud pour un
+spot, neutre pour un plafonnier — et des intensités revues à la baisse (DCL
+320, plafonnier 400, spot 380, applique 240 à 300), avec une portée
+d'atténuation qui commence plus tôt : la lumière se pose sur les meubles
+sans les délaver. Cela revient sur ce que disait la section suivante pour la
+maquette (« elle baisse le jour comme la visite ») : ni l'une ni l'autre ne
+le baisse plus.
+
+**Plus d'option « Nord » dans l'application.** Les lignes « Points
+cardinaux » des deux menus « Afficher » (plan et maquette) sont retirées,
+avec l'état qui les allumait ; le plan d'édition ne propose plus d'orienter
+le plan. La rose des vents ne vit plus que dans le dossier PDF, et seulement
+quand le scan a relevé le nord.
+
+**« Décorer » garde sa pièce et la montre en tournant** (`DecorSheet`). La
+pièce choisie se reprenait à chaque changement des pièces du plan — et
+peindre un mur en est un : on revenait à la première pièce. Elle ne se
+reprend plus qu'à l'ouverture de la feuille. En tête de la feuille, la pièce
+elle-même tourne d'un tour lent (`PieceTournante` : la maquette réduite à la
+pièce, `focusRoomId`) ; chaque couleur s'y voit aussitôt. Un doigt la
+reprend ; elle repart seule deux secondes et demie après.
+
+**Le dossier PDF.**
+- Une puce « Repères » à l'export (si l'appareillage existe) : la vue 3D du
+  dossier peut s'imprimer sans ses repères d'appareils (`reperes3D`).
+- La légende ne présente plus la porte, la fenêtre ni le repère de mur
+  d'élévation : ils se lisent d'eux-mêmes. La section « PLAN » de la légende
+  disparaît.
+
+**Des symboles d'appareillage plus discrets** (`FixtureLayer`, et le plan du
+PDF). Un symbole plus petit (5,5 à 10 points de rayon au lieu de 7 à 13), un
+trait plus fin, une tige plus légère. Un bloc de postes identiques ne
+dessine plus le symbole trois fois : il le dessine une fois, avec un petit
+badge « ×3 » de la couleur de l'appareil (`symboleCompact`). Un bloc mêlé
+(prise + RJ45) garde un symbole par sorte. La cible du doigt, elle, ne
+rapetisse pas (18 points).
+
+**Le mur se touche sur toute l'épaisseur dessinée** (`geometry/cibleMur.ts`).
+Le plan dessine une façade plus épaisse vers le dehors (la convention du
+plan d'architecte), mais la cible du doigt suivait l'épaisseur réelle : la
+part extérieure du trait noir ne répondait pas. Chaque mur de façade reçoit
+une cible transparente de ce côté-là (`cotesExterieurs`, `cibleDeFacade`) ;
+côté pièce rien ne change, pour ne pas voler l'appui d'un meuble plaqué au
+mur.
+
+**La rangée des gestes dit qu'elle défile** (`RangeeDActions`). Quand ses
+boutons ne tiennent pas, le bord s'estompe et une flèche ronde « › » s'y
+pose ; un appui fait défiler de presque un écran. Au bout, la flèche passe à
+gauche, « ‹ », pour revenir. Quand tout tient, rien ne s'affiche.
+
+Bancs : `retouchesdossier` (11), `murtouche` (5) ; mis à jour :
+`lumieresjustes`, `legendeplan`, `sigles`, `calquesvides`, `menuafficher`,
+`bandeaux`, `pasqueelec`, et les planches de rendu du plan.
+
 ## Les meubles d'aujourd'hui, et leur vignette en vraie 3D
 
 Relevé du patron : « ajoute de nouveaux meubles, miroirs éclairés, etc., tout
