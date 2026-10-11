@@ -443,10 +443,10 @@ describe('rien ne s’achète en effaçant', () => {
     expect(ecrits(exemple())).toContain('Colonne montante ici');
   });
 
-  it('le plafond garde ses sigles et ses cotes', () => {
+  it('le plafond garde ses cotes — et plus aucun sigle', () => {
     const vus = ecrits(electrique(0.9, 1, true));
-    expect(vus).toContain('DCL');
-    expect(vus).toContain('DAAF');
+    expect(vus).not.toContain('DCL');
+    expect(vus).not.toContain('DAAF');
     // Les cotes de pose des appareils de plafond : des centimètres.
     expect(vus.filter((t) => /^\d{2,3}$/.test(t)).length).toBeGreaterThan(10);
   });

@@ -95,6 +95,7 @@ import {
   faceXofT,
   fromFaceX,
   interiorSide,
+  pieceDuCote,
   wallFace,
   type Fixture,
 } from '../geometry/electrical';
@@ -895,7 +896,19 @@ export function WallElevation({
       ? { left: px(0), top: py(H), w: face.len * scale, h: H * scale }
       : null;
   const calqueVisible = calque && !!photoDuCalque && !!cadreDuMur;
-  const roomName = rooms.find(r => r.id === roomOf(wall))?.name ?? '';
+  /*
+    LA PIÈCE DU CÔTÉ REGARDÉ — relevé du patron : « note aussi le nom de la
+    pièce du côté du mur observé ; on peut se tromper si le mur joint deux
+    pièces ». La pièce du mur est celle qui l'a relevé ; on dit celle qu'on
+    a devant soi, et celle qui est au dos.
+  */
+  const pieceVue = pieceDuCote(wall, side, walls, rooms) ?? roomOf(wall);
+  const roomName = rooms.find(r => r.id === pieceVue)?.name ?? '';
+  const pieceAuDos = pieceDuCote(wall, side === 1 ? -1 : 1, walls, rooms);
+  const nomAuDos =
+    pieceAuDos && pieceAuDos !== pieceVue
+      ? rooms.find(r => r.id === pieceAuDos)?.name ?? ''
+      : '';
   /**
    * DE QUEL MUR S'AGIT-IL ? Celui du nord, celui de l'est.
    *
@@ -1296,7 +1309,8 @@ export function WallElevation({
             {titreDuMur}
           </Text>
           <Text style={styles.sousTitre} numberOfLines={1}>
-            {roomName ? `${roomName} · ${mesures}` : mesures}
+            {(roomName ? `Côté ${roomName} · ${mesures}` : mesures) +
+              (nomAuDos ? ` · dos : ${nomAuDos}` : '')}
           </Text>
         </View>
         <TouchableOpacity

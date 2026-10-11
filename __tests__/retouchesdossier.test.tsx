@@ -164,9 +164,20 @@ describe('les symboles d’appareillage, compacts', () => {
   });
 
   it('un ensemble mêlé garde chaque nature une fois, et compte celle qui se répète', () => {
-    const c = symboleCompact(['rj45', 'prise', 'prise'], 'rjPrise2');
+    const c = symboleCompact(['inter', 'va', 'va'], 'inter');
     expect(c.fois).toBe(2);
-    expect(c.symbole.length).toBe(FIXTURE_SYMBOL.rj45.length + FIXTURE_SYMBOL.prise.length);
+    expect(c.symbole.length).toBe(FIXTURE_SYMBOL.inter.length + FIXTURE_SYMBOL.va.length);
+  });
+
+  /*
+    UNE RJ45 ET SES PRISES : LE LOGO RJ SEUL — relevé du patron : « un simple
+    logo RJ, sans faire les prises à côté, se comprend comme RJ + PC ».
+  */
+  it('une RJ45 accompagnée de prises se dessine en RJ seule', () => {
+    expect(symboleCompact(['rj45', 'prise', 'prise'], 'rjPrise2')).toEqual({ symbole: FIXTURE_SYMBOL.rj45, fois: null });
+    expect(symboleCompact(['rj45', 'prise'], 'rjPrise')).toEqual({ symbole: FIXTURE_SYMBOL.rj45, fois: null });
+    // Deux RJ45 restent deux RJ45 : « ×2 ».
+    expect(symboleCompact(['rj45', 'rj45'], 'rj2').fois).toBe(2);
   });
 
   it('le plan dessine le symbole compact, plus petit, et son badge', () => {

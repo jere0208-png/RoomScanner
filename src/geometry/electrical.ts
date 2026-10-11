@@ -796,6 +796,53 @@ export function interiorSide(
 }
 
 /**
+ * LA PIÈCE D'UN CÔTÉ DU MUR — celle qu'on a devant soi quand on regarde
+ * cette face. Relevé du patron : « on peut se tromper si le mur joint deux
+ * pièces, d'un côté et de l'autre ». `roomOf` donne la pièce qui a relevé le
+ * mur ; celle-ci se lit sur le plan : trois points pris à quarante
+ * centimètres du nu, du côté voulu, et la pièce qui en contient le plus.
+ * Une façade n'a rien dehors : `null`.
+ */
+export function pieceDuCote(
+  wall: WallSeg,
+  side: 1 | -1,
+  walls: WallSeg[],
+  rooms?: RoomShape[],
+): string | null {
+  const len = segLength(wall) || 1;
+  const u = { x: (wall.b.x - wall.a.x) / len, z: (wall.b.z - wall.a.z) / len };
+  const n = perpOf(u);
+  const dedans = (q: { x: number; z: number }, pts: { x: number; z: number }[]) => {
+    let oui = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const a = pts[i];
+      const b = pts[j];
+      if (a.z > q.z !== b.z > q.z && q.x < ((b.x - a.x) * (q.z - a.z)) / (b.z - a.z) + a.x) oui = !oui;
+    }
+    return oui;
+  };
+  const parts = roomParts(walls, rooms).filter((p) => p.surface);
+  const voix = new Map<string, number>();
+  for (const t of [0.25, 0.5, 0.75]) {
+    const q = {
+      x: wall.a.x + u.x * len * t + n.x * side * 0.4,
+      z: wall.a.z + u.z * len * t + n.z * side * 0.4,
+    };
+    const ici = parts.find((p) => dedans(q, p.surface!.pts));
+    if (ici) voix.set(ici.roomId, (voix.get(ici.roomId) ?? 0) + 1);
+  }
+  let mieux: string | null = null;
+  let max = 0;
+  for (const [id, v] of voix) {
+    if (v > max) {
+      max = v;
+      mieux = id;
+    }
+  }
+  return mieux;
+}
+
+/**
  * Un appareil neuf, posé à 20 cm du coin bas gauche de la face — le point de
  * départ demandé, qu'on déplace ensuite au doigt ou à la cote.
  */
@@ -1068,12 +1115,27 @@ export function symboleCompact(
   fallback?: FixtureKind,
 ): { symbole: SymbolStroke[]; fois: number | null } {
   if (posts.length < 2) return { symbole: postsSymbol(posts, fallback), fois: null };
+  /*
+    UNE PRISE DE COMMUNICATION SE SUFFIT — relevé du patron : « un simple
+    logo RJ, sans faire les prises à côté, se comprend comme RJ + PC ». Sur
+    un plan, la RJ45 ou la TV d'un séjour a toujours ses prises à côté :
+    le symbole de communication dit la plaque, les socles de courant
+    n'ajoutaient qu'une frise.
+  */
+  const vdi = posts.filter((p) => COMMUNICATION.has(p));
+  if (vdi.length > 0 && vdi.length < posts.length && posts.every((p) => COMMUNICATION.has(p) || COURANT.has(p))) {
+    return symboleCompact(vdi, fallback);
+  }
   const uniques = posts.filter((p, i) => posts.indexOf(p) === i);
   const repete = uniques
     .map((k) => posts.filter((p) => p === k).length)
     .reduce((m, n) => Math.max(m, n), 1);
   return { symbole: postsSymbol(uniques, fallback), fois: repete > 1 ? repete : null };
 }
+
+/** Les postes de communication, et les socles de courant qui les accompagnent. */
+const COMMUNICATION = new Set<FixtureKind>(['rj45', 'tv']);
+const COURANT = new Set<FixtureKind>(['prise', 'prise20', 'prise32']);
 
 /** Décale les abscisses d'un chemin. Les arcs gardent leurs rayons. */
 function shiftPath(d: string, dx: number): string {

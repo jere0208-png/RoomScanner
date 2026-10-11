@@ -178,10 +178,12 @@ describe('le plafond sur le plan', () => {
     expect(pages(doc(PLAFOND))).toBe(1);
   });
 
-  it('porte les appareils, leur sigle et la légende du lien', () => {
+  it('porte les appareils et la légende du lien — sans sigle à côté', () => {
     const vu = texte(doc(PLAFOND));
-    expect(vu).toContain('DCL');
-    expect(vu).toContain('DAAF');
+    // La légende nomme les appareils (« Point lumineux DCL ») ; le plan ne
+    // les sigle plus (relevé du patron : « les "DCL" etc. ne sont pas
+    // utiles »).
+    expect(vu).toContain('Point lumineux');
     expect(vu).toContain('Lien de commande');
     // Et le sous-titre annonce ce que la feuille porte vraiment.
     expect(vu).toContain('plafond');

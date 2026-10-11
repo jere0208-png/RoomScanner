@@ -136,14 +136,14 @@ describe('le plan imprimé se lit', () => {
     valeur cede alors, la ligne de cote reste —, mais pas au point de vider
     le plan.
   */
-  it('et garde ses cotes, ses sigles et ses cartouches', () => {
+  it('et garde ses cotes et ses cartouches — les sigles, eux, sont partis', () => {
     const vus = motsDu(plan())
       .filter((m) => m.y > 120 && m.y < 700)
       .map((m) => m.texte);
     expect(vus).toContain('Séjour');
     expect(vus).toContain('Cuisine');
-    expect(vus).toContain('DCL');
-    expect(vus).toContain('DAAF');
+    expect(vus).not.toContain('DCL');
+    expect(vus).not.toContain('DAAF');
     expect(vus.filter((t) => /^\d+$/.test(t)).length).toBeGreaterThanOrEqual(12);
     expect(vus.filter((t) => t.includes('m')).length).toBeGreaterThanOrEqual(4);
   });

@@ -14285,6 +14285,78 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## L'élévation dit d'où on la regarde
+
+Relevé du patron : « sur les élévations des murs, note aussi le nom de la
+pièce du côté du mur observé. On peut se tromper si le mur joint deux pièces,
+d'un côté et de l'autre. »
+
+L'élévation nommait la pièce du mur (`roomOf`), c'est-à-dire celle qui l'a
+relevé, et pas forcément celle d'où on le regarde.
+
+`pieceDuCote` (`geometry/electrical`) lit la pièce sur le plan :
+- trois points pris à quarante centimètres du nu, du côté voulu ;
+- la pièce qui en contient le plus ;
+- une façade n'a personne dehors : `null`.
+
+**Dans le dossier**, le titre dit « Élévation — Mur 3 · côté Chambre, mur
+nord ». Une cloison ajoute au sous-titre « Au dos : Séjour. ». L'orientation
+se calcule depuis la pièce regardée.
+
+**Dans l'établi du mur**, le sous-titre dit « Côté Chambre · 3,36 × 2,50 m ·
+dos : Séjour », et suit la face qu'on choisit.
+
+`planpdfepure.test.ts`.
+
+## Le plan imprimé, épuré
+
+Relevé du patron, capture du dossier à l'appui :
+- « les noms de pièces sont trop imposants et mal placés, gênant la
+  visibilité des éléments électriques » ;
+- « les "DCL" etc. ne sont pas utiles, et la légende n'est pas adaptée : un
+  simple logo RJ, sans faire les prises à côté, se comprend comme RJ + PC.
+  Revois pour quelque chose de plus ludique » ;
+- « les éléments électriques ne doivent pas être en collision avec les
+  cheminements tracés de leur interaction avec l'interrupteur ; laisse une
+  marge. Rends ces lignes moins opaques » ;
+- « améliore la visibilité en général des éléments, de manière plus épurée
+  et intelligente ».
+
+**Plus de sigle à côté des symboles.**
+- Ni « DCL », « DAAF », « SP » sous les appareils de plafond, ni « RJ »,
+  « PC 20A », « LUM » à côté de l'appareillage mural.
+- Le symbole dit déjà ce qu'est l'appareil (le trait d'une RJ45, la barre
+  d'une prise spécialisée), et la légende le nomme.
+- Reste le repère de circuit (« C2 ») : lui ne se lit nulle part ailleurs.
+
+**Des noms de pièce plus discrets.**
+- Deux crans de moins : 8,5 points au lieu de 10,5 (11 au lieu de 14 pour
+  une pièce seule).
+- Le cartouche se tient à trois points de tout ce qui est encré.
+- Son fond est voilé au lieu d'être un pavé blanc : ce qui passerait
+  dessous se devine encore.
+
+**Des liens de commande qui s'écartent.**
+- Ils partent du symbole de l'interrupteur, à moitié transparents, et plus
+  fins (0,55).
+- `horsDesDisques` les interrompt autour de chaque symbole, mural ou de
+  plafond, et de chaque « ×2 », avec une marge de 2,5 points. Ils reprennent
+  de l'autre côté.
+
+**Une légende qui dessine ce que le plan dessine.**
+- Elle reprend le symbole compact du plan et son « ×2 », au lieu de poser
+  chaque poste d'un ensemble (trois symboles pour « RJ45 + prise double »).
+- Une RJ45 accompagnée de prises se dessine en RJ seule, sur le plan comme
+  dans la légende (`symboleCompact`, la TV aussi). Ce qui se dessine pareil
+  ne s'écrit qu'une fois : « RJ45, seule ou avec prises ».
+- Plus ludique : une carte aux coins ronds, une pastille de couleur devant
+  chaque titre, chaque symbole sur une vignette teintée, et le lien de
+  commande en tireté estompé, comme sur le plan.
+
+`planpdfepure.test.ts`. Les bancs qui exigeaient les sigles (`plafond`,
+`planepure`, `planlisible`, `dossierlisible`, `etiquettesplafond`,
+`liermur`, `retouchesdossier`) disent maintenant qu'ils ne sont plus là.
+
 ## Le plan 2D ne saccade plus à la prise du doigt
 
 Relevé du patron : « le plan 2D sur l'exemple saccade en le bougeant. Il

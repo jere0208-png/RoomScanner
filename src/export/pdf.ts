@@ -65,6 +65,7 @@ import {
   faceXofT,
   facePoint,
   interiorSide,
+  pieceDuCote,
   masonryRuns,
   postsOf,
   retourALaCote,
@@ -75,6 +76,7 @@ import {
   PLAQUE,
   SYMBOL_SPAN,
   type Fixture,
+  type FixtureKind,
   type SymbolStroke,
 } from '../geometry/electrical';
 import {
@@ -589,12 +591,14 @@ class Draw {
     );
   }
 
-  /** Ligne brisée en tireté : le cheminement d'une gaine. */
-  dashedPath(pts: Pt[], w: number, hex: string, dash: [number, number]) {
+  /** Ligne brisée en tireté : le cheminement d'une gaine. `alpha` l'estompe
+   *  (dixièmes, comme `poly`) : un lien de commande se lit sans dominer. */
+  dashedPath(pts: Pt[], w: number, hex: string, dash: [number, number], alpha = 1) {
     if (pts.length < 2) return;
     const [r, g, b] = hexRgb(hex);
+    const ga = Math.round(Math.min(1, Math.max(0.1, alpha)) * 10);
     this.ops.push(
-      `q [${dash[0]} ${dash[1]}] 0 d ${n2(r)} ${n2(g)} ${n2(b)} RG ${n2(w)} w 1 J 1 j ` +
+      `q ${ga < 10 ? `/GA${ga} gs ` : ''}[${dash[0]} ${dash[1]}] 0 d ${n2(r)} ${n2(g)} ${n2(b)} RG ${n2(w)} w 1 J 1 j ` +
         pts.map((p, i) => `${n2(p.x)} ${n2(p.y)} ${i === 0 ? 'm' : 'l'}`).join(' ') +
         ' S Q',
     );
@@ -812,8 +816,8 @@ const TETE = FRAME.y + FRAME.h - 30;
 const CADRE_MARGE = 10;
 /** Hauteur d'une ligne de légende, texte compris. */
 const CADRE_LIGNE = 12;
-/** Largeur du trait de couleur qui précède un libellé, et son écart. */
-const CADRE_PUCE = 18;
+/** Largeur de la vignette qui précède un libellé, et son écart. */
+const CADRE_PUCE = 21;
 
 /**
  * Dessine un cadre de légende : titre(s), lignes colorées, marges égales.
@@ -832,13 +836,97 @@ interface LegendLine {
   texte: string;
   /** Un trait de couleur — pour un circuit, un conducteur, un lien. */
   couleur?: string;
+  /** Le trait est un tireté estompé : celui des liens de commande. */
+  tirete?: boolean;
   /** Ou un symbole dessiné — pour un appareil. */
   symbole?: { paths: SymbolStroke[]; color: string };
+  /** Son nombre, comme sur le plan : « ×2 » pour une double prise. */
+  fois?: number;
 }
 
 interface LegendSection {
   titre?: string;
+  /** La pastille de couleur devant le titre. */
+  teinte?: string;
   lignes: LegendLine[];
+}
+
+/**
+ * UN LIEN DE COMMANDE, ESTOMPÉ — relevé du patron : « rends ces lignes moins
+ * opaques ». Un fil fin, à moitié transparent : on suit l'interrupteur
+ * jusqu'à sa lampe sans qu'il passe devant le reste.
+ */
+const LIEN_LARGEUR = 0.55;
+const LIEN_ALPHA = 0.5;
+/** Le jour laissé entre un lien et le symbole qu'il frôle, en points. */
+const MARGE_LIEN = 2.5;
+
+/**
+ * UN TRAIT QUI S'INTERROMPT AUTOUR DES SYMBOLES — relevé du patron : « les
+ * éléments électriques ne doivent pas être en collision avec les
+ * cheminements tracés de leur interaction avec l'interrupteur ; laisse une
+ * marge ». Le lien partait du centre de l'interrupteur, finissait sur la
+ * lampe et traversait au passage les prises qui se trouvaient là.
+ *
+ * Il est découpé : chaque disque (un symbole et sa marge) le coupe, et il
+ * reprend de l'autre côté. Rend les morceaux qui restent, chacun d'au moins
+ * deux points.
+ */
+export function horsDesDisques(
+  pts: Pt[],
+  disques: { x: number; y: number; r: number }[],
+  pas = 1.2,
+): Pt[][] {
+  const dehors = (q: Pt) => disques.every((c) => Math.hypot(q.x - c.x, q.y - c.y) >= c.r);
+  const morceaux: Pt[][] = [];
+  let courant: Pt[] = [];
+  const pousser = (q: Pt) => {
+    if (dehors(q)) {
+      courant.push(q);
+      return;
+    }
+    if (courant.length >= 2) morceaux.push(courant);
+    courant = [];
+  };
+  pts.forEach((b, i) => {
+    if (i === 0) {
+      pousser(b);
+      return;
+    }
+    const a = pts[i - 1];
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / pas));
+    for (let k = 1; k <= n; k++) {
+      pousser({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n });
+    }
+  });
+  if (courant.length >= 2) morceaux.push(courant);
+  // Les points intermédiaires d'une même droite ne disent rien : on garde
+  // les coudes, le flux reste léger.
+  return morceaux.map((m) =>
+    m.filter((q, i) => {
+      if (i === 0 || i === m.length - 1) return true;
+      const a = m[i - 1];
+      const b = m[i + 1];
+      return Math.abs((q.x - a.x) * (b.y - a.y) - (q.y - a.y) * (b.x - a.x)) > 0.02;
+    }),
+  );
+}
+
+/** Un rectangle aux coins arrondis, en points de page. */
+function rectArrondi(x: number, y: number, w: number, h: number, r: number): Pt[] {
+  const k = Math.min(r, w / 2, h / 2);
+  const pts: Pt[] = [];
+  const coin = (cx: number, cy: number, a0: number) => {
+    for (let i = 0; i <= 4; i++) {
+      const a = a0 + (i / 4) * (Math.PI / 2);
+      pts.push({ x: cx + k * Math.cos(a), y: cy + k * Math.sin(a) });
+    }
+  };
+  coin(x + w - k, y + k, -Math.PI / 2);
+  coin(x + w - k, y + h - k, 0);
+  coin(x + k, y + h - k, Math.PI / 2);
+  coin(x + k, y + k, Math.PI);
+  return pts;
 }
 
 /**
@@ -864,36 +952,58 @@ function drawLegendBox(
     );
   const rangs = Math.max(...colonnes.map(rangsDe));
   const haut = rangs * CADRE_LIGNE + CADRE_MARGE * 2;
-  d.rect(x, y, larg, haut, '#FFFFFFEE', '#D8DEE7', 0.6);
+  /*
+    UNE CARTE, PAS UN FORMULAIRE — relevé du patron : « la légende n'est pas
+    adaptée ; revois pour quelque chose de plus ludique ». Les coins
+    s'arrondissent, chaque titre porte sa pastille de couleur, et chaque
+    symbole se pose sur une vignette teintée, son « ×2 » au coin — comme sur
+    le plan, qu'elle explique.
+  */
+  d.poly(rectArrondi(x, y, larg, haut, 7), '#FFFFFF', '#E1E6EE', 0.6);
   const largCol = (larg - CADRE_MARGE * (colonnes.length + 1)) / colonnes.length;
   colonnes.forEach((sections, ci) => {
     const tx = x + CADRE_MARGE + ci * (largCol + CADRE_MARGE);
     let base = y + haut - CADRE_MARGE - CADRE_LIGNE + 3.5;
     for (const sec of sections) {
       if (sec.titre) {
-        d.text(sec.titre, tx, base, 6, GREY_LIGHT, { align: 'left' });
+        d.circle(tx + 2.4, base + 2.2, 2.2, sec.teinte ?? ENCRE_ELEC);
+        d.text(sec.titre, tx + 8, base, 6.3, GREY, { align: 'left', bold: true });
         base -= CADRE_LIGNE;
       }
       for (const ligne of sec.lignes) {
         if (ligne.symbole) {
+          // La vignette tient le symbole ; son « ×2 » se pose à côté, sur le
+          // blanc, là où il se lit.
+          d.poly(
+            rectArrondi(tx, base - 2.6, 13, 10.4, 3),
+            mixHex(ligne.symbole.color, '#FFFFFF', 0.9),
+            null,
+          );
           drawSymbol(
             d,
             ligne.symbole.paths,
-            tx + 7,
+            tx + 6.5,
             base + 2.5,
-            0.42,
+            0.4,
             ligne.symbole.color,
             0.9,
           );
+          if (ligne.fois) {
+            d.text(`×${ligne.fois}`, tx + 14, base + 0.5, 4.6, ligne.symbole.color, {
+              align: 'left',
+              bold: true,
+            });
+          }
         } else if (ligne.couleur) {
-          d.line(
-            tx,
-            base + 2.5,
-            tx + CADRE_PUCE - 4,
-            base + 2.5,
-            2,
-            ligne.couleur,
-          );
+          const trait = [
+            { x: tx + 1, y: base + 2.5 },
+            { x: tx + CADRE_PUCE - 5, y: base + 2.5 },
+          ];
+          if (ligne.tirete) {
+            d.dashedPath(trait, LIEN_LARGEUR * 1.4, ligne.couleur, [3, 2.2], LIEN_ALPHA);
+          } else {
+            d.path(trait, 2, ligne.couleur);
+          }
         }
         d.text(
           fitText(ligne.texte, 7, largCol - CADRE_PUCE),
@@ -1734,12 +1844,37 @@ function planPage(
   */
   const colonnesLegende: LegendSection[][] = [];
   if (kindsLegende.length > 0) {
+    /*
+      LA LÉGENDE DESSINE CE QUE LE PLAN DESSINE — relevé du patron : « la
+      légende n'est pas adaptée : un simple logo RJ, sans faire les prises à
+      côté, se comprend comme RJ + PC ». Elle posait chaque poste d'un
+      ensemble, trois symboles pour « RJ45 + prise double », quand le plan
+      n'en pose qu'un (`symboleCompact`). Elle reprend donc le symbole du
+      plan et son « ×2 » ; et ce qui se dessine pareil ne s'écrit qu'une
+      fois — une RJ45, seule ou avec ses prises, c'est le même logo.
+    */
+    const groupes: { cle: string; kinds: FixtureKind[]; symbole: SymbolStroke[]; fois: number | null }[] = [];
+    for (const k of kindsLegende) {
+      const { symbole, fois } = symboleCompact(postsOf(k), k);
+      const cle = `${JSON.stringify(symbole)}|${fois ?? 1}`;
+      const deja = groupes.find((g) => g.cle === cle);
+      if (deja) deja.kinds.push(k);
+      else groupes.push({ cle, kinds: [k], symbole, fois });
+    }
+    const libelle = (kinds: FixtureKind[]) => {
+      if (kinds.length === 1) return FIXTURES[kinds[0]].label;
+      if (kinds.every((k) => postsOf(k).includes('rj45'))) return 'RJ45, seule ou avec prises';
+      if (kinds.every((k) => postsOf(k).includes('tv'))) return 'Prise TV, seule ou avec prises';
+      return kinds.map((k) => FIXTURES[k].label).join(' · ');
+    };
     colonnesLegende.push([
       {
         titre: 'APPAREILLAGE',
-        lignes: kindsLegende.map((k) => ({
-          texte: FIXTURES[k].label,
-          symbole: { paths: assemblySymbol(k), color: ENCRE_ELEC },
+        teinte: ENCRE_ELEC,
+        lignes: groupes.map((g) => ({
+          texte: libelle(g.kinds),
+          symbole: { paths: g.symbole, color: ENCRE_ELEC },
+          ...(g.fois ? { fois: g.fois } : {}),
         })),
       },
     ]);
@@ -1749,12 +1884,13 @@ function planPage(
     if (plafondLegende.length > 0) {
       seconde.push({
         titre: 'PLAFOND',
+        teinte: '#F2A93B',
         lignes: plafondLegende.map((k) => ({
           texte: CEILINGS[k].label,
           symbole: { paths: CEILING_SYMBOL[k], color: ENCRE_ELEC },
         })),
       });
-      seconde.push({ lignes: [{ couleur: GREY, texte: 'Lien de commande' }] });
+      seconde.push({ lignes: [{ couleur: ENCRE_ELEC, tirete: true, texte: 'Lien de commande' }] });
     }
     if (seconde.length > 0) colonnesLegende.push(seconde);
   }
@@ -2367,7 +2503,8 @@ function planPage(
         const w = f ? murParIdent.get(f.wallId) : undefined;
         if (!f || !w) continue;
         const face = wallFace(w, murQuads.get(w.id), f.side);
-        const depart = facePoint(face, faceX(face, f.along), 0.16);
+        // Depuis le symbole de l'interrupteur, là où le lien se dessine.
+        const depart = facePoint(face, faceX(face, f.along), sortieDuMur(f.id));
         const arrivee = linkAnchor({ x: depart.x, z: depart.z }, cl.at, CEILINGS[cl.kind].d * 0.7);
         encre.trait(linkCurve({ x: depart.x, z: depart.z }, arrivee).map(px), 0.8);
       }
@@ -2528,47 +2665,14 @@ function planPage(
       }
     }
 
-    /**
-     * PUIS LE SIGLE, sous son symbole — et sinon tout autour.
-     *
-     * Le cas qui a tout déclenché : le DAAF posé à dix centimètres du point
-     * lumineux, comme la norme le veut dans la circulation. Deux sigles pour
-     * un même point : le second passe de l'autre côté, et le plan cesse de
-     * porter « DCAF ».
-     */
+    /*
+      PLUS DE SIGLE SOUS LES APPAREILS DE PLAFOND — relevé du patron : « les
+      "DCL" etc. ne sont pas utiles ». Le symbole dit déjà ce qu'est
+      l'appareil, et la légende le nomme : le mot ne faisait qu'ajouter de
+      l'écriture là où l'on vient lire les symboles. La table reste, vide :
+      ce qui la consultait n'a plus rien à éviter.
+    */
     const siglesPose = new Map<string, Boite>();
-    const TAILLE_SIGLE_PLAFOND = 6.5;
-    for (const cl of plafondPose) {
-      const q = px(cl.at);
-      if (!dansLeCadre(q)) continue;
-      const spec = CEILINGS[cl.kind];
-      const r = Math.max(
-        RAYON_PLAFOND_MIN,
-        Math.min(RAYON_PLAFOND_MAX, (spec.d / 2) * scale),
-      );
-      const larg = latin1(spec.short).length * TAILLE_SIGLE_PLAFOND * 0.5;
-      const E = ECART_SIGLE_PLAFOND;
-      /*
-        Sous le symbole, puis dessus — À UN POINT ET DEMI DE SA PASTILLE, le
-        jour que la réserve exige entre deux choses posées : à un point trois,
-        la place préférée n'était jamais « libre », et le sigle partait
-        chercher ailleurs ce qu'il avait juste sous son spot.
-      */
-      const places = [
-        { x: q.x - larg / 2, y: q.y - r - 8.5 },
-        { x: q.x - larg / 2, y: q.y + r + 3.6 },
-        { x: q.x + r + 3, y: q.y - 3 },
-        { x: q.x - r - 3 - larg, y: q.y - 3 },
-        { x: q.x - larg / 2, y: q.y - r - E },
-        { x: q.x - larg / 2, y: q.y + r + E - 6 },
-      ];
-      const c =
-        placeAutour(places, (v) => boiteEcrite(spec.short, v.x, v.y, TAILLE_SIGLE_PLAFOND)) ??
-        places[0];
-      const b = boiteEcrite(spec.short, c.x, c.y, TAILLE_SIGLE_PLAFOND);
-      reserver(b);
-      siglesPose.set(cl.id, b);
-    }
 
     for (const { f, face, along, postes, membres } of unites) {
       const x = Math.max(0, Math.min(face.len, along));
@@ -2576,47 +2680,12 @@ function planPage(
       if (!dansLeCadre(q)) continue;
       const rayon = rayonDuSymbole(postes.length);
       /*
-        LE SIGLE CUMULÉ. Le plan reste sobre — seuls les appareils qui se
-        distinguent portent un mot (20 A, RJ, TV) —, mais une plaque annonce
-        TOUT ce qu'elle porte : « RJ + TV » sous une plaque de communication.
+        PLUS DE SIGLE À CÔTÉ DU SYMBOLE — « RJ », « PC 20A », « LUM » : relevé
+        du patron, « ces mots ne sont pas utiles ». Le symbole distingue déjà
+        une RJ45 (son trait), une prise spécialisée (sa barre), et la légende
+        les nomme. Reste le repère de circuit : lui ne se lit nulle part
+        ailleurs sur la feuille.
       */
-      const tags = [
-        ...new Set(postes.map((k) => FIXTURE_TAG[k]).filter(Boolean)),
-      ].join(' + ');
-      if (tags) {
-        const larg = latin1(tags).length * TAILLE_SIGLE * 0.5;
-        /*
-          À DROITE DU DISQUE D'ABORD — c'est là qu'on lit un sigle, et c'est
-          là qu'il était. Puis à gauche, puis d'un cran plus haut ou plus
-          bas : il reste attaché à son symbole dans tous les cas. À droite
-          « du disque », jamais « du centre » : sur une plaque de trois
-          postes, le sigle tombait en plein sur le dernier symbole.
-        */
-        const places = [
-          { x: q.x + rayon + 5, y: q.y + 4 },
-          { x: q.x - rayon - 5 - larg, y: q.y + 4 },
-          { x: q.x + rayon + 5, y: q.y - 5 },
-          { x: q.x - rayon - 5 - larg, y: q.y - 5 },
-          { x: q.x + rayon + 5, y: q.y + 12 },
-          { x: q.x - rayon - 5 - larg, y: q.y + 12 },
-          { x: q.x - larg / 2, y: q.y + rayon + 3 },
-          { x: q.x + rayon + 5, y: q.y - 13 },
-          { x: q.x - rayon - 5 - larg, y: q.y - 13 },
-          { x: q.x + rayon + 14, y: q.y + 4 },
-          { x: q.x - rayon - 14 - larg, y: q.y + 4 },
-          { x: q.x - larg / 2, y: q.y + rayon + 11 },
-        ];
-        const p =
-          placeAutour(places, (c) => boiteEcrite(tags, c.x, c.y, TAILLE_SIGLE)) ?? places[0];
-        reserver(boiteEcrite(tags, p.x, p.y, TAILLE_SIGLE));
-        motsAppareil.push({
-          texte: tags,
-          x: p.x,
-          y: p.y,
-          couleur: ENCRE_ELEC,
-          bold: false,
-        });
-      }
       /*
         LE REPÈRE DE CIRCUIT, sous l'appareil — celui-là même qu'on lit à
         l'écran et qu'on retrouve sur le tableau. Le dossier le taisait :
@@ -2675,8 +2744,14 @@ function planPage(
       { x: number; y: number; w: number; h: number; cx: number; cy: number; avecAire: boolean }
     >();
     if (showSurfaces) {
-      const gros = parts.length === 1 ? 14 : 10.5;
-      const petit = parts.length === 1 ? 11 : 9;
+      /*
+        PLUS DISCRET — relevé du patron : « les noms de pièces sont trop
+        imposants et mal placés, gênant la visibilité des éléments
+        électriques ». Deux crans de moins, et il se tient à trois points de
+        tout ce qui est encré (voir `candidat`).
+      */
+      const gros = parts.length === 1 ? 11 : 8.5;
+      const petit = parts.length === 1 ? 8.5 : 7;
       /*
         LES PLACES, EN ANNEAUX AUTOUR DU MILIEU — c'est là qu'on va chercher
         le nom d'une pièce, et l'on s'en éloigne le moins possible.
@@ -2740,16 +2815,16 @@ function planPage(
               : [[label, gros * 1.05]]
             : avecAire
               ? [
-                  [area, (parts.length === 1 ? 15 : 11) * 1.05],
-                  ['surface au sol', 8],
+                  [area, (parts.length === 1 ? 12 : 9) * 1.05],
+                  ['surface au sol', 6.5],
                 ]
-              : [[area, (parts.length === 1 ? 15 : 11) * 1.05]];
+              : [[area, (parts.length === 1 ? 12 : 9) * 1.05]];
           const larg =
-            Math.max(...lignes.map(([t, z]) => latin1(t).length * z)) * 0.52 + 10;
-          const haut = avecAire ? (label ? 30 : 32) : 18;
+            Math.max(...lignes.map(([t, z]) => latin1(t).length * z)) * 0.52 + 8;
+          const haut = avecAire ? (label ? 23 : 25) : 14;
           return {
             x: cx - larg / 2,
-            y: cy - (avecAire ? (label ? 15 : 16) : 9),
+            y: cy - (avecAire ? (label ? 11.5 : 12.5) : 7),
             w: larg,
             h: haut,
             cx,
@@ -2808,7 +2883,9 @@ function planPage(
             if (contour.length >= 3 && !dansLaPiece(contour, q)) continue;
             const b = emprise(avecAire, q.x, q.y);
             if (!libre(b) || !entier(b, marge)) continue;
-            const tache = encre.sous(b);
+            // Trois points d'air autour : un nom collé à une prise la cache
+            // autant qu'un nom posé dessus.
+            const tache = encre.sous({ x: b.x - 3, y: b.y - 3, w: b.w + 6, h: b.h + 6 });
             if (propre) {
               if (tache === 0) return b;
               continue;
@@ -3331,6 +3408,30 @@ function planPage(
       }
     }
 
+    /*
+      LES LIENS S'ÉCARTENT DES SYMBOLES — voir `horsDesDisques`. Chaque
+      symbole, mural ou de plafond, retient son disque et sa marge ; un lien
+      qui le traverse s'interrompt, et reprend de l'autre côté.
+    */
+    const disquesElec: { x: number; y: number; r: number }[] = [];
+    for (const { f, face, along, postes } of unites) {
+      const q = px(facePoint(face, Math.max(0, Math.min(face.len, along)), sortieDuMur(f.id)));
+      disquesElec.push({ x: q.x, y: q.y, r: rayonDuSymbole(postes.length) + MARGE_LIEN });
+      // Son « ×2 » aussi, posé à droite du symbole : un lien ne le barre pas.
+      if (symboleCompact(postes, f.kind).fois) {
+        disquesElec.push({ x: q.x + 7.7, y: q.y + 5.3, r: 4.5 + MARGE_LIEN });
+      }
+    }
+    for (const cl of ctx.ceiling ?? []) {
+      const q = px(cl.at);
+      disquesElec.push({ x: q.x, y: q.y, r: rayonPlafond(cl) + MARGE_LIEN });
+    }
+    const tracerLien = (pts: Pt[]) => {
+      for (const morceau of horsDesDisques(pts, disquesElec)) {
+        d.dashedPath(morceau, LIEN_LARGEUR, ENCRE_ELEC, [3, 2.2], LIEN_ALPHA);
+      }
+    };
+
     // ------------------------------------------- appareillage électrique
     // Même convention qu'à l'écran : le symbole se pose DANS la pièce,
     // devant la face qui le porte, relié au mur par un filet. Les appareils
@@ -3360,12 +3461,7 @@ function planPage(
             Math.max(0, Math.min(cible.face.len, cible.along)),
             sortie(cible.f),
           );
-          d.dashedPath(
-            linkCurve({ x: de.x, z: de.z }, { x: vers.x, z: vers.z }).map(px),
-            0.7,
-            ENCRE_ELEC,
-            [3, 2.2],
-          );
+          tracerLien(linkCurve({ x: de.x, z: de.z }, { x: vers.x, z: vers.z }).map(px));
         }
       }
       for (const { f, face, along, postes } of unites) {
@@ -3456,18 +3552,14 @@ function planPage(
             const w = f ? murParId.get(f.wallId) : undefined;
             if (!f || !w) continue;
             const face = wallFace(w, quadsMur.get(w.id), f.side);
-            const depart = facePoint(face, faceX(face, f.along), 0.16);
+            // Depuis le symbole de l'interrupteur — le disque le dégage.
+            const depart = facePoint(face, faceX(face, f.along), sortieDuMur(f.id));
             const arrivee = linkAnchor(
               { x: depart.x, z: depart.z },
               cl.at,
               CEILINGS[cl.kind].d * 0.7,
             );
-            d.dashedPath(
-              linkCurve({ x: depart.x, z: depart.z }, arrivee).map(px),
-              0.7,
-              ENCRE_ELEC,
-              [3, 2.2],
-            );
+            tracerLien(linkCurve({ x: depart.x, z: depart.z }, arrivee).map(px));
           }
         }
 
@@ -3611,22 +3703,6 @@ function planPage(
             avoir besoin de creuser un trou.
           */
           drawSymbol(d, CEILING_SYMBOL[cl.kind], q.x, q.y, r / 9, ENCRE_ELEC, 1.1);
-          // La place retenue plus haut, avant que les cotes ne se posent.
-          // Absente : le sigle a cédé la place au nom de sa pièce, qui n'en
-          // avait aucune autre — voir « une pièce saturée garde son nom ».
-          const pose = sigles.get(cl.id);
-          if (!pose) continue;
-          // À la place retenue, en x COMME en y : le sigle peut être passé
-          // de l'autre côté de son symbole, et le texte doit suivre — sinon
-          // la place vérifiée n'est pas la place occupée.
-          d.text(
-            spec.short,
-            pose ? pose.x : q.x - latin1(spec.short).length * 6.5 * 0.25,
-            pose ? pose.y : q.y - r - 8,
-            6.5,
-            ENCRE_ELEC,
-            { bold: true, align: 'left' },
-          );
         }
       }
 
@@ -3681,7 +3757,7 @@ function planPage(
           et c'est ce que fait un plan papier : on réserve la place du
           cartouche.
         */
-        const gros = big ? 14 : 10.5;
+        const gros = big ? 11 : 8.5;
         /*
           LA PLACE A ÉTÉ RETENUE AVANT LES COTES — voir « puis le cartouche
           de la pièce ». On la relit, on ne la recalcule pas : deux calculs
@@ -3691,20 +3767,29 @@ function planPage(
         const pose = cartouchesPose.get(part.roomId);
         if (!pose) continue;
         emprises.push(pose);
-        d.rect(pose.x, pose.y, pose.w, pose.h, '#FFFFFF', null);
+        // Un fond VOILÉ, pas un pavé blanc : ce qui passerait dessous — un
+        // symbole, un lien — se devine encore.
+        d.poly(
+          rectArrondi(pose.x, pose.y, pose.w, pose.h, 3),
+          '#FFFFFF',
+          null,
+          0,
+          false,
+          0.8,
+        );
         // Nom au-dessus, surface en dessous (l'axe y du PDF monte).
         if (label && pose.avecAire) {
-          d.text(label, pose.cx, pose.cy + 3, gros, INK, { bold: true });
-          d.text(area, pose.cx, pose.cy - 9, big ? 11 : 9, GREY);
+          d.text(label, pose.cx, pose.cy + 2.2, gros, INK, { bold: true });
+          d.text(area, pose.cx, pose.cy - 7.2, big ? 8.5 : 7, GREY);
         } else if (label) {
           // La surface a cédé la place : il ne reste que le nom, centré.
-          d.text(label, pose.cx, pose.cy - 3, gros, INK, { bold: true });
+          d.text(label, pose.cx, pose.cy - 0.36 * gros, gros, INK, { bold: true });
         } else if (pose.avecAire) {
-          d.text(area, pose.cx, pose.cy + 4, big ? 15 : 11, INK, { bold: true });
-          d.text('surface au sol', pose.cx, pose.cy - 10, 8, GREY);
+          d.text(area, pose.cx, pose.cy + 3, big ? 12 : 9, INK, { bold: true });
+          d.text('surface au sol', pose.cx, pose.cy - 8, 6.5, GREY);
         } else {
           // « surface au sol » a cédé la place : la surface seule, centrée.
-          d.text(area, pose.cx, pose.cy - 0.36 * (big ? 15 : 11), big ? 15 : 11, INK, {
+          d.text(area, pose.cx, pose.cy - 0.36 * (big ? 12 : 9), big ? 12 : 9, INK, {
             bold: true,
           });
         }
@@ -4995,7 +5080,17 @@ function elevationPage(
   const mine = (ctx.fixtures ?? []).filter((f) => f.wallId === wall.id);
   /* Ce qui est posé sur l'AUTRE face : on ne perce pas dos à dos. */
   const dos = mine.filter((f) => f.side !== side);
-  const piece = ctx.roomNames[roomOf(wall) ?? ''] ?? '';
+  /*
+    LA PIÈCE DU CÔTÉ OBSERVÉ — relevé du patron : « sur les élévations,
+    note aussi le nom de la pièce du côté du mur observé ; on peut se
+    tromper si le mur joint deux pièces ». La pièce du mur (`roomOf`) est
+    celle qui l'a relevé, pas forcément celle d'où on le regarde. On lit
+    donc la pièce DEVANT la face dessinée, et celle qui est au dos.
+  */
+  const devant = pieceDuCote(wall, side, walls, rooms) ?? roomOf(wall);
+  const derriere = pieceDuCote(wall, side === 1 ? -1 : 1, walls, rooms);
+  const piece = ctx.roomNames[devant ?? ''] ?? '';
+  const auDos = derriere && derriere !== devant ? ctx.roomNames[derriere] ?? '' : '';
   /**
    * DE QUEL MUR S'AGIT-IL ? Celui du nord, celui de l'est.
    *
@@ -5003,7 +5098,7 @@ function elevationPage(
    * laquelle on tient. L'orientation, elle, se vérifie sur place.
    */
   const centre = roomParts(ctx.walls, ctx.rooms).find(
-    (p) => p.roomId === roomOf(wall),
+    (p) => p.roomId === devant,
   )?.labelAt;
   const cardinal = centre ? wallLabel(wall, centre, ctx.north ?? null) : null;
   // Le numéro du mur, tel qu'il est écrit sur le plan : c'est par lui qu'on
@@ -5012,7 +5107,7 @@ function elevationPage(
   // Nom de pièce et cardinal, sans bégayer : une pièce sans nom donnait
   // « mur, mur nord-est » — le cardinal commence déjà par « mur », le
   // bouche-trou ne sert que s'il n'y a ni l'un ni l'autre.
-  const quoi = [piece, cardinal].filter(Boolean).join(', ') || 'mur';
+  const quoi = [piece ? `côté ${piece}` : '', cardinal].filter(Boolean).join(', ') || 'mur';
 
   // ------------------------------------------------------------- cadre
   const hautTitre = TETE;
@@ -5026,7 +5121,8 @@ function elevationPage(
   );
   const poses0 = mine.length - dos.length;
   d.text(
-    `Mur de ${face.len.toFixed(2).replace('.', ',')} m sous ` +
+    (auDos ? `Au dos : ${auDos}. ` : '') +
+      `Mur de ${face.len.toFixed(2).replace('.', ',')} m sous ` +
       `${H.toFixed(2).replace('.', ',')} m · ` +
       `${poses0} appareil${poses0 > 1 ? 's' : ''} · cotes en cm ` +
       'depuis le nu du mur et depuis le sol.' +

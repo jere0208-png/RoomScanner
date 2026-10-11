@@ -109,7 +109,7 @@ describe('le magasin', () => {
  * séquentiel : ce qui s'imprime d'abord apparaît d'abord.
  */
 describe('le lien sur le papier', () => {
-  it('passe sous les symboles : son tireté precede leurs sigles', () => {
+  it('passe sous les symboles : son tireté précède leur filet', () => {
     const { buildScanPdf } = require('../src/export/pdf');
     const walls = [
       MUR,
@@ -127,7 +127,6 @@ describe('le lien sur le papier', () => {
         fixtures: [
           { ...fx('ap1', 'applique', 1), height: 1.8, commands: ['i1'] },
           { ...fx('i1', 'inter', 3), height: 1.1 },
-          // Le témoin : son sigle « RJ » marque le bloc des symboles.
           fx('rj', 'rj45', 4),
         ],
         photos: [],
@@ -139,9 +138,14 @@ describe('le lien sur le papier', () => {
     for (let i = 0; i < bytes.length; i++) src += String.fromCharCode(bytes[i]);
     // Le tireté du plan électrique : celui de l'architecte (voir `ui/encreElec`).
     const lien = src.indexOf('[3 2.2]');
-    const sigle = src.indexOf('(RJ');
+    // Le témoin du bloc des symboles : le filet qui relie chacun à son mur,
+    // un trait plein de l'encre électrique. (Le sigle « RJ » qui servait de
+    // témoin a quitté le plan : la légende nomme la prise.)
+    const n2 = (v: number) => (Math.round(v * 100) / 100).toString();
+    const rgb = [1, 3, 5].map((i) => n2(parseInt('#D7263D'.slice(i, i + 2), 16) / 255)).join(' ');
+    const filet = src.indexOf(`${rgb} RG 0.6 w [] 0 d`);
     expect(lien).toBeGreaterThanOrEqual(0);
-    expect(sigle).toBeGreaterThanOrEqual(0);
-    expect(lien).toBeLessThan(sigle);
+    expect(filet).toBeGreaterThanOrEqual(0);
+    expect(lien).toBeLessThan(filet);
   });
 });

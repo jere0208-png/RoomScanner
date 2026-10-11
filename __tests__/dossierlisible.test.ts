@@ -134,18 +134,18 @@ describe('la tête de la feuille du plan', () => {
 });
 
 describe('le cartouche de la pièce', () => {
-  it('ne recouvre pas le sigle du point lumineux', () => {
+  /*
+    LE SIGLE DU POINT LUMINEUX N'EXISTE PLUS — relevé du patron : « les
+    "DCL" etc. ne sont pas utiles ». Il n'y a donc plus rien à ne pas
+    recouvrir : le cartouche garde son nom et sa surface, sans rival.
+  */
+  it('garde son nom et sa surface, et le point lumineux n’a plus de sigle', () => {
     const mots = motsDu(dossier(true));
-    const dcl = mots.find((m) => m.texte === 'DCL')!;
+    expect(mots.find((m) => m.texte === 'DCL')).toBeUndefined();
     const nom = mots.find((m) => m.texte === 'Sejour')!;
     const aire = mots.find((m) => /m²$/.test(m.texte) && m.y < 700)!;
-    expect(dcl).toBeDefined();
     expect(nom).toBeDefined();
-    // Le fond blanc du cartouche couvre ses deux lignes : on juge sur elles.
-    expect(seTouchent(emprise(dcl), emprise(nom))).toBe(false);
-    expect(seTouchent(emprise(dcl), emprise(aire))).toBe(false);
-    // Et le cartouche reste PRÈS du milieu : il désigne sa pièce, il ne
-    // part pas se poser dans un coin.
-    expect(Math.abs(nom.y - dcl.y)).toBeLessThan(60);
+    expect(aire).toBeDefined();
+    expect(seTouchent(emprise(nom), emprise(aire))).toBe(false);
   });
 });
