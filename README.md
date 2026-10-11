@@ -14285,6 +14285,63 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les élévations : chaque face équipée, chaque mur à son vrai nom
+
+Suite de la revue du dossier par des architectes (voir la section suivante).
+Trois défauts relevés par les quatre revues, et réparés ici.
+
+**« 7 appareils sur 23 ne sont cotés nulle part ».** Le dossier faisait une
+feuille par mur, vue de la pièce qui l'a relevé. Ce qui était posé de l'autre
+côté d'une cloison n'y paraissait qu'en clair, sans cote, parfois caché sous
+le disque de la prise de devant.
+- `elevationWalls` rend maintenant des faces (`FaceAElever` : le mur et le
+  côté regardé).
+- Chaque face qui porte un appareil a son élévation, vue de sa pièce et
+  cotée depuis son propre nu.
+
+**Deux faces par feuille, à une seule échelle** (`elevationsDeDeuxFaces`).
+- Une feuille par mur, c'était beaucoup de feuilles à moitié vides, à des
+  échelles changeantes (1:20, 1:25 et 1:40 dans la même pièce).
+- Deux faces de la même pièce, ou les deux faces d'une cloison, se
+  partagent désormais une feuille, à l'échelle commune.
+- Elles ne s'assemblent que si cette échelle reste lisible (1:50 au moins)
+  et si aucune ne porte de photo.
+- Le cartouche dit « Murs 3 et 4 », ou « Mur 6 — ses deux faces ».
+- La face se dessine dans un cadre (`dessinerUneFace`, `zoneDeLaFace`) :
+  la même règle sert pour une face seule ou pour deux.
+- Sur les dossiers de la revue, on passe de 15 à 11 feuilles pour le T2, et
+  de 13 à 9 pour la cloison, avec plus d'appareils cotés.
+
+**Le mur se nomme par le côté de la pièce qu'il ferme** (`wallCardinal`).
+- Le nom venait de la direction du centre de la pièce vers le milieu du mur.
+  Dans une enfilade, les quatre tronçons du même mur sud s'appelaient ouest,
+  sud-ouest, sud-est et est, et deux murs différents finissaient « mur
+  est ».
+- C'est maintenant la normale du mur, tournée vers le dehors de la pièce,
+  qui donne le nom.
+- Quand on connaît le côté de la pièce, il tranche (paramètre `cote`).
+  L'appareil le sait par sa face, l'élévation par la face qu'elle regarde.
+  Ça règle le mur rentrant d'un L, dont le centre de la pièce tombe dans
+  l'alignement.
+
+**Et deux retouches du plan.**
+- Les gaines prennent la couleur de leur circuit (`circuitsDesAppareils`,
+  qui ne sert qu'à la couleur : le plan n'écrit toujours pas de repère).
+  Le tableau de tirage les distinguait, le tracé non.
+- Les numéros de mur cherchent leur place après l'encre des symboles. Ils
+  n'en savaient rien, et se posaient sous une prise.
+
+**Bancs.**
+- `elevationsfaces` : les deux faces d'une cloison sur une feuille,
+  chacune vue de sa pièce, avec l'interrupteur de la chambre coté sous son
+  titre ; une seule face équipée qui ne donne qu'une feuille, vue du bon
+  côté ; l'enfilade dont les trois tronçons sont « sud » ; le mur rentrant
+  d'un L ; la gaine à la teinte de son repère.
+- Mis à jour :
+  - `simulation-metier` : l'aiguille suit la normale du mur nommé ;
+  - `elevationpdf` : quatre murs sur deux feuilles ;
+  - `dossierepure`.
+
 ## Le dossier PDF revu par des architectes : le superflu s'en va
 
 Relevé du patron : « ajoute des agents sur l'export PDF qui chercheront les

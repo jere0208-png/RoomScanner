@@ -266,6 +266,7 @@ describe('le cartouche dit tout, sans couper', () => {
 
   it('l’élévation s’y nomme par son mur', () => {
     // (Le tiret cadratin s'écrit en WinAnsi, octet 0x97.)
-    expect(texte(SRC)).toMatch(/DOCUMENT \| Mur \d+ \x97 /);
+    // Une face seule : « Mur 3 — côté … » ; deux faces : « Murs 1 et 2 ».
+    expect(texte(SRC)).toMatch(/DOCUMENT \| (Mur \d+ \x97 |Murs \d+ et \d+)/);
   });
 });

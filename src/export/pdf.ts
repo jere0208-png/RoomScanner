@@ -37,6 +37,7 @@ import {
 } from '../geometry/existant';
 import {
   echelleElevation,
+  type EchelleChoisie,
   echelleNormalisee,
   graduationsRegle,
 } from './echelle';
@@ -90,6 +91,7 @@ import {
 } from '../geometry/nfc15100';
 import {
   circuitColor,
+  markColor,
   type MultiWireSchema,
   type SchemaRow,
 } from '../geometry/schema';
@@ -1623,6 +1625,11 @@ interface SheetContext {
   rooms?: RoomShape[];
   /** Appareillage électrique posé sur les murs. */
   fixtures?: Fixture[];
+  /**
+   * Le circuit de chaque appareil (C1, C2…), pour la COULEUR de sa gaine
+   * seulement — le plan coté n'écrit plus de repère (relevé du patron).
+   */
+  circuitsDesAppareils?: Map<string, string>;
   colorOpenings: boolean;
   showSurfaces: boolean;
   showTextures: boolean;
@@ -2293,35 +2300,6 @@ function planPage(
       if (r.path.length >= 2) encre.trait(r.path.map(px), 0.8);
     }
 
-    /*
-      LES NUMÉROS DE MUR S'INSCRIVENT LES PREMIERS.
-
-      Ils se DESSINENT en dernier (ce sont des annotations posées sur le
-      plan fini), mais leur place ne se discute pas : un numéro tient sur
-      son mur, au milieu de son épaisseur — voir `placeDuNumero`. Il réserve
-      sa place tout de suite, et les cotes s'en écartent au lieu de se faire
-      recouvrir dix mille points plus loin. La place retenue est celle que
-      le dessin relira.
-    */
-    const numerosPoses = new Map<
-      string,
-      { n: number; x: number; y: number; taille: number; couleur: string }
-    >();
-    {
-      const numeros = wallNumbers(ctx);
-      const centre = centreDesMurs(walls);
-      for (const w of walls) {
-        const n = numeros.get(w.id);
-        if (!n) continue;
-        const q = placeDuNumero(w, openings, n, scale, px, centre, poche.contours, encre, libre);
-        numerosPoses.set(w.id, { n, ...q });
-        posees.push(q.boite);
-        // Hors du poché, le numéro est un mot posé sur le blanc : il réserve
-        // aussi sa place sur la carte.
-        if (q.couleur !== '#FFFFFF') encre.boite(q.boite);
-      }
-    }
-
     /**
      * LES MOTS DE L'APPAREILLAGE S'INSCRIVENT AVANT LES COTES.
      *
@@ -2457,6 +2435,38 @@ function planPage(
         encre.trait(linkCurve({ x: depart.x, z: depart.z }, arrivee).map(px), 0.8);
       }
     }
+    /*
+      LES NUMÉROS DE MUR S'INSCRIVENT AVANT LES COTES — et APRÈS l'encre
+      des symboles : revues du dossier, « les numéros 14, 15 et 16 sont
+      recouverts par des symboles de prise ». Ils cherchaient leur place sur
+      une carte où les appareils n'étaient pas encore encrés.
+
+      Ils se DESSINENT en dernier (ce sont des annotations posées sur le
+      plan fini), mais leur place ne se discute pas : un numéro tient sur
+      son mur, au milieu de son épaisseur — voir `placeDuNumero`. Il réserve
+      sa place tout de suite, et les cotes s'en écartent au lieu de se faire
+      recouvrir dix mille points plus loin. La place retenue est celle que
+      le dessin relira.
+    */
+    const numerosPoses = new Map<
+      string,
+      { n: number; x: number; y: number; taille: number; couleur: string }
+    >();
+    {
+      const numeros = wallNumbers(ctx);
+      const centre = centreDesMurs(walls);
+      for (const w of walls) {
+        const n = numeros.get(w.id);
+        if (!n) continue;
+        const q = placeDuNumero(w, openings, n, scale, px, centre, poche.contours, encre, libre);
+        numerosPoses.set(w.id, { n, ...q });
+        posees.push(q.boite);
+        // Hors du poché, le numéro est un mot posé sur le blanc : il réserve
+        // aussi sa place sur la carte.
+        if (q.couleur !== '#FFFFFF') encre.boite(q.boite);
+      }
+    }
+
     /**
      * LE PLAFOND ANNONCE SES PASTILLES ET SES SIGLES, LUI AUSSI AVANT LES
      * COTES.
@@ -3316,7 +3326,12 @@ function planPage(
         if (r.path.length < 2) continue;
         // Un tireté fin : lisible sans manger le plan, et distinct du trait
         // plein des murs comme du pointillé des passages.
-        d.dashedPath(r.path.map(px), 0.7, '#2F6BFF', [4, 3]);
+        //
+        // À LA COULEUR DE SON CIRCUIT — revues du dossier : les six départs
+        // avaient le même bleu, quand le tableau de tirage juste au-dessus
+        // les distingue chacun par sa teinte.
+        const repere = ctx.circuitsDesAppareils?.get(r.id);
+        d.dashedPath(r.path.map(px), 0.7, repere ? markColor(repere) : '#2F6BFF', [4, 3]);
       }
     }
 
@@ -4892,11 +4907,101 @@ function elevationPage(
   sheet: string,
   wall: WallSeg,
   cliches: { im: PdfImage; along?: number }[],
+  /** La face regardée ; par défaut, celle de la pièce qui a relevé le mur. */
+  cote?: 1 | -1,
 ): string {
   const d = new Draw();
+  const r = dessinerUneFace(d, ctx, wall, cliches, cote, CADRE_FEUILLE);
+  drawSheetChrome(d, {
+    project: ctx.name,
+    filename: ctx.filename,
+    client: ctx.client,
+    particulier: ctx.particulier,
+    entreprise: ctx.entreprise,
+    address: ctx.address,
+    // Le numéro du mur d'abord : c'est par lui qu'on retrouve la feuille
+    // depuis le plan (cinq feuilles s'appelaient « côté Séjour »).
+    sheetTitle: r.titre,
+    sheet,
+    // Plus d'arrondi : le cartouche dit l'échelle à laquelle on a tracé.
+    scaleLabel: r.echelle.label,
+    metersToPoints: r.echelle.ptParMetre,
+  });
+  return d.stream();
+}
+
+/** Le cadre d'une feuille d'élévation entière : du titre aux photos. */
+const CADRE_FEUILLE = { haut: TETE, bas: FRAME.y + TITLE_H + 34 };
+
+/**
+ * LA ZONE DU DESSIN, dans un cadre — la même règle pour une face seule ou
+ * pour deux faces sur une feuille : sous le titre et la cote de longueur,
+ * au-dessus des photos et de la chaîne du bas.
+ */
+function zoneDeLaFace(cadre: { haut: number; bas: number }, avecPhotos: boolean) {
+  const hautPhoto = avecPhotos ? cadre.bas + 190 : cadre.bas;
+  const MARGE_ELEV = 40;
+  return {
+    x: FRAME.x + MARGE_ELEV,
+    y: hautPhoto + 46,
+    w: FRAME.w - MARGE_ELEV * 2,
+    h: cadre.haut - 62 - (hautPhoto + 46),
+  };
+}
+
+/**
+ * DEUX FACES SUR UNE FEUILLE — relevé des revues du dossier : une feuille
+ * par mur, à moitié vide, et des échelles qui changent d'une feuille à
+ * l'autre (1:20, 1:25, 1:40 dans la même pièce). Un pro développe les murs
+ * d'une pièce côte à côte, à une échelle. Ici, deux faces de la MÊME pièce
+ * — ou les deux faces d'une même cloison, pour voir d'un coup d'œil qu'on
+ * ne perce pas dos à dos — se partagent la feuille, à l'échelle commune.
+ */
+function elevationsDeDeuxFaces(
+  ctx: SheetContext,
+  sheet: string,
+  a: FaceAElever,
+  b: FaceAElever,
+  echelle: EchelleChoisie,
+): string {
+  const d = new Draw();
+  const { haut, bas } = CADRE_FEUILLE;
+  const milieu = (haut + bas) / 2;
+  const ra = dessinerUneFace(d, ctx, a.wall, [], a.cote, { haut, bas: milieu + 4 }, echelle);
+  // Un filet sépare les deux faces : deux dessins, pas un.
+  d.line(FRAME.x + 30, milieu - 2, FRAME.x + FRAME.w - 30, milieu - 2, 0.5, '#D6DBE3');
+  const rb = dessinerUneFace(d, ctx, b.wall, [], b.cote, { haut: milieu - 20, bas }, echelle);
+  drawSheetChrome(d, {
+    project: ctx.name,
+    filename: ctx.filename,
+    client: ctx.client,
+    particulier: ctx.particulier,
+    entreprise: ctx.entreprise,
+    address: ctx.address,
+    sheetTitle:
+      a.wall.id === b.wall.id
+        ? `${ra.titre.split(' — ')[0]} — ses deux faces`
+        : `${ra.titre.split(' — ')[0].replace(/^Mur /, 'Murs ')} et ${rb.titre.split(' — ')[0].replace(/^Mur /, '')}`,
+    sheet,
+    scaleLabel: echelle.label,
+    metersToPoints: echelle.ptParMetre,
+  });
+  return d.stream();
+}
+
+/** La face dessinée dans son cadre : le titre qu'elle donne, l'échelle tenue. */
+function dessinerUneFace(
+  d: Draw,
+  ctx: SheetContext,
+  wall: WallSeg,
+  cliches: { im: PdfImage; along?: number }[],
+  cote: 1 | -1 | undefined,
+  cadre: { haut: number; bas: number },
+  echelleImposee?: EchelleChoisie,
+): { titre: string; echelle: EchelleChoisie } {
   const walls = ctx.walls;
   const rooms = ctx.rooms ?? [];
-  const side = interiorSide(wall, walls, rooms);
+  const side = cote ?? interiorSide(wall, walls, rooms);
   const face = wallFace(wall, wallQuads(walls).get(wall.id), side);
   const H = wall.height;
   const mine = (ctx.fixtures ?? []).filter((f) => f.wallId === wall.id);
@@ -4922,7 +5027,8 @@ function elevationPage(
   const centre = roomParts(ctx.walls, ctx.rooms).find(
     (p) => p.roomId === devant,
   )?.labelAt;
-  const cardinal = centre ? wallLabel(wall, centre, ctx.north ?? null) : null;
+  // La face regardée tranche : c'est la pièce de CE côté que le mur ferme.
+  const cardinal = centre ? wallLabel(wall, centre, ctx.north ?? null, side) : null;
   // Le numéro du mur, tel qu'il est écrit sur le plan : c'est par lui qu'on
   // retrouve le pan dont parle cette feuille.
   const numero = wallNumbers(ctx).get(wall.id);
@@ -4932,7 +5038,7 @@ function elevationPage(
   const quoi = [piece ? `côté ${piece}` : '', cardinal].filter(Boolean).join(', ') || 'mur';
 
   // ------------------------------------------------------------- cadre
-  const hautTitre = TETE;
+  const hautTitre = cadre.haut;
   d.text(
     `Élévation — ${numero ? `Mur ${numero} · ` : ''}${quoi}`,
     FRAME.x + 30,
@@ -4973,8 +5079,7 @@ function elevationPage(
   });
 
   // Les photos prennent le bas de la feuille ; sans elles, le dessin descend.
-  const BAS = FRAME.y + TITLE_H + 34;
-  const hautPhoto = cliches.length > 0 ? BAS + 190 : BAS;
+  const BAS = cadre.bas;
   // Le dessin s'arrête SOUS le sous-titre, cote de longueur comprise : la
   // cote du haut dépasse le mur de 22 points, et c'est elle qui venait
   // barrer la ligne « Mur de 2,32 m sous 2,51 m ».
@@ -4990,13 +5095,7 @@ function elevationPage(
     Quarante suffisent : la cote de longueur et ses attaches débordent de
     douze points, les repères de bord d'autant.
   */
-  const MARGE_ELEV = 40;
-  const zone = {
-    x: FRAME.x + MARGE_ELEV,
-    y: hautPhoto + 46,
-    w: FRAME.w - MARGE_ELEV * 2,
-    h: hautTitre - 62 - (hautPhoto + 46),
-  };
+  const zone = zoneDeLaFace(cadre, cliches.length > 0);
   /*
     L'ÉCHELLE VRAIE, ICI AUSSI.
 
@@ -5006,7 +5105,7 @@ function elevationPage(
     l'autre main, et sur laquelle on reporte une cote au kutch — un pour
     cent et demi sur deux mètres cinquante, ce sont quatre centimètres.
   */
-  const echelle = echelleElevation(zone.w, zone.h, face.len, H);
+  const echelle = echelleImposee ?? echelleElevation(zone.w, zone.h, face.len, H);
   const scale = echelle.ptParMetre;
   const x0 = zone.x + (zone.w - face.len * scale) / 2;
   /**
@@ -5473,23 +5572,7 @@ function elevationPage(
     });
   }
 
-  drawSheetChrome(d, {
-    project: ctx.name,
-    filename: ctx.filename,
-    client: ctx.client,
-    particulier: ctx.particulier,
-    entreprise: ctx.entreprise,
-    address: ctx.address,
-    // Le numéro du mur d'abord : c'est par lui qu'on retrouve la feuille
-    // depuis le plan (cinq feuilles s'appelaient « côté Séjour »).
-    sheetTitle: numero ? `Mur ${numero} — ${quoi}` : `Élévation — ${quoi}`,
-    sheet,
-    // Un mètre vaut 2834,6 points à l'échelle 1:1 (72 pt par pouce).
-    // Plus d'arrondi : le cartouche dit l'échelle à laquelle on a tracé.
-    scaleLabel: echelle.label,
-    metersToPoints: scale,
-  });
-  return d.stream();
+  return { titre: numero ? `Mur ${numero} — ${quoi}` : `Élévation — ${quoi}`, echelle };
 }
 
 /**
@@ -5721,16 +5804,37 @@ function wallTagAt(w: WallSeg, openings: WallSeg[]): { x: number; z: number } {
  * expliquer. Sa vignette disparaissait purement et simplement du dossier
  * tant qu'aucune prise n'y était posée.
  */
+/**
+ * UNE FEUILLE PAR FACE ÉQUIPÉE, pas par mur — relevé des quatre revues du
+ * dossier : « 7 appareils sur 23 ne sont cotés nulle part ». Le mur avait
+ * une feuille, vue de la pièce qui l'a relevé ; ce qui était posé de l'autre
+ * côté d'une cloison n'y paraissait qu'en clair, sans cote, parfois caché
+ * sous le disque de la prise de devant. Chaque face qui porte un appareil a
+ * maintenant sa feuille, vue de sa pièce, cotée depuis son propre nu. Les
+ * deux faces d'une cloison se suivent : on vérifie d'un coup d'œil qu'on ne
+ * perce pas dos à dos.
+ */
+interface FaceAElever {
+  wall: WallSeg;
+  /** La face regardée : le côté du mur où l'on se tient. */
+  cote: 1 | -1;
+}
+
 function elevationWalls(
   ctx: SheetContext,
   toutes = false,
   photographies: Set<string> = new Set(),
-): WallSeg[] {
-  if (toutes) return wallsInOrder(ctx);
-  const equipes = new Set((ctx.fixtures ?? []).map((f) => f.wallId));
-  return wallsInOrder(ctx).filter(
-    (w) => equipes.has(w.id) || photographies.has(w.id),
-  );
+): FaceAElever[] {
+  const out: FaceAElever[] = [];
+  for (const w of wallsInOrder(ctx)) {
+    const interieur = interiorSide(w, ctx.walls, ctx.rooms ?? []);
+    const appareils = (ctx.fixtures ?? []).filter((f) => f.wallId === w.id);
+    const devant = appareils.some((f) => f.side === interieur);
+    const derriere = appareils.some((f) => f.side !== interieur);
+    if (toutes || devant || photographies.has(w.id)) out.push({ wall: w, cote: interieur });
+    if (derriere) out.push({ wall: w, cote: interieur === 1 ? -1 : 1 });
+  }
+  return out;
 }
 
 /**
@@ -7028,6 +7132,7 @@ function planifierUnNiveau(
     rooms: scan.rooms,
     fixtures: scan.fixtures ?? [],
     routes: scan.routes,
+    circuitsDesAppareils: schemas?.marks,
     ceiling: opts.ceiling ?? [],
     notes: scan.notes,
     mesures: scan.mesures,
@@ -7104,13 +7209,57 @@ function planifierUnNiveau(
   }
   // Les élévations viennent après les plans et avant les schémas : on lit
   // le logement, puis chaque mur, puis le tableau.
-  murs.forEach((w, i) => {
+  // Les photos d'un mur vont à sa PREMIÈRE feuille : celle de la face de
+  // la pièce qui l'a relevé, d'où on l'a photographié.
+  const dejaPhotographie = new Set<string>();
+  const avecCliches = murs.map(({ wall: w }) => {
+    const cliches = dejaPhotographie.has(w.id) ? [] : photos.get(w.id) ?? [];
+    dejaPhotographie.add(w.id);
+    return cliches;
+  });
+  /*
+    DEUX FACES PAR FEUILLE quand elles vont ensemble (même pièce, ou les
+    deux faces d'une cloison), qu'aucune ne porte de photo, et que l'échelle
+    commune reste lisible : au 1:50 au moins. Voir `elevationsDeDeuxFaces`.
+  */
+  const pieceDe = (f: FaceAElever) => pieceDuCote(f.wall, f.cote, ctx.walls, ctx.rooms ?? []);
+  const zoneMoitie = zoneDeLaFace({ haut: CADRE_FEUILLE.haut, bas: (CADRE_FEUILLE.haut + CADRE_FEUILLE.bas) / 2 + 4 }, false);
+  const echelleCommune = (a: FaceAElever, b: FaceAElever): EchelleChoisie | null => {
+    const e = [a, b].map((f) => {
+      const len = wallFace(f.wall, wallQuads(ctx.walls).get(f.wall.id), f.cote).len;
+      return echelleElevation(zoneMoitie.w, zoneMoitie.h, len, f.wall.height);
+    });
+    const pire = e[0].ratio >= e[1].ratio ? e[0] : e[1];
+    return pire.ratio <= 50 ? pire : null;
+  };
+  let numeroDeFace = 0;
+  for (let i = 0; i < murs.length; i++) {
+    const a = murs[i];
+    const b = murs[i + 1];
+    numeroDeFace += 1;
+    const ensemble =
+      b &&
+      avecCliches[i].length === 0 &&
+      avecCliches[i + 1].length === 0 &&
+      (a.wall.id === b.wall.id || (pieceDe(a) !== null && pieceDe(a) === pieceDe(b)));
+    const commune = ensemble ? echelleCommune(a, b) : null;
+    if (b && commune) {
+      feuilles.push({
+        genre: 'elevation',
+        titre: `Murs ${numeroDeFace} et ${numeroDeFace + 1}`,
+        fabriquer: (n) => elevationsDeDeuxFaces(ctx, n, a, b, commune),
+      });
+      numeroDeFace += 1;
+      i += 1;
+      continue;
+    }
+    const cliches = avecCliches[i];
     feuilles.push({
       genre: 'elevation',
-      titre: `Mur ${i + 1}`,
-      fabriquer: (n) => elevationPage(ctx, n, w, photos.get(w.id) ?? []),
+      titre: `Mur ${numeroDeFace}`,
+      fabriquer: (n) => elevationPage(ctx, n, a.wall, cliches, a.cote),
     });
-  });
+  }
   if (withSchema && schemas) {
     /**
      * LES SCHÉMAS HORS SOL : unifilaire, puis multifilaire.

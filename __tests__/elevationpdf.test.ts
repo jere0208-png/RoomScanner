@@ -198,8 +198,9 @@ describe('les feuilles d’élévation', () => {
   */
   it('couvrent TOUS les murs quand on le demande', () => {
     const tous = doc({ elevations: true, toutesElevations: true });
-    // Quatre murs, quatre feuilles, plus le plan.
-    expect(pages(tous)).toBe(5);
+    // Quatre murs, deux par feuille (revues du dossier : un pro développe
+    // les murs d'une pièce côte à côte), plus le plan.
+    expect(pages(tous)).toBe(3);
     const vu = texte(tous);
     expect(vu).toContain('Mur 1');
     expect(vu).toContain('Mur 4');

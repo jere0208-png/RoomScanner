@@ -431,13 +431,37 @@ describe('le banc d’épreuve de la boussole', () => {
         };
         for (const nord of [0, 30, 90, 137, 200, 314]) {
           for (const w of walls) {
-            const nom = wallCardinal(w, c, nord);
+            // Le côté de la pièce, lu sur le contour : c'est ce que savent
+            // l'appareil (sa face) et l'élévation (la face qu'elle regarde).
+            const L0 = Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z);
+            const n0 = { x: -(w.b.z - w.a.z) / L0, z: (w.b.x - w.a.x) / L0 };
+            const m0 = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+            const sonde = { x: m0.x + n0.x * 0.05, z: m0.z + n0.z * 0.05 };
+            let dedans = false;
+            for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+              const [xi, zi] = pts[i];
+              const [xj, zj] = pts[j];
+              if (zi > sonde.z !== zj > sonde.z && sonde.x < ((xj - xi) * (sonde.z - zi)) / (zj - zi) + xi) {
+                dedans = !dedans;
+              }
+            }
+            const cote: 1 | -1 = dedans ? 1 : -1;
+            const nom = wallCardinal(w, c, nord, cote);
             if (!nom) continue;
             const mid = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+            /*
+              LE MUR NOMMÉ « NORD » FERME LA PIÈCE AU NORD : c'est sa
+              normale, tournée vers le dehors, que l'aiguille doit suivre —
+              plus la direction du centre à son milieu, qui dans une pièce
+              en L ou en longueur dit où est le tronçon, pas quel côté il
+              ferme (revues du dossier PDF).
+            */
+            // Le dehors : à l'opposé de la pièce.
+            const nw = { x: -cote * n0.x, z: -cote * n0.z };
             const pm = page(mid);
-            const pc = page(c);
-            const vx = pm.x - pc.x;
-            const vy = pm.y - pc.y;
+            const pn = page({ x: mid.x + nw.x, z: mid.z + nw.z });
+            const vx = pn.x - pm.x;
+            const vy = pn.y - pm.y;
             const n = Math.hypot(vx, vy);
             if (n < 0.05) continue;
             // L'aiguille de CE cap, et le mur qui porte son nom : moins de

@@ -13,7 +13,7 @@
  * mieux vaut taire l'orientation qu'en inventer une.
  */
 import { FIXTURES, type Fixture } from './electrical';
-import { roomOf, segLength, type Pt, type WallSeg } from './floorplan';
+import { perpOf, roomOf, segLength, type Pt, type WallSeg } from './floorplan';
 
 /** Les huit aires de vent, dans l'ordre des bearings croissants. */
 const AIRES = [
@@ -49,14 +49,29 @@ export function bearingName(dir: Pt, north: number): string {
 /**
  * De quel côté de la pièce se trouve ce mur : « nord », « sud-est »…
  *
- * On regarde la direction qui va du centre de la pièce au milieu du mur —
- * c'est ainsi qu'on en parle sur place : le mur nord est celui qui est au
- * nord, pas celui qui regarde vers le nord.
+ * C'est ainsi qu'on en parle sur place : le mur nord est celui qui ferme la
+ * pièce au nord.
+ *
+ * PAR LA NORMALE DU MUR, PAS PAR LA DIRECTION DU CENTRE — relevé des revues
+ * du dossier PDF : dans une enfilade de dix mètres, les quatre tronçons du
+ * MÊME mur sud se nommaient « ouest », « sud-ouest », « sud-est » et
+ * « est ». La direction du centre au milieu d'un tronçon dit où il est le
+ * long de la pièce, pas de quel côté il la ferme ; deux murs différents
+ * finissaient par s'appeler « mur est ». La normale du mur, tournée vers le
+ * dehors de la pièce, dit le côté.
+ *
+ * `cote` : le côté du mur où se trouve la pièce (la convention de
+ * `Fixture.side` et d'`interiorSide`). Quand on le connaît — l'appareil sait
+ * sur quelle face il est posé, l'élévation sait quelle face elle regarde —
+ * il tranche. Sinon, la direction du centre choisit le sens de la normale ;
+ * dans un L, le centre peut tomber dans l'alignement d'un mur rentrant, et
+ * seule la position parle alors.
  */
 export function wallCardinal(
   wall: WallSeg,
   center: Pt,
   north: number | null,
+  cote?: 1 | -1,
 ): string | null {
   if (north === null || !isFinite(north)) return null;
   const milieu = {
@@ -64,8 +79,20 @@ export function wallCardinal(
     z: (wall.a.z + wall.b.z) / 2,
   };
   const dir = { x: milieu.x - center.x, z: milieu.z - center.z };
+  const L = segLength(wall);
+  if (L >= 1e-6 && cote) {
+    const n = perpOf({ x: (wall.b.x - wall.a.x) / L, z: (wall.b.z - wall.a.z) / L });
+    // La pièce est du côté `cote` : le dehors, de l'autre.
+    return bearingName({ x: -cote * n.x, z: -cote * n.z }, north);
+  }
   if (Math.hypot(dir.x, dir.z) < 0.05) return null;
-  return bearingName(dir, north);
+  if (L < 1e-6) return bearingName(dir, north);
+  const n = { x: -(wall.b.z - wall.a.z) / L, z: (wall.b.x - wall.a.x) / L };
+  const cote0 = n.x * dir.x + n.z * dir.z;
+  // Le centre dans l'alignement du mur : la normale n'a pas de sens à
+  // choisir, la position seule parle.
+  if (Math.abs(cote0) < 0.05) return bearingName(dir, north);
+  return bearingName(cote0 > 0 ? n : { x: -n.x, z: -n.z }, north);
 }
 
 /** « mur nord », ou rien du tout si la boussole s'est tue. */
@@ -73,8 +100,10 @@ export function wallLabel(
   wall: WallSeg,
   center: Pt,
   north: number | null,
+  /** Le côté de la pièce, quand on le sait : voir `wallCardinal`. */
+  cote?: 1 | -1,
 ): string | null {
-  const aire = wallCardinal(wall, center, north);
+  const aire = wallCardinal(wall, center, north, cote);
   return aire ? `mur ${aire}` : null;
 }
 
@@ -157,7 +186,7 @@ export function deviceNames(
     const centre = centers.get(roomId);
     const mur =
       w && centre && segLength(w) > 0.05
-        ? wallLabel(w, centre, north) ?? ''
+        ? wallLabel(w, centre, north, f.side) ?? ''
         : '';
     out.set(f.id, {
       nom: `${base} ${n}`,
@@ -178,5 +207,5 @@ export function fixtureWallLabel(
   const w = walls.find((x) => x.id === f.wallId);
   if (!w) return null;
   const centre = centers.get(roomOf(w) ?? '');
-  return centre ? wallLabel(w, centre, north) : null;
+  return centre ? wallLabel(w, centre, north, f.side) : null;
 }
