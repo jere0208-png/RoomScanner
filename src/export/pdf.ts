@@ -128,6 +128,8 @@ const PAGE_H = 842;
 const INK = '#141922';
 const GREY = '#5A6472';
 const GREY_LIGHT = '#98A1AE';
+/** Le bleu des cotes posées à la main, celui de l'app. */
+const BLEU_REGLE = '#2F6BFF';
 const AMBER = '#B97F26';
 const SKY = '#2E93BD';
 
@@ -1425,6 +1427,8 @@ interface SheetContext {
   ceiling?: CeilingFixture[];
   /** Les mots écrits sur le plan, déjà filtrés à l'étage imprimé. */
   notes?: { id: string; text: string; at: { x: number; z: number } }[];
+  /** Les cotes posées à la règle libre, déjà filtrées à l'étage imprimé. */
+  mesures?: { a: { x: number; z: number }; b: { x: number; z: number } }[];
   /**
    * Le cap du scan : d'où vient le nord, en degrés horaires sur l'axe −Z.
    * `null` = boussole muette (scan ancien, appareil sans magnétomètre) : on
@@ -3702,6 +3706,27 @@ function planPage(
     }
 
     /*
+      LES COTES POSÉES À LA RÈGLE — relevé du patron, point 7 de la réflexion
+      « grand public ». Une cote d'architecte, en bleu pour qu'on la
+      distingue de celles que le plan calcule : un trait, deux talons, la
+      longueur dans une pastille.
+    */
+    for (const m of ctx.mesures ?? []) {
+      const a = px(m.a);
+      const b = px(m.b);
+      if (!dansLeCadre(a) && !dansLeCadre(b)) continue;
+      const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+      const t = { x: (-(b.y - a.y) / L) * 3, y: ((b.x - a.x) / L) * 3 };
+      d.line(a.x, a.y, b.x, b.y, 0.7, BLEU_REGLE);
+      for (const q of [a, b]) d.line(q.x - t.x, q.y - t.y, q.x + t.x, q.y + t.y, 0.7, BLEU_REGLE);
+      const mot = `${(Math.hypot(m.b.x - m.a.x, m.b.z - m.a.z)).toFixed(2).replace('.', ',')} m`;
+      const larg = latin1(mot).length * 7 * 0.55 + 8;
+      const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      d.rect(c.x - larg / 2, c.y - 5.5, larg, 11, '#FFFFFF', BLEU_REGLE, 0.5);
+      d.text(mot, c.x, c.y - 2.4, 7, BLEU_REGLE, { bold: true });
+    }
+
+    /*
       LE NUMÉRO DE CHAQUE MUR, DANS SON ÉPAISSEUR.
 
       C'est le repère qui renvoie aux feuilles d'élévation — sans lui, une
@@ -5748,6 +5773,8 @@ export interface ScanForPdf {
    * DÉJÀ FILTRÉES à l'étage imprimé, comme les murs.
    */
   notes?: { id: string; text: string; at: { x: number; z: number } }[];
+  /** Les cotes posées à la règle libre, déjà filtrées à l'étage imprimé. */
+  mesures?: { a: { x: number; z: number }; b: { x: number; z: number } }[];
   /**
    * Cap du scan, pour nommer les murs par leur orientation — et dessiner
    * la rose des vents, DE SÉRIE, sur la seule feuille du plan 2D. Elle a
@@ -6604,6 +6631,7 @@ function planifierLeDossier(
     routes: scan.routes,
     ceiling: opts.ceiling ?? [],
     notes: scan.notes,
+    mesures: scan.mesures,
     north: scan.north ?? null,
     colorOpenings: opts.colorOpenings ?? false,
     showSurfaces: opts.surfaces ?? true,

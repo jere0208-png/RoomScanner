@@ -14285,6 +14285,29 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## La règle libre : mesurer entre deux points du plan, et garder la cote
+
+Relevé du patron, point 7 de la réflexion « grand public » : « une règle
+libre pour mesurer entre deux points du plan ».
+
+- **« Mesurer »** : une pastille à côté d'« Explorer », sur le plan 2D. Règle
+  sortie, chaque appui pose un bout ; le troisième recommence. La barre du
+  bas dit la longueur au centimètre (« 2,35 m »), ou ce qu'il reste à faire.
+- **Les bouts s'accrochent** (`geometry/regle.ts`, `accrocher`) à ce qu'on
+  voulait viser, à la largeur d'un doigt près : d'abord un **coin** (de mur
+  au nu, ou de meuble), sinon le **nu d'un mur**, sinon le **bord d'un
+  meuble**. Les deux bouts se glissent ensuite au doigt (`RegleHandle`), et
+  s'accrochent encore.
+- **« Garder »** fait de la mesure une cote du plan (`addMesure`) : dessinée
+  en cote d'architecte — un trait, deux talons, la longueur dans une
+  pastille —, annulable, enregistrée avec le plan (brouillon, bibliothèque,
+  copies), rattachée à l'étage où on l'a posée, déplacée ou tournée avec
+  lui. En édition, un appui la choisit, « Retirer » l'enlève.
+- **Au dossier PDF**, les cotes gardées s'impriment sur le plan, en bleu
+  pour qu'on les distingue de celles que le plan calcule.
+
+Bancs : `reglelibre` (10).
+
 ## « Ça passe ? » : le meuble et les portes
 
 Relevé du patron, point 6 de la réflexion « grand public » : « vérifier

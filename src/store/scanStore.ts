@@ -1,4 +1,5 @@
 import { NOM_EXEMPLE, appartementExemple } from '../data/exemple';
+import type { Mesure } from '../geometry/regle';
 import { photosDesMurs } from '../geometry/photosAuto';
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -299,6 +300,8 @@ export interface BrouillonScan {
    * relevé sauvé il y a dix minutes par l'ancienne app doit se rouvrir.
    */
   notes?: PlanNote[];
+  /** Les cotes posées à la règle. Absentes des brouillons d'avant. */
+  mesures?: Mesure[];
   photos: ScanPhoto[];
   modelPath: string | null;
   /**
@@ -396,6 +399,7 @@ export type ContenuDuPlan = Pick<
   | 'photos'
   | 'ceiling'
   | 'notes'
+  | 'mesures'
   | 'north'
   | 'modelPath'
   | 'devis'
@@ -444,6 +448,8 @@ export interface SavedScan {
   ceiling?: CeilingFixture[];
   /** Notes écrites sur le plan. Absentes des relevés d'avant. */
   notes?: PlanNote[];
+  /** Cotes posées à la règle libre. Absentes des relevés d'avant. */
+  mesures?: Mesure[];
   /**
    * LE TABLEAU QU'ON A TROUVÉ EN ARRIVANT.
    *
@@ -1158,6 +1164,7 @@ interface Snapshot {
   photos: ScanPhoto[];
   ceiling: CeilingFixture[];
   notes: PlanNote[];
+  mesures: Mesure[];
 }
 const HISTORY_MAX = 40;
 const history: Snapshot[] = [];
@@ -1544,6 +1551,15 @@ interface ScanState {
   editNote: (id: string, text: string) => void;
   /** Retire une note. */
   removeNote: (id: string) => void;
+  /**
+   * LES COTES DE LA RÈGLE LIBRE — relevé du patron, point 7 de la réflexion
+   * « grand public » : mesurer entre deux points du plan, et garder la cote.
+   */
+  mesures: Mesure[];
+  /** Garde une cote, à l'étage affiché. Une cote nulle n'en crée aucune. */
+  addMesure: (a: Pt, b: Pt) => void;
+  /** Retire une cote gardée. */
+  removeMesure: (id: string) => void;
   /** Pose un appareil au plafond, dans la pièce dont on donne le contour. */
   addCeiling: (
     kind: CeilingKind,
@@ -2282,6 +2298,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       photos: st.photos,
       ceiling: st.ceiling,
       notes: st.notes,
+      mesures: st.mesures,
     });
     if (history.length > HISTORY_MAX) history.shift();
     if (!st.canUndo) set({ canUndo: true });
@@ -2456,6 +2473,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       photos: st.photos,
       ceiling: st.ceiling,
       notes: st.notes,
+      mesures: st.mesures,
       north: st.north ?? undefined,
       modelPath: st.modelPath,
       // Le chiffrage suit le plan : voir `DevisEnregistre`.
@@ -2714,6 +2732,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     photos: [],
     ceiling: [],
     notes: [],
+    mesures: [],
     existant: null,
     planVierge: false,
     dirty: false,
@@ -4794,6 +4813,30 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({ notes: get().notes.filter((n) => n.id !== id), dirty: true });
     },
 
+    addMesure: (a, b) => {
+      // Deux appuis au même endroit ne font pas une cote.
+      if (Math.hypot(b.x - a.x, b.z - a.z) < 0.01) return;
+      pushHistory('addMesure');
+      const st = get();
+      set({
+        mesures: [
+          ...st.mesures,
+          {
+            id: `mesure-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            a,
+            b,
+            niveau: st.niveauCourant,
+          },
+        ],
+        dirty: true,
+      });
+    },
+
+    removeMesure: (id) => {
+      pushHistory('removeMesure');
+      set({ mesures: get().mesures.filter((m) => m.id !== id), dirty: true });
+    },
+
     removeCeiling: (id) => {
       pushHistory('removeCeiling');
       set({ ceiling: get().ceiling.filter((c) => c.id !== id), dirty: true });
@@ -5027,6 +5070,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         photos: st.photos,
         ceiling: st.ceiling,
         notes: st.notes,
+        mesures: st.mesures,
       });
       set({
         ...prev,
@@ -5053,6 +5097,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         photos: st.photos,
         ceiling: st.ceiling,
         notes: st.notes,
+        mesures: st.mesures,
       });
       set({
         ...suite,
@@ -5466,6 +5511,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           à la place qu'avait la cuisine avant le recalage.
         */
         notes: st.notes.map((x) => (niveauDe(x) === n ? { ...x, at: bouge(x.at) } : x)),
+        mesures: st.mesures.map((x) => (niveauDe(x) === n ? { ...x, a: bouge(x.a), b: bouge(x.b) } : x)),
         dirty: true,
       });
       // L'appareillage et les photos tiennent à un mur par une cote le long
@@ -5508,6 +5554,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           dansLeNiveau(cl.roomId) ? { ...cl, at: tourne(cl.at) } : cl,
         ),
         notes: st.notes.map((x) => (niveauDe(x) === n ? { ...x, at: tourne(x.at) } : x)),
+        mesures: st.mesures.map((x) => (niveauDe(x) === n ? { ...x, a: tourne(x.a), b: tourne(x.b) } : x)),
         dirty: true,
       });
     },
@@ -5543,6 +5590,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         rooms: piecesGardees,
         openings: aGarder(st.openings),
         notes: aGarder(st.notes),
+        mesures: aGarder(st.mesures),
         // Ce qui tient à un mur s'en va avec lui ; ce qui tient à une pièce
         // aussi. Aucun orphelin : un appareil sans mur ne se dessine nulle
         // part et fausse le métré en silence.
@@ -5810,6 +5858,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           photos: [],
           ceiling: [],
           notes: [],
+          mesures: [],
           processing: false,
           scanning: false,
           /* Un plan qui s'ouvre repose ses calques. */
@@ -6302,6 +6351,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           photos: st.photos,
           ceiling: st.ceiling,
         notes: st.notes,
+        mesures: st.mesures,
           existant: st.existant ?? undefined,
           north: st.north ?? undefined,
           client: st.client || undefined,
@@ -7544,6 +7594,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         photos: st.photos,
         ceiling: st.ceiling,
         notes: st.notes,
+        mesures: st.mesures,
         existant: st.existant ?? undefined,
         north: st.north ?? undefined,
         client: st.client || undefined,
@@ -7618,6 +7669,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         fixtures: st.fixtures,
         ceiling: st.ceiling,
         notes: st.notes,
+        mesures: st.mesures,
         existant: st.existant ?? undefined,
         photos: st.photos,
         modelPath: st.modelPath,
@@ -7664,6 +7716,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           sauvé il y a dix minutes par l'ancienne app doit se reprendre.
         */
         notes: b.notes ?? [],
+        mesures: b.mesures ?? [],
         existant: b.existant ?? null,
         photos: b.photos,
         modelPath: b.modelPath,
@@ -7860,6 +7913,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         ceiling: save.ceiling ?? [],
         // Les relevés d'avant les notes n'en portent aucune, et c'est bien.
         notes: save.notes ?? [],
+        mesures: save.mesures ?? [],
         // Un dossier ouvert n est pas un plan vierge, meme s il est vide.
         planVierge: false,
         // Le tableau trouvé sur place revient avec son relevé.
@@ -7976,6 +8030,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         ceiling: ex.ceiling,
         photos: [],
         notes: [],
+        mesures: [],
         currentSaveId: null,
         dirty: false,
       });
@@ -8031,6 +8086,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         photos: [],
         ceiling: [],
         notes: [],
+        mesures: [],
         existant: null,
         north: null,
         // Le popup de fin de scan appartient au scan qui vient de finir.

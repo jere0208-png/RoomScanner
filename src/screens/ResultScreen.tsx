@@ -35,6 +35,7 @@ import { ancrerElec } from '../geometry/viseur';
 import { TravauxSheet } from '../components/TravauxSheet';
 import { achats as achatsDe, coutDesAchats, travauxDesPieces } from '../geometry/travaux';
 import { surfacesHabitables } from '../geometry/habitable';
+import { accrocher, texteDeMesure } from '../geometry/regle';
 import { useReglagesTravaux } from '../store/reglagesTravaux';
 import { LaserSheet } from './result/LaserSheet';
 import { ExportSheet } from './result/ExportSheet';
@@ -1428,6 +1429,15 @@ export function ResultScreen() {
   }, [modeElec]);
   /** L'exploration à la première personne est ouverte. */
   const [explorant, setExplorant] = useState(false);
+  /*
+    LA RÈGLE LIBRE — relevé du patron, point 7 de la réflexion « grand
+    public ». Sortie, chaque appui pose un bout ; le troisième recommence.
+    Ce qu'on garde devient une cote du plan (`addMesure`).
+  */
+  const [mesurant, setMesurant] = useState(false);
+  const [regle, setRegle] = useState<{ a: Pt | null; b: Pt | null }>({ a: null, b: null });
+  const [selMesure, setSelMesure] = useState<string | null>(null);
+  const toutesLesMesures = useScanStore((st) => st.mesures);
   /* Le bilan du relevé qui vient d'aboutir : voir `BilanDuReleve`. */
   const bilan = useBilanStore((st) => st.bilan);
   const fermerLeBilan = useBilanStore((st) => st.fermer);
@@ -2001,6 +2011,24 @@ export function ResultScreen() {
     réflexion « grand public » : le chiffre qu'on écrit dans une annonce.
   */
   const habitable = useMemo(() => surfacesHabitables(rooms, parts), [rooms, parts]);
+  const mesuresDuNiveau = useMemo(
+    () => toutesLesMesures.filter((m) => (m.niveau ?? 0) === niveauCourant),
+    [toutesLesMesures, niveauCourant],
+  );
+  /** Un bout de règle s'accroche aux coins, au nu des murs, aux meubles. */
+  const accrocherLaRegle = (p: Pt, tolerance: number) =>
+    accrocher(p, walls, showFurniture ? objects : [], tolerance).pt;
+  const viserRegle = (p: Pt, tolerance: number) => {
+    const q = accrocherLaRegle(p, tolerance);
+    haptic('leger');
+    setRegle((r) => (!r.a || r.b ? { a: q, b: null } : { a: r.a, b: q }));
+  };
+  const sortirLaRegle = (oui: boolean) => {
+    seuleSelection();
+    setSelMesure(null);
+    setRegle({ a: null, b: null });
+    setMesurant(oui);
+  };
   /*
     « ÇA PASSE ? » — relevé du patron, point 6 de la réflexion « grand
     public ». Les portes qu'un meuble empêche de s'ouvrir se rougissent sur
@@ -3765,6 +3793,18 @@ export function ResultScreen() {
             }}
             retourEfface={retourEfface}
             portesBloquees={showFurniture ? portesBloquees : undefined}
+            regle={mesurant ? regle : null}
+            onRegleTap={viserRegle}
+            onRegleBout={(bout, p, tol) => {
+              const q = accrocherLaRegle(p, tol);
+              setRegle((r) => ({ ...r, [bout]: q }));
+            }}
+            mesures={mesuresDuNiveau}
+            selectedMesureId={selMesure}
+            onSelectMesure={(id) => {
+              seuleSelection();
+              setSelMesure(id);
+            }}
             selectedRoomId={selectedRoomId}
             /* Glisser dans la pièce choisie la déplace, avec ses meubles et
                son appareillage — et elle s'aimante aux murs voisins. */
@@ -4340,6 +4380,26 @@ export function ResultScreen() {
               qu'ici, il se voit dans les deux vues dès qu'un plan s'ouvre.
               Pas de murs, rien où marcher : la pastille se tait.
             */}
+            {/*
+              MESURER — la règle libre, sur le plan seulement : c'est là
+              qu'on vise un point au centimètre.
+            */}
+            {walls.length > 0 && tab === '2d' && (
+              <TouchableOpacity
+                style={[styles.vuePastille, mesurant && { backgroundColor: teinte.blue }]}
+                accessibilityLabel="Mesurer"
+                accessibilityHint="Mesurer entre deux points du plan"
+                accessibilityState={{ selected: mesurant }}
+                onPress={() => {
+                  haptic('leger');
+                  sortirLaRegle(!mesurant);
+                }}>
+                <Svg width={16} height={16} viewBox="0 0 24 24">
+                  <Trace d={SOLAIRES.ruler} fill={mesurant ? '#FFFFFF' : teinte.blue} fillRule="evenodd" />
+                </Svg>
+                <Text style={[styles.vuePastilleTexte, mesurant && { color: '#FFFFFF' }]}>Mesurer</Text>
+              </TouchableOpacity>
+            )}
             {walls.length > 0 && (
               <TouchableOpacity
                 style={[styles.vuePastille, styles.explorerPastille]}
@@ -5571,6 +5631,75 @@ export function ResultScreen() {
                         },
                       ]
                     : []),
+                ]}
+              />
+            );
+          })()}
+
+        {vue === '2d' && mesurant && !capturing && (
+          <StripBar
+            key="regle"
+            styles={stylesBarres}
+            icone={SOLAIRES.ruler}
+            strong={
+              regle.a && regle.b
+                ? texteDeMesure({ a: regle.a, b: regle.b })
+                : regle.a
+                  ? 'Touchez le second point'
+                  : 'Touchez un premier point'
+            }
+            note="Les bouts s’accrochent aux coins, aux murs et aux meubles"
+            onFermer={() => sortirLaRegle(false)}
+            actions={[
+              ...(regle.a && regle.b
+                ? [
+                    {
+                      label: 'Garder',
+                      icone: SOLAIRES.check,
+                      onPress: () => {
+                        if (!regle.a || !regle.b) return;
+                        useScanStore.getState().addMesure(regle.a, regle.b);
+                        setRegle({ a: null, b: null });
+                        haptic('succes');
+                      },
+                    },
+                  ]
+                : []),
+              ...(regle.a
+                ? [
+                    {
+                      label: 'Recommencer',
+                      icone: SOLAIRES.undo,
+                      sansMot: true,
+                      onPress: () => setRegle({ a: null, b: null }),
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        )}
+        {vue === '2d' && !mesurant && selMesure && !selectedObject && !selectedWall && !selectedOpening && !capturing &&
+          (() => {
+            const m = mesuresDuNiveau.find((x) => x.id === selMesure);
+            if (!m) return null;
+            return (
+              <StripBar
+                key={`mesure-${m.id}`}
+                styles={stylesBarres}
+                icone={SOLAIRES.ruler}
+                strong={texteDeMesure(m)}
+                note="cote posée à la règle"
+                onFermer={() => setSelMesure(null)}
+                actions={[
+                  {
+                    label: 'Retirer',
+                    icone: SOLAIRES.supprimer,
+                    danger: true,
+                    onPress: () => {
+                      useScanStore.getState().removeMesure(m.id);
+                      setSelMesure(null);
+                    },
+                  },
                 ]}
               />
             );

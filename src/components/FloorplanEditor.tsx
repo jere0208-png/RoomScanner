@@ -1,4 +1,5 @@
 import React, { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { texteDeMesure, type Mesure } from '../geometry/regle';
 import {
   Animated,
   PanResponder,
@@ -512,6 +513,21 @@ interface Props {
    * surface teintée : on voit d'un coup d'œil quelle porte coince.
    */
   portesBloquees?: Set<string>;
+  /**
+   * LA RÈGLE LIBRE — relevé du patron, point 7 de la réflexion « grand
+   * public » : mesurer entre deux points du plan. Sortie (`regle` non nul),
+   * chaque appui pose un bout ; ses bouts se glissent. L'écran accroche les
+   * points (coins, nu des murs, meubles) : le plan ne fait que viser.
+   */
+  regle?: { a: Pt | null; b: Pt | null } | null;
+  /** Un appui sur le plan, règle sortie : le point visé, et la largeur d'un doigt (m). */
+  onRegleTap?: (p: Pt, tolerance: number) => void;
+  /** Un bout de règle glissé. */
+  onRegleBout?: (bout: 'a' | 'b', p: Pt, tolerance: number) => void;
+  /** Les cotes gardées, à l'étage affiché. */
+  mesures?: Mesure[];
+  selectedMesureId?: string | null;
+  onSelectMesure?: (id: string | null) => void;
 }
 
 /**
@@ -543,6 +559,12 @@ export function FloorplanEditor({
   onEditRoomName,
   retourEfface,
   portesBloquees,
+  regle,
+  onRegleTap,
+  onRegleBout,
+  mesures,
+  selectedMesureId,
+  onSelectMesure,
   onSelectFixture,
   ceiling,
   showCeiling: showCeilingDemande,
@@ -3416,6 +3438,64 @@ export function FloorplanEditor({
                   </G>
                 );
               })()}
+            {/*
+              LES COTES DE LA RÈGLE — gardées, puis celle qu'on tire. Une
+              cote d'architecte : un trait, deux talons, la longueur dans
+              une pastille au milieu.
+            */}
+            {[
+              ...(mesures ?? []).map((m) => ({ m, cle: m.id, vive: false })),
+              ...(regle?.a && regle.b ? [{ m: { a: regle.a, b: regle.b }, cle: 'regle', vive: true }] : []),
+            ].map(({ m, cle, vive }) => {
+              const p1 = mapping.toPx(m.a);
+              const p2 = mapping.toPx(m.b);
+              const L = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
+              const tx = (-(p2.y - p1.y) / L) * 6;
+              const ty = ((p2.x - p1.x) / L) * 6;
+              const mx = (p1.x + p2.x) / 2;
+              const my = (p1.y + p2.y) / 2;
+              const texte = texteDeMesure(m);
+              const w = texte.length * 6.8 + 12;
+              const choisie = cle === selectedMesureId;
+              const encre = vive || choisie ? c.blue : c.ink;
+              return (
+                <G
+                  key={cle}
+                  onPress={
+                    !vive && !regle && editable && onSelectMesure
+                      ? () => onSelectMesure(choisie ? null : cle)
+                      : undefined
+                  }>
+                  {!vive && editable ? (
+                    <Line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="transparent" strokeWidth={22} />
+                  ) : null}
+                  <Line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={encre} strokeWidth={vive ? 2 : 1.4} />
+                  {[p1, p2].map((q, i) => (
+                    <Line key={i} x1={q.x - tx} y1={q.y - ty} x2={q.x + tx} y2={q.y + ty} stroke={encre} strokeWidth={vive ? 2 : 1.4} />
+                  ))}
+                  <Rect x={mx - w / 2} y={my - 10} width={w} height={20} rx={10} fill={c.surface} stroke={encre} strokeWidth={1} />
+                  <SvgText x={mx} y={my + 4} fill={encre} fontSize={12} fontWeight="700" textAnchor="middle">
+                    {texte}
+                  </SvgText>
+                </G>
+              );
+            })}
+            {regle?.a && !regle.b && (
+              <Circle cx={mapping.toPx(regle.a).x} cy={mapping.toPx(regle.a).y} r={5} fill={c.blue} pointerEvents="none" />
+            )}
+            {regle && (
+              <Rect
+                x={0}
+                y={0}
+                width={layout.w}
+                height={layout.h}
+                fill="transparent"
+                onPress={(e) => {
+                  const { locationX, locationY } = e.nativeEvent;
+                  onRegleTap?.(mapping.toMeters({ x: locationX, y: locationY }), 18 / mapping.scale);
+                }}
+              />
+            )}
             {placing && (
               <Rect
                 x={0}
@@ -3451,6 +3531,22 @@ export function FloorplanEditor({
                 />
               );
             })()}
+
+          {/* Les bouts de la règle se glissent : un doigt n'y vise pas au centimètre. */}
+          {regle &&
+            (['a', 'b'] as const).map((bout) => {
+              const at = regle[bout];
+              if (!at) return null;
+              return (
+                <RegleHandle
+                  key={bout}
+                  center={mapping.toPx(at)}
+                  at={at}
+                  mapping={mapping}
+                  onMove={(q, tol) => onRegleBout?.(bout, q, tol)}
+                />
+              );
+            })}
 
           {/* Meuble sélectionné : poignée de déplacement + bouton supprimer */}
           {/* Le meuble sélectionné : toute son emprise se glisse, sa croix
@@ -4200,6 +4296,72 @@ export function CeilingDragHandle({
       }}
       {...pan.panHandlers}
     />
+  );
+}
+
+/** Un bout de la règle : un point bleu qu'on glisse, accroché par l'écran. */
+function RegleHandle({
+  center,
+  at,
+  mapping,
+  onMove,
+}: {
+  center: { x: number; y: number };
+  at: Pt;
+  mapping: EffMapping;
+  onMove: (p: Pt, tolerance: number) => void;
+}) {
+  const c = useTheme();
+  const depart = useRef(at);
+  const vif = useRef({ mapping, at, onMove });
+  vif.current = { mapping, at, onMove };
+  const pan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
+        onPanResponderGrant: () => {
+          depart.current = vif.current.at;
+          haptic('accroche');
+        },
+        onPanResponderMove: (_e, g) => {
+          const d = vif.current.mapping.deltaToMeters(g.dx, g.dy);
+          vif.current.onMove(
+            { x: depart.current.x + d.x, z: depart.current.z + d.z },
+            18 / vif.current.mapping.scale,
+          );
+        },
+        onPanResponderRelease: () => releaseHaptic('accroche'),
+        onPanResponderTerminate: () => releaseHaptic('accroche'),
+      }),
+    [],
+  );
+  return (
+    <View
+      accessibilityLabel="Bout de la règle"
+      style={{
+        position: 'absolute',
+        left: center.x - 22,
+        top: center.y - 22,
+        width: 44,
+        height: 44,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+      {...pan.panHandlers}>
+      <View
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 9,
+          backgroundColor: c.blue,
+          borderWidth: 3,
+          borderColor: '#FFFFFF',
+        }}
+      />
+    </View>
   );
 }
 

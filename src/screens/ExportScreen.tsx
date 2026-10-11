@@ -233,6 +233,7 @@ const styles = getStyles(c);
   /** La feuille d'implantation du plafond, avec ses liens de commande. */
   const [plafond, setPlafond] = useState(false);
   const toutesLesPhotos = useScanStore((s) => s.photos);
+  const toutesLesMesures = useScanStore((s) => s.mesures);
   /*
     LE DOSSIER SORT L'ÉTAGE QU'ON REGARDE.
 
@@ -527,6 +528,8 @@ const styles = getStyles(c);
         // Les mots du relevé passent au dossier : c'est celui qui pose
         // qui les lit, et il lit cette feuille-là.
         notes,
+        // Les cotes posées à la règle, à l'étage imprimé.
+        mesures: toutesLesMesures.filter((m) => (m.niveau ?? 0) === niveauCourant),
         floors: floorsOf(rooms),
         roomNames: Object.fromEntries(rooms.map((r) => [r.id, r.name])),
         photos: vignettes,
