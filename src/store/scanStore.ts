@@ -7953,8 +7953,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings: ex.openings,
         rooms: ex.rooms,
         objects: ex.objects,
-        fixtures: [],
-        ceiling: [],
+        // L'installation électrique de la vitrine : on voit, dès l'accueil,
+        // ce que l'établi sait poser (affichée en mode électricité).
+        fixtures: ex.fixtures,
+        ceiling: ex.ceiling,
         photos: [],
         notes: [],
         currentSaveId: null,

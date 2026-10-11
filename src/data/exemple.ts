@@ -18,11 +18,14 @@
 import type { ObjectData } from 'react-native-room-scan';
 import { CATALOGUE, catalogTransform, type CatalogItem } from '../geometry/catalogue';
 import { pointInPolygon } from '../geometry/appearance';
+import { FIXTURES, type Fixture, type FixtureKind } from '../geometry/electrical';
+import type { CeilingFixture, CeilingKind } from '../geometry/ceiling';
 import {
   WALL_T,
   detectRooms,
   mergeColinear,
   roomParts,
+  segLength,
   splitAtJunctions,
   weldCorners,
   type WallSeg,
@@ -204,6 +207,132 @@ const OBJECTS: ObjectData[] = [
   meuble('plante', 4.62, 5.55),
 ];
 
+/*
+  L'INSTALLATION ÉLECTRIQUE — relevé du patron : « ajoute sur le plan
+  d'exemple des éléments électriques aussi, avec des positionnements bien
+  pensés (prise derrière le frigo pour son alimentation, sortie de câble
+  derrière le meuble de la plaque, et autres) ».
+
+  Posée comme un électricien la poserait, et conforme au contrôle NF C 15-100
+  de l'application (voir `exemple.test`) :
+  - chaque appareil ménager a son alimentation DERRIÈRE lui — la prise du
+    frigo, la sortie de câble de la plaque, le 20 A du lave-linge au-dessus
+    de la machine, hors des volumes de la douche ;
+  - chaque pièce a son point lumineux, commandé depuis sa porte ;
+  - les prises vont où l'on branche — une double compte pour UN socle, comme
+    le veut la norme : de part et d'autre du lit au-dessus
+    des chevets, la box et la lampe au bout du canapé, le bureau à hauteur
+    de plan, le rasoir à côté du miroir ;
+  - le tableau près de la porte d'entrée, le détecteur de fumée dans la
+    circulation, la VMC qui extrait en salle d'eau.
+*/
+
+/** Vers où regarde la face qui porte l'appareil — le côté de la pièce. */
+const VERS = {
+  nord: { x: 0, z: -1 },
+  sud: { x: 0, z: 1 },
+  est: { x: 1, z: 0 },
+  ouest: { x: -1, z: 0 },
+} as const;
+
+/**
+ * Un appareil posé sur le mur qui passe par (x, z) — un point de son AXE —,
+ * sur la face qui regarde `vers`, à `hauteur` d'axe (sa hauteur usuelle par
+ * défaut). Les murs sont retrouvés par la géométrie : leurs identifiants
+ * naissent du découpage aux jonctions.
+ */
+const appareil = (
+  id: string,
+  kind: FixtureKind,
+  x: number,
+  z: number,
+  vers: keyof typeof VERS,
+  hauteur: number = FIXTURES[kind].std,
+  commands?: string[],
+): Fixture => {
+  for (const w of WALLS) {
+    const len = segLength(w);
+    const ux = (w.b.x - w.a.x) / len;
+    const uz = (w.b.z - w.a.z) / len;
+    const along = (x - w.a.x) * ux + (z - w.a.z) * uz;
+    const ecart = Math.abs((x - w.a.x) * -uz + (z - w.a.z) * ux);
+    if (ecart > 0.01 || along <= 0 || along >= len) continue;
+    // La normale du mur, celle de `side = 1` (`perpOf`).
+    const n = { x: -uz, z: ux };
+    const side = VERS[vers].x * n.x + VERS[vers].z * n.z > 0 ? 1 : -1;
+    return {
+      id: `exemple-${id}`,
+      kind,
+      wallId: w.id,
+      along,
+      height: hauteur,
+      side,
+      ...(commands ? { commands: commands.map((c) => `exemple-${c}`) } : {}),
+    };
+  }
+  throw new Error(`Aucun mur sous l'appareil d'exemple ${id}`);
+};
+
+const FIXTURES_EXEMPLE: Fixture[] = [
+  // ── Séjour — la cuisine ouverte d'abord.
+  // Derrière le frigo, sa prise ; derrière le caisson de la plaque, sa
+  // sortie de câble — décalée hors de l'aplomb de la fenêtre.
+  appareil('prise-frigo', 'prise', 0.44, 0, 'sud', 0.25),
+  appareil('sortie-plaque', 'sortieCable', 2.4, 0, 'sud', 0.25),
+  // Le coin repas : une double au mur, entre les chaises.
+  appareil('prises-repas', 'prise2', 0, 2.1, 'est', 0.25),
+  // Le bout du canapé : la box internet et la lampe.
+  appareil('box-canape', 'rjPrise2', 5, 0.38, 'ouest', 0.25),
+  // Entre la porte-fenêtre et l'angle : le lampadaire, le balcon.
+  appareil('prise-fenetre', 'prise', 4.72, 0, 'sud', 0.25),
+  // Le mur du passage : une prise dans l'angle, et en entrant, la commande
+  // des deux points lumineux au-dessus d'une prise d'aspirateur.
+  appareil('prise-angle', 'prise', 0.5, 4.2, 'nord', 0.25),
+  appareil('prise-passage', 'prise', 2.95, 4.2, 'nord', 0.25),
+  appareil('inter-sejour', 'inter2', 2.95, 4.2, 'nord', 1.1),
+  // ── Chambre — une double au-dessus de chaque chevet, à portée de main
+  // depuis le lit ; la commande à la porte ; RJ45 et prise en face du lit.
+  appareil('chevet-nord', 'prise2', 8, 0.82, 'ouest', 0.7),
+  appareil('chevet-sud', 'prise2', 8, 2.78, 'ouest', 0.7),
+  appareil('inter-chambre', 'inter', 5, 2.3, 'est', 1.1),
+  appareil('rj-chambre', 'rjPrise', 6, 3.6, 'nord', 0.25),
+  // ── Salle d'eau — tout hors des volumes de la douche.
+  // Le 20 A du lave-linge AU-DESSUS de la machine, qu'on débranche sans la
+  // tirer ; la prise du rasoir à côté du miroir, l'applique au-dessus.
+  appareil('prise-lave-linge', 'prise20', 6.3, 6, 'nord', 1.1),
+  appareil('prise-miroir', 'prise', 5.45, 3.6, 'sud', 1.1),
+  appareil('applique-miroir', 'applique', 6.15, 3.6, 'sud', 1.9, ['inter-sde']),
+  appareil('inter-sde', 'inter2', 5, 5.55, 'est', 1.1),
+  // ── Bureau — l'ensemble RJ45 + double au-dessus du plan, une prise près
+  // de la porte, la commande à la porte.
+  appareil('bureau-plan', 'rjPrise2', 0.45, 6, 'nord', 1),
+  appareil('prise-bureau', 'prise', 2.2, 6, 'nord', 0.25),
+  // Contre la bibliothèque : la lampe de lecture, l'imprimante.
+  appareil('prise-biblio', 'prise', 1, 4.2, 'sud', 0.25),
+  appareil('inter-bureau', 'inter', 2.6, 5.75, 'ouest', 1.1),
+  // ── Entrée — le tableau (la GTL) à côté de la porte palière, la commande
+  // à portée de main en entrant, une prise pour l'aspirateur.
+  appareil('tableau', 'tableau', 2.98, 6, 'nord', 1.35),
+  appareil('inter-entree', 'inter', 2.6, 5.75, 'est', 1.1),
+  appareil('prise-entree', 'prise', 5, 4.42, 'ouest', 0.25),
+];
+
+/** Au plafond : la pièce se retrouve à la pose, par le point. */
+const PLAFOND_EXEMPLE: { id: string; kind: CeilingKind; at: { x: number; z: number }; commands?: string[] }[] = [
+  // Un point au-dessus de la table, un au-dessus du coin salon.
+  { id: 'dcl-repas', kind: 'dcl', at: { x: 1.3, z: 2.1 }, commands: ['inter-sejour'] },
+  { id: 'dcl-salon', kind: 'dcl', at: { x: 3.75, z: 1.5 }, commands: ['inter-sejour'] },
+  { id: 'dcl-chambre', kind: 'dcl', at: { x: 6.5, z: 1.8 }, commands: ['inter-chambre'] },
+  { id: 'dcl-sde', kind: 'dcl', at: { x: 6.5, z: 4.8 }, commands: ['inter-sde'] },
+  // La bouche d'extraction, au-dessus des WC : c'est là que l'air vicié part.
+  { id: 'vmc-sde', kind: 'vmc', at: { x: 7.45, z: 5.4 } },
+  { id: 'dcl-bureau', kind: 'dcl', at: { x: 1.3, z: 5.1 }, commands: ['inter-bureau'] },
+  { id: 'dcl-entree', kind: 'dcl', at: { x: 3.6, z: 5.1 }, commands: ['inter-entree'] },
+  // Le détecteur de fumée, dans la circulation — jamais en cuisine ni en
+  // salle d'eau, où la vapeur le déclencherait pour rien.
+  { id: 'daaf', kind: 'daaf', at: { x: 4.3, z: 4.8 } },
+];
+
 /** Tout ce qu'il faut pour ouvrir l'exemple comme on ouvre un relevé. */
 export function appartementExemple() {
   const detectees = detectRooms(WALLS);
@@ -227,5 +356,19 @@ export function appartementExemple() {
     const part = parts.find((p) => pointInPolygon(ici, p.surface?.pts ?? []));
     return { ...o, roomId: part?.roomId };
   });
-  return { walls: WALLS, openings: OPENINGS, rooms, objects };
+  // Le plafond appartient à la pièce qui le porte : son circuit, son métré.
+  const ceiling: CeilingFixture[] = PLAFOND_EXEMPLE.flatMap((c) => {
+    const part = parts.find((p) => pointInPolygon(c.at, p.surface?.pts ?? []));
+    if (!part) return [];
+    return [
+      {
+        id: `exemple-${c.id}`,
+        kind: c.kind,
+        roomId: part.roomId,
+        at: c.at,
+        ...(c.commands ? { commands: c.commands.map((x) => `exemple-${x}`) } : {}),
+      },
+    ];
+  });
+  return { walls: WALLS, openings: OPENINGS, rooms, objects, fixtures: FIXTURES_EXEMPLE, ceiling };
 }

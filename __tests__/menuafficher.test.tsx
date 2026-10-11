@@ -155,6 +155,26 @@ describe('le plan 2D', () => {
     expect(notes.props.accessibilityHint).toMatch(/Aucune note/);
   });
 
+  /*
+    L'ÉCLAIR DEVIENT LA PRISE — relevé du patron : « l'éclair en icône pour
+    afficher les appareils doit être la prise qu'on a dans Ajouter ». Le
+    même dessin pour la même chose, qu'on la pose ou qu'on l'affiche.
+  */
+  it('« Appareils » porte la prise d’« Ajouter », pas l’éclair', () => {
+    const icone = (edition: boolean, label: string) => {
+      const t = rangee2D(edition);
+      const i = t.root.findAllByType(ToolPill).find((p) => p.props.label === label)?.props.icon;
+      act(() => t.unmount());
+      arbre = null;
+      return i;
+    };
+    const affiche = icone(false, 'Appareils');
+    expect(affiche).toBe(icone(true, 'Appareil'));
+    expect(affiche).not.toBe('elec');
+    const src = lire('src/screens/result/ResultToolbar.tsx');
+    expect(src).toContain("{ cle: 'appareils', icone: 'appareil' as const,");
+  });
+
   it('en édition, chaque bouton qui ajoute porte son petit « + » — « Redresser » non', () => {
     const t = rangee2D(true);
     const pastilles = t.root.findAllByType(ToolPill);

@@ -14285,6 +14285,53 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## L'appartement d'exemple reçoit son installation électrique
+
+Relevé du patron : « ajoute sur le plan d'exemple des éléments électriques
+aussi, avec les positionnements bien pensés (prise derrière le frigo pour son
+alimentation, sortie de câble derrière le meuble de la plaque électrique, et
+autres). L'éclair en icône pour afficher les appareils doit être la prise
+qu'on a dans Ajouter ».
+
+**Une installation d'électricien** (`data/exemple.ts`, 23 appareils au mur,
+8 au plafond), posée par un utilitaire `appareil(id, nature, x, z, vers,
+hauteur)` qui retrouve le mur par sa géométrie et la face par le côté de la
+pièce :
+- **cuisine ouverte** : la prise du frigo DERRIÈRE lui, la sortie de câble
+  de la plaque derrière son caisson (décalée hors de l'aplomb de la
+  fenêtre) ;
+- **séjour** : une double entre les chaises du coin repas, la box internet
+  et la lampe au bout du canapé (RJ45 + double), une prise près de la
+  porte-fenêtre, une dans l'angle ; en entrant par le passage, le double
+  interrupteur des deux points lumineux (table, salon) au-dessus d'une prise
+  d'aspirateur ;
+- **chambre** : une double au-dessus de chaque chevet (70 cm, à portée
+  depuis le lit), RJ45 + prise en face, la commande à la porte ;
+- **salle d'eau** : le 20 A du lave-linge au-dessus de la machine, la prise
+  du rasoir et l'applique à côté du miroir — tout hors des volumes de la
+  douche ; la bouche de VMC au-dessus des WC ;
+- **bureau** : RJ45 + double au-dessus du plan, une prise contre la
+  bibliothèque, une près de la porte ;
+- **entrée** : le tableau (GTL) à côté de la porte palière, la commande en
+  entrant, une prise d'aspirateur, le **détecteur de fumée**.
+
+Chaque pièce a son point lumineux commandé par un interrupteur de la pièce.
+Le contrôle NF C 15-100 de l'application n'y lève **aucune alerte** (une
+double compte pour un seul socle, comme le veut la norme), ni appareil mal
+posé, ni hauteurs presque alignées. `ouvrirExemple` charge maintenant ces
+appareils (ils n'apparaissent qu'en mode électricité, comme sur un vrai
+relevé).
+
+**L'icône « Appareils »** (rangée du plan et menu « Afficher ») est la
+**prise** du bouton « Appareil » d'Ajouter, et plus l'éclair.
+
+Bancs : `exemple` (+7 : alimentation derrière le frigo, la plaque et le
+lave-linge ; un mur, une pièce et la bonne face pour chaque appareil ; aucune
+plaque qui en chevauche une autre ; un point lumineux commandé par pièce ;
+tableau, DAAF et VMC à leur place ; le contrôle NF C 15-100 sans alerte ;
+l'exemple ouvert arrive avec son installation), `menuafficher` (+1 : la
+prise d'Ajouter).
+
 ## Le menu « Autres » se valide ; à côté, il se quitte sans rien changer
 
 Relevé du patron : « le OK et la croix sont au même endroit sur le menu

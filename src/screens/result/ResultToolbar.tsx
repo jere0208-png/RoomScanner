@@ -430,9 +430,11 @@ export function Toolbar2D({
         // logement équipé, ses symboles couvrent la maçonnerie qu'on est
         // venu regarder. Pas « Élec » : c'est déjà le nom de la commande qui
         // ouvre l'établi depuis un mur.
+        // La PRISE, comme le bouton « Appareil » d'Ajouter — relevé du
+        // patron : l'éclair disait « électricité », pas « ce que j'ai posé ».
         <ToolPill
           key="elec"
-          icon="elec"
+          icon="appareil"
           label="Appareils"
           active={showFixtures}
           vide={contenu.appareils === 0 ? RIEN.appareils : null}
@@ -488,7 +490,7 @@ export function Toolbar2D({
             },
             ...(modeElec
               ? [
-                  { cle: 'appareils', icone: 'elec' as const, libelle: 'Appareils', aide: 'Prises, interrupteurs et points lumineux posés', actif: showFixtures, vide: contenu.appareils === 0 ? RIEN.appareils : null, onBascule: () => setShowFixtures((v) => !v) },
+                  { cle: 'appareils', icone: 'appareil' as const, libelle: 'Appareils', aide: 'Prises, interrupteurs et points lumineux posés', actif: showFixtures, vide: contenu.appareils === 0 ? RIEN.appareils : null, onBascule: () => setShowFixtures((v) => !v) },
                   { cle: 'plafond', icone: 'plafond' as const, libelle: 'Plafond', aide: 'Points lumineux, spots, détecteurs, VMC', actif: showCeiling, vide: contenu.plafond === 0 ? RIEN.plafond : null, onBascule: () => setShowCeiling(!showCeiling) },
                   { cle: 'gaines', icone: 'gaines' as const, libelle: 'Gaines', aide: 'Le chemin des câbles depuis le tableau', actif: showRoutes, vide: hasRoutes ? null : RIEN.gaines, onBascule: () => setShowRoutes((v) => !v) },
                 ]
