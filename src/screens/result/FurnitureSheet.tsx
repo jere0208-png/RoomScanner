@@ -30,6 +30,7 @@
 import React from 'react';
 import {
   Animated,
+  Dimensions,
   Image,
   Keyboard,
   Modal,
@@ -45,6 +46,8 @@ import {
 } from 'react-native';
 import Svg, { Line as SvgLine, Rect as SvgRect } from 'react-native-svg';
 import { useTheme } from '../../theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useKeyboardInset } from '../../components/Sheet';
 import { CATALOGUE, SUR_MESURE, type CatalogItem } from '../../geometry/catalogue';
 import { furnKind, furnitureStrokes } from '../../geometry/furniture';
 import { vignetteDuMeuble, vignetteEnCache } from '../../geometry/vignette3d';
@@ -397,6 +400,19 @@ export function FurnitureSheet({
   */
   const [familleChoisie, setFamilleChoisie] = React.useState<string | null>(null);
   /*
+    LE CLAVIER NE CACHE PLUS LES MEUBLES QU'ON CHERCHE — relevé du patron :
+    « la zone de texte gêne l'affichage du listing meubles ». La fenêtre
+    était centrée sur l'écran entier : on tapait « frig », le clavier
+    montait et recouvrait la liste. Clavier ouvert, elle se cale en haut de
+    l'écran et s'arrête au clavier ; la liste prend la place qui reste et
+    défile dedans. La consigne et le lien du meuble sur mesure s'effacent le
+    temps de la frappe : c'est de la place pour les résultats.
+  */
+  const clavier = useKeyboardInset();
+  const marges = useSafeAreaInsets();
+  const auClavier = clavier > 0;
+  const hauteurEcran = Dimensions.get('window').height;
+  /*
     LE MEUBLE SUR MESURE — correctif de l'audit. Quatre champs : un nom, et
     les trois cotes au centimètre, comme on les relève au mètre ruban. Le
     bouton ne pose que des cotes de meuble (de 5 cm à 6 m).
@@ -485,13 +501,22 @@ export function FurnitureSheet({
       transparent
       animationType="fade"
       onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+      <Pressable
+        style={[
+          styles.modalBackdrop,
+          auClavier && { justifyContent: 'flex-start', paddingTop: marges.top + 8, paddingBottom: clavier + 8 },
+        ]}
+        onPress={onClose}>
         <Animated.View style={[styles.catVoile, { opacity: voile }]}>
-          <Pressable style={styles.modalCard} onPress={() => {}}>
+          <Pressable
+            style={[styles.modalCard, auClavier && { maxHeight: hauteurEcran - clavier - marges.top - 16 }]}
+            onPress={() => {}}>
             <Text style={styles.modalTitle}>Ajouter un meuble</Text>
-            <Text style={styles.catAide}>
-              Touchez pour poser au centre, maintenez pour glisser sur le plan.
-            </Text>
+            {!auClavier && (
+              <Text style={styles.catAide}>
+                Touchez pour poser au centre, maintenez pour glisser sur le plan.
+              </Text>
+            )}
             <TextInput
               style={styles.catSearch}
               value={quete}
@@ -501,6 +526,7 @@ export function FurnitureSheet({
               autoCorrect={false}
               clearButtonMode="while-editing"
             />
+            {(!auClavier || mesure.ouvert) && (
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Meuble sur mesure"
@@ -515,6 +541,7 @@ export function FurnitureSheet({
                 {mesure.ouvert ? 'Fermer le meuble sur mesure' : '+ Meuble sur mesure, à vos cotes'}
               </Text>
             </TouchableOpacity>
+            )}
             {mesure.ouvert && (
               <View style={[surMesure.cadre, { backgroundColor: teinte.surfaceSunken }]}>
                 <TextInput
@@ -587,7 +614,7 @@ export function FurnitureSheet({
               })}
             </ScrollView>
             <ScrollView
-              style={styles.catScroll}
+              style={[styles.catScroll, auClavier && { flexShrink: 1 }]}
               keyboardShouldPersistTaps="handled">
               {CATALOGUE.map((famille) => {
                 if (familleChoisie && famille.name !== familleChoisie) return null;

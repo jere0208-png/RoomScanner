@@ -7359,17 +7359,40 @@ export const useScanStore = create<ScanState>((set, get) => {
       /** D'où il vient : c'est ce qui dit de quel côté chaque mur repousse. */
       const ici = { x: obj.transform[12], z: obj.transform[14] };
       const parts = roomParts(st.walls, st.rooms);
-      const part =
-        parts.find((p) => pointInPolygon({ x, z }, p.surface?.pts ?? [])) ??
-        parts.find((p) => pointInPolygon(ici, p.surface?.pts ?? [])) ??
-        parts.find((p) => p.roomId === obj.roomId);
+      const dansUnePiece = parts.find((p) => pointInPolygon({ x, z }, p.surface?.pts ?? []));
+      /*
+        LE RENFONCEMENT QU'AUCUNE PIÈCE NE FERME — relevé du patron : « un
+        meuble plus petit qu'une zone, avec la zone où je souhaite
+        l'imbriquer, ne veut pas y aller ». La niche n'était dans aucune pièce
+        fermée (un mur manquait autour), et le rangement prenait alors la
+        pièce d'OÙ VENAIT le meuble : il le ramenait dans son contour, contre
+        le mur, du mauvais côté.
+
+        Lâché dans un lieu que des murs entourent — six directions sur huit
+        butent sur un mur à moins de trois mètres —, le meuble y RESTE : les
+        murs autour l'arrêtent, rien ne le renvoie. Lâché vraiment dehors,
+        au-delà d'une façade, il revient dans sa pièce, comme avant.
+      */
+      const entoure =
+        !dansUnePiece &&
+        Array.from({ length: 8 }, (_, k) => (k * Math.PI) / 4).filter((a) => {
+          const d = castToWall({ x, z }, { x: Math.cos(a), z: Math.sin(a) }, st.walls);
+          return d !== null && d < 3;
+        }).length >= 6;
+      const part = entoure
+        ? undefined
+        : dansUnePiece ??
+          parts.find((p) => pointInPolygon(ici, p.surface?.pts ?? [])) ??
+          parts.find((p) => p.roomId === obj.roomId);
       // Sans pièce reconnue — un plan dont les contours ne se referment pas
       // — les murs arrêtent quand même : c'est le mur qui fait la collision,
       // la pièce ne fait que dire de quel côté.
       const murs = part ? part.walls : st.walls;
-      const ancre = part ? part.labelAt : ici;
+      // Dans un renfoncement ouvert, c'est le point lâché qui dit le côté.
+      const depuis = entoure ? { x, z } : ici;
+      const ancre = part ? part.labelAt : depuis;
       const contour = part?.surface?.pts;
-      const arrete = pushOutOfWalls({ x, z }, box, murs, ancre, contour, ici);
+      const arrete = pushOutOfWalls({ x, z }, box, murs, ancre, contour, depuis);
       /*
         LES VOISINS SONT CEUX DE LA PIÈCE D'ARRIVÉE, PAS CEUX D'AVANT.
 
@@ -7406,7 +7429,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           murs,
           ancre,
           contour,
-          ici,
+          depuis,
         );
       /**
        * RESTE-T-IL UN CHEVAUCHEMENT ? (deux rectangles tournés, par axes)
@@ -7529,25 +7552,35 @@ export const useScanStore = create<ScanState>((set, get) => {
           }
         }
       }
+      /*
+        ET IL S'AJUSTE À LA NICHE OÙ IL ATTERRIT — s'il est RELEVÉ. RoomPlan
+        rend une boîte un peu plus petite que le meuble (voir `niche.ts`) :
+        lâché entre deux murs qui se font face, il en remplit l'intervalle,
+        comme en fin de scan. Un meuble du CATALOGUE garde ses cotes — ce
+        sont celles d'un produit, et le patron a retiré le rabotage
+        automatique ; « Caler dans sa niche » reste à un appui.
+      */
+      const range = (o: ObjectData): ObjectData => {
+        const t = [...o.transform];
+        t[12] = pose.x;
+        t[14] = pose.z;
+        // Les cotes du catalogue, toujours : le doigt ne rabote pas.
+        const pose_: ObjectData = {
+          ...o,
+          transform: t,
+          width: o.baseWidth ?? o.width,
+          depth: o.baseDepth ?? o.depth,
+          // Il appartient à la pièce où il ATTERRIT. Sans pièce reconnue —
+          // un plan dont les contours ne se referment pas — on ne lui
+          // retire pas la sienne : une étiquette vide est pire qu'une
+          // étiquette ancienne.
+          roomId: piece,
+        };
+        if (o.modele) return pose_;
+        return calerDansLaNiche(pose_, st.walls) ?? pose_;
+      };
       set({
-        objects: st.objects.map((o) => {
-          if (o.id !== id) return o;
-          const t = [...o.transform];
-          t[12] = pose.x;
-          t[14] = pose.z;
-          // Les cotes du catalogue, toujours : le doigt ne rabote pas.
-          return {
-            ...o,
-            transform: t,
-            width: o.baseWidth ?? o.width,
-            depth: o.baseDepth ?? o.depth,
-            // Il appartient à la pièce où il ATTERRIT. Sans pièce reconnue —
-            // un plan dont les contours ne se referment pas — on ne lui
-            // retire pas la sienne : une étiquette vide est pire qu'une
-            // étiquette ancienne.
-            roomId: piece,
-          };
-        }),
+        objects: st.objects.map((o) => (o.id === id ? range(o) : o)),
         dirty: true,
       });
     },

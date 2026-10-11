@@ -14285,6 +14285,41 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le meuble entre dans sa niche, et le clavier ne cache plus le catalogue
+
+Deux relevés du patron, captures à l'appui.
+
+**« Pourquoi un meuble plus petit qu'une zone ne veut pas y aller ? »** Un
+réfrigérateur relevé (47 × 39 cm), glissé au doigt dans un renfoncement
+plus grand que lui, revenait se coller au mur, de l'autre côté.
+
+La cause : au lâcher, le meuble se range dans la pièce où il atterrit
+(`rangerMeuble`). Le renfoncement n'était dans aucune pièce fermée, car un
+mur manquait autour. Le rangement prenait alors la pièce d'où venait le
+meuble, et le ramenait dans son contour, contre le mur, du mauvais côté.
+
+Désormais :
+- lâché dans un lieu que des murs entourent (six directions sur huit
+  butent sur un mur à moins de trois mètres), le meuble y reste ; les murs
+  autour l'arrêtent, rien ne le renvoie ;
+- lâché vraiment dehors, au-delà d'une façade, il revient dans sa pièce,
+  comme avant ;
+- un meuble relevé se cale dans la niche où il atterrit et en remplit
+  l'intervalle, comme en fin de scan, car RoomPlan sous-estime ses cotes ;
+- un meuble du catalogue garde ses cotes, celles d'un produit.
+  « Caler dans sa niche » reste à un appui.
+
+**« La zone de texte gêne l'affichage du listing meubles. »** Le catalogue
+était une fenêtre centrée sur l'écran entier : en tapant « frig », le
+clavier recouvrait la liste. Clavier ouvert :
+- la fenêtre se cale en haut de l'écran et s'arrête au clavier
+  (`useKeyboardInset`, la mesure des feuilles de saisie) ;
+- la liste prend la place qui reste et défile dedans ;
+- la consigne et le lien du meuble sur mesure s'effacent le temps de la
+  frappe.
+
+Bancs : `meubleniche` (4) et `catalogueclavier` (3).
+
 ## Le décor partout, et la visite où l'on veut
 
 Correctifs de l'audit « dans la peau d'un utilisateur », lot 4 (décor et
