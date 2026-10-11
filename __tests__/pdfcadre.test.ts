@@ -216,9 +216,18 @@ describe('la perspective du PDF montre ce que montre l’app', () => {
     expect(premierCote).toBeGreaterThan(0);
     // Après la première cote : plus un seul pan. Seuls les halos blancs et
     // le texte ont le droit de suivre — c'est ce qui garantit qu'aucune
-    // maçonnerie ne repassera par-dessus un nombre.
+    // maçonnerie ne repassera par-dessus un nombre. Les noms de pièces en
+    // marge suivent aussi, avec leurs annotations : le trait de rappel (un
+    // filet de 0,5 pt) et le point qui marque la pièce (moins de 5 pt).
+    const annotation = (ligne: string) => {
+      if (/ 0\.5 w /.test(ligne) && / S$/.test(ligne.trim())) return true;
+      const nombres = [...ligne.matchAll(/(-?[\d.]+) (-?[\d.]+) [ml]/g)].map((m) => [Number(m[1]), Number(m[2])]);
+      const xs = nombres.map((q) => q[0]);
+      const ys = nombres.map((q) => q[1]);
+      return nombres.length > 2 && Math.max(...xs) - Math.min(...xs) < 5 && Math.max(...ys) - Math.min(...ys) < 5;
+    };
     for (const ligne of zone.slice(premierCote).split('\n')) {
-      if (/ [ml] /.test(ligne) && /[bfsS]$/.test(ligne.trim())) {
+      if (/ [ml] /.test(ligne) && /[bfsS]$/.test(ligne.trim()) && !annotation(ligne)) {
         expect(ligne).toContain('1 1 1 rg');
       }
     }

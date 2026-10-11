@@ -255,6 +255,22 @@ export interface View3DParams {
 export interface PdfOptions {
   plan?: PlanViewParams;
   /**
+   * Une page de garde en tête du dossier : le logement, à qui il est, ses
+   * chiffres, une vue d'ensemble et le contenu du dossier (voir `gardePage`).
+   */
+  garde?: boolean;
+  /**
+   * TOUS LES NIVEAUX DU LOGEMENT, dans l'ordre où le dossier les montre —
+   * correctif de l'audit : le dossier ne sortait que l'étage affiché.
+   *
+   * Chaque niveau garde ses feuilles (plan, métré, perspectives, murs de
+   * face), titrées de son nom. Les feuilles électriques (existant, gaines,
+   * schémas, plafond) ne sortent qu'avec le niveau `courant` ; les achats
+   * et la page de garde valent pour tout le logement. À moins de deux
+   * niveaux, le dossier est celui du `scan`, comme avant.
+   */
+  niveaux?: { nom: string; scan: Omit<ScanForPdf, 'name'>; courant?: boolean }[];
+  /**
    * Les perspectives à imprimer, une par page.
    *
    * Une liste, et non plus une paire : deux vues se partageaient une feuille
@@ -762,6 +778,15 @@ function drawLogo(d: Draw, x: number, y: number, size: number) {
 // --------------------------------------------------- cadre et cartouche
 
 const FRAME = { x: 30, y: 30, w: PAGE_W - 60, h: PAGE_H - 60 };
+
+/** L'entreprise de l'artisan, telle que le cartouche l'imprime. */
+export interface EntreprisePdf {
+  nom: string;
+  adresse?: string;
+  telephone?: string;
+  email?: string;
+  siret?: string;
+}
 /**
  * LA LIGNE DE TITRE, EN HAUT DE LA FEUILLE.
  *
@@ -950,6 +975,8 @@ function drawSheetChrome(
     address?: string;
     /** Un particulier : son dossier est à un PROPRIÉTAIRE, pas à un client. */
     particulier?: boolean;
+    /** L'entreprise de l'artisan : elle prend la place de la marque. */
+    entreprise?: EntreprisePdf | null;
   },
 ) {
   // Cadre de feuille
@@ -975,9 +1002,30 @@ function drawSheetChrome(
     sur un établi. Il occupe maintenant cinquante points, et le nom se
     décale d'autant.
   */
-  drawLogo(d, FRAME.x + 12, ty + 8, 50);
-  d.text('EchoPlan', FRAME.x + 70, ty + 38, 14, INK, { bold: true, align: 'left' });
-  d.text('Scan 3D & plans', FRAME.x + 70, ty + 23, 7.5, GREY, { align: 'left' });
+  /*
+    L'ENTREPRISE DE L'ARTISAN, À LA PLACE DE LA MARQUE — correctif de
+    l'audit : le dossier n'avait ni son nom ni ses coordonnées, et c'est
+    lui qui le remet à son client. Son nom, puis trois lignes au plus :
+    téléphone, e-mail, adresse ou SIRET.
+  */
+  const ent = info.entreprise?.nom ? info.entreprise : null;
+  if (ent) {
+    const large = cols[0] - FRAME.x - 24;
+    d.text(fitText(ent.nom, 11, large), FRAME.x + 12, ty + 46, 11, INK, { bold: true, align: 'left' });
+    const lignes = [
+      ent.telephone,
+      ent.email,
+      ent.adresse,
+      ent.siret ? `SIRET ${ent.siret}` : '',
+    ].filter((x): x is string => !!x && !!x.trim());
+    lignes.slice(0, 3).forEach((l, i) => {
+      d.text(fitText(l, 7, large), FRAME.x + 12, ty + 32 - i * 10, 7, GREY, { align: 'left' });
+    });
+  } else {
+    drawLogo(d, FRAME.x + 12, ty + 8, 50);
+    d.text('EchoPlan', FRAME.x + 70, ty + 38, 14, INK, { bold: true, align: 'left' });
+    d.text('Scan 3D & plans', FRAME.x + 70, ty + 23, 7.5, GREY, { align: 'left' });
+  }
 
   // Bloc projet
   d.text('PROJET', cols[0] + 12, ty + 50, 6.5, GREY_LIGHT, { align: 'left' });
@@ -1081,6 +1129,33 @@ const PDF_SCENE: ScenePalette = {
   objectStroke: '#9FACBF',
 };
 
+/**
+ * RANGE UNE COLONNE D'ÉTIQUETTES EN MARGE — chacune au plus près de la
+ * hauteur de sa pièce, jamais à moins de `pas` de sa voisine, toutes entre
+ * `bas` et `haut`, et dans l'ordre de leurs pièces à l'écran : les traits
+ * qui les relient ne se croisent pas. Rend les hauteurs dans l'ordre reçu.
+ */
+export function rangerEnColonne(voulues: number[], bas: number, haut: number, pas: number): number[] {
+  const n = voulues.length;
+  if (n === 0) return [];
+  // Trop d'étiquettes pour la hauteur : elles se serrent plutôt que de sortir.
+  const ecart = n > 1 ? Math.min(pas, (haut - bas) / (n - 1)) : pas;
+  const ordre = voulues.map((_, i) => i).sort((a, b) => voulues[b] - voulues[a]);
+  const ys = ordre.map((i) => Math.min(Math.max(voulues[i], bas), haut));
+  // De haut en bas : chacune sous sa voisine du dessus.
+  for (let k = 1; k < n; k++) ys[k] = Math.min(ys[k], ys[k - 1] - ecart);
+  // Puis de bas en haut : ce qui est sorti par le bas remonte la colonne.
+  if (ys[n - 1] < bas) {
+    ys[n - 1] = bas;
+    for (let k = n - 2; k >= 0; k--) ys[k] = Math.max(ys[k], ys[k + 1] + ecart);
+  }
+  const out = new Array<number>(n);
+  ordre.forEach((i, k) => {
+    out[i] = ys[k];
+  });
+  return out;
+}
+
 function draw3DView(
   d: Draw,
   walls: WallSeg[],
@@ -1149,8 +1224,39 @@ function draw3DView(
    * en toute rigueur, un bout de mur pris de trop près.
    */
   const zoom = Math.min(2.2, Math.max(0.5, view.zoom || 1));
-  const scale = ((Math.min(box.w, box.h) * 0.46) / r3) * zoom;
-  const cx = box.x + box.w / 2 + view.fx * (box.w / 2);
+  /*
+    LES NOMS DES PIÈCES SORTENT DU DESSIN — relevé du patron : « les notes
+    avec les noms des pièces font cheap ; les sortir du plan pour ne pas
+    gêner la vue, et faire un trait vers la pièce concernée ». Un cartouche
+    blanc posé sur le modèle cachait justement les murs et les meubles
+    qu'on voulait montrer. Les étiquettes se rangent en marge — à gauche les
+    pièces de gauche, à droite celles de droite —, et la marge se réserve
+    AVANT le cadrage : le modèle se loge entre les deux colonnes.
+  */
+  const etiquettes = (opts.showSurfaces ? scene.rooms : [])
+    .filter((room) => !!room.surface)
+    .map((room) => {
+      const x = room.labelAt.x - ctr.x;
+      const z = room.labelAt.z - ctr.z;
+      return {
+        monde: { x: room.labelAt.x, y: 0, z: room.labelAt.z },
+        nom: opts.roomNames?.[room.roomId] ?? '',
+        aire: `${room.surface!.exact ? '' : '≈ '}${fr1(room.surface!.area)} m²`,
+        gauche: x * ct - z * st < 0,
+      };
+    });
+  const largeurDe = (e: { nom: string; aire: string }) =>
+    Math.max(e.nom.length * 9 * 0.56, e.aire.length * 7.5 * 0.52);
+  const marge = (cote: boolean) => {
+    const siennes = etiquettes.filter((e) => e.gauche === cote);
+    if (siennes.length === 0) return 0;
+    return Math.min(Math.max(...siennes.map(largeurDe)) + 26, box.w * 0.24);
+  };
+  const margeG = marge(true);
+  const margeD = marge(false);
+  const cadre = { x: box.x + margeG, y: box.y, w: box.w - margeG - margeD, h: box.h };
+  const scale = ((Math.min(cadre.w, cadre.h) * 0.46) / r3) * zoom;
+  const cx = cadre.x + cadre.w / 2 + view.fx * (box.w / 2);
   const cy = box.y + box.h / 2 - view.fy * (box.h / 2);
 
   const project = (p: P3) => {
@@ -1235,93 +1341,10 @@ function draw3DView(
         alpha?: number;
       }
     | { kind: 'dot'; depth: number; x: number; y: number; color: string }
-    | { kind: 'label'; depth: number; x: number; y: number; text: string }
-    | { kind: 'area'; depth: number; x: number; y: number; text: string };
+    | { kind: 'label'; depth: number; x: number; y: number; text: string };
   const items: Item[] = polys.map((p) => ({ kind: 'poly' as const, ...p }));
 
-  /**
-   * UN PAN DE MUR PLEIN SE DRESSE-T-IL ENTRE L'ŒIL ET CE POINT ?
-   *
-   * Même raisonnement que le masquage strict des meubles : un pan est un
-   * morceau de plan ; si sa normale va vers l'œil et que le point est de
-   * l'autre côté, le rayon qui va du point à l'œil traverse ce plan. Reste à
-   * savoir si le morceau, à l'écran, couvre le point.
-   *
-   * PLEIN seulement : un mur en écorché s'efface justement pour qu'on voie
-   * la pièce derrière — lui demander de cacher son étiquette serait lui
-   * faire dire l'inverse de ce qu'il fait.
-   */
-  const masqueParUnMurPlein = (monde: { x: number; z: number }) => {
-    const vers = { x: st * sp, y: cp, z: ct * sp };
-    const e = project({ x: monde.x, y: 0, z: monde.z });
-    for (const f of faces) {
-      if (f.ownerId || !f.normal || f.pts.length < 3 || f.isFloor) continue;
-      if (f.cutaway && cutawayOpacity(f.normal, cam) < 0.9) continue;
-      const n = f.normal;
-      if (n.x * vers.x + n.y * vers.y + n.z * vers.z <= 0) continue;
-      const p0 = f.pts[0];
-      const q3 = { x: monde.x, y: 1.2, z: monde.z };
-      const d = n.x * (q3.x - p0.x) + n.y * (q3.y - p0.y) + n.z * (q3.z - p0.z);
-      if (d > -0.01) continue;
-      const poly = f.pts.map((pt) => project(pt));
-      let dedans = false;
-      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-        if (
-          poly[i].y > e.y !== poly[j].y > e.y &&
-          e.x <
-            ((poly[j].x - poly[i].x) * (e.y - poly[i].y)) /
-              (poly[j].y - poly[i].y) +
-              poly[i].x
-        ) {
-          dedans = !dedans;
-        }
-      }
-      if (dedans) return true;
-    }
-    return false;
-  };
-
-  // Semis du sol et surface : mêmes repères que sur le plan 2D, pièce
-  // par pièce — chaque sol garde sa teinte et porte son propre libellé.
-  if (opts.showSurfaces) {
-    for (const room of scene.rooms) {
-      if (!room.surface) continue;
-      // Plus de semis — relevé du patron : « on doit voir le nom et le
-      // sol, sans pointillés ». Le sol porte sa matière, elle dit tout.
-      const q = project({ x: room.labelAt.x, y: 0, z: room.labelAt.z });
-      const name = opts.roomNames?.[room.roomId] ?? '';
-      const area = `${room.surface.exact ? '' : '≈ '}${fr1(room.surface.area)} m²`;
-      /*
-        TOUT ENTIÈRE, OU PAS DU TOUT.
-
-        Relevé du patron : « la surface du plan 3D d'un scan doit pas se voir
-        à travers les murs ». Elle se classait tout au-devant (`Infinity`),
-        avec cette raison : « c'est une annotation, pas un volume ». C'est
-        vrai d'un PLAN, où l'on regarde à travers ; c'est faux d'un MODÈLE,
-        qu'on regarde de l'extérieur.
-
-        Premier essai : lui donner la profondeur de son point, et laisser le
-        tri faire. Regardé en image, c'était pire — « Séjour » sortait coupé
-        en « S », « Cuisine · 9,0 m² » en « sine · 9,0 m² » : le canapé et
-        le réfrigérateur mangeaient la moitié des mots. Un demi-mot est plus
-        faux qu'un mot absent.
-
-        Elle reste donc au-dessus de tout, et l'on décide AVANT de l'écrire :
-        si un pan PLEIN se dresse entre l'œil et son point, on ne l'écrit
-        pas. En écorché — le réglage par défaut du dossier —, le pan de
-        devant s'efface à quinze pour cent : la pièce se voit, son étiquette
-        aussi.
-      */
-      if (masqueParUnMurPlein(room.labelAt)) continue;
-      items.push({
-        kind: 'area',
-        depth: Infinity,
-        x: q.x,
-        y: q.y,
-        text: name ? `${name} · ${area}` : area,
-      });
-    }
-  }
+  // Les noms et les surfaces des pièces se posent en marge : voir plus bas.
 
   for (const w of showDims ? walls : []) {
     const mid = project({
@@ -1380,13 +1403,41 @@ function draw3DView(
       }
     } else if (item.kind === 'dot') {
       d.circle(item.x, item.y, 0.55, item.color);
-    } else if (item.kind === 'area') {
-      halo(item.x, item.y, 9.5, item.text);
-      d.text(item.text, item.x, item.y, 9.5, INK, { bold: true });
     } else {
       halo(item.x, item.y, 8, item.text);
       d.text(item.text, item.x, item.y, 8, '#2A3340');
     }
+  }
+
+  /*
+    LES ÉTIQUETTES EN MARGE, ET LEUR TRAIT. Le nom en gras, la surface en
+    dessous ; un trait fin mène à la pièce, qu'un point marque. Chaque
+    colonne suit l'ordre des pièces à l'écran : les traits ne se croisent
+    pas.
+  */
+  for (const gauche of [true, false]) {
+    const colonne = etiquettes
+      .filter((e) => e.gauche === gauche)
+      .map((e) => ({ ...e, ancre: project(e.monde) }));
+    if (colonne.length === 0) continue;
+    const ys = rangerEnColonne(
+      colonne.map((e) => e.ancre.y),
+      box.y + 16,
+      box.y + box.h - 14,
+      26,
+    );
+    const bord = gauche ? cadre.x - 10 : cadre.x + cadre.w + 10;
+    colonne.forEach((e, i) => {
+      const y = ys[i];
+      const attache = gauche ? bord + 4 : bord - 4;
+      d.line(attache, y + 3, gauche ? attache + 6 : attache - 6, y + 3, 0.5, GREY);
+      d.line(gauche ? attache + 6 : attache - 6, y + 3, e.ancre.x, e.ancre.y, 0.5, GREY);
+      d.circle(e.ancre.x, e.ancre.y, 2.4, '#FFFFFF');
+      d.circle(e.ancre.x, e.ancre.y, 1.5, INK);
+      const align = gauche ? 'right' : 'left';
+      if (e.nom) d.text(e.nom, bord, y, 9, INK, { bold: true, align });
+      d.text(e.aire, bord, e.nom ? y - 10 : y, e.nom ? 7.5 : 9, e.nom ? GREY : INK, { align, bold: !e.nom });
+    });
   }
   d.restore();
 
@@ -1409,6 +1460,8 @@ interface SheetContext {
   address?: string;
   /** Un particulier : le cartouche dit « Propriétaire ». */
   particulier?: boolean;
+  /** L'entreprise de l'artisan, pour le cartouche. */
+  entreprise?: EntreprisePdf | null;
   /** Les perspectives portent-elles les repères d'appareillage ? */
   reperes3D?: boolean;
   walls: WallSeg[];
@@ -1566,6 +1619,7 @@ function planPage(
       filename,
       client: ctx.client,
       particulier: ctx.particulier,
+    entreprise: ctx.entreprise,
       address: ctx.address,
       sheetTitle: extra?.title ?? 'Plan d’ensemble coté',
       sheet,
@@ -3860,6 +3914,7 @@ function planPage(
     filename,
     client: ctx.client,
     particulier: ctx.particulier,
+    entreprise: ctx.entreprise,
     address: ctx.address,
     sheetTitle: titre,
     sheet,
@@ -4019,6 +4074,7 @@ function metrePage(
       filename: ctx.filename,
       client: ctx.client,
       particulier: ctx.particulier,
+    entreprise: ctx.entreprise,
       address: ctx.address,
       sheetTitle: 'Métré par pièce',
       sheet,
@@ -4111,6 +4167,7 @@ function metrePage(
     filename: ctx.filename,
     client: ctx.client,
     particulier: ctx.particulier,
+    entreprise: ctx.entreprise,
     address: ctx.address,
     sheetTitle: 'Métré par pièce',
     sheet,
@@ -4228,6 +4285,7 @@ function achatsPage(
     filename: ctx.filename,
     client: ctx.client,
     particulier: ctx.particulier,
+    entreprise: ctx.entreprise,
     address: ctx.address,
     sheetTitle: 'Ce qu’il faut acheter',
     sheet,
@@ -4371,6 +4429,7 @@ function existantPage(
     filename: ctx.filename,
     client: ctx.client,
     particulier: ctx.particulier,
+    entreprise: ctx.entreprise,
     address: ctx.address,
     sheetTitle: 'Installation existante',
     sheet,
@@ -4733,6 +4792,7 @@ function unifilairePage(
     filename: ctx.filename,
     client: ctx.client,
     particulier: ctx.particulier,
+    entreprise: ctx.entreprise,
     address: ctx.address,
     sheetTitle: 'Schéma unifilaire',
     sheet,
@@ -4862,6 +4922,7 @@ function multifilairePage(
     filename: ctx.filename,
     client: ctx.client,
     particulier: ctx.particulier,
+    entreprise: ctx.entreprise,
     address: ctx.address,
     sheetTitle: 'Schéma multifilaire',
     sheet,
@@ -5467,6 +5528,7 @@ function elevationPage(
     filename: ctx.filename,
     client: ctx.client,
     particulier: ctx.particulier,
+    entreprise: ctx.entreprise,
     address: ctx.address,
     sheetTitle: `Élévation — ${quoi}`,
     sheet,
@@ -5806,6 +5868,7 @@ function threeDPage(
     filename: ctx.filename,
     client: ctx.client,
     particulier: ctx.particulier,
+    entreprise: ctx.entreprise,
     address: ctx.address,
     sheetTitle: showDims ? `${titre} cotée` : titre,
     sheet,
@@ -5855,6 +5918,11 @@ export interface ScanForPdf {
   address?: string;
   /** Un particulier : le cartouche dit « Propriétaire », pas « Client ». */
   particulier?: boolean;
+  /**
+   * L'entreprise de l'artisan (voir `store/entreprise`) : elle prend la
+   * place de la marque EchoPlan dans le cartouche de chaque feuille.
+   */
+  entreprise?: EntreprisePdf | null;
   /**
    * Le nom de chaque appareil : « Prise plinthe 2 », sa pièce, son mur.
    * Calculé par l'écran d'export, qui connaît le placement et la boussole.
@@ -6608,9 +6676,186 @@ function ctxTemporaire(scan: ScanForPdf): SheetContext {
   };
 }
 
+/**
+ * LA PAGE DE GARDE — correctif de l'audit « dans la peau d'un utilisateur » :
+ * le dossier s'ouvrait directement sur le plan coté. Un dossier qu'on remet
+ * à un acheteur, à un artisan ou à un client commence par dire de quoi il
+ * s'agit : le logement et à qui il est, ses chiffres, une vue d'ensemble, et
+ * ce que contient chaque feuille.
+ */
+const GENRE_EN_CLAIR: Record<FeuilleDuDossier['genre'], string> = {
+  garde: 'Page de garde',
+  plan: 'Plan coté',
+  metre: 'Métré',
+  achats: 'Ce qu’il faut acheter',
+  existant: 'Tableau existant',
+  gaines: 'Plan des gaines',
+  perspective: 'Perspectives',
+  elevation: 'Murs de face',
+  unifilaire: 'Schéma unifilaire',
+  multifilaire: 'Schéma multifilaire',
+};
+
+function gardePage(
+  ctx: SheetContext,
+  sheet: string,
+  suite: FeuilleDuDossier[],
+  /** Les niveaux du logement, quand il en a plusieurs : ses chiffres en font la somme. */
+  niveaux?: { nom: string; ctx: SheetContext }[],
+): string {
+  const d = new Draw();
+  const x0 = FRAME.x + 30;
+  const w = FRAME.w - 60;
+  let y = TETE - 10;
+
+  // Qui remet le dossier : l'entreprise de l'artisan, ou la marque.
+  const ent = ctx.entreprise?.nom ? ctx.entreprise : null;
+  if (ent) {
+    d.text(fitText(ent.nom, 13, w), x0, y, 13, INK, { bold: true, align: 'left' });
+    const coord = [ent.telephone, ent.email, ent.adresse].filter((x): x is string => !!x && !!x.trim()).join(' · ');
+    if (coord) d.text(fitText(coord, 8.5, w), x0, y - 14, 8.5, GREY, { align: 'left' });
+    if (ent.siret) d.text(fitText(`SIRET ${ent.siret}`, 8, w), x0, y - 26, 8, GREY_LIGHT, { align: 'left' });
+  } else {
+    drawLogo(d, x0, y - 30, 36);
+    d.text('EchoPlan', x0 + 44, y - 12, 13, INK, { bold: true, align: 'left' });
+    d.text('Scan 3D & plans', x0 + 44, y - 24, 7.5, GREY, { align: 'left' });
+  }
+
+  // Le logement.
+  y -= 96;
+  d.text(fitText(ctx.name, 26, w), x0, y, 26, INK, { bold: true, align: 'left' });
+  y -= 22;
+  d.text(ctx.particulier ? 'Dossier du logement' : 'Dossier de chantier', x0, y, 12, GREY, { align: 'left' });
+  if (niveaux && niveaux.length > 1) {
+    y -= 15;
+    d.text(fitText(`${niveaux.length} niveaux : ${niveaux.map((x) => x.nom).join(', ')}`, 10, w), x0, y, 10, GREY, {
+      align: 'left',
+    });
+  }
+  y -= 26;
+  const now = new Date();
+  const two = (v: number) => String(v).padStart(2, '0');
+  const lignes: [string, string | undefined][] = [
+    [ctx.particulier ? 'Propriétaire' : 'Client', ctx.client],
+    [ctx.particulier ? 'Adresse' : 'Chantier', ctx.address],
+    ['Établi le', `${two(now.getDate())}/${two(now.getMonth() + 1)}/${now.getFullYear()}`],
+  ];
+  for (const [mot, valeur] of lignes) {
+    if (!valeur) continue;
+    d.text(mot.toUpperCase(), x0, y, 7, GREY_LIGHT, { align: 'left' });
+    d.text(fitText(valeur, 10.5, w - 90), x0 + 90, y, 10.5, INK, { align: 'left' });
+    y -= 16;
+  }
+
+  // Ses chiffres : trois cases, sur tous les niveaux du logement.
+  let nPieces = 0;
+  let sol = 0;
+  let habitable = 0;
+  let avecHabitable = false;
+  for (const c of niveaux ? niveaux.map((x) => x.ctx) : [ctx]) {
+    const parts = roomParts(c.walls, c.rooms);
+    nPieces += parts.length;
+    sol += parts.reduce((t, p) => t + (p.surface?.area ?? 0), 0);
+    const hab = surfacesHabitables(
+      (c.rooms ?? []).map((r) => ({
+        id: r.id,
+        name: c.roomNames[r.id],
+        releve: (r as { releve?: { plafond?: PlafondDeLaPiece | null } | null }).releve,
+      })),
+      parts,
+    );
+    habitable += hab.total;
+    avecHabitable = avecHabitable || hab.pieces.length > 0;
+  }
+  const cases: [string, string][] = [
+    ['Pièces', String(nPieces)],
+    ['Surface au sol', `${fr1(sol)} m²`],
+    ...(avecHabitable ? ([['Habitable estimée', `≈ ${fr1(habitable)} m²`]] as [string, string][]) : []),
+  ];
+  y -= 14;
+  const large = (w - 2 * 12) / 3;
+  cases.forEach(([mot, valeur], i) => {
+    const cx = x0 + i * (large + 12);
+    d.rect(cx, y - 46, large, 46, '#F4F6FA', null, 0);
+    d.text(mot.toUpperCase(), cx + 12, y - 16, 7, GREY, { align: 'left' });
+    d.text(valeur, cx + 12, y - 36, 16, INK, { bold: true, align: 'left' });
+  });
+  y -= 46;
+
+  // Une vue d'ensemble, quand il y a de quoi la dessiner.
+  const basVue = FRAME.y + TITLE_H + 190;
+  if (ctx.walls.length > 0 && y - 20 - basVue > 120) {
+    draw3DView(
+      d,
+      ctx.walls,
+      ctx.openings,
+      ctx.objects,
+      { x: x0, y: basVue, w, h: y - 20 - basVue },
+      // La case est large et basse : sans zoom, le logement n'en prenait
+      // que le milieu. La case rogne de toute façon ce qui dépasserait.
+      { ...DEFAULT_PDF_VIEWS[0], zoom: 1.6 },
+      {
+        showDims: false,
+        showSurfaces: ctx.showSurfaces,
+        floors: ctx.floors,
+        roomNames: ctx.roomNames,
+        rooms: ctx.rooms,
+        fixtures: [],
+      },
+    );
+  }
+
+  /*
+    LE CONTENU DU DOSSIER — une ligne par sorte de feuille, avec ses
+    numéros : un dossier de trente murs de face ne déroule pas trente
+    lignes, il dit « Murs de face, 6 à 35 ».
+  */
+  let yl = basVue - 22;
+  d.text('Contenu du dossier', x0, yl, 11, INK, { bold: true, align: 'left' });
+  yl -= 6;
+  d.line(x0, yl, x0 + w, yl, 0.6, INK);
+  const groupes: { genre: FeuilleDuDossier['genre']; titre: string; de: number; a: number }[] = [];
+  suite.forEach((f, i) => {
+    const numero = i + 2;
+    const dernier = groupes[groupes.length - 1];
+    if (dernier && dernier.genre === f.genre) dernier.a = numero;
+    else groupes.push({ genre: f.genre, titre: f.titre, de: numero, a: numero });
+  });
+  for (const g of groupes) {
+    if (yl < FRAME.y + TITLE_H + 24) break;
+    yl -= 15;
+    const titre = g.a > g.de ? GENRE_EN_CLAIR[g.genre] : g.titre;
+    d.text(fitText(titre, 10, w - 80), x0, yl, 10, INK, { align: 'left' });
+    d.text(g.a > g.de ? `${g.de} à ${g.a}` : String(g.de), x0 + w, yl, 10, GREY, { align: 'right' });
+  }
+
+  drawSheetChrome(d, {
+    project: ctx.name,
+    filename: ctx.filename,
+    client: ctx.client,
+    particulier: ctx.particulier,
+    entreprise: ctx.entreprise,
+    address: ctx.address,
+    sheetTitle: 'Page de garde',
+    sheet,
+    scaleLabel: null,
+  });
+  return d.stream();
+}
+
 /** Une feuille du dossier, telle que le sommaire la nomme. */
 export interface FeuilleDuDossier {
-  genre: 'plan' | 'metre' | 'achats' | 'existant' | 'gaines' | 'perspective' | 'elevation' | 'unifilaire' | 'multifilaire';
+  genre:
+    | 'garde'
+    | 'plan'
+    | 'metre'
+    | 'achats'
+    | 'existant'
+    | 'gaines'
+    | 'perspective'
+    | 'elevation'
+    | 'unifilaire'
+    | 'multifilaire';
   titre: string;
 }
 
@@ -6619,11 +6864,13 @@ interface FeuillePlanifiee extends FeuilleDuDossier {
   fabriquer: (numero: string) => ReturnType<typeof planPage>;
 }
 
-function planifierLeDossier(
+function planifierUnNiveau(
   scan: ScanForPdf,
   include3D: boolean,
-  opts: PdfOptions = {},
-): { feuilles: FeuillePlanifiee[]; images: PdfImage[] } {
+  opts: PdfOptions,
+  /** Le préfixe des images : deux niveaux n'ont pas le droit au même nom. */
+  prefixe = '',
+): { feuilles: FeuillePlanifiee[]; images: PdfImage[]; ctx: SheetContext } {
   const filename = pdfFilename(scan.name);
   const withMetre = opts.metre ?? true;
   /* La feuille de l existant : seulement si un tableau a ete releve. */
@@ -6652,7 +6899,7 @@ function planifierLeDossier(
   const photos = new Map<string, { im: PdfImage; along?: number }[]>();
   const images: PdfImage[] = [];
   (scan.photos ?? []).forEach((p, i) => {
-    const im = pdfImage(`Im${i}`, p.base64);
+    const im = pdfImage(`${prefixe}Im${i}`, p.base64);
     if (!im) return;
     const lot = photos.get(p.wallId) ?? [];
     lot.push({ im, along: p.along });
@@ -6686,6 +6933,7 @@ function planifierLeDossier(
     client: scan.client,
     address: scan.address,
     particulier: scan.particulier,
+    entreprise: scan.entreprise ?? null,
     reperes3D: opts.reperes3D ?? true,
     walls: scan.walls,
     openings: scan.openings,
@@ -6797,6 +7045,76 @@ function planifierLeDossier(
         fabriquer: (n) => multifilairePage(ctx, n, sch.multi, sch.rows),
       });
     }
+  }
+  return { feuilles, images, ctx };
+}
+
+function planifierLeDossier(
+  scan: ScanForPdf,
+  include3D: boolean,
+  opts: PdfOptions = {},
+): { feuilles: FeuillePlanifiee[]; images: PdfImage[] } {
+  const niveaux = opts.niveaux && opts.niveaux.length > 1 ? opts.niveaux : null;
+  let feuilles: FeuillePlanifiee[];
+  let images: PdfImage[];
+  /** Le logement, pour la page de garde ; et ses niveaux, pour ses chiffres. */
+  let ctx: SheetContext;
+  let ctxNiveaux: { nom: string; ctx: SheetContext }[] | undefined;
+  if (!niveaux) {
+    ({ feuilles, images, ctx } = planifierUnNiveau(scan, include3D, opts));
+  } else {
+    feuilles = [];
+    images = [];
+    ctxNiveaux = [];
+    niveaux.forEach((nv, k) => {
+      // Ce qui est au logement (son nom, à qui il est) ; ce qui est au niveau.
+      const sien: ScanForPdf = {
+        ...nv.scan,
+        name: `${scan.name} — ${nv.nom}`,
+        client: scan.client,
+        address: scan.address,
+        particulier: scan.particulier,
+        entreprise: scan.entreprise,
+        north: scan.north,
+      };
+      const r = planifierUnNiveau(
+        sien,
+        include3D,
+        {
+          ...opts,
+          niveaux: undefined,
+          achats: null,
+          existant: nv.courant ? opts.existant : undefined,
+          schemas: nv.courant ? opts.schemas : null,
+          marks: nv.courant ? opts.marks : undefined,
+          ceiling: nv.courant ? opts.ceiling : undefined,
+        },
+        `N${k}`,
+      );
+      for (const f of r.feuilles) feuilles.push({ ...f, titre: `${f.titre} — ${nv.nom}` });
+      images.push(...r.images);
+      ctxNiveaux!.push({ nom: nv.nom, ctx: r.ctx });
+    });
+    // Le logement : le niveau courant pour la vue d'ensemble, le nom du tout.
+    const courant = ctxNiveaux[Math.max(0, niveaux.findIndex((x) => x.courant))].ctx;
+    ctx = { ...courant, name: scan.name, filename: pdfFilename(scan.name) };
+    // Les achats, une fois, pour tout le logement.
+    const achats = opts.achats && opts.achats.pieces.length > 0 ? opts.achats : null;
+    if (achats) {
+      const pourTout = ctx;
+      feuilles.push({ genre: 'achats', titre: 'Ce qu’il faut acheter', fabriquer: (n) => achatsPage(pourTout, n, achats) });
+    }
+  }
+  // La page de garde ouvre le dossier, et annonce les feuilles qui suivent.
+  if (opts.garde) {
+    const suite = feuilles.map(({ genre, titre }) => ({ genre, titre }));
+    const duLogement = ctx;
+    const parNiveau = ctxNiveaux;
+    feuilles.unshift({
+      genre: 'garde',
+      titre: 'Page de garde',
+      fabriquer: (n) => gardePage(duLogement, n, suite, parNiveau),
+    });
   }
   return { feuilles, images };
 }

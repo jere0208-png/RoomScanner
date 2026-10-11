@@ -45,6 +45,7 @@ import {
 import { fixtureMarks, multiWire, schemaRows } from '../geometry/schema';
 import { useModeElec } from '../store/usage';
 import { useReglagesTravaux } from '../store/reglagesTravaux';
+import { entrepriseAImprimer, useEntreprise } from '../store/entreprise';
 import { piecesRetenues, travauxDesPieces } from '../geometry/travaux';
 import type { Fixture } from '../geometry/electrical';
 import { planRoutes } from '../geometry/elecplan';
@@ -206,6 +207,12 @@ const EXPORT_ICONS = {
 const styles = getStyles(c);
 
   const [include3D, setInclude3D] = useState(true);
+  /**
+   * LA PAGE DE GARDE — correctif de l'audit : le dossier s'ouvrait sur le
+   * plan coté, sans dire de quoi il s'agissait. Cochée de base : c'est elle
+   * qu'on voit en premier, chez l'acheteur comme chez le client.
+   */
+  const [garde, setGarde] = useState(true);
   /** Les repères d'appareillage sur les perspectives : ôtables. */
   const [reperes3D, setReperes3D] = useState(true);
   const [includeMetre, setIncludeMetre] = useState(true);
@@ -221,6 +228,17 @@ const styles = getStyles(c);
     if (!reglages.charge) reglages.charger();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  /*
+    L'ENTREPRISE DE L'ARTISAN, EN TÊTE DE CHAQUE FEUILLE — correctif de
+    l'audit. Seulement pour l'électricien : le particulier relève son
+    propre logement.
+  */
+  const entreprise = useEntreprise();
+  useEffect(() => {
+    if (!entreprise.charge) entreprise.charger();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const entrepriseDuDossier = modeElec ? entrepriseAImprimer(entreprise) : null;
   const [measures2D, setMeasures2D] = useState(true);
   /**
    * Plan des gaines : le tracé du tableau à chaque appareil, celui-là même
@@ -279,11 +297,57 @@ const styles = getStyles(c);
         niveauCourant,
       ],
     );
-  /** Le titre du dossier : il porte l'étage dès qu'il y en a plusieurs. */
+  /*
+    TOUS LES NIVEAUX DANS LE MÊME DOSSIER — correctif de l'audit : une maison
+    à étage partait en deux PDF, et personne n'avait le logement entier sous
+    les yeux. Coché dès qu'il y a plusieurs niveaux : chacun garde ses
+    feuilles, titrées de son nom (le PDF ne les empile pas sur un même plan).
+    Les feuilles électriques restent celles de l'étage affiché. Décoché, on
+    retrouve le dossier de l'étage affiché, seul.
+  */
+  const [tousNiveaux, setTousNiveaux] = useState(true);
+  const multi = niveaux.length > 1 && tousNiveaux;
+  /** Le titre du dossier : il porte l'étage quand il n'en sort qu'un parmi plusieurs. */
   const titreDuDossier =
-    niveaux.length > 1
+    niveaux.length > 1 && !multi
       ? `${scanName} — ${nomDuNiveau(niveauCourant)}`
       : scanName;
+  /** Les niveaux, dans l'ordre du dossier : le rez-de-chaussée, les étages en montant, puis les sous-sols. */
+  const parNiveau = useMemo(
+    () =>
+      multi
+        ? [...niveaux]
+            .sort((a, b) => (a >= 0 ? a : 100 - a) - (b >= 0 ? b : 100 - b))
+            .map((nv) => ({
+              nv,
+              ...filtrerAuNiveau(
+                {
+                  walls: tousLesMurs,
+                  openings: toutesLesOuvertures,
+                  rooms: toutesLesPieces,
+                  fixtures: toutLAppareillage,
+                  photos: toutesLesPhotos,
+                  objects: tousLesMeubles,
+                  ceiling: toutLePlafond,
+                  notes: toutesLesNotes,
+                },
+                nv,
+              ),
+            }))
+        : [],
+    [
+      multi,
+      niveaux,
+      tousLesMurs,
+      toutesLesOuvertures,
+      toutesLesPieces,
+      toutLAppareillage,
+      toutesLesPhotos,
+      tousLesMeubles,
+      toutLePlafond,
+      toutesLesNotes,
+    ],
+  );
   // Les couleurs relevées se jugent sur l'étage qu'on exporte : le
   // rez-de-chaussée peut les avoir et l'étage non, s'il a été scanné dans
   // le noir.
@@ -361,9 +425,27 @@ const styles = getStyles(c);
     LES SEULES PIÈCES COCHÉES DANS « TRAVAUX » — correctif de l'audit : une
     pièce décochée comptait quand même au dossier.
   */
+  /*
+    Sur plusieurs niveaux, les achats comptent tout le logement — chaque
+    pièce avec son niveau, deux « Chambre » ne se confondent pas.
+  */
+  const piecesDuDossier = useMemo(
+    () =>
+      multi
+        ? parNiveau.flatMap((x) =>
+            travauxDesPieces(
+              roomParts(x.walls, x.rooms),
+              x.openings,
+              (id, rang) => `${nomDuNiveau(x.nv)} · ${x.rooms.find((r) => r.id === id)?.name || `Pièce ${rang + 1}`}`,
+              (id) => x.rooms.find((r) => r.id === id),
+            ),
+          )
+        : piecesTravaux,
+    [multi, parNiveau, piecesTravaux],
+  );
   const retenues = useMemo(
-    () => piecesRetenues(piecesTravaux, reglages.horsTravaux),
-    [piecesTravaux, reglages.horsTravaux],
+    () => piecesRetenues(piecesDuDossier, reglages.horsTravaux),
+    [piecesDuDossier, reglages.horsTravaux],
   );
   const achatsDuDossier = (oui: boolean) =>
     oui && retenues.length > 0
@@ -496,7 +578,7 @@ const styles = getStyles(c);
         along?: number;
       }[] = [];
       if (elevations || cotesElec) {
-        for (const ph of [...photos].sort((a, b) => a.at - b.at)) {
+        for (const ph of [...(multi ? toutesLesPhotos : photos)].sort((a, b) => a.at - b.at)) {
           const b64 = await RoomScan.readPhoto(ph.path, 900);
           if (b64) {
             vignettes.push({
@@ -555,6 +637,7 @@ const styles = getStyles(c);
         address,
         // Le particulier relève son propre logement : le cartouche le dit.
         particulier: !modeElec,
+        entreprise: entrepriseDuDossier,
       },
       include3D,
       {
@@ -576,6 +659,31 @@ const styles = getStyles(c);
         surfaces: showSurfaces,
         textures: showTextures,
         metre: includeMetre,
+        garde,
+        niveaux: multi
+          ? parNiveau.map((x) => {
+              const courant = x.nv === niveauCourant;
+              const ici = new Set(x.walls.map((w) => w.id));
+              return {
+                nom: nomDuNiveau(x.nv),
+                courant,
+                scan: {
+                  walls: x.walls,
+                  openings: x.openings,
+                  objects: showFurniture ? x.objects : [],
+                  rooms: x.rooms,
+                  fixtures: x.fixtures,
+                  routes: courant && (gaines || schema) ? cheminements?.traces : undefined,
+                  notes: x.notes,
+                  mesures: toutesLesMesures.filter((m) => (m.niveau ?? 0) === x.nv),
+                  floors: floorsOf(x.rooms),
+                  roomNames: Object.fromEntries(x.rooms.map((r) => [r.id, r.name])),
+                  photos: vignettes.filter((v) => ici.has(v.wallId)),
+                  deviceNames: courant ? noms : undefined,
+                },
+              };
+            })
+          : undefined,
         reperes3D,
         achats: achatsDuDossier(includeAchats),
         ...feuillesElevations(elevations, cotesElec),
@@ -591,8 +699,8 @@ const styles = getStyles(c);
     se relit sur le disque au moment d'envoyer.
   */
   const photosVides = useMemo(
-    () => photos.map((p) => ({ wallId: p.wallId, base64: '', along: p.along })),
-    [photos],
+    () => (multi ? toutesLesPhotos : photos).map((p) => ({ wallId: p.wallId, base64: '', along: p.along })),
+    [multi, toutesLesPhotos, photos],
   );
 
   /** L'empreinte des choix : si elle n'a pas bougé, le document non plus. */
@@ -612,11 +720,17 @@ const styles = getStyles(c);
     measures2D,
     measures3D,
     includeMetre,
+    garde,
+    multi,
+    tousLesMurs.length,
+    toutesLesPieces.length,
     reperes3D,
     includeAchats,
     reglages.hypotheses,
     reglages.avecPrix,
     reglages.prix,
+    reglages.horsTravaux,
+    entrepriseDuDossier,
     elevations,
     cotesElec,
     gaines,
@@ -877,6 +991,30 @@ const styles = getStyles(c);
           <Text style={styles.section}>Composez votre dossier</Text>
 
           {/* ------------------------------------------------ le plan coté */}
+          {/* ----------------------------------------- la page de garde */}
+          <Carte
+            icone={SOLAIRES.maison}
+            titre="Page de garde"
+            dit="Le logement, à qui il est, ses surfaces, une vue d’ensemble et le contenu du dossier."
+            pages={pagesDe(garde, combien(sommaire, 'garde'), 1)}
+            actif={garde}
+            label="Page de garde"
+            onChange={(v) => basculer(() => setGarde(v))}
+          />
+
+          {/* ------------------------------------------ tous les niveaux */}
+          {niveaux.length > 1 && (
+            <Carte
+              icone={SOLAIRES.etage}
+              titre="Tous les niveaux"
+              dit={`Les ${niveaux.length} niveaux dans un seul dossier, chacun avec ses plans et son métré.`}
+              pages={multi ? 'Tout le logement' : nomDuNiveau(niveauCourant)}
+              actif={tousNiveaux}
+              label="Tous les niveaux"
+              onChange={(v) => basculer(() => setTousNiveaux(v))}
+            />
+          )}
+
           <Carte
             icone={EXPORT_ICONS.cotes2d}
             titre="Plan coté"

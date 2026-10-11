@@ -46,6 +46,7 @@ const CADENAS =
 
 /** L'icône d'une feuille, selon ce qu'elle montre. */
 const ICONE: Record<FeuilleDuDossier['genre'], string> = {
+  garde: SOLAIRES.maison,
   plan: SOLAIRES.cotes2d,
   metre: SOLAIRES.metre,
   achats: SOLAIRES.panier,
@@ -64,8 +65,10 @@ export function resumeDuDossier(sommaire: FeuilleDuDossier[]): string {
   const dire = (k: number, un: string, plusieurs: string) => {
     if (k > 0) bouts.push(`${k} ${k > 1 ? plusieurs : un}`);
   };
+  dire(n('garde'), 'page de garde', 'pages de garde');
   dire(n('plan'), 'plan', 'plans');
-  dire(n('metre'), 'métré', 'métrés');
+  // Un métré sur deux feuilles reste UN métré.
+  dire(Math.min(1, n('metre')), 'métré', 'métrés');
   dire(n('achats'), 'liste d’achats', 'listes d’achats');
   dire(n('perspective'), 'vue 3D', 'vues 3D');
   dire(n('elevation'), 'mur de face', 'murs de face');

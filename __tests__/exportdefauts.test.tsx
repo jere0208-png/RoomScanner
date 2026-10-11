@@ -132,7 +132,7 @@ describe('les options cochées à l’ouverture de l’export', () => {
   */
   // « Surfaces » est cochée : un dossier sans un nom de pièce ni un mètre
   // carré ne sert à personne (correctif de l'audit).
-  const COCHEES = ['Vues 3D', 'Métré', 'Cotes', 'Meubles', 'Surfaces', 'Murs de face', 'Tous les murs'];
+  const COCHEES = ['Page de garde', 'Vues 3D', 'Métré', 'Cotes', 'Meubles', 'Surfaces', 'Murs de face', 'Tous les murs'];
   const DECOCHEES = [
     'Cotes sur la 3D',
     'Menuiseries en couleur',

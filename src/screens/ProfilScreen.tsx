@@ -13,7 +13,7 @@
  * carte, l'apparence en ronds, le reste en rangées à chevron. Chaque bloc
  * est une chose qu'on vient FAIRE ici, jamais une décoration.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -30,6 +30,8 @@ import { MoreDots } from '../components/MoreDots';
 import { MenuCompte } from '../components/MenuCompte';
 import { SupportSheet } from '../components/SupportSheet';
 import { JournalSheet } from '../components/JournalSheet';
+import { PromptSheet, type PromptData } from '../components/Sheet';
+import { useEntreprise, type Entreprise } from '../store/entreprise';
 import { usePannes } from '../ui/journalPannes';
 import { useUsage } from '../store/usage';
 import { ThemeGlyph } from '../components/ThemeGlyph';
@@ -111,6 +113,13 @@ export function ProfilScreen() {
   const [menu, setMenu] = useState(false);
   /** Le mot au service client : sujet, message, photo. */
   const [support, setSupport] = useState(false);
+  /** L'entreprise de l'électricien, et le champ qu'on est en train d'écrire. */
+  const entreprise = useEntreprise();
+  useEffect(() => {
+    if (!entreprise.charge) entreprise.charger();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const [prompt, setPrompt] = useState<PromptData | null>(null);
 
   const quitterInvite = useAccountStore((st) => st.quitterInvite);
   // L'invité s'appelle par son état, pas par un « Mon compte » qui promet
@@ -332,6 +341,38 @@ export function ProfilScreen() {
             trackColor={{ true: c.blue, false: c.line }}
           />
         </View>
+        {/*
+          MON ENTREPRISE — correctif de l'audit : le dossier PDF n'avait ni le
+          nom ni les coordonnées de l'artisan, et la marque EchoPlan y était
+          figée. Renseignée une fois ici, elle prend la place de la marque en
+          tête de chaque feuille. Pour l'électricien seulement : le
+          particulier relève son propre logement.
+        */}
+        {modeElec ? (
+          <>
+            <Text style={s.section}>Mon entreprise</Text>
+            <Text style={s.sectionDit}>En tête de chaque feuille de vos dossiers, à la place d’EchoPlan.</Text>
+            {CHAMPS_ENTREPRISE.map((f) => (
+              <Rangee
+                key={f.cle}
+                s={s}
+                c={c}
+                icone={f.icone}
+                label={f.label}
+                valeur={entreprise[f.cle] || 'À renseigner'}
+                onPress={() =>
+                  setPrompt({
+                    title: f.label,
+                    subtitle: f.cle === 'nom' ? 'Il paraît en tête de chaque feuille du dossier.' : undefined,
+                    value: entreprise[f.cle],
+                    okLabel: 'Enregistrer',
+                    onSubmit: (t: string) => entreprise.regler({ [f.cle]: t }),
+                  })
+                }
+              />
+            ))}
+          </>
+        ) : null}
         <Text style={s.section}>Apparence</Text>
         {/*
           TROIS RONDS, PAS UNE LISTE — c'est le design du patron, et c'est
@@ -517,6 +558,7 @@ export function ProfilScreen() {
       <MenuCompte visible={menu} fermer={() => setMenu(false)} />
       <SupportSheet visible={support} fermer={() => setSupport(false)} />
       <JournalSheet visible={journal} fermer={() => setJournal(false)} />
+      <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
     </RetourGlisse>
   );
 }
@@ -528,6 +570,7 @@ function Rangee({
   icone,
   label,
   note,
+  valeur,
   onPress,
 }: {
   s: ReturnType<typeof themed>;
@@ -535,6 +578,8 @@ function Rangee({
   icone: keyof typeof SOLAIRES;
   label: string;
   note?: string;
+  /** Ce que le réglage vaut, en clair, à droite. */
+  valeur?: string;
   onPress: () => void;
 }) {
   return (
@@ -548,6 +593,11 @@ function Rangee({
       </Svg>
       <Text style={s.rangeeMot}>{label}</Text>
       {!!note && <Text style={s.rangeeNote}>{note}</Text>}
+      {!!valeur && (
+        <Text style={s.rangeeValeur} numberOfLines={1}>
+          {valeur}
+        </Text>
+      )}
       {/* Le chevron pointe à droite : la même flèche que le retour, retournée. */}
       <View style={s.chevronDroit}>
         <BackChevron color={c.inkFaint} size={20} weight={2.2} />
@@ -555,6 +605,18 @@ function Rangee({
     </Pressable>
   );
 }
+
+/**
+ * LES CHAMPS DE L'ENTREPRISE — dans l'ordre du cartouche : le nom d'abord,
+ * puis ce qu'on lit pour joindre l'artisan.
+ */
+const CHAMPS_ENTREPRISE: { cle: keyof Entreprise; label: string; icone: keyof typeof SOLAIRES }[] = [
+  { cle: 'nom', label: 'Nom de l’entreprise', icone: 'etiquette' },
+  { cle: 'telephone', label: 'Téléphone', icone: 'telephone' },
+  { cle: 'email', label: 'E-mail', icone: 'tchat' },
+  { cle: 'adresse', label: 'Adresse', icone: 'maison' },
+  { cle: 'siret', label: 'SIRET', icone: 'bouclier' },
+];
 
 const themed = (c: Palette) =>
   StyleSheet.create({
@@ -738,6 +800,8 @@ const themed = (c: Palette) =>
     rangeeEnfoncee: { backgroundColor: c.surfaceSunken },
     rangeeMot: { flex: 1, color: c.ink, fontSize: 14.5, fontWeight: '600' },
     rangeeNote: { color: c.inkFaint, fontSize: 13, fontWeight: '700' },
+    rangeeValeur: { color: c.inkSoft, fontSize: 13, maxWidth: '55%' },
+    sectionDit: { color: c.inkSoft, fontSize: 13, marginTop: -4, marginBottom: 8 },
     chevronDroit: { transform: [{ rotate: '180deg' }] },
     enfonce: { transform: [{ scale: 0.97 }] },
   });

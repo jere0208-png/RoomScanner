@@ -14285,6 +14285,66 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le dossier d'un logement entier, signé de l'artisan
+
+Correctifs de l'audit « dans la peau d'un utilisateur », lot 2, seconde
+moitié. S'y ajoute une demande du patron sur la vue d'ensemble.
+
+**Une page de garde.** Le dossier s'ouvrait directement sur le plan coté.
+Il commence désormais par dire de quoi il s'agit :
+- l'entreprise de l'artisan, ou la marque ;
+- le logement, à qui il est, son adresse, la date ;
+- trois chiffres : pièces, surface au sol, surface habitable estimée ;
+- une vue d'ensemble en perspective, décor compris ;
+- le contenu du dossier, avec le numéro de chaque feuille. Les murs de
+  face se résument en une ligne (« Murs de face, 5 à 20 »).
+
+Elle est cochée de base dans l'export (« Page de garde »).
+
+**L'en-tête de l'artisan.** Le PDF n'avait ni le nom ni les coordonnées de
+l'artisan, et la marque EchoPlan y était figée. L'électricien renseigne
+son entreprise une fois, au profil, dans « Mon entreprise » : nom,
+téléphone, e-mail, adresse, SIRET (`store/entreprise`). Chaque feuille la
+porte ensuite dans son cartouche, à la place de la marque. Sans nom
+d'entreprise, la marque reste. Le particulier n'a pas cette section.
+
+**Tous les niveaux dans un même dossier.** Une maison à étage partait en
+deux PDF. Dès que le plan a plusieurs niveaux, « Tous les niveaux » est
+coché :
+- chaque niveau garde ses feuilles (plan, métré, perspectives, murs de
+  face), titrées de son nom ; les niveaux ne s'empilent pas sur un même
+  plan ;
+- les feuilles électriques restent celles de l'étage affiché ;
+- les achats et la page de garde valent pour tout le logement ; chaque
+  pièce y porte son niveau.
+
+Décoché, on retrouve le dossier de l'étage affiché, seul.
+
+**Les noms des pièces sortent du dessin.** Demande du patron : « les notes
+avec les noms des pièces font cheap ; les sortir du plan pour ne pas gêner
+la vue, et faire un trait vers la pièce concernée ». Sur les perspectives
+et la page de garde, un cartouche blanc « Séjour · 21,0 m² » cachait les
+murs et les meubles. Désormais :
+- les étiquettes se rangent en marge, les pièces de gauche à gauche et
+  celles de droite à droite ;
+- le nom est en gras, la surface en dessous ;
+- un filet mène chacune à sa pièce, marquée d'un point ;
+- chaque colonne suit l'ordre des pièces à l'écran, si bien que les traits
+  ne se croisent pas (`rangerEnColonne`) ;
+- la marge se réserve avant le cadrage : le modèle se loge entre les deux
+  colonnes.
+
+Bancs nouveaux :
+- `pagedegarde` (5) ;
+- `entreprise` (8) ;
+- `dossierniveaux` (6) et `exportniveaux` (3) ;
+- `etiquettesenmarge` (5).
+
+Mis à jour :
+- `exportdefauts` (la page de garde cochée) ;
+- `pdfcadre` : après les cotes, seuls les halos, les filets de rappel et
+  les points d'attache ont le droit de suivre.
+
 ## Le dossier PDF qui tient ce qu'il promet
 
 Correctifs de l'audit « dans la peau d'un utilisateur », lot 2, première
