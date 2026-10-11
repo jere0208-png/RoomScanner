@@ -1337,6 +1337,79 @@ export function symbolPolylines(
 export const SYMBOL_SPAN = 22;
 
 /**
+ * JUSQU'OÙ UN SYMBOLE DESCEND VERS SON MUR, dans son repère.
+ *
+ * Le bas du repère, c'est le mur : la tige du socle descend jusqu'à 10, le
+ * point de l'interrupteur jusqu'à 10,4. C'est là que le filet doit
+ * s'arrêter — voir `filetJusquAuSymbole`.
+ */
+export function porteeVersLeMur(paths: SymbolStroke[]): number {
+  let m = 0;
+  for (const { pts } of symbolPolylines(paths)) {
+    for (const p of pts) m = Math.max(m, p.y);
+  }
+  return m;
+}
+
+/**
+ * LE SYMBOLE POSÉ SUR LA FEUILLE, TOURNÉ VERS SON MUR — relevé du patron :
+ * « les icônes doivent être tournées de façon à comprendre sur quel mur
+ * elles se posent : sur un mur à 90°, la prise aussi est à 90° ».
+ *
+ * `versLeMur` : la direction du mur vue du centre, unitaire, dans le repère
+ * de la feuille (y vers le HAUT, celui du PDF). Le bas du symbole — sa
+ * tige — est envoyé dessus ; sa droite, un quart de tour plus loin. Par
+ * défaut (0, −1) : le symbole droit, tige vers le bas de la feuille.
+ */
+export function symbolePose(
+  paths: SymbolStroke[],
+  cx: number,
+  cy: number,
+  k: number,
+  versLeMur: { x: number; y: number } = { x: 0, y: -1 },
+): { pts: { x: number; y: number }[]; fill?: boolean }[] {
+  const w = versLeMur;
+  const e = { x: -w.y, y: w.x };
+  return symbolPolylines(paths).map(({ pts, fill }) => ({
+    pts: pts.map((p) => ({
+      x: cx + (p.x * e.x + p.y * w.x) * k,
+      y: cy + (p.x * e.y + p.y * w.y) * k,
+    })),
+    fill,
+  }));
+}
+
+/**
+ * LE FILET S'ARRÊTE AVANT LE SYMBOLE — relevé du patron : « le trait rouge
+ * ne doit pas traverser l'icône mais s'arrêter 1 px avant ».
+ *
+ * Le filet relie le mur (`ancre`) au symbole (`centre`) ; il filait jusqu'au
+ * centre et barrait le dessin. Il finit maintenant au bout de la tige, plus
+ * `jeu` — la demi-épaisseur des traits et le pixel d'air demandé. Rend
+ * aussi la direction du mur vue du symbole : c'est elle qui le tourne.
+ * `bout` vaut `null` quand le symbole touche déjà son mur : rien à tracer.
+ */
+export function filetJusquAuSymbole(
+  ancre: { x: number; y: number },
+  centre: { x: number; y: number },
+  paths: SymbolStroke[],
+  echelle: number,
+  jeu: number,
+): { versLeMur: { x: number; y: number }; bout: { x: number; y: number } | null } {
+  const dx = ancre.x - centre.x;
+  const dy = ancre.y - centre.y;
+  const L = Math.hypot(dx, dy);
+  if (L < 1e-9) return { versLeMur: { x: 0, y: -1 }, bout: null };
+  const versLeMur = { x: dx / L, y: dy / L };
+  const arret = porteeVersLeMur(paths) * echelle + jeu;
+  if (L <= arret) return { versLeMur, bout: null };
+  return {
+    versLeMur,
+    bout: { x: centre.x + versLeMur.x * arret, y: centre.y + versLeMur.y * arret },
+  };
+}
+
+/**
  * Mention portée à côté du symbole quand le dessin seul ne suffit pas : le
  * socle d'une prise 20 A est le même que celui d'une 16 A, seule
  * l'intensité change, et un plan l'écrit.

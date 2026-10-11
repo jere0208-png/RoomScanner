@@ -184,7 +184,7 @@ describe('les symboles d’appareillage, compacts', () => {
     const calque = lire('src/components/FixtureLayer.tsx');
     expect(calque).toContain('symboleCompact(postes, f.kind)');
     expect(calque).toContain('{`×${fois}`}');
-    expect(calque).toContain('Math.min(10, 5.5 + (mapping.scale - 60) * 0.06)');
+    expect(calque).toContain('rayonDAppareil(mapping.scale)');
   });
 
   it('et rien n’est écrit tant qu’il n’y a qu’un poste', () => {

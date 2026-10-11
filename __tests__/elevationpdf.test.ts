@@ -535,21 +535,32 @@ describe('le plan du dossier fusionne les ensembles', () => {
   });
 });
 
-describe('le plan du dossier porte les repères de circuit', () => {
-  it('écrit le repère sous l’appareil, comme à l’écran', () => {
-    const src = docFixtures(FX, {
-      marks: new Map([
-        ['i1', 'C2'],
-        ['pr', 'C1'],
-      ]),
-    });
-    const vu = texte(src);
-    expect(vu).toContain('C1');
-    expect(vu).toContain('C2');
+describe('le plan du dossier ne porte plus de repères de circuit', () => {
+  /*
+    RELEVÉ DU PATRON : « sur le plan, enlève les infos inutiles aux pros,
+    comme les "C2, C4", qui ne sont pas utiles sur ce plan de cotes ». Le
+    plan dit OÙ ; de quel départ dépend chaque appareil, c'est le détail
+    des départs, sous le schéma unifilaire, qui le dit.
+  */
+  it('même quand les départs sont connus', () => {
+    const marks = new Map([
+      ['i1', 'C2'],
+      ['pr', 'C1'],
+    ]);
+    // L'ancienne option, passée de force : le plan ne la lit plus.
+    const vu = texte(docFixtures(FX, { marks } as never));
+    expect(vu).not.toMatch(/\bC[12]\b/);
   });
 
-  it('et se tait quand personne ne les a calculés', () => {
-    expect(texte(docFixtures(FX))).not.toContain('C1');
+  it('et le dossier ne la transporte plus jusqu’au plan', () => {
+    const { readFileSync } = require('node:fs') as typeof import('node:fs');
+    const { join } = require('node:path') as typeof import('node:path');
+    const pdf = readFileSync(join(__dirname, '..', 'src', 'export', 'pdf.ts'), 'utf8');
+    expect(pdf).not.toContain('opts.marks');
+    // Et le pied de l'unifilaire ne renvoie plus à des repères disparus.
+    expect(pdf).not.toContain('identiques à ceux du plan');
+    const ecran = readFileSync(join(__dirname, '..', 'src', 'screens', 'ExportScreen.tsx'), 'utf8');
+    expect(ecran).not.toContain('marks: schemas?.marks');
   });
 });
 

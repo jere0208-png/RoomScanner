@@ -14285,6 +14285,57 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le plan qui dézoome, et des symboles tournés vers leur mur
+
+Relevés du patron :
+- « au dézoom du plan 2D, les lumières restent bien en place, mais le ×2 et
+  les noms de pièces non » ;
+- « enlève les points verts qui sélectionnent la pièce, le nom cliqué
+  suffit » ;
+- « sur le plan PDF, enlève les infos inutiles aux pros, comme les "C2, C4" » ;
+- « les icônes doivent être tournées de façon à comprendre sur quel mur elles
+  se posent, et le trait rouge ne doit pas traverser l'icône mais s'arrêter
+  1 px avant ».
+
+**À l'écran.**
+- **Les noms de pièces suivent le dézoom** (`echelleDesNoms`). Au cadrage
+  d'ouverture et en zoomant, le cartouche garde sa taille. En dézoomant, il
+  rapetisse avec le plan, jusqu'à 45 % de sa taille.
+- **Le symbole mural et son « ×2 » aussi** (`rayonDAppareil`). Sous 60 pixels
+  par mètre, le symbole décroît à proportion, jusqu'à un plancher de
+  2,5 pixels. Le badge est taillé sur son symbole : il n'a plus de planchers à
+  lui qui le gardaient grand.
+- **Plus d'anneau à côté du nom.** L'anneau de progression se lisait comme
+  un bouton collé au nom. Toucher le nom suffit pour prendre la pièce. Le
+  compte des socles posés reste affiché dans l'établi du mur.
+
+**Sur le dossier PDF.**
+- **Plus de repères de circuit sur le plan coté.** Le plan dit où sont les
+  appareils. De quel départ dépend chacun, c'est le détail des départs de
+  l'unifilaire qui le dit. L'option `marks` ne descend plus jusqu'au plan, et
+  le pied de l'unifilaire ne renvoie plus à « des repères identiques à ceux
+  du plan ».
+- **Chaque symbole regarde son mur** (`symbolePose`). Le bas du symbole (la
+  tige de la prise, le point de l'interrupteur) est envoyé vers le mur. Tous
+  étaient posés droits : à l'envers sur le mur du haut, en travers sur ceux
+  de côté. L'écran les tournait déjà. La légende et les élévations, qui
+  regardent le mur de face, restent droites.
+
+**Partout : le filet s'arrête avant le symbole** (`filetJusquAuSymbole`). Il
+filait jusqu'au centre et barrait le dessin. Il finit maintenant au bout de
+la tige (`porteeVersLeMur`), plus un jeu : la demi-épaisseur des traits et un
+pixel d'air (0,75 point sur le PDF).
+
+**Bancs.**
+- `dezoomdesnoms` : la règle ; le nom à 10,5 points au zoom 1 et à moitié au
+  zoom 0,5 ; le « ×2 » qui rapetisse avec son symbole.
+- `symboletourne` : la portée de la tige ; l'arrêt du filet ; la tige qui
+  monte sur le mur du haut et part à droite sur le mur de droite ; à l'écran,
+  un filet qui finit hors du symbole et reste dans l'axe du mur au centre.
+- `elevationpdf` : aucun C1 ni C2 sur le plan, même quand on force l'ancienne
+  option.
+- `anneaudepiece` : plus d'anneau, même en édition, calque électrique allumé.
+
 ## Lire un plan papier
 
 Relevé du patron : « une grosse mise à jour strictement fonctionnelle :

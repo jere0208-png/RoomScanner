@@ -18,6 +18,7 @@ import {
   assemblyTag,
   faceX,
   facePoint,
+  filetJusquAuSymbole,
   postsOf,
   symboleCompact,
   stackRanks,
@@ -37,6 +38,16 @@ import {
 interface Mapping {
   scale: number;
   toPx: (p: Pt) => { x: number; y: number };
+}
+
+/**
+ * LE RAYON D'UN SYMBOLE D'APPAREILLAGE À L'ÉCRAN — de 5,5 à 10 points en
+ * zoomant ; sous 60 pixels par mètre, à proportion du plan, jusqu'à 2,5 :
+ * au dézoom, le symbole et son « ×2 » rapetissent avec ce qu'ils décrivent.
+ */
+export function rayonDAppareil(echelle: number): number {
+  if (echelle >= 60) return Math.min(10, 5.5 + (echelle - 60) * 0.06);
+  return Math.max(2.5, (5.5 * echelle) / 60);
 }
 
 export function FixtureLayer({
@@ -238,10 +249,13 @@ export function FixtureLayer({
           resserre (de 7–13 à 5,5–10 points de rayon), son trait s'affine, et
           un ensemble ne s'étale plus : un symbole, et son nombre.
         */
-        const rayon = Math.max(
-          5.5,
-          Math.min(10, 5.5 + (mapping.scale - 60) * 0.06),
-        );
+        /*
+          ET AU DÉZOOM, IL RAPETISSE AVEC LE PLAN — relevé du patron : les
+          points lumineux suivaient le dézoom, les appareils muraux et leur
+          « ×2 » non. Sous soixante pixels par mètre, le symbole décroît à
+          proportion (cinq et demi à soixante, deux et demi au plus petit).
+        */
+        const rayon = rayonDAppareil(mapping.scale);
         const taillePolice = Math.max(6.5, Math.min(9, rayon * 0.72));
 
         /**
@@ -300,6 +314,20 @@ export function FixtureLayer({
           // plan pouvant être tourné, l'angle se prend à l'écran.
           const dir =
             (Math.atan2(-face.nz, -face.nx) + view.rot) * (180 / Math.PI) - 90;
+          /*
+            ET SON FILET S'ARRÊTE AVANT LUI — relevé du patron : « le trait
+            rouge ne doit pas traverser l'icône mais s'arrêter 1 px avant ».
+            Il filait jusqu'au centre et barrait le symbole. Le jeu : la
+            demi-épaisseur de la tige (0,7 dans le repère du symbole, à bout
+            rond) et le pixel d'air.
+          */
+          const { bout } = filetJusquAuSymbole(
+            anchor,
+            p,
+            symbol,
+            rayon / 11,
+            0.7 * (rayon / 11) + 1,
+          );
           return (
             <G
               key={f.id}
@@ -344,15 +372,17 @@ export function FixtureLayer({
                 et plus on agrandit, plus on lit.
               */}
               <G>
-                  <Line
-                    x1={anchor.x}
-                    y1={anchor.y}
-                    x2={p.x}
-                    y2={p.y}
-                    stroke={(encre ?? spec.color)}
-                    strokeWidth={0.9}
-                    opacity={0.8}
-                  />
+                  {bout && (
+                    <Line
+                      x1={anchor.x}
+                      y1={anchor.y}
+                      x2={bout.x}
+                      y2={bout.y}
+                      stroke={(encre ?? spec.color)}
+                      strokeWidth={0.9}
+                      opacity={0.8}
+                    />
+                  )}
                   {/*
                     LE HALO SUIT LA FORME DU SYMBOLE — relevé du patron :
                     « le bloc blanc rond derrière les icônes élec prend trop
@@ -409,19 +439,20 @@ export function FixtureLayer({
                   {/* « ×3 » : le nombre de postes, en petit, contre le symbole. */}
                   {fois ? (
                     <G>
+                      {/* À la taille de SON symbole : il dézoome avec lui. */}
                       <Rect
                         x={p.x + rayon * 0.75}
                         y={p.y - rayon * 1.25}
-                        width={Math.max(10, rayon * 1.25) + (fois > 9 ? 4 : 0)}
-                        height={Math.max(8, rayon * 0.95)}
-                        rx={Math.max(4, rayon * 0.47)}
+                        width={rayon * (fois > 9 ? 1.9 : 1.45)}
+                        height={rayon * 1.05}
+                        rx={rayon * 0.52}
                         fill={(encre ?? spec.color)}
                       />
                       <SvgText
-                        x={p.x + rayon * 0.75 + (Math.max(10, rayon * 1.25) + (fois > 9 ? 4 : 0)) / 2}
-                        y={p.y - rayon * 1.25 + Math.max(8, rayon * 0.95) * 0.76}
+                        x={p.x + rayon * 0.75 + (rayon * (fois > 9 ? 1.9 : 1.45)) / 2}
+                        y={p.y - rayon * 1.25 + rayon * 1.05 * 0.76}
                         fill="#FFFFFF"
-                        fontSize={Math.max(6, rayon * 0.72)}
+                        fontSize={rayon * 0.8}
                         fontWeight="800"
                         textAnchor="middle">
                         {`×${fois}`}

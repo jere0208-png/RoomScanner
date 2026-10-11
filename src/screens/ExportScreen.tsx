@@ -657,9 +657,6 @@ const styles = getStyles(c);
         measures2D,
         measures3D,
         schemas: schema ? schemas : null,
-        // Les repères de circuit voyagent À PART : le plan les porte dès
-        // que l'app les connaît. C'est le lien entre le plan et le tableau.
-        marks: schemas?.marks ?? null,
         // Le plafond se dessine sur le plan d'ensemble, quand on le demande.
         ceiling: plafond ? ceiling : undefined,
         surfaces: showSurfaces,

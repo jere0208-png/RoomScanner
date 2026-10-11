@@ -248,9 +248,6 @@ const dossier = (fx: Fixture[], opts: Record<string, unknown>) =>
 describe('rien ne se touche sur la feuille du plan', () => {
   for (const pas of [0.6, 0.9, 1.4]) {
     const fx = appareillage(pas);
-    // Un repère de circuit par appareil : c'est ce que le dossier porte dès
-    // que l'app connaît les départs.
-    const marks = new Map(fx.map((f, i) => [f.id, String((i % 9) + 1)]));
     for (const zoom of [0.8, 1, 1.3, 1.7, 2.2]) {
       for (const plafond of [false, true]) {
         it(`appareil tous les ${pas} m, zoom ${zoom}, ${plafond ? 'avec' : 'sans'} plafond`, () => {
@@ -259,7 +256,6 @@ describe('rien ne se touche sur la feuille du plan', () => {
               dossier(fx, {
                 plan: { zoom },
                 ceiling: plafond ? CEILING : undefined,
-                marks,
               }),
             ),
           );

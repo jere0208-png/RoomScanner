@@ -389,7 +389,6 @@ const electrique = (pas: number, zoom: number, plafond: boolean) => {
           surfaces: true,
           plan: { zoom },
           ceiling: plafond ? PLAFOND : undefined,
-          marks: new Map(fx.map((f, i) => [f.id, String((i % 9) + 1)])),
         } as never,
       ),
     ),

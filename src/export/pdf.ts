@@ -70,6 +70,8 @@ import {
   postsOf,
   retourALaCote,
   symboleCompact,
+  symbolePose,
+  filetJusquAuSymbole,
   stackRanks,
   wallFace,
   ENTRAXE,
@@ -88,7 +90,6 @@ import {
 } from '../geometry/nfc15100';
 import {
   circuitColor,
-  markColor,
   type MultiWireSchema,
   type SchemaRow,
 } from '../geometry/schema';
@@ -336,15 +337,6 @@ export interface PdfOptions {
     /** Repère de circuit par appareil : ce qui relie le plan au tableau. */
     marks: Map<string, string>;
   } | null;
-  /**
-   * Les repères de circuit à écrire SUR LE PLAN.
-   *
-   * Ils vivaient dans `schemas`, donc n'existaient qu'avec la feuille de
-   * schéma cochée : le plan des gaines sortait muet sur les départs alors
-   * que l'app les connaissait. Ils voyagent maintenant à part — la feuille
-   * de schéma commande les PAGES, pas ce que le plan sait dire.
-   */
-  marks?: Map<string, string> | null;
   /**
    * « CE QU'IL FAUT ACHETER », sur sa feuille — relevé du patron, point 3 de
    * la réflexion « grand public » : le calcul vivait à l'écran et n'allait
@@ -1609,13 +1601,6 @@ interface SheetContext {
   rooms?: RoomShape[];
   /** Appareillage électrique posé sur les murs. */
   fixtures?: Fixture[];
-  /**
-   * Repère de circuit par appareil (C1, C2…) : le lien entre le plan et le
-   * tableau. L'écran l'écrit sous chaque symbole depuis toujours ; le
-   * dossier imprimé le taisait, et celui qui tire les gaines devait
-   * deviner de quel départ dépend chaque prise.
-   */
-  marks?: Map<string, string>;
   colorOpenings: boolean;
   showSurfaces: boolean;
   showTextures: boolean;
@@ -2131,65 +2116,6 @@ function planPage(
       FENETRE_PLAN.w,
       FENETRE_PLAN.h,
     );
-    /**
-     * PARMI DES PLACES POSSIBLES, LA PLUS BLANCHE — libre de mots d'abord,
-     * puis la moins encrée ; à égalité, la première, c'est-à-dire celle que
-     * l'appelant préfère. Rien de libre : rien.
-     */
-    const laPlusBlanche = <T,>(places: T[], boiteDe: (v: T) => Boite): T | undefined => {
-      let mieux: T | undefined;
-      let tache = Infinity;
-      for (const v of places) {
-        const b = boiteDe(v);
-        if (!libre(b)) continue;
-        const t = encre.sous(b);
-        if (t < tache) {
-          mieux = v;
-          tache = t;
-          if (t === 0) break;
-        }
-      }
-      return mieux;
-    };
-    /**
-     * ET SI AUCUNE N'EST LIBRE, TOUT AUTOUR DE LA PREMIÈRE — par anneaux de
-     * trois points, jusqu'à dix-huit : un sigle reste près de son symbole,
-     * mais ne s'écrit plus sur le sigle du voisin.
-     */
-    const autourDe = (p: Pt): Pt[] => {
-      const out: Pt[] = [];
-      for (let i = -6; i <= 6; i++) {
-        for (let j = -6; j <= 6; j++) out.push({ x: p.x + i * 3, y: p.y + j * 3 });
-      }
-      return out.sort(
-        (a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y),
-      );
-    };
-    /**
-     * LES PLACES HABITUELLES D'ABORD, ET TOUT AUTOUR SI ELLES SONT TOUTES
-     * ENCRÉES. Un spot en tête de colonne a, dessous comme dessus, la cote
-     * qui le pose ; à gauche comme à droite, la chaîne de sa ligne : ses
-     * quatre places habituelles sont barrées. Un cran en diagonale, le
-     * papier est blanc.
-     */
-    const placeAutour = (places: Pt[], boiteDe: (v: Pt) => Boite): Pt | undefined => {
-      /*
-        D'ABORD UN GLISSEMENT SUR SA LIGNE : les sigles d'une rangée de spots
-        se lisent alignés, comme leurs spots. Un trait de cote sous le
-        premier ne doit pas l'envoyer au-dessus — un cran de côté suffit.
-      */
-      const [premiere, ...autres] = places;
-      const glisses = [3, -3, 6, -6, 9, -9, 12, -12].map((dx) => ({
-        x: premiere.x + dx,
-        y: premiere.y,
-      }));
-      const p1 = laPlusBlanche([premiere, ...glisses, ...autres], boiteDe);
-      if (p1 && encre.sous(boiteDe(p1)) === 0) return p1;
-      const p2 = laPlusBlanche(autourDe(places[0]), boiteDe);
-      if (!p1) return p2;
-      if (!p2) return p1;
-      return encre.sous(boiteDe(p2)) < encre.sous(boiteDe(p1)) ? p2 : p1;
-    };
     /** Réserve une place : plus aucun mot ni aucun trait ne s'y pose. */
     const reserver = (b: { x: number; y: number; w: number; h: number }) => {
       posees.push(b);
@@ -2452,20 +2378,6 @@ function planPage(
         2;
     /** La taille des mots qui accompagnent un symbole. */
     const TAILLE_SIGLE = 5.5;
-    /**
-     * LA BOÎTE D'UN MOT ÉCRIT À GAUCHE, telle que le lecteur la verra.
-     *
-     * `d.text(..., align: 'left')` pose le début de la ligne de base en
-     * (x, y) ; le texte occupe la hauteur de ses CHIFFRES (0,72 em), pas
-     * celle de sa police — ni jambage, ni accent. Une seule fonction pour
-     * réserver et pour dessiner.
-     */
-    const boiteEcrite = (texte: string, x: number, y: number, taille: number) => ({
-      x,
-      y,
-      w: latin1(texte).length * taille * 0.5,
-      h: taille * 0.72,
-    });
     /** Un mot retenu ici, dessiné plus bas, à la place qu'il a trouvée. */
     const motsAppareil: {
       texte: string;
@@ -2674,52 +2586,13 @@ function planPage(
     */
     const siglesPose = new Map<string, Boite>();
 
-    for (const { f, face, along, postes, membres } of unites) {
-      const x = Math.max(0, Math.min(face.len, along));
-      const q = px(facePoint(face, x, sortieDuMur(f.id)));
-      if (!dansLeCadre(q)) continue;
-      const rayon = rayonDuSymbole(postes.length);
-      /*
-        PLUS DE SIGLE À CÔTÉ DU SYMBOLE — « RJ », « PC 20A », « LUM » : relevé
-        du patron, « ces mots ne sont pas utiles ». Le symbole distingue déjà
-        une RJ45 (son trait), une prise spécialisée (sa barre), et la légende
-        les nomme. Reste le repère de circuit : lui ne se lit nulle part
-        ailleurs sur la feuille.
-      */
-      /*
-        LE REPÈRE DE CIRCUIT, sous l'appareil — celui-là même qu'on lit à
-        l'écran et qu'on retrouve sur le tableau. Le dossier le taisait :
-        celui qui tire les gaines devait deviner de quel départ dépend
-        chaque prise, alors que l'app le sait.
-      */
-      const mark = ctx.marks?.get(membres[0].f.id);
-      if (mark) {
-        const larg = latin1(mark).length * TAILLE_SIGLE * 0.5;
-        // SOUS le disque (l'axe y du PDF monte), puis au-dessus, puis de
-        // part et d'autre : il désigne son symbole, il ne part pas loin.
-        const places = [
-          { x: q.x - larg / 2, y: q.y - rayon - 6 },
-          { x: q.x - larg / 2, y: q.y + rayon + 2 },
-          { x: q.x - rayon - 4 - larg, y: q.y - rayon - 6 },
-          { x: q.x + rayon + 4, y: q.y - rayon - 6 },
-          { x: q.x - larg / 2, y: q.y - rayon - 13 },
-          { x: q.x - rayon - 4 - larg, y: q.y + rayon + 2 },
-          { x: q.x + rayon + 4, y: q.y + rayon + 2 },
-          { x: q.x - larg / 2, y: q.y + rayon + 9 },
-          { x: q.x - larg / 2, y: q.y - rayon - 20 },
-        ];
-        const p =
-          placeAutour(places, (c) => boiteEcrite(mark, c.x, c.y, TAILLE_SIGLE)) ?? places[0];
-        reserver(boiteEcrite(mark, p.x, p.y, TAILLE_SIGLE));
-        motsAppareil.push({
-          texte: mark,
-          x: p.x,
-          y: p.y,
-          couleur: markColor(mark),
-          bold: true,
-        });
-      }
-    }
+    /*
+      PLUS DE MOTS À CÔTÉ DES SYMBOLES, NI SIGLES NI REPÈRES DE CIRCUIT — relevé
+      du patron : « sur le plan, enlève les infos inutiles aux pros, comme les
+      "C2, C4", qui ne sont pas utiles sur ce plan de cotes ». Le plan coté
+      dit OÙ ; le circuit de chaque appareil se lit sur le schéma unifilaire
+      et sur l'élévation de son mur, là où l'on tire les gaines.
+    */
 
     /**
      * PUIS LE CARTOUCHE DE LA PIÈCE — avant les cotes, et il CÈDE LIGNE PAR
@@ -3472,7 +3345,19 @@ function planPage(
         const anchor = px(facePoint(face, x, 0.02));
         const q = px(facePoint(face, x, sortieDuMur(f.id)));
         if (!dansLeCadre(q)) continue;
-        d.path([anchor, q], 0.6, ENCRE_ELEC);
+        /*
+          LE SYMBOLE REGARDE SON MUR, ET SON FILET S'ARRÊTE AVANT LUI —
+          relevé du patron : « les icônes doivent être tournées de façon à
+          comprendre sur quel mur elles se posent », et « le trait rouge ne
+          doit pas traverser l'icône mais s'arrêter 1 px avant ». Tous
+          étaient posés droits, tige vers le bas de la feuille : à l'envers
+          sur le mur du haut, en travers sur ceux de côté. Le jeu : la
+          demi-épaisseur de la tige (0,45) et du filet (0,3), à bouts ronds,
+          plus un pixel d'air (0,75 point).
+        */
+        const { symbole, fois } = symboleCompact(postes, f.kind);
+        const { versLeMur, bout } = filetJusquAuSymbole(anchor, q, symbole, ECHELLE_SYMBOLE, 0.45 + 0.3 + 0.75);
+        if (bout) d.path([anchor, bout], 0.6, ENCRE_ELEC);
         /*
           PLUS DE PASTILLE BLANCHE SOUS LE SYMBOLE — relevé du patron :
           « enlève le bloc blanc derrière les icônes des éléments
@@ -3487,8 +3372,7 @@ function planPage(
           UN SYMBOLE, ET SON NOMBRE — relevé du patron : « si 3 prises en
           bloc de 3, mettre l'icône prise avec un "x3" en petit à côté ».
         */
-        const { symbole, fois } = symboleCompact(postes, f.kind);
-        drawSymbol(d, symbole, q.x, q.y, ECHELLE_SYMBOLE, ENCRE_ELEC, 0.9);
+        drawSymbol(d, symbole, q.x, q.y, ECHELLE_SYMBOLE, ENCRE_ELEC, 0.9, versLeMur);
         if (fois) {
           d.text(`×${fois}`, q.x + SYMBOL_SPAN * ECHELLE_SYMBOLE * 0.45, q.y + SYMBOL_SPAN * ECHELLE_SYMBOLE * 0.3, 5.5, ENCRE_ELEC, {
             align: 'left',
@@ -4887,7 +4771,7 @@ function unifilairePage(
     d.line(x0, BAS + 16, x0 + w, BAS + 16, 0.6, GREY_LIGHT);
     d.text(
       'La barre oblique et son chiffre donnent le nombre de conducteurs du ' +
-        'départ. Repères identiques à ceux du plan.',
+        'départ.',
       x0,
       BAS + 4,
       7,
@@ -6074,16 +5958,13 @@ export interface ScanForPdf {
  *
  * Les symboles sont écrits une seule fois, en données de chemin SVG, et
  * servent au plan de l'app comme à ce PDF : deux jeux de dessins finiraient
- * par diverger. Il faut donc les relire ici — le générateur PDF ne parle pas
- * SVG.
+ * par diverger. Leur traduction en points est celle de la 3D
+ * (`symbolPolylines`), et leur pose — tournée vers le mur — celle de
+ * `symbolePose`.
  *
- * Le sous-ensemble employé se limite à `M m H V L A a Z`, et **tous les arcs
- * sont des demi-cercles dont la corde est le diamètre** (c'est ainsi que les
- * symboles sont écrits : deux demi-arcs pour un cercle, un seul pour le
- * socle de prise). Le centre est donc le milieu de la corde, et l'arc se
- * réduit à un échantillonnage de douze segments — pas besoin de la
- * paramétrisation générale des arcs SVG, qui serait une source de bogues
- * pour rien.
+ * `versLeMur` : où est le mur, vu du symbole, sur la feuille (y vers le
+ * haut). Par défaut le symbole est droit : c'est ce que veulent la légende
+ * et les élévations, qui regardent le mur de face.
  */
 function drawSymbol(
   d: Draw,
@@ -6093,86 +5974,11 @@ function drawSymbol(
   k: number,
   color: string,
   width = 1.1,
+  versLeMur: Pt = { x: 0, y: -1 },
 ) {
-  // Repère du symbole : x vers la droite, y vers le BAS (comme en SVG) —
-  // le PDF ayant son y vers le haut, on inverse ici.
-  const P = (x: number, y: number): Pt => ({ x: cx + x * k, y: cy - y * k });
-  for (const seg of paths) {
-    const toks = seg.d.match(/[MmHVLAaZz]|-?\d*\.?\d+/g) ?? [];
-    let i = 0;
-    let x = 0;
-    let y = 0;
-    let pts: Pt[] = [];
-    const flush = () => {
-      if (pts.length >= 2) {
-        if (seg.fill) d.poly(pts, color, color, width);
-        else d.path(pts, width, color);
-      }
-      pts = [];
-    };
-    const num = () => parseFloat(toks[i++]);
-    while (i < toks.length) {
-      const cmd = toks[i++];
-      switch (cmd) {
-        case 'M':
-          flush();
-          x = num();
-          y = num();
-          pts.push(P(x, y));
-          break;
-        case 'm':
-          x += num();
-          y += num();
-          if (pts.length === 0) pts.push(P(x, y));
-          break;
-        case 'H':
-          x = num();
-          pts.push(P(x, y));
-          break;
-        case 'V':
-          y = num();
-          pts.push(P(x, y));
-          break;
-        case 'L':
-          x = num();
-          y = num();
-          pts.push(P(x, y));
-          break;
-        case 'A':
-        case 'a': {
-          const r = num();
-          num(); // ry, toujours égal à rx dans nos symboles
-          num(); // rotation
-          num(); // grand arc
-          const sweep = num();
-          const ex = cmd === 'A' ? num() : x + num();
-          const ey = cmd === 'A' ? num() : y + num();
-          // Demi-cercle : le centre est le milieu de la corde.
-          const mx = (x + ex) / 2;
-          const my = (y + ey) / 2;
-          const a0 = Math.atan2(y - my, x - mx);
-          const a1 = Math.atan2(ey - my, ex - mx);
-          let span = a1 - a0;
-          // Le sens du balayage est celui de l'écran (y vers le bas).
-          if (sweep === 1 && span < 0) span += Math.PI * 2;
-          if (sweep === 0 && span > 0) span -= Math.PI * 2;
-          for (let t = 1; t <= 12; t++) {
-            const a = a0 + (span * t) / 12;
-            pts.push(P(mx + r * Math.cos(a), my + r * Math.sin(a)));
-          }
-          x = ex;
-          y = ey;
-          break;
-        }
-        case 'Z':
-        case 'z':
-          if (pts.length >= 2) pts.push(pts[0]);
-          break;
-        default:
-          break;
-      }
-    }
-    flush();
+  for (const { pts, fill } of symbolePose(paths, cx, cy, k, versLeMur)) {
+    if (fill) d.poly(pts, color, color, width);
+    else d.path(pts, width, color);
   }
 }
 
@@ -7283,8 +7089,6 @@ function planifierUnNiveau(
     roomNames: scan.roomNames ?? {},
     rooms: scan.rooms,
     fixtures: scan.fixtures ?? [],
-    // Les repères passés à part, ou ceux du schéma quand il est demandé.
-    marks: opts.marks ?? schemas?.marks ?? undefined,
     routes: scan.routes,
     ceiling: opts.ceiling ?? [],
     notes: scan.notes,
@@ -7427,7 +7231,6 @@ function planifierLeDossier(
           achats: null,
           existant: nv.courant ? opts.existant : undefined,
           schemas: nv.courant ? opts.schemas : null,
-          marks: nv.courant ? opts.marks : undefined,
           ceiling: nv.courant ? opts.ceiling : undefined,
         },
         `N${k}`,

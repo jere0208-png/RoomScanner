@@ -142,14 +142,12 @@ describe('l’avancement d’une pièce', () => {
   });
 });
 
-describe('il ne paraît QUE là où l’on équipe', () => {
+describe('il ne paraît plus sur le plan', () => {
   /*
-    LE REFUS ANTÉRIEUR EST RESPECTÉ. Un relevé du patron avait chassé le
-    point de conformité du cartouche : « rien sur le nom de la pièce ». Ce
-    refus reste juste — quand on MONTRE son plan, rien ne doit ressembler à
-    un reproche. Mais quand on POSE des prises, la même information devient
-    l'aide qu'on cherchait. C'est le contexte qui décide : édition ouverte
-    ET calque électrique allumé.
+    RELEVÉ DU PATRON : « enlève les points verts sur le plan 2D qui
+    sélectionnent la pièce, le nom cliqué suffit ». L'anneau, collé au nom,
+    se lisait comme un bouton. Il quitte le plan, même en édition, calque
+    électrique allumé ; le compte, lui, reste — l'établi du mur le montre.
   */
   const monter = (props: { editable: boolean; showFixtures: boolean }) => {
     /*
@@ -203,8 +201,11 @@ describe('il ne paraît QUE là où l’on équipe', () => {
       .findAllByType(Circle)
       .filter((n) => String(n.props.testID ?? '').startsWith('anneau-'));
 
-  it('en édition, calque élec allumé : la jauge est là', () => {
-    expect(anneaux(monter({ editable: true, showFixtures: true })).length).toBe(1);
+  it('en édition, calque élec allumé : plus de jauge non plus', () => {
+    const t = monter({ editable: true, showFixtures: true });
+    // Le cartouche est bien là : c'est l'anneau seul qui manque.
+    expect(t.root.findAll((n) => n.props.children === 'Chambre').length).toBeGreaterThan(0);
+    expect(anneaux(t)).toHaveLength(0);
   });
 
   it('en lecture — le plan qu’on montre — rien', () => {
