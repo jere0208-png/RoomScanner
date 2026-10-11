@@ -741,7 +741,11 @@ function fenetre3d(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   const type = attribut(c, 'FenetreType') ?? 'fenetre';
   const sens = attribut(c, 'FenetreSens') === '-1' ? -1 : 1;
   const vantaux = Math.max(1, Math.min(4, Math.round(Number(attribut(c, 'Vantaux') ?? 1) || 1)));
-  const vitre = c.teinte ?? TEINTES.ciel;
+  // Vu du dehors (la maquette), un verre clair qu'on traverse du regard ;
+  // vu du dedans (la visite), le jour bleu.
+  const clair = attribut(c, 'Vitrage') === 'clair';
+  const vitre = clair ? TEINTES.verre : c.teinte ?? TEINTES.ciel;
+  const matVitre: Matiere = clair ? 'verre' : 'vitrage';
   const blanc = TEINTES.laque;
   const auSol = type === 'portefenetre' || type === 'coulissant';
   // Le dormant : un cadre de cinq centimètres, côté pièce dans l'épaisseur.
@@ -770,7 +774,7 @@ function fenetre3d(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
     a.boite(x0 + p, x1 - p, yi1 - p, yi1, zv - ep / 2, zv + ep / 2, 'laque', blanc, { r: 0.003 });
     a.boite(x0 + p, x1 - p, yi0, yi0 + pb, zv - ep / 2, zv + ep / 2, 'laque', blanc, { r: 0.003 });
     // Le vitrage : le bleu du dehors, en retrait d'un rien dans son cadre.
-    a.boite(x0 + p, x1 - p, yi0 + pb, yi1 - p, zv - 0.012, zv + 0.012, 'vitrage', vitre);
+    a.boite(x0 + p, x1 - p, yi0 + pb, yi1 - p, zv - 0.012, zv + 0.012, matVitre, vitre);
   };
   // La poignée, côté pièce, à hauteur de main.
   const yMain = auSol ? Math.min(1.05, (yi0 + yi1) / 2) : (yi0 + yi1) / 2;

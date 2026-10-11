@@ -19,9 +19,10 @@
  * d'une direction du monde, et tout le reste est commun.
  */
 import React from 'react';
-import { StyleSheet } from 'react-native';
-import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import Svg, { Circle, G, Path, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '../theme';
+import { SOLAIRES } from '../ui/solaires';
 
 export function CardinalRing({
   w,
@@ -95,6 +96,13 @@ export function CardinalRing({
  * mauvais mur. Plutôt que de laisser un vide inexplicable, on propose de
  * l'orienter à la main, en une phrase et deux appuis, sans refaire le scan.
  */
+/*
+  LE NORD À ORIENTER SE DIT EN CLAIR — relevé du patron : « dans le mode
+  édition, je vois un "N?" à côté du bouton des points à corriger ». Un N
+  suivi d'un point d'interrogation, dans un rond, collé aux pastilles : on ne
+  savait ni ce que c'était, ni à quoi ça servait. Une boussole et trois mots
+  — « Orienter le nord » —, et l'invitation qui suit l'appui.
+*/
 export function NorthBadge({
   x,
   y,
@@ -103,41 +111,50 @@ export function NorthBadge({
 }: {
   x: number;
   y: number;
-  /** true = la consigne est affichée, le prochain appui valide. */
   invite: boolean;
   onPress: () => void;
 }) {
   const c = useTheme();
   return (
-    <Svg
-      width={invite ? 250 : 54}
-      height={44}
-      style={[styles.badge, { left: x, top: y }]}
-      onPress={onPress}>
-      <Circle
-        cx={22}
-        cy={22}
-        r={17}
-        fill={c.surface}
-        stroke={invite ? c.blue : c.line}
-        strokeWidth={invite ? 1.8 : 1}
-      />
-      <SvgText
-        x={22}
-        y={26}
-        fill={invite ? c.blue : c.inkFaint}
-        fontSize={13}
-        fontWeight="900"
-        textAnchor="middle">
-        N?
-      </SvgText>
-      {invite && (
-        <SvgText x={46} y={26} fill={c.ink} fontSize={11} fontWeight="700">
-          Face au haut du plan, touchez ici
-        </SvgText>
-      )}
-    </Svg>
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityLabel={invite ? 'Face au haut du plan, touchez ici' : 'Orienter le nord'}
+      accessibilityHint="Donne au plan son nord, d'après la boussole du téléphone"
+      activeOpacity={0.8}
+      onPress={onPress}
+      style={[
+        styles.badge,
+        {
+          left: x,
+          top: y,
+          backgroundColor: invite ? c.blue : c.surface,
+          borderColor: invite ? c.blue : c.line,
+        },
+      ]}>
+      <Svg width={16} height={16} viewBox="0 0 24 24">
+        <Path d={SOLAIRES.boussole} fill={invite ? '#FFFFFF' : c.blue} fillRule="evenodd" />
+      </Svg>
+      <Text style={[styles.mot, { color: invite ? '#FFFFFF' : c.ink }]} numberOfLines={1}>
+        {invite ? 'Face au haut du plan, touchez ici' : 'Orienter le nord'}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({ badge: { position: 'absolute' } });
+const styles = StyleSheet.create({
+  badge: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 32,
+    paddingHorizontal: 11,
+    borderRadius: 16,
+    borderWidth: 1,
+    shadowColor: '#000000',
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  mot: { fontSize: 13, fontWeight: '700' },
+});

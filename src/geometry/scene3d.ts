@@ -3760,7 +3760,19 @@ export function buildScene(
       yaw: Math.atan2(u.z, u.x),
       yb: Math.max(0, f.y0),
       color: bleuDuDehors,
-      attributes: [`FenetreType:${type}`, `Vantaux:${vantaux}`, `FenetreSens:${sens}`],
+      /*
+        DU DEHORS, ON VOIT À TRAVERS — relevé du patron : « depuis
+        l'extérieur sur la vue 3D, on doit voir transparent dans les
+        fenêtres, pas bleu ». Le jour bleu est celui qu'on voit DE
+        L'INTÉRIEUR (la visite) ; la maquette, qu'on regarde du dehors, reçoit
+        un verre clair.
+      */
+      attributes: [
+        `FenetreType:${type}`,
+        `Vantaux:${vantaux}`,
+        `FenetreSens:${sens}`,
+        `Vitrage:${opts.plafonds ? 'jour' : 'clair'}`,
+      ],
       murId: f.w.id,
     });
   }

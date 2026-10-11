@@ -3039,6 +3039,31 @@ export function ResultScreen() {
     );
   }
 
+  /*
+    LA RANGÉE DU HAUT TIENT DANS L'ÉCRAN — relevé du patron, capture à
+    l'appui : « le prix du devis sort de l'écran ». Collée au bord droit,
+    elle s'allonge vers la gauche à chaque pastille, et sur un téléphone le
+    prix du devis passait sous le bord. On estime sa largeur ; si elle
+    déborde, « Explorer » et « Travaux » gardent leur icône et perdent leur
+    mot — ils se reconnaissent, le prix, lui, doit se lire.
+  */
+  const rangeeSerree = (() => {
+    const largeurs = [
+      !modeElec && piecesTravaux.length > 0 ? 104 : 0,
+      modeElec && totalDevis !== null && totalDevis > 0 ? 96 : 0,
+      modeElec ? 34 : 0,
+      !modeElec && alertesDePlan > 0 ? 34 : 0,
+      walls.length > 0 && tab === '2d' ? 34 : 0,
+      walls.length > 0 ? 118 : 0,
+      walls.length > 0 && tab === '3d' ? 66 : 0,
+      niveaux.length > 1 ? 74 : 0,
+      70,
+    ].filter((l) => l > 0);
+    const total = largeurs.reduce((t, l) => t + l, 0) + 8 * (largeurs.length - 1);
+    // Le cadre du plan prend ses marges, la rangée ses dix points de bord.
+    return total > winLargeur - 2 * 16 - 20;
+  })();
+
   const metrics = [
     ...(rooms.length > 1
       ? [{ value: `${rooms.length}`, label: 'pièces' }]
@@ -4292,7 +4317,7 @@ export function ResultScreen() {
             */}
             {!modeElec && piecesTravaux.length > 0 && (
               <TouchableOpacity
-                style={styles.vuePastille}
+                style={[styles.vuePastille, rangeeSerree && styles.pastilleIcone]}
                 accessibilityLabel="Travaux"
                 accessibilityHint="Ce qu’il faut acheter : peinture, sol, plinthes"
                 onPress={() => {
@@ -4312,7 +4337,7 @@ export function ResultScreen() {
                     />
                   ))}
                 </Svg>
-                <Text style={styles.vuePastilleTexte}>Travaux</Text>
+                {!rangeeSerree && <Text style={styles.vuePastilleTexte}>Travaux</Text>}
               </TouchableOpacity>
             )}
             {modeElec && (
@@ -4395,7 +4420,7 @@ export function ResultScreen() {
             */}
             {walls.length > 0 && tab === '2d' && (
               <TouchableOpacity
-                style={[styles.vuePastille, mesurant && { backgroundColor: teinte.blue }]}
+                style={[styles.vuePastille, styles.pastilleIcone, mesurant && { backgroundColor: teinte.blue }]}
                 accessibilityLabel="Mesurer"
                 accessibilityHint="Mesurer entre deux points du plan"
                 accessibilityState={{ selected: mesurant }}
@@ -4403,15 +4428,16 @@ export function ResultScreen() {
                   haptic('leger');
                   sortirLaRegle(!mesurant);
                 }}>
-                <Svg width={16} height={16} viewBox="0 0 24 24">
+                {/* L'icône seule : la rangée tient dans un téléphone, et la
+                    règle se reconnaît d'elle-même. */}
+                <Svg width={18} height={18} viewBox="0 0 24 24">
                   <Trace d={SOLAIRES.ruler} fill={mesurant ? '#FFFFFF' : teinte.blue} fillRule="evenodd" />
                 </Svg>
-                <Text style={[styles.vuePastilleTexte, mesurant && { color: '#FFFFFF' }]}>Mesurer</Text>
               </TouchableOpacity>
             )}
             {walls.length > 0 && (
               <TouchableOpacity
-                style={[styles.vuePastille, styles.explorerPastille]}
+                style={[styles.vuePastille, styles.explorerPastille, rangeeSerree && styles.pastilleIcone]}
                 accessibilityLabel="Explorer"
                 accessibilityHint="Entrer dans la pièce et s’y promener"
                 onPress={() => {
@@ -4421,7 +4447,7 @@ export function ResultScreen() {
                 <Svg width={16} height={16} viewBox="0 0 24 24">
                   <Trace d={SOLAIRES.marcher} fill="#FFFFFF" fillRule="evenodd" />
                 </Svg>
-                <Text style={styles.explorerPastilleTexte}>Explorer</Text>
+                {!rangeeSerree && <Text style={styles.explorerPastilleTexte}>Explorer</Text>}
               </TouchableOpacity>
             )}
             {/*

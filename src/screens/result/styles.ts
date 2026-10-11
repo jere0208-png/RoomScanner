@@ -173,6 +173,8 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     ...ombreBouton,
   },
   vuePastilleTexte: { color: c.ink, fontSize: 14, fontWeight: '600' },
+  /** Une pastille sans mot : un rond, l'icône au centre. */
+  pastilleIcone: { width: 34, paddingHorizontal: 0, justifyContent: 'center' },
   /*
     L'EXPLORATION, EN BLEU PLEIN — la seule pastille pleine de la rangée.
 

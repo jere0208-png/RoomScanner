@@ -314,6 +314,13 @@ export interface ViseurPlan {
   ) => { x: number; z: number } | null;
 }
 
+/**
+ * SOUS LA RANGÉE DES PASTILLES (2D/3D, Explorer, contrôle…), qui tient le haut
+ * du plan : 10 de marge, 34 de pastille, 10 d'air. Ce qui se pose en haut à
+ * gauche du plan commence là — sans quoi il se colle à elles.
+ */
+const HAUT_SOUS_LES_PASTILLES = 54;
+
 interface Props {
   /** Cotes visibles le long des murs. */
   showMeasures: boolean;
@@ -1911,7 +1918,7 @@ export function FloorplanEditor({
       {showNorth && north === null && layout.w > 0 && (
         <NorthBadge
           x={10}
-          y={10}
+          y={HAUT_SOUS_LES_PASTILLES}
           invite={invite}
           onPress={async () => {
             /*

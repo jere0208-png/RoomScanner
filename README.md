@@ -14285,6 +14285,43 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les points à corriger, version ludique ; le nord en clair ; des fenêtres qu'on traverse du regard
+
+Relevé du patron : « dans le mode édition, je vois un "N?" à côté du bouton
+des points à corriger. Aussi, revois de façon plus ludique et moderne
+l'affichage des points à corriger. Depuis l'extérieur sur la vue 3D, on doit
+voir transparent dans les fenêtres, pas bleu. »
+
+**Le nord en clair.** Le « N? » était la pastille qui propose d'orienter un
+plan sans nord, posée en haut à gauche du plan — là où la rangée des
+pastilles (2D/3D, Explorer, Mesurer, contrôle…) finissait par la rejoindre.
+Elle dit maintenant **« Orienter le nord »**, avec la boussole Solar, et se
+pose **sous** la rangée (`HAUT_SOUS_LES_PASTILLES`). « Mesurer » se resserre
+en icône seule ; et quand la rangée déborderait quand même (prix du devis
+sorti de l'écran, capture du patron), « Explorer » et « Travaux » perdent
+leur mot et gardent leur icône (`rangeeSerree`, estimée sur la largeur de
+l'écran).
+
+**Les points à corriger** (`DiagnosticSheet`) :
+- une **jauge** en tête, qui se remplit à chaque point réglé pendant que la
+  feuille est ouverte — « 1 corrigé · encore 2, vous y êtes presque » —, et
+  un **bravo** quand plus rien ne bloque ;
+- des **filtres** : Tout, À corriger, À vérifier, chacun son compte ;
+- des **cartes** : le sujet en dessin dans une tuile teintée, la gravité en
+  étiquette (« À corriger » en rouge, « À vérifier » en ambre), la phrase,
+  l'aide, et le geste qui règle le constat en bouton bleu ; un point de
+  couleur devant chaque pièce ;
+- **rien à corriger** : un grand rond vert, quelques éclats, « Tout est bon ! ».
+Inchangé : la carte emmène voir l'élément sur le plan, le bouton qui
+corrige ne navigue pas, la portée du contrôle (niveau) reste dite.
+
+**Les fenêtres vues du dehors.** La maquette, qu'on regarde de l'extérieur,
+reçoit un **verre clair** (matière `verre`, transparente au natif) au lieu du
+jour bleu ; la visite, qu'on fait de l'intérieur, garde le bleu du dehors
+(attribut `Vitrage:clair` / `Vitrage:jour`, d'après `plafonds`).
+
+Bancs : `pointsacorriger` (9).
+
 ## L'habillage de la maquette : le sol, un mur d'accent, la couleur des meubles
 
 Relevé du patron, point 9 de la réflexion « grand public » : « plus de
