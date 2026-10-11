@@ -69,8 +69,13 @@ describe('la page de garde', () => {
     expect(avec[1].genre).toBe('plan');
     const sans = sommaireDuDossier(scan, true, { metre: true });
     expect(sans[0].genre).toBe('plan');
+    // Une feuille de plus… et une de moins : la perspective sous l'angle de
+    // la garde ne se répète plus (revues du dossier).
     expect(pages(buildScanPdf(scan, true, { metre: true, garde: true }))).toBe(
-      pages(buildScanPdf(scan, true, { metre: true })) + 1,
+      pages(buildScanPdf(scan, true, { metre: true })),
+    );
+    expect(pages(buildScanPdf(scan, false, { metre: true, garde: true }))).toBe(
+      pages(buildScanPdf(scan, false, { metre: true })) + 1,
     );
   });
 
@@ -86,7 +91,9 @@ describe('la page de garde', () => {
     expect(garde).toContain('Contenu du dossier');
     expect(garde).toContain('(Plan coté) Tj');
     expect(garde).toContain('(Métré) Tj');
-    expect(garde).toContain('(Perspective) Tj');
+    // La perspective sous l'angle de la garde n'a plus sa feuille : la garde
+    // la montre déjà.
+    expect(garde).not.toContain('(Perspective) Tj');
   });
 
   it('porte l’entreprise de l’artisan quand il en a une', () => {

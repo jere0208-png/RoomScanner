@@ -1224,7 +1224,7 @@ const styles = getStyles(c);
             <Carte
               icone={EXPORT_ICONS.schema}
               titre="Schémas électriques"
-              dit="L’unifilaire et le multifilaire : le tableau, et le câblage de chaque circuit."
+              dit="L’unifilaire : le tableau, ses protections et chacun de ses départs."
               pages={pagesDe(schema, combien(sommaire, 'unifilaire', 'multifilaire'), combien(avecTout, 'unifilaire', 'multifilaire'))}
               actif={schema}
               label="Schémas"

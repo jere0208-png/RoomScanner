@@ -2392,9 +2392,17 @@ export function empriseDuCoffre(
    * défaut : on reste alors dans le repère de la menuiserie seule.
    */
   xBaie = 0,
+  /**
+   * LE SOL DU RELEVÉ, dans le repère du scan — relevé des revues du dossier :
+   * le coffre s'imprimait au milieu de la baie. RoomPlan met son origine
+   * sous l'iPhone, le sol tombe vers −1,3 m ; l'élévation compte ses
+   * hauteurs depuis le sol, l'emprise les comptait depuis l'iPhone. Zéro
+   * par défaut : le repère du scan, comme avant.
+   */
+  sol = 0,
 ): { x0: number; x1: number; y0: number; y1: number } | null {
   if (!o.coffre || o.coffre <= 0) return null;
-  const haut = o.yCenter + o.height / 2;
+  const haut = o.yCenter + o.height / 2 - sol;
   return {
     x0: xBaie,
     x1: xBaie + segLength(o),
@@ -2413,8 +2421,9 @@ export function dansLeCoffre(
   x: number,
   y: number,
   xBaie = 0,
+  sol = 0,
 ): boolean {
-  const e = empriseDuCoffre(o, xBaie);
+  const e = empriseDuCoffre(o, xBaie, sol);
   if (!e) return false;
   return x >= e.x0 && x <= e.x1 && y >= e.y0 && y <= e.y1;
 }

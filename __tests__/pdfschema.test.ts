@@ -165,9 +165,11 @@ describe('la feuille unifilaire', () => {
    * PARAFOUDRE, que l'app ne peut pas trancher (il dépend de la commune et
    * du branchement) mais qu'un dossier réel mentionne toujours.
    */
-  it('rappelle la coupure d’urgence et le parafoudre', () => {
-    expect(doc).toContain('urgence');
-    expect(doc).toContain('arafoudre');
+  it('ne bavarde plus : ni coupure d’urgence ni parafoudre en tête', () => {
+    // Revues du dossier : une mention générale, la même sur tous les
+    // dossiers, qui ne disait rien de CE tableau.
+    expect(doc).not.toContain('urgence');
+    expect(doc).not.toContain('arafoudre');
   });
 
   it('porte un repère par circuit, dans l’ordre du tableau', () => {
@@ -241,7 +243,7 @@ describe('rien ne sort de la feuille', () => {
     expect(pdf).toContain(trait('#2F6BFF'));
   });
 
-  it('le document compte TROIS feuilles de plus : gaines, unifilaire, multifilaire', () => {
+  it('le document compte DEUX feuilles de plus : gaines, unifilaire', () => {
     /*
       TROIS, ET LA TROISIEME EST NEUVE.
 
@@ -258,9 +260,13 @@ describe('rien ne sort de la feuille', () => {
 
       Elle apparait des qu'un cheminement est fourni : le fournir, c'est
       vouloir la feuille.
+
+      Et la multifilaire est repartie — revues du dossier : des traits de
+      couleur paralleles, sans appareil ni borne, qui n'apprenaient rien que
+      l'unifilaire ne dise.
     */
     const feuilles = (src: string) => (src.match(/\/Type \/Page /g) ?? []).length;
-    expect(feuilles(pdf)).toBe(feuilles(sansSchema) + 3);
+    expect(feuilles(pdf)).toBe(feuilles(sansSchema) + 2);
   });
 
 });
@@ -331,7 +337,8 @@ describe('la lisibilité des feuilles de schéma', () => {
         w: m[3].length * 7 * 0.52,
       });
     }
-    expect(chiffres.length).toBeGreaterThanOrEqual(rows.length);
+    // Un chiffre par départ protégé : les courants faibles n'en portent pas.
+    expect(chiffres.length).toBeGreaterThanOrEqual(rows.filter((r) => r.breaker !== null).length);
     // Les disques blancs des pastilles : 20 sommets, remplis en blanc.
     const cercles: { at: number; xs: number[]; ys: number[] }[] = [];
     const reCercle = /1 1 1 rg ((?:[-\d.]+ [-\d.]+ [ml] ?){20})f/g;
@@ -385,31 +392,20 @@ describe('la lisibilité des feuilles de schéma', () => {
 });
 
 /**
- * LA FEUILLE MULTIFILAIRE — le câblage, un trait par conducteur.
+ * LA FEUILLE MULTIFILAIRE EST PARTIE — relevé unanime des revues du dossier.
  *
- * `multiWire` était calculé à chaque export puis JETÉ : aucune feuille ne le
- * dessinait, le README promettait un schéma que le dossier n'a jamais porté.
- * La feuille montre chaque circuit avec ses conducteurs aux couleurs de la
- * norme, et les notes qui disent le principe (va-et-vient, courants faibles).
+ * Elle montrait chaque circuit en traits de couleur parallèles, sans
+ * appareil ni borne, et annonçait des navettes là où chaque pièce est en
+ * simple allumage. Ce n'était pas un multifilaire. L'unifilaire dit le
+ * tableau ; le câblage se décide au boîtier.
  */
 describe('la feuille multifilaire', () => {
-  const doc = texte(pdf);
-
-  it('existe quand on demande les schémas, pas sans', () => {
-    expect(doc).toContain('multifilaire');
-    expect(texte(sansSchema)).not.toContain('multifilaire');
+  it('n’est plus imprimée, même avec les schémas', () => {
+    expect(texte(pdf)).not.toContain('multifilaire');
   });
 
-  it('nomme les conducteurs et les trace aux couleurs de la norme', () => {
-    expect(doc).toContain('bleu clair');
-    expect(doc).toContain('vert/jaune');
-    // Le bleu clair du neutre est réellement TRACÉ, pas seulement écrit.
-    expect(pdf).toContain(trait('#2E6FD6'));
-  });
-
-  it('dit le principe du va-et-vient de la cuisine', () => {
-    // La cuisine a un interrupteur et un va-et-vient : deux commandes.
-    expect(doc).toContain('navettes');
+  it('et l’unifilaire reste', () => {
+    expect(texte(pdf)).toContain('Schéma unifilaire');
   });
 });
 

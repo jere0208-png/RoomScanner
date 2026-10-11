@@ -1156,9 +1156,21 @@ function drawSheetChrome(
   d.text(aQui ? (info.particulier ? 'PROPRIÉTAIRE' : 'CLIENT') : 'FICHIER', cols[0] + 12, ty + 24, 6.5, GREY_LIGHT, {
     align: 'left',
   });
-  d.text(fitText(aQui || info.filename, 8, width(0)), cols[0] + 12, ty + 12, 8, GREY, {
-    align: 'left',
-  });
+  /*
+    SANS COUPER — relevé des revues du dossier : « 12 rue des Lila… » sur
+    toutes les feuilles. Quand la ligne ne tient pas, le client et
+    l'adresse prennent chacun la leur.
+  */
+  const surDeux =
+    !!aQui && fitText(aQui, 8, width(0)) !== aQui && !!info.client && !!info.address;
+  if (surDeux) {
+    d.text(fitText(info.client!, 7, width(0)), cols[0] + 12, ty + 14, 7, GREY, { align: 'left' });
+    d.text(fitText(info.address!, 7, width(0)), cols[0] + 12, ty + 5.5, 7, GREY, { align: 'left' });
+  } else {
+    d.text(fitText(aQui || info.filename, 8, width(0)), cols[0] + 12, ty + 12, 8, GREY, {
+      align: 'left',
+    });
+  }
 
   // Bloc date / échelle
   const now = new Date();
@@ -1208,9 +1220,19 @@ function drawSheetChrome(
 
   // Bloc feuille
   d.text('DOCUMENT', cols[2] + 12, ty + 50, 6.5, GREY_LIGHT, { align: 'left' });
-  d.text(fitText(info.sheetTitle, 8.5, width(2)), cols[2] + 12, ty + 38, 8.5, INK, {
-    align: 'left',
-  });
+  // Deux lignes quand le titre ne tient pas : « Élévation — côté Séjou… »
+  // ne disait plus de quel mur il s'agissait.
+  const titreDoc = wrapText(info.sheetTitle, 7.5, width(2));
+  if (fitText(info.sheetTitle, 8.5, width(2)) === info.sheetTitle || titreDoc.length < 2) {
+    d.text(fitText(info.sheetTitle, 8.5, width(2)), cols[2] + 12, ty + 38, 8.5, INK, {
+      align: 'left',
+    });
+  } else {
+    d.text(titreDoc[0], cols[2] + 12, ty + 42, 7.5, INK, { align: 'left' });
+    d.text(fitText(titreDoc.slice(1).join(' '), 7.5, width(2)), cols[2] + 12, ty + 33.5, 7.5, INK, {
+      align: 'left',
+    });
+  }
   d.text('FEUILLE', cols[2] + 12, ty + 24, 6.5, GREY_LIGHT, { align: 'left' });
   d.text(info.sheet, cols[2] + 12, ty + 12, 10, INK, { bold: true, align: 'left' });
 }
@@ -1804,6 +1826,16 @@ function planPage(
   const plafondLegende = extra?.hideLegend
     ? []
     : [...new Set((ctx.ceiling ?? []).map((c) => c.kind))];
+  /*
+    UN LIEN DE COMMANDE N'ENTRE À LA LÉGENDE QUE S'IL EST TRACÉ — relevé des
+    revues du dossier : elle l'annonçait dès qu'un point lumineux existait,
+    et le plan n'en montrait aucun. Une légende qui promet un trait absent
+    fait chercher ce qui n'est pas là.
+  */
+  const existeIci = (id: string) => (ctx.fixtures ?? []).some((x) => x.id === id);
+  const liensTraces =
+    (ctx.ceiling ?? []).some((cl) => (cl.commands ?? []).some(existeIci)) ||
+    (ctx.fixtures ?? []).some((g) => (g.commands ?? []).some((cid) => cid !== g.id && existeIci(cid)));
   /**
    * CE QUE LA LÉGENDE VA DIRE — construit ICI, dessiné plus bas.
    *
@@ -1869,12 +1901,16 @@ function planPage(
     if (plafondLegende.length > 0) {
       seconde.push({
         titre: 'PLAFOND',
-        teinte: '#F2A93B',
+        // L'encre de ses symboles : la pastille orange annonçait une
+        // couleur que rien ne portait sur le plan.
+        teinte: ENCRE_ELEC,
         lignes: plafondLegende.map((k) => ({
           texte: CEILINGS[k].label,
           symbole: { paths: CEILING_SYMBOL[k], color: ENCRE_ELEC },
         })),
       });
+    }
+    if (liensTraces && !extra?.hideLegend) {
       seconde.push({ lignes: [{ couleur: ENCRE_ELEC, tirete: true, texte: 'Lien de commande' }] });
     }
     if (seconde.length > 0) colonnesLegende.push(seconde);
@@ -2895,7 +2931,10 @@ function planPage(
       const angleDe = (a: Pt, b: Pt) => {
         let ang = (Math.atan2(b.y - a.y, b.x - a.x) * 180) / Math.PI;
         if (ang > 90) ang -= 180;
-        if (ang < -90) ang += 180;
+        // Une cote verticale se lit depuis la droite de la feuille, toujours
+        // (−90° la retournait : à gauche du bas vers le haut, à droite du
+        // haut vers le bas — revues du dossier).
+        if (ang <= -89.5) ang += 180;
         return ang;
       };
       /** La normale d'un mur, sur la page, du côté `cote` (+1 ou −1). */
@@ -3881,25 +3920,17 @@ function planPage(
         { x: cx + dir(120).x * 5, y: cy + dir(120).y * 5 },
         { x: cx + dir(240).x * 5, y: cy + dir(240).y * 5 },
       ],
-      '#C4453B',
+      // À l'encre du dessin : le rouge est celui de l'appareillage.
+      INK,
       null,
     );
-    for (const [lettre, deg] of [
-      ['N', 0],
-      ['E', 90],
-      ['S', 180],
-      ['O', 270],
-    ] as [string, number][]) {
-      const p = dir(deg);
-      d.text(
-        lettre,
-        cx + p.x * 22,
-        cy + p.y * 22 - 2.5,
-        lettre === 'N' ? 7.5 : 6.5,
-        lettre === 'N' ? INK : GREY_LIGHT,
-        { bold: true },
-      );
-    }
+    /*
+      LE NORD, ET LUI SEUL — relevé des revues du dossier : E, S et O
+      flottaient autour de la flèche sans rien apprendre de plus. Une
+      flèche et son N, c'est la convention d'un plan.
+    */
+    const pn = dir(0);
+    d.text('N', cx + pn.x * 22, cy + pn.y * 22 - 2.5, 7.5, INK, { bold: true });
   }
 
   drawSheetChrome(d, {
@@ -3996,7 +4027,6 @@ function metrePage(
   let totalArea2 = 0;
   let totalWalls = 0;
   let totalPoints = 0;
-  let totalWatts = 0;
   // Le total compte TOUTES les pièces ; la feuille n'en dessine que sa tranche.
   parts.forEach((part, rang) => {
     const dessinee = rang >= premiere && rang < premiere + LIGNES_DU_METRE;
@@ -4024,7 +4054,6 @@ function metrePage(
     totalArea2 += part.surface?.area ?? 0;
     totalWalls += nets;
     totalPoints += eclairage.get(part.roomId)?.points ?? 0;
-    totalWatts += eclairage.get(part.roomId)?.watts ?? 0;
     if (!dessinee) return;
     const lum = eclairage.get(part.roomId);
     const cells = [
@@ -4044,7 +4073,11 @@ function metrePage(
                 // « pts » se lit d'ailleurs « points PostScript » par tout
                 // le monde sauf un dessinateur : le mot entier tient dans
                 // la colonne, et ne se lit que d'une façon.
-                `${lum.points} point${lum.points > 1 ? 's' : ''} · ${lum.watts} W`
+                //
+                // PLUS DE WATTS — relevé des revues du dossier : « 60 W »
+                // par point ne veut rien dire avec des LED, et le total
+                // débordait de son filet. Le nombre de points suffit.
+                `${lum.points} point${lum.points > 1 ? 's' : ''}`
               : '—',
           ]
         : []),
@@ -4083,7 +4116,7 @@ function metrePage(
   d.text(fr1(totalWalls), cols[5], y, 10, INK, { align: 'left', bold: true });
   if (avecEclairage && totalPoints > 0) {
     d.text(
-      `${totalPoints} point${totalPoints > 1 ? 's' : ''} · ${totalWatts} W`,
+      `${totalPoints} point${totalPoints > 1 ? 's' : ''}`,
       cols[6],
       y,
       10,
@@ -4128,11 +4161,10 @@ function metrePage(
     tient pas lieu : on le dit dans un cadre, pour qu'on ne le manque pas.
   */
   if (parts.length > 0) {
+    // Une ligne : le renvoi suffit — le pavé de quatre lignes expliquait
+    // la loi au lieu de dire ce que vaut ce métré (revues du dossier).
     const lignes = wrapText(
-      'Loi Carrez : ce métré n’en tient pas lieu. La surface privative due à l’acheteur ' +
-        'd’un lot de copropriété se mesure au nu des murs, hors parties de moins de 1,80 m de ' +
-        'hauteur ; si elle est inférieure de plus de 5 % à celle de l’acte, l’acheteur peut ' +
-        'obtenir une baisse du prix. Faites-la mesurer avant de la déclarer.',
+      'Surfaces indicatives : ce métré ne tient pas lieu de mesurage Loi Carrez.',
       8,
       w - 2 * CADRE_MARGE,
     );
@@ -4630,17 +4662,6 @@ function unifilairePage(
     GREY,
     { align: 'left' },
   );
-  // Deux mentions qu'un schéma réel porte toujours : la coupure d'urgence
-  // (c'est l'AGCP, encore faut-il le dire) et le parafoudre, que l'app ne
-  // peut pas trancher — il dépend de la commune et du branchement.
-  d.text(
-    'Coupure d’urgence assurée par l’AGCP, à garder accessible · parafoudre selon exposition, à vérifier.',
-    BUS + 42,
-    y - 22,
-    6.5,
-    GREY_LIGHT,
-    { align: 'left' },
-  );
   y -= 26;
 
   // Les départs, rangés sous leur différentiel.
@@ -4650,7 +4671,7 @@ function unifilairePage(
     if (!r.under) libres.push(r);
     else parDiff.set(r.under, [...(parDiff.get(r.under) ?? []), r]);
   }
-  const blocs: { titre: string; sous: string; rows: SchemaRow[] }[] = [];
+  const blocs: { titre: string; sous: string; rows: SchemaRow[]; aLaBarre: boolean }[] = [];
   diffs.forEach((diff, i2) => {
     const list = parDiff.get(`ID${i2 + 1}`) ?? [];
     if (list.length === 0) return;
@@ -4658,15 +4679,38 @@ function unifilairePage(
       titre: `ID${i2 + 1}`,
       sous: `${diff.rating} A · 30 mA · type ${diff.type}`,
       rows: list,
+      aLaBarre: true,
     });
   });
+  /*
+    LE COFFRET DE COMMUNICATION SE NOMME, ET NE PEND PLUS SOUS LES
+    DIFFÉRENTIELS — relevé des revues du dossier : titré « GTL » (la gaine,
+    pas le coffret) et accroché à la barre, il se lisait alimenté derrière
+    le dernier différentiel. Il est à part : courants faibles, sans
+    protection au tableau.
+  */
   if (libres.length > 0) {
     blocs.push({
-      titre: 'GTL',
-      sous: 'coffret de communication, sans disjoncteur',
+      titre: 'Coffret',
+      sous: 'de communication — courants faibles, hors protection',
       rows: libres,
+      aLaBarre: false,
     });
   }
+  /*
+    LES POINTS DESSERVIS EN ENTIER, SUR DEUX LIGNES AU BESOIN — relevé des
+    revues du dossier : « Prise plint… », « Bureau, mur no… » : on ne
+    pouvait pas vérifier ce que dessert chaque départ, et la feuille avait
+    la place.
+  */
+  const dessertDe = (r: SchemaRow): string[] => {
+    const dessert = detail?.get(r.mark) || r.points;
+    if (!dessert) return [];
+    const lignes = wrapText(dessert, 6.5, CABLE - NOM);
+    if (lignes.length <= 3) return lignes;
+    return [lignes[0], lignes[1], fitText(lignes.slice(2).join(' '), 6.5, CABLE - NOM)];
+  };
+  const pasDe = (r: SchemaRow) => PAS + (Math.max(1, dessertDe(r).length) - 1) * 8;
 
   /** Une ligne de départ, avec tout ce qui se lit dessus. */
   const ligneDepart = (r: SchemaRow, cy: number, teinte: string) => {
@@ -4693,9 +4737,18 @@ function unifilairePage(
     // L'oblique au MILIEU du segment, le chiffre à son épaule : posé au bout,
     // le chiffre tombait sous le disque blanc de la pastille de repère,
     // dessinée après lui — la légende promettait un chiffre invisible.
-    const oblique = (DISJ + 16 + finTrait) / 2;
-    d.line(oblique - 4, cy - 5, oblique + 4, cy + 5, 0.9, INK);
-    d.text(`${r.wires}`, oblique + 7, cy + 4, 7, GREY);
+    /*
+      UN DÉPART 230 V, C'EST TROIS CONDUCTEURS — relevé des revues du
+      dossier : l'éclairage en annonçait six (navettes et retours comptés),
+      quand le multifilaire en dessinait trois. Ce qui sort du disjoncteur,
+      c'est phase, neutre, terre ; les navettes vivent entre les boîtiers.
+      Les courants faibles n'ont pas de conducteurs à compter ici.
+    */
+    if (r.breaker !== null) {
+      const oblique = (DISJ + 16 + finTrait) / 2;
+      d.line(oblique - 4, cy - 5, oblique + 4, cy + 5, 0.9, INK);
+      d.text('3', oblique + 7, cy + 4, 7, GREY);
+    }
     // Le repère, à sa teinte de circuit : la même que sur le plan.
     markerAt(d, { x: NOM - 14, y: cy }, r.mark, teinte);
     // Le libellé dispose de toute la place jusqu'à la colonne de droite.
@@ -4703,14 +4756,10 @@ function unifilairePage(
     d.text(fitText(r.label, 8, largeurNom), NOM, cy - 3, 8, INK, {
       align: 'left',
     });
-    const dessert = detail?.get(r.mark) || r.points;
-    if (dessert) {
-      // Toute la largeur : la colonne de droite est vide à cette hauteur,
-      // et « Applique murale 1 » sortait en « Ap… » avec de la place libre.
-      d.text(fitText(dessert, 6.5, CABLE - NOM), NOM, cy - 12, 6.5, GREY_LIGHT, {
-        align: 'left',
-      });
-    }
+    // Toute la largeur : la colonne de droite est vide à cette hauteur.
+    dessertDe(r).forEach((l, k) => {
+      d.text(l, NOM, cy - 12 - k * 8, 6.5, GREY_LIGHT, { align: 'left' });
+    });
     const droite =
       r.section === null
         ? `ICTA Ø${r.conduit}`
@@ -4721,6 +4770,17 @@ function unifilairePage(
   const BAS = FRAME.y + TITLE_H + 30;
   let restants = 0;
   let indexGlobal = 0;
+  /*
+    LES DIFFÉRENTIELS EN PARALLÈLE, SUR UNE NOURRICE — relevé des revues du
+    dossier : la barre s'interrompait sous ID1 et repartait vers ID2, et on
+    lisait deux 30 mA en cascade. Chacun est alimenté par l'AGCP : une
+    nourrice descend à gauche, et chaque différentiel s'y pique.
+  */
+  const NOURRICE = BUS - 40;
+  const hautNourrice = y - 6;
+  let basNourrice: number | null = null;
+  d.line(BUS, y, BUS, hautNourrice, 1.2, INK);
+  d.line(BUS, hautNourrice, NOURRICE, hautNourrice, 1.2, INK);
 
   for (const bloc of blocs) {
     // Un bloc s'annonce, et ses départs suivent. On ne commence pas un
@@ -4730,7 +4790,10 @@ function unifilairePage(
       continue;
     }
     y -= 16;
-    d.line(BUS, y + 16, BUS, y, 1.2, INK);
+    if (bloc.aLaBarre) {
+      d.line(NOURRICE, y - 10, BUS - 30, y - 10, 1.2, INK);
+      basNourrice = y - 10;
+    }
     d.rect(BUS - 30, y - 20, 60, 20, '#F3F6FB', INK, 1);
     d.text(bloc.titre, BUS, y - 8, 8, INK, { bold: true });
     d.text(bloc.sous, BUS + 42, y - 12, 7.5, GREY, { align: 'left' });
@@ -4738,19 +4801,23 @@ function unifilairePage(
 
     const debut = y;
     for (const r of bloc.rows) {
-      if (y - PAS < BAS) {
+      const pas = pasDe(r);
+      if (y - pas < BAS) {
         restants += 1;
         indexGlobal += 1;
         continue;
       }
-      y -= PAS;
-      ligneDepart(r, y + PAS / 2 - 2, circuitColor(indexGlobal));
+      y -= pas;
+      // Ancré en HAUT de sa place : la seconde ligne des points desservis
+      // descend dans le surplus, le départ reste où on l'attend.
+      ligneDepart(r, y + pas - PAS / 2 - 2, circuitColor(indexGlobal));
       indexGlobal += 1;
     }
     // La barre qui porte les dérivations de ce différentiel.
     d.line(BUS, debut, BUS, y + 4, 1.2, INK);
     y -= 8;
   }
+  if (basNourrice !== null) d.line(NOURRICE, hautNourrice, NOURRICE, basNourrice, 1.2, INK);
 
   if (restants > 0) {
     y -= 6;
@@ -4794,135 +4861,6 @@ function unifilairePage(
   return d.stream();
 }
 
-/**
- * LA FEUILLE MULTIFILAIRE — le câblage, un trait par conducteur.
- *
- * `multiWire` était calculé à chaque export puis JETÉ : aucune feuille ne le
- * dessinait, alors que le README promet le schéma de câblage dans le dossier
- * et que ses couleurs normatives (`WIRE_COLORS`) étaient prêtes et testées.
- * Un bloc par circuit : le repère à sa teinte de plan, puis chaque
- * conducteur en trait plein à sa couleur, nommé en clair — et la note qui
- * dit le principe quand le câblage dépend du chantier (va-et-vient,
- * courants faibles).
- */
-function multifilairePage(
-  ctx: SheetContext,
-  sheet: string,
-  multi: MultiWireSchema[],
-  rows: SchemaRow[],
-): string {
-  const d = new Draw();
-  const x0 = FRAME.x + 30;
-  const w = FRAME.w - 60;
-  let y = TETE - 22;
-
-  d.text('Schéma multifilaire', x0, y + 22, 13, INK, { bold: true, align: 'left' });
-  d.text(
-    'Un trait par conducteur, aux couleurs de la norme. Le câblage exact se choisit sur place.',
-    x0,
-    y + 8,
-    8,
-    GREY,
-    { align: 'left' },
-  );
-  y -= 8;
-
-  const BAS = FRAME.y + TITLE_H + 30;
-  const FIL_H = 10;
-  // La même teinte de repère que sur le plan et l'unifilaire : l'ordre du
-  // tableau fait la roue des couleurs, ici comme là-bas.
-  const ordre = new Map(rows.map((r, i) => [r.mark, i]));
-  // Les libellés à gauche, les traits à droite : la colonne des traits
-  // commence après le plus long libellé de conducteur.
-  const DEBUT_TRAIT = x0 + 168;
-  let restants = 0;
-
-  for (const m of multi) {
-    const noteLignes = m.note ? wrapText(m.note, 7.5, w - 26) : [];
-    // Chaque départ porte son titre et ses fils : voir `MultiWireSchema.runs`.
-    const fils = m.runs.reduce((t, r) => t + r.wires.length, 0);
-    const h = 22 + m.runs.length * 12 + fils * FIL_H + noteLignes.length * 10 + 12;
-    if (y - h < BAS) {
-      restants += 1;
-      continue;
-    }
-    const teinte = circuitColor(ordre.get(m.mark) ?? 0);
-    markerAt(d, { x: x0 + 10, y: y - 8 }, m.mark, teinte);
-    d.text(m.label, x0 + 26, y - 11, 9, INK, { bold: true, align: 'left' });
-    if (m.devices.length > 0) {
-      d.text(
-        `${m.devices.length} appareil${m.devices.length > 1 ? 's' : ''}`,
-        x0 + w,
-        y - 11,
-        7.5,
-        GREY_LIGHT,
-        { align: 'right' },
-      );
-    }
-    y -= 24;
-    /*
-      UN BLOC PAR DÉPART — relevé du patron : « le PDF d'un simple allumage
-      montre 4 fils, alors qu'il n'y a que le retour lampe, bleu, terre ».
-
-      La feuille traçait les conducteurs du CIRCUIT, d'un bord à l'autre : vrai
-      du circuit, faux de chaque gaine. Un multifilaire se lit départ par
-      départ, et chacun n'a que ses fils.
-    */
-    for (const run of m.runs) {
-      d.text(run.titre, x0 + 26, y - 2, 7.5, INK, { bold: true, align: 'left' });
-      y -= 12;
-      for (const fil of run.wires) {
-        d.text(fil.label, x0 + 34, y - 2, 6.5, fil.color, { align: 'left' });
-        d.line(DEBUT_TRAIT, y, x0 + w, y, 1.4, fil.color);
-        // La terre est BICOLORE sur le chantier : un tireté jaune court sur
-        // le vert — c'est à cette livrée qu'on la reconnaît d'un coup d'œil.
-        if (fil.role === 'terre') {
-          d.dashedPath(
-            [
-              { x: DEBUT_TRAIT, y },
-              { x: x0 + w, y },
-            ],
-            0.7,
-            '#E7C51B',
-            [4, 4],
-          );
-        }
-        y -= FIL_H;
-      }
-    }
-    for (const l of noteLignes) {
-      d.text(l, x0 + 26, y - 2, 7.5, GREY, { align: 'left' });
-      y -= 10;
-    }
-    y -= 12;
-  }
-
-  if (restants > 0) {
-    y -= 4;
-    d.text(
-      `${restants} circuit${restants > 1 ? 's' : ''} de plus — même câblage ` +
-        'type, sections et calibres sur l’unifilaire.',
-      x0,
-      y,
-      7.5,
-      GREY,
-      { align: 'left' },
-    );
-  }
-
-  drawSheetChrome(d, {
-    project: ctx.name,
-    filename: ctx.filename,
-    client: ctx.client,
-    particulier: ctx.particulier,
-    entreprise: ctx.entreprise,
-    address: ctx.address,
-    sheetTitle: 'Schéma multifilaire',
-    sheet,
-    scaleLabel: null,
-  });
-  return d.stream();
-}
 
 /**
  * Les deux schémas se lisent SUR LE PLAN.
@@ -5004,7 +4942,12 @@ function elevationPage(
     { bold: true, align: 'left' },
   );
   const poses0 = mine.length - dos.length;
-  d.text(
+  /*
+    LE SOUS-TITRE SE REPLIE — relevé des revues du dossier : « …de l'autre
+    face. » sortait du cadre de la feuille. Deux lignes au plus, dans la
+    largeur du cadre.
+  */
+  const sousTitre =
     (auDos ? `Au dos : ${auDos}. ` : '') +
       `Mur de ${face.len.toFixed(2).replace('.', ',')} m sous ` +
       `${H.toFixed(2).replace('.', ',')} m · ` +
@@ -5016,13 +4959,18 @@ function elevationPage(
         ? ` En clair : ${dos.length} appareil${
             dos.length > 1 ? 's' : ''
           } de l’autre face.`
-        : ''),
-    FRAME.x + 30,
-    hautTitre - 14,
-    8,
-    GREY,
-    { align: 'left' },
-  );
+        : '');
+  const lignesSous = wrapText(sousTitre, 8, FRAME.w - 60);
+  lignesSous.slice(0, 2).forEach((l, k) => {
+    d.text(
+      k === 1 && lignesSous.length > 2 ? fitText(lignesSous.slice(1).join(' '), 8, FRAME.w - 60) : l,
+      FRAME.x + 30,
+      hautTitre - 14 - k * 10,
+      8,
+      GREY,
+      { align: 'left' },
+    );
+  });
 
   // Les photos prennent le bas de la feuille ; sans elles, le dessin descend.
   const BAS = FRAME.y + TITLE_H + 34;
@@ -5103,9 +5051,15 @@ function elevationPage(
       py(bas),
       larg,
       Math.max(1, (haut - bas) * scale),
-      contre ? '#EDF3FF' : '#F2F4F7',
-      contre ? '#2F6BFF' : GREY_LIGHT,
-      contre ? 1.1 : 0.7,
+      /*
+        EN GRIS, JAMAIS EN BLEU — relevé des revues du dossier : le meuble
+        contre le mur avait le bleu et l'épaisseur des baies, et la fenêtre
+        ne se distinguait plus du frigo. Le mobilier se dessine en trait
+        fin ; contre le mur, un cran plus foncé.
+      */
+      '#F4F5F7',
+      contre ? GREY : GREY_LIGHT,
+      contre ? 0.8 : 0.6,
     );
     if (larg > 46) {
       d.text(
@@ -5118,23 +5072,13 @@ function elevationPage(
     }
   }
 
-  // Les hauteurs de référence, en filigrane : ce sont les quatre lignes
-  // sur lesquelles une installation se pose.
-  for (const r of HAUTEURS_REF) {
-    if (r.y >= H - 0.05) continue;
-    d.dashedPath(
-      [
-        { x: px(0), y: py(r.y) },
-        { x: px(face.len), y: py(r.y) },
-      ],
-      0.5,
-      '#C7D2E0',
-      [2, 5],
-    );
-    d.text(r.nom, px(face.len) - 3, py(r.y) + 3, 6, GREY_LIGHT, {
-      align: 'right',
-    });
-  }
+  /*
+    PLUS DE LIGNES DE RÉFÉRENCE — relevé des revues du dossier : « applique
+    210, tableau 135, commande 110, plinthe 25 » se traçaient sur chaque mur,
+    même sans tableau ni applique, coupaient les baies et débordaient du
+    mur. Une élévation de pro ne porte que les hauteurs de SES appareils,
+    cotées depuis le sol fini : c'est ce que dit la colonne de gauche.
+  */
 
   // ---------------------------------------------------- baies et retours
   const trous = assignOpenings(walls, ctx.openings, solY).get(wall.id) ?? [];
@@ -5157,7 +5101,7 @@ function elevationPage(
       pas. Le scan ne le voit pas ; déclaré à la main, il s'imprime comme
       il s'affiche : hachuré, ambre, coté.
     */
-    const coffre = empriseDuCoffre(t.seg, gx);
+    const coffre = empriseDuCoffre(t.seg, gx, solY);
     if (coffre) {
       const hc = (coffre.y1 - coffre.y0) * scale;
       d.rect(
@@ -5182,8 +5126,12 @@ function elevationPage(
     }
     if (larg * scale > 40) {
       d.text(
+        // Une baie vitrée qui part du sol est une PORTE-FENÊTRE (revues du
+        // dossier : « Fenêtre » pour une baie de 240 × 205 sans allège).
         t.seg.type === 'window'
-          ? 'Fenêtre'
+          ? t.y0 < 0.05
+            ? 'Porte-fenêtre'
+            : 'Fenêtre'
           : estTraversante(t.seg)
           ? 'Passage'
           : 'Porte',
@@ -5198,7 +5146,9 @@ function elevationPage(
       d.text(
         `${Math.round(larg * 100)} × ${Math.round((t.y1 - t.y0) * 100)}`,
         px(gx + larg / 2),
-        py(t.y0) - 11,
+        // Dans la baie quand elle part du sol : dessous, le chiffre tombait
+        // dans les hachures du sol (revues du dossier).
+        t.y0 < 0.15 ? py(t.y0) + 8 : py(t.y0) - 11,
         6.5,
         SKY,
       );
@@ -5237,17 +5187,12 @@ function elevationPage(
       const yr = py(H) - 14;
       d.line(px(r.x0) + 1, yr, px(r.x1) - 1, yr, 0.8, GREY);
       for (const x of [r.x0, r.x1]) d.line(px(x), yr - 3, px(x), yr + 3, 1, GREY);
-      d.dashedPath(
-        [
-          { x: px(m), y: py(0) + 2 },
-          { x: px(m), y: py(H) - 20 },
-        ],
-        0.5,
-        '#C7D2E0',
-        [2, 5],
-      );
+      // Plus de tireté vertical au milieu du trumeau : il se lisait comme
+      // l'axe d'un appareil (revues du dossier).
       d.circle(px(m), yr, 8.5, '#FFFFFF');
-      d.text(`${Math.round((r.x1 - r.x0) * 100)}`, px(m), yr - 2.5, 7, GREY, {
+      // Arrondi AU CUMUL : chaque morceau arrondi pour lui-même, la chaîne
+      // ne faisait plus la longueur du mur (97 + 83 + 164 = 344 pour 343).
+      d.text(`${Math.round(r.x1 * 100) - Math.round(r.x0 * 100)}`, px(m), yr - 2.5, 7, GREY, {
         bold: true,
       });
     }
@@ -5449,7 +5394,8 @@ function elevationPage(
     const yv = yb - etage * 13;
     if (!tient) d.line(px(m), yb - 3, px(m), yv + 4, 0.5, '#B9C2CE');
     d.circle(px(m), yv, 9, '#FFFFFF');
-    d.text(`${Math.round(larg * 100)}`, px(m), yv - 2.5, 7, GREY, { bold: true });
+    // Arrondi au cumul : la chaîne fait la longueur du mur, au centimètre.
+    d.text(`${Math.round(bornes[i + 1] * 100) - Math.round(bornes[i] * 100)}`, px(m), yv - 2.5, 7, GREY, { bold: true });
   }
 
   if (poses.length === 0) {
@@ -5534,7 +5480,9 @@ function elevationPage(
     particulier: ctx.particulier,
     entreprise: ctx.entreprise,
     address: ctx.address,
-    sheetTitle: `Élévation — ${quoi}`,
+    // Le numéro du mur d'abord : c'est par lui qu'on retrouve la feuille
+    // depuis le plan (cinq feuilles s'appelaient « côté Séjour »).
+    sheetTitle: numero ? `Mur ${numero} — ${quoi}` : `Élévation — ${quoi}`,
     sheet,
     // Un mètre vaut 2834,6 points à l'échelle 1:1 (72 pt par pouce).
     // Plus d'arrondi : le cartouche dit l'échelle à laquelle on a tracé.
@@ -5543,14 +5491,6 @@ function elevationPage(
   });
   return d.stream();
 }
-
-/** Les hauteurs de référence d'une installation — les mêmes qu'à l'écran. */
-const HAUTEURS_REF = [
-  { y: 0.25, nom: 'plinthe 25' },
-  { y: 1.1, nom: 'commande 110' },
-  { y: 1.35, nom: 'tableau 135' },
-  { y: 2.1, nom: 'applique 210' },
-];
 
 /**
  * Les murs qui méritent leur feuille, dans l'ordre où on visite le
@@ -5805,6 +5745,11 @@ const DEFAULT_PDF_VIEWS: View3DParams[] = [
   { theta: -32, tilt: 58, zoom: 1, fx: 0, fy: 0 },
 ];
 
+/** Deux vues sous le même angle, au degré près : la même image. */
+function memeAngle(a: View3DParams, b: View3DParams): boolean {
+  return Math.abs(a.theta - b.theta) < 1 && Math.abs(a.tilt - b.tilt) < 1;
+}
+
 /**
  * UNE PERSPECTIVE, TOUTE LA PAGE.
  *
@@ -5842,15 +5787,8 @@ function threeDPage(
     bold: true,
     align: 'left',
   });
-  d.text(
-    `Vue d'ensemble du logement — angle ${Math.round(view.theta)}°, ` +
-      `inclinaison ${Math.round(view.tilt)}°.`,
-    FRAME.x + 24,
-    FRAME.y + FRAME.h - 34,
-    8,
-    GREY,
-    { align: 'left' },
-  );
+  // Plus de « angle −32°, inclinaison 58° » : des degrés ne disent rien à
+  // qui regarde la maquette (revues du dossier).
   // Toute la hauteur disponible entre le cartouche et le titre.
   draw3DView(
     d,
@@ -6917,7 +6855,11 @@ function gardePage(
   const cases: [string, string][] = [
     ['Pièces', String(nPieces)],
     ['Surface au sol', `${fr1(sol)} m²`],
-    ...(avecHabitable ? ([['Habitable estimée', `≈ ${fr1(habitable)} m²`]] as [string, string][]) : []),
+    // Seulement quand elle dit AUTRE CHOSE que la surface au sol : deux
+    // cases au même chiffre se lisaient comme une erreur (revues du dossier).
+    ...(avecHabitable && Math.abs(habitable - sol) >= 0.05
+      ? ([['Habitable estimée', `≈ ${fr1(habitable)} m²`]] as [string, string][])
+      : []),
   ];
   y -= 14;
   const large = (w - 2 * 12) / 3;
@@ -7064,10 +7006,6 @@ function planifierUnNiveau(
       : opts.views && opts.views.length > 0
         ? opts.views
         : [...DEFAULT_PDF_VIEWS];
-  // Deux feuilles de schéma : l'unifilaire, puis le multifilaire quand il
-  // a de la matière (un appelant qui ne fournit pas les conducteurs garde
-  // l'unifilaire seul plutôt qu'une page blanche).
-  const withMulti = withSchema && (schemas?.multi.length ?? 0) > 0;
   /*
     LA FEUILLE DES GAINES existe des qu'un cheminement a ete calcule : c'est
     l'appelant qui decide de le fournir, et le fournir veut dire qu'on veut
@@ -7150,6 +7088,13 @@ function planifierUnNiveau(
   }
   if (include3D) {
     vues.forEach((v, i) => {
+      /*
+        LA PERSPECTIVE QUI REDIT LA GARDE S'EN VA — relevé des revues du
+        dossier : la même vue, sous le même angle, ouvrait le dossier et
+        occupait la feuille 4, avec 70 % de blanc. Un autre angle, réglé à
+        l'export, garde sa feuille.
+      */
+      if (opts.garde && memeAngle(v, DEFAULT_PDF_VIEWS[0])) return;
       feuilles.push({
         genre: 'perspective',
         titre: vues.length > 1 ? `Perspective ${i + 1}` : 'Perspective',
@@ -7183,13 +7128,13 @@ function planifierUnNiveau(
       titre: 'Schéma unifilaire',
       fabriquer: (n) => unifilairePage(ctx, n, sch.rows, sch.differentials, detailDesDeparts(scan, sch.marks, sch.rows)),
     });
-    if (withMulti) {
-      feuilles.push({
-        genre: 'multifilaire',
-        titre: 'Schéma multifilaire',
-        fabriquer: (n) => multifilairePage(ctx, n, sch.multi, sch.rows),
-      });
-    }
+    /*
+      PLUS DE FEUILLE MULTIFILAIRE — relevé unanime des revues du dossier :
+      des traits de couleur parallèles, sans appareil ni borne, qui
+      annonçaient des navettes là où chaque pièce est en simple allumage.
+      Ce n'est pas un multifilaire, et la feuille n'apprenait rien que
+      l'unifilaire ne dise.
+    */
   }
   return { feuilles, images, ctx };
 }

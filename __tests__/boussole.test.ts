@@ -73,7 +73,9 @@ const dossier = (surcharge: object = {}) =>
 
 // La rose est un triangle rouge : c'est sa teinte qui la trahit dans le
 // flux — une occurrence par feuille qui la dessine.
-const roses = (src: string) => src.split('0.77 0.27 0.23 rg').length - 1;
+// La rose, c'est la flèche et son N — à l'encre du dessin depuis les revues
+// du dossier (le rouge était celui de l'appareillage).
+const roses = (src: string) => src.split('(N) Tj').length - 1;
 
 describe('la rose des vents du dossier', () => {
   it('s’imprime de série, sur la seule feuille du plan 2D', () => {

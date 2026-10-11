@@ -1857,7 +1857,12 @@ export function WallElevation({
                     dessine ici, coté, au-dessus de sa baie.
                   */}
                     {(() => {
-                      const e = empriseDuCoffre(hole.seg, x0);
+                      // Depuis le SOL, comme les baies qu'il surmonte.
+                      const e = empriseDuCoffre(
+                        hole.seg,
+                        x0,
+                        Math.min(...walls.map((w) => w.yCenter - w.height / 2)),
+                      );
                       if (!e) return null;
                       const hh = (e.y1 - e.y0) * scale;
                       return (

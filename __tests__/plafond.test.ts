@@ -862,7 +862,7 @@ describe('l’éclairage sur la feuille de métré', () => {
       ),
     );
 
-  it('compte les points et leur puissance, par pièce et au total', () => {
+  it('compte les points, par pièce et au total — sans watts', () => {
     const vu = doc(PLAFOND);
     expect(vu).toContain('Éclairage');
     /*
@@ -876,8 +876,10 @@ describe('l’éclairage sur la feuille de métré', () => {
       tout le monde sauf un dessinateur ; le mot entier tient dans la
       colonne et ne se lit que d'une façon.
     */
-    const total = CEILINGS.dcl.watts + CEILINGS.spot.watts;
-    expect(vu).toContain(`2 points · ${total} W`);
+    expect(vu).toContain('2 points');
+    // Plus de watts — revues du dossier : « 60 W » par point ne veut rien
+    // dire avec des LED, et le total débordait de son filet.
+    expect(vu).not.toMatch(/\d W\b/);
   });
 
   it('et la colonne n’existe pas quand aucun plafond n’est équipé', () => {

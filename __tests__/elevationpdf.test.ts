@@ -173,8 +173,10 @@ describe('les feuilles d’élévation', () => {
     // L'interrupteur : 110 cm du sol. La prise : 25.
     expect(vu).toContain('110');
     expect(vu).toContain('25');
-    // Et sa distance au bord gauche du mur, en centimètres.
-    expect(vu).toContain('35');
+    // Et sa distance au bord gauche du mur, en centimètres, depuis le NU :
+    // 0,35 sur l'axe, moins la demi-épaisseur du mur d'angle. (Ce banc
+    // lisait « 35 » dans « tableau 135 », la ligne de référence partie.)
+    expect(vu).toMatch(/\| 28 \|/);
   });
 
   it('cotent le retour de mur quand le mur est percé', () => {

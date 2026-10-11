@@ -14285,6 +14285,79 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le dossier PDF revu par des architectes : le superflu s'en va
+
+Relevé du patron : « ajoute des agents sur l'export PDF qui chercheront les
+défauts visuels et techniques, sur différentes conceptions d'appartements.
+Compare ces plans à de réels plans pro dignes de vrais architectes. On
+enlève le superflu et on améliore la qualité de l'utile. »
+
+**La revue.**
+- Sept dossiers complets ont été générés : l'appartement d'exemple, un T2,
+  une cloison équipée des deux côtés, une enfilade, un studio en L, un pan
+  coupé avec baie, une niche.
+- Les 99 pages ont été rendues en images.
+- Quatre revues indépendantes, menées en architecte et en bureau d'études
+  électricité, les ont comparées à des plans de pros.
+- Ce lot traite ce qu'elles relèvent toutes et qui se corrige sans toucher
+  au modèle. Les cotes au nu, les élévations par face et l'orientation des
+  murs viennent ensuite.
+
+**Ce qui s'en va.**
+- **La feuille multifilaire.** Elle montrait des traits de couleur
+  parallèles, sans appareil ni borne. Elle annonçait des navettes là où
+  chaque pièce est en simple allumage.
+- **La perspective qui redit la page de garde**, sous le même angle. Un
+  autre angle, réglé à l'export, garde sa feuille. Ses « angle −32°,
+  inclinaison 58° » s'en vont aussi.
+- **Les quatre lignes de référence des élévations** (applique 210, tableau
+  135, commande 110, plinthe 25). Elles étaient tracées sur chaque mur, même
+  sans tableau, coupaient les baies et débordaient du mur.
+- **Les tiretés verticaux au milieu des trumeaux**, qui se lisaient comme
+  des axes d'appareils.
+- **E, S et O autour du nord.** Restent la flèche, à l'encre du dessin, et
+  son N.
+- **Les watts du métré.** « 60 W » par point ne veut rien dire avec des LED.
+- **Le pavé Loi Carrez**, réduit à une ligne.
+- **« Habitable estimée » sur la garde**, quand elle redit la surface au sol.
+- **La mention « coupure d'urgence… parafoudre »** de l'unifilaire.
+- **« Lien de commande » dans la légende** quand aucun lien n'est tracé
+  (`liensTraces`). La pastille « PLAFOND » prend l'encre de ses symboles.
+
+**Ce qui est réparé.**
+- **Le coffre de volet sur son linteau** (`empriseDuCoffre(o, x, sol)`).
+  RoomPlan met son origine sous l'iPhone, et le sol tombe vers −1,3 m.
+  L'emprise comptait depuis l'iPhone : le coffre s'imprimait au milieu de la
+  baie, à l'écran comme sur le PDF.
+- **L'unifilaire :**
+  - les différentiels sont en parallèle sur une nourrice, et non plus en
+    cascade ;
+  - un départ 230 V compte trois conducteurs (on en lisait six pour
+    l'éclairage) ;
+  - le coffret de communication se nomme et ne pend plus sous les
+    différentiels ;
+  - les points desservis s'écrivent en entier, sur trois lignes au besoin.
+- **Les élévations :**
+  - le mobilier est en gris fin (il avait le bleu des baies) ;
+  - les chaînes sont arrondies au cumul (97 + 83 + 164 faisait 344 pour un
+    mur de 343) ;
+  - le sous-titre se replie au lieu de sortir du cadre ;
+  - une baie qui part du sol se nomme « Porte-fenêtre », et ses dimensions
+    s'écrivent dans la baie plutôt que dans les hachures du sol.
+- **Les cotes verticales** se lisent toutes depuis la droite de la feuille.
+- **Le cartouche :**
+  - le client et l'adresse prennent chacun leur ligne au lieu de
+    « 12 rue des Lila… » ;
+  - l'élévation s'appelle « Mur N — côté … » ;
+  - un titre trop long passe sur deux lignes.
+
+**Bancs.**
+- `dossierepure` : tout ce qui précède, sur un séjour dont le sol est à
+  −1,32 m.
+- `pdfschema`, `pagedegarde`, `boussole`, `plafond` et `elevationpdf` sont
+  mis à jour. L'ancien test d'élévation lisait « 35 » dans « tableau 135 » ;
+  il vérifie maintenant la vraie distance au nu, 28.
+
 ## Le plan qui dézoome, et des symboles tournés vers leur mur
 
 Relevés du patron :
