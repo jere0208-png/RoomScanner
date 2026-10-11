@@ -73,7 +73,6 @@ import { PaywallScreen } from '../src/screens/PaywallScreen';
 import { BadgePro } from '../src/components/BadgePro';
 import { ContourVif, BLEUS, TexteVif } from '../src/components/ContourVif';
 import { dark, light } from '../src/theme';
-import { EssaiEpuise } from '../src/components/EssaiEpuise';
 import { SurprisePro } from '../src/components/SurprisePro';
 import { SignInScreen } from '../src/screens/SignInScreen';
 import { HomeScreen } from '../src/screens/HomeScreen';
@@ -92,7 +91,6 @@ beforeEach(() => {
     proVia: null,
     plansUtilises: 0,
     paywallVisible: true,
-    essaiEpuiseVisible: false,
     surpriseVisible: false,
     offres: null,
   });
@@ -508,7 +506,6 @@ describe('la surprise Pro', () => {
     useAccountStore.setState({
       compte: null,
       surpriseVisible: false,
-      essaiEpuiseVisible: false,
     });
     mockMarqueur = null;
     await act(async () => {
@@ -773,26 +770,8 @@ describe('le menu des trois points', () => {
   });
 });
 
-describe('le popup « essai déjà utilisé »', () => {
-  it('annonce l’essai consommé et ouvre la page Pro', () => {
-    useAccountStore.setState({ essaiEpuiseVisible: true, paywallVisible: false });
-    const t = monter(<EssaiEpuise />);
-    expect(textesDe(t)).toContain('essai gratuit');
-    act(() => {
-      bouton(t, 'Passer en Pro').props.onPress();
-    });
-    const s = useAccountStore.getState();
-    expect(s.essaiEpuiseVisible).toBe(false);
-    expect(s.paywallVisible).toBe(true);
-  });
+/*
+  LE POPUP « ESSAI DÉJÀ UTILISÉ » EST PARTI — il n'était plus jamais montré, et
+  il disait le contraire du modèle : le scan est gratuit et sans limite.
+*/
 
-  it('« Plus tard » referme sans rien vendre', () => {
-    useAccountStore.setState({ essaiEpuiseVisible: true, paywallVisible: false });
-    const t = monter(<EssaiEpuise />);
-    act(() => {
-      bouton(t, 'Plus tard').props.onPress();
-    });
-    expect(useAccountStore.getState().essaiEpuiseVisible).toBe(false);
-    expect(useAccountStore.getState().paywallVisible).toBe(false);
-  });
-});

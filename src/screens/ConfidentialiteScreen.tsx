@@ -57,7 +57,7 @@ const SECTIONS: { titre: string; texte: string }[] = [
     texte:
       'Nous gardons votre identifiant de compte, votre prénom et votre ' +
       'adresse e-mail si vous les avez donnés, un identifiant d’appareil ' +
-      '(qui sert à compter le relevé offert), et l’état de votre ' +
+      '(qui relie votre téléphone à votre compte), et l’état de votre ' +
       'abonnement. Aucun mot de passe : la connexion par e-mail se prouve ' +
       'par un code à six chiffres envoyé à l’adresse, et « Se connecter avec ' +
       'Apple » ne nous transmet que ce qu’Apple veut bien nous dire.',

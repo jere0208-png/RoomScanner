@@ -60,7 +60,6 @@ beforeEach(() => {
     plansUtilises: 0,
     bonusEssais: 0,
     paywallVisible: false,
-    essaiEpuiseVisible: false,
     jeton: null,
   });
 });

@@ -788,14 +788,20 @@ export function LibraryScreen() {
   const [inside, setInside] = useState<string | null>(null);
   const byFolder = useMemo(() => {
     const m = new Map<string, SavedScan[]>();
+    /*
+      UN DOSSIER QUI N'EXISTE PLUS N'AVALE PAS SES PLANS — un plan revenu du
+      serveur après une réinstallation garde son dossier, qui, lui, ne
+      revient pas : il disparaissait de la liste. Il revient à la racine.
+    */
+    const dossiersConnus = new Set(folders.map((f) => f.id));
     for (const s of saves) {
-      const key = s.folderId ?? '';
+      const key = s.folderId && dossiersConnus.has(s.folderId) ? s.folderId : '';
       const list = m.get(key) ?? [];
       list.push(s);
       m.set(key, list);
     }
     return m;
-  }, [saves]);
+  }, [saves, folders]);
   const dossierOuvert = folders.find((f) => f.id === inside) ?? null;
   const liste = useMemo(() => {
     const brute = dossierOuvert

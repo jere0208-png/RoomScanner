@@ -90,7 +90,7 @@ export function FichePieceSheet({
                   <Tuile
                     mot="Surface habitable"
                     valeur={`${fr(fiche.surfaceHabitable)} m²`}
-                    note={`Sous ${fr(HAUTEUR_HABITABLE)} m exclu (loi Carrez)`}
+                    note={fiche.raisonHabitable ?? `Sous ${fr(HAUTEUR_HABITABLE)} m exclu (loi Carrez)`}
                     accent
                   />
                 )}

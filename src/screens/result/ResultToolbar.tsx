@@ -598,8 +598,9 @@ export function Toolbar3D({
   const fixtures = useScanStore((s) => s.fixtures);
   const showFurniture = useScanStore((s) => s.showFurniture);
   const setShowFurniture = useScanStore((s) => s.setShowFurniture);
-  const showSurfaces = useScanStore((s) => s.showSurfaces);
-  const setShowSurfaces = useScanStore((s) => s.setShowSurfaces);
+  // La maquette a SES surfaces, éteintes à l'ouverture (voir `show3DSurfaces`).
+  const show3DSurfaces = useScanStore((s) => s.show3DSurfaces);
+  const setShow3DSurfaces = useScanStore((s) => s.setShow3DSurfaces);
   const showTextures = useScanStore((s) => s.showTextures);
   const setShowTextures = useScanStore((s) => s.setShowTextures);
   const solidWalls = useScanStore((s) => s.solidWalls);
@@ -646,9 +647,9 @@ export function Toolbar3D({
       key="surface"
       icon="etiquette"
       label="Surfaces"
-      active={showSurfaces}
+      active={show3DSurfaces}
       vide={contenu.pieces === 0 ? RIEN.surfaces : null}
-      onPress={() => setShowSurfaces(!showSurfaces)}
+      onPress={() => setShow3DSurfaces(!show3DSurfaces)}
     />,
     colorsAvailable ? (
       <ToolPill
@@ -723,7 +724,7 @@ export function Toolbar3D({
           titre: 'Mesures',
           lignes: [
             { cle: 'cotes', icone: 'ruler', libelle: 'Cotes', aide: 'Les longueurs, posées sur les murs', actif: showMeasures, vide: contenu.murs === 0 ? RIEN.cotes : null, onBascule: () => setShowMeasures((v) => !v) },
-            { cle: 'surfaces', icone: 'etiquette', libelle: 'Surfaces', aide: 'Le nom et les mètres carrés de chaque pièce', actif: showSurfaces, vide: contenu.pieces === 0 ? RIEN.surfaces : null, onBascule: () => setShowSurfaces(!showSurfaces) },
+            { cle: 'surfaces', icone: 'etiquette', libelle: 'Surfaces', aide: 'Le nom et les mètres carrés de chaque pièce', actif: show3DSurfaces, vide: contenu.pieces === 0 ? RIEN.surfaces : null, onBascule: () => setShow3DSurfaces(!show3DSurfaces) },
           ],
         },
         {

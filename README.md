@@ -14285,6 +14285,77 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le plan qui parle dès l'ouverture, et plus de pièges
+
+Correctifs de l'audit « dans la peau d'un utilisateur », premier lot.
+
+**Le plan s'ouvre avec ses pièces nommées et leurs mètres carrés.** Le
+calque Surfaces, éteint à l'ouverture, était commun au plan 2D et à la
+maquette 3D. Or le patron avait demandé que la 3D s'ouvre « sur les meubles
+et les murs ». Les deux sont maintenant séparés (`showSurfaces`,
+`show3DSurfaces`), comme l'étaient déjà les cotes :
+- le plan 2D s'ouvre nommé ;
+- la 3D garde son ouverture épurée ;
+- le dossier PDF n'éteint plus les surfaces : ses pièces y sont nommées.
+
+**Le cartouche d'une pièce ne vole plus le doigt aux murs.** Dans une petite
+pièce, il débordait sur le mur : toucher le mur de la salle d'eau prenait
+la pièce. Ses quatre coins restent maintenant dans la pièce, à une
+demi-épaisseur de mur au moins ; sinon il se dessine sans prendre le doigt,
+comme devant un meuble.
+
+**Toucher le nom d'une pièce ouvre son menu, aussi hors édition**, avec en
+tête « Fiche de la pièce ». La fiche n'était accessible qu'en mode édition.
+Sa tuile « Surface habitable » paraît pour toutes les pièces, avec la
+raison quand une partie ne compte pas : elle ne paraissait que sous un
+rampant.
+
+**Les chiffres de l'en-tête disent vrai** :
+- « m périm. » est le tour des pièces (`perimetreDesPieces`), et non plus
+  la somme de tous les murs, cloisons comprises ;
+- « m² hab. » porte « ≈ » quand la surface est approchée.
+
+**Fin de scan : une fenêtre à la fois.** « Ce que le plan intègre » attend
+que le bilan du relevé soit refermé ; les deux s'ouvraient ensemble.
+
+**Les boutons font ce qu'ils disent** :
+- « Scanner un étage » ou « un sous-sol » sans LiDAR dit pourquoi il
+  refuse, et ne laisse plus un étage « en cours » derrière lui ; il échouait
+  sans un mot ;
+- « Refaire un scan » relance un scan (`lancerUnScan`). « Nouveau scan »
+  demande, puis scanne. Les deux ramenaient à l'accueil ;
+- « Jeter » un relevé interrompu demande confirmation ;
+- un nouveau scan lancé alors qu'un relevé interrompu attend propose
+  « Reprendre » : il l'effaçait sans prévenir.
+
+**« Ça passe ? » et « Caler dans sa niche » se disent dès que le meuble est
+choisi**, en deux puces au-dessus des outils. La barre complète du meuble
+reste à la demande, puisqu'elle couvrait le plan.
+
+**Les textes ne disent plus le contraire du code** :
+- plus de « palier gratuit » ni de « relevé offert » ;
+- le Pro n'est plus vendu pour des « relevés illimités », que tout le monde
+  a déjà ;
+- « Les nouveautés en premier » n'est plus promis, faute de rien qui le
+  tienne ;
+- « Dessiner un plan » se fait aux cotes, pas au doigt ;
+- l'aperçu du dossier ne parle plus de « client » au particulier ;
+- la pose estimée ne parle plus de « prix public ».
+
+L'écran « essai épuisé », jamais montré et contraire au modèle, est retiré,
+avec sa constante.
+
+**La bibliothèque ne perd plus un plan revenu du serveur.** Un plan rangé
+dans un dossier qui n'existe plus, après une réinstallation, revient à la
+racine. Il disparaissait de la liste.
+
+Banc : `lisibilite` (15). Mis à jour :
+- `calquesbase` et `exportdefauts` (les surfaces allumées) ;
+- `surfaceautravers` (les surfaces de la maquette) ;
+- `compte`, `paywall`, `synchro`, `scanlibre`, `grandpublicpartout`,
+  `parcourscompte` et `pasqueelec` (l'essai épuisé retiré) ;
+- la planche « plan-lecture » (le nom de pièce se touche hors édition).
+
 ## Personne ne se connecte au compte d'un autre
 
 Constat de l'audit « dans la peau d'un utilisateur » : l'action `connecter`

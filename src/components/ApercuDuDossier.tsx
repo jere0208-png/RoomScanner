@@ -292,7 +292,7 @@ function Visionneuse({
         {!net && (
           <View style={s.voilePied}>
             <Text style={s.voileArgument}>
-              C’est bien votre plan. Sans flou ni filigrane, il est prêt à partir chez votre client.
+              C’est bien votre plan. Sans flou ni filigrane, il est prêt à partir.
             </Text>
             <TouchableOpacity accessibilityLabel="Déflouter et télécharger" style={s.voileBouton} onPress={onDeflouter}>
               <Svg width={16} height={16} viewBox="0 0 24 24">

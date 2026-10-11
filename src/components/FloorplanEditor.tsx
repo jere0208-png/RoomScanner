@@ -53,6 +53,8 @@ import {
   type WallQuad,
   type WallRun,
   type WallSeg,
+  pointOnSeg,
+  epaisseurDe,
 } from '../geometry/floorplan';
 import { avancementDesPieces } from '../geometry/nfc15100';
 import type { ObjectData } from 'react-native-room-scan';
@@ -1678,6 +1680,26 @@ export function FloorplanEditor({
           if (contour && contour.length >= 3 && !insidePoly(cand, contour)) {
             continue;
           }
+          /*
+            LE CARTOUCHE TIENT DANS SA PIÈCE, À L'ÉCART DES MURS — sans quoi,
+            dans une petite pièce, il débordait sur le mur et lui volait le
+            doigt (le mur de la salle d'eau ne se prenait plus). Ses quatre
+            coins restent dedans, à une demi-épaisseur de mur au moins.
+          */
+          if (contour && contour.length >= 3) {
+            const coins = [
+              { x: cand.x - lw / 2, z: cand.z - lh / 2 },
+              { x: cand.x + lw / 2, z: cand.z - lh / 2 },
+              { x: cand.x + lw / 2, z: cand.z + lh / 2 },
+              { x: cand.x - lw / 2, z: cand.z + lh / 2 },
+            ];
+            const deborde = coins.some(
+              (k) =>
+                !insidePoly(k, contour) ||
+                part.walls.some((w) => w.type === 'wall' && pointOnSeg(k, w.a, w.b).dist < epaisseurDe(w) / 2),
+            );
+            if (deborde) continue;
+          }
           if (cartoucheHeurte(cand, lw / 2, lh / 2, obstacles)) continue;
           pos = cand;
           retenues = essai;
@@ -3216,11 +3238,19 @@ export function FloorplanEditor({
                   // En édition, le cartouche EST le bouton de renommage :
                   // on touche le nom là où il s'affiche.
                   onPress={
-                    editable && !gene
+                    !gene
                       ? () => {
-                          // Toucher le sol, c'est quitter le meuble.
-                          onSelectObject?.(null);
-                          onSelectRoom?.(part.roomId);
+                          if (editable) {
+                            // Toucher le sol, c'est quitter le meuble.
+                            onSelectObject?.(null);
+                            onSelectRoom?.(part.roomId);
+                          }
+                          /*
+                            HORS ÉDITION AUSSI : toucher le nom d'une pièce
+                            ouvre ce qu'on peut en faire — sa fiche d'abord
+                            (correctif de l'audit : elle n'était accessible
+                            qu'en mode édition).
+                          */
                           onEditRoomName?.(part.roomId);
                         }
                       : undefined

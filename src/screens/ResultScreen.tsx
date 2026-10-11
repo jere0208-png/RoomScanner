@@ -121,6 +121,7 @@ import {
   totalArea,
   type RoomPart,
   solDesMurs,
+  perimetreDesPieces,
 } from '../geometry/floorplan';
 import { hasCapturedColors, pointInPolygon } from '../geometry/appearance';
 import { planRoutes } from '../geometry/elecplan';
@@ -171,7 +172,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useScanStore } from '../store/scanStore';
 import { useAccountStore } from '../store/accountStore';
-import { demarrerComplement, demarrerEtage } from '../native/useRoomScan';
+import { demarrerComplement, demarrerEtage, lancerUnScan } from '../native/useRoomScan';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
 import { EnAttente } from '../components/PendingPill';
 import {
@@ -761,7 +762,7 @@ export function ResultScreen() {
           // Au-dessus du plus haut : on monte, on ne creuse pas. Le
           // sous-sol se demande depuis le menu du plan, où l'on a la place
           // de le dire en toutes lettres.
-          demarrerEtage(Math.max(...niveaux) + 1).catch(() => {});
+          demarrerEtage(Math.max(...niveaux) + 1).catch(refusDuScan);
         },
       },
     ],
@@ -1979,7 +1980,6 @@ export function ResultScreen() {
   };
 
   const selectedWall = walls.find((w) => w.id === selectedWallId) ?? null;
-  const perimeter = walls.reduce((s, w) => s + segLength(w), 0);
   /*
     LE DÉCOUPAGE EN PIÈCES SE MÉMOÏSE — et pas seulement pour lui-même.
 
@@ -1991,6 +1991,11 @@ export function ResultScreen() {
     doigt déplaçait un meuble.
   */
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
+  /*
+    « m périm. » — LE TOUR DES PIÈCES, pas la somme de tous les murs : une
+    cloison comptait comme un périmètre (correctif de l'audit).
+  */
+  const perimeter = useMemo(() => perimetreDesPieces(parts), [parts]);
   /*
     LES TRAVAUX, PIÈCE PAR PIÈCE — peinture, sol, plinthes. Calculés sur le
     niveau affiché, comme tout l'écran : on refait un étage à la fois.
@@ -2060,7 +2065,12 @@ export function ResultScreen() {
     if (!ficheOuverte || !targetRoom) return null;
     const part = parts.find((p) => p.roomId === targetRoom.id);
     if (!part) return null;
-    return ficheDeLaPiece({
+    // La surface habitable de CETTE pièce, comme l'en-tête et le dossier la
+    // comptent : elle ne paraissait que sous un rampant.
+    const lue = habitable.pieces.find((x) => x.roomId === targetRoom.id);
+    const habitableDeLaCible = lue ? lue.habitable : null;
+    return {
+      ...ficheDeLaPiece({
       contour: part.surface?.pts ?? [],
       surface: part.surface?.area ?? 0,
       surfaceExacte: !!part.surface?.exact,
@@ -2072,8 +2082,11 @@ export function ResultScreen() {
       fixtures,
       north: nordReleve,
       releve: targetRoom.releve,
-    });
-  }, [ficheOuverte, targetRoom, parts, walls, openings, objects, fixtures, nordReleve]);
+      }),
+      surfaceHabitable: habitableDeLaCible,
+      raisonHabitable: lue?.raison ?? null,
+    };
+  }, [ficheOuverte, targetRoom, parts, walls, openings, objects, fixtures, nordReleve, habitable]);
   const targetPart = parts.find((p) => p.roomId === targetRoomId) ?? null;
   const targetExtent = targetPart?.surface
     ? roomExtent(targetPart.surface.pts)
@@ -2449,6 +2462,24 @@ export function ResultScreen() {
     rangerLeTravail();
     reset();
   };
+  /** Un scan qui ne démarre pas le DIT — il échouait sans un mot. */
+  const refusDuScan = (e: any) =>
+    alerte(expliquer('releve', e).titre, expliquer('releve', e?.message ?? 'Le scan n’a pas pu démarrer.').message);
+  /*
+    « NOUVEAU SCAN » SCANNE — correctif de l'audit : il ramenait à l'accueil.
+    Il demande d'abord : le plan ouvert est rangé, pas perdu, mais on quitte.
+  */
+  const nouveauScan = () =>
+    alerte('Commencer un nouveau scan ?', 'Ce plan est rangé dans Mes scans : vous le retrouverez tel quel.', [
+      { label: 'Annuler' },
+      {
+        label: 'Scanner',
+        onPress: () => {
+          repartirDeZero();
+          lancerUnScan().catch(refusDuScan);
+        },
+      },
+    ]);
 
   /** Amène sous les yeux l'élément visé par un constat. */
   const goToIssue = (issue: Constat) => {
@@ -2489,6 +2520,16 @@ export function ResultScreen() {
       title: piece?.name || 'Pièce sans nom',
       subtitle: 'Ce qu’on peut faire de cette pièce.',
       actions: [
+        /*
+          LA FICHE, SANS PASSER PAR L'ÉDITION — correctif de l'audit : elle
+          ne s'ouvrait que depuis la barre de la pièce, en mode édition.
+        */
+        {
+          label: 'Fiche de la pièce',
+          hint: 'Surfaces, hauteur, volume, ouvertures.',
+          icon: 'piece' as const,
+          onPress: () => setFicheOuverte(true),
+        },
         {
           label: 'Renommer',
           icon: 'renommer' as const,
@@ -2983,7 +3024,11 @@ export function ResultScreen() {
           <TouchableOpacity
             style={styles.emptyGhost}
             accessibilityLabel="Refaire un scan"
-            onPress={reset}>
+            onPress={() => {
+              // Il RELANCE un scan : il ramenait à l'accueil.
+              reset();
+              lancerUnScan().catch(refusDuScan);
+            }}>
             <Text style={styles.emptyGhostText}>Refaire un scan</Text>
           </TouchableOpacity>
         )}
@@ -3076,7 +3121,7 @@ export function ResultScreen() {
     */
     ...(habitable.pieces.length > 0 &&
     (!modeElec || Math.abs(habitable.total - habitable.sol) >= 0.5)
-      ? [{ value: fr(habitable.total), label: 'm² hab.' }]
+      ? [{ value: `${surface && !surface.exact ? '≈ ' : ''}${fr(habitable.total)}`, label: 'm² hab.' }]
       : []),
     { value: fr(perimeter), label: 'm périm.' },
     ...(objects.length > 0
@@ -3367,7 +3412,7 @@ export function ResultScreen() {
                         ? `Le dossier en compte ${niveaux.length}.`
                         : 'Il s’ajoute au-dessus de ce plan.',
                     onPress: () => {
-                      demarrerEtage(Math.max(...niveaux) + 1).catch(() => {});
+                      demarrerEtage(Math.max(...niveaux) + 1).catch(refusDuScan);
                     },
                   },
                   {
@@ -3375,7 +3420,7 @@ export function ResultScreen() {
                     icon: 'soussol' as const,
                     hint: 'Cave, garage : il se range sous le plan.',
                     onPress: () => {
-                      demarrerEtage(Math.min(...niveaux) - 1).catch(() => {});
+                      demarrerEtage(Math.min(...niveaux) - 1).catch(refusDuScan);
                     },
                   },
                   {
@@ -3612,8 +3657,8 @@ export function ResultScreen() {
                     : []),
                   {
                     label: 'Nouveau scan',
-                    icon: 'sortir' as const,
-                    onPress: repartirDeZero,
+                    icon: 'scanner' as const,
+                    onPress: nouveauScan,
                   },
                 ],
               });
@@ -4590,6 +4635,39 @@ export function ResultScreen() {
           maintenant deux pastilles qu'on touche, comme au plafond, et la
           feuille de saisie monte AVEC le clavier.
         */}
+        {/*
+          CE QUI COMPTE SE DIT DÈS QUE LE MEUBLE EST CHOISI — correctif de
+          l'audit : « ne passe pas » et « caler » n'apparaissaient qu'après
+          « Cotes du meuble ». La barre entière reste à la demande (elle
+          couvrait le plan) ; ces deux mots-là, non.
+        */}
+        {vue === '2d' && selectedObject && showFurniture && !capturing && !objDims &&
+          ((verdictDePassage && !verdictDePassage.ok && !objDims) || calage) && (
+            <View style={[styles.pucesDuMeuble, { bottom: etageCommandes }]} pointerEvents="box-none">
+              {verdictDePassage && !verdictDePassage.ok ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={verdictDePassage.court}
+                  style={[styles.puceDuMeuble, { borderColor: teinte.amber }]}
+                  onPress={() => alerte('Il ne passe pas', verdictDePassage.detail)}>
+                  <Text style={styles.puceDuMeubleTexte} numberOfLines={1}>
+                    {verdictDePassage.court}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              {calage ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Caler le meuble dans sa niche"
+                  style={[styles.puceDuMeuble, { borderColor: teinte.blue }]}
+                  onPress={() => calerMeuble(selectedObject.id)}>
+                  <Text style={styles.puceDuMeubleTexte} numberOfLines={1}>
+                    Caler dans sa niche
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          )}
         {vue === '2d' && selectedObject && showFurniture && objDims && !capturing && (
           <ObjectBar
             key={selectedObject.id}
@@ -5945,7 +6023,8 @@ export function ResultScreen() {
 
       {/* ---------- Le choix de fin de scan ---------- */}
       <ChoixScan
-        visible={!!arrivage && !capturing && !rienACocher}
+        // Une fenêtre à la fois : le choix attend que le bilan soit refermé.
+        visible={!!arrivage && !capturing && !rienACocher && !bilan}
         meubles={arrivage?.meubles ?? 0}
         posesViseur={arrivage?.posesViseur ?? 0}
         elec={modeElec}

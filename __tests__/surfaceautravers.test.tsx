@@ -86,7 +86,8 @@ function modele(mursPleins: boolean) {
       ceiling: [],
       photos: [],
       showFurniture: true,
-      showSurfaces: true,
+      // Les surfaces de la MAQUETTE : un calque à part (voir `show3DSurfaces`).
+      show3DSurfaces: true,
     });
     t = TestRenderer.create(
       <Iso3DView

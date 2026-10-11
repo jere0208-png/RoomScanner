@@ -1862,6 +1862,13 @@ interface ScanState {
   showSurfaces: boolean;
   setShowSurfaces: (v: boolean) => void;
   /**
+   * LES SURFACES DE LA MAQUETTE, à part de celles du plan — comme les cotes.
+   * Le plan s'ouvre avec ses pièces nommées ; la 3D, sur ses meubles et ses
+   * murs seulement (relevé du patron).
+   */
+  show3DSurfaces: boolean;
+  setShow3DSurfaces: (v: boolean) => void;
+  /**
    * LE SOL EN 3D, INDÉPENDANT DES SURFACES — relevé du patron : « Sol (activé
    * par défaut, et doit être indépendant de “Surfaces”, qui doit afficher les
    * surfaces uniquement) ». « Surfaces » ne pose plus que les étiquettes des
@@ -2265,7 +2272,14 @@ const solDe = (walls: WallSeg[]) =>
 const CALQUES_DE_BASE = {
   showFurniture: true,
   solidWalls: true,
-  showSurfaces: false,
+  /*
+    LE PLAN PARLE DÈS L'OUVERTURE — correctif de l'audit : il s'ouvrait sans
+    un nom de pièce ni un mètre carré, parce que le calque des surfaces était
+    commun à la 2D et à la 3D. Ils sont séparés : la 2D s'ouvre nommée, la 3D
+    reste sur ses meubles et ses murs.
+  */
+  showSurfaces: true,
+  show3DSurfaces: false,
   showTextures: false,
   showSol: true,
   showNotes: true,
@@ -2937,7 +2951,9 @@ export const useScanStore = create<ScanState>((set, get) => {
       chacun à une question précise ; allumés d'office, ils couvrent ce
       qu'on vient regarder — la maçonnerie et ce qu'il y a dedans.
     */
-    showSurfaces: false,
+    showSurfaces: true,
+    show3DSurfaces: false,
+    setShow3DSurfaces: (show3DSurfaces) => set({ show3DSurfaces }),
     setShowSurfaces: (showSurfaces) => {
       set({ showSurfaces });
       AsyncStorage.setItem(SURFACES_KEY, showSurfaces ? '1' : '0').catch(() => {});

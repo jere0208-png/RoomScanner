@@ -55,6 +55,8 @@ export interface PlafondDeLaPiece {
   rampant: boolean;
   /** Surface au sol où l'on tient debout (m²), si le plafond a été assez vu. */
   surfaceHabitable: number | null;
+  /** Pourquoi une partie de la pièce ne compte pas — null si tout compte. */
+  raisonHabitable?: string | null;
 }
 
 const arrondi = (v: number, pas = 0.01) => Math.round(v / pas) * pas;
@@ -239,6 +241,8 @@ export interface FicheDeLaPiece {
   surfaceReleve: number | null;
   /** Surface où l'on tient debout (loi Carrez), quand le plafond est rampant. */
   surfaceHabitable: number | null;
+  /** Pourquoi une partie de la pièce ne compte pas — null si tout compte. */
+  raisonHabitable?: string | null;
   hauteur: number;
   hauteurMin: number | null;
   hauteurMax: number | null;

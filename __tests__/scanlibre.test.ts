@@ -31,7 +31,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { RoomScan } from 'react-native-room-scan';
 import { demarrerEtage } from '../src/native/useRoomScan';
-import { PLANS_GRATUITS, useAccountStore } from '../src/store/accountStore';
+import { useAccountStore } from '../src/store/accountStore';
 import { useScanStore } from '../src/store/scanStore';
 import {
   SNAPSHOT_OBJECTS,
@@ -76,7 +76,7 @@ const sansAbonnement = () => {
   useAccountStore.setState({
     pro: false,
     proVia: null,
-    plansUtilises: PLANS_GRATUITS,
+    plansUtilises: 1,
     bonusEssais: 0,
     surpriseVisible: false,
     paywallVisible: false,

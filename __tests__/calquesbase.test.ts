@@ -43,13 +43,17 @@ const calques = () => ({
   meubles: st().showFurniture,
   murs: st().solidWalls,
   surfaces: st().showSurfaces,
+  surfaces3D: st().show3DSurfaces,
   couleurs: st().showTextures,
 });
 
 const DE_BASE = {
   meubles: true,
   murs: true,
-  surfaces: false,
+  // Le plan s'ouvre avec ses pièces nommées (correctif de l'audit) ; la
+  // maquette, elle, reste sur ses meubles et ses murs.
+  surfaces: true,
+  surfaces3D: false,
   couleurs: false,
 };
 

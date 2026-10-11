@@ -410,7 +410,8 @@ const styles = getStyles(c);
    */
   useEffect(() => {
     setShowFurniture(true);
-    setShowSurfaces(false);
+    // Les SURFACES restent comme le plan les montre (allumées d'office) : un
+    // dossier sans un nom de pièce ni un mètre carré ne sert à personne.
     setShowTextures(false);
     setShowOpeningColors(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps

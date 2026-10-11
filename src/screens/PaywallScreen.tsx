@@ -89,7 +89,7 @@ import { panne as expliquer } from '../ui/panne';
 
   Elle vendait « Meubles, 3D et cotes au centimètre » et « Tous les exports :
   PDF, DXF, CSV ». Or RIEN DE TOUT ÇA N'EST VERROUILLÉ : le seul palier de
-  l'application est le NOMBRE de logements (`PLANS_GRATUITS`), et l'abonnement
+  l'application est le NOMBRE de logements, et l'abonnement
   n'est consulté ni par la vue 3D, ni par les cotes, ni par l'export.
 
   Autrement dit, on vendait à quelqu'un ce qu'il était déjà en train
@@ -115,7 +115,6 @@ const ATOUTS: { icone: keyof typeof SOLAIRES; mot: string }[] = [
   { icone: 'metre', mot: 'Métré CSV pour Excel' },
   { icone: 'save', mot: 'Vos plans sauvegardés en ligne' },
   { icone: 'elec', mot: 'Devis aux prix du magasin' },
-  { icone: 'etoile', mot: 'Les nouveautés en premier' },
 ];
 /*
   AU GRAND PUBLIC, LE MÉTIER TIENT EN UNE LIGNE — et elle se lit comme une

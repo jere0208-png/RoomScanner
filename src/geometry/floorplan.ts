@@ -1582,6 +1582,24 @@ export function solDesMurs(walls: readonly { yCenter: number; height: number; ty
   return pieds.length > 0 ? Math.min(...pieds) : 0;
 }
 
+/**
+ * LE TOUR DES PIÈCES (m) — la somme des contours, pas celle de tous les
+ * murs : une cloison libre n'est le périmètre de personne.
+ */
+export function perimetreDesPieces(parts: RoomPart[]): number {
+  let total = 0;
+  for (const p of parts) {
+    const pts = p.surface?.pts;
+    if (!pts || pts.length < 3) continue;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      total += Math.hypot(b.x - a.x, b.z - a.z);
+    }
+  }
+  return total;
+}
+
 /** Aire cumulée des pièces ; `exact` tombe dès qu'un contour est reconstitué. */
 export function totalArea(
   parts: RoomPart[],

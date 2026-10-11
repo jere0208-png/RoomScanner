@@ -40,8 +40,8 @@ export function MenuCompte({
   const confirmerSuppression = () =>
     alerte(
       'Supprimer le compte ?',
-      'Vos relevés restent sur l’appareil, mais l’identité est effacée. ' +
-        'Le palier gratuit déjà consommé ne se remet pas à zéro.',
+      'Votre compte et les plans déposés en ligne sont effacés de nos ' +
+        'serveurs. Les relevés enregistrés sur ce téléphone y restent.',
       [
         { label: 'Annuler' },
         {

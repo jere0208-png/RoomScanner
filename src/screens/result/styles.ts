@@ -765,6 +765,27 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     qui ne compterait que la rangée unique laisserait poser un menu dessus,
     et c'est le défaut qu'on vient de corriger.
   */
+  /** Les puces du meuble choisi : ce qui compte, sans ouvrir la barre. */
+  pucesDuMeuble: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  puceDuMeuble: {
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    backgroundColor: c.surface,
+    justifyContent: 'center',
+    maxWidth: '100%',
+    ...shadowCard,
+    shadowOpacity: 0.08,
+  },
+  puceDuMeubleTexte: { color: c.ink, fontSize: 13, fontWeight: '700' },
   editRow: {
     flexDirection: 'row',
     alignItems: 'center',

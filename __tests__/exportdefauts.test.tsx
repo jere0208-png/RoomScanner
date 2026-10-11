@@ -129,10 +129,11 @@ describe('les options cochées à l’ouverture de l’export', () => {
     calque Cotes du plan, « Élévations » et « Cotes Élec » sont les murs de
     face — tous les murs.
   */
-  const COCHEES = ['Vues 3D', 'Métré', 'Cotes', 'Meubles', 'Murs de face', 'Tous les murs'];
+  // « Surfaces » est cochée : un dossier sans un nom de pièce ni un mètre
+  // carré ne sert à personne (correctif de l'audit).
+  const COCHEES = ['Vues 3D', 'Métré', 'Cotes', 'Meubles', 'Surfaces', 'Murs de face', 'Tous les murs'];
   const DECOCHEES = [
     'Cotes sur la 3D',
-    'Surfaces',
     'Menuiseries en couleur',
     'Couleurs relevées',
     'Plafond',
@@ -162,7 +163,7 @@ describe('les options cochées à l’ouverture de l’export', () => {
     monter();
     const st = useScanStore.getState();
     expect(st.showFurniture).toBe(true);
-    expect(st.showSurfaces).toBe(false);
+    expect(st.showSurfaces).toBe(true);
     expect(st.showTextures).toBe(false);
     expect(st.showOpeningColors).toBe(false);
   });

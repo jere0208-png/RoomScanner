@@ -132,7 +132,7 @@ export function PoseEstimee({
         <TotalQuiMonte valeur={materiel + pose.ttc} format={euros} style={s.totalValeur} />
       </View>
       <Text style={s.mention}>
-        Estimation à partir des points du plan : à ajuster au métré réel. Le matériel est compté au prix public TTC.
+        Estimation à partir des points du plan : à ajuster au métré réel. Le matériel est compté au prix retenu sur le devis, TTC.
       </Text>
     </View>
   );

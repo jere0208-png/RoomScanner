@@ -261,8 +261,8 @@ export function ProfilScreen() {
             <Text style={s.aboSous} numberOfLines={2}>
               {pro
                 ? proVia === 'code'
-                  ? 'Débloqué par code · relevés illimités'
-                  : 'Abonnement actif · relevés illimités'
+                  ? 'Débloqué par code · exports et sauvegarde en ligne'
+                  : 'Abonnement actif · exports et sauvegarde en ligne'
                 : 'Gratuit · scans illimités, exports en Pro'}
             </Text>
             {/*

@@ -51,7 +51,6 @@ beforeEach(() => {
     proVia: null,
     plansUtilises: 0,
     paywallVisible: false,
-    essaiEpuiseVisible: false,
     jeton: null,
   });
 });
@@ -89,13 +88,13 @@ describe('l’essai gratuit appartient au téléphone', () => {
     // Le modèle « exporter et partager » : le compteur ne ferme plus rien,
     // il n'y a donc rien à annoncer.
     expect(s.peutCreerPlan()).toBe(true);
-    expect(s.essaiEpuiseVisible).toBe(false);
+    expect(s.paywallVisible).toBe(false);
   });
 
   it('ne montre AUCUN popup quand l’essai est encore là', async () => {
     const r = await useAccountStore.getState().connecter(MARTIN);
     expect(r.ok).toBe(true);
-    expect(useAccountStore.getState().essaiEpuiseVisible).toBe(false);
+    expect(useAccountStore.getState().paywallVisible).toBe(false);
   });
 
   /**
@@ -113,7 +112,7 @@ describe('l’essai gratuit appartient au téléphone', () => {
     expect(r.ok).toBe(true);
     const s = useAccountStore.getState();
     expect(s.pro).toBe(false);
-    expect(s.essaiEpuiseVisible).toBe(false);
+    expect(s.paywallVisible).toBe(false);
     // Le trousseau ne porte plus le Pro de l'ancien compte : il ne doit
     // pas se réappliquer au suivant par accident.
     expect(mockMarqueur?.pro).toBeUndefined();
@@ -126,7 +125,7 @@ describe('l’essai gratuit appartient au téléphone', () => {
     const s = useAccountStore.getState();
     expect(s.pro).toBe(true);
     expect(s.proVia).toBe('code');
-    expect(s.essaiEpuiseVisible).toBe(false);
+    expect(s.paywallVisible).toBe(false);
   });
 });
 

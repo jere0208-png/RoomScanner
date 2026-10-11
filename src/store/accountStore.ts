@@ -83,7 +83,6 @@ async function api(
   }
 }
 
-export const PLANS_GRATUITS = 1;
 export const PRIX_PRO = '4,90 €';
 export const PRIX_PRO_NUM = 4.9;
 export const PRODUIT_PRO = 'echoplan.pro.mensuel';
@@ -195,7 +194,6 @@ interface AccountState {
    * téléphone a déjà consommé son relevé gratuit — on accueille le compte,
    * on annonce la couleur, on montre la page Pro. Jamais un refus.
    */
-  essaiEpuiseVisible: boolean;
   /**
    * Le popup « Surprise ! » : l'offre de lancement d'Apple, quand elle
    * existe et que l'utilisateur y a droit. Levé à la PREMIÈRE inscription
@@ -274,7 +272,6 @@ interface AccountState {
   noterPlanCree: () => void;
   ouvrirPaywall: () => void;
   fermerPaywall: () => void;
-  fermerEssaiEpuise: () => void;
   ouvrirSurprise: () => void;
   fermerSurprise: () => void;
   /** Le clic sur la surprise : le code s'applique TOUT SEUL, et la page
@@ -329,7 +326,6 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   proVia: null,
   plansUtilises: 0,
   paywallVisible: false,
-  essaiEpuiseVisible: false,
   surpriseVisible: false,
   offres: null,
   bonusEssais: 0,
@@ -753,7 +749,6 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     set({ paywallVisible: true });
   },
   fermerPaywall: () => set({ paywallVisible: false }),
-  fermerEssaiEpuise: () => set({ essaiEpuiseVisible: false }),
   /*
     LA SURPRISE N'EXISTE QUE SI L'OFFRE EXISTE. Sans offre de lancement
     éligible, le geste mène droit à la page Pro : promettre une remise que

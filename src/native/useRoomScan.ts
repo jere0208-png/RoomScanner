@@ -74,12 +74,44 @@ export async function demarrerEtage(n: number): Promise<void> {
     compte.ouvrirSurprise();
     return;
   }
+  // Sans LiDAR, on le DIT — et rien n'est commencé (l'étage restait « en cours »).
+  if (st.supported === false) {
+    throw new Error('Le scan demande un iPhone Pro (capteur LiDAR).');
+  }
   st.scannerUnEtage(n);
   st.beginScan();
-  await RoomScan.start();
+  try {
+    await RoomScan.start();
+  } catch (e) {
+    useScanStore.setState({ etageEnCours: null });
+    throw e;
+  }
   st.setScreen('scan');
   st.setScanning(true);
   st.setPaused(false);
+}
+
+/**
+ * LANCER UN SCAN DEPUIS N'IMPORTE OÙ — « Refaire un scan », « Nouveau scan »
+ * ramenaient à l'accueil au lieu de scanner. Sans LiDAR, on le dit ; sans
+ * caméra, on passe par sa page.
+ */
+export async function lancerUnScan(): Promise<void> {
+  const st = useScanStore.getState();
+  if (st.supported === false) {
+    throw new Error('Le scan demande un iPhone Pro (capteur LiDAR).');
+  }
+  const status = await RoomScan.cameraStatus();
+  if (status !== 'granted') {
+    st.setScreen('camera');
+    return;
+  }
+  st.setError(null);
+  st.beginScan();
+  await RoomScan.start();
+  st.setScanning(true);
+  st.setPaused(false);
+  st.setScreen('scan');
 }
 
 /**

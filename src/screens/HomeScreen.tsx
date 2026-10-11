@@ -197,8 +197,34 @@ export function HomeScreen() {
       ouvrirSurprise();
       return;
     }
+    /*
+      UN RELEVÉ INTERROMPU ATTEND — correctif de l'audit : un nouveau scan
+      l'effaçait sans prévenir. On demande.
+    */
+    if (brouillon) {
+      alerte(
+        'Un relevé interrompu vous attend',
+        'Un nouveau scan le remplacera. Vous pouvez aussi le reprendre là où il en était.',
+        [
+          { label: 'Annuler' },
+          { label: 'Reprendre', onPress: reprendreBrouillon },
+          { label: 'Nouveau scan', danger: true, onPress: start },
+        ],
+      );
+      return;
+    }
     start();
   };
+  /** Jeter un relevé interrompu se confirme : il ne revient pas. */
+  const jeterLeBrouillon = () =>
+    alerte(
+      'Jeter le relevé interrompu ?',
+      'Les murs déjà relevés seront perdus.',
+      [
+        { label: 'Garder' },
+        { label: 'Jeter', danger: true, onPress: oublierBrouillon },
+      ],
+    );
   const dessiner = () => {
     if (!peutCreerPlan()) {
       ouvrirSurprise();
@@ -344,7 +370,7 @@ export function HomeScreen() {
                       onPress={() =>
                         alerte(
                           'Scan indisponible',
-                          'Le scan demande un iPhone Pro (capteur LiDAR). Tout le reste fonctionne : dessinez votre plan au doigt, ou ouvrez l’exemple.',
+                          'Le scan demande un iPhone Pro (capteur LiDAR). Tout le reste fonctionne : dessinez votre plan aux cotes, ou ouvrez l’exemple.',
                         )
                       }
                     />
@@ -383,7 +409,7 @@ export function HomeScreen() {
                     hauteur={BASSE}
                     icone={SOLAIRES.crayon}
                     titre={'Dessiner\nun plan'}
-                    sous="Au doigt, sans capteur"
+                    sous="Aux cotes, sans capteur"
                     label="Dessiner un plan sans scanner"
                     onPress={dessiner}
                   />
@@ -415,7 +441,7 @@ export function HomeScreen() {
             {scanIndisponible && (
               <Text style={styles.avis}>
                 Cet appareil n’est pas compatible avec le scan (il faut un iPhone Pro,
-                capteur LiDAR). Dessinez votre plan au doigt : tout le reste fonctionne.
+                capteur LiDAR). Dessinez votre plan aux cotes : tout le reste fonctionne.
               </Text>
             )}
           </>
@@ -482,7 +508,7 @@ export function HomeScreen() {
                     accessibilityRole="button"
                     accessibilityLabel="Jeter le relevé interrompu"
                     hitSlop={8}
-                    onPress={oublierBrouillon}>
+                    onPress={jeterLeBrouillon}>
                     <Text style={styles.jeter}>Jeter</Text>
                   </Pressable>
                 </View>

@@ -263,7 +263,6 @@ describe('la page Pro vend aussi ce qui n’est pas électrique', () => {
       proVia: null,
       plansUtilises: 0,
       paywallVisible: true,
-      essaiEpuiseVisible: false,
     });
   });
 

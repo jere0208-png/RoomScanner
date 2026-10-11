@@ -559,7 +559,8 @@ export function Iso3DView({
     [showFurniture, meublesDuNiveau],
   );
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
-  const showSurfaces = useScanStore((s) => s.showSurfaces);
+  // Les surfaces de la MAQUETTE : un calque à part de celles du plan.
+  const showSurfaces = useScanStore((s) => s.show3DSurfaces);
   /*
     DEDANS — l'œil est-il DANS le logement ?
 

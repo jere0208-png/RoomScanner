@@ -3971,6 +3971,13 @@
          "type": "RNSVGGroup",
          "props": {
           "pointerEvents": "auto",
+          "onResponderMove": "[fn]",
+          "onResponderGrant": "[fn]",
+          "onResponderRelease": "[fn]",
+          "onResponderTerminate": "[fn]",
+          "onStartShouldSetResponder": "[fn]",
+          "onResponderTerminationRequest": "[fn]",
+          "responsible": true,
           "fill": {
            "type": 0,
            "payload": 4278190080

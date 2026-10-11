@@ -56,7 +56,6 @@ jest.mock('../src/screens/ExportScreen', () => ({ ExportScreen: () => null }));
 jest.mock('../src/screens/CameraScreen', () => ({ CameraScreen: () => null }));
 jest.mock('../src/screens/SignInScreen', () => ({ SignInScreen: () => null }));
 jest.mock('../src/screens/PaywallScreen', () => ({ PaywallScreen: () => null }));
-jest.mock('../src/components/EssaiEpuise', () => ({ EssaiEpuise: () => null }));
 jest.mock('../src/components/SurprisePro', () => ({ SurprisePro: () => null }));
 
 import React from 'react';

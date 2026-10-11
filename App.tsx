@@ -18,7 +18,6 @@ import { EcranChargement } from './src/components/EcranChargement';
 import { MagasinScreen } from './src/screens/MagasinScreen';
 import { GammeScreen } from './src/screens/GammeScreen';
 import { reprendreLesTarifs } from './src/net/tarifs';
-import { EssaiEpuise } from './src/components/EssaiEpuise';
 import { SurprisePro } from './src/components/SurprisePro';
 import { AlerteHote } from './src/components/AlerteHote';
 import { AstuceHote } from './src/components/AstuceHote';
@@ -357,7 +356,6 @@ function Application() {
       )}
       {screen === 'camera' && <CameraScreen />}
       <PaywallScreen />
-      <EssaiEpuise />
       {/*
         LE PREMIER LANCEMENT, ET RIEN QU'UNE FOIS.
 

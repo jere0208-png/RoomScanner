@@ -250,7 +250,6 @@ describe('5 — la page Pro vend ce qu’on va faire', () => {
       proVia: null,
       plansUtilises: 0,
       paywallVisible: true,
-      essaiEpuiseVisible: false,
     });
   });
 
