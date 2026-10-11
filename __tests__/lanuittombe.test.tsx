@@ -108,7 +108,7 @@ describe('le bouton de la nuit', () => {
       join(__dirname, '..', 'src', 'screens', 'result', 'ResultToolbar.tsx'),
       'utf8',
     );
-    expect(src).toContain('icon="lune"');
-    expect(src).toContain('label="Nuit"');
+    // Elle vit maintenant dans le menu « Afficher » de la maquette.
+    expect(src).toContain("icone: 'lune' as const, libelle: 'Nuit'");
   });
 });

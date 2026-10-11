@@ -1,0 +1,222 @@
+/**
+ * LE MENU « AFFICHER » ET LES RANGÉES REPENSÉES.
+ *
+ * Relevé du patron : « en mode édition, avant les icônes d'ajout, rajoute un
+ * petit “+” ; sur la 3D, “Volumes” est peu intuitif ; rajoute un bouton “…”
+ * en bas à droite à la place de Pièces : un menu “Afficher” avec Volumes
+ * d'eau, Points cardinaux, Sol (activé par défaut, indépendant de
+ * “Surfaces”), la Nuit, Murs… Affiche hors du “…” les plus utiles — meubles,
+ * cotes, surfaces —, ajoute d'autres idées de choses à afficher, et donne de
+ * l'ampleur aux possibilités du plan 2D ».
+ */
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(async () => null),
+  setItem: jest.fn(async () => undefined),
+  removeItem: jest.fn(async () => undefined),
+}));
+
+import React from 'react';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { Animated, Switch, Text } from 'react-native';
+import TestRenderer, { act } from 'react-test-renderer';
+import { Toolbar2D, Toolbar3D } from '../src/screens/result/ResultToolbar';
+import { ToolPill } from '../src/components/ToolPill';
+import { useScanStore } from '../src/store/scanStore';
+import { useUsage } from '../src/store/usage';
+import { buildScene, type ScenePalette } from '../src/geometry/scene3d';
+import type { WallSeg } from '../src/geometry/floorplan';
+
+const lire = (p: string) => readFileSync(join(__dirname, '..', p), 'utf8');
+
+let arbre: TestRenderer.ReactTestRenderer | null = null;
+afterEach(() => {
+  act(() => arbre?.unmount());
+  arbre = null;
+});
+const monter = (el: React.ReactElement) => {
+  act(() => {
+    arbre = TestRenderer.create(el);
+  });
+  return arbre!;
+};
+const libelles = (t: TestRenderer.ReactTestRenderer) =>
+  t.root.findAllByType(ToolPill).map((n) => String(n.props.label));
+const textes = (t: TestRenderer.ReactTestRenderer) =>
+  t.root.findAllByType(Text).map((n) => [].concat(n.props.children).join(''));
+const appuyer = (t: TestRenderer.ReactTestRenderer, label: string) => {
+  const b = t.root.findAll((n) => n.props.accessibilityLabel === label && typeof n.props.onPress === 'function', { deep: false })[0];
+  expect([label, !!b]).toEqual([label, true]);
+  act(() => b.props.onPress());
+};
+
+const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
+  id,
+  type: 'wall',
+  a: { x: ax, z: az },
+  b: { x: bx, z: bz },
+  height: 2.5,
+  yCenter: 1.25,
+  roomId: 'r1',
+});
+const PIECE = [mur('n', 0, 0, 4, 0), mur('e', 4, 0, 4, 3), mur('s', 4, 3, 0, 3), mur('o', 0, 3, 0, 0)];
+
+const rangee2D = (edition: boolean) =>
+  monter(
+    <Toolbar2D
+      anim={new Animated.Value(1)}
+      largeur={1400}
+      bas={0}
+      dessus={0}
+      edition={edition}
+      pendingKind={null}
+      pendingCeiling={null}
+      pendingNote={false}
+      onNote={jest.fn()}
+      showMeasures={false}
+      setShowMeasures={jest.fn()}
+      showRoutes={false}
+      showFixtures={false}
+      setShowFixtures={jest.fn()}
+      setShowRoutes={jest.fn()}
+      hasRoutes={false}
+      showNorth={false}
+      setShowNorth={jest.fn()}
+      showCeiling={false}
+      setShowCeiling={jest.fn()}
+      onFixture={jest.fn()}
+      onFurniture={jest.fn()}
+      onFurnitureOff={jest.fn()}
+      seulGeste={jest.fn()}
+      setMenu={jest.fn()}
+      setPendingCeiling={jest.fn()}
+      setPendingSpots={jest.fn()}
+    />,
+  );
+
+const rangee3D = () =>
+  monter(
+    <Toolbar3D
+      anim={new Animated.Value(1)}
+      largeur={1400}
+      bas={0}
+      showMeasures={false}
+      setShowMeasures={jest.fn()}
+      showNorth={false}
+      setShowNorth={jest.fn()}
+      showCeiling={false}
+      setShowCeiling={jest.fn()}
+      showVolumes={false}
+      setShowVolumes={jest.fn()}
+      nuit={false}
+      setNuit={jest.fn()}
+      zonesHumides={0}
+      showElecTags={false}
+      setShowElecTags={jest.fn()}
+      colorsAvailable={false}
+      focusIdx={-1}
+      setFocusIdx={jest.fn()}
+    />,
+  );
+
+beforeEach(() => {
+  act(() => {
+    useScanStore.getState().reset();
+    useScanStore.setState({ walls: PIECE, showGrille: false, showSol: true });
+    useUsage.setState({ modeElec: true });
+  });
+});
+
+describe('le plan 2D', () => {
+  it('la rangée garde l’essentiel — cotes, meubles, surfaces, appareils — et « Plus » au bout', () => {
+    const t = rangee2D(false);
+    const ordre = libelles(t);
+    expect(ordre).toEqual(['Cotes', 'Meubles', 'Surfaces', 'Appareils', 'Autres']);
+  });
+
+  it('« Plus » ouvre le menu Afficher : nord, grille, couleurs des ouvertures, notes, photos', () => {
+    const t = rangee2D(false);
+    appuyer(t, 'Autres');
+    const vu = textes(t);
+    expect(vu).toContain('Afficher sur le plan');
+    for (const mot of ['Points cardinaux', 'Grille', 'Portes et fenêtres en couleur', 'Notes', 'Photos', 'Gaines', 'Plafond']) {
+      expect(vu).toContain(mot);
+    }
+    // La grille s'allume d'un appui sur sa ligne.
+    appuyer(t, 'Grille');
+    expect(useScanStore.getState().showGrille).toBe(true);
+    // Un calque vide reste dans la liste, grisé, et dit pourquoi.
+    const notes = t.root.findAll((n) => n.props.accessibilityLabel === 'Notes' && n.props.accessibilityRole === 'switch')[0];
+    expect(notes.props.accessibilityState).toEqual({ checked: false, disabled: true });
+    expect(notes.props.accessibilityHint).toMatch(/Aucune note/);
+  });
+
+  it('en édition, chaque bouton qui ajoute porte son petit « + » — « Redresser » non', () => {
+    const t = rangee2D(true);
+    const pastilles = t.root.findAllByType(ToolPill);
+    const ajout = (label: string) => pastilles.find((p) => p.props.label === label)?.props.ajout === true;
+    for (const label of ['Meuble', 'Appareil', 'Plafond', 'Note']) expect([label, ajout(label)]).toEqual([label, true]);
+    expect(ajout('Redresser')).toBe(false);
+  });
+
+  it('la grille se dessine sous le plan ; notes et photos se cachent hors édition', () => {
+    const editeur = lire('src/components/FloorplanEditor.tsx');
+    expect(editeur).toContain('const grille = useMemo(() => {');
+    expect(editeur).toContain('if (!showGrille || !mapping || walls.length === 0) return null;');
+    const ecran = lire('src/screens/ResultScreen.tsx');
+    expect(ecran).toContain('photos={editMode || showPhotos ? photos : SANS_PHOTOS}');
+    expect(ecran).toContain('notes={editMode || showNotes ? notes : SANS_NOTES}');
+  });
+});
+
+describe('la maquette 3D', () => {
+  it('la rangée : meubles, cotes, surfaces — et « Plus » à la place de « Pièces »', () => {
+    const t = rangee3D();
+    const ordre = libelles(t);
+    expect(ordre).toEqual(['Meubles', 'Cotes', 'Surfaces', 'Autres']);
+    for (const parti of ['Pièces', 'Volumes', 'Nuit', 'Murs', 'Nord']) expect(ordre).not.toContain(parti);
+  });
+
+  it('le menu : le sol (allumé), les murs pleins, les volumes de salle d’eau, la pièce isolée', () => {
+    act(() => useScanStore.setState({ rooms: [{ id: 'r1', name: 'Séjour' }, { id: 'r2', name: 'Chambre' }] as never }));
+    const t = rangee3D();
+    appuyer(t, 'Autres');
+    const vu = textes(t);
+    expect(vu).toContain('Afficher sur la maquette');
+    for (const mot of ['Sol', 'Murs pleins', 'Volumes de salle d’eau', 'Points cardinaux', 'Nuit', 'Pièce isolée', 'Tout le logement', 'Séjour']) {
+      expect(vu).toContain(mot);
+    }
+    const sol = t.root.findAll((n) => n.props.accessibilityLabel === 'Sol' && n.props.accessibilityRole === 'switch')[0];
+    expect(sol.props.accessibilityState).toEqual({ checked: true, disabled: false });
+    appuyer(t, 'Sol');
+    expect(useScanStore.getState().showSol).toBe(false);
+    // « Volumes » ne se lit plus comme le volume d'une pièce, et dit quand il est vide.
+    const volumes = t.root.findAll((n) => n.props.accessibilityLabel === 'Volumes de salle d’eau' && n.props.accessibilityRole === 'switch')[0];
+    expect(volumes.props.accessibilityHint).toMatch(/baignoire ni douche/);
+    expect(t.root.findAllByType(Switch).length).toBeGreaterThan(8);
+  });
+
+  it('hors électricité, les volumes, la nuit et les repères ne sont pas proposés', () => {
+    act(() => useUsage.setState({ modeElec: false }));
+    const t = rangee3D();
+    appuyer(t, 'Autres');
+    const vu = textes(t);
+    expect(vu).not.toContain('Volumes de salle d’eau');
+    expect(vu).not.toContain('Nuit');
+    expect(vu).toContain('Sol');
+  });
+
+  it('le sol est indépendant des surfaces', () => {
+    const PAL = {
+      floor: '#EEEEEE', floorStroke: '#CCCCCC', wall: '#FFFFFF', wallStroke: '#888888', wallTop: '#F4F4F4',
+      wallTopStroke: '#949494', opening: '#B9C2CE', door: '#E8A13B', window: '#3EB8E5', passage: '#2F6BFF',
+      object: '#D8E1F2', objectTop: '#E9EEF9', objectStroke: '#9FACBF',
+    } as ScenePalette;
+    const sols = (o: { showSurfaces: boolean; showSol?: boolean }) =>
+      buildScene(PIECE, [], [], { palette: PAL, rooms: [{ id: 'r1' }], ...o }).faces.filter((f) => f.isFloor).length;
+    expect(sols({ showSurfaces: false, showSol: true })).toBeGreaterThan(0);
+    expect(sols({ showSurfaces: true, showSol: false })).toBe(0);
+    // Sans le calque Sol (export, PDF), il suit les surfaces comme avant.
+    expect(sols({ showSurfaces: true })).toBeGreaterThan(0);
+  });
+});

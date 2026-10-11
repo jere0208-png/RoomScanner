@@ -13,34 +13,14 @@
  * ne reçoit que ce qui appartient à l'écran — l'animation, la géométrie de
  * la carte, et les gestes en attente.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import { Animated } from 'react-native';
-import Svg, { Circle, Polygon } from 'react-native-svg';
 import { useTheme } from '../../theme';
 import { RangeeOutils } from '../../components/RangeeOutils';
 import { ToolPill } from '../../components/ToolPill';
 import { CeilingIcon } from '../../components/CeilingIcon';
 import { VignetteProduit } from '../../components/VignetteProduit';
 
-/**
- * La boussole du calque « Nord » — cercle au trait, LOSANGE PLEIN.
- * Relevé du patron, en trois temps : plus grasse, plus grande, remplie.
- * Le tracé lucide gardait son aiguille vide au milieu des silhouettes.
- */
-function BoussoleNord({ teinte }: { teinte: string }) {
-  return (
-    <Svg width={26} height={26} viewBox="0 0 24 24">
-      <Circle cx={12} cy={12} r={10} stroke={teinte} strokeWidth={2.6} fill="none" />
-      <Polygon
-        points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88"
-        fill={teinte}
-        stroke={teinte}
-        strokeWidth={1.2}
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
 import {
   CEILINGS,
   CEILING_KINDS,
@@ -77,6 +57,7 @@ const sansElec = (
     (el): el is React.ReactElement =>
       !!el && (modeElec || !cles.has(String(el.key))),
   );
+import { CalquesSheet } from '../../components/CalquesSheet';
 import { getStyles } from './styles';
 
 /*
@@ -99,6 +80,13 @@ const RIEN = {
   nord3D: 'Nord inconnu — orientez le plan en mode édition, sur le plan 2D.',
   nuit: 'Aucun luminaire à allumer — posez-en en mode édition, sur le plan.',
   murs: 'Aucun mur à afficher : scannez ou dessinez une pièce.',
+  plafond: 'Aucun appareil au plafond — posez-en en mode édition.',
+  gaines: 'Posez le tableau sur le plan pour tracer les gaines.',
+  notes: 'Aucune note — écrivez-en en mode édition.',
+  photos: 'Aucune photo — prenez-en depuis un mur.',
+  couleurs: 'Aucune couleur relevée sur ce plan.',
+  reperes: 'Aucun appareil posé — passez en mode édition, sur le plan.',
+  volumes: 'Aucune baignoire ni douche relevée.',
 } as const;
 
 /** Ce qui s'allume la nuit : une applique au mur, un luminaire au plafond. */
@@ -111,12 +99,15 @@ function useContenus() {
   const appareils = useScanStore((s) => s.fixtures.length);
   const pieces = useScanStore((s) => s.rooms.length);
   const nord = useScanStore((s) => s.north !== null && s.north !== undefined);
+  const notes = useScanStore((s) => s.notes.length);
+  const photos = useScanStore((s) => s.photos.length);
+  const plafond = useScanStore((s) => s.ceiling.length);
   const luminaires = useScanStore(
     (s) =>
       s.fixtures.some((f) => f.kind === 'applique') ||
       s.ceiling.some((cl) => LUMINAIRES_AU_PLAFOND.has(cl.kind)),
   );
-  return { murs, meubles, appareils, pieces, nord, luminaires };
+  return { murs, meubles, appareils, pieces, nord, luminaires, notes, photos, plafond };
 }
 
 /** Ce que les deux rangées partagent : la place qu'elles occupent. */
@@ -203,7 +194,6 @@ export function Toolbar2D({
   const teinte = useTheme();
   const styles = getStyles(teinte);
   const rooms = useScanStore((s) => s.rooms);
-  const ceiling = useScanStore((s) => s.ceiling);
   const showFurniture = useScanStore((s) => s.showFurniture);
   const setShowFurniture = useScanStore((s) => s.setShowFurniture);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
@@ -211,6 +201,16 @@ export function Toolbar2D({
   const straightenPlan = useScanStore((s) => s.straightenPlan);
   const modeElec = useModeElec();
   const contenu = useContenus();
+  const showNotes = useScanStore((s) => s.showNotes);
+  const setShowNotes = useScanStore((s) => s.setShowNotes);
+  const showPhotos = useScanStore((s) => s.showPhotos);
+  const setShowPhotos = useScanStore((s) => s.setShowPhotos);
+  const showGrille = useScanStore((s) => s.showGrille);
+  const setShowGrille = useScanStore((s) => s.setShowGrille);
+  const showOpeningColors = useScanStore((s) => s.showOpeningColors);
+  const setShowOpeningColors = useScanStore((s) => s.setShowOpeningColors);
+  /** Le menu « Afficher » du plan : tout ce que la rangée ne garde pas. */
+  const [afficher, setAfficher] = useState(false);
 
   /**
    * LE MENU DU PLAFOND.
@@ -346,6 +346,7 @@ export function Toolbar2D({
           */
           label="Meuble"
           active={false}
+          ajout
           onPress={onFurniture}
         />,
         <ToolPill
@@ -353,6 +354,7 @@ export function Toolbar2D({
           icon="appareil"
           label="Appareil"
           active={!!pendingKind}
+          ajout
           onPress={onFixture}
         />,
         // Le plafond s'équipe comme les murs : on choisit l'appareil, puis
@@ -362,6 +364,7 @@ export function Toolbar2D({
           icon="plafond"
           label="Plafond"
           active={!!pendingCeiling}
+          ajout
           onPress={menuDuPlafond}
         />,
         /*
@@ -381,10 +384,18 @@ export function Toolbar2D({
           icon="note"
           label="Note"
           active={pendingNote}
+          ajout
           onPress={onNote}
         />,
       ]
     : [
+        /*
+          LA RANGÉE NE GARDE QUE CE QU'ON ALLUME TOUS LES JOURS — relevé du
+          patron : « affiche hors du “…” les boutons les plus utiles, comme
+          les meubles, les cotes, les surfaces ». Le reste — nord, grille,
+          notes, photos, gaines, plafond, couleurs des ouvertures — vit dans
+          le menu « Afficher », au bout de la rangée.
+        */
         <ToolPill
           key="ruler"
           icon="ruler"
@@ -393,23 +404,6 @@ export function Toolbar2D({
           vide={contenu.murs === 0 ? RIEN.cotes : null}
           onPress={() => setShowMeasures((v) => !v)}
         />,
-        // Le calque des gaines ne s'offre que s'il a quelque chose à
-        // montrer : sans tableau posé, on ne sait pas d'où part le câble,
-        // et une pastille qui n'allume rien est un piège.
-        ...(hasRoutes
-          ? [
-              <ToolPill
-                key="gaines"
-                icon="gaines"
-                label="Gaines"
-                active={showRoutes}
-                onPress={() => setShowRoutes((v) => !v)}
-              />,
-            ]
-          : []),
-        // HORS ÉDITION, une pastille ne fait qu'AFFICHER ou CACHER. Le « + »
-        // du catalogue vivait ici : on pouvait donc modifier le plan sans
-        // être en édition, et la barre mélangeait deux natures de gestes.
         <ToolPill
           key="furniture"
           icon="furniture"
@@ -424,22 +418,6 @@ export function Toolbar2D({
             setShowFurniture(!showFurniture);
           }}
         />,
-        // L'appareillage s'allume au départ, mais il se coupe — sur un
-        // logement équipé, ses symboles couvrent la maçonnerie qu'on est
-        // venu regarder. Il n'a rien à montrer tant que rien n'est posé :
-        // depuis que la fin de scan ne coche plus l'électricité, un plan
-        // simplement meublé s'ouvre nu, et c'est bien ce qu'on veut.
-        <ToolPill
-          key="elec"
-          icon="elec"
-          // Pas « Élec » : c'est déjà le nom de la commande qui ouvre
-          // l'établi depuis un mur, et deux boutons du même écran ne
-          // peuvent pas porter le même mot pour deux gestes différents.
-          label="Appareils"
-          active={showFixtures}
-          vide={contenu.appareils === 0 ? RIEN.appareils : null}
-          onPress={() => setShowFixtures((v) => !v)}
-        />,
         <ToolPill
           key="surface"
           icon="surface"
@@ -448,31 +426,29 @@ export function Toolbar2D({
           vide={contenu.pieces === 0 ? RIEN.surfaces : null}
           onPress={() => setShowSurfaces(!showSurfaces)}
         />,
+        // L'appareillage s'allume au départ, mais il se coupe — sur un
+        // logement équipé, ses symboles couvrent la maçonnerie qu'on est
+        // venu regarder. Pas « Élec » : c'est déjà le nom de la commande qui
+        // ouvre l'établi depuis un mur.
         <ToolPill
-          key="nord"
-          icon="square"
-          label="Nord"
-          node={<BoussoleNord teinte={showNorth && contenu.nord ? '#FFFFFF' : contenu.nord ? teinte.ink : teinte.inkFaint} />}
-          active={showNorth}
-          vide={contenu.nord ? null : RIEN.nord2D}
-          onPress={() => setShowNorth((v) => !v)}
+          key="elec"
+          icon="elec"
+          label="Appareils"
+          active={showFixtures}
+          vide={contenu.appareils === 0 ? RIEN.appareils : null}
+          onPress={() => setShowFixtures((v) => !v)}
         />,
-        // Le plafond se cache pour revoir le sol : superposés, les deux
-        // calques deviennent illisibles.
-        ...(ceiling.length > 0
-          ? [
-              <ToolPill
-                key="plafond"
-                icon="plafond"
-                label="Plafond"
-                active={showCeiling}
-                onPress={() => setShowCeiling(!showCeiling)}
-              />,
-            ]
-          : []),
+        <ToolPill
+          key="afficher"
+          icon="points"
+          label="Autres"
+          active={afficher}
+          onPress={() => setAfficher(true)}
+        />,
       ];
 
   return (
+    <>
     <RangeeOutils
       onSuite={onSuite}
       styles={styles}
@@ -492,6 +468,46 @@ export function Toolbar2D({
       peigne={edition ? { mot: 'Ajouter', depuis: 1 } : { mot: 'Afficher' }}
       elements={sansElec(outils, OUTILS_ELEC_PLAN, modeElec)}
     />
+    <CalquesSheet
+      visible={afficher}
+      onClose={() => setAfficher(false)}
+      titre="Afficher sur le plan"
+      sousTitre="Ce que le plan montre — rien n'est supprimé."
+      sections={[
+        {
+          titre: 'Sur le plan',
+          lignes: [
+            { cle: 'cotes', icone: 'ruler', libelle: 'Cotes', aide: 'Les longueurs des murs, au centimètre', actif: showMeasures, vide: contenu.murs === 0 ? RIEN.cotes : null, onBascule: () => setShowMeasures((v) => !v) },
+            { cle: 'surfaces', icone: 'surface', libelle: 'Surfaces', aide: 'Le sol de chaque pièce et ses mètres carrés', actif: showSurfaces, vide: contenu.pieces === 0 ? RIEN.surfaces : null, onBascule: () => setShowSurfaces(!showSurfaces) },
+            {
+              cle: 'meubles', icone: 'furniture', libelle: 'Meubles', aide: 'Le mobilier relevé au scan ou ajouté', actif: showFurniture, vide: contenu.meubles === 0 ? RIEN.meubles2D : null,
+              onBascule: () => {
+                if (showFurniture) onFurnitureOff();
+                setShowFurniture(!showFurniture);
+              },
+            },
+            ...(modeElec
+              ? [
+                  { cle: 'appareils', icone: 'elec' as const, libelle: 'Appareils', aide: 'Prises, interrupteurs et points lumineux posés', actif: showFixtures, vide: contenu.appareils === 0 ? RIEN.appareils : null, onBascule: () => setShowFixtures((v) => !v) },
+                  { cle: 'plafond', icone: 'plafond' as const, libelle: 'Plafond', aide: 'Points lumineux, spots, détecteurs, VMC', actif: showCeiling, vide: contenu.plafond === 0 ? RIEN.plafond : null, onBascule: () => setShowCeiling(!showCeiling) },
+                  { cle: 'gaines', icone: 'gaines' as const, libelle: 'Gaines', aide: 'Le chemin des câbles depuis le tableau', actif: showRoutes, vide: hasRoutes ? null : RIEN.gaines, onBascule: () => setShowRoutes((v) => !v) },
+                ]
+              : []),
+          ],
+        },
+        {
+          titre: 'Repères',
+          lignes: [
+            { cle: 'nord', icone: 'boussole', libelle: 'Points cardinaux', aide: 'La rose des vents autour du plan', actif: showNorth, vide: contenu.nord ? null : RIEN.nord2D, onBascule: () => setShowNorth((v) => !v) },
+            { cle: 'grille', icone: 'grille', libelle: 'Grille', aide: 'Un trait tous les 50 cm, pour estimer d’un coup d’œil', actif: showGrille, vide: contenu.murs === 0 ? RIEN.murs : null, onBascule: () => setShowGrille(!showGrille) },
+            { cle: 'ouvertures', icone: 'ouvertures', libelle: 'Portes et fenêtres en couleur', aide: 'Les portes en ambre, les fenêtres en bleu', actif: showOpeningColors, onBascule: () => setShowOpeningColors(!showOpeningColors) },
+            { cle: 'notes', icone: 'note', libelle: 'Notes', aide: 'Les mots écrits sur le plan', actif: showNotes, vide: contenu.notes === 0 ? RIEN.notes : null, onBascule: () => setShowNotes(!showNotes) },
+            { cle: 'photos', icone: 'image', libelle: 'Photos', aide: 'Les repères des photos prises sur place', actif: showPhotos, vide: contenu.photos === 0 ? RIEN.photos : null, onBascule: () => setShowPhotos(!showPhotos) },
+          ],
+        },
+      ]}
+    />
+    </>
   );
 }
 
@@ -569,7 +585,6 @@ export function Toolbar3D({
   const teinte = useTheme();
   const styles = getStyles(teinte);
   const rooms = useScanStore((s) => s.rooms);
-  const ceiling = useScanStore((s) => s.ceiling);
   const fixtures = useScanStore((s) => s.fixtures);
   const showFurniture = useScanStore((s) => s.showFurniture);
   const setShowFurniture = useScanStore((s) => s.setShowFurniture);
@@ -582,16 +597,23 @@ export function Toolbar3D({
   const modeElec = useModeElec();
   // Même règle qu'en plan : un calque vide ne s'allume pas, une bulle dit pourquoi.
   const contenu = useContenus();
+  const showSol = useScanStore((s) => s.showSol);
+  const setShowSol = useScanStore((s) => s.setShowSol);
+  const showOpeningColors = useScanStore((s) => s.showOpeningColors);
+  const setShowOpeningColors = useScanStore((s) => s.setShowOpeningColors);
+  /** Le menu « Afficher » de la maquette, au bout de la rangée. */
+  const [afficher, setAfficher] = useState(false);
 
+  /*
+    LA RANGÉE DE LA MAQUETTE — relevé du patron : « “Volumes” est peu
+    intuitif, ça peut être le volume d'une pièce ; et peu de gens demandent
+    cela, surtout hors élec. Rajoute un bouton “…” en bas à droite à la place
+    de Pièces ». La rangée garde les meubles, les cotes, les surfaces (et les
+    couleurs relevées, les repères électriques quand il y en a) ; le sol, les
+    murs, la nuit, le nord, le plafond, les volumes de salle d'eau et la pièce
+    isolée passent au menu « Afficher ».
+  */
   const outils = [
-    <ToolPill
-      key="ruler"
-      icon="ruler"
-      label="Cotes"
-      active={showMeasures}
-      vide={contenu.murs === 0 ? RIEN.cotes : null}
-      onPress={() => setShowMeasures((v) => !v)}
-    />,
     <ToolPill
       key="furniture"
       icon="furniture"
@@ -601,96 +623,23 @@ export function Toolbar3D({
       onPress={() => setShowFurniture(!showFurniture)}
     />,
     <ToolPill
+      key="ruler"
+      icon="ruler"
+      label="Cotes"
+      active={showMeasures}
+      vide={contenu.murs === 0 ? RIEN.cotes : null}
+      onPress={() => setShowMeasures((v) => !v)}
+    />,
+    /* « Surfaces » ne pose plus que le nom et les m² de chaque pièce : le sol
+       a son propre calque, dans le menu. */
+    <ToolPill
       key="surface"
-      icon="surface"
+      icon="etiquette"
       label="Surfaces"
       active={showSurfaces}
       vide={contenu.pieces === 0 ? RIEN.surfaces : null}
       onPress={() => setShowSurfaces(!showSurfaces)}
     />,
-    <ToolPill
-      key="nord"
-      icon="square"
-      label="Nord"
-      node={<BoussoleNord teinte={showNorth && contenu.nord ? '#FFFFFF' : contenu.nord ? teinte.ink : teinte.inkFaint} />}
-      active={showNorth}
-      vide={contenu.nord ? null : RIEN.nord3D}
-      onPress={() => setShowNorth((v) => !v)}
-    />,
-    /*
-      LES VOLUMES DE SALLE D'EAU — seulement s'il y en a.
-
-      Le calque n'existe que quand une baignoire ou une douche a été relevée :
-      sans zone humide, il n'y a pas de volume à montrer, et une pastille qui
-      n'allume rien donne à l'écran l'air d'être en panne. C'est la règle du
-      « Plafond » juste en dessous.
-
-      IL PART ÉTEINT : un gabarit permanent finirait par masquer la maquette
-      qu'il sert à vérifier. On l'allume au moment de poser.
-    */
-    zonesHumides > 0 ? (
-      <ToolPill
-        key="volumes"
-        icon="check"
-        label="Volumes"
-        active={showVolumes}
-        onPress={() => setShowVolumes(!showVolumes)}
-      />
-    ) : null,
-    /*
-      LA NUIT — la pastille qui rend l'installation VIVANTE.
-
-      On éteint la maquette et l'on touche un interrupteur : ce qu'il
-      commande s'allume pour de bon. Tout existait déjà — les liens, l'état
-      des lampes, leurs halos —, il manquait la PÉNOMBRE pour que ça se
-      voie : en plein jour, un halo ambre sur un sol crème ne dit rien.
-
-      Elle vit sur la barre du VOLUME, jamais sur celle du plan : sur un
-      dessin vu de dessus, une nuit ne veut rien dire. (La première version
-      l'avait posée sur la barre 2D — `tsc` l'a dit aussitôt, comme pour le
-      gabarit des volumes avant elle.)
-    */
-    <ToolPill
-      key="nuit"
-      icon="lune"
-      label="Nuit"
-      active={nuit}
-      vide={contenu.luminaires ? null : RIEN.nuit}
-      onPress={() => setNuit((v) => !v)}
-    />,
-    /* Le plafond existe aussi en 3D : même calque, même bouton. */
-    ceiling.length > 0 ? (
-      <ToolPill
-        key="plafond"
-        icon="plafond"
-        label="Plafond"
-        active={showCeiling}
-        onPress={() => setShowCeiling(!showCeiling)}
-      />
-    ) : null,
-    /* Murs pleins ou écorché : l'écorché montre la pièce, les murs pleins
-       montrent le bâti. Ni l'un ni l'autre n'a toujours raison — c'est un
-       réglage, pas une trouvaille. */
-    <ToolPill
-      key="murs"
-      icon="murs"
-      label="Murs"
-      active={solidWalls}
-      vide={contenu.murs === 0 ? RIEN.murs : null}
-      onPress={toggleSolidWalls}
-    />,
-    /* Les repères électriques : indispensables pour poser, encombrants pour
-       montrer. Une pièce équipée en porte une dizaine, et ils couvrent
-       alors la moitié de la scène. */
-    fixtures.length > 0 ? (
-      <ToolPill
-        key="reperes"
-        icon="reperes"
-        label="Repères"
-        active={showElecTags}
-        onPress={() => setShowElecTags((v) => !v)}
-      />
-    ) : null,
     colorsAvailable ? (
       <ToolPill
         key="couleurs"
@@ -700,18 +649,28 @@ export function Toolbar3D({
         onPress={() => setShowTextures(!showTextures)}
       />
     ) : null,
-    rooms.length > 1 ? (
+    /* Les repères électriques : indispensables pour poser, encombrants pour
+       montrer. Une pièce équipée en porte une dizaine. */
+    fixtures.length > 0 ? (
       <ToolPill
-        key="pieces"
-        icon="rooms"
-        label="Pièces"
-        active={focusIdx >= 0}
-        onPress={() => setFocusIdx((i) => (i + 2 > rooms.length ? -1 : i + 1))}
+        key="reperes"
+        icon="reperes"
+        label="Repères"
+        active={showElecTags}
+        onPress={() => setShowElecTags((v) => !v)}
       />
     ) : null,
+    <ToolPill
+      key="afficher"
+      icon="points"
+      label="Autres"
+      active={afficher}
+      onPress={() => setAfficher(true)}
+    />,
   ];
 
   return (
+    <>
     <RangeeOutils
       styles={styles}
       anim={anim}
@@ -722,5 +681,60 @@ export function Toolbar3D({
       onSuite={onSuite}
       elements={sansElec(outils, OUTILS_ELEC_VOLUME, modeElec)}
     />
+    <CalquesSheet
+      visible={afficher}
+      onClose={() => setAfficher(false)}
+      titre="Afficher sur la maquette"
+      sousTitre="Ce que la 3D montre — rien n'est supprimé."
+      // La pièce isolée n'a de sens qu'à partir de deux pièces.
+      vue={rooms.length < 2 ? null : {
+        titre: 'Pièce isolée',
+        aide: 'La maquette se réduit à la pièce choisie, en coupe.',
+        options: [{ cle: '-1', libelle: 'Tout le logement' }, ...rooms.map((r, i) => ({ cle: String(i), libelle: r.name || `Pièce ${i + 1}` }))],
+        actuel: String(focusIdx),
+        onChoix: (cle) => setFocusIdx(() => Number(cle)),
+      }}
+      sections={[
+        {
+          titre: 'Le logement',
+          lignes: [
+            { cle: 'sol', icone: 'surface', libelle: 'Sol', aide: 'Le sol de chaque pièce, ses lattes ou son image relevée', actif: showSol, vide: contenu.pieces === 0 ? RIEN.surfaces : null, onBascule: () => setShowSol(!showSol) },
+            { cle: 'murs', icone: 'murs', libelle: 'Murs pleins', aide: 'Éteint, les murs qui vous font face s’effacent', actif: solidWalls, vide: contenu.murs === 0 ? RIEN.murs : null, onBascule: toggleSolidWalls },
+            { cle: 'meubles', icone: 'furniture', libelle: 'Meubles', aide: 'Le mobilier à ses cotes, dans ses couleurs', actif: showFurniture, vide: contenu.meubles === 0 ? RIEN.meubles3D : null, onBascule: () => setShowFurniture(!showFurniture) },
+            ...(modeElec
+              ? [{ cle: 'plafond', icone: 'plafond' as const, libelle: 'Plafond', aide: 'Points lumineux, spots, détecteurs, VMC', actif: showCeiling, vide: contenu.plafond === 0 ? RIEN.plafond : null, onBascule: () => setShowCeiling(!showCeiling) }]
+              : []),
+          ],
+        },
+        {
+          titre: 'Mesures',
+          lignes: [
+            { cle: 'cotes', icone: 'ruler', libelle: 'Cotes', aide: 'Les longueurs, posées sur les murs', actif: showMeasures, vide: contenu.murs === 0 ? RIEN.cotes : null, onBascule: () => setShowMeasures((v) => !v) },
+            { cle: 'surfaces', icone: 'etiquette', libelle: 'Surfaces', aide: 'Le nom et les mètres carrés de chaque pièce', actif: showSurfaces, vide: contenu.pieces === 0 ? RIEN.surfaces : null, onBascule: () => setShowSurfaces(!showSurfaces) },
+          ],
+        },
+        {
+          titre: 'Ambiance',
+          lignes: [
+            { cle: 'couleurs', icone: 'colors', libelle: 'Couleurs relevées', aide: 'Les vraies images des murs et du sol', actif: showTextures, vide: colorsAvailable ? null : RIEN.couleurs, onBascule: () => setShowTextures(!showTextures) },
+            { cle: 'ouvertures', icone: 'ouvertures', libelle: 'Portes et fenêtres en couleur', aide: 'Les portes en ambre, les fenêtres en bleu', actif: showOpeningColors, onBascule: () => setShowOpeningColors(!showOpeningColors) },
+            { cle: 'nord', icone: 'boussole', libelle: 'Points cardinaux', aide: 'Nord, sud, est et ouest autour de la maquette', actif: showNorth, vide: contenu.nord ? null : RIEN.nord3D, onBascule: () => setShowNorth((v) => !v) },
+            ...(modeElec
+              ? [{ cle: 'nuit', icone: 'lune' as const, libelle: 'Nuit', aide: 'La maquette s’éteint : touchez un interrupteur', actif: nuit, vide: contenu.luminaires ? null : RIEN.nuit, onBascule: () => setNuit((v) => !v) }]
+              : []),
+          ],
+        },
+        {
+          titre: 'Électricité',
+          lignes: modeElec
+            ? [
+                { cle: 'reperes', icone: 'reperes', libelle: 'Repères électriques', aide: 'Les étiquettes des appareils posés', actif: showElecTags, vide: fixtures.length === 0 ? RIEN.reperes : null, onBascule: () => setShowElecTags((v) => !v) },
+                { cle: 'volumes', icone: 'goutte', libelle: 'Volumes de salle d’eau', aide: 'Les volumes 0, 1 et 2 autour de la baignoire et de la douche', actif: showVolumes, vide: zonesHumides > 0 ? null : RIEN.volumes, onBascule: () => setShowVolumes(!showVolumes) },
+              ]
+            : [],
+        },
+      ]}
+    />
+    </>
   );
 }

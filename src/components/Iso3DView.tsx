@@ -493,6 +493,8 @@ export function Iso3DView({
   const tousLesMeubles = useScanStore((s) => s.objects);
   const niveauCourant = useScanStore((s) => s.niveauCourant);
   const showFurniture = useScanStore((s) => s.showFurniture);
+  // Le sol, à part des surfaces (qui ne sont plus que les étiquettes).
+  const showSol = useScanStore((s) => s.showSol);
   const north = useScanStore((s) => s.north);
   const toutLePlafondStocke = useScanStore((s) => s.ceiling);
   const toutesLesPieces = useScanStore((s) => s.rooms);
@@ -1052,6 +1054,7 @@ export function Iso3DView({
     ceiling,
     palette,
     showSurfaces,
+    showSol,
     showTextures,
     colorOpenings,
     showCeiling,
@@ -1113,6 +1116,7 @@ export function Iso3DView({
         palette,
         colorOpenings,
         showSurfaces,
+        showSol,
         showTextures,
         floors: floorsOf(e.rooms),
         rooms: e.rooms,
@@ -1131,6 +1135,7 @@ export function Iso3DView({
       palette,
       colorOpenings,
       showSurfaces,
+      showSol,
       showTextures,
       ceiling,
       showCeiling,
@@ -1166,6 +1171,7 @@ export function Iso3DView({
               d'en haut ; à hauteur d'œil, sans sol, on marcherait sur le vide.
             */
             showSurfaces: showSurfaces || dedans,
+            showSol: showSol || dedans,
             plafonds: dedans,
             showTextures,
             floors,
@@ -1218,6 +1224,7 @@ export function Iso3DView({
       palette,
       colorOpenings,
       showSurfaces,
+      showSol,
       dedans,
       showTextures,
       floors,

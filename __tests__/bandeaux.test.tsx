@@ -149,6 +149,24 @@ const bouton = (tree: TestRenderer.ReactTestRenderer, label: string) =>
     .findAllByType(TouchableOpacity)
     .find((n) => n.props.accessibilityLabel === label);
 
+/** Une ligne du menu « Afficher » (ouvert par « Plus ») : un interrupteur. */
+const ligne = (tree: TestRenderer.ReactTestRenderer, label: string) =>
+  tree.root.findAll(
+    (n) =>
+      n.props.accessibilityRole === 'switch' &&
+      n.props.accessibilityLabel === label &&
+      typeof n.props.onPress === 'function',
+    { deep: false },
+  )[0];
+
+/** Ouvre le menu « Afficher » de la rangée affichée — « Autres », au bout de la
+ * rangée ; « Plus », dans l'en-tête, reste le menu du scan. */
+const ouvrirAfficher = (tree: TestRenderer.ReactTestRenderer) => {
+  const plus = bouton(tree, 'Autres');
+  expect(plus).toBeDefined();
+  act(() => plus!.props.onPress());
+};
+
 /*
   LE BANDEAU D'UNE NOTE — relevé du patron, capture à l'appui : « le bloc qui
   s'affiche pour le clic sur une note est trop imposant et mal fait (bouton
@@ -250,12 +268,13 @@ describe('l’écran des résultats', () => {
         .map((n) => n.props.children)
         .filter((c) => c === 'N' || c === 'E' || c === 'S' || c === 'O');
     expect(lettres()).toHaveLength(0);
-    const b = bouton(tree, 'Nord');
-    expect(b).toBeDefined();
-    act(() => b?.props.onPress());
+    // Les points cardinaux vivent dans le menu « Afficher », au bout de la rangée.
+    ouvrirAfficher(tree);
+    expect(ligne(tree, 'Points cardinaux')).toBeDefined();
+    act(() => ligne(tree, 'Points cardinaux').props.onPress());
     // Quatre lettres par vue affichée : la couronne est bien là.
     expect(lettres().length).toBeGreaterThanOrEqual(4);
-    act(() => b?.props.onPress());
+    act(() => ligne(tree, 'Points cardinaux').props.onPress());
     expect(lettres()).toHaveLength(0);
   });
 
@@ -264,32 +283,21 @@ describe('l’écran des résultats', () => {
     expect(bouton(tree, 'Édition')).toBeDefined();
     expect(bouton(tree, 'Meubles')).toBeDefined();
     expect(bouton(tree, 'Surfaces')).toBeDefined();
-    // Le plafond est équipé : son calque doit être proposé.
-    expect(bouton(tree, 'Plafond')).toBeDefined();
+    // Le plafond est équipé : son calque est proposé, dans le menu « Afficher ».
+    ouvrirAfficher(tree);
+    expect(ligne(tree, 'Plafond')).toBeDefined();
+    expect(ligne(tree, 'Plafond').props.accessibilityState.disabled).toBe(false);
     /*
-      LA BOUSSOLE DU CALQUE « NORD » PÈSE COMME LES AUTRES — relevé du
-      patron : à côté des silhouettes Solar, son trait de 2 faisait
-      maigrelet. Légèrement plus grasse : 2,6.
+      LA BOUSSOLE DU NORD est passée dans le menu, sous « Points
+      cardinaux » : une silhouette Solar PLEINE, comme ses voisines — plus
+      de dessin maison au trait (relevé du patron : il faisait maigrelet).
     */
-    const nord = bouton(tree, 'Nord');
+    const nord = ligne(tree, 'Points cardinaux');
     expect(nord).toBeDefined();
-    const grasses = nord!.findAll(
-      (n) => Number(n.props?.strokeWidth) >= 2.5,
+    const pleines = nord.findAll(
+      (n) => n.props?.d === SOLAIRES.boussole && n.props?.fillRule === 'evenodd',
     );
-    expect(grasses.length).toBeGreaterThan(0);
-    // Et elle est GRANDE dans sa pastille — relevé du patron : à 22
-    // points, elle restait timide à côté des silhouettes.
-    const larges = nord!.findAll((n) => Number(n.props?.width) >= 25);
-    expect(larges.length).toBeGreaterThan(0);
-    // Le losange de l'aiguille est PLEIN — relevé du patron : un contour
-    // vide flottait au milieu des silhouettes Solar.
-    const aiguille = nord!.findAll(
-      (n) =>
-        typeof n.props?.points === 'string' &&
-        n.props?.fill &&
-        n.props.fill !== 'none',
-    );
-    expect(aiguille.length).toBeGreaterThan(0);
+    expect(pleines.length).toBeGreaterThan(0);
   });
 
   it('le cartouche esquive les spots et laisse voir au travers', () => {
@@ -1548,18 +1556,19 @@ describe('la rangée d’outils', () => {
     const tree = monter();
     passerEn3D(tree);
     expect(bouton(tree, 'Passer en 2D')).toBeDefined();
-    expect(bouton(tree, 'Murs')).toBeDefined();
+    // La rangée garde l'essentiel ; le reste vit dans le menu « Afficher ».
     expect(bouton(tree, 'Cotes')).toBeDefined();
     expect(bouton(tree, 'Meubles')).toBeDefined();
     expect(bouton(tree, 'Surfaces')).toBeDefined();
-    expect(bouton(tree, 'Nord')).toBeDefined();
-    // Le scan de référence porte de l'appareillage, un plafond et deux
-    // pièces : les trois pastilles conditionnelles sont donc là.
+    // Le scan de référence porte de l'appareillage : ses repères sont là.
     expect(bouton(tree, 'Repères')).toBeDefined();
-    expect(bouton(tree, 'Plafond')).toBeDefined();
-    expect(bouton(tree, 'Pièces')).toBeDefined();
+    expect(bouton(tree, 'Autres')).toBeDefined();
     // Le bouton d'édition, lui, n'existe PAS en 3D : on n'y retouche rien.
     expect(bouton(tree, 'Édition')).toBeUndefined();
+    ouvrirAfficher(tree);
+    for (const l of ['Sol', 'Murs pleins', 'Points cardinaux', 'Plafond']) expect([l, !!ligne(tree, l)]).toEqual([l, true]);
+    // Deux pièces au moins : on peut en isoler une.
+    expect(bouton(tree, 'Tout le logement')).toBeDefined();
   });
 
   /**
@@ -1591,10 +1600,13 @@ describe('la rangée d’outils', () => {
       }
     });
     passerEn3D(tree);
-    expect(bouton(tree, 'Murs')).toBeDefined();
     expect(bouton(tree, 'Repères')).toBeUndefined();
-    expect(bouton(tree, 'Pièces')).toBeUndefined();
-    expect(bouton(tree, 'Plafond')).toBeUndefined();
+    ouvrirAfficher(tree);
+    expect(ligne(tree, 'Murs pleins')).toBeDefined();
+    // Une seule pièce : rien à isoler. Pas de plafond équipé : la ligne se grise.
+    expect(bouton(tree, 'Tout le logement')).toBeUndefined();
+    const plafond = ligne(tree, 'Plafond');
+    if (plafond) expect(plafond.props.accessibilityState.disabled).toBe(true);
     act(() => tree.unmount());
   });
 });

@@ -108,15 +108,19 @@ const allume = (t: TestRenderer.ReactTestRenderer, label: string) => {
 };
 
 describe('la vue 3D à l’ouverture d’un scan', () => {
-  const ALLUMES = ['Meubles', 'Murs'];
-  const ETEINTS = ['Cotes', 'Surfaces', 'Nord', 'Repères'];
+  // Les murs pleins et le sol sont passés au menu « Afficher » : ils
+  // partent allumés, dans le magasin.
+  const ALLUMES = ['Meubles'];
+  const ETEINTS = ['Cotes', 'Surfaces', 'Repères'];
 
-  it('n’allume que les meubles et les murs', () => {
+  it('n’allume que les meubles, les murs et le sol', () => {
     const t = monter();
     presser(t, 'Passer en 3D');
     for (const nom of ALLUMES) {
       expect({ [nom]: allume(t, nom) }).toEqual({ [nom]: true });
     }
+    expect(useScanStore.getState().solidWalls).toBe(true);
+    expect(useScanStore.getState().showSol).toBe(true);
     for (const nom of ETEINTS) {
       const etat = allume(t, nom);
       if (etat === undefined) continue;

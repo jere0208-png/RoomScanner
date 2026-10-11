@@ -1390,6 +1390,11 @@ export interface SceneOptions {
   colorOpenings?: boolean;
   /** Sol visible (surface de la pièce). */
   showSurfaces?: boolean;
+  /**
+   * Le sol (et l'ombre de contact des meubles), à part des surfaces : voir
+   * `showSol` dans le magasin. Absent, il suit `showSurfaces`, comme avant.
+   */
+  showSol?: boolean;
   /** Couleurs et textures relevées pendant le scan. */
   showTextures?: boolean;
   /** Relevé du sol par pièce, indexé par identifiant de pièce. */
@@ -1959,7 +1964,7 @@ export function buildScene(
     }
     // Un sol photographié se montre en 3D : c'est la reproduction du relevé.
     const solEnImage = !!(opts.showTextures && opts.habillage !== false && floor?.ortho);
-    if (surface && (opts.showSurfaces || solEnImage)) {
+    if (surface && ((opts.showSol ?? opts.showSurfaces) || solEnImage)) {
       const pts = surface.pts.map((p) => ({ x: p.x, y: 0, z: p.z }));
       // Le sol en vraie image, quand le relevé l'a photographié d'en haut.
       const habillage = solEnImage ? habillerLeSol(pts, floor?.ortho) : null;
@@ -3409,7 +3414,7 @@ export function buildScene(
      * Rien pour ce qui ne touche pas le sol : une ombre au pied d'une télé
      * accrochée au mur désignerait un objet qui n'est pas là.
      */
-    if (opts.showSurfaces !== false && yb < 0.3) {
+    if ((opts.showSol ?? opts.showSurfaces) !== false && yb < 0.3) {
       const nappe = (marge: number, force: number) => {
         const pts = [
           [-1, -1],

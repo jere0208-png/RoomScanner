@@ -14285,6 +14285,60 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le menu « Afficher » : l'essentiel dans la rangée, tout le reste derrière « … »
+
+Relevé du patron : « en mode édition, avant les icônes d'ajout, rajoute un
+petit “+” ; sur la 3D, “Volumes” est peu intuitif — ça peut être le volume
+d'une pièce ; rajoute un bouton “…” en bas à droite à la place de Pièces, qui
+ouvre un menu “Afficher” : Volumes d'eau, Points cardinaux, Sol (activé par
+défaut, indépendant de Surfaces), la Nuit, Murs… Affiche hors du “…” les plus
+utiles, ajoute d'autres idées de choses à afficher, et donne de l'ampleur au
+plan 2D ».
+
+**Le « + » des outils d'ajout.** En édition, Meuble, Appareil, Plafond et
+Note portent une petite pastille bleue « + » dans leur coin : ils POSENT
+quelque chose. « Redresser », qui ne pose rien, n'en a pas (`ToolPill`,
+propriété `ajout`).
+
+**Les rangées, resserrées sur l'essentiel.**
+- Plan : Cotes, Meubles, Surfaces, Appareils (mode électricité), **Autres**.
+- 3D : Meubles, Cotes, Surfaces, Couleurs (si relevées), Repères (mode
+  électricité, s'il y en a), **Autres**.
+- « Autres » (icône « … ») ouvre le menu ; il s'appelle ainsi pour ne pas
+  se confondre avec « Plus », le menu du scan dans l'en-tête, et se lit
+  naturellement sous le peigne « Afficher ».
+
+**Le menu « Afficher »** (`CalquesSheet`) : chaque calque a sa ligne — icône
+Solar, nom, une phrase qui dit ce qu'il montre, interrupteur. Un calque sans
+rien à montrer reste dans la liste, grisé, et sa phrase dit pourquoi (même
+`RIEN` que les bulles).
+- **Plan** — *Sur le plan* : Cotes, Surfaces, Meubles, et en électricité
+  Appareils, Plafond, Gaines. *Repères* : Points cardinaux, **Grille** (un
+  trait tous les 50 cm, plus appuyé au mètre — nouveau), Portes et fenêtres
+  en couleur, **Notes**, **Photos** (on peut maintenant les masquer pour un
+  plan propre ; en édition elles restent visibles pour être déplacées).
+- **3D** — *Pièce isolée* (puces « Tout le logement » et une par pièce,
+  à partir de deux pièces — remplace l'ancien bouton « Pièces »). *Le
+  logement* : **Sol**, Murs pleins, Meubles, Plafond (électricité).
+  *Mesures* : Cotes, Surfaces. *Ambiance* : Couleurs relevées, Portes et
+  fenêtres en couleur, Points cardinaux, Nuit (électricité). *Électricité* :
+  Repères électriques, **Volumes de salle d'eau** (l'ancien « Volumes », qu'on
+  prenait pour le volume d'une pièce ; seulement en mode électricité).
+
+**Le sol ne dépend plus de « Surfaces ».** Nouveau calque `showSol` (allumé
+par défaut) : il pose les dalles de sol et les ombres de contact ;
+« Surfaces » n'affiche plus que les étiquettes de surface. `buildScene`
+retombe sur `showSurfaces` si `showSol` n'est pas fourni (anciens appels).
+
+Nouveaux calques du magasin, remis à leur valeur de base à chaque scan :
+`showSol` (oui), `showNotes` (oui), `showPhotos` (oui), `showGrille` (non).
+Icônes Solar ajoutées par `tools/gen-solaires.mjs` : étiquette, boussole,
+grille, goutte, œil — les anciennes inchangées.
+
+Bancs : `menuafficher` (nouveau : rangées plan et 3D, le menu et ses
+interrupteurs, la grille, les lignes grisées, les « + », le sol indépendant),
+`bandeaux`, `barreoutils`, `calquesvides`, `lanuittombe` adaptés.
+
 ## Un calque vide ne s'allume pas : une bulle dit pourquoi
 
 Relevés du patron : « sur le plan 2D, empêche l'activation des boutons

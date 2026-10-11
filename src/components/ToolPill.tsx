@@ -54,7 +54,9 @@ export type ToolIcon =
   | 'murs'
   | 'appareil'
   | 'reperes'
-  | 'plus';
+  | 'plus'
+  | 'points'
+  | 'etiquette';
 
 /*
   LES TRACES VIENNENT DU JEU « SOLAR BOLD » — refonte du patron.
@@ -172,6 +174,7 @@ export function ToolPill({
   node,
   halo,
   vide,
+  ajout,
 }: {
   icon: ToolIcon;
   /**
@@ -205,6 +208,13 @@ export function ToolPill({
    * calque vide qu'on croirait cassé.
    */
   vide?: string | null;
+  /**
+   * UN BOUTON QUI AJOUTE porte son petit « + » — relevé du patron : « en mode
+   * édition, avant les icônes d'ajout, rajoute un petit “+” pour comprendre
+   * qu'on ajoute ». Une pastille bleue au coin : on lit « ajouter un meuble »
+   * avant même d'avoir lu le mot.
+   */
+  ajout?: boolean;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
@@ -330,6 +340,13 @@ export function ToolPill({
             lire d'un coup d'œil sans élargir la barre d'outils. */}
         {/* Une icône de bibliothèque l'emporte sur le jeu maison : celui-ci
             couvre les gestes de l'app, pas tout le vocabulaire du métier. */}
+        {ajout ? (
+          <View pointerEvents="none" style={[styles.toolAjout, plein && styles.toolAjoutPlein]}>
+            <Svg width={10} height={10} viewBox="0 0 10 10">
+              <Path d="M5 1.5v7M1.5 5h7" stroke={plein ? c.blue : '#FFFFFF'} strokeWidth={2} strokeLinecap="round" />
+            </Svg>
+          </View>
+        ) : null}
         {node ?? (
         <Svg width={22} height={22} viewBox="0 0 24 24">
           {/* La silhouette Solar : UN chemin plein — le Bold est un jeu de
@@ -364,6 +381,22 @@ const getStyles = themedStyles((c: Palette) =>
   toolLabelActive: { color: c.blue },
   // Rien à montrer : la pastille s'efface d'un ton, sans disparaître.
   toolPillVide: { opacity: 0.6 },
+  // Le petit « + » d'un bouton d'ajout, au coin haut gauche de la pastille.
+  toolAjout: {
+    position: 'absolute',
+    top: -5,
+    left: -5,
+    width: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: c.blue,
+    borderWidth: 2,
+    borderColor: c.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  toolAjoutPlein: { backgroundColor: '#FFFFFF', borderColor: c.blue },
   toolPill: {
     width: PILL_SIZE,
     height: PILL_SIZE,

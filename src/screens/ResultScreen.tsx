@@ -203,6 +203,10 @@ type Tab = '2d' | '3d';
 /** Le saut de ligne des rapports, ecrit une fois. */
 const SAUT = String.fromCharCode(10);
 
+/** Des listes vides STABLES : un `[]` écrit dans le rendu redessinerait le plan à chaque fois. */
+const SANS_PHOTOS: never[] = [];
+const SANS_NOTES: never[] = [];
+
 export function ResultScreen() {
   /**
    * CE QUE LE SYSTÈME OCCUPE EN BAS, et qu'on lui laisse.
@@ -1237,6 +1241,8 @@ export function ResultScreen() {
   /* Le nord est-il connu ? Sans lui, la pastille « Nord » ne s'allume pas
      (voir `ResultToolbar`) : c'est en édition qu'on oriente le plan. */
   const nordConnu = useScanStore((s) => s.north !== null && s.north !== undefined);
+  const showPhotos = useScanStore((s) => s.showPhotos);
+  const showNotes = useScanStore((s) => s.showNotes);
   const [editMode, setEditMode] = useState(false);
   /**
    * Jeu de pastilles affiché. Il RETARDE sur `editMode` : les anciennes
@@ -3579,7 +3585,9 @@ export function ResultScreen() {
                     useScanStore.getState().recalerNiveau(niveauCourant, dx, dz)
                 : undefined
             }
-            photos={photos}
+            /* Les photos et les notes se cachent comme un calque — hors
+               édition seulement : on ne pose pas une note qu'on ne voit pas. */
+            photos={editMode || showPhotos ? photos : SANS_PHOTOS}
             onSelectPhoto={setPhotoVue}
             showMeasures={showMeasures}
             editable={editMode}
@@ -3649,7 +3657,7 @@ export function ResultScreen() {
             showNorth={showNorth || (editMode && !nordConnu)}
             selectedCeilingId={selCeiling}
             selectedCeilingRow={selRow}
-            notes={notes}
+            notes={editMode || showNotes ? notes : SANS_NOTES}
             selectedNoteId={selNote}
             onSelectNote={(id) => {
               if (id) {

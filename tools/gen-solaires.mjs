@@ -259,6 +259,18 @@ const CHOIX = {
   murer: ['eraser-square-bold', 'eraser-bold'],
   rouleau: ['paint-roller-bold'],
   tableau: ['server-square-bold', 'server-minimalistic-bold'],
+  /*
+    LE MENU « AFFICHER » — relevé du patron : « rajoute un bouton “…” qui
+    ouvrira un menu où beaucoup d'autres options s'affichent ». Chaque calque
+    y a sa silhouette : L'ÉTIQUETTE pour les surfaces (le nom et les m² de la
+    pièce), LA BOUSSOLE pour les points cardinaux, LA GRILLE, LA GOUTTE pour
+    les volumes de salle d'eau, L'ŒIL pour le menu lui-même.
+  */
+  etiquette: ['tag-bold'],
+  boussole: ['compass-bold', 'compass-big-bold'],
+  grille: ['widget-4-bold', 'widget-5-bold'],
+  goutte: ['waterdrop-bold'],
+  oeil: ['eye-bold'],
 };
 
 /*

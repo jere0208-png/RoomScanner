@@ -645,6 +645,7 @@ export function FloorplanEditor({
   const north = useScanStore((s) => s.north);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
+  const showGrille = useScanStore((s) => s.showGrille);
   const c = useTheme();
   const styles = getStyles(c);
   /* Le conteneur du plan : c'est LUI qu'on mesure pour viser depuis
@@ -1072,6 +1073,37 @@ export function FloorplanEditor({
       },
     };
   }, [baseMapping, view, layout]);
+  const grille = useMemo(() => {
+    if (!showGrille || !mapping || walls.length === 0) return null;
+    const b = bounds(walls);
+    const x0 = Math.floor(b.minX * 2) / 2 - 1;
+    const x1 = Math.ceil(b.maxX * 2) / 2 + 1;
+    const z0 = Math.floor(b.minZ * 2) / 2 - 1;
+    const z1 = Math.ceil(b.maxZ * 2) / 2 + 1;
+    const traits: React.ReactElement[] = [];
+    const trait = (cle: string, a: { x: number; z: number }, d: { x: number; z: number }, metre: boolean) => {
+      const p = mapping.toPx(a);
+      const q = mapping.toPx(d);
+      traits.push(
+        <Line
+          key={cle}
+          x1={p.x}
+          y1={p.y}
+          x2={q.x}
+          y2={q.y}
+          stroke={metre ? c.lineStrong : c.line}
+          strokeWidth={metre ? 1 : 0.6}
+        />,
+      );
+    };
+    for (let x = x0; x <= x1 + 1e-6; x += 0.5) {
+      trait(`gx${x.toFixed(1)}`, { x, z: z0 }, { x, z: z1 }, Math.abs(x - Math.round(x)) < 1e-6);
+    }
+    for (let z = z0; z <= z1 + 1e-6; z += 0.5) {
+      trait(`gz${z.toFixed(1)}`, { x: x0, z }, { x: x1, z }, Math.abs(z - Math.round(z)) < 1e-6);
+    }
+    return <G pointerEvents="none">{traits}</G>;
+  }, [showGrille, mapping, walls, c.line, c.lineStrong]);
   /*
     LA MARGE DE LA TOILE : nulle au repos, large pendant le geste.
 
@@ -1998,6 +2030,14 @@ export function FloorplanEditor({
                 }}
               />
             )}
+
+            {/*
+              LA GRILLE — un trait tous les cinquante centimètres, un plus
+              marqué tous les mètres, dans le repère du logement : elle tourne
+              et s'agrandit avec lui. On estime une distance d'un coup d'œil,
+              sans poser une cote.
+            */}
+            {grille}
 
             {/* Surface au sol : aplat + semis de points, pour la distinguer
                 d'un coup d'œil des murs pochés en noir. */}

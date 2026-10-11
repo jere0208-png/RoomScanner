@@ -1801,6 +1801,24 @@ interface ScanState {
   // Surface au sol : fond pointillé + valeur en m². Activée par défaut.
   showSurfaces: boolean;
   setShowSurfaces: (v: boolean) => void;
+  /**
+   * LE SOL EN 3D, INDÉPENDANT DES SURFACES — relevé du patron : « Sol (activé
+   * par défaut, et doit être indépendant de “Surfaces”, qui doit afficher les
+   * surfaces uniquement) ». « Surfaces » ne pose plus que les étiquettes des
+   * pièces et leurs mètres carrés ; le sol, ses lattes ou son image relevée
+   * ont leur propre calque.
+   */
+  showSol: boolean;
+  setShowSol: (v: boolean) => void;
+  /** Les notes écrites sur le plan, affichées ou non (hors édition). */
+  showNotes: boolean;
+  setShowNotes: (v: boolean) => void;
+  /** Les repères des photos sur le plan, affichés ou non (hors édition). */
+  showPhotos: boolean;
+  setShowPhotos: (v: boolean) => void;
+  /** Une grille de cinquante centimètres sous le plan, pour estimer d'un coup d'œil. */
+  showGrille: boolean;
+  setShowGrille: (v: boolean) => void;
 
   // Couleurs et textures relevées au scan (2D, 3D, PDF). Décoché par défaut.
   showTextures: boolean;
@@ -2178,6 +2196,10 @@ const CALQUES_DE_BASE = {
   solidWalls: true,
   showSurfaces: false,
   showTextures: false,
+  showSol: true,
+  showNotes: true,
+  showPhotos: true,
+  showGrille: false,
 } as const;
 
 /**
@@ -2844,6 +2866,14 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({ showSurfaces });
       AsyncStorage.setItem(SURFACES_KEY, showSurfaces ? '1' : '0').catch(() => {});
     },
+    showSol: true,
+    setShowSol: (showSol) => set({ showSol }),
+    showNotes: true,
+    setShowNotes: (showNotes) => set({ showNotes }),
+    showPhotos: true,
+    setShowPhotos: (showPhotos) => set({ showPhotos }),
+    showGrille: false,
+    setShowGrille: (showGrille) => set({ showGrille }),
 
     showTextures: false,
     // Murs pleins d'office : c'est le bâti qu'on regarde en ouvrant un

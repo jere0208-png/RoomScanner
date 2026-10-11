@@ -88,15 +88,16 @@ describe('les rangées du plan et de la 3D', () => {
     expect(barre).toContain("vide={contenu.meubles === 0 ? RIEN.meubles2D : null}");
     expect(barre).toContain("vide={contenu.appareils === 0 ? RIEN.appareils : null}");
     expect(barre).toContain("vide={contenu.pieces === 0 ? RIEN.surfaces : null}");
-    expect(barre).toContain('vide={contenu.nord ? null : RIEN.nord2D}');
+    // Le nord est passé au menu « Afficher » : même règle, dans sa ligne.
+    expect(barre).toContain('vide: contenu.nord ? null : RIEN.nord2D');
     expect(barre).toContain('Aucun appareil à afficher — passez en mode édition pour en poser.');
   });
 
   it('en 3D aussi : Meubles, Nord, Nuit et Murs', () => {
     expect(barre).toContain("vide={contenu.meubles === 0 ? RIEN.meubles3D : null}");
-    expect(barre).toContain('vide={contenu.nord ? null : RIEN.nord3D}');
-    expect(barre).toContain('vide={contenu.luminaires ? null : RIEN.nuit}');
-    expect(barre).toContain("vide={contenu.murs === 0 ? RIEN.murs : null}");
+    expect(barre).toContain('vide: contenu.nord ? null : RIEN.nord3D');
+    expect(barre).toContain('vide: contenu.luminaires ? null : RIEN.nuit');
+    expect(barre).toContain('vide: contenu.murs === 0 ? RIEN.murs : null');
   });
 
   it('sans nord, l’édition propose d’orienter le plan ; la bulle vit à la racine', () => {
