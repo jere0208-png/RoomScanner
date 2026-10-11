@@ -328,6 +328,13 @@ interface Props {
    */
   niveau?: number;
   onChange?: (v: View3DParams) => void;
+  /**
+   * TOUCHER LE TABLEAU OUVRE SON RENDU RÉALISTE — relevé du patron : « sur
+   * le plan 3D, le clic sur le modèle tableau doit ouvrir son visuel
+   * réaliste ». Sans lui, le tableau n'offre aucune cible : il n'allume rien
+   * et n'est sur aucun départ.
+   */
+  onTapTableau?: () => void;
   /** Cotes sur les arêtes (arêtes en noir). */
   showMeasures?: boolean;
   /**
@@ -463,6 +470,7 @@ export function Iso3DView({
   enMarche = false,
   value,
   onChange,
+  onTapTableau,
   niveau,
   showMeasures,
   showElecTags: showElecTagsDemande = true,
@@ -1415,8 +1423,13 @@ export function Iso3DView({
       cy: number;
       lampes: string[];
       departs: string[];
+      tableau?: boolean;
     }[];
   } | null>(null);
+  /* L'ouverture du tableau passe par une référence, comme tout le geste. */
+  const onTapTableauRef = useRef(onTapTableau);
+  onTapTableauRef.current = onTapTableau;
+  const tableauTouchable = !!onTapTableau;
 
   const rendered = useMemo(() => {
     if (layout.w === 0 || layout.h === 0) return null;
@@ -1814,6 +1827,7 @@ export function Iso3DView({
       cy: number;
       lampes: string[];
       departs: string[];
+      tableau?: boolean;
     }[] = [];
     /**
      * OÙ SE POSE LA BAGUE D'UN DÉPART.
@@ -2065,6 +2079,11 @@ export function Iso3DView({
           tableau — qui n'est sur aucun départ — et, quand l'écran ne passe
           pas ses circuits, tout ce qui n'allume pas.
         */
+        // Le tableau, lui, se touche pour s'ouvrir — quand l'écran sait l'ouvrir.
+        if (tableauTouchable && lot.some((f) => f.kind === 'tableau')) {
+          ciblesInter.push({ id: lot[0].id, cx: qc.sx, cy: qc.sy, lampes: [], departs: [], tableau: true });
+          continue;
+        }
         if (lampes.length === 0 && departs.length === 0) continue;
         ciblesInter.push({
           id: lot[0].id,
@@ -2530,6 +2549,7 @@ export function Iso3DView({
     showVolumes,
     departDe,
     natif,
+    tableauTouchable,
   ]);
 
   /**
@@ -2579,6 +2599,10 @@ export function Iso3DView({
     if (!touchee) return;
     const cible = touchee;
     haptic('leger');
+    if (cible.tableau) {
+      onTapTableauRef.current?.();
+      return;
+    }
     if (cible.lampes.length === 0) {
       // Ce qui ne commande rien montre son départ.
       const depart = cible.departs[0];

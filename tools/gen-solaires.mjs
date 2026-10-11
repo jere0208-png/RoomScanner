@@ -272,6 +272,26 @@ const CHOIX = {
   goutte: ['waterdrop-bold'],
   oeil: ['eye-bold'],
   panier: ['cart-large-2-bold', 'cart-3-bold'],
+  /*
+    LES ÉTIQUETTES DU TABLEAU FINI — relevé du patron : « les notes sous
+    chaque disjoncteur selon ce que l'on a mis (des icônes Solar de prises,
+    lumières, etc.) ». Une icône par usage du tableau (`USAGES_DU_TABLEAU`),
+    et une pour l'interrupteur général et le parafoudre.
+  */
+  lumiere: ['lightbulb-bold', 'lightbulb-minimalistic-bold'],
+  prise: ['socket-bold', 'plug-circle-bold'],
+  cuisine: ['chef-hat-bold', 'chef-hat-minimalistic-bold'],
+  cuisson: ['flame-bold', 'fire-bold'],
+  four: ['fire-square-bold', 'fire-bold'],
+  laveLinge: ['washing-machine-bold', 'washing-machine-minimalistic-bold'],
+  laveVaisselle: ['plate-bold', 'cup-hot-bold'],
+  chauffeEau: ['waterdrops-bold', 'water-bold'],
+  chauffage: ['temperature-bold', 'thermometer-bold'],
+  volets: ['window-frame-bold'],
+  exterieur: ['sun-bold', 'sun-2-bold'],
+  garage: ['garage-bold', 'car-bold'],
+  general: ['power-bold'],
+  parafoudre: ['cloud-bolt-bold', 'bolt-circle-bold'],
 };
 
 /*

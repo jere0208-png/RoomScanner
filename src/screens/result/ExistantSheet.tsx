@@ -88,6 +88,19 @@ const MOT: Record<GraviteConstat, string> = {
   directement, chacun sous son nom.
 */
 const ORGANES: { cle: string; organe: Organe; nom: string; note: string; modele: Omit<DepartExistant, 'id'> }[] = [
+  /*
+    L'INTERRUPTEUR GÉNÉRAL ET LE RÉPARTITEUR — relevé du patron : « ajoute des
+    éléments dans la construction du tableau comme interrupteur général,
+    répartiteur ». Ils ouvrent le rail : ce sont eux qu'on lit en premier.
+  */
+  {
+    cle: 'interrupteur',
+    organe: 'interrupteur',
+    nom: 'Interrupteur général',
+    note: '63 A · 2 places',
+    modele: { organe: 'interrupteur', calibre: 63 },
+  },
+  { cle: 'repartiteur', organe: 'repartiteur', nom: 'Répartiteur', note: '4 places', modele: { organe: 'repartiteur', calibre: null } },
   {
     cle: 'diff-a',
     organe: 'differentiel',
@@ -125,6 +138,8 @@ export function ExistantSheet({
   surLePlan,
   onPlacer,
   onVoir,
+  pieces,
+  onVoirFini,
 }: {
   visible: boolean;
   existant: TableauExistant | null;
@@ -138,6 +153,10 @@ export function ExistantSheet({
   surLePlan?: { piece?: string } | null;
   onPlacer?: () => void;
   onVoir?: () => void;
+  /** Les pièces du plan : un départ s'y rattache, et son étiquette le dit. */
+  pieces?: string[];
+  /** Ouvre le rendu réaliste du tableau fini. */
+  onVoirFini?: () => void;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
@@ -319,6 +338,19 @@ export function ExistantSheet({
               <Text style={styles.croix}>✕</Text>
             </TouchableOpacity>
           </View>
+          {/* Le rendu réaliste du tableau, tel qu'il sera fini. */}
+          {onVoirFini && departs.length > 0 ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Voir le tableau fini"
+              style={[styles.lienBouton, styles.voirFini]}
+              onPress={() => {
+                haptic('leger');
+                onVoirFini();
+              }}>
+              <Text style={styles.lienBoutonTexte}>Voir le tableau fini</Text>
+            </TouchableOpacity>
+          ) : null}
 
           {/*
             LE VERDICT, EN HAUT ET TOUT DE SUITE — et il bat quand il change.
@@ -508,7 +540,10 @@ export function ExistantSheet({
                       onChoix={(s) => onModifier(choix.id, { sensibilite: s })}
                     />
                   </>
-                ) : choix.organe === 'parafoudre' || choix.organe === 'agcp' ? null : (
+                ) : choix.organe === 'parafoudre' ||
+                  choix.organe === 'agcp' ||
+                  choix.organe === 'interrupteur' ||
+                  choix.organe === 'repartiteur' ? null : (
                   <>
                     <Text style={styles.aide}>Ce qu’il commande</Text>
                     <View style={styles.rangeeBoutons}>
@@ -545,6 +580,34 @@ export function ExistantSheet({
                           }}
                           onChoix={(a) => onModifier(choix.id, { calibre: a })}
                         />
+                      </>
+                    )}
+                    {/*
+                      LA PIÈCE QU'IL DESSERT — elle s'écrit sous le disjoncteur
+                      dans le rendu du tableau fini (relevé du patron : « avec
+                      leur pièce si possible »).
+                    */}
+                    {pieces && pieces.length > 0 && (
+                      <>
+                        <Text style={styles.aide}>Pièce</Text>
+                        <View style={styles.rangeeBoutons}>
+                          {pieces.map((p) => {
+                            const prise = choix.piece === p;
+                            return (
+                              <TouchableOpacity
+                                key={p}
+                                accessibilityLabel={`Pièce : ${p}`}
+                                accessibilityState={{ selected: prise }}
+                                style={[styles.choix, prise && { backgroundColor: c.blue }]}
+                                onPress={() => {
+                                  haptic('leger');
+                                  onModifier(choix.id, { piece: prise ? undefined : p });
+                                }}>
+                                <Text style={[styles.choixTexte, prise && { color: '#FFFFFF' }]}>{p}</Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
                       </>
                     )}
                   </>
@@ -908,4 +971,5 @@ const getStyles = (c: Palette) =>
       paddingVertical: 9,
     },
     lienBoutonTexte: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '700' },
+    voirFini: { marginTop: 10, marginBottom: 4 },
   });

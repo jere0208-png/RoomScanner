@@ -14285,6 +14285,66 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le tableau fini, en vrai
+
+Relevé du patron, photo d'un coffret à l'appui : « avoir un rendu visuel du
+tableau fini réaliste, avec le tableau que l'on a constitué. Ajoute des
+éléments dans la construction du tableau comme interrupteur général,
+répartiteur, etc. Sur le plan 3D, le clic sur le modèle tableau doit ouvrir
+son visuel réaliste, avec les notes sous chaque disjoncteur selon ce que
+l'on a mis (des icônes Solar de prises, lumières…), avec leur pièce si
+possible. »
+
+**La construction du tableau gagne deux organes**, en tête du rail :
+- l'interrupteur général (63 A, 2 places) ;
+- le répartiteur (4 places).
+
+Chaque départ se rattache à une pièce du plan (`piece`) : des puces
+« Pièce : Séjour » sous son usage et son calibre.
+
+**Le rendu réaliste** (`components/TableauRealiste`) dessine le coffret à
+ses cotes réelles (17,5 mm par module, 12,5 cm par rangée) :
+- le bac beige et sa platine, les montants noirs, les barrettes de terre
+  vertes en haut et en bas ;
+- un rail DIN par rangée, nu là où rien n'est clipsé ;
+- chaque organe à sa place et à sa largeur, avec ce qui le distingue :
+  - la manette et la fenêtre du calibre d'un disjoncteur (« C16 ») ;
+  - le bouton test, la sensibilité et le type d'un différentiel ;
+  - la manette rouge de l'interrupteur général ;
+  - les bornes brunes et bleues du répartiteur ;
+  - la cartouche d'un porte-fusible, le voyant d'un parafoudre ;
+- les embouts jaunes du peigne sous les modules ;
+- sous chaque organe, son étiquette : l'icône Solar de ce qu'il commande
+  (ampoule, prise, toque, flamme, lave-linge, goutte du chauffe-eau…), son
+  repère (IG, ID1, Q3), son calibre et sa pièce ;
+- les cotes du coffret en flèches, comme sur la fiche du fabricant
+  (« L : 328 mm », « H : 590 mm »).
+
+`etiquettesDuTableau` (`geometry/tableauFini`) dit, pour chaque organe, son
+repère, son icône, son calibre et sa pièce. Quatorze icônes Solar ont été
+ajoutées par l'outil du jeu (`tools/gen-solaires.mjs`), sans toucher aux
+autres.
+
+**La fenêtre du tableau fini** (`TableauFiniSheet`) montre ce dessin dans
+la largeur de l'écran ; il se pince pour lire les étiquettes. Dessous, la
+légende les redit en toutes lettres : « Q1 · Disjoncteur 16 A — Éclairage ·
+Séjour ».
+
+Tant qu'aucun tableau n'a été constitué, elle montre celui que le plan
+appelle (`tableauDepuisLePlan`) et le dit :
+- l'interrupteur général en tête ;
+- chaque différentiel sur sa rangée, suivi de ses départs, avec l'usage et
+  les pièces de chaque circuit ;
+- « Constituer le tableau » mène à sa construction.
+
+**Elle s'ouvre de trois endroits** :
+- en touchant le tableau sur la maquette 3D (`onTapTableau`) : le tableau
+  n'y offrait aucune cible ;
+- par « Voir le tableau fini », dans la feuille du tableau ;
+- par la fiche du tableau posé sur le plan 2D.
+
+Bancs : `tableaufini` (12) et `tableau3d` (2).
+
 ## Le meuble entre dans sa niche, et le clavier ne cache plus le catalogue
 
 Deux relevés du patron, captures à l'appui.

@@ -305,6 +305,10 @@ export function nommerOrgane(d: DepartExistant): string {
       return 'Contacteur heures creuses';
     case 'telerupteur':
       return 'Télérupteur';
+    case 'interrupteur':
+      return d.calibre ? `Interrupteur général ${d.calibre} A` : 'Interrupteur général';
+    case 'repartiteur':
+      return 'Répartiteur';
     case 'autre':
       return 'Autre organe';
     default:

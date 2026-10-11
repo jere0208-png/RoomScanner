@@ -153,9 +153,12 @@ import {
   constatsDePose,
   fixturePlacement,
   materialList,
+  planDifferentials,
   roomInputsOf,
   wallToRooms,
 } from '../geometry/nfc15100';
+import { tableauDepuisLePlan } from '../geometry/tableauFini';
+import { TableauFiniSheet } from '../components/TableauFiniSheet';
 import { buildMaterialPdf, materialFilename, toBase64 } from '../export/pdf';
 import { buildMetreCsv, metreFilename, type RoomMetre } from '../export/csv';
 import { buildDxf, dxfFilename } from '../export/dxf';
@@ -575,6 +578,8 @@ export function ResultScreen() {
   const [recalage, setRecalage] = useState(false);
   /** La feuille du tableau existant — rénovation. */
   const [existantOuvert, setExistantOuvert] = useState(false);
+  /** Le rendu réaliste du tableau fini (voir `TableauFiniSheet`). */
+  const [tableauFini, setTableauFini] = useState(false);
   /** La feuille « Ce qu'il faut acheter » (voir `geometry/travaux`). */
   const [travauxOuvert, setTravauxOuvert] = useState(false);
   const existant = useScanStore((s) => s.existant);
@@ -1084,6 +1089,12 @@ export function ResultScreen() {
                   : 'Reconstruisez-le organe par organe : il se dessinera tel quel.',
                 icon: 'tableau' as const,
                 onPress: () => setExistantOuvert(true),
+              },
+              {
+                label: 'Voir le tableau fini',
+                hint: 'Son rendu réaliste, une étiquette sous chaque disjoncteur.',
+                icon: 'tableau' as const,
+                onPress: () => setTableauFini(true),
               },
             ]
           : []),
@@ -2263,6 +2274,26 @@ export function ResultScreen() {
     );
   }, [fige.fixtures, fige.rooms, fige.placement, fige.ceiling]);
   const marks = useMemo(() => fixtureMarks(circuitsDuPlan), [circuitsDuPlan]);
+  /*
+    LE TABLEAU FINI QU'ON MONTRE — celui qu'on a constitué ; à défaut, celui
+    que le plan appelle (relevé du patron : « avec le tableau que l'on a
+    constitué »).
+  */
+  const tableauConstitue = !!existant && existant.departs.length > 0;
+  const tableauAffiche = useMemo(
+    () =>
+      tableauConstitue
+        ? existant
+        : circuitsDuPlan.length > 0
+          ? tableauDepuisLePlan(circuitsDuPlan, planDifferentials(circuitsDuPlan))
+          : null,
+    [tableauConstitue, existant, circuitsDuPlan],
+  );
+  /*
+    D'UNE FENÊTRE À L'AUTRE — iOS refuse d'en présenter une pendant qu'une
+    autre se retire : on laisse la première partir.
+  */
+  const ouvrirApres = (ouvrir: () => void) => setTimeout(ouvrir, 450);
 
   /**
    * Volumes de salle d'eau : le seul contrôle où une erreur est dangereuse.
@@ -4207,6 +4238,8 @@ export function ResultScreen() {
           <Iso3DView
             showMeasures={show3DMeasures}
             showElecTags={showElecTags}
+            // Toucher le tableau sur la maquette ouvre son rendu réaliste.
+            onTapTableau={modeElec ? () => setTableauFini(true) : undefined}
             /* Le même calque que sur le plan, mais en volume : le tube
                court dans la chape et remonte au nu du mur. C'est ce
                dessin-là qu'on emporte sur le chantier. */
@@ -6126,6 +6159,23 @@ export function ResultScreen() {
         }
         onPlacer={poserLeTableau}
         onVoir={tableauDuPlan ? () => voirAuMur(tableauDuPlan) : undefined}
+        pieces={rooms.map((r, i) => r.name || `Pièce ${i + 1}`)}
+        onVoirFini={() => {
+          setExistantOuvert(false);
+          ouvrirApres(() => setTableauFini(true));
+        }}
+      />
+
+      {/* ---------- Le tableau fini, en vrai ---------- */}
+      <TableauFiniSheet
+        visible={tableauFini}
+        tableau={tableauAffiche}
+        projete={!tableauConstitue}
+        onClose={() => setTableauFini(false)}
+        onModifier={() => {
+          setTableauFini(false);
+          ouvrirApres(() => setExistantOuvert(true));
+        }}
       />
 
       {/* ---------- Diagnostic du plan ---------- */}

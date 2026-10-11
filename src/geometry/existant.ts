@@ -50,6 +50,14 @@ export interface DepartExistant {
     | 'contacteur'
     /** Télérupteur d'un éclairage commandé de plusieurs endroits. */
     | 'telerupteur'
+    /**
+     * L'INTERRUPTEUR GÉNÉRAL du coffret — relevé du patron : « ajoute des
+     * éléments dans la construction du tableau comme interrupteur général,
+     * répartiteur ». Il coupe tout le tableau, en tête de rail.
+     */
+    | 'interrupteur'
+    /** Le RÉPARTITEUR : il distribue la phase et le neutre aux rangées. */
+    | 'repartiteur'
     | 'autre';
   /** Calibre en ampères. Nul quand l'organe n'en a pas. */
   calibre: number | null;
@@ -59,6 +67,11 @@ export interface DepartExistant {
   typeDiff?: 'A' | 'AC' | 'F' | 'B';
   /** Ce qu'il protège, en clair : « Prises cuisine ». */
   usage?: string;
+  /**
+   * LA PIÈCE QU'IL DESSERT, quand on la sait — elle s'écrit sous le
+   * disjoncteur, dans le rendu du tableau fini (« Séjour »).
+   */
+  piece?: string;
   /** Le différentiel sous lequel ce départ est raccordé. */
   sousDifferentiel?: string;
   /** Photo du tableau ou de l'étiquette, si elle a été prise. */
@@ -126,6 +139,8 @@ export const LARGEUR_ORGANE: Record<Organe, number> = {
   differentiel: 2,
   agcp: 2,
   parafoudre: 2,
+  interrupteur: 2,
+  repartiteur: 4,
   disjoncteur: 1,
   fusible: 1,
   contacteur: 1,
@@ -282,7 +297,15 @@ export function rattacher(departs: DepartExistant[], impl: Implantation): Depart
 }
 
 /** Le genre d'un organe, tel que le dessin du tableau le connaît. */
-export type GenreDeModule = 'differentiel' | 'disjoncteur' | 'fusible' | 'parafoudre' | 'agcp' | 'autre';
+export type GenreDeModule =
+  | 'differentiel'
+  | 'disjoncteur'
+  | 'fusible'
+  | 'parafoudre'
+  | 'agcp'
+  | 'interrupteur'
+  | 'repartiteur'
+  | 'autre';
 
 /**
  * LE RAIL DU TABLEAU, POUR LE DESSINER — en élévation, en 3D, partout où le
@@ -299,7 +322,13 @@ export function railDuReleve(t: TableauExistant | null | undefined): RailDuTable
   if (!t || (t.departs.length === 0 && !t.rangees)) return null;
   const impl = implanter(t);
   const genre = (o: Organe): GenreDeModule =>
-    o === 'differentiel' || o === 'disjoncteur' || o === 'fusible' || o === 'parafoudre' || o === 'agcp'
+    o === 'differentiel' ||
+    o === 'disjoncteur' ||
+    o === 'fusible' ||
+    o === 'parafoudre' ||
+    o === 'agcp' ||
+    o === 'interrupteur' ||
+    o === 'repartiteur'
       ? o
       : 'autre';
   return {
