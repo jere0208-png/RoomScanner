@@ -14285,6 +14285,39 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Un calque vide ne s'allume pas : une bulle dit pourquoi
+
+Relevés du patron : « sur le plan 2D, empêche l'activation des boutons
+Appareils, Meubles, etc. si aucun élément à afficher ; au clic, le bouton ne
+devient pas actif et affiche un petit message au-dessus, comme “Aucun
+appareil à afficher, passez en mode édition”. Pareil pour “Nord” » — puis
+« fais de même sur plan 3D ».
+
+**La pastille vide** (`ToolPill`, propriété `vide`). Quand son calque n'a rien
+à montrer, la pastille reste éteinte et grisée — même si le calque était resté
+allumé. Un appui la fait buter (vibration) et pose une **bulle** juste
+au-dessus d'elle, sa pointe sur le bouton, le temps de la lire (`ui/bulle`,
+`BulleHote` monté à la racine pour passer par-dessus les pastilles empilées,
+et rester dans l'écran même pour un bouton du bord).
+
+**Ce qui est jugé** (`ResultToolbar`, une phrase par cas, `RIEN`) :
+- en plan : **Cotes** (aucun mur), **Meubles**, **Appareils**, **Surfaces**
+  (aucune pièce refermée), **Nord** (nord inconnu) ;
+- en 3D : **Cotes**, **Meubles**, **Surfaces**, **Nord**, **Nuit** (aucun
+  luminaire — applique au mur, point lumineux, spot, applique ou ventilateur
+  au plafond), **Murs** ;
+- Gaines, Plafond, Volumes, Repères, Couleurs et Pièces ne s'affichaient
+  déjà que s'ils avaient de quoi montrer.
+
+**Le nord s'oriente en édition.** Allumer « Nord » sans nord connu faisait
+apparaître le badge de la boussole (« orienter le plan ») ; la pastille ne
+s'allumant plus, c'est le mode édition qui le propose maintenant, et la bulle
+y renvoie.
+
+Bancs : `calquesvides` (6 : la pastille vide ne bascule pas, la pleine
+bascule, la bulle, les rangées plan et 3D, le nord en édition),
+`motsouspastille` inchangé.
+
 ## Le tableau existant qui défile, huit circuits au plus, le type AC ; la torche qui s'allume seule
 
 Relevés du patron : « dans le menu du tableau existant, le scroll est bug. De

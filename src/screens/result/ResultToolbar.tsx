@@ -79,6 +79,46 @@ const sansElec = (
   );
 import { getStyles } from './styles';
 
+/*
+  RIEN À MONTRER, ET LA PASTILLE LE DIT — relevé du patron : « sur le plan
+  2D, empêche l'activation des boutons Appareils, Meubles, etc. si aucun
+  élément à afficher ; au clic, le bouton ne devient pas actif et affiche un
+  petit message au-dessus. Pareil pour “Nord” » — puis « fais de même sur
+  plan 3D ».
+
+  Chaque calque qui peut être vide a sa phrase : ce qui manque, et où aller
+  le chercher. `null` : il y a de quoi montrer, la pastille s'allume.
+*/
+const RIEN = {
+  cotes: 'Aucun mur à coter : scannez ou dessinez une pièce.',
+  meubles2D: 'Aucun meuble à afficher — passez en mode édition pour en ajouter.',
+  meubles3D: 'Aucun meuble à afficher — ajoutez-en en mode édition, sur le plan.',
+  appareils: 'Aucun appareil à afficher — passez en mode édition pour en poser.',
+  surfaces: 'Aucune pièce refermée : pas de surface à afficher.',
+  nord2D: 'Nord inconnu — passez en mode édition pour orienter le plan.',
+  nord3D: 'Nord inconnu — orientez le plan en mode édition, sur le plan 2D.',
+  nuit: 'Aucun luminaire à allumer — posez-en en mode édition, sur le plan.',
+  murs: 'Aucun mur à afficher : scannez ou dessinez une pièce.',
+} as const;
+
+/** Ce qui s'allume la nuit : une applique au mur, un luminaire au plafond. */
+const LUMINAIRES_AU_PLAFOND = new Set(['dcl', 'spot', 'applique', 'ventilateur']);
+
+/** De quoi juger ce que chaque calque a à montrer — lu une fois par rangée. */
+function useContenus() {
+  const murs = useScanStore((s) => s.walls.length);
+  const meubles = useScanStore((s) => s.objects.length);
+  const appareils = useScanStore((s) => s.fixtures.length);
+  const pieces = useScanStore((s) => s.rooms.length);
+  const nord = useScanStore((s) => s.north !== null && s.north !== undefined);
+  const luminaires = useScanStore(
+    (s) =>
+      s.fixtures.some((f) => f.kind === 'applique') ||
+      s.ceiling.some((cl) => LUMINAIRES_AU_PLAFOND.has(cl.kind)),
+  );
+  return { murs, meubles, appareils, pieces, nord, luminaires };
+}
+
 /** Ce que les deux rangées partagent : la place qu'elles occupent. */
 type Cadre = {
   anim: Animated.Value;
@@ -170,6 +210,7 @@ export function Toolbar2D({
   const setShowSurfaces = useScanStore((s) => s.setShowSurfaces);
   const straightenPlan = useScanStore((s) => s.straightenPlan);
   const modeElec = useModeElec();
+  const contenu = useContenus();
 
   /**
    * LE MENU DU PLAFOND.
@@ -349,6 +390,7 @@ export function Toolbar2D({
           icon="ruler"
           label="Cotes"
           active={showMeasures}
+          vide={contenu.murs === 0 ? RIEN.cotes : null}
           onPress={() => setShowMeasures((v) => !v)}
         />,
         // Le calque des gaines ne s'offre que s'il a quelque chose à
@@ -373,6 +415,7 @@ export function Toolbar2D({
           icon="furniture"
           label="Meubles"
           active={showFurniture}
+          vide={contenu.meubles === 0 ? RIEN.meubles2D : null}
           onPress={() => {
             // Éteindre le calque éteint tout ce qui l'accompagne : les
             // poignées d'un meuble invisible restaient à l'écran,
@@ -394,6 +437,7 @@ export function Toolbar2D({
           // peuvent pas porter le même mot pour deux gestes différents.
           label="Appareils"
           active={showFixtures}
+          vide={contenu.appareils === 0 ? RIEN.appareils : null}
           onPress={() => setShowFixtures((v) => !v)}
         />,
         <ToolPill
@@ -401,14 +445,16 @@ export function Toolbar2D({
           icon="surface"
           label="Surfaces"
           active={showSurfaces}
+          vide={contenu.pieces === 0 ? RIEN.surfaces : null}
           onPress={() => setShowSurfaces(!showSurfaces)}
         />,
         <ToolPill
           key="nord"
           icon="square"
           label="Nord"
-          node={<BoussoleNord teinte={showNorth ? '#FFFFFF' : teinte.ink} />}
+          node={<BoussoleNord teinte={showNorth && contenu.nord ? '#FFFFFF' : contenu.nord ? teinte.ink : teinte.inkFaint} />}
           active={showNorth}
+          vide={contenu.nord ? null : RIEN.nord2D}
           onPress={() => setShowNorth((v) => !v)}
         />,
         // Le plafond se cache pour revoir le sol : superposés, les deux
@@ -534,6 +580,8 @@ export function Toolbar3D({
   const solidWalls = useScanStore((s) => s.solidWalls);
   const toggleSolidWalls = useScanStore((s) => s.toggleSolidWalls);
   const modeElec = useModeElec();
+  // Même règle qu'en plan : un calque vide ne s'allume pas, une bulle dit pourquoi.
+  const contenu = useContenus();
 
   const outils = [
     <ToolPill
@@ -541,6 +589,7 @@ export function Toolbar3D({
       icon="ruler"
       label="Cotes"
       active={showMeasures}
+      vide={contenu.murs === 0 ? RIEN.cotes : null}
       onPress={() => setShowMeasures((v) => !v)}
     />,
     <ToolPill
@@ -548,6 +597,7 @@ export function Toolbar3D({
       icon="furniture"
       label="Meubles"
       active={showFurniture}
+      vide={contenu.meubles === 0 ? RIEN.meubles3D : null}
       onPress={() => setShowFurniture(!showFurniture)}
     />,
     <ToolPill
@@ -555,14 +605,16 @@ export function Toolbar3D({
       icon="surface"
       label="Surfaces"
       active={showSurfaces}
+      vide={contenu.pieces === 0 ? RIEN.surfaces : null}
       onPress={() => setShowSurfaces(!showSurfaces)}
     />,
     <ToolPill
       key="nord"
       icon="square"
       label="Nord"
-      node={<BoussoleNord teinte={showNorth ? '#FFFFFF' : teinte.ink} />}
+      node={<BoussoleNord teinte={showNorth && contenu.nord ? '#FFFFFF' : contenu.nord ? teinte.ink : teinte.inkFaint} />}
       active={showNorth}
+      vide={contenu.nord ? null : RIEN.nord3D}
       onPress={() => setShowNorth((v) => !v)}
     />,
     /*
@@ -603,6 +655,7 @@ export function Toolbar3D({
       icon="lune"
       label="Nuit"
       active={nuit}
+      vide={contenu.luminaires ? null : RIEN.nuit}
       onPress={() => setNuit((v) => !v)}
     />,
     /* Le plafond existe aussi en 3D : même calque, même bouton. */
@@ -623,6 +676,7 @@ export function Toolbar3D({
       icon="murs"
       label="Murs"
       active={solidWalls}
+      vide={contenu.murs === 0 ? RIEN.murs : null}
       onPress={toggleSolidWalls}
     />,
     /* Les repères électriques : indispensables pour poser, encombrants pour

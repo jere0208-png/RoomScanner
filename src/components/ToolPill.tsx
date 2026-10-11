@@ -24,6 +24,8 @@ import Svg, { Path, Rect } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
 import { ombreBouton, themedStyles, useTheme, type Palette } from '../theme';
 import { useGeste } from '../store/geste';
+import { haptic } from '../ui/haptic';
+import { useBulle } from '../ui/bulle';
 
 export type ToolIcon =
   /* La nuit de la maquette : on éteint pour voir les lumières s'allumer. */
@@ -169,6 +171,7 @@ export function ToolPill({
   onPress,
   node,
   halo,
+  vide,
 }: {
   icon: ToolIcon;
   /**
@@ -193,10 +196,34 @@ export function ToolPill({
    * sans emprunter la couleur des calques.
    */
   halo?: boolean;
+  /**
+   * RIEN À MONTRER : la phrase qui le dit. Relevé du patron : « empêche
+   * l'activation des boutons Appareils, Meubles, etc. si aucun élément à
+   * afficher ; au clic, le bouton ne devient pas actif et affiche un petit
+   * message au-dessus ». La pastille reste éteinte et grisée ; un appui la
+   * fait buter et montre la bulle (voir `ui/bulle`), au lieu d'allumer un
+   * calque vide qu'on croirait cassé.
+   */
+  vide?: string | null;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
-  const plein = active && !halo;
+  const eteint = !!vide;
+  const plein = active && !halo && !eteint;
+  const cellule = useRef<View>(null);
+  const montrerBulle = useBulle((s) => s.montrer);
+  const toucher = () => {
+    if (!vide) {
+      onPress();
+      return;
+    }
+    haptic('butee');
+    const v = cellule.current as unknown as {
+      measureInWindow?: (cb: (x: number, y: number, w: number, h: number) => void) => void;
+    } | null;
+    if (v?.measureInWindow) v.measureInWindow((x, y, w) => montrerBulle(vide, x + w / 2, y));
+    else montrerBulle(vide, 0, 0);
+  };
   /*
     LES FOURMIS NE TOURNENT QUE PENDANT L'ÉDITION.
 
@@ -234,7 +261,7 @@ export function ToolPill({
     return () => boucle.stop();
   }, [tourne, fourmis]);
   // Icône noire sur fond blanc ; blanche sur bleu quand l'outil est actif.
-  const stroke = plein ? '#FFFFFF' : active ? c.blue : c.ink;
+  const stroke = eteint ? c.inkFaint : plein ? '#FFFFFF' : active ? c.blue : c.ink;
   /**
    * Actif = un contour, POSÉ. Il ne respire plus.
    *
@@ -245,10 +272,11 @@ export function ToolPill({
    * franc le dit une fois, et se tait.
    */
   return (
-    <View style={styles.toolCell}>
+    <View style={styles.toolCell} ref={cellule}>
       <TouchableOpacity
-        style={[styles.toolPill, plein && styles.toolPillActive]}
+        style={[styles.toolPill, plein && styles.toolPillActive, eteint && styles.toolPillVide]}
         accessibilityLabel={label}
+        accessibilityHint={vide ?? undefined}
         /*
           ET CE QUI EST ALLUMÉ SE DIT.
 
@@ -260,7 +288,7 @@ export function ToolPill({
           permanence, l'avait oublié.
         */
         accessibilityRole="button"
-        accessibilityState={{ selected: active }}
+        accessibilityState={eteint ? { selected: false, disabled: true } : { selected: active }}
         /**
          * 38 POINTS DESSINÉS, 44 SOUS LE DOIGT.
          *
@@ -270,7 +298,7 @@ export function ToolPill({
          * cible, comme le fait iOS partout.
          */
         hitSlop={{ top: 4, bottom: 4, left: 6, right: 6 }}
-        onPress={onPress}>
+        onPress={toucher}>
         {halo && active && (
           <View pointerEvents="none" style={styles.toolHalo}>
             {/* Le contour épouse exactement la pastille : un anneau posé
@@ -312,7 +340,7 @@ export function ToolPill({
       </TouchableOpacity>
       {label ? (
         <Text
-          style={[styles.toolLabel, active && styles.toolLabelActive]}
+          style={[styles.toolLabel, active && !eteint && styles.toolLabelActive]}
           numberOfLines={1}>
           {label}
         </Text>
@@ -334,6 +362,8 @@ const getStyles = themedStyles((c: Palette) =>
     textAlign: 'center',
   },
   toolLabelActive: { color: c.blue },
+  // Rien à montrer : la pastille s'efface d'un ton, sans disparaître.
+  toolPillVide: { opacity: 0.6 },
   toolPill: {
     width: PILL_SIZE,
     height: PILL_SIZE,

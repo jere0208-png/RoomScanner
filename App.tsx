@@ -21,6 +21,7 @@ import { EssaiEpuise } from './src/components/EssaiEpuise';
 import { SurprisePro } from './src/components/SurprisePro';
 import { AlerteHote } from './src/components/AlerteHote';
 import { AstuceHote } from './src/components/AstuceHote';
+import { BulleHote } from './src/components/BulleHote';
 import { GardeFou } from './src/components/GardeFou';
 import { usePannes } from './src/ui/journalPannes';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
@@ -366,6 +367,8 @@ function Application() {
           qu'un message d'erreur doit survivre à l'écran qui l'a levé — on
           apprend souvent EN QUITTANT qu'un enregistrement a échoué. */}
       <AlerteHote />
+      {/* La bulle d'un bouton qui n'a rien à montrer : voir `src/ui/bulle.ts`. */}
+      <BulleHote />
       {/*
         ET LE MOT QUI PASSE — voir `src/ui/astuce.ts`. Monté ici pour la même
         raison que l'alerte : une astuce naît là où le geste se produit, et

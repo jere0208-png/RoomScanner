@@ -1234,6 +1234,9 @@ export function ResultScreen() {
    * dossier imprimé, lui, porte toujours sa rose des vents.
    */
   const [showNorth, setShowNorth] = useState(false);
+  /* Le nord est-il connu ? Sans lui, la pastille « Nord » ne s'allume pas
+     (voir `ResultToolbar`) : c'est en édition qu'on oriente le plan. */
+  const nordConnu = useScanStore((s) => s.north !== null && s.north !== undefined);
   const [editMode, setEditMode] = useState(false);
   /**
    * Jeu de pastilles affiché. Il RETARDE sur `editMode` : les anciennes
@@ -3641,7 +3644,9 @@ export function ResultScreen() {
             }
             ceiling={ceiling}
             showCeiling={showCeiling}
-            showNorth={showNorth}
+            /* Sans nord, l'édition propose d'orienter le plan (le badge de
+               la boussole) : la pastille « Nord » y renvoie. */
+            showNorth={showNorth || (editMode && !nordConnu)}
             selectedCeilingId={selCeiling}
             selectedCeilingRow={selRow}
             notes={notes}
