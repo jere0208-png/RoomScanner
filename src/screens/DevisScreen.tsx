@@ -59,6 +59,13 @@ import {
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { BackChevron } from '../components/BackChevron';
+import { PromptSheet, type PromptData } from '../components/Sheet';
+import { RoomScan } from 'react-native-room-scan';
+import { buildDevisPdf, devisFilename, toBase64 } from '../export/pdf';
+import { useAccountStore } from '../store/accountStore';
+import { entrepriseAImprimer, useEntreprise } from '../store/entreprise';
+import { alerte } from '../ui/alerte';
+import { panne as expliquer } from '../ui/panne';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { DevisAttention } from '../components/DevisAttention';
@@ -234,6 +241,7 @@ function Article({
   onBasculer,
   onMoins,
   onPlus,
+  onPrix,
   pro,
   distributeur,
 }: {
@@ -243,6 +251,8 @@ function Article({
   onBasculer: () => void;
   onMoins: () => void;
   onPlus: () => void;
+  /** Corriger le prix unitaire (voir `prixAjuste`). */
+  onPrix?: () => void;
   /** Le prix d'achat de l'électricien, quand son tarif reconnaît l'article. */
   pro?: PrixPro;
   distributeur?: string;
@@ -262,11 +272,31 @@ function Article({
         <Text style={[styles.articleNom, hors && styles.barre]}>
           {ligne.libelle}
         </Text>
-        <Text style={styles.articleDetail}>
-          {ligne.pu === null
-            ? `${ligne.quantite} ${ligne.unite} — pas de prix au catalogue`
-            : `${ligne.quantite} ${ligne.unite} × ${euros(ligne.pu)}`}
-        </Text>
+        {/*
+          LE PRIX SE TOUCHE POUR SE CORRIGER — correctif de l'audit : les prix
+          unitaires ne se modifiaient pas. Le prix est souligné : c'est lui
+          qu'on touche, pas la ligne (qui, elle, écarte l'article).
+        */}
+        {onPrix && !hors ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={`Modifier le prix : ${ligne.libelle}`}
+            hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+            onPress={onPrix}>
+            <Text style={styles.articleDetail}>
+              {ligne.pu === null ? `${ligne.quantite} ${ligne.unite} — ` : `${ligne.quantite} ${ligne.unite} × `}
+              <Text style={styles.articlePrixTouchable}>
+                {ligne.pu === null ? 'fixer un prix' : euros(ligne.pu)}
+              </Text>
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.articleDetail}>
+            {ligne.pu === null
+              ? `${ligne.quantite} ${ligne.unite} — pas de prix au catalogue`
+              : `${ligne.quantite} ${ligne.unite} × ${euros(ligne.pu)}`}
+          </Text>
+        )}
         {/*
           D'OÙ SORT CE PRIX — relevé du patron : « fournir une référence pour
           le prix (ex : Castorama - date) ».
@@ -289,6 +319,7 @@ function Article({
             {ligne.duMagasin ? 'Pris au magasin' : 'Quantité corrigée'}
           </Text>
         )}
+        {ligne.prixAjuste && <Text style={styles.articleOrigine}>Prix modifié</Text>}
         {!!ligne.source && ligne.pu !== null && (
           <Text style={styles.articleSource}>
             {`${ligne.source}${ligne.releve ? ` · ${dateDuReleve(ligne.releve)}` : ''}`}
@@ -382,6 +413,15 @@ export function DevisScreen() {
   const ecartes = useScanStore((s) => s.devisEcartes);
   const quantites = useScanStore((s) => s.devisQuantites);
   const ajouts = useScanStore((s) => s.devisAjouts);
+  const prixVoulus = useScanStore((s) => s.devisPrix);
+  const reglerPrixDevis = useScanStore((s) => s.reglerPrixDevis);
+  /** La correction du prix d'une ligne, quand on l'a touchée. */
+  const [prompt, setPrompt] = useState<PromptData | null>(null);
+  const setDevisNumero = useScanStore((s) => s.setDevisNumero);
+  const exportOuvert = useAccountStore((st) => st.exportOuvert);
+  useEffect(() => {
+    if (!useEntreprise.getState().charge) useEntreprise.getState().charger();
+  }, []);
   const reglerQuantiteDevis = useScanStore((s) => s.reglerQuantiteDevis);
   const ajouterAuDevis = useScanStore((s) => s.ajouterAuDevis);
   const retirerDuDevis = useScanStore((s) => s.retirerDuDevis);
@@ -493,6 +533,7 @@ export function DevisScreen() {
       chiffrerLePlan(walls, rooms, fixtures, ceiling, gamme, horsJeu, openings, {
         quantites,
         ajouts,
+        prix: prixVoulus,
       }),
     /*
       `versionTarifs` N'ENTRE DANS AUCUN CALCUL, et c'est pour cela qu'il est
@@ -516,6 +557,7 @@ export function DevisScreen() {
       openings,
       quantites,
       ajouts,
+      prixVoulus,
       versionTarifs,
     ],
   );
@@ -687,6 +729,81 @@ export function DevisScreen() {
       return;
     }
     reglerQuantiteDevis(cleDeLigne(l), voulue);
+  };
+
+  /*
+    CORRIGER LE PRIX D'UNE LIGNE — correctif de l'audit. Le champ s'ouvre sur
+    le prix affiché ; le vider rend celui du catalogue.
+  */
+  const corrigerLePrix = (l: LigneDevis) => {
+    haptic('leger');
+    const cle = cleDeLigne(l);
+    setPrompt({
+      title: `Prix unitaire TTC — ${l.libelle}`,
+      subtitle: l.prixAjuste
+        ? 'Videz le champ pour revenir au prix du catalogue.'
+        : 'Votre prix remplace celui du catalogue sur ce devis.',
+      value: l.pu === null ? '' : String(l.pu).replace('.', ','),
+      unit: '€',
+      numeric: true,
+      okLabel: 'Appliquer',
+      onSubmit: (v: string) => {
+        const t = v.trim();
+        if (!t) {
+          reglerPrixDevis(cle, null);
+          return;
+        }
+        const n = Number(t.replace(/\s/g, '').replace(',', '.'));
+        if (isFinite(n) && n >= 0) reglerPrixDevis(cle, n);
+      },
+    });
+  };
+
+  /*
+    LE DEVIS S'EXPORTE — correctif de l'audit : ni PDF ni partage, pas de
+    bloc entreprise ou client, pas de numéro. Le numéro se donne au premier
+    envoi et reste au plan : renvoyer le même devis ne lui en donne pas un
+    autre. L'export est la barrière, comme pour le dossier (`exportOuvert`).
+  */
+  const exporterLeDevis = async () => {
+    if (!exportOuvert()) return;
+    const envoyer = async () => {
+      try {
+        let numero = useScanStore.getState().devisNumero;
+        if (!numero) {
+          numero = useEntreprise.getState().numeroterUnDevis();
+          setDevisNumero(numero);
+        }
+        const st = useScanStore.getState();
+        const bytes = buildDevisPdf({
+          numero,
+          date: new Date(),
+          chantier: st.scanName,
+          client: st.client,
+          adresse: st.address,
+          entreprise: entrepriseAImprimer(useEntreprise.getState()),
+          gamme: nomDeLaGamme,
+          devis,
+          pose,
+        });
+        await RoomScan.sharePDF(toBase64(bytes), devisFilename(numero, st.scanName));
+      } catch (e) {
+        alerte(expliquer('export', e).titre, expliquer('export', e).message);
+      }
+    };
+    // Sans entreprise, le devis partirait sans en-tête : on le dit avant.
+    if (!useEntreprise.getState().nom.trim()) {
+      alerte(
+        'Votre entreprise n’est pas renseignée',
+        'Elle paraît en tête du devis, avec vos coordonnées et votre SIRET. Vous pouvez la renseigner au profil.',
+        [
+          { label: 'Renseigner', onPress: () => setScreen('profil') },
+          { label: 'Exporter quand même', onPress: () => void envoyer() },
+        ],
+      );
+      return;
+    }
+    await envoyer();
   };
 
   /** Le nom de la gamme en toutes lettres — l'en-tête et le bouton le lisent. */
@@ -1048,6 +1165,7 @@ export function DevisScreen() {
                     }}
                     onMoins={() => reglerLaQuantite(l, -1)}
                     onPlus={() => reglerLaQuantite(l, 1)}
+                    onPrix={() => corrigerLePrix(l)}
                   />
                 ))
               : devis.parFamille.map((f) => (
@@ -1068,6 +1186,7 @@ export function DevisScreen() {
                           distributeur={tarifPro?.distributeur}
                           onMoins={() => reglerLaQuantite(l, -1)}
                           onPlus={() => reglerLaQuantite(l, 1)}
+                          onPrix={() => corrigerLePrix(l)}
                           onBasculer={() => {
                             haptic('leger');
                             basculer(cleDeLigne(l));
@@ -1177,6 +1296,16 @@ export function DevisScreen() {
               onTaux={reglerTaux}
             />
 
+            {/* Le devis, numéroté, à l'en-tête de l'entreprise, prêt à signer. */}
+            <TouchableOpacity
+              accessibilityLabel="Exporter le devis (PDF)"
+              accessibilityRole="button"
+              activeOpacity={0.85}
+              style={styles.action}
+              onPress={exporterLeDevis}>
+              <Text style={styles.actionTexte}>Exporter le devis (PDF)</Text>
+            </TouchableOpacity>
+
             {/*
               LE PLAN EN PIED DE TICKET — d'où sortent ces quantités.
 
@@ -1240,6 +1369,7 @@ export function DevisScreen() {
           <Text style={styles.actionTexte}>Voir le prix</Text>
         </TouchableOpacity>
       )}
+      <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
     </RetourGlisse>
   );
 }
@@ -1450,6 +1580,7 @@ const getStyles = themedStyles((c: Palette) =>
     },
     articleNom: { color: c.ink, fontSize: 14, fontWeight: '700' },
     articleDetail: { color: c.inkFaint, fontSize: 12, marginTop: 2 },
+    articlePrixTouchable: { color: c.blue, fontWeight: '600', textDecorationLine: 'underline' },
     articleNote: { color: c.inkFaint, fontSize: 11, lineHeight: 15, marginTop: 3 },
     /* La provenance du prix : plus petite et plus pâle que le reste. On la
        cherche quand on la cherche, elle ne dispute pas la ligne au libellé. */

@@ -122,6 +122,8 @@ import { ecarterLesGaines } from '../geometry/routing';
 import { matieresDesSols } from '../ui/maquette';
 import { accentsDesPieces, peinturesDesPieces, solsDesPieces } from '../ui/habillage';
 import { cotesExterieures, ECART_DE_COTE } from '../geometry/cotes3d';
+import type { Devis } from '../geometry/devis';
+import { enHeures, type Pose } from '../geometry/mainDOeuvre';
 import { nomDeTeinte } from '../ui/peintures';
 
 const PAGE_W = 595;
@@ -6628,6 +6630,227 @@ export function buildMaterialPdf(
     }),
   );
   return buildDocument(pages.map((p) => p.stream()));
+}
+
+/**
+ * LE DEVIS, PRÊT À REMETTRE — correctif de l'audit « dans la peau d'un
+ * utilisateur » : le devis ne s'exportait pas (ni PDF ni partage, pas de bloc
+ * entreprise ou client, pas de numéro). « Pour un pro, c'est une impasse. »
+ *
+ * Un document de lettre, pas une feuille de plan : l'entreprise en tête, le
+ * numéro et la date, le client et le chantier, les fournitures rayon par
+ * rayon, la pose estimée avec sa TVA, le total, les exclusions, et la case
+ * « bon pour accord ». Les lignes écartées du ticket n'y sont pas : le client
+ * n'a pas à lire ce qu'on ne lui vend pas. Un long devis passe sur autant de
+ * pages qu'il faut ; le total n'arrive qu'une fois, à la fin.
+ */
+export interface DevisPourPdf {
+  numero: string;
+  date: Date;
+  /** Le nom du plan : le chantier. */
+  chantier: string;
+  client?: string;
+  adresse?: string;
+  entreprise?: EntreprisePdf | null;
+  /** La gamme d'appareillage, en toutes lettres. */
+  gamme?: string;
+  devis: Devis;
+  /** La pose estimée, quand on la compte. */
+  pose?: Pose | null;
+}
+
+/** « 1 234,50 € » — l'espace des milliers, la virgule, les centimes. */
+const enEuros = (v: number) => {
+  const [e, c] = (Math.round(v * 100) / 100).toFixed(2).split('.');
+  return `${e.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')},${c} €`;
+};
+
+export function devisFilename(numero: string, chantier: string): string {
+  const nom = chantier.replace(/[\\/:*?"<>|]/g, ' ').trim();
+  return `Devis ${numero}${nom ? ` — ${nom}` : ''}.pdf`;
+}
+
+export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
+  const X0 = 40;
+  const X1 = PAGE_W - 40;
+  const COL_QTE = 382;
+  const COL_PU = 468;
+  const BAS = 78;
+  const two = (v: number) => String(v).padStart(2, '0');
+  const date = `${two(e.date.getDate())}/${two(e.date.getMonth() + 1)}/${e.date.getFullYear()}`;
+  const feuilles: Draw[] = [];
+  let d = new Draw();
+  let y = 0;
+
+  const enTeteDuTableau = () => {
+    d.rect(X0, y - 6, X1 - X0, 18, '#EEF1F6', null, 0);
+    d.text('Désignation', X0 + 8, y, 8, GREY, { bold: true, align: 'left' });
+    d.text('Qté', COL_QTE, y, 8, GREY, { bold: true, align: 'right' });
+    d.text('PU TTC', COL_PU, y, 8, GREY, { bold: true, align: 'right' });
+    d.text('Total TTC', X1 - 6, y, 8, GREY, { bold: true, align: 'right' });
+    y -= 22;
+  };
+  const nouvellePage = () => {
+    d = new Draw();
+    feuilles.push(d);
+    y = PAGE_H - 50;
+  };
+  /** Une page de plus quand ce qui vient ne tient pas — le tableau reprend son en-tête. */
+  const place = (h: number, tableau = true) => {
+    if (y - h >= BAS) return;
+    nouvellePage();
+    d.text(`Devis n° ${e.numero} — suite`, X0, y, 10, GREY, { bold: true, align: 'left' });
+    y -= 26;
+    if (tableau) enTeteDuTableau();
+  };
+
+  // ------------------------------------------------------------ l'en-tête
+  nouvellePage();
+  const ent = e.entreprise?.nom ? e.entreprise : null;
+  if (ent) {
+    d.text(fitText(ent.nom, 15, 270), X0, y, 15, INK, { bold: true, align: 'left' });
+    let yy = y - 16;
+    for (const l of [ent.adresse, [ent.telephone, ent.email].filter(Boolean).join(' · '), ent.siret ? `SIRET ${ent.siret}` : '']) {
+      if (!l) continue;
+      d.text(fitText(l, 8.5, 270), X0, yy, 8.5, GREY, { align: 'left' });
+      yy -= 11;
+    }
+  } else {
+    drawLogo(d, X0, y - 26, 34);
+    d.text('EchoPlan', X0 + 42, y - 10, 13, INK, { bold: true, align: 'left' });
+  }
+  d.text('DEVIS', X1, y - 4, 24, INK, { bold: true, align: 'right' });
+  d.text(`N° ${e.numero}`, X1, y - 24, 10.5, INK, { align: 'right' });
+  d.text(`Date : ${date}`, X1, y - 38, 9.5, INK, { align: 'right' });
+  d.text('Valable un mois', X1, y - 51, 8, GREY, { align: 'right' });
+
+  // Le client et le chantier, dans leur cadre.
+  y -= 84;
+  const cx = 320;
+  d.rect(cx, y - 62, X1 - cx, 70, null, GREY_LIGHT, 0.6);
+  d.text('CLIENT', cx + 10, y - 4, 7, GREY, { align: 'left' });
+  d.text(fitText(e.client || '—', 11, X1 - cx - 20), cx + 10, y - 19, 11, INK, { bold: true, align: 'left' });
+  if (e.adresse) d.text(fitText(e.adresse, 9, X1 - cx - 20), cx + 10, y - 33, 9, INK, { align: 'left' });
+  d.text(fitText(`Chantier : ${e.chantier}`, 8.5, X1 - cx - 20), cx + 10, y - 50, 8.5, GREY, { align: 'left' });
+  const objet = `Objet : installation électrique${e.gamme ? `, appareillage ${e.gamme}` : ''}.`;
+  for (const [i, l] of wrapText(objet, 9.5, cx - X0 - 20).entries()) {
+    d.text(l, X0, y - 19 - i * 13, 9.5, INK, { align: 'left' });
+  }
+  y -= 96;
+
+  // ------------------------------------------------------- les fournitures
+  enTeteDuTableau();
+  const lignes = e.devis.lignes.filter((l) => !l.ecarte);
+  const familles: string[] = [];
+  for (const l of lignes) if (!familles.includes(l.famille)) familles.push(l.famille);
+  for (const f of familles) {
+    place(36);
+    d.text(f.toUpperCase(), X0 + 8, y, 7.5, GREY, { bold: true, align: 'left' });
+    y -= 16;
+    for (const l of lignes.filter((x) => x.famille === f)) {
+      place(16);
+      d.text(fitText(l.libelle, 9.5, COL_QTE - X0 - 60), X0 + 8, y, 9.5, INK, { align: 'left' });
+      d.text(`${String(l.quantite).replace('.', ',')} ${l.unite}`, COL_QTE, y, 9, INK, { align: 'right' });
+      /*
+        CE QUI NE SE FACTURE PAS NE S'ÉCRIT PAS « 0,00 € » : un luminaire
+        n'est pas compté (cela dépend des envies), le support du tableau est
+        compris dans le coffret. Un zéro sur un devis se lit comme un oubli.
+      */
+      if (l.pu === 0 && l.total === 0) {
+        d.text('—', COL_PU, y, 9, GREY, { align: 'right' });
+        d.text(/non compt/i.test(l.note ?? '') ? 'non compté' : 'compris', X1 - 6, y, 9, GREY, { align: 'right' });
+      } else {
+        d.text(l.pu === null ? 'à chiffrer' : enEuros(l.pu), COL_PU, y, 9, l.pu === null ? GREY : INK, { align: 'right' });
+        d.text(l.pu === null ? '—' : enEuros(l.total), X1 - 6, y, 9, INK, { align: 'right' });
+      }
+      d.line(X0, y - 5, X1, y - 5, 0.3, '#E3E7ED');
+      y -= 16;
+    }
+    y -= 4;
+  }
+  place(24);
+  d.line(X0, y + 8, X1, y + 8, 0.8, INK);
+  d.text('Total fournitures TTC', X0 + 8, y - 6, 10, INK, { bold: true, align: 'left' });
+  d.text(enEuros(e.devis.total), X1 - 6, y - 6, 10, INK, { bold: true, align: 'right' });
+  y -= 32;
+
+  // ------------------------------------------------- la pose, estimée
+  const pose = e.pose && e.pose.heures > 0 ? e.pose : null;
+  if (pose) {
+    place(60);
+    d.text('MAIN-D’ŒUVRE (ESTIMÉE)', X0 + 8, y, 7.5, GREY, { bold: true, align: 'left' });
+    y -= 16;
+    for (const l of pose.lignes) {
+      place(16);
+      d.text(fitText(`Pose — ${l.famille} (${l.quantite} point${l.quantite > 1 ? 's' : ''})`, 9.5, COL_QTE - X0 - 60), X0 + 8, y, 9.5, INK, {
+        align: 'left',
+      });
+      d.text(enHeures(l.heures), COL_QTE, y, 9, INK, { align: 'right' });
+      d.text(`${enEuros(pose.taux)} HT/h`, COL_PU, y, 8.5, INK, { align: 'right' });
+      d.text(`${enEuros(Math.round(l.heures * pose.taux * 100) / 100)} HT`, X1 - 6, y, 9, INK, { align: 'right' });
+      d.line(X0, y - 5, X1, y - 5, 0.3, '#E3E7ED');
+      y -= 16;
+    }
+    place(52);
+    d.line(X0, y + 8, X1, y + 8, 0.8, INK);
+    const lignesPose: [string, number][] = [
+      ['Total main-d’œuvre HT', pose.ht],
+      [`TVA ${Math.round(pose.tauxTva * 100)} %`, pose.tva],
+      ['Total main-d’œuvre TTC', pose.ttc],
+    ];
+    for (const [mot, v] of lignesPose) {
+      d.text(mot, X0 + 8, y - 6, 9.5, INK, { bold: mot.startsWith('Total'), align: 'left' });
+      d.text(enEuros(v), X1 - 6, y - 6, 9.5, INK, { bold: mot.startsWith('Total'), align: 'right' });
+      y -= 15;
+    }
+    y -= 14;
+  }
+
+  // ------------------------------------------------------------ le total
+  place(70, false);
+  const bx = 320;
+  const hauteurTotal = pose ? 62 : 44;
+  d.rect(bx, y - hauteurTotal + 10, X1 - bx, hauteurTotal, '#F4F6FA', null, 0);
+  let yt = y - 4;
+  d.text('Fournitures TTC', bx + 10, yt, 9, GREY, { align: 'left' });
+  d.text(enEuros(e.devis.total), X1 - 10, yt, 9, INK, { align: 'right' });
+  if (pose) {
+    yt -= 14;
+    d.text('Main-d’œuvre TTC', bx + 10, yt, 9, GREY, { align: 'left' });
+    d.text(enEuros(pose.ttc), X1 - 10, yt, 9, INK, { align: 'right' });
+  }
+  yt -= 20;
+  d.text('TOTAL TTC', bx + 10, yt, 12, INK, { bold: true, align: 'left' });
+  d.text(enEuros(e.devis.total + (pose?.ttc ?? 0)), X1 - 10, yt, 13, INK, { bold: true, align: 'right' });
+  y -= hauteurTotal + 18;
+
+  // ------------------------------------------------------- les mentions
+  const mentions = [
+    'Prix des fournitures TTC, relevés en enseigne : à confirmer à la commande.',
+    ...(pose ? ['Main-d’œuvre estimée au temps de pose de chaque point, à confirmer après visite.'] : []),
+    ...e.devis.exclusions.filter((x) => !(pose && /^Main-d/.test(x))),
+  ];
+  for (const m of mentions) {
+    const ls = wrapText(m, 7.5, X1 - X0);
+    place(ls.length * 10 + 2, false);
+    for (const l of ls) {
+      d.text(l, X0, y, 7.5, GREY, { align: 'left' });
+      y -= 10;
+    }
+  }
+
+  // ------------------------------------------------ le bon pour accord
+  y -= 10;
+  place(84, false);
+  d.rect(cx, y - 72, X1 - cx, 76, null, GREY_LIGHT, 0.6);
+  d.text('Bon pour accord — date et signature du client', cx + 10, y - 10, 8, GREY, { align: 'left' });
+
+  // ------------------------------------------------------- les pieds de page
+  const signe = ent ? `${ent.nom}${ent.siret ? ` · SIRET ${ent.siret}` : ''}` : 'EchoPlan';
+  feuilles.forEach((f, i) => {
+    f.text(fitText(`${signe} · Devis n° ${e.numero} — page ${i + 1} / ${feuilles.length}`, 7.5, X1 - X0), PAGE_W / 2, 30, 7.5, GREY_LIGHT);
+  });
+  return buildDocument(feuilles.map((f) => f.stream()));
 }
 
 export function materialFilename(name: string): string {

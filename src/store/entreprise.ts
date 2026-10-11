@@ -33,11 +33,26 @@ function disque(): {
   return m.default ?? m;
 }
 
+/** Le dernier numéro de devis attribué : son année, et son rang dans l'année. */
+export interface DernierDevis {
+  annee: number;
+  rang: number;
+}
+
 interface Etat extends Entreprise {
   charge: boolean;
+  /** Voir `numeroterUnDevis`. */
+  dernierDevis: DernierDevis | null;
   charger: () => Promise<void>;
   /** Corrige un ou plusieurs champs ; les blancs autour s'en vont. */
   regler: (champs: Partial<Entreprise>) => void;
+  /**
+   * LE NUMÉRO DU DEVIS SUIVANT — « D-2026-0042 » : l'année, puis le rang dans
+   * l'année, sans trou ni doublon sur cet appareil. Correctif de l'audit :
+   * le devis n'avait pas de numéro, et un devis sans numéro ne se retrouve
+   * pas dans une comptabilité.
+   */
+  numeroterUnDevis: (date?: Date) => string;
 }
 
 const champsDe = (e: Entreprise): Entreprise => ({
@@ -48,10 +63,10 @@ const champsDe = (e: Entreprise): Entreprise => ({
   siret: e.siret,
 });
 
-function ecrire(e: Entreprise): void {
+function ecrire(e: Entreprise & { dernierDevis: DernierDevis | null }): void {
   try {
     disque()
-      .setItem(CLE_ENTREPRISE, JSON.stringify(champsDe(e)))
+      .setItem(CLE_ENTREPRISE, JSON.stringify({ ...champsDe(e), dernierDevis: e.dernierDevis }))
       .catch(() => {});
   } catch {
     // Pas de disque : l'entreprise vit le temps de la session.
@@ -61,6 +76,7 @@ function ecrire(e: Entreprise): void {
 export const useEntreprise = create<Etat>((set, get) => ({
   charge: false,
   ...ENTREPRISE_VIDE,
+  dernierDevis: null,
 
   charger: async () => {
     let brut: string | null = null;
@@ -76,12 +92,17 @@ export const useEntreprise = create<Etat>((set, get) => ({
       lu = null;
     }
     const out: Partial<Entreprise> = {};
+    let dernierDevis: DernierDevis | null = get().dernierDevis;
     if (lu && typeof lu === 'object') {
       for (const k of Object.keys(ENTREPRISE_VIDE) as (keyof Entreprise)[]) {
         if (typeof lu[k] === 'string') out[k] = lu[k] as string;
       }
+      const d = lu.dernierDevis as Partial<DernierDevis> | null | undefined;
+      if (d && Number.isInteger(d.annee) && Number.isInteger(d.rang)) {
+        dernierDevis = { annee: d.annee as number, rang: d.rang as number };
+      }
     }
-    set({ charge: true, ...out });
+    set({ charge: true, ...out, dernierDevis });
   },
 
   regler: (champs) => {
@@ -91,6 +112,15 @@ export const useEntreprise = create<Etat>((set, get) => ({
     }
     set(propres);
     ecrire(get());
+  },
+
+  numeroterUnDevis: (date = new Date()) => {
+    const annee = date.getFullYear();
+    const avant = get().dernierDevis;
+    const rang = avant && avant.annee === annee ? avant.rang + 1 : 1;
+    set({ dernierDevis: { annee, rang } });
+    ecrire(get());
+    return `D-${annee}-${String(rang).padStart(4, '0')}`;
   },
 }));
 

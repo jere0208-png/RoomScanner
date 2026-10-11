@@ -375,6 +375,10 @@ export interface DevisEnregistre {
   quantites: Record<string, number>;
   /** Ce qu'on a pris au magasin. */
   ajouts: { code: string; quantite: number }[];
+  /** Prix unitaires corrigés à la main, par clé de ligne. */
+  prix?: Record<string, number>;
+  /** Le numéro donné au devis à son premier envoi (voir `numeroterUnDevis`). */
+  numero?: string;
 }
 
 /**
@@ -1856,6 +1860,18 @@ interface ScanState {
   /** Ce qu'on a pris au magasin, et que le plan ne pouvait pas deviner. */
   devisAjouts: { code: string; quantite: number }[];
   ajouterAuDevis: (code: string, quantite?: number) => void;
+  /**
+   * LES PRIX UNITAIRES CORRIGÉS À LA MAIN, par clé de ligne — correctif de
+   * l'audit : ils ne se modifiaient pas. `null` rend le prix du catalogue.
+   */
+  devisPrix: Record<string, number>;
+  reglerPrixDevis: (cle: string, pu: number | null) => void;
+  /**
+   * LE NUMÉRO DU DEVIS DE CE PLAN — donné au premier envoi, gardé ensuite :
+   * renvoyer le même devis ne lui en donne pas un autre.
+   */
+  devisNumero: string | null;
+  setDevisNumero: (numero: string | null) => void;
   retirerDuDevis: (code: string) => void;
 
   // Surface au sol : fond pointillé + valeur en m². Activée par défaut.
@@ -2379,11 +2395,15 @@ export const useScanStore = create<ScanState>((set, get) => {
     devisEcartes: string[];
     devisQuantites: Record<string, number>;
     devisAjouts: { code: string; quantite: number }[];
+    devisPrix: Record<string, number>;
+    devisNumero: string | null;
   }): DevisEnregistre => ({
     gamme: st.gammeDevis,
     ecartes: st.devisEcartes,
     quantites: st.devisQuantites,
     ajouts: st.devisAjouts,
+    ...(Object.keys(st.devisPrix).length > 0 ? { prix: st.devisPrix } : {}),
+    ...(st.devisNumero ? { numero: st.devisNumero } : {}),
   });
 
   /**
@@ -2398,6 +2418,8 @@ export const useScanStore = create<ScanState>((set, get) => {
     devisEcartes: devis?.ecartes ?? [],
     devisQuantites: devis?.quantites ?? {},
     devisAjouts: devis?.ajouts ?? [],
+    devisPrix: devis?.prix ?? {},
+    devisNumero: devis?.numero ?? null,
     // Un dossier qu'on ouvre n'a pas lu l'avertissement du devis.
     etapeDevis: 0,
   });
@@ -2890,6 +2912,16 @@ export const useScanStore = create<ScanState>((set, get) => {
     devisEcartes: [],
     devisQuantites: {},
     devisAjouts: [],
+    devisPrix: {},
+    devisNumero: null,
+    setDevisNumero: (devisNumero) => set({ devisNumero, dirty: true }),
+    reglerPrixDevis: (cle, pu) =>
+      set((e) => {
+        const devisPrix = { ...e.devisPrix };
+        if (pu === null || !isFinite(pu)) delete devisPrix[cle];
+        else devisPrix[cle] = Math.max(0, Math.round(pu * 100) / 100);
+        return { dirty: true, devisPrix };
+      }),
     /*
       RÉGLER UNE QUANTITÉ, ET SAVOIR REVENIR EN ARRIÈRE.
 

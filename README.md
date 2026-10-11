@@ -14285,6 +14285,51 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le devis qu'on remet au client
+
+Correctifs de l'audit « dans la peau d'un utilisateur », lot 3. L'audit
+disait : « Le devis ne s'exporte pas : ni PDF ni partage, pas de bloc
+entreprise ou client, pas de numéro. Les prix unitaires ne se modifient
+pas. Pour un pro, c'est une impasse. »
+
+**Les prix unitaires se corrigent.** Sur le ticket, le prix de chaque ligne
+est souligné : le toucher ouvre un champ (« Prix unitaire TTC »). Le prix
+saisi remplace celui du catalogue sur ce devis ; vider le champ rend le
+prix du catalogue. Ce prix corrigé :
+- se voit sur la ligne (« Prix modifié »), comme une quantité corrigée :
+  on ne fait pas passer un chiffre humain pour un chiffre relevé ;
+- vaut aussi pour un article pris au magasin ;
+- est borné : jamais négatif, au centime ;
+- s'enregistre avec le plan (`devisPrix`).
+
+La pastille verte du plan compte maintenant les mêmes corrections que la
+page : quantités, caddie et prix. Elle ignorait les deux premières.
+
+**Le devis s'exporte en PDF** (« Exporter le devis (PDF) », sous la pose
+estimée). Le document est celui qu'on remet :
+- l'entreprise en tête, avec ses coordonnées et son SIRET (voir « Mon
+  entreprise » au profil) ;
+- « DEVIS », son numéro, la date, « valable un mois » ;
+- le client, l'adresse et le chantier, dans leur cadre, et l'objet ;
+- les fournitures rayon par rayon, au prix TTC. Les lignes écartées n'y
+  sont pas. Ce qui n'a pas de prix dit « à chiffrer » ; ce qui ne se
+  facture pas dit « non compté » ou « compris », jamais « 0,00 € » ;
+- la pose estimée, famille par famille, en heures et au taux de l'artisan,
+  avec son total HT, sa TVA et son total TTC ;
+- le total TTC, les mentions et exclusions, et la case « bon pour accord ».
+
+Un long devis passe sur autant de pages qu'il faut, avec l'en-tête du
+tableau repris. Le total n'arrive qu'une fois, à la fin. Chaque page porte
+« page n / N ».
+
+**Le numéro** (« D-2026-0042 ») suit l'année, sans trou ni doublon sur
+l'appareil (`numeroterUnDevis`). Il est donné au premier envoi et reste au
+plan : renvoyer le même devis ne lui en donne pas un autre. Sans entreprise
+renseignée, l'app le dit avant d'exporter et propose le profil.
+
+Bancs : `devisprix` (5) et `devispdf` (7). `devisecran` lit le texte des
+lignes à plat : le prix souligné est un texte dans le texte.
+
 ## Les cotes de la 3D, à la façon d'un architecte
 
 Demande du patron : « rends les cotes 3D plus professionnelles, sans gêner

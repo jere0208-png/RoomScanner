@@ -73,14 +73,23 @@ afterEach(() => {
 });
 
 /** Tous les textes d'un arbre, dans l'ordre où ils se lisent. */
+/*
+  LE TEXTE SE LIT À PLAT — le prix d'une ligne est un texte souligné DANS
+  le texte de la ligne (on le touche pour le corriger, voir `devisprix`) :
+  « 1 cour. 100 m × 26,90 € » reste une seule phrase à l'écran.
+*/
+const aPlat = (x: unknown): string =>
+  typeof x === 'string' || typeof x === 'number'
+    ? String(x)
+    : Array.isArray(x)
+      ? x.map(aPlat).join('')
+      : x && typeof x === 'object' && 'props' in x
+        ? aPlat((x as { props: { children?: unknown } }).props.children)
+        : '';
 const mots = (t: TestRenderer.ReactTestRenderer): string[] =>
   t.root
     .findAllByType(Text)
-    .map((n) =>
-      (Array.isArray(n.props.children) ? n.props.children : [n.props.children])
-        .filter((x: unknown) => typeof x === 'string' || typeof x === 'number')
-        .join(''),
-    )
+    .map((n) => aPlat(n.props.children))
     .filter((s) => s.length > 0);
 
 // ---------------------------------------------------------------- le bouton

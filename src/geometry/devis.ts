@@ -109,6 +109,12 @@ export interface LigneDevis {
    * qu'on a déjà dans la camionnette.
    */
   duMagasin?: boolean;
+  /**
+   * LE PRIX UNITAIRE VIENT DE L'ÉLECTRICIEN — correctif de l'audit : les
+   * prix du devis ne se modifiaient pas. Il achète à son prix, vend à son
+   * prix ; le devis le dit, comme une quantité corrigée.
+   */
+  prixAjuste?: boolean;
 }
 
 /**
@@ -123,6 +129,8 @@ export interface AjustementsDevis {
   quantites?: Readonly<Record<string, number>>;
   /** Les articles pris au magasin, par code de catalogue. */
   ajouts?: readonly { code: string; quantite: number }[];
+  /** Par clé de ligne : le prix unitaire TTC voulu, à la place du catalogue. */
+  prix?: Readonly<Record<string, number>>;
 }
 
 /**
@@ -577,6 +585,23 @@ export function chiffrer(
       ...(art.tarif.public !== undefined ? { puPublic: art.tarif.public } : {}),
       duMagasin: true,
     });
+  }
+
+  /*
+    LE PRIX DE L'ÉLECTRICIEN, À LA PLACE DE CELUI DU CATALOGUE — après les
+    quantités et le caddie, pour qu'il vaille aussi sur un article pris au
+    magasin. Borné comme une quantité : jamais négatif, au centime.
+  */
+  const prixVoulus = ajustements?.prix;
+  if (prixVoulus) {
+    for (const l of lignes) {
+      const pu = prixVoulus[cleDeLigne(l)];
+      if (pu === undefined) continue;
+      const net = !isFinite(pu) || pu < 0 ? 0 : Math.round(pu * 100) / 100;
+      l.pu = net;
+      l.total = centimes(net * l.quantite);
+      l.prixAjuste = true;
+    }
   }
 
   // ---------------------------------------------------------- les totaux

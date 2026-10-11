@@ -446,6 +446,9 @@ export function ResultScreen() {
   const delierPlafond = useScanStore((s) => s.delierPlafond);
   const gammeDevis = useScanStore((s) => s.gammeDevis);
   const devisEcartes = useScanStore((s) => s.devisEcartes);
+  const devisQuantites = useScanStore((s) => s.devisQuantites);
+  const devisAjouts = useScanStore((s) => s.devisAjouts);
+  const devisPrix = useScanStore((s) => s.devisPrix);
   const reset = useScanStore((s) => s.reset);
   const teinte = useTheme();
   const styles = getStyles(teinte);
@@ -2191,8 +2194,21 @@ export function ResultScreen() {
       gammeDevis,
       new Set(devisEcartes),
       fige.openings,
+      // Les mêmes corrections que la page du devis : quantités, caddie, prix.
+      { quantites: devisQuantites, ajouts: devisAjouts, prix: devisPrix },
     ).total;
-  }, [fige.walls, fige.rooms, fige.fixtures, fige.ceiling, gammeDevis, devisEcartes, fige.openings]);
+  }, [
+    fige.walls,
+    fige.rooms,
+    fige.fixtures,
+    fige.ceiling,
+    gammeDevis,
+    devisEcartes,
+    fige.openings,
+    devisQuantites,
+    devisAjouts,
+    devisPrix,
+  ]);
 
   /**
    * À QUELLE HAUTEUR ARRIVE CHAQUE GAINE.
