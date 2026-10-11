@@ -10,8 +10,14 @@
  * chantier — le trousseau local garde le dernier état connu.
  */
 export const SERVEUR = {
-  /** L'API des comptes, à la racine de bourseur.fr — vide = tout en local. */
-  url: 'https://bourseur.fr',
+  /**
+   * L'API des comptes, dans le dossier `echoplan/` de bourseur.fr — vide =
+   * tout en local. Relevé du patron (11/10/2026) : « tous les fichiers sont
+   * désormais sur bourseur.fr/echoplan ». L'API, la connexion Google, les
+   * messages et les tarifs se composent tous à partir d'ici : c'est la seule
+   * adresse à changer si le dossier bouge encore.
+   */
+  url: 'https://bourseur.fr/echoplan',
   /** Le schéma de retour du flux Google, déclaré dans auth-google.php. */
   schemaRetour: 'echoplan',
   /**

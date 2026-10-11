@@ -4,7 +4,7 @@
  *
  * Relevé du patron : « un vrai système qui me permet d'envoyer ce que je
  * souhaite dans les notifications de l'app ». On ouvre cette page dans un
- * navigateur (https://bourseur.fr/echoplan-messages.php), on se connecte avec
+ * navigateur (https://bourseur.fr/echoplan/echoplan-messages.php), on se connecte avec
  * le mot de passe de `messages-cle.php`, on écrit un titre et un texte, on
  * publie : le message s'ajoute à `messages.json`, que l'application lit à
  * chaque ouverture. On peut aussi retirer un message publié.

@@ -79,8 +79,8 @@ en base64 — rien d'autre à téléverser), responsive. Le bouton App Store est
 volontairement INACTIF (« en attente ») tant que l'app n'est pas publiée :
 le jour venu, remplacer son `href="#"` par l'URL de la fiche.
 
-Déploiement : copier `server/echoplan.html` à la racine `www/` de
-l'hébergement (comme `api.php`) → https://bourseur.fr/echoplan.html
+Déploiement : copier `server/echoplan.html` dans le dossier `www/echoplan/`
+de l'hébergement (comme `api.php`) → https://bourseur.fr/echoplan/echoplan.html
 
 ## Ce qui reste volontairement dehors
 

@@ -14285,6 +14285,41 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le serveur dans son dossier
+
+Relevé du patron : « tous les fichiers sont désormais sur
+bourseur.fr/echoplan. Change tout en conséquence. »
+
+L'API, la connexion Google, la page des messages, les tarifs et la page de
+présentation ont quitté la racine du site pour `www/echoplan/`.
+
+**Une seule adresse change dans l'app** : `SERVEUR.url`
+(`src/config/serveur.ts`) vaut maintenant `https://bourseur.fr/echoplan`.
+Tout le reste se compose à partir d'elle :
+- `api.php` : comptes, plans du compte, tarifs ;
+- `auth-google.php` : la connexion Google ;
+- `messages.json` : les notifications ;
+- `tarifs.json` : les prix de secours.
+
+Un banc vérifie qu'aucun autre fichier de `src` n'écrit l'adresse en dur :
+si le dossier bouge encore, il n'y aura qu'une ligne à changer.
+
+**Côté serveur, une seule valeur dépend de l'emplacement** :
+`GOOGLE_REDIRECT`, dans `config-echoplan.php`, devient
+`https://bourseur.fr/echoplan/auth-google.php`. La même adresse doit figurer
+dans la console Google, parmi les « URI de redirection autorisés ». Sinon
+Google répond `redirect_uri_mismatch`.
+
+La documentation suit :
+- la page des messages : `bourseur.fr/echoplan/echoplan-messages.php` ;
+- la page de présentation : `bourseur.fr/echoplan/echoplan.html` ;
+- les tarifs se déposent dans le même dossier.
+
+Les anciennes versions de l'app appellent encore la racine du site : les
+anciens fichiers peuvent y rester tant qu'on n'a pas installé la nouvelle.
+
+`serveurechoplan.test.ts`.
+
 ## Un seul tableau, partout
 
 Relevé du patron : « sur le plan d'exemple, au clic sur le tableau, on voit

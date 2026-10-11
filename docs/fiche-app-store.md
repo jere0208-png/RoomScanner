@@ -125,7 +125,7 @@ des trous de configuration. À cocher un par un.
       via « J'ai un code » — c'est gratuit, et c'est la voie autorisée.
 - [ ] **L'adresse de la politique de confidentialité** : App Store Connect exige
       une URL publique. Publier le texte de l'écran « Confidentialité des
-      données » sur bourseur.fr, et renseigner l'adresse.
+      données » sur bourseur.fr/echoplan/, et renseigner l'adresse.
 - [ ] **Les étiquettes de confidentialité** (« App Privacy ») : l'e-mail et le
       prénom du compte, l'identifiant Apple si l'on se connecte avec Apple —
       ET **les plans** (« Contenu utilisateur », lié à l'identité) : quand on
@@ -137,5 +137,6 @@ des trous de configuration. À cocher un par un.
       explique que le scan exige le LiDAR — sinon le relecteur, sur un appareil
       sans LiDAR, ne voit que « appareil non compatible » et peut refuser pour
       fonctionnalité absente. Mentionner le dessin au doigt, qui marche partout.
-- [ ] **Les prix du devis** : téléverser `server/tarifs.json` sur bourseur.fr
-      (le serveur sert encore l'ancien fichier de 32 articles).
+- [ ] **Les prix du devis** : téléverser `server/tarifs.json` dans
+      bourseur.fr/echoplan/ (le serveur servait l'ancien fichier de 32
+      articles).
