@@ -16,8 +16,8 @@
  * voit ce qui part. Le dossier joint porte les données du plan — pas ses
  * photos, pas les coordonnées de son client (`dossierDuDiagnostic`).
  */
-import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { BackChevron } from '../components/BackChevron';
@@ -70,6 +70,19 @@ export function DiagnosticPlanScreen() {
   const [remarques, setRemarques] = useState<string[]>([]);
   const [commentaire, setCommentaire] = useState('');
   const [etat, setEtat] = useState<Etat>('pret');
+  /*
+    LE CLAVIER NE CACHE PLUS CE QU'ON ÉCRIT — relevé du patron, capture à
+    l'appui : « la saisie de texte empêche de voir ce que l'on écrit, et on
+    ne peut pas valider en ayant ce bloc gênant ». La page laisse la place
+    du clavier (`automaticallyAdjustKeyboardInsets`) et, au toucher du
+    champ, défile jusqu'à lui — il est en bas, avec le bouton d'envoi.
+    « Terminé » range le clavier ; un glissé vers le bas aussi.
+  */
+  const defile = useRef<ScrollView>(null);
+  const amenerLeChamp = () => {
+    // Le temps que le clavier monte et que la page lui ait fait sa place.
+    setTimeout(() => defile.current?.scrollToEnd({ animated: true }), 300);
+  };
 
   const retour = () => setScreen('library');
   const basculer = (cle: string) =>
@@ -77,6 +90,7 @@ export function DiagnosticPlanScreen() {
 
   const envoyer = async () => {
     if (!plan || !diag || etat === 'envoi') return;
+    Keyboard.dismiss();
     setEtat('envoi');
     const contexte = await infosDeLApp();
     const fichier = fichierDuDiagnostic(plan.name);
@@ -127,8 +141,11 @@ export function DiagnosticPlanScreen() {
     <RetourGlisse onRetour={retour} style={[s.fond, { paddingTop: insets.top }]}>
       <Barre s={s} c={c} onRetour={retour} />
       <ScrollView
+        ref={defile}
         contentContainerStyle={[s.contenu, { paddingBottom: insets.bottom + 32 }]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}>
         <Text style={s.nom}>{plan.name}</Text>
         <Text style={s.chapeau}>
@@ -208,6 +225,10 @@ export function DiagnosticPlanScreen() {
             multiline
             value={commentaire}
             onChangeText={setCommentaire}
+            onFocus={amenerLeChamp}
+            returnKeyType="done"
+            blurOnSubmit
+            onSubmitEditing={() => Keyboard.dismiss()}
             style={[s.champ, { color: c.ink, borderColor: c.line, backgroundColor: c.bg }]}
           />
         </View>

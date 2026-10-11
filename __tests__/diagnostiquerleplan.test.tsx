@@ -19,7 +19,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { NativeModules, Text, TextInput } from 'react-native';
+import { NativeModules, ScrollView, Text, TextInput } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { RoomScan } from 'react-native-room-scan';
 import {
@@ -214,6 +214,33 @@ describe('la page du diagnostic', () => {
     expect(fichier).toMatch(/\.json$/);
     expect(JSON.parse(contenu).remarques).toEqual([REMARQUES[0].cle]);
     expect(textes(t).join(' ')).toMatch(/Merci/);
+    act(() => t.unmount());
+  });
+
+  /*
+    LE CLAVIER NE CACHE PLUS CE QU'ON ÉCRIT — relevé du patron, capture à
+    l'appui : « la saisie de texte empêche de voir ce que l'on écrit, et on
+    ne peut pas valider en ayant ce bloc gênant ». La page remonte au-dessus
+    du clavier et amène le champ en vue ; « Terminé » range le clavier.
+  */
+  it('le clavier remonte la page, amène le champ en vue, et « Terminé » le range', () => {
+    const t = monter();
+    const defile = t.root.findAll((n) => n.props.automaticallyAdjustKeyboardInsets === true, { deep: false })[0];
+    expect(defile).toBeDefined();
+    expect(defile.props.keyboardDismissMode).toBe('interactive');
+    const champ = t.root.findByType(TextInput);
+    expect(champ.props.returnKeyType).toBe('done');
+    expect(champ.props.blurOnSubmit).toBe(true);
+    // Au toucher du champ, la page défile jusqu'à lui.
+    const vers = jest.spyOn(ScrollView.prototype, 'scrollToEnd').mockImplementation(() => {});
+    jest.useFakeTimers();
+    act(() => champ.props.onFocus?.());
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+    jest.useRealTimers();
+    expect(vers).toHaveBeenCalled();
+    vers.mockRestore();
     act(() => t.unmount());
   });
 

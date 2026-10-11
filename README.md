@@ -14285,6 +14285,24 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le diagnostic qu'on écrit sans que le clavier le cache
+
+Relevé du patron, capture à l'appui : « lors d'un diagnostic de plan, la
+saisie de texte empêche de voir ce que l'on écrit, et on ne peut pas valider
+en ayant ce bloc gênant ». Le clavier montait par-dessus le champ, en bas de
+la page, et la touche Entrée ajoutait une ligne au lieu de le ranger.
+
+`DiagnosticPlanScreen` :
+- la page laisse maintenant au clavier sa place
+  (`automaticallyAdjustKeyboardInsets`) ;
+- au toucher du champ, elle défile jusqu'à lui : il est en bas, avec le
+  bouton d'envoi ;
+- la touche Entrée devient « Terminé » et range le clavier ; un glissé vers
+  le bas ou un appui à côté le range aussi ;
+- « Envoyer le diagnostic » le range avant d'ouvrir la messagerie.
+
+Banc : `diagnostiquerleplan` (+1).
+
 ## Retours de chantier : la pièce qui ne se fermait pas, la baie prise pour une porte, le coffre ouvert, le frigo dans sa niche, le mur douteux nommé
 
 Relevés du patron, captures et diagnostic à l'appui :
