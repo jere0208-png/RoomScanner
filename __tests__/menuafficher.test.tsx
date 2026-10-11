@@ -137,7 +137,7 @@ describe('le plan 2D', () => {
     appuyer(t, 'Autres');
     const vu = textes(t);
     expect(vu).toContain('Afficher sur le plan');
-    for (const mot of ['Grille', 'Portes et fenêtres en couleur', 'Notes', 'Photos', 'Gaines', 'Plafond']) {
+    for (const mot of ['Grille', 'Portes et fenêtres en couleur', 'Notes', 'Photos', 'Gaines (tracé proposé)', 'Plafond']) {
       expect(vu).toContain(mot);
     }
     // Plus d'option « Nord » : la rose des vents ne vit plus que dans le PDF.

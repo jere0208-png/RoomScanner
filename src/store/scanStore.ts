@@ -18,6 +18,7 @@ import {
 import { bornerCalage, CALAGE_NEUTRE, type Calage } from '../ui/calage';
 import { ACCENT_DEFAUT, estUnAccent } from '../ui/accents';
 import { ICONE_DEFAUT, estUneIcone, poserIcone } from '../ui/icone';
+import { astuce } from '../ui/astuce';
 import { identiteDuCompte, useAccountStore } from './accountStore';
 import {
   insetOnRing,
@@ -4824,7 +4825,9 @@ export const useScanStore = create<ScanState>((set, get) => {
     reprendreDuCompte: async (qui) => {
       if (!qui) return 0;
       const liste = await catalogueDesPlans(qui);
-      if (!liste?.length) return 0;
+      // Le serveur n'a pas répondu : −1, pour que la reprise se retente.
+      if (liste === null) return -1;
+      if (!liste.length) return 0;
       const ici = new Set(get().saves.map((s) => s.id));
       let repris = 0;
       for (const p of liste) {
@@ -8171,7 +8174,17 @@ export const useScanStore = create<ScanState>((set, get) => {
         // bibliothèque vide. `reprendreDuCompte` ne pose que ce qui manque.
       }
       const repris = await get().reprendreDuCompte(qui);
+      /*
+        UNE REPRISE MANQUÉE SE RETENTE — revue « Thomas » : le serveur muet
+        au premier lancement, la reprise était déclarée faite, et la
+        bibliothèque restait vide pour toujours. On ne pose le marqueur
+        qu'une fois le serveur entendu, et l'on dit ce qui est revenu.
+      */
+      if (repris < 0) return 0;
       AsyncStorage.setItem(REPRISE_KEY, String(Date.now())).catch(() => {});
+      if (repris > 0) {
+        astuce(`${repris} plan${repris > 1 ? 's' : ''} récupéré${repris > 1 ? 's' : ''} depuis votre compte.`, { icone: 'save' });
+      }
       return repris;
     },
 

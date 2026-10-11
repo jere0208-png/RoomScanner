@@ -28,12 +28,18 @@ const CHOIX: { elec: boolean; titre: string; phrase: string }[] = [
   {
     elec: false,
     titre: 'Mesurer et aménager',
-    phrase: 'Scanner une pièce, lire ses cotes, la meubler, la partager.',
+    phrase: 'Scanner son logement, voir ses mesures, le meubler. L’image du plan se partage gratuitement.',
   },
+  /*
+    POUR L'ÉLECTRICIEN, ET POUR QUI PRÉVOIT SON ÉLECTRICITÉ — revues
+    « Sophie » et « Paul » : « Je suis électricien » éloignait le particulier
+    qui voulait placer ses prises ; il découvrait ensuite qu'il les avait
+    cachées dans toute l'app.
+  */
   {
     elec: true,
-    titre: 'Je suis électricien',
-    phrase: 'En plus : prises et éclairage sur le plan, normes NF C 15-100 et devis.',
+    titre: 'Prévoir l’électricité',
+    phrase: 'En plus : prises et éclairage sur le plan, normes NF C 15-100 et devis — électriciens comme particuliers.',
   },
 ];
 
@@ -80,7 +86,9 @@ export function PremierLancement({ onFini }: { onFini: () => void }) {
         </View>
       ) : (
         <FilmTutoriel
-          onPasser={onFini}
+          // Passer le film ne passe pas la question : un artisan pressé
+          // passe le film, et croyait l'app sans électricité (revue « Karim »).
+          onPasser={() => (aRepondu ? onFini() : setQuestion(true))}
           onFini={() => (aRepondu ? onFini() : setQuestion(true))}
           finTexte={aRepondu ? 'C’est parti' : 'Continuer'}
         />

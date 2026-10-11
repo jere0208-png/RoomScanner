@@ -79,7 +79,7 @@ const RIEN = {
   nuit: 'Aucun luminaire à allumer — posez-en en mode édition, sur le plan.',
   murs: 'Aucun mur à afficher : scannez ou dessinez une pièce.',
   plafond: 'Aucun appareil au plafond — posez-en en mode édition.',
-  gaines: 'Posez le tableau sur le plan pour tracer les gaines.',
+  gaines: 'Posez le tableau sur le plan : l’app propose alors un tracé de gaines (pas vos câbles réels).',
   notes: 'Aucune note — écrivez-en en mode édition.',
   photos: 'Aucune photo — en édition, touchez un mur puis « Photo ».',
   couleurs: 'Aucune couleur relevée sur ce plan.',
@@ -492,7 +492,7 @@ export function Toolbar2D({
               ? [
                   { cle: 'appareils', icone: 'appareil' as const, libelle: 'Appareils', aide: 'Prises, interrupteurs et points lumineux posés', actif: showFixtures, vide: contenu.appareils === 0 ? RIEN.appareils : null, onBascule: () => setShowFixtures((v) => !v) },
                   { cle: 'plafond', icone: 'plafond' as const, libelle: 'Plafond', aide: 'Points lumineux, spots, détecteurs, VMC', actif: showCeiling, vide: contenu.plafond === 0 ? RIEN.plafond : null, onBascule: () => setShowCeiling(!showCeiling) },
-                  { cle: 'gaines', icone: 'gaines' as const, libelle: 'Gaines', aide: 'Le chemin des câbles depuis le tableau', actif: showRoutes, vide: hasRoutes ? null : RIEN.gaines, onBascule: () => setShowRoutes((v) => !v) },
+                  { cle: 'gaines', icone: 'gaines' as const, libelle: 'Gaines (tracé proposé)', aide: 'Un chemin calculé pour une installation neuve — pas vos câbles réels', actif: showRoutes, vide: hasRoutes ? null : RIEN.gaines, onBascule: () => setShowRoutes((v) => !v) },
                 ]
               : []),
           ],

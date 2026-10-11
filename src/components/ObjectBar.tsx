@@ -283,7 +283,7 @@ export function ObjectBar({
           numeric: true,
           okLabel: 'Appliquer',
           onSubmit: (t) => {
-            const v = parseFloat(t.replace(',', '.'));
+            const v = metresSaisis(t);
             if (v >= (depuisZero ? 0 : 0.05) && v < 12) poser(v);
           },
         })
@@ -540,3 +540,15 @@ const local = StyleSheet.create({
     marginRight: 6,
   },
 });
+
+/**
+ * UNE COTE TAPÉE, EN MÈTRES — ou en centimètres, quand elle ne peut être
+ * qu'en centimètres. Revue « Marie » : « 160 » pour son lit fermait la
+ * feuille sans rien changer ; aucun meuble ne fait douze mètres, un nombre
+ * de 12 à 1 200 est donc une cote en centimètres.
+ */
+export function metresSaisis(t: string): number {
+  const v = parseFloat(t.replace(',', '.').trim());
+  if (!Number.isFinite(v)) return NaN;
+  return v >= 12 && v < 1200 ? v / 100 : v;
+}

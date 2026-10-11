@@ -253,6 +253,7 @@ export function HomeScreen() {
     qu'on se ravise (voir `BandeauAnnuler`).
   */
   const deleteSave = useScanStore((s) => s.deleteSave);
+  const enLigne = useAccountStore((st) => !!st.compte && !!st.jeton && st.pro);
   const suppression = useSuppressionDifferee(deleteSave);
   const montres = useMemo(() => {
     const q = pourChercher(cherche.trim());
@@ -431,7 +432,9 @@ export function HomeScreen() {
                     hauteur={HAUTE}
                     icone={SOLAIRES.planPapier}
                     titre={'Lire un\nplan papier'}
-                    sous="Une photo, un plan coté"
+                    // Revue « Sophie » : avec un PDF en main, « une photo »
+                    // faisait hésiter.
+                    sous="Photo ou PDF de l’architecte"
                     label="Lire un plan papier"
                     onPress={lirePlanPapier}
                   />
@@ -588,7 +591,13 @@ export function HomeScreen() {
       </ScrollView>
       {suppression.enAttente && (
         <BandeauAnnuler
-          texte={`« ${suppression.enAttente.nom} » supprimé`}
+          // Revue « Thomas » : le plan partait AUSSI de la sauvegarde en
+          // ligne, et le bandeau ne le disait pas.
+          texte={
+            enLigne
+              ? `« ${suppression.enAttente.nom} » supprimé, ici et de votre sauvegarde en ligne`
+              : `« ${suppression.enAttente.nom} » supprimé`
+          }
           bas={insets.bottom + 18}
           onAnnuler={suppression.annuler}
         />

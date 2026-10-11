@@ -115,6 +115,12 @@ const ATOUTS: { icone: keyof typeof SOLAIRES; mot: string }[] = [
   { icone: 'metre', mot: 'Métré CSV pour Excel' },
   { icone: 'save', mot: 'Vos plans sauvegardés en ligne' },
   { icone: 'elec', mot: 'Devis aux prix du magasin' },
+  /*
+    LA LECTURE DE PLANS SE VEND AUSSI ICI — revue « Thomas » : elle n'était
+    annoncée que sur sa propre page et dans la Confidentialité. Son plafond
+    se dit : « sans compter » était faux pour elle.
+  */
+  { icone: 'planPapier', mot: 'Lecture de plans par IA, 20 par jour' },
 ];
 /*
   AU GRAND PUBLIC, LE MÉTIER TIENT EN UNE LIGNE — et elle se lit comme une
@@ -256,7 +262,7 @@ export function PaywallScreen() {
             style={s.titreNom}
           />
           <Text style={s.sousTitre}>
-            Tout l’outil, sans compter. Résiliable à tout moment.
+            Tout l’outil. Résiliable à tout moment.
           </Text>
 
           {/*

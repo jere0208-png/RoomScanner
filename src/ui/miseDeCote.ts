@@ -103,7 +103,14 @@ export function useMaintenant(pas = 60000): number {
  */
 export function rangerLeTravail(): void {
   const st = useScanStore.getState();
-  if (!useUsage.getState().modeElec && st.enregistrerAuto()) return;
+  /*
+    UN RELEVÉ NEUF S'ENREGISTRE, MÊME EN MODE ÉLECTRICITÉ — revues « Karim »
+    et « Sophie » : la visite du lundi, quittée sans « Enregistrer »,
+    s'effaçait le mardi soir, sans un mot. La mise de côté garde son sens
+    pour la RETOUCHE d'un plan client déjà enregistré : c'est là que
+    l'électricien décide lui-même du plan remis.
+  */
+  if ((!useUsage.getState().modeElec || planJamaisEnregistre()) && st.enregistrerAuto()) return;
   const id = st.currentSaveId;
   const sorte = st.mettreDeCote();
   if (sorte !== 'retouche' || !id) return;
@@ -114,4 +121,16 @@ export function rangerLeTravail(): void {
       faire: () => useScanStore.getState().enregistrerRetouche(id),
     },
   });
+}
+
+/**
+ * Le plan à l'écran n'a jamais été enregistré : neuf, ou seulement gardé
+ * douze heures. Il n'a encore rien d'un plan remis — il ne doit pas se
+ * perdre.
+ */
+export function planJamaisEnregistre(): boolean {
+  const st = useScanStore.getState();
+  if (!st.currentSaveId) return true;
+  const entree = st.saves.find((x) => x.id === st.currentSaveId);
+  return !entree || !!entree.supprimeLe;
 }

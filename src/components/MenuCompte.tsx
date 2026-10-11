@@ -20,6 +20,7 @@ import {
   StyleSheet,
   Text,
   View,
+  Linking,
 } from 'react-native';
 import { useAccountStore } from '../store/accountStore';
 import { radius, shadowCard, useTheme, type Palette } from '../theme';
@@ -37,19 +38,51 @@ export function MenuCompte({
   const deconnecter = useAccountStore((st) => st.deconnecter);
   const supprimerCompte = useAccountStore((st) => st.supprimerCompte);
 
+  /*
+    L'ABONNEMENT N'EST PAS LE COMPTE — revue « Thomas » : supprimer son
+    compte laissait Apple prélever l'abonnement, sans un mot. On le dit, on
+    ouvre la gestion d'Apple d'un geste, et l'on confirme ce qui a été
+    effacé — ou qu'on n'a rien pu effacer en ligne.
+  */
+  const supprimerVraiment = async () => {
+    fermer();
+    const issue = await supprimerCompte();
+    if (issue === 'echec') {
+      alerte(
+        'Suppression impossible pour l’instant',
+        'Nos serveurs n’ont pas répondu : rien n’a été effacé. Vérifiez la ' +
+          'connexion, puis recommencez.',
+      );
+    } else {
+      alerte(
+        'Compte supprimé',
+        issue === 'efface'
+          ? 'Votre compte et vos plans en ligne sont effacés de nos serveurs.'
+          : 'Le compte est retiré de ce téléphone. Il n’était pas relié à ' +
+              'nos serveurs : rien n’y était déposé à son nom.',
+      );
+    }
+  };
   const confirmerSuppression = () =>
     alerte(
       'Supprimer le compte ?',
       'Votre compte et les plans déposés en ligne sont effacés de nos ' +
-        'serveurs. Les relevés enregistrés sur ce téléphone y restent.',
+        'serveurs. Les relevés enregistrés sur ce téléphone y restent. ' +
+        'Un abonnement Pro, lui, continue d’être facturé par Apple tant ' +
+        'que vous ne l’avez pas résilié.',
       [
         { label: 'Annuler' },
+        {
+          label: 'Gérer mon abonnement',
+          onPress: () => {
+            Linking.openURL('https://apps.apple.com/account/subscriptions').catch(() => {});
+          },
+        },
         {
           label: 'Supprimer',
           danger: true,
           onPress: () => {
-            fermer();
-            supprimerCompte();
+            supprimerVraiment().catch(() => {});
           },
         },
       ],

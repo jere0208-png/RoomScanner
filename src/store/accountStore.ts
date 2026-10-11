@@ -150,6 +150,8 @@ export function offreDeBienvenue(
 const CLE = 'roomscanner.compte.v1';
 /** La surprise ne se joue qu'une fois par appareil : le drapeau du déjà-vu. */
 const CLE_SURPRISE = 'roomscanner.surprise.v1';
+/** La surprise s'est-elle déjà montrée (ici ou lors d'un lancement passé) ? */
+let surpriseDejaMontree = false;
 
 export type MethodeConnexion = 'apple' | 'google' | 'email';
 
@@ -254,7 +256,12 @@ interface AccountState {
    * pas le palier gratuit. Le Pro tombe avec le compte — l'abonnement se
    * retrouve par « Restaurer l'achat ».
    */
-  supprimerCompte: () => Promise<void>;
+  /**
+   * Rend ce qui s'est passé : `efface` (en ligne et ici), `local` (ici
+   * seulement : la connexion n'avait pas de jeton), `echec` (le serveur n'a
+   * pas répondu — rien n'est effacé, on peut réessayer).
+   */
+  supprimerCompte: () => Promise<'efface' | 'local' | 'echec'>;
   /** La feuille d'Apple des codes d'offre, puis l'échéance relue. */
   codeOffre: () => Promise<void>;
   /** L'achat StoreKit de l'offre choisie. Mensuel par défaut. */
@@ -522,6 +529,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       l'annonce d'entrée : ce téléphone a déjà donné son essai.
     */
     const dejaVue = await AsyncStorage.getItem(CLE_SURPRISE).catch(() => null);
+    if (dejaVue) surpriseDejaMontree = true;
     const s = get();
     if (!marqueur?.compte && !dejaVue && !s.pro) {
       // On demande l'offre à l'App Store sans faire attendre la connexion :
@@ -530,6 +538,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
         .chargerOffres()
         .then(() => {
           if (offreDeBienvenue(get().offres) && !get().pro) {
+            surpriseDejaMontree = true;
             set({ surpriseVisible: true });
             AsyncStorage.setItem(CLE_SURPRISE, '1').catch(() => {});
           }
@@ -602,8 +611,16 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       partent avec lui. Hors ligne, la suppression locale se fait quand même.
     */
     const s = get();
+    let issue: 'efface' | 'local' = 'local';
     if (s.compte && s.jeton) {
-      await api('supprimer', { identifiant: s.compte.id, jeton: s.jeton });
+      /*
+        LA RÉPONSE COMPTE — revue « Thomas » : hors ligne, rien n'était
+        effacé en ligne et l'écran disait pourtant adieu. On attend le
+        serveur ; s'il ne répond pas, le compte RESTE, et on le dit.
+      */
+      const r = await api('supprimer', { identifiant: s.compte.id, jeton: s.jeton });
+      if (!r?.ok) return 'echec';
+      issue = 'efface';
     }
     // L'identité sort du trousseau ; le compteur de plans y reste, et le
     // Pro tombe avec le compte.
@@ -616,6 +633,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       proEcheance: null,
     });
     persister(get());
+    return issue;
   },
 
   codeOffre: async () => {
@@ -652,6 +670,12 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 
   restaurerPro: async () => {
+    /*
+      SANS COMPTE, PAS DE RESTAURATION — revue « Thomas » : l'invité lisait
+      « Votre Pro est de retour », et le Pro tombait au relancement. Le Pro
+      appartient au compte : c'est lui qu'on ouvre d'abord.
+    */
+    if (demanderUnCompte()) return false;
     /*
       LES DEUX PRODUITS, PAS UN.
 
@@ -712,10 +736,18 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     // Pas un refus sec : le plan est prêt, le compte est la clé qui
     // l'ouvre — et l'on revient exactement là où l'export attendait,
     // puisque l'écran du magasin de plans ne change pas.
+    /*
+      DIT HONNÊTEMENT — revues « Thomas », « Nadia », « Marie » : « un compte
+      sert à l'envoyer en PDF » faisait créer un compte… qui menait à la
+      page payante. Le PDF, le DXF et la 3D sont Pro ; l'image du plan,
+      elle, part gratuitement, sans compte.
+    */
     alerte(
-      'Créez un compte pour exporter',
-      'Votre plan est prêt. Un compte sert à l’envoyer en PDF, ' +
-        'CSV ou DXF — et, avec le Pro, à garder vos plans en ligne.',
+      'L’envoi en PDF fait partie du Pro',
+      'Votre plan est prêt. L’image du plan, avec ses cotes, s’envoie ' +
+        'gratuitement, sans compte. Le PDF coté, le DXF et la 3D font ' +
+        'partie d’EchoPlan Pro, qui se prend avec un compte (création ' +
+        'gratuite).',
       [
         { label: 'Plus tard' },
         { label: 'Créer mon compte', onPress: () => get().quitterInvite() },
@@ -744,8 +776,13 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       .catch(() => {});
   },
 
+  /*
+    LES PRIX SE MONTRENT À TOUS — revue « Thomas » : l'invité qui touchait
+    « Voir l'offre » recevait « Créez un compte », et ne voyait aucun prix
+    avant d'avoir donné son e-mail. La page s'ouvre ; c'est l'ACHAT qui
+    demande le compte (`acheterPro`).
+  */
   ouvrirPaywall: () => {
-    if (demanderUnCompte()) return;
     set({ paywallVisible: true });
   },
   fermerPaywall: () => set({ paywallVisible: false }),
@@ -756,8 +793,16 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   */
   ouvrirSurprise: () => {
     if (demanderUnCompte()) return;
-    if (offreDeBienvenue(get().offres)) set({ surpriseVisible: true });
-    else set({ paywallVisible: true });
+    /*
+      UNE SURPRISE NE SE RÉPÈTE PAS — revues « Thomas », « Nadia » : elle
+      revenait à chaque export. Montrée une fois (à l'inscription ou au
+      premier export), la suite mène droit à la page Pro.
+    */
+    if (offreDeBienvenue(get().offres) && !surpriseDejaMontree) {
+      surpriseDejaMontree = true;
+      AsyncStorage.setItem(CLE_SURPRISE, '1').catch(() => {});
+      set({ surpriseVisible: true });
+    } else set({ paywallVisible: true });
   },
   /*
     Refuser l'offre referme, simplement. Elle ouvrait l'« avis contre un

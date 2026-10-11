@@ -34,12 +34,14 @@ const SECTIONS: { titre: string; texte: string }[] = [
       'c’est voulu — un chantier n’a pas toujours de réseau.',
   },
   {
-    titre: 'Vos photos ne quittent jamais votre appareil',
+    titre: 'Vos photos de mur restent sur votre appareil',
     texte:
       'Les photos de mur sont rangées dans votre photothèque, dans l’album ' +
       '« EchoPlan ». Elles vous appartiennent : elles suivent vos ' +
       'sauvegardes iCloud et survivent à une réinstallation. Aucune de ces ' +
-      'images n’est jamais envoyée à nos serveurs, ni à personne d’autre.',
+      'images n’est envoyée à nos serveurs, ni à personne d’autre. Une ' +
+      'seule exception, et seulement à votre demande : la page d’un plan ' +
+      'papier que vous faites lire (ci-dessous).',
   },
   {
     titre: 'La lecture d’un plan papier, et elle seule',

@@ -26,6 +26,7 @@ import {
   roomsInAlert,
   wallToRooms,
 } from '../geometry/nfc15100';
+import { useAccountStore } from '../store/accountStore';
 import { useScanStore, type SavedScan, type ScanFolder } from '../store/scanStore';
 import { useModeElec } from '../store/usage';
 import {
@@ -749,6 +750,7 @@ export function LibraryScreen() {
     Le menu « … » passe par la même attente : un seul chemin pour jeter, et
     la même chance de se raviser.
   */
+  const enLigne = useAccountStore((st) => !!st.compte && !!st.jeton && st.pro);
   const suppression = useSuppressionDifferee(deleteSave);
   const marges = useSafeAreaInsets();
   const addFolder = useScanStore((s) => s.addFolder);
@@ -1413,7 +1415,13 @@ export function LibraryScreen() {
       <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
       {suppression.enAttente && (
         <BandeauAnnuler
-          texte={`« ${suppression.enAttente.nom} » supprimé`}
+          // Revue « Thomas » : le plan partait AUSSI de la sauvegarde en
+          // ligne, et le bandeau ne le disait pas.
+          texte={
+            enLigne
+              ? `« ${suppression.enAttente.nom} » supprimé, ici et de votre sauvegarde en ligne`
+              : `« ${suppression.enAttente.nom} » supprimé`
+          }
           bas={marges.bottom + 18}
           onAnnuler={suppression.annuler}
         />

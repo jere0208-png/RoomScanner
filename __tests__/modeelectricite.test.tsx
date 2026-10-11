@@ -274,7 +274,7 @@ describe('la proposition', () => {
   it('sans le mode, le menu du plan offre de le passer', () => {
     const t = monter(false);
     presser(t, 'Plus');
-    expect(textes(t)).toContain('Passer en mode Électricité');
+    expect(textes(t)).toContain('Placer prises et interrupteurs');
   });
 
   it('avec le mode, tout est là — et la proposition se tait', () => {
@@ -284,7 +284,7 @@ describe('la proposition', () => {
     presser(t, 'Plus');
     const menu = textes(t);
     expect(menu).toContain('Relever le tableau existant');
-    expect(menu).not.toContain('Passer en mode Électricité');
+    expect(menu).not.toContain('Placer prises et interrupteurs');
   });
 });
 

@@ -123,8 +123,10 @@ export function ExportSheet({
     ],
     [
       'image',
-      'Image',
-      'La vue affichée, filigranée.',
+      'Image du plan',
+      // Revues « Nadia », « Marie », « Sophie » : la seule sortie gratuite
+      // ne disait pas qu'elle l'était.
+      'La vue affichée, avec ses cotes. Gratuite, avec le logo EchoPlan.',
       onImage,
     ],
   ];
@@ -204,6 +206,11 @@ export function ExportSheet({
                       {!pro && art !== 'image' && (
                         <View style={styles.exportBadgePro} testID={`badge-pro-${art}`}>
                           <Text style={styles.exportBadgeProTexte}>PRO</Text>
+                        </View>
+                      )}
+                      {!pro && art === 'image' && (
+                        <View style={styles.exportBadgeGratuit} testID="badge-gratuit-image">
+                          <Text style={styles.exportBadgeProTexte}>GRATUIT</Text>
                         </View>
                       )}
                     </View>

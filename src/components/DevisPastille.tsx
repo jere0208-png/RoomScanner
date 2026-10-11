@@ -83,7 +83,9 @@ export function DevisPastille({
       style={[styles.bouton, { borderColor: teinte }]}
       onPress={onPress}>
       <Text style={[styles.prix, { color: teinte }]} numberOfLines={1}>
-        {actif ? prixCourt(total) : '—'}
+        {/* « Devis », en toutes lettres — revue « Karim » : un prix seul,
+            sans le mot, ne se lisait pas comme la porte du devis. */}
+        {actif ? `Devis ${prixCourt(total)}` : '—'}
       </Text>
     </TouchableOpacity>
   );

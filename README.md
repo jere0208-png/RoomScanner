@@ -14285,6 +14285,114 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Six nouveaux utilisateurs : ce qui les a bloqués, réparé
+
+Relevé du patron : « lance des agents sur l'application, ils auront chacun
+un but distinct ; ils devront juger indépendamment de la qualité et du côté
+intuitif de l'application, sans les connaissances au préalable ».
+
+**Six parcours**, chacun jugeant seulement ce que l'écran montre :
+- **Marie** mesure son T3 et y place un canapé d'angle et un lit, puis
+  l'envoie à sa mère.
+- **Karim**, électricien, chiffre la rénovation d'un T2 et remet le dossier.
+- **Sophie** reprend dans l'app le plan PDF de son architecte et y place ses
+  prises.
+- **Paul** veut percer pour une étagère sans toucher un câble.
+- **Nadia**, 64 ans, fait le plan et la surface de son appartement pour
+  l'agence.
+- **Thomas** veut savoir ce qu'il paie et ce que deviennent ses données.
+
+Ce lot traite ce qui bloquait, et ce que plusieurs parcours ont trouvé
+ensemble.
+
+**L'argent, dit avant de payer.**
+- **L'invité qui exporte** lit maintenant ceci : « L'envoi en PDF fait
+  partie du Pro… l'image du plan, avec ses cotes, s'envoie gratuitement ».
+  Avant, il lisait « un compte sert à l'envoyer en PDF », créait son
+  compte… et tombait sur la page payante.
+- **L'invité voit les prix** (`ouvrirPaywall`). C'est l'achat qui demande
+  le compte.
+- **« Restaurer l'achat »** sans compte ouvre la porte du compte, au lieu
+  d'un « Votre Pro est de retour » qui tombait au relancement.
+- **La page Pro** annonce la lecture de plans par IA, avec son plafond de
+  20 par jour, et ne dit plus « sans compter ».
+- **La surprise de bienvenue :**
+  - seul le bouton achète, alors qu'avant toute la carte menait à l'achat ;
+  - « Non merci » est un vrai bouton ;
+  - toucher à côté referme ;
+  - elle ne se montre qu'une fois ; ensuite on va directement à la page Pro.
+- **Le bouton « Passer au Pro »** de la lecture de plan ouvre la page Pro.
+  Il levait le drapeau des tarifs du devis, et rien ne bougeait.
+- **La carte Pro du profil** a un bouton « Gérer », qui ouvre les
+  abonnements Apple.
+- **Supprimer son compte :**
+  - l'écran prévient que l'abonnement continue d'être facturé par Apple
+    tant qu'on ne l'a pas résilié ;
+  - `supprimerCompte` rend ce qui s'est passé (`efface`, `local`, `echec`) ;
+  - si le serveur ne répond pas, rien n'est effacé, le compte reste, et on
+    le dit.
+- **La Confidentialité** ne promet plus que « vos photos ne quittent
+  jamais l'appareil » quand la page d'un plan papier, elle, part.
+
+**Le travail ne se perd plus.**
+- **Un relevé neuf s'enregistre, même en mode Électricité**
+  (`planJamaisEnregistre`). La visite du lundi s'effaçait le mardi soir.
+  La mise de côté reste pour la retouche d'un plan client déjà enregistré.
+- **Retirer une pièce se confirme**, puis « Pièce retirée — Annuler ».
+  « Scinder » et « Retirer un mur » proposent aussi d'annuler.
+- **La récupération des plans en ligne se retente** si le serveur n'a pas
+  répondu. Avant, elle était déclarée faite pour toujours. Elle dit
+  maintenant combien de plans sont revenus.
+- **Supprimer un plan d'un compte Pro** le dit : « supprimé, ici et de votre
+  sauvegarde en ligne ».
+
+**L'électricité, sans faux-semblant.**
+- **Les gaines deviennent « Gaines (tracé proposé) »**, et le plan affiche
+  « ce ne sont pas vos câbles, ne vous y fiez pas pour percer » tant que le
+  calque est allumé. Paul lisait le tracé calculé comme le passage réel de
+  ses câbles.
+- **La fiche d'un appareil donne sa hauteur** (« à 30 cm du sol »). Elle
+  n'affiche plus de circuit tant qu'aucun tableau n'est posé : le « C2 »
+  était un départ proposé, lu comme le disjoncteur à couper.
+- **« Placer prises et interrupteurs »** remplace « Passer en mode
+  Électricité — Pour les électriciens » dans le menu. Au premier
+  lancement, « Prévoir l'électricité » remplace « Je suis électricien ».
+- **« Passer » le film ne fait plus sauter la question de l'usage.**
+- **La page du mur pose ses questions dans sa propre fenêtre** (ElecSheet
+  héberge sa feuille). « Abandonner les modifications ? » passait par
+  l'alerte de l'app, qu'iOS ne présente pas par-dessus une fenêtre ouverte :
+  la croix ne faisait rien.
+
+**Les petits pièges.**
+- **« 160 » tapé pour un lit se lit en centimètres** (`metresSaisis`).
+- **Une adresse mal tapée** donne « Cette adresse semble incomplète », et
+  plus « Vérifiez votre accès à internet ».
+- **L'image partagée emporte ses cotes**, même si elles étaient éteintes à
+  l'écran. Elle est annoncée « Gratuite » dans « Exporter ».
+- **La pastille du devis** porte « Devis 1,2 k€ ».
+- **La tuile de lecture** dit « Photo ou PDF de l'architecte ».
+
+**Bancs.**
+- `parcoursutilisateurs` : 25 épreuves, une par constat.
+- Mis à jour, pour l'ancien comportement :
+  - `compte` ;
+  - `apercudossier` ;
+  - `devisecran` ;
+  - `ficheelec` ;
+  - `gardemaison` ;
+  - `grandpublic` ;
+  - `lectureplanecran` ;
+  - `menuafficher` ;
+  - `paywall` ;
+  - `premierlancement` ;
+  - `modeelectricite` ;
+  - `bandeaux`.
+
+**En attente du patron** (Karim, à confirmer par un électricien) :
+- 12 socles par circuit en 2,5 mm² sous 20 A ;
+- les différentiels 30 mA en type A (NF C 15-100 de 2024) ;
+- un devis HT avec une TVA appliquée aux fournitures et à la pose.
+
 ## Lire un plan en fichier, et la reconnexion qui ne faisait rien
 
 **Le plan reçu en PDF ou en image.** Relevé du patron : « on doit aussi

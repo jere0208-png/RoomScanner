@@ -262,6 +262,21 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    * « Édition » commande le contenu de la barre : il reste à demeure, et
    * les outils défilent à sa gauche, jamais dessous.
    */
+  /** L'avertissement des gaines : en haut du plan, lisible sur tout fond. */
+  avisGaines: {
+    position: 'absolute',
+    top: 10,
+    left: 16,
+    right: 16,
+    zIndex: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.md,
+    backgroundColor: c.surface,
+    borderWidth: 1,
+    borderColor: c.amber,
+  },
+  avisGainesTexte: { color: c.ink, fontSize: 13, lineHeight: 18, fontWeight: '600', textAlign: 'center' },
   editAnchor: {
     position: 'absolute',
     right: 4,
@@ -1096,6 +1111,12 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 2,
   },
   exportBadgeProTexte: { color: '#FFFFFF', fontSize: 10.5, fontWeight: '700', letterSpacing: 0.4 },
+  exportBadgeGratuit: {
+    backgroundColor: c.green,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
   exportCarteDetail: { color: c.inkSoft, fontSize: 13, lineHeight: 17, marginTop: 3 },
   exportCarteDetailClair: { color: 'rgba(255,255,255,0.72)' },
   exportChoiceTexts: { flex: 1 },

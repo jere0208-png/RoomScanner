@@ -286,13 +286,13 @@ describe('la question du mode, après le film', () => {
     const lus = mots(t);
     expect(lus).toContain('À quoi va vous servir EchoPlan ?');
     expect(bouton(t, 'Mesurer et aménager')).toBeDefined();
-    expect(bouton(t, 'Je suis électricien')).toBeDefined();
+    expect(bouton(t, 'Prévoir l’électricité')).toBeDefined();
   });
 
-  it('« Je suis électricien » allume le mode, et referme', () => {
+  it('« Prévoir l’électricité » allume le mode, et referme', () => {
     const fini = jest.fn();
     const t = jusquALaQuestion(fini);
-    act(() => bouton(t, 'Je suis électricien').props.onPress());
+    act(() => bouton(t, 'Prévoir l’électricité').props.onPress());
     expect(useUsage.getState().modeElec).toBe(true);
     expect(useUsage.getState().choisi).toBe(true);
     expect(fini).toHaveBeenCalledTimes(1);

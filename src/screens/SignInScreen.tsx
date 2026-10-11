@@ -51,8 +51,16 @@ export function SignInScreen() {
   const [code, setCode] = useState('');
   const demanderCodeEmail = useAccountStore((st) => st.demanderCodeEmail);
 
+  /*
+    LA VRAIE CAUSE, SANS ACCUSER INTERNET — revue « Nadia » : une faute dans
+    l'adresse donnait « Vérifiez votre accès à internet… ». Quand le serveur
+    ou la saisie donnent une raison, c'est elle qu'on lit ; le conseil du
+    réseau ne vient que quand on n'en sait pas plus.
+  */
   const refuse = (raison?: string) =>
-    alerte(expliquer('connexion', raison).titre, expliquer('connexion', raison).message);
+    raison
+      ? alerte('La connexion n’a pas abouti', raison)
+      : alerte(expliquer('connexion', raison).titre, expliquer('connexion', raison).message);
 
   const viaApple = async () => {
     const r = await connecterApple();
@@ -122,7 +130,7 @@ export function SignInScreen() {
   const viaEmail = async () => {
     const adresse = adresseSaisie();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adresse)) {
-      refuse('L’adresse e-mail ne ressemble pas à une adresse.');
+      alerte('Adresse à vérifier', 'Cette adresse semble incomplète (exemple : prenom@gmail.com).');
       return;
     }
     const r = await demanderCodeEmail(adresse);
@@ -143,7 +151,7 @@ export function SignInScreen() {
     if (!codeEnvoye) return;
     const chiffres = code.replace(/\D/g, '');
     if (chiffres.length !== 6) {
-      refuse('Le code reçu par e-mail compte six chiffres.');
+      alerte('Code à six chiffres', 'Le code reçu par e-mail compte six chiffres : recopiez-le en entier.');
       return;
     }
     await entrerParEmail(codeEnvoye, { code: chiffres });

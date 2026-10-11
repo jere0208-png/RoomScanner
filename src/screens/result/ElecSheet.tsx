@@ -5,7 +5,7 @@
  * marchent dessus sur iOS — la seconde ne se présente pas tant que la
  * première n'est pas retirée, et l'établi ne s'ouvrait jamais.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Modal,
@@ -20,7 +20,7 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../../theme';
 import { WallElevation } from '../../components/WallElevation';
-import type { ActionData } from '../../components/Sheet';
+import { ActionSheet, type ActionData } from '../../components/Sheet';
 import {
   FIXTURES,
   FIXTURE_FAMILIES,
@@ -59,6 +59,14 @@ export function ElecSheet({
 }) {
   const styles = getStyles(useTheme());
   const plein = vue === 'mur';
+  /*
+    LES QUESTIONS DU MUR S'OUVRENT DANS CETTE FENÊTRE — revue « Paul » :
+    après un déplacement, la croix demandait « Abandonner les modifications
+    ? » par l'alerte de l'app, ouverte depuis la racine. iOS ne présente pas
+    une fenêtre par-dessus celle-ci : rien ne s'affichait, et la seule
+    sortie était « Enregistrer ». La feuille vit ici, dans notre fenêtre.
+  */
+  const [demande, setDemande] = useState<ActionData | null>(null);
   return (
     <Modal
       visible={visible}
@@ -97,7 +105,7 @@ export function ElecSheet({
                 onSelect={onSelect}
                 onLinkRequest={onLinkRequest}
                 onClose={onClose}
-                onDemander={onDemander}
+                onDemander={onDemander ?? setDemande}
               />
             </View>
           ) : (
@@ -170,6 +178,7 @@ export function ElecSheet({
             </View>
           )}
         </KeyboardAvoidingView>
+        <ActionSheet data={demande} onClose={() => setDemande(null)} />
       </View>
     </Modal>
   );

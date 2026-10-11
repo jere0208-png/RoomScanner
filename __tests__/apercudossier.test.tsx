@@ -172,7 +172,10 @@ describe('sans abonnement : le dossier flouté, et l’envie de le déflouter', 
     });
     expect(partager).not.toHaveBeenCalled();
     // L'invité se voit proposer le compte : c'est la porte de l'offre.
-    expect(`${useAlerte.getState().courante?.titre ?? ''}`).toMatch(/compte/i);
+    // Le titre dit que le PDF est Pro ; le message, que le compte s'ouvre
+    // gratuitement (revues « Thomas », « Nadia », « Marie »).
+    const q = useAlerte.getState().courante;
+    expect(`${q?.titre ?? ''} ${q?.message ?? ''}`).toMatch(/compte/i);
     act(() => useAlerte.setState({ courante: null } as never));
   });
 });

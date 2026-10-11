@@ -131,7 +131,8 @@ describe('la fiche répond aux deux questions qu’on se pose', () => {
       circuit: 'C2',
       allume: ['le plafonnier'],
     });
-    expect(sousTitre).toBe('Chambre · circuit C2 · allume le plafonnier');
+    // La hauteur vient après la pièce (revue « Paul ») : où, à quelle hauteur.
+    expect(sousTitre).toBe('Chambre · à 110 cm du sol · circuit C2 · allume le plafonnier');
   });
 });
 

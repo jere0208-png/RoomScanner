@@ -259,12 +259,14 @@ describe('sans compte, pas de Pro', () => {
     expect(useAccountStore.getState().pro).toBe(true);
   });
 
-  it('l’invité qui veut le Pro est mené au compte, pas à la caisse', async () => {
+  it('l’invité voit les prix, mais l’achat le mène au compte, pas à la caisse', async () => {
     const native = jest.requireMock('../src/native/account');
     native.acheterAbonnement.mockClear();
     useAccountStore.setState({ compte: null, invite: true });
+    // Revue « Thomas » : il voulait le prix avant de donner son e-mail.
     useAccountStore.getState().ouvrirPaywall();
-    expect(useAccountStore.getState().paywallVisible).toBe(false);
+    expect(useAccountStore.getState().paywallVisible).toBe(true);
+    useAccountStore.setState({ paywallVisible: false });
     useAccountStore.getState().ouvrirSurprise();
     expect(useAccountStore.getState().surpriseVisible).toBeFalsy();
     expect(useAccountStore.getState().paywallVisible).toBe(false);
@@ -334,6 +336,8 @@ describe('le code promo et l’achat', () => {
   });
 
   it('« Restaurer l’achat » redonne le Pro quand l’App Store le confirme', async () => {
+    // Le Pro appartient au compte : on restaure connecté (revue « Thomas »).
+    useAccountStore.setState({ compte: MARTIN as never });
     await useAccountStore.getState().restaurerPro();
     expect(useAccountStore.getState().pro).toBe(true);
     expect(useAccountStore.getState().proVia).toBe('abonnement');

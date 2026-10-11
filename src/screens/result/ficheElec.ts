@@ -58,6 +58,14 @@ export function ficheElec(e: FicheElecEntree): {
   const spec = FIXTURES[e.appareil.kind];
   const bouts: string[] = [];
   if (e.piece) bouts.push(e.piece);
+  /*
+    SA HAUTEUR — revue « Paul » : il touchait sa prise pour savoir où elle
+    était, et la fiche lui donnait un circuit. La hauteur du sol à l'axe est
+    la première chose qu'on vient chercher avant de percer.
+  */
+  if (Number.isFinite(e.appareil.height)) {
+    bouts.push(`à ${Math.round(e.appareil.height * 100)} cm du sol`);
+  }
 
   /*
     LE CIRCUIT, ET SON ABSENCE.

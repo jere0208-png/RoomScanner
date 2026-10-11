@@ -355,14 +355,19 @@ describe('4 — le plan s’enregistre tout seul', () => {
     expect(useScanStore.getState().saves).toHaveLength(0);
   });
 
-  it('en partant : le particulier est enregistré, l’électricien garde sa mise de côté', () => {
+  it('en partant : le particulier est enregistré — l’électricien aussi, pour un relevé NEUF', () => {
     planOuvert();
     rangerLeTravail();
     expect(useScanStore.getState().saves[0].supprimeLe).toBeUndefined();
+    /*
+      Revues « Karim » et « Sophie » : la visite du lundi s'effaçait le
+      mardi soir. Le relevé neuf s'enregistre aussi en mode Électricité ;
+      seule la RETOUCHE d'un plan client reste de côté.
+    */
     act(() => useUsage.setState({ modeElec: true }));
     planOuvert();
     rangerLeTravail();
-    expect(useScanStore.getState().saves[0].supprimeLe).toBeDefined();
+    expect(useScanStore.getState().saves[0].supprimeLe).toBeUndefined();
     act(() => useAstuce.setState({ courante: null, file: [] }));
   });
 

@@ -1703,7 +1703,7 @@ describe('le menu du scan', () => {
     act(() => bouton(tree, 'Plus')!.props.onPress());
     const vu = textes(tree);
     expect(vu).not.toContain('Normes auto');
-    expect(vu).toContain('Passer en mode Électricité');
+    expect(vu).toContain('Placer prises et interrupteurs');
     act(() => useUsage.setState({ modeElec: avant }));
   });
 });

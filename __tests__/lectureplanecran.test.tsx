@@ -214,7 +214,10 @@ describe('la page', () => {
     await act(async () => bouton(t, 'Scanner le plan').props.onPress());
     expect(textes(t)).toContain('Réservé au Pro');
     act(() => bouton(t, 'Passer au Pro').props.onPress());
-    expect(useScanStore.getState().forcerTarifs).toBe(true);
+    // La page Pro s'ouvre (revues « Thomas », « Sophie ») : le drapeau des
+    // tarifs du devis ne faisait rien bouger.
+    expect(useAccountStore.getState().paywallVisible).toBe(true);
+    act(() => useAccountStore.setState({ paywallVisible: false } as never));
     act(() => t.unmount());
   });
 

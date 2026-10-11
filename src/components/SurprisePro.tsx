@@ -44,6 +44,13 @@ export function SurprisePro() {
       animationType="fade"
       onRequestClose={fermer}>
       <View style={s.voile}>
+        {/* Toucher à côté referme : un popup qu'on ne peut quitter qu'en
+            visant un petit mot gris retient, il ne propose plus. */}
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          accessibilityLabel="Fermer"
+          onPress={fermer}
+        />
         {/*
           UN SEUL CHIFFRE, EN HÉROS — relevé du patron, capture à l'appui :
           « trop de chiffres, les phrases sont cassées ». Trois prix dans
@@ -52,11 +59,13 @@ export function SurprisePro() {
           Les prix, c'est la page Pro qui les montre, ancien barré à
           l'appui ; le code s'applique tout seul, il n'a pas à s'annoncer.
         */}
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="J’en profite"
-          style={({ pressed }) => [s.prise, pressed && s.enfonce]}
-          onPress={profiter}>
+        {/*
+          UNE SEULE ZONE D'ACHAT : LE BOUTON — revues « Thomas » et
+          « Nadia ». Toute la carte, image comprise, menait à l'achat : un
+          appui pour la fermer ou pour lire ouvrait la caisse. La carte se
+          lit ; le bouton achète ; « Non merci » est un vrai bouton.
+        */}
+        <View style={s.prise}>
           <ContourVif rayon={24} fond="#FFFFFF">
             <View style={s.carte}>
               <Image
@@ -67,21 +76,23 @@ export function SurprisePro() {
               <TexteVif texte="Surprise !" taille={22} fond="#FFFFFF" />
               <TexteVif texte={bienvenue?.accroche ?? 'Pro'} taille={44} fond="#FFFFFF" />
               <Text style={s.corps}>{bienvenue?.phrase ?? ''}</Text>
-              {/* L'affordance du geste : un bouton dessiné — mais c'est
-                  toute la carte qui répond, on ne peut pas le rater. */}
-              <View style={s.cta}>
-                <Text style={s.ctaTexte}>J’en profite</Text>
-              </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Plus tard"
-                onPress={fermer}
-                hitSlop={8}>
-                <Text style={s.plusTard}>Plus tard</Text>
+                accessibilityLabel="J’en profite"
+                style={({ pressed }) => [s.cta, pressed && s.enfonce]}
+                onPress={profiter}>
+                <Text style={s.ctaTexte}>J’en profite</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Non merci"
+                style={({ pressed }) => [s.nonMerci, pressed && s.enfonce]}
+                onPress={fermer}>
+                <Text style={s.nonMerciTexte}>Non merci</Text>
               </Pressable>
             </View>
           </ContourVif>
-        </Pressable>
+        </View>
       </View>
     </Modal>
   );
@@ -120,5 +131,13 @@ const themed = (c: Palette) =>
       marginTop: 4,
     },
     ctaTexte: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
-    plusTard: { color: c.inkFaint, fontSize: 14, fontWeight: '600', padding: 6 },
+    nonMerci: {
+      alignSelf: 'stretch',
+      height: 46,
+      borderRadius: 15,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    nonMerciTexte: { color: c.ink, fontSize: 15, fontWeight: '700' },
   });

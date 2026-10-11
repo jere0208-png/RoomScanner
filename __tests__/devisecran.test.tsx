@@ -134,7 +134,8 @@ describe('le bouton du plan', () => {
       t = TestRenderer.create(<DevisPastille total={793.3} onPress={() => {}} />);
     });
     arbre = t;
-    expect(mots(t)).toEqual(['793 €']);
+    // « Devis », en toutes lettres (revue « Karim »).
+    expect(mots(t)).toEqual(['Devis 793 €']);
   });
 
   it('écrit court : au-delà du millier, on passe au k€', () => {

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { constatsDeChute } from '../geometry/chute';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
-import { rangerLeTravail } from '../ui/miseDeCote';
+import { planJamaisEnregistre, rangerLeTravail } from '../ui/miseDeCote';
 import { ChoixOuverture } from '../components/ChoixOuverture';
 import {
   ALLEGES_COURANTES,
@@ -1044,10 +1044,15 @@ export function ResultScreen() {
         .filter((cl) => (cl.commands ?? []).includes(f.id))
         .map((cl) => CEILINGS[cl.kind].label.toLowerCase()),
     ];
+    /*
+      PAS DE CIRCUIT SANS TABLEAU — revue « Paul » : « circuit C2 » était
+      un départ PROPOSÉ par l'app, lu comme le disjoncteur à couper.
+    */
+    const aTableau = fixtures.some((x) => x.kind === 'tableau');
     const { titre, sousTitre } = ficheElec({
       appareil: f,
       piece: rooms.find((r) => r.id === placement.get(f.id))?.name,
-      circuit: marks.get(f.id) || undefined,
+      circuit: (aTableau ? marks.get(f.id) : undefined) || undefined,
       allumePar,
       allume,
     });
@@ -1433,10 +1438,12 @@ export function ResultScreen() {
     retouche le dossier d'un client, et décide lui-même du plan remis.
   */
   useEffect(() => {
-    if (modeElec) return;
     let minuterie: ReturnType<typeof setTimeout> | null = null;
     const desabonner = useScanStore.subscribe((st) => {
       if (!st.dirty) return;
+      // En mode Électricité, seul le plan NEUF s'enregistre seul : la
+      // retouche d'un plan client attend la décision de l'électricien.
+      if (modeElec && !planJamaisEnregistre()) return;
       if (minuterie) clearTimeout(minuterie);
       minuterie = setTimeout(() => {
         minuterie = null;
@@ -1544,18 +1551,28 @@ export function ResultScreen() {
   const exportOuvert = useAccountStore((st) => st.exportOuvert);
 
   const shareImage = async () => {
+    /*
+      LES COTES PARTENT AVEC L'IMAGE — revue « Marie » : le plan rouvert
+      avait ses cotes éteintes, et l'image partait sans une seule mesure.
+      Le temps de la capture, elles s'allument ; elles reprennent ensuite
+      l'état où on les avait laissées.
+    */
+    const cotesAvant = showMeasures;
+    if (vue === '2d' && !cotesAvant) setShowMeasures(true);
     try {
       setCapturing(true);
-      await new Promise<void>((r) => setTimeout(() => r(), 60)); // rendu du watermark
+      await new Promise<void>((r) => setTimeout(() => r(), cotesAvant ? 60 : 160)); // rendu du watermark et des cotes
       const uri = await captureRef(canvasRef, {
         format: 'png',
         quality: 1,
         result: 'tmpfile',
       });
       setCapturing(false);
+      if (!cotesAvant) setShowMeasures(false);
       await RoomScan.shareFile(uri);
     } catch (e: any) {
       setCapturing(false);
+      if (!cotesAvant) setShowMeasures(false);
       alerte(expliquer('capture', e).titre, expliquer('capture', e).message);
     }
   };
@@ -2631,6 +2648,10 @@ export function ResultScreen() {
           onPress: () => {
             splitRoom(roomId);
             setSelectedRoomId(null);
+            astuce('Pièce scindée.', {
+              icone: 'undo',
+              action: { label: 'Annuler', faire: () => useScanStore.getState().undo() },
+            });
           },
         },
         ...(autres > 0
@@ -2639,10 +2660,34 @@ export function ResultScreen() {
                 label: 'Retirer la pièce',
                 icon: 'supprimer' as const,
                 danger: true,
-                onPress: () => {
-                  removeRoom(roomId);
-                  setSelectedRoomId(null);
-                },
+                /*
+                  UNE PIÈCE NE SE RETIRE PAS D'UN APPUI — revues « Nadia »,
+                  « Marie », « Paul » : on touchait le nom pour le renommer,
+                  et « Retirer » agissait aussitôt, hors édition, là où
+                  « Annuler » n'est pas. On le demande, et l'on propose
+                  d'annuler ensuite.
+                */
+                onPress: () =>
+                  setMenu({
+                    title: `Retirer « ${piece?.name || 'cette pièce'} » ?`,
+                    subtitle: 'Ses murs et ce qui y est posé quittent le plan.',
+                    actions: [
+                      {
+                        label: 'Retirer la pièce',
+                        icon: 'supprimer' as const,
+                        danger: true,
+                        onPress: () => {
+                          removeRoom(roomId);
+                          setSelectedRoomId(null);
+                          astuce('Pièce retirée.', {
+                            icone: 'undo',
+                            action: { label: 'Annuler', faire: () => useScanStore.getState().undo() },
+                          });
+                        },
+                      },
+                      { label: 'Garder la pièce', onPress: () => {} },
+                    ],
+                  }),
               },
             ]
           : []),
@@ -3643,15 +3688,21 @@ export function ResultScreen() {
                             cherche dans le menu du plan qu'il a sous les
                             yeux. Elle se tait dès que le mode est allumé.
                           */
-                          label: 'Passer en mode Électricité',
+                          /*
+                            POUR TOUT LE MONDE — revues « Sophie » et
+                            « Paul » : « Pour les électriciens » faisait
+                            croire au particulier que l'app ne savait pas
+                            poser une prise.
+                          */
+                          label: 'Placer prises et interrupteurs',
                           icon: 'tableau' as const,
                           hint:
-                            'Prises, éclairage, normes NF C 15-100 et devis. ' +
-                            'Pour les électriciens.',
+                            'Prises, éclairage, normes NF C 15-100 et devis — ' +
+                            'pour prévoir l’électricité de votre logement.',
                           onPress: () => {
                             useUsage.getState().choisir(true);
                             haptic('succes');
-                            astuce('Mode Électricité activé.', {
+                            astuce('Mode Électricité activé : touchez « Édition », puis « Appareil ».', {
                               icone: 'elec',
                             });
                           },
@@ -4274,6 +4325,21 @@ export function ResultScreen() {
             onChange={setView3d}
             focusRoomId={rooms[focusIdx]?.id ?? null}
           />
+        )}
+
+        {/*
+          UN TRACÉ PROPOSÉ N'EST PAS UN CÂBLE — revue « Paul » : il cherchait
+          où percer, et lisait dans les gaines le passage réel de ses câbles.
+          Ce sont des chemins CALCULÉS pour une installation neuve. Tant que
+          le calque est allumé, le plan le dit — l'image partagée aussi.
+        */}
+        {showRoutes && !!cheminements?.traces?.length && (
+          <View pointerEvents="none" style={styles.avisGaines}>
+            <Text style={styles.avisGainesTexte}>
+              Tracé proposé pour une installation neuve : ce ne sont pas vos câbles,
+              ne vous y fiez pas pour percer.
+            </Text>
+          </View>
         )}
 
         {/* Toute la quincaillerie s'efface pendant une capture : une image
@@ -5760,6 +5826,12 @@ export function ResultScreen() {
                 onPress: () => {
                   removeWall(selectedWall.id);
                   setSelectedWallId(null);
+                  // Revue « Paul » : retiré d'un appui, dans la rangée où
+                  // l'on cherche autre chose. On propose de revenir.
+                  astuce('Mur retiré.', {
+                    icone: 'undo',
+                    action: { label: 'Annuler', faire: () => useScanStore.getState().undo() },
+                  });
                 },
               },
             ]}

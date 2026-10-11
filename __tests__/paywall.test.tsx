@@ -557,7 +557,8 @@ describe('la surprise Pro', () => {
     expect(typos).toContain('Surprise !');
     // Le pourcentage est CALCULÉ sur les prix de l'App Store : 3,92 / 4,90.
     expect(typos).toContain('−20 %');
-    expect(bouton(t, 'Plus tard')).toBeDefined();
+    // Un vrai bouton pour refuser (revues « Thomas », « Nadia »).
+    expect(bouton(t, 'Non merci')).toBeDefined();
   });
 
   it('« J’en profite » ouvre la page Pro, et le prix affiché est celui qu’Apple facturera', async () => {

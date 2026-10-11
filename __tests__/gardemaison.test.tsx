@@ -117,7 +117,9 @@ describe('quitter un plan modifié', () => {
     expect(st.screen).not.toBe('result');
     expect(st.saves.length).toBe(avant + 1);
     expect(st.saves[0].name).toBe('Chantier');
-    expect(st.saves[0].supprimeLe).toBeGreaterThan(Date.now());
+    // Un relevé neuf s'enregistre pour de bon, mode Électricité compris
+    // (revues « Karim », « Sophie ») : il ne s'efface plus douze heures après.
+    expect(st.saves[0].supprimeLe).toBeUndefined();
   });
 
   it('et ne range rien quand il n’y a rien à perdre', () => {

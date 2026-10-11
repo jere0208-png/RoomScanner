@@ -21,6 +21,7 @@ import {
   Switch,
   Text,
   View,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -129,6 +130,11 @@ export function ProfilScreen() {
   const nom = compte?.prenom || compte?.email || 'Invité';
 
   const restaurer = async () => {
+    // Sans compte, `restaurerPro` ouvre lui-même la porte du compte.
+    if (!useAccountStore.getState().compte) {
+      await restaurerPro();
+      return;
+    }
     try {
       const ok = await restaurerPro();
       alerte(
@@ -306,6 +312,23 @@ export function ProfilScreen() {
               style={({ pressed }) => [s.boutonAbo, pressed && s.enfonce]}
               onPress={ouvrirPaywall}>
               <Text style={s.boutonAboTexte}>Voir l’offre</Text>
+            </Pressable>
+          )}
+          {/*
+            GÉRER, RÉSILIER — revues « Thomas » et « Nadia » : la carte disait
+            « Renouvellement le … » sans aucun moyen de l'arrêter ; le chemin
+            n'était écrit que dans la page Confidentialité. Le bouton ouvre
+            les abonnements du compte Apple, là où l'on résilie.
+          */}
+          {pro && proVia !== 'code' && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Gérer l’abonnement"
+              style={({ pressed }) => [s.boutonAbo, pressed && s.enfonce]}
+              onPress={() => {
+                Linking.openURL('https://apps.apple.com/account/subscriptions').catch(() => {});
+              }}>
+              <Text style={s.boutonAboTexte}>Gérer</Text>
             </Pressable>
           )}
         </View>

@@ -104,7 +104,7 @@ export function LecturePlanScreen() {
   const insets = useSafeAreaInsets();
   const setScreen = useScanStore((st) => st.setScreen);
   const ouvrirPlanLu = useScanStore((st) => st.ouvrirPlanLu);
-  const demanderLesTarifs = useScanStore((st) => st.demanderLesTarifs);
+  const ouvrirPaywall = useAccountStore((st) => st.ouvrirPaywall);
   const compte = useAccountStore((st) => st.compte);
   const jeton = useAccountStore((st) => st.jeton);
   const pro = useAccountStore((st) => st.pro);
@@ -277,7 +277,9 @@ export function LecturePlanScreen() {
             </Text>
             <Text style={s.echecTexte}>{etat.message}</Text>
             {etat.motif === 'pro' && (
-              <Bouton s={s} principal libelle="Passer au Pro" onPress={() => demanderLesTarifs()} />
+              // Revues « Thomas » et « Sophie » : il levait le drapeau des
+              // tarifs du devis, et l'écran ne bougeait pas.
+              <Bouton s={s} principal libelle="Passer au Pro" onPress={() => ouvrirPaywall()} />
             )}
             {etat.motif === 'compte' && (
               <Bouton
