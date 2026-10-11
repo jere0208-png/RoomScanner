@@ -14285,6 +14285,87 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Un seul tableau, partout
+
+Relevé du patron : « sur le plan d'exemple, au clic sur le tableau, on voit
+un tableau déjà bien établi sur le modèle 3D, mais si on clique sur
+"Constituer le tableau", la page pour l'édition du tableau n'affiche pas les
+disjoncteurs que l'on a pourtant sur la 3D. Revois ça pour qu'ils
+correspondent en toute circonstance. »
+
+**Trois dessins ne se parlaient pas** quand aucun tableau n'était
+constitué :
+- la 3D, le mur vu de face et la visite posaient un tableau DÉCORATIF
+  (treize, dix, quatorze et huit disjoncteurs), faute de relevé ;
+- le rendu réaliste montrait celui que le plan appelle ;
+- la feuille d'édition s'ouvrait vide.
+
+**Ils lisent maintenant le même tableau de référence**
+(`tableauDeReference`, `geometry/tableauFini`) :
+- celui qu'on a constitué s'il existe, même vide : c'est un choix ;
+- sinon celui que le plan appelle, calculé sur TOUT le logement
+  (`circuitsDuLogement` : chaque appareil rattaché à sa pièce sur son
+  niveau, puis les circuits formés sur l'ensemble) ;
+- sinon rien, et le coffret se dessine vide.
+
+Le crochet `useTableauDeReference` (`store/tableauDeReference`) le donne à
+la 3D, au mur, à la visite, au rendu réaliste et à l'écran du plan. Aucun
+d'eux ne calcule plus le sien.
+
+**Un tableau vide se dessine vide.** `railDuReleve` ne rend plus `null`
+que s'il n'y a aucun tableau ; à défaut, les dessins prennent `RAIL_VIDE`
+(deux rangées de treize, des obturateurs). Le tableau décoratif ne
+s'affiche plus nulle part.
+
+**Ouvrir la feuille remplit le tableau qu'on voyait.** « Constituer le
+tableau », « Relever ce tableau » ou « Relever le tableau existant », sur un
+tableau jamais constitué, passent par `constituerLeTableau` :
+- les organes projetés deviennent le tableau constitué, chacun avec son
+  identifiant `dep-…` ;
+- un tableau déjà constitué n'est jamais écrasé ;
+- le geste s'annule comme les autres.
+
+**« Vider le tableau »** (`viderLeTableau`), dans la feuille, repart d'un
+coffret vide pour qui relève un tableau ancien, différent du plan. Il se
+confirme d'un second geste (« Retirer les 12 organe(s) ? »), et « Garder »
+le désarme.
+
+À savoir : un tableau constitué de cette façon est un tableau relevé. Il
+figure donc dans le dossier PDF, à la page du tableau existant.
+
+`tableaucoherent.test.tsx`.
+
+## Des disjoncteurs Resi9, à l'identique
+
+Relevé du patron, photo d'un répartiteur 4 × 14 départs à l'appui : « je ne
+veux pas un SVG mal fait, une reproduction honnête des disjoncteurs
+Schneider. Pour chaque, tu devras te fier à l'identique réaliste. »
+
+**Chaque organe du rendu réaliste est dessiné d'après l'appareil réel** de
+la gamme Resi9 XE (`components/AppareilsResi9`), de face, à 80 mm de haut :
+- le corps blanc à dégradé, sa tête à vis et son nez en saillie, ombré ;
+- les vis dans leur logement carré, à empreinte cruciforme ;
+- le pied, avec le clip DIN bleu et le connecteur embrochable jaune ;
+- « Schneider Electric » écrit en vert, sans logo.
+
+Ce qui les distingue :
+- **le disjoncteur** : « Resi9 », « DM C16 », la pastille XE, le voyant
+  rouge « I.ON », la manette verte levée, « C16 » et « 230V~ » ;
+- **le différentiel** : le bouton test « T » et la mention « Test
+  régulier », « Resi9 ID », « Type AC », « 30mA », « 40A » ;
+- **l'interrupteur général** : « Interrupteur sectionneur », la manette
+  grise, « 63A » ;
+- **le répartiteur** : le capot bleu translucide, les embouts gris, quatre
+  barres de quatorze trous vues au travers, l'étiquette blanche à l'éclair (« 125A ·
+  4 × 14 départs · Ø5,3 Ø7,5 Ø9 Ø9 »), L1 et N, la rangée de vis du bas ;
+- le parafoudre, le contacteur et le télérupteur, le porte-fusible et
+  le disjoncteur d'abonné, chacun avec sa face.
+
+Le répartiteur prend désormais **6 places** sur le rail, sa largeur réelle
+(il en prenait 4).
+
+`tableaufini.test.tsx`.
+
 ## Le tableau fini, en vrai
 
 Relevé du patron, photo d'un coffret à l'appui : « avoir un rendu visuel du

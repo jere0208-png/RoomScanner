@@ -1307,6 +1307,14 @@ interface ScanState {
   /** Décrit le contenant : rangées, modules par rangée, note libre. */
   decrireTableau: (t: Partial<Omit<TableauExistant, 'departs'>>) => void;
   /**
+   * CONSTITUE LE TABLEAU D'APRÈS CELUI QU'ON VOYAIT — relevé du patron : la
+   * feuille d'édition s'ouvrait vide quand la 3D montrait le tableau que le
+   * plan appelle. Ne fait rien si un tableau est déjà constitué.
+   */
+  constituerLeTableau: (t: TableauExistant) => void;
+  /** Repart d'un tableau vide (qui reste constitué : vide, il se dessine vide). */
+  viderLeTableau: () => void;
+  /**
    * Déplace un organe sur le rail : d'une place à gauche ou à droite dans sa
    * rangée (`pas`), ou dans une autre rangée, à la suite de ce qui y est.
    */
@@ -5626,6 +5634,33 @@ export const useScanStore = create<ScanState>((set, get) => {
       const ex = get().existant;
       set({
         existant: rangerLeTableau({ ...(ex ?? { departs: [] }), ...t }),
+        dirty: true,
+      });
+    },
+
+    constituerLeTableau: (t) => {
+      // La garde AVANT le point de reprise : voir `annulerunefois`.
+      if (get().existant) return;
+      pushHistory('constituerLeTableau');
+      const graine = Date.now().toString(36);
+      set({
+        existant: rangerLeTableau({
+          ...t,
+          departs: t.departs.map((d, i) => ({
+            ...d,
+            id: `dep-${graine}-${i.toString(36)}${Math.random().toString(36).slice(2, 4)}`,
+          })),
+        }),
+        dirty: true,
+      });
+    },
+
+    viderLeTableau: () => {
+      const ex = get().existant;
+      if (!ex || ex.departs.length === 0) return;
+      pushHistory('viderLeTableau');
+      set({
+        existant: { departs: [], ...(ex.rangees ? { rangees: ex.rangees } : {}), ...(ex.parRangee ? { parRangee: ex.parRangee } : {}) },
         dirty: true,
       });
     },

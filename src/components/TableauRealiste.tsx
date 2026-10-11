@@ -11,12 +11,8 @@
  *   — le bac et sa platine, les montants noirs, les barrettes de terre vertes
  *     en haut et en bas ;
  *   — un rail DIN par rangée, nu là où il n'y a rien ;
- *   — chaque organe à sa place et à sa largeur, avec ce qui le distingue :
- *     la manette d'un disjoncteur et la fenêtre de son calibre, le bouton
- *     test d'un différentiel, la grosse manette rouge de l'interrupteur
- *     général, les bornes brunes et bleues du répartiteur, la cartouche d'un
- *     porte-fusible, le voyant d'un parafoudre ; les embouts jaunes du peigne
- *     sous les modules ;
+ *   — chaque organe à sa place et à sa largeur, dessiné d'après l'appareil
+ *     réel de la gamme Resi9 XE (voir `AppareilsResi9`) ;
  *   — sous chaque organe, son étiquette : l'icône de ce qu'il commande, son
  *     repère, son calibre et sa pièce ;
  *   — les cotes du coffret, en flèches, comme sur la fiche du fabricant.
@@ -32,6 +28,7 @@ import {
 import { etiquettesDuTableau, type EtiquetteDuModule } from '../geometry/tableauFini';
 import { SOLAIRES } from '../ui/solaires';
 import { usageDuTableau } from './TableauVivant';
+import { AppareilResi9, DefsResi9 } from './AppareilsResi9';
 
 /** Un module DIN, en millimètres. */
 const MOD = 17.5;
@@ -67,154 +64,6 @@ export function teinteDeLEtiquette(d: DepartExistant): string {
 function tenir(s: string, taille: number, large: number): string {
   const max = Math.max(2, Math.floor(large / (taille * 0.56)));
   return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
-}
-
-/** Les vis d'un bornier : deux par module. */
-function Vis({ x, y, w }: { x: number; y: number; w: number }) {
-  const n = Math.max(2, Math.round((w / MOD) * 2));
-  const pas = w / n;
-  return (
-    <>
-      {Array.from({ length: n }, (_, i) => {
-        const cx = x + pas * (i + 0.5);
-        return (
-          <G key={i}>
-            <Circle cx={cx} cy={y} r={2.1} fill="#C2C7CC" stroke="#8A9096" strokeWidth={0.35} />
-            <Line x1={cx - 1.2} y1={y} x2={cx + 1.2} y2={y} stroke="#6E747A" strokeWidth={0.45} />
-          </G>
-        );
-      })}
-    </>
-  );
-}
-
-/** Le dessin d'un organe : son corps, ses bornes, et ce qui le distingue. */
-function Organe({ d, x, y, w }: { d: DepartExistant; x: number; y: number; w: number }) {
-  const cx = x + w / 2;
-  const corps =
-    d.organe === 'fusible' ? '#F2EBDD' : d.organe === 'agcp' ? '#DCD8D0' : d.organe === 'repartiteur' ? '#EEF1F5' : '#FAFAF8';
-  const face = (() => {
-    switch (d.organe) {
-      case 'differentiel':
-        return (
-          <>
-            <Rect x={x + 3} y={y + 22} width={w * 0.45} height={6} rx={0.8} fill="#DDE2E7" />
-            <SvgText x={x + 3 + (w * 0.45) / 2} y={y + 26.6} fontSize={3.4} fill={ENCRE} textAnchor="middle">
-              {`${d.sensibilite ?? 30}mA`}
-            </SvgText>
-            <Circle cx={x + 7} cy={y + 37} r={3.2} fill="#5E6B78" />
-            <SvgText x={x + 7} y={y + 38.3} fontSize={3.4} fill="#FFFFFF" textAnchor="middle" fontWeight="700">
-              T
-            </SvgText>
-            <Rect x={x + w - 12} y={y + 30} width={7} height={18} rx={1.2} fill="#2C3136" />
-            <Rect x={x + w - 12} y={y + 30} width={7} height={4} rx={1} fill="#4A5158" />
-            {d.typeDiff ? (
-              <>
-                <Rect x={x + 3} y={y + 45} width={9} height={6} rx={1} fill={d.typeDiff === 'A' ? '#2F6BFF' : '#8A9096'} />
-                <SvgText x={x + 7.5} y={y + 49.4} fontSize={3.4} fill="#FFFFFF" textAnchor="middle" fontWeight="700">
-                  {d.typeDiff}
-                </SvgText>
-              </>
-            ) : null}
-          </>
-        );
-      case 'interrupteur':
-        return (
-          <>
-            <SvgText x={cx} y={y + 25} fontSize={3.6} fill={ENCRE} textAnchor="middle" fontWeight="700">
-              I
-            </SvgText>
-            <Rect x={cx - 6} y={y + 28} width={12} height={20} rx={2} fill="#C8372D" />
-            <Rect x={cx - 6} y={y + 28} width={12} height={5} rx={1.6} fill="#E05A4F" />
-            <SvgText x={cx} y={y + 55} fontSize={3.6} fill={ENCRE} textAnchor="middle" fontWeight="700">
-              O
-            </SvgText>
-          </>
-        );
-      case 'repartiteur':
-        return (
-          <>
-            {[0, 1].map((ligne) =>
-              Array.from({ length: 7 }, (_, i) => (
-                <Circle
-                  key={`${ligne}-${i}`}
-                  cx={x + 6 + i * ((w - 12) / 6)}
-                  cy={y + 30 + ligne * 14}
-                  r={2.2}
-                  fill={ligne === 0 ? '#8B5A2B' : '#2F6FDE'}
-                  stroke="#3A3F45"
-                  strokeWidth={0.3}
-                />
-              )),
-            )}
-            <SvgText x={x + 3} y={y + 25} fontSize={3} fill={ENCRE} fontWeight="700">
-              L
-            </SvgText>
-            <SvgText x={x + 3} y={y + 53} fontSize={3} fill={ENCRE} fontWeight="700">
-              N
-            </SvgText>
-          </>
-        );
-      case 'fusible':
-        return (
-          <>
-            <Rect x={x + 3.5} y={y + 24} width={w - 7} height={28} rx={1.5} fill="#FFFFFF" stroke="#C9C2B4" strokeWidth={0.4} />
-            <Rect x={x + 3.5} y={y + 36} width={w - 7} height={3} fill="#C8372D" />
-          </>
-        );
-      case 'parafoudre':
-        return (
-          <>
-            <Rect x={cx - 7} y={y + 26} width={14} height={8} rx={1.2} fill="#3BB273" />
-            <SvgText x={cx} y={y + 44} fontSize={3.6} fill={ENCRE} textAnchor="middle" fontWeight="700">
-              PF
-            </SvgText>
-          </>
-        );
-      case 'agcp':
-        return (
-          <>
-            <Rect x={cx - 6} y={y + 26} width={12} height={22} rx={2} fill="#3A3F45" />
-            <Circle cx={x + 6} cy={y + 52} r={2.6} fill="#C8372D" />
-          </>
-        );
-      case 'contacteur':
-      case 'telerupteur':
-      case 'autre':
-        return (
-          <>
-            <Circle cx={cx} cy={y + 30} r={4} fill="#E8ECF0" stroke={GRIS} strokeWidth={0.4} />
-            <Line x1={cx} y1={y + 30} x2={cx + 2.6} y2={y + 27.4} stroke={ENCRE} strokeWidth={0.9} />
-            <Rect x={cx - 2.5} y={y + 38} width={5} height={10} rx={1} fill="#2C3136" />
-          </>
-        );
-      default:
-        // Le disjoncteur : la fenêtre de son calibre, et sa manette.
-        return (
-          <>
-            <Rect x={x + 2.5} y={y + 22} width={w - 5} height={6} rx={0.8} fill="#DDE2E7" />
-            <SvgText x={cx} y={y + 26.6} fontSize={3.4} fill={ENCRE} textAnchor="middle" fontWeight="700">
-              {d.calibre ? `C${d.calibre}` : 'C'}
-            </SvgText>
-            <Rect x={cx - 3} y={y + 31} width={6} height={17} rx={1} fill="#2C3136" />
-            <Rect x={cx - 3} y={y + 31} width={6} height={4} rx={1} fill="#4A5158" />
-          </>
-        );
-    }
-  })();
-  const embrochable = d.organe === 'disjoncteur' || d.organe === 'differentiel';
-  return (
-    <G testID={`module-${d.id}`}>
-      <Rect x={x} y={y} width={w} height={80} rx={1.6} fill={corps} stroke="#C3C8CE" strokeWidth={0.45} />
-      <Rect x={x + 0.8} y={y + 2} width={w - 1.6} height={12} rx={1} fill="#ECEEF0" />
-      <Vis x={x} y={y + 8} w={w} />
-      <Rect x={x + 1.5} y={y + 16.5} width={w - 3} height={1.1} fill="#3DCD58" />
-      {face}
-      <Rect x={x + 0.8} y={y + 64} width={w - 1.6} height={12} rx={1} fill="#ECEEF0" />
-      <Vis x={x} y={y + 70} w={w} />
-      {embrochable ? <Rect x={cx - 3} y={y + 77} width={6} height={3.2} rx={0.6} fill="#F2C230" /> : null}
-    </G>
-  );
 }
 
 /** L'étiquette sous un organe : icône, repère, calibre, pièce. */
@@ -280,6 +129,7 @@ export function TableauRealiste({
   };
   return (
     <Svg width={Wt * echelle} height={Ht * echelle} viewBox={`0 0 ${Wt} ${Ht}`}>
+      <DefsResi9 />
       {/* Les cotes du coffret. */}
       {fleche(ox, oy - 12, ox + W, oy - 12)}
       <SvgText x={ox + W / 2} y={oy - 16} fontSize={7} fill={ENCRE} textAnchor="middle" fontWeight="600">
@@ -343,7 +193,7 @@ export function TableauRealiste({
         const e = etiquettes.get(m.depart.id);
         return (
           <G key={m.depart.id}>
-            <Organe d={m.depart} x={x} y={yb + 8} w={w} />
+            <AppareilResi9 d={m.depart} x={x} y={yb + 8} w={w} />
             {e ? <Etiquette e={e} d={m.depart} x={x} y={yb + 92} w={w} /> : null}
           </G>
         );

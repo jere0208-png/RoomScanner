@@ -100,7 +100,7 @@ const ORGANES: { cle: string; organe: Organe; nom: string; note: string; modele:
     note: '63 A · 2 places',
     modele: { organe: 'interrupteur', calibre: 63 },
   },
-  { cle: 'repartiteur', organe: 'repartiteur', nom: 'Répartiteur', note: '4 places', modele: { organe: 'repartiteur', calibre: null } },
+  { cle: 'repartiteur', organe: 'repartiteur', nom: 'Répartiteur', note: '4 × 14 départs · 6 places', modele: { organe: 'repartiteur', calibre: null } },
   {
     cle: 'diff-a',
     organe: 'differentiel',
@@ -140,6 +140,7 @@ export function ExistantSheet({
   onVoir,
   pieces,
   onVoirFini,
+  onVider,
 }: {
   visible: boolean;
   existant: TableauExistant | null;
@@ -157,9 +158,16 @@ export function ExistantSheet({
   pieces?: string[];
   /** Ouvre le rendu réaliste du tableau fini. */
   onVoirFini?: () => void;
+  /** Retire tous les organes : on repart d'un coffret vide. */
+  onVider?: () => void;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
+  /** Vider se confirme d'un second geste, dans la feuille même. */
+  const [aVider, setAVider] = useState(false);
+  useEffect(() => {
+    if (!visible) setAVider(false);
+  }, [visible]);
   // Le tableau absent donne une liste vide — mais TOUJOURS la même : un
   // `?? []` écrit dans le corps fabriquerait un tableau neuf à chaque
   // rendu, et le diagnostic se recalculerait sans fin.
@@ -350,6 +358,39 @@ export function ExistantSheet({
               }}>
               <Text style={styles.lienBoutonTexte}>Voir le tableau fini</Text>
             </TouchableOpacity>
+          ) : null}
+          {/*
+            REPARTIR DE ZÉRO — ouvert sur un tableau jamais constitué, la
+            feuille se remplit de celui que le plan appelle. Qui relève un
+            tableau ancien, différent, le vide d'abord ; un second geste le
+            confirme, et « Annuler » du plan le rend.
+          */}
+          {onVider && departs.length > 0 ? (
+            <View style={styles.viderLigne}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={aVider ? 'Confirmer : retirer tous les organes' : 'Vider le tableau'}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                onPress={() => {
+                  if (!aVider) {
+                    haptic('leger');
+                    setAVider(true);
+                    return;
+                  }
+                  haptic('alerte');
+                  setAVider(false);
+                  onVider();
+                }}>
+                <Text style={[styles.viderTexte, aVider && { color: c.danger }]}>
+                  {aVider ? `Retirer les ${departs.length} organe(s) ?` : 'Vider le tableau'}
+                </Text>
+              </TouchableOpacity>
+              {aVider ? (
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel="Garder le tableau" onPress={() => setAVider(false)}>
+                  <Text style={styles.viderTexte}>Garder</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
           ) : null}
 
           {/*
@@ -972,4 +1013,6 @@ const getStyles = (c: Palette) =>
     },
     lienBoutonTexte: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '700' },
     voirFini: { marginTop: 10, marginBottom: 4 },
+    viderLigne: { flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 8 },
+    viderTexte: { fontSize: 13, fontWeight: '600', color: c.inkSoft },
   });

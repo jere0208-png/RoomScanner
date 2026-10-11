@@ -24,7 +24,8 @@ import {
 import { cameraOrbite, maillageDeLaMaquette } from '../geometry/maquette3d';
 import { maillageDesMeubles } from '../geometry/modeles3d';
 import { groupesDesAppareils, habillerLesTableaux } from '../geometry/appareils3d';
-import { railDuReleve } from '../geometry/existant';
+import { RAIL_VIDE, railDuReleve } from '../geometry/existant';
+import { useTableauDeReference } from '../store/tableauDeReference';
 import { grouperTraces } from '../ui/traces';
 import { cotesExterieures } from '../geometry/cotes3d';
 import { mettreAPlat } from '../ui/canevas';
@@ -518,8 +519,12 @@ export function Iso3DView({
   const toutesLesPieces = useScanStore((s) => s.rooms);
   const toutLAppareillageStocke = useScanStore((s) => s.fixtures);
   /* Le tableau relevé se dessine tel quel dans la maquette. */
-  const existant = useScanStore((s) => s.existant);
-  const rail = useMemo(() => railDuReleve(existant), [existant]);
+  /*
+    LE TABLEAU DE RÉFÉRENCE — le même que le rendu réaliste et la feuille
+    d'édition (voir `useTableauDeReference`) ; vide, il se dessine vide.
+  */
+  const reference = useTableauDeReference();
+  const rail = useMemo(() => railDuReleve(reference.tableau) ?? RAIL_VIDE, [reference.tableau]);
   // Masqués, pas effacés : la scène reçoit des listes vides, le relevé
   // garde les siennes.
   const toutLePlafond = modeElec ? toutLePlafondStocke : AUCUN_PLAFOND;

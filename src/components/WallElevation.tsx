@@ -107,7 +107,8 @@ import { SOLAIRES } from '../ui/solaires';
 import { CloseCross } from './CloseCross';
 import { AppareilDeFace, DefsAppareils, empriseDeFace } from './AppareilDeFace';
 import { habillerLesTableaux, posesDUnLot, postesDuLot, type PoseDAppareil } from '../geometry/appareils3d';
-import { railDuReleve } from '../geometry/existant';
+import { RAIL_VIDE, railDuReleve } from '../geometry/existant';
+import { useTableauDeReference } from '../store/tableauDeReference';
 import { VignetteAppareil } from './VignetteAppareil';
 import { wallLabel } from '../geometry/naming';
 import { frCategory } from '../geometry/furniture';
@@ -221,8 +222,12 @@ export function WallElevation({
 }: Props) {
   const walls = useScanStore(s => s.walls);
   /* Le tableau relevé : celui qui se dessine au mur, organe pour organe. */
-  const existant = useScanStore(s => s.existant);
-  const rail = useMemo(() => railDuReleve(existant), [existant]);
+  /*
+    LE TABLEAU DE RÉFÉRENCE — le même que le rendu réaliste et la feuille
+    d'édition (voir `useTableauDeReference`) ; vide, il se dessine vide.
+  */
+  const reference = useTableauDeReference();
+  const rail = useMemo(() => railDuReleve(reference.tableau) ?? RAIL_VIDE, [reference.tableau]);
   const openings = useScanStore(s => s.openings);
   const rooms = useScanStore(s => s.rooms);
   const fixtures = useScanStore(s => s.fixtures);

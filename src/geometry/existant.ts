@@ -140,7 +140,8 @@ export const LARGEUR_ORGANE: Record<Organe, number> = {
   agcp: 2,
   parafoudre: 2,
   interrupteur: 2,
-  repartiteur: 4,
+  // Un répartiteur 4 × 14 départs, 125 A : 105 mm, six modules.
+  repartiteur: 6,
   disjoncteur: 1,
   fusible: 1,
   contacteur: 1,
@@ -319,7 +320,14 @@ export interface RailDuTableau {
 }
 
 export function railDuReleve(t: TableauExistant | null | undefined): RailDuTableau | null {
-  if (!t || (t.departs.length === 0 && !t.rangees)) return null;
+  /*
+    UN TABLEAU VIDE SE DESSINE VIDE — relevé du patron : les dessins doivent
+    « correspondre en toute circonstance ». Faute de rail, la 3D et le mur
+    posaient un tableau DÉCORATIF (treize, dix, quatorze et huit
+    disjoncteurs) que rien d'autre ne montrait. Seule l'absence de tout
+    tableau rend `null` ; voir aussi `RAIL_VIDE`.
+  */
+  if (!t) return null;
   const impl = implanter(t);
   const genre = (o: Organe): GenreDeModule =>
     o === 'differentiel' ||
@@ -342,6 +350,9 @@ export function railDuReleve(t: TableauExistant | null | undefined): RailDuTable
     })),
   };
 }
+
+/** Le coffret sans rien dessus : deux rangées de treize, et des obturateurs. */
+export const RAIL_VIDE: RailDuTableau = { rangees: RANGEES_MIN, parRangee: PAR_RANGEE_DEFAUT, modules: [] };
 
 /** Un module DIN : 17,5 mm. */
 export const MODULE_M = 0.0175;

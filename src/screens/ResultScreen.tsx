@@ -153,12 +153,11 @@ import {
   constatsDePose,
   fixturePlacement,
   materialList,
-  planDifferentials,
   roomInputsOf,
   wallToRooms,
 } from '../geometry/nfc15100';
-import { tableauDepuisLePlan } from '../geometry/tableauFini';
 import { TableauFiniSheet } from '../components/TableauFiniSheet';
+import { useTableauDeReference } from '../store/tableauDeReference';
 import { buildMaterialPdf, materialFilename, toBase64 } from '../export/pdf';
 import { buildMetreCsv, metreFilename, type RoomMetre } from '../export/csv';
 import { buildDxf, dxfFilename } from '../export/dxf';
@@ -580,6 +579,21 @@ export function ResultScreen() {
   const [existantOuvert, setExistantOuvert] = useState(false);
   /** Le rendu réaliste du tableau fini (voir `TableauFiniSheet`). */
   const [tableauFini, setTableauFini] = useState(false);
+  /*
+    UN SEUL TABLEAU, PARTOUT — relevé du patron : la 3D montrait un tableau
+    bien établi, et « Constituer le tableau » ouvrait une feuille vide. La
+    3D, le rendu réaliste et la feuille lisent la même référence ; ouvrir la
+    feuille sur un tableau jamais constitué la remplit de celui qu'on voyait.
+    Lu par un `ref` : certaines actions sont figées dans des `useMemo`.
+  */
+  const reference = useTableauDeReference();
+  const referenceRef = useRef(reference);
+  referenceRef.current = reference;
+  const ouvrirLeTableau = useCallback(() => {
+    const r = referenceRef.current;
+    if (r.projete && r.tableau) useScanStore.getState().constituerLeTableau(r.tableau);
+    setExistantOuvert(true);
+  }, []);
   /** La feuille « Ce qu'il faut acheter » (voir `geometry/travaux`). */
   const [travauxOuvert, setTravauxOuvert] = useState(false);
   const existant = useScanStore((s) => s.existant);
@@ -1086,9 +1100,11 @@ export function ResultScreen() {
                 label: existant?.departs.length ? 'Ouvrir son relevé' : 'Relever ce tableau',
                 hint: existant?.departs.length
                   ? `${existant.departs.length} organe(s) relevé(s) — tels qu’ils sont dessinés ici.`
-                  : 'Reconstruisez-le organe par organe : il se dessinera tel quel.',
+                  : reference.projete
+                    ? 'Pré-rempli du tableau dessiné ici : ajustez-le organe par organe.'
+                    : 'Reconstruisez-le organe par organe : il se dessinera tel quel.',
                 icon: 'tableau' as const,
-                onPress: () => setExistantOuvert(true),
+                onPress: () => ouvrirLeTableau(),
               },
               {
                 label: 'Voir le tableau fini',
@@ -2274,21 +2290,6 @@ export function ResultScreen() {
     );
   }, [fige.fixtures, fige.rooms, fige.placement, fige.ceiling]);
   const marks = useMemo(() => fixtureMarks(circuitsDuPlan), [circuitsDuPlan]);
-  /*
-    LE TABLEAU FINI QU'ON MONTRE — celui qu'on a constitué ; à défaut, celui
-    que le plan appelle (relevé du patron : « avec le tableau que l'on a
-    constitué »).
-  */
-  const tableauConstitue = !!existant && existant.departs.length > 0;
-  const tableauAffiche = useMemo(
-    () =>
-      tableauConstitue
-        ? existant
-        : circuitsDuPlan.length > 0
-          ? tableauDepuisLePlan(circuitsDuPlan, planDifferentials(circuitsDuPlan))
-          : null,
-    [tableauConstitue, existant, circuitsDuPlan],
-  );
   /*
     D'UNE FENÊTRE À L'AUTRE — iOS refuse d'en présenter une pendant qu'une
     autre se retire : on laisse la première partir.
@@ -3601,7 +3602,7 @@ export function ResultScreen() {
                         hint: existant?.departs.length
                           ? `${existant.departs.length} organe(s) relevé(s) — le même tableau qu’au mur.`
                           : 'Rénovation : reconstruisez-le organe par organe, l’app dit ce qui bloque.',
-                        onPress: () => setExistantOuvert(true),
+                        onPress: () => ouvrirLeTableau(),
                       },
                       {
                         /*
@@ -6151,6 +6152,7 @@ export function ResultScreen() {
         }
         onRetirer={(id) => useScanStore.getState().retirerDepart(id)}
         onDecrire={(t) => useScanStore.getState().decrireTableau(t)}
+        onVider={() => useScanStore.getState().viderLeTableau()}
         onDeplacer={(id, vers) => useScanStore.getState().deplacerDepart(id, vers)}
         surLePlan={
           tableauDuPlan
@@ -6169,12 +6171,12 @@ export function ResultScreen() {
       {/* ---------- Le tableau fini, en vrai ---------- */}
       <TableauFiniSheet
         visible={tableauFini}
-        tableau={tableauAffiche}
-        projete={!tableauConstitue}
+        tableau={reference.tableau}
+        projete={reference.projete}
         onClose={() => setTableauFini(false)}
         onModifier={() => {
           setTableauFini(false);
-          ouvrirApres(() => setExistantOuvert(true));
+          ouvrirApres(ouvrirLeTableau);
         }}
       />
 

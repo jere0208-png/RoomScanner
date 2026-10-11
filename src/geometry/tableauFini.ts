@@ -14,7 +14,19 @@
  */
 import type { IconeSolaire } from '../ui/solaires';
 import { implanter, PAR_RANGEE_DEFAUT, RANGEES_MIN, type DepartExistant, type TableauExistant } from './existant';
-import type { Circuit, Differential } from './nfc15100';
+import { filtrerAuNiveau, niveauxPresents, roomParts, type RoomShape, type WallSeg } from './floorplan';
+import type { CeilingFixture } from './ceiling';
+import type { Fixture } from './electrical';
+import {
+  fixturePlacement,
+  planCircuits,
+  planDifferentials,
+  roomInputsOf,
+  roomUse,
+  type Circuit,
+  type Differential,
+} from './nfc15100';
+import type { RoomKind } from './furniture';
 
 /** L'icône Solar de chaque usage du tableau (`USAGES_DU_TABLEAU`). */
 const ICONE_DE_L_USAGE: Record<string, IconeSolaire> = {
@@ -190,4 +202,50 @@ export function tableauDepuisLePlan(circuits: Circuit[], differentiels: Differen
     rangee = r + 1;
   }
   return { departs, rangees: Math.max(RANGEES_MIN, rangee), parRangee: PAR_RANGEE_DEFAUT };
+}
+
+/**
+ * LES CIRCUITS DE TOUT LE LOGEMENT — tous niveaux confondus : un tableau
+ * dessert la maison entière. Chaque appareil est rattaché à sa pièce sur
+ * SON niveau, comme le fait l'écran du plan, puis les circuits se forment
+ * sur l'ensemble.
+ */
+export function circuitsDuLogement(
+  walls: WallSeg[],
+  rooms: (RoomShape & { id: string; name?: string; kind?: RoomKind | null; niveau?: number })[],
+  fixtures: Fixture[],
+  ceiling: CeilingFixture[],
+): Circuit[] {
+  if (fixtures.length === 0 && ceiling.length === 0) return [];
+  const placement = new Map<string, string>();
+  for (const n of niveauxPresents(walls, rooms)) {
+    const x = filtrerAuNiveau(
+      { walls, openings: [], rooms, fixtures, photos: [], objects: [], ceiling },
+      n,
+    );
+    if (x.fixtures.length === 0) continue;
+    const nommees = x.rooms.map((r) => ({ ...r, name: r.name ?? '' }));
+    const p = fixturePlacement(x.fixtures, x.walls, roomInputsOf(nommees, roomParts(x.walls, x.rooms)));
+    for (const [k, v] of p) placement.set(k, v);
+  }
+  const pieceDe = (f: Fixture) => rooms.find((r) => r.id === placement.get(f.id));
+  return planCircuits(
+    fixtures,
+    (f) => pieceDe(f)?.name ?? '',
+    (f) => roomUse(pieceDe(f)?.name ?? '', pieceDe(f)?.kind) === 'cuisine',
+    (f) => pieceDe(f)?.id,
+    ceiling,
+  );
+}
+
+/**
+ * LE TABLEAU DE RÉFÉRENCE — relevé du patron : la 3D, le rendu réaliste et
+ * la feuille d'édition doivent « correspondre en toute circonstance ».
+ * Celui qu'on a constitué s'il existe (même vide : c'est un choix) ; sinon
+ * celui que le plan appelle ; sinon rien.
+ */
+export function tableauDeReference(existant: TableauExistant | null | undefined, circuits: Circuit[]): TableauExistant | null {
+  if (existant) return existant;
+  if (!circuits.some((c) => c.breaker !== null)) return null;
+  return tableauDepuisLePlan(circuits, planDifferentials(circuits));
 }

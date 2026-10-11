@@ -48,7 +48,8 @@ import { buildScene, type ScenePalette } from '../geometry/scene3d';
 import { cameraNative, maillageDeLaVisite } from '../geometry/visite3d';
 import { maillageDesMeubles } from '../geometry/modeles3d';
 import { groupesDesAppareils, habillerLesTableaux } from '../geometry/appareils3d';
-import { railDuReleve } from '../geometry/existant';
+import { RAIL_VIDE, railDuReleve } from '../geometry/existant';
+import { useTableauDeReference } from '../store/tableauDeReference';
 import {
   basculer,
   interrupteurSousLeDoigt,
@@ -292,8 +293,12 @@ export function Exploration({
   const modeElec = useModeElec();
   const toutLAppareillage = useScanStore((s) => s.fixtures);
   /* Le tableau relevé, tel quel, au mur de la visite. */
-  const existant = useScanStore((s) => s.existant);
-  const rail = useMemo(() => railDuReleve(existant), [existant]);
+  /*
+    LE TABLEAU DE RÉFÉRENCE — le même que le rendu réaliste et la feuille
+    d'édition (voir `useTableauDeReference`) ; vide, il se dessine vide.
+  */
+  const reference = useTableauDeReference();
+  const rail = useMemo(() => railDuReleve(reference.tableau) ?? RAIL_VIDE, [reference.tableau]);
   const toutLePlafond = useScanStore((s) => s.ceiling);
   const showTextures = useScanStore((s) => s.showTextures);
   const colorOpenings = useScanStore((s) => s.showOpeningColors);

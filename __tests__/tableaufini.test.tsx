@@ -60,7 +60,7 @@ const traces = (t: TestRenderer.ReactTestRenderer) => t.root.findAllByType(Path)
 describe('la construction du tableau', () => {
   it('l’interrupteur général et le répartiteur se posent sur le rail, à leur largeur', () => {
     expect(LARGEUR_ORGANE.interrupteur).toBe(2);
-    expect(LARGEUR_ORGANE.repartiteur).toBe(4);
+    expect(LARGEUR_ORGANE.repartiteur).toBe(6);
     const rail = railDuReleve(CONSTITUE)!;
     expect(rail.modules.map((m) => m.genre).slice(0, 2)).toEqual(['interrupteur', 'repartiteur']);
     expect(nommerOrgane(CONSTITUE.departs[0])).toBe('Interrupteur général 63 A');
