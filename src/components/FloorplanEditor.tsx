@@ -506,6 +506,12 @@ interface Props {
    * retour vit ici, et deux sélections ne coexistent pas.
    */
   retourEfface?: number;
+  /**
+   * LES PORTES QU'UN MEUBLE EMPÊCHE DE S'OUVRIR — relevé du patron, point 6
+   * de la réflexion « grand public ». Leur battant se dessine en rouge, sa
+   * surface teintée : on voit d'un coup d'œil quelle porte coince.
+   */
+  portesBloquees?: Set<string>;
 }
 
 /**
@@ -536,6 +542,7 @@ export function FloorplanEditor({
   onMoveRoom,
   onEditRoomName,
   retourEfface,
+  portesBloquees,
   onSelectFixture,
   ceiling,
   showCeiling: showCeilingDemande,
@@ -2959,16 +2966,27 @@ export function FloorplanEditor({
                     traîner. Tous les plans du métier le dessinent ; le nôtre
                     ne le faisait pas.
                   */}
-                  {o.type === 'door' && battant && (
-                    <Path
-                      d={`M ${battant.pivot.x} ${battant.pivot.y} L ${battant.bout.x} ${battant.bout.y} A ${battant.r} ${battant.r} 0 0 ${battant.sens} ${battant.autre.x} ${battant.autre.y}`}
-                      fill="none"
-                      stroke={choisie ? c.blue : color}
-                      strokeWidth={1.2}
-                      strokeLinecap="round"
-                      opacity={0.9}
-                    />
-                  )}
+                  {o.type === 'door' && battant && (() => {
+                    const bloquee = !!portesBloquees?.has(o.id);
+                    const arc = `M ${battant.pivot.x} ${battant.pivot.y} L ${battant.bout.x} ${battant.bout.y} A ${battant.r} ${battant.r} 0 0 ${battant.sens} ${battant.autre.x} ${battant.autre.y}`;
+                    return (
+                      <>
+                        {/* Un meuble dans le battant : la surface balayée
+                            se teinte, la porte ne s'ouvre plus en grand. */}
+                        {bloquee && (
+                          <Path d={`${arc} Z`} fill={c.danger} fillOpacity={0.12} stroke="none" pointerEvents="none" />
+                        )}
+                        <Path
+                          d={arc}
+                          fill="none"
+                          stroke={choisie ? c.blue : bloquee ? c.danger : color}
+                          strokeWidth={bloquee ? 1.8 : 1.2}
+                          strokeLinecap="round"
+                          opacity={0.9}
+                        />
+                      </>
+                    );
+                  })()}
                 </G>
               );
             })}

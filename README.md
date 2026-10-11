@@ -14285,6 +14285,40 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## « Ça passe ? » : le meuble et les portes
+
+Relevé du patron, point 6 de la réflexion « grand public » : « vérifier
+qu'un canapé passe par les portes jusqu'à sa pièce, dessiner l'ouverture des
+portes en 2D et prévenir si un meuble la bloque ».
+
+Le plan dessinait déjà le battant de chaque porte. Nouveau module
+`geometry/passage.ts` :
+
+- **Le battant en mètres** (`battantsDesPortes`) : mêmes règles que le
+  dessin — côté de la pièce qui porte la porte, sauf ouverture vers
+  l'extérieur ; pivot rangé par `pivotsDesBattants`.
+- **Les meubles qui le heurtent** (`meublesQuiBloquent`) : le quart de cercle
+  balayé contre l'emprise de chaque meuble (deux centimètres de jeu). Un
+  tapis ne bloque rien, un meuble haut au-dessus de la porte non plus. Sur
+  le plan, le battant d'une porte gênée se dessine **en rouge, sa surface
+  teintée** ; la barre du meuble dit « Gêne la porte de la chambre » ; le
+  contrôle porte une ligne d'information par porte gênée.
+- **Le chemin des portes** (`passageDuMeuble`) : depuis la porte d'entrée,
+  de pièce en pièce par les portes et les passages (pas les
+  portes-fenêtres), jusqu'à la pièce du meuble. Un meuble passe une baie si
+  ses deux plus petites cotes y tiennent — porté debout ou sur le côté ; une
+  porte perd 6 cm de passage (vantail ouvert et dormant). Sans porte
+  d'entrée relevée, il suffit d'une porte de la pièce.
+- **À l'écran** : la barre d'un meuble choisi porte une puce **« Passe par
+  les portes »** (verte) ou **« Ne passe pas par la porte de la chambre »**
+  (ambre) ; un appui explique : les portes franchies et leur passage, ou la
+  porte qui coince, son passage et ce qu'il faudrait. Un lit, un rangement
+  ou une table qui ne passent pas montés : « livré en kit, il se monte sur
+  place ».
+
+L'appartement d'exemple ne s'accuse pas lui-même : aucune de ses portes
+n'est gênée. Bancs : `capasse` (11).
+
 ## Le plan du particulier : surface habitable, achats chiffrés, enregistrement automatique
 
 Relevé du patron, après l'analyse du système de plans vu par un utilisateur

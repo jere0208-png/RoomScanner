@@ -11,12 +11,13 @@
  */
 import React, { useCallback, useEffect, useRef } from 'react';
 import { DEBORD_DOIGT } from '../ui/bandeau';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
 import { CarteDuMenu, IconeBandeau } from './StripBar';
 import { frCategory } from '../geometry/furniture';
 import type { PromptData } from './Sheet';
+import type { VerdictDePassage } from '../geometry/passage';
 import type { Palette } from '../theme';
 
 import type { ObjectData } from 'react-native-room-scan';
@@ -175,6 +176,9 @@ export function ObjectBar({
   onNudge,
   onPlacer,
   onDupliquer,
+  passage,
+  bloque,
+  onPassage,
 }: {
   object: ObjectData;
   /** Les styles de l'écran : le bandeau partage ceux des autres barres. */
@@ -209,6 +213,15 @@ export function ObjectBar({
    * direction qu'on voit, pas celle du repère du scan.
    */
   onNudge?: (dx: number, dz: number) => void;
+  /**
+   * « ÇA PASSE ? » — relevé du patron, point 6 de la réflexion « grand
+   * public » : le meuble passe-t-il les portes jusqu'à sa pièce ? Le verdict
+   * court se lit sur la barre ; l'appui donne l'explication (`onPassage`).
+   */
+  passage?: VerdictDePassage | null;
+  /** Le meuble heurte le battant d'une porte : la phrase qui le dit. */
+  bloque?: string | null;
+  onPassage?: () => void;
 }) {
   /** Le dessous du meuble, au-dessus du sol. */
   const pose = object.transform[13] - object.height / 2;
@@ -351,6 +364,31 @@ export function ObjectBar({
           )}
         </View>
       </View>
+      {(passage || bloque) && (
+        <View style={[local.verdicts, styles.bandeauFilet]}>
+          {passage && (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Ça passe ?"
+              accessibilityHint={passage.court}
+              hitSlop={6}
+              style={[local.puce, { backgroundColor: `${passage.ok ? palette.green : palette.amber}1F` }]}
+              onPress={onPassage}>
+              <Svg width={14} height={14} viewBox="0 0 24 24">
+                <Path d={SOLAIRES.ouvertures} fill={passage.ok ? palette.green : palette.amber} fillRule="evenodd" />
+              </Svg>
+              <Text style={[local.puceTexte, { color: palette.ink }]} numberOfLines={1}>
+                {passage.court}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {bloque ? (
+            <Text style={[local.bloque, { color: palette.danger }]} numberOfLines={1}>
+              {bloque}
+            </Text>
+          ) : null}
+        </View>
+      )}
       {onNudge && (
         /* Le filet passe ICI : au-dessus de ce qui règle, sous ce qui nomme.
            Voir `bandeauFilet`. */
@@ -420,3 +458,18 @@ export function ObjectBar({
   );
 
 }
+
+const local = StyleSheet.create({
+  verdicts: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingTop: 6 },
+  puce: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    height: 28,
+    borderRadius: 14,
+    maxWidth: '100%',
+  },
+  puceTexte: { fontSize: 12.5, fontWeight: '700', flexShrink: 1 },
+  bloque: { fontSize: 12.5, fontWeight: '700', flexShrink: 1 },
+});

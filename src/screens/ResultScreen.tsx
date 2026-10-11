@@ -128,8 +128,13 @@ import {
   type VolumeVerdict,
 } from '../geometry/volumes';
 import { buyingList, pullSchedule } from '../geometry/conduits';
+import { frCategory } from '../geometry/furniture';
 import {
-} from '../geometry/furniture';
+  battantsDesPortes,
+  meublesQuiBloquent,
+  nomDeLaPorte,
+  passageDuMeuble,
+} from '../geometry/passage';
 import { type CatalogItem } from '../geometry/catalogue';
 import { buildObj, objFilename } from '../export/model3d';
 import { checkPlan } from '../geometry/diagnostics';
@@ -1996,6 +2001,20 @@ export function ResultScreen() {
     réflexion « grand public » : le chiffre qu'on écrit dans une annonce.
   */
   const habitable = useMemo(() => surfacesHabitables(rooms, parts), [rooms, parts]);
+  /*
+    « ÇA PASSE ? » — relevé du patron, point 6 de la réflexion « grand
+    public ». Les portes qu'un meuble empêche de s'ouvrir se rougissent sur
+    le plan ; le meuble choisi dit s'il passe les portes jusqu'à sa pièce.
+  */
+  const battants = useMemo(() => battantsDesPortes(openings, walls, rooms), [openings, walls, rooms]);
+  const bloquages = useMemo(() => meublesQuiBloquent(battants, objects), [battants, objects]);
+  const portesBloquees = useMemo(() => new Set(bloquages.keys()), [bloquages]);
+  // Le verdict suit le meuble et ses cotes, pas chaque image d'un glissé.
+  const verdictDePassage = useMemo(
+    () => (selectedObject ? passageDuMeuble(selectedObject, { walls, openings, rooms }) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedObject?.id, selectedObject?.width, selectedObject?.depth, selectedObject?.height, selectedObject?.roomId, walls, openings, rooms],
+  );
   // Une seule pièce : l'outil de nommage n'a pas besoin de sélection.
   const targetRoomId =
     selectedRoomId ?? (rooms.length === 1 ? rooms[0].id : null);
@@ -2300,8 +2319,32 @@ export function ResultScreen() {
         severity: i.severity as string,
         code: i.code,
       })),
+      /*
+        UNE PORTE QU'UN MEUBLE GÊNE — relevé du patron, point 6 de la
+        réflexion « grand public ». Une information : un meuble relevé au
+        scan peut être à dix centimètres de sa place réelle.
+      */
+      ...[...meublesQuiBloquent(battantsDesPortes(fige.openings, fige.walls, fige.rooms), fige.objects)].map(
+        ([porteId, ids], n) => {
+          const porte = fige.openings.find((o) => o.id === porteId)!;
+          const nom = nomDeLaPorte(porte, fige.rooms);
+          const meuble = fige.objects.find((o) => o.id === ids[0]);
+          return {
+            key: `b${n}`,
+            message: `${nom.charAt(0).toUpperCase()}${nom.slice(1)} : ${
+              ids.length > 1 ? 'des meubles gênent' : `${frCategory(meuble?.category ?? '').toLowerCase()} gêne`
+            } son ouverture`,
+            hint:
+              'Le vantail heurte le meuble avant d’être grand ouvert. Décalez le meuble, ' +
+              'ou faites ouvrir la porte de l’autre côté depuis son menu.',
+            severity: 'info',
+            code: 'porte',
+            roomId: porte ? roomOf(porte) : undefined,
+          };
+        },
+      ),
     ],
-    [fige.walls, fige.rooms, fige.openings, elecIssues, modeElec, cheminements],
+    [fige.walls, fige.rooms, fige.openings, fige.objects, elecIssues, modeElec, cheminements],
   );
   const alertes = useMemo(
     () => issues.filter((i) => i.severity === 'alerte').length,
@@ -3721,6 +3764,7 @@ export function ResultScreen() {
               setSelectedOpeningId(id);
             }}
             retourEfface={retourEfface}
+            portesBloquees={showFurniture ? portesBloquees : undefined}
             selectedRoomId={selectedRoomId}
             /* Glisser dans la pièce choisie la déplace, avec ses meubles et
                son appareillage — et elle s'aimante aux murs voisins. */
@@ -4463,6 +4507,16 @@ export function ResultScreen() {
             }}
             onRotate={() => rotateObject(selectedObject.id)}
             onCancel={cancelObject}
+            passage={verdictDePassage}
+            bloque={(() => {
+              const porte = [...bloquages].find(([, ids]) => ids.includes(selectedObject.id))?.[0];
+              const o = porte ? openings.find((x) => x.id === porte) : undefined;
+              return o ? `Gêne ${nomDeLaPorte(o, rooms)}` : null;
+            })()}
+            onPassage={() =>
+              verdictDePassage &&
+              alerte(verdictDePassage.ok ? 'Il passe' : 'Il ne passe pas', verdictDePassage.detail)
+            }
             onDupliquer={() => {
               const copie = useScanStore.getState().dupliquerMeuble(selectedObject.id);
               if (!copie) return;
