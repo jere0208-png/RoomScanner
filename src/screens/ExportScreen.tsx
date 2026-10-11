@@ -213,8 +213,14 @@ const styles = getStyles(c);
    * qu'on voit en premier, chez l'acheteur comme chez le client.
    */
   const [garde, setGarde] = useState(true);
-  /** Les repères d'appareillage sur les perspectives : ôtables. */
-  const [reperes3D, setReperes3D] = useState(true);
+  /**
+   * Les repères d'appareillage sur les perspectives : ÉTEINTS AU DÉPART —
+   * relevé du patron : « dans la page export, le bloc vue 3D, enlève les
+   * repères sur le modèle présenté ». Une perspective se montre au client ;
+   * la pastille « Repères » les rallume pour le chantier, dans l'aperçu comme
+   * sur la feuille.
+   */
+  const [reperes3D, setReperes3D] = useState(false);
   const [includeMetre, setIncludeMetre] = useState(true);
   /*
     « CE QU'IL FAUT ACHETER » DANS LE DOSSIER — relevé du patron, point 3 de
@@ -1146,6 +1152,9 @@ const styles = getStyles(c);
                         value={v}
                         onChange={(nv) => setVues((liste) => liste.map((x, k) => (k === i ? nv : x)))}
                         showMeasures={measures3D}
+                        // Ce qu'on voit est ce qui part : l'aperçu suit la
+                        // pastille « Repères », comme la feuille.
+                        showElecTags={reperes3D}
                         // Les cardinaux appartiennent au plan 2D : sur une
                         // perspective, quatre lettres au bord du cadre ne
                         // désignent plus rien.

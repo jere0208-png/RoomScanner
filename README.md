@@ -14285,6 +14285,24 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## La vue 3D de l'export, sans repères
+
+Relevé du patron : « dans la page export PDF, le bloc vue 3D, enlève les
+repères sur le modèle présenté. »
+
+L'aperçu de la perspective ne lisait pas la pastille « Repères ». Il portait
+toujours la désignation, la hauteur et la cote de chaque appareil, alors que
+la feuille, elle, suivait la pastille.
+
+Désormais :
+- **l'aperçu suit la pastille** (`showElecTags={reperes3D}`) : ce qu'on voit
+  est ce qui part ;
+- **les repères sont éteints au départ** : une perspective se montre au
+  client, et la pastille les rallume pour le chantier, dans l'aperçu comme
+  sur la feuille.
+
+`exportreperes.test.ts`.
+
 ## L'élévation dit d'où on la regarde
 
 Relevé du patron : « sur les élévations des murs, note aussi le nom de la
