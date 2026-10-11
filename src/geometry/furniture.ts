@@ -292,6 +292,21 @@ const AUTRES: Record<string, string> = {
   radiateur: 'Radiateur',
   climatiseur: 'Climatiseur',
   chauffeeau: 'Chauffe-eau',
+  plante: 'Plante',
+  tapis: 'Tapis',
+  miroir: 'Miroir',
+  portemanteau: 'Portemanteau',
+  cadre: 'Tableau',
+  horloge: 'Horloge',
+  vase: 'Vase',
+  rideau: 'Rideaux',
+  piano: 'Piano',
+  aquarium: 'Aquarium',
+  poele: 'Poêle',
+  portant: 'Portant',
+  transat: 'Transat',
+  parasol: 'Parasol',
+  barbecue: 'Barbecue',
 };
 
 /**

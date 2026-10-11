@@ -65,6 +65,12 @@ export function orienterLesSieges<O extends ObjectData>(
   return objects.map(o => {
     const cat = o.category ?? '';
     if (!SIEGE.test(cat)) return o;
+    /*
+      UN CANAPÉ D'ANGLE RÉUNI SAIT OÙ EST SON AVANT : du côté de sa
+      méridienne (voir `reunirLesCanapesDAngle`). Le retourner la mettrait
+      contre le mur.
+    */
+    if ((o as { attributes?: string[] }).attributes?.some(a => /^SofaAngle:/i.test(a))) return o;
     const t = o.transform;
     const p = { x: t[12], z: t[14] };
     const l = Math.hypot(t[8], t[10]) || 1;

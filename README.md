@@ -14285,6 +14285,79 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le canapé d'angle scanné reste un canapé d'angle ; un catalogue pour chacun, rangé par familles
+
+Relevés du patron : « le canapé d'angle scanné détecte un canapé standard +
+un fauteuil, vois si tu peux corriger cela » ; « complète le catalogue par
+des variétés de décorations, meubles, pour plaire à chacun ; peaufine
+l'aspect ameublement de l'app ».
+
+**Le canapé d'angle, réuni** (`geometry/canapeAngle.ts`). RoomPlan découpe
+souvent un L en deux boîtes : le grand côté (un canapé) et la méridienne (un
+« canapé » étroit, ou une « chaise » que le modèle 3D dessinait en
+fauteuil). Aucune étape ne les réunissait. À la fin du scan, la seconde pièce
+est lue dans le repère du canapé (avant = −z). Elle forme un L si elle est :
+- d'équerre (à 7° près) et de hauteur voisine ;
+- collée à l'un des bouts du canapé ;
+- en avancée devant lui.
+
+Si elle avance DERRIÈRE, c'est que RoomPlan a pris le canapé à l'envers (il
+hésite à 180° près sur les sièges) : on le retourne.
+
+Le canapé réuni garde l'identifiant, la couleur et l'orientation du grand
+côté. Sa caisse couvre les deux pièces. Il porte `SofaType:lShaped` et le
+côté de sa méridienne (`SofaAngle:droite|gauche`).
+
+Cela se fait avant d'écarter les meubles qui se chevauchent (qui
+repousserait la méridienne). Le redressement des sièges laisse ensuite un L
+réuni tel quel : le retourner mettrait la méridienne contre le mur.
+
+Ne se réunissent pas :
+- un fauteuil à un mètre, ou de biais ;
+- un pouf au milieu, devant le canapé ;
+- une table basse ;
+- deux canapés alignés.
+
+**La méridienne à gauche.** Le modèle 3D ne savait la poser qu'à droite. Il
+se fabrique maintenant dans un miroir quand elle est à gauche.
+`Atelier.avec` remet l'ordre des triangles posés sous une transformation qui
+retourne l'espace (déterminant négatif) : sans cela, chaque face aurait été
+vue de dos.
+
+**Vingt et un articles de plus** (`catalogue.ts`), chacun avec son modèle 3D
+(`modeles3d.ts`) :
+- une famille **Décoration** :
+  - tableau (une toile abstraite dans son cadre) et trio de cadres photo ;
+  - miroir rond et horloge murale (dix heures dix), deux disques fabriqués
+    couchés puis redressés contre le mur ;
+  - grand vase et sa gerbe de branches ;
+  - grande plante et plante suspendue (pot à cordes, feuillage qui retombe) ;
+  - rideaux plissés sur leur tringle ;
+- au **séjour** : piano droit (ses blanches et ses noires), aquarium sur son
+  meuble, poêle à bois (sa vitre et son feu) ;
+- à la **chambre** : lits superposés (barrière et échelle), portant à
+  vêtements, banc de bout de lit ;
+- à la **cuisine** : table haute ;
+- une famille **Balcon et jardin** : table et chaise de jardin, transat,
+  jardinière, parasol à huit pans, barbecue.
+
+Ce qui s'accroche au mur est posé à sa hauteur (`base`). Les nouvelles
+catégories se nomment en français (`frCategory`), et la plante, le tapis, le
+miroir et le portemanteau, qui affichaient leur nom brut, aussi. Chaque
+article passe les bancs communs du catalogue : son modèle tient dans sa
+caisse et la remplit, aucune face retournée, une vignette lisible. Les
+rideaux en ont révélé une : une boîte arrondie plus fine en hauteur
+qu'ailleurs retournait les triangles de ses coins. Les plis ont maintenant
+un rayon uniforme.
+
+**La feuille « Ajouter un meuble » se range par familles.** Sous la
+recherche, une rangée de puces (« Tout », Chambre, Cuisine, Séjour,
+Décoration… Balcon et jardin) mène droit à une famille. Le catalogue a
+dépassé les quatre-vingt-dix articles.
+
+Bancs : `canapedangle` (14), `catalogueenrichi` (7). Mis à jour :
+`glisserposer` (la première tuile n'est pas une puce de famille).
+
 ## Le coffre de volet lu dans le maillage ; une couleur par mur, la majoritaire ; le diagnostic d'un plan, envoyé au support
 
 Relevés du patron : « les coffrages de volets roulants, au-dessus des baies,

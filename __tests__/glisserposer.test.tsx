@@ -225,7 +225,9 @@ describe('la tuile du catalogue se prend en main', () => {
         (n: { props: Record<string, unknown> }) =>
           typeof n.props.onStartShouldSetResponder === 'function' &&
           typeof n.props.onResponderRelease === 'function' &&
-          n.props.accessibilityRole === 'button',
+          n.props.accessibilityRole === 'button' &&
+          // Les puces de famille, au-dessus de la grille, ne sont pas des tuiles.
+          !String(n.props.accessibilityLabel ?? '').startsWith('Famille '),
       )!;
 
   /*

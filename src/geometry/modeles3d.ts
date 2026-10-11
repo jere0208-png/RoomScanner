@@ -214,14 +214,34 @@ export class Atelier {
   private groupes = new Map<string, GroupeLocal>();
   private m: Affine = IDENTITE;
 
-  /** Fabrique sous une transformation (une pièce inclinée, tournée). */
+  /**
+   * Fabrique sous une transformation (une pièce inclinée, tournée).
+   *
+   * UN MIROIR RETOURNE LES FACES : les normales suivent la transformation,
+   * mais l'ordre des sommets de chaque triangle, lui, s'inverse — et une
+   * face dont l'ordre contredit la normale est une face qu'on ne voit pas.
+   * Sous une transformation qui retourne l'espace (déterminant négatif), on
+   * remet donc l'ordre des triangles posés pendant la fabrication.
+   */
   avec(t: Affine, faire: () => void) {
     const avant = this.m;
     this.m = composer(avant, t);
+    const miroir =
+      t[0] * (t[5] * t[10] - t[6] * t[9]) - t[1] * (t[4] * t[10] - t[6] * t[8]) + t[2] * (t[4] * t[9] - t[5] * t[8]) < 0;
+    const departs = miroir ? new Map([...this.groupes].map(([k, g]) => [k, g.i.length])) : null;
     try {
       faire();
     } finally {
       this.m = avant;
+      if (departs) {
+        for (const [k, g] of this.groupes) {
+          for (let j = departs.get(k) ?? 0; j + 2 < g.i.length; j += 3) {
+            const x = g.i[j + 1];
+            g.i[j + 1] = g.i[j + 2];
+            g.i[j + 2] = x;
+          }
+        }
+      }
     }
   }
 
@@ -873,6 +893,7 @@ export const marchesDEscalier = (H: number) => borne(Math.round(H / 0.18), 3, 20
   galbés, tête de lit capitonnée en lés, plaid au pied.
 */
 function lit(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  if (c.modele.startsWith('litsuperpose')) return litSuperpose(a, { W, D, H }, c);
   if (c.modele.startsWith('litbebe') || (W < 0.8 && D < 1.45)) return berceau(a, { W, D, H });
   const tete = H >= 0.7 ? borne(D * 0.045, 0.06, 0.09) : 0;
   const zT = D / 2 - tete;
@@ -985,6 +1006,16 @@ function berceau(a: Atelier, { W, D, H }: Gabarit) {
   En angle quand RoomPlan le dit — ou quand l'emprise ne laisse pas de doute.
 */
 function canape(a: Atelier, { W, D, H }: Gabarit, c: Commande, fauteuil = false) {
+  /*
+    LA MÉRIDIENNE À GAUCHE — un canapé d'angle réuni au scan dit de quel
+    côté elle avance (`SofaAngle`, voir `canapeAngle`). Le dessin la pose à
+    droite : on le fabrique dans un miroir.
+  */
+  if (attribut(c, 'SofaAngle') === 'gauche') {
+    const droit = { ...c, attributs: c.attributs.filter((x) => !/^sofaangle:/i.test(x)) };
+    a.avec([-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], () => canape(a, { W, D, H }, droit, fauteuil));
+    return;
+  }
   const type = attribut(c, 'SofaType');
   const unePlace = fauteuil || type === 'singleseat' || W < 1.15;
   const angle = !unePlace && (type === 'lshaped' || (type === undefined && D > 1.35 && W > 1.9));
@@ -2123,6 +2154,16 @@ function portemanteau(a: Atelier, { W, D, H }: Gabarit) {
 function miroir(a: Atelier, { W, D, H }: Gabarit, c?: Commande) {
   const ep = Math.min(D, 0.03);
   const z1 = D / 2;
+  if (c?.modele.startsWith('miroirrond')) {
+    // LE MIROIR ROND : un disque se tourne autour de la verticale ; on le
+    // fabrique couché, puis on le redresse contre le mur.
+    const R = Math.min(W, H) / 2;
+    a.avec(tourner('x', -Math.PI / 2, [0, H / 2, z1]), () => {
+      a.tour([[0, H / 2], [R, H / 2, true], [R, H / 2 + ep - 0.006, true], [0, H / 2 + ep - 0.006]], 0, z1, 'bois', c.teinte ?? TEINTES.chene, { seg: 48 });
+      a.tour([[0, H / 2 + ep - 0.006], [R - 0.03, H / 2 + ep - 0.006, true], [R - 0.03, H / 2 + ep - 0.002, true], [0, H / 2 + ep - 0.002]], 0, z1, 'miroir', TEINTES.chrome, { seg: 48 });
+    });
+    return;
+  }
   if (c?.modele.startsWith('miroirled')) {
     // LE MIROIR ÉCLAIRÉ : la glace bord à bord, un ruban de lumière tout
     // autour, en retrait du bord — celui des salles d'eau d'aujourd'hui.
@@ -2342,6 +2383,451 @@ function objet(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
 // ------------------------------------------------------------ l'aiguillage
 
 /** Le modèle d'un meuble, d'après sa catégorie et sa référence. */
+/*
+  POUR PLAIRE À CHACUN — relevé du patron : « complète le catalogue par des
+  variétés de décorations, meubles, pour plaire à chacun ». La décoration
+  (tableaux, miroir rond, horloge, vase, plantes, rideaux), quelques meubles
+  qui font une maison (piano, aquarium, poêle, lits superposés, portant) et
+  le dehors (transat, jardinière, parasol, barbecue). Mêmes règles que le
+  reste du mobilier : tout tient dans la caisse et la remplit, le mur est
+  derrière (+z), la pièce devant (−z).
+*/
+
+/** Des feuilles semées dans une zone, toutes gardées dans l'emprise. */
+function semerDesFeuilles(
+  a: Atelier,
+  c: Commande,
+  { W, D, H }: Gabarit,
+  n: number,
+  semer: () => { base: V3; dir: V3; long: number },
+  plancher = 0,
+) {
+  for (let k = 0; k < n; k++) {
+    const { base, dir, long } = semer();
+    const l = Math.hypot(dir[0], dir[1], dir[2]) || 1;
+    const bout: V3 = [base[0] + (dir[0] / l) * long, base[1] + (dir[1] / l) * long, base[2] + (dir[2] / l) * long];
+    const marge = long * 0.32 + 0.008;
+    if (
+      Math.max(Math.abs(bout[0]), Math.abs(base[0])) > W / 2 - marge ||
+      Math.max(Math.abs(bout[2]), Math.abs(base[2])) > D / 2 - marge ||
+      Math.max(bout[1], base[1]) > H - marge ||
+      Math.min(bout[1], base[1]) < plancher + marge
+    )
+      continue;
+    a.feuille(base, dir, [0, 1, 0], long, long * 0.42, TEINTES.vert[Math.floor(c.hasard() * 3)]);
+  }
+}
+
+/** Le tableau, et le trio de cadres photo : un cadre, un fond, ce qu'il montre. */
+function cadre(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const z0 = -D / 2;
+  const z1 = D / 2;
+  const zf = z0 + Math.min(0.01, D * 0.3);
+  const unCadre = (x0: number, x1: number, y0: number, y1: number, bord: string, fond: string) => {
+    const b = Math.min(0.035, (x1 - x0) * 0.08, (y1 - y0) * 0.08);
+    a.boite(x0, x1, y0, y0 + b, z0, z1, 'bois', bord, { r: 0.003, seg: 1 });
+    a.boite(x0, x1, y1 - b, y1, z0, z1, 'bois', bord, { r: 0.003, seg: 1 });
+    a.boite(x0, x0 + b, y0 + b, y1 - b, z0, z1, 'bois', bord, { r: 0.003, seg: 1 });
+    a.boite(x1 - b, x1, y0 + b, y1 - b, z0, z1, 'bois', bord, { r: 0.003, seg: 1 });
+    // Le fond, en retrait du cadre.
+    a.boite(x0 + b, x1 - b, y0 + b, y1 - b, zf, z1, 'papier', fond, { sans: ['arriere'] });
+    return { x0: x0 + b, x1: x1 - b, y0: y0 + b, y1: y1 - b };
+  };
+  // Ce qui se montre, posé sur le fond.
+  const aplat = (x0: number, x1: number, y0: number, y1: number, teinte: string) =>
+    a.boite(x0, x1, y0, y1, zf - 0.002, zf, 'papier', teinte, { sans: ['arriere'] });
+
+  if (c.modele.startsWith('cadresphotos')) {
+    const teintes = [TEINTES.bleu, TEINTES.argile, TEINTES.sauge];
+    const cadres: [number, number, number, number][] = [
+      [-W / 2, -W / 2 + W * 0.28, H * 0.18, H * 0.82],
+      [-W / 2 + W * 0.34, W / 2 - W * 0.34, 0, H],
+      [W / 2 - W * 0.28, W / 2, H * 0.08, H * 0.62],
+    ];
+    cadres.forEach(([x0, x1, y0, y1], k) => {
+      const f = unCadre(x0, x1, y0, y1, k === 1 ? TEINTES.noir : TEINTES.chene, TEINTES.linge);
+      const mx = (f.x1 - f.x0) * 0.16;
+      const my = (f.y1 - f.y0) * 0.16;
+      aplat(f.x0 + mx, f.x1 - mx, f.y0 + my, f.y1 - my, teintes[k]);
+    });
+    return;
+  }
+  // Le tableau : une toile abstraite, un horizon, deux masses de couleur.
+  const f = unCadre(-W / 2, W / 2, 0, H, c.teinte ?? TEINTES.chene, '#F1ECE2');
+  const lx = f.x1 - f.x0;
+  const ly = f.y1 - f.y0;
+  aplat(f.x0, f.x1, f.y0, f.y0 + ly * 0.38, TEINTES.sauge);
+  aplat(f.x0 + lx * 0.12, f.x0 + lx * 0.46, f.y0 + ly * 0.5, f.y0 + ly * 0.86, TEINTES.argile);
+  aplat(f.x0 + lx * 0.58, f.x0 + lx * 0.9, f.y0 + ly * 0.3, f.y0 + ly * 0.66, TEINTES.bleu);
+}
+
+/** L'horloge murale : un boîtier rond, son cadran, ses aiguilles. */
+function horloge(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const R = Math.min(W, H) / 2;
+  const ep = Math.min(D, 0.05);
+  const yc = H / 2;
+  const z1 = D / 2;
+  // Un disque se tourne autour de la verticale : on le fabrique couché, puis
+  // on le redresse contre le mur.
+  a.avec(tourner('x', -Math.PI / 2, [0, yc, z1]), () => {
+    a.tour([[0, yc], [R, yc, true], [R, yc + ep - 0.006, true], [0, yc + ep - 0.006]], 0, z1, 'noir', c.teinte ?? TEINTES.noir, { seg: 48 });
+    a.tour([[0, yc + ep - 0.006], [R - 0.014, yc + ep - 0.006, true], [R - 0.014, yc + ep - 0.004, true], [0, yc + ep - 0.004]], 0, z1, 'laque', TEINTES.linge, { seg: 48 });
+  });
+  const zh0 = z1 - ep + 0.0005;
+  const zh1 = z1 - ep + 0.003;
+  // Les douze heures.
+  for (let k = 0; k < 12; k++) {
+    a.avec(tourner('z', (k * Math.PI) / 6, [0, yc, 0]), () => {
+      a.boite(-0.003, 0.003, yc + R * 0.72, yc + R * (k % 3 === 0 ? 0.86 : 0.8), zh0, zh1, 'noir', TEINTES.noir);
+    });
+  }
+  // Dix heures dix : l'heure des vitrines.
+  a.avec(tourner('z', Math.PI / 3, [0, yc, 0]), () => {
+    a.boite(-0.006, 0.006, yc - R * 0.08, yc + R * 0.48, zh0, zh1, 'noir', TEINTES.noir, { r: 0.002 });
+  });
+  a.avec(tourner('z', -Math.PI / 3, [0, yc, 0]), () => {
+    a.boite(-0.004, 0.004, yc - R * 0.1, yc + R * 0.68, zh0, zh1, 'noir', TEINTES.noir, { r: 0.0015 });
+  });
+}
+
+/** Le grand vase et sa gerbe de branches. */
+function vase(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const R = Math.min(W, D) / 2;
+  const hv = H * 0.55;
+  a.tour(
+    [
+      [0, 0],
+      [R * 0.55, 0, true],
+      [R * 0.85, hv * 0.25],
+      [R, hv * 0.5],
+      [R * 0.75, hv * 0.78],
+      [R * 0.42, hv * 0.92],
+      [R * 0.48, hv, true],
+      [R * 0.36, hv, true],
+      [0, hv * 0.9],
+    ],
+    0,
+    0,
+    'ceramique',
+    c.teinte ?? TEINTES.argile,
+    { seg: 36, sx: W / (2 * R), sz: D / (2 * R) },
+  );
+  // Les branches s'ouvrent depuis le col ; la première monte jusqu'en haut.
+  const n = 7;
+  for (let k = 0; k < n; k++) {
+    const ang = (k / n) * Math.PI * 2 + c.hasard() * 0.5;
+    const ouvre = k === 0 ? 0.15 : 0.45 + c.hasard() * 0.5;
+    const haut = k === 0 ? H - 0.006 : H * (0.72 + c.hasard() * 0.24);
+    const bout: V3 = [Math.cos(ang) * (W / 2 - 0.012) * ouvre, haut, Math.sin(ang) * (D / 2 - 0.012) * ouvre];
+    a.tube([0, hv * 0.85, 0], bout, 0.004, 0.003, 'bois', TEINTES.noyer, { seg: 6 });
+  }
+  semerDesFeuilles(a, c, { W, D, H }, 60, () => {
+    const ang = c.hasard() * Math.PI * 2;
+    const r = (0.2 + c.hasard() * 0.75) * (Math.min(W, D) / 2);
+    const y = hv + (H - hv) * (0.35 + c.hasard() * 0.6);
+    return { base: [Math.cos(ang) * r, y, Math.sin(ang) * r], dir: [Math.cos(ang), 0.5, Math.sin(ang)], long: 0.045 + c.hasard() * 0.03 };
+  }, hv);
+}
+
+/** La plante suspendue : un pot à cordes, un feuillage qui retombe. */
+function planteSuspendue(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const r = Math.min(W, D) / 2;
+  const rp = r * 0.5;
+  const yp0 = H * 0.42;
+  const yp1 = H * 0.62;
+  a.tour(
+    [
+      [0, yp0],
+      [rp * 0.72, yp0, true],
+      [rp, yp1 - 0.01],
+      [rp + 0.006, yp1, true],
+      [0, yp1 - 0.02],
+    ],
+    0,
+    0,
+    'ceramique',
+    c.teinte ?? TEINTES.ceramique,
+    { seg: 28 },
+  );
+  // Trois cordes jusqu'au crochet.
+  for (let k = 0; k < 3; k++) {
+    const ang = (k * Math.PI * 2) / 3;
+    a.tube([Math.cos(ang) * rp * 0.95, yp1, Math.sin(ang) * rp * 0.95], [0, H - 0.03, 0], 0.003, 0.003, 'tissu', TEINTES.beige, { seg: 6 });
+  }
+  a.tube([0, H - 0.035, 0], [0, H - 0.004, 0], 0.006, 0.006, 'noir', TEINTES.noir, { seg: 8 });
+  // Les tiges qui retombent jusqu'en bas, puis les feuilles qui les habillent.
+  const tiges = 7;
+  for (let k = 0; k < tiges; k++) {
+    const ang = (k / tiges) * Math.PI * 2 + c.hasard() * 0.4;
+    const loin = r - 0.012;
+    const mi: V3 = [Math.cos(ang) * loin * 0.85, yp1 - (yp1 - 0.05) * 0.35, Math.sin(ang) * loin * 0.85];
+    const bas: V3 = [Math.cos(ang) * loin, k === 0 ? 0.03 : 0.03 + c.hasard() * 0.12, Math.sin(ang) * loin];
+    a.tube([Math.cos(ang) * rp, yp1 - 0.005, Math.sin(ang) * rp], mi, 0.003, 0.003, 'feuillage', TEINTES.vert[1], { seg: 5 });
+    a.tube(mi, bas, 0.003, 0.0025, 'feuillage', TEINTES.vert[1], { seg: 5 });
+  }
+  semerDesFeuilles(a, c, { W, D, H }, 140, () => {
+    const ang = c.hasard() * Math.PI * 2;
+    const t = Math.pow(c.hasard(), 0.8);
+    const y = yp1 + 0.04 - t * (yp1 - 0.02);
+    const rr = rp + (r - rp - 0.05) * Math.min(1, t * 1.4);
+    return {
+      base: [Math.cos(ang) * rr, y, Math.sin(ang) * rr],
+      dir: [Math.cos(ang) * 0.5, -0.8, Math.sin(ang) * 0.5],
+      long: 0.05 + c.hasard() * 0.04,
+    };
+  });
+}
+
+/** Les rideaux : une tringle, deux pans plissés qui tombent au sol. */
+function rideaux(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const tissu = c.teinte ?? TEINTES.lin2;
+  const zt = D / 2 - 0.03;
+  a.tube([-W / 2 + 0.012, H - 0.03, zt], [W / 2 - 0.012, H - 0.03, zt], 0.012, 0.012, 'noir', TEINTES.anthracite, { seg: 10 });
+  const pan = W * 0.32;
+  const plis = 7;
+  const lp = pan / plis;
+  for (const gauche of [true, false]) {
+    const xa = gauche ? -W / 2 : W / 2 - pan;
+    for (let k = 0; k < plis; k++) {
+      const x0 = xa + k * lp;
+      const avant = k % 2 === 0;
+      a.boite(x0, x0 + lp, 0.01, H - 0.05, avant ? -D / 2 : -D / 2 + 0.03, avant ? -D / 2 + 0.03 : -D / 2 + 0.06, 'tissu', tissu, {
+        // Un rayon UNIFORME : plus fin en hauteur, l'arrondi des coins retournait ses faces.
+        r: Math.min(0.01, lp * 0.3),
+        seg: 2,
+      });
+    }
+  }
+}
+
+/** Le piano droit : le coffre, les joues, le clavier, le pupitre. */
+function piano(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const corps = c.teinte ?? TEINTES.noir;
+  const zDos = D / 2 - Math.min(0.32, D * 0.55);
+  a.boite(-W / 2, W / 2, 0.06, H, zDos, D / 2, 'laque', corps, { r: 0.01, seg: 1 });
+  a.boite(-W / 2, W / 2, 0, 0.06, zDos - 0.03, D / 2, 'laque', corps, { r: 0.004 });
+  const yK = Math.min(0.72, H * 0.58);
+  const joue = 0.06;
+  a.boite(-W / 2, -W / 2 + joue, 0, yK + 0.06, -D / 2, zDos, 'laque', corps, { r: 0.008, seg: 1 });
+  a.boite(W / 2 - joue, W / 2, 0, yK + 0.06, -D / 2, zDos, 'laque', corps, { r: 0.008, seg: 1 });
+  const xg = -W / 2 + joue;
+  const xd = W / 2 - joue;
+  const zK = -D / 2 + 0.02;
+  // Le lit du clavier, les blanches, les noires.
+  a.boite(xg, xd, yK - 0.05, yK, zK, zDos, 'laque', corps, { r: 0.004 });
+  a.boite(xg + 0.01, xd - 0.01, yK, yK + 0.02, zK + 0.005, zK + 0.15, 'ceramique', TEINTES.linge, { r: 0.002 });
+  const pas = 0.0235;
+  const nb = Math.floor((xd - xg - 0.02) / pas);
+  for (let k = 0; k < nb - 1; k++) {
+    const note = k % 7;
+    // Pas de noire entre mi et fa, ni entre si et do.
+    if (note === 2 || note === 6) continue;
+    const x = xg + 0.01 + (k + 1) * pas;
+    a.boite(x - 0.006, x + 0.006, yK + 0.02, yK + 0.032, zK + 0.06, zK + 0.15, 'noir', TEINTES.ecran, { r: 0.002 });
+  }
+  // Le pupitre, contre le coffre.
+  a.boite(xg, xd, yK + 0.02, yK + 0.34, zDos - 0.05, zDos, 'laque', corps, { r: 0.006 });
+  // Les pédales.
+  for (const x of [-0.08, 0, 0.08]) {
+    a.boite(x - 0.015, x + 0.015, 0.03, 0.05, zDos - 0.13, zDos - 0.03, 'inox', TEINTES.inox, { r: 0.004 });
+  }
+}
+
+/** L'aquarium sur son meuble : le bac, l'eau, le sable, les plantes. */
+function aquarium(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const corps = c.teinte ?? TEINTES.noir;
+  const hM = Math.min(0.75, H * 0.58);
+  const yT = H - 0.06;
+  a.boite(-W / 2, W / 2, 0, hM, -D / 2, D / 2, 'laque', corps, { r: 0.006, seg: 1 });
+  a.boite(-W / 2 + 0.005, W / 2 - 0.005, hM, yT, -D / 2 + 0.005, D / 2 - 0.005, 'verre', TEINTES.verre);
+  a.boite(-W / 2 + 0.015, W / 2 - 0.015, hM + 0.004, hM + 0.035, -D / 2 + 0.015, D / 2 - 0.015, 'pierre', '#D9C9A3');
+  a.boite(-W / 2 + 0.012, W / 2 - 0.012, hM + 0.035, yT - 0.04, -D / 2 + 0.012, D / 2 - 0.012, 'verre', '#9FD0D8');
+  semerDesFeuilles(
+    a,
+    c,
+    { W, D, H: yT - 0.05 },
+    70,
+    () => {
+      const x = (c.hasard() - 0.5) * (W - 0.12);
+      const z = (c.hasard() - 0.2) * (D - 0.1) * 0.5;
+      return { base: [x, hM + 0.04 + c.hasard() * 0.12, z], dir: [(c.hasard() - 0.5) * 0.4, 1, (c.hasard() - 0.5) * 0.3], long: 0.06 + c.hasard() * 0.08 };
+    },
+    hM + 0.03,
+  );
+  a.boite(-W / 2, W / 2, yT, H, -D / 2, D / 2, 'laque', corps, { r: 0.006 });
+}
+
+/** Le poêle à bois : le corps de fonte, la vitre et son feu, le conduit. */
+function poele(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const fonte = c.teinte ?? TEINTES.anthracite;
+  const hC = Math.min(0.78, H * 0.68);
+  const zF = -D / 2 + 0.008;
+  a.boite(-W / 2 + 0.03, W / 2 - 0.03, 0, 0.08, zF + 0.03, D / 2 - 0.03, 'noir', TEINTES.noir);
+  a.boite(-W / 2, W / 2, 0.08, hC, zF, D / 2, 'noir', fonte, { r: 0.025, seg: 2 });
+  // La porte : un cadre, la vitre, et le feu derrière.
+  const wx = (W / 2) * 0.62;
+  const y0 = 0.08 + (hC - 0.08) * 0.28;
+  const y1 = hC - 0.07;
+  const b = 0.025;
+  a.boite(-wx, wx, y0, y0 + b, -D / 2, zF, 'noir', TEINTES.noir);
+  a.boite(-wx, wx, y1 - b, y1, -D / 2, zF, 'noir', TEINTES.noir);
+  a.boite(-wx, -wx + b, y0 + b, y1 - b, -D / 2, zF, 'noir', TEINTES.noir);
+  a.boite(wx - b, wx, y0 + b, y1 - b, -D / 2, zF, 'noir', TEINTES.noir);
+  a.boite(-wx + b, wx - b, y0 + b, y1 - b, zF - 0.004, zF - 0.002, 'lumiere', '#FFB061');
+  a.boite(-wx + b, wx - b, y0 + b, y1 - b, -D / 2 + 0.001, -D / 2 + 0.003, 'verre', TEINTES.hublot);
+  a.tube([0, hC - 0.01, 0.04], [0, H - 0.004, 0.04], 0.055, 0.055, 'noir', fonte, { seg: 20 });
+}
+
+/** Les lits superposés : quatre montants, deux couchages, la barrière, l'échelle. */
+function litSuperpose(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const bois = TEINTES.chene;
+  const p = 0.05;
+  for (const gauche of [true, false]) {
+    for (const tete of [true, false]) {
+      a.boite(gauche ? -W / 2 : W / 2 - p, gauche ? -W / 2 + p : W / 2, 0, H, tete ? D / 2 - p : -D / 2, tete ? D / 2 : -D / 2 + p, 'bois', bois, {
+        r: 0.008,
+        seg: 1,
+      });
+    }
+  }
+  const yH = Math.min(1.12, H * 0.68);
+  for (const y of [0.18, yH]) {
+    a.boite(-W / 2 + p, W / 2 - p, y, y + 0.1, -D / 2 + p, D / 2 - p, 'bois', bois, { r: 0.006, seg: 1 });
+    a.boite(-W / 2 + p + 0.01, W / 2 - p - 0.01, y + 0.1, y + 0.24, -D / 2 + p + 0.01, D / 2 - p - 0.01, 'linge', TEINTES.linge, { r: 0.04, seg: 2 });
+    a.boite(-W / 2 + p + 0.005, W / 2 - p - 0.005, y + 0.24, y + 0.27, -D / 2 + p + 0.005, D / 2 - p - 0.45, 'tissu', c.teinte ?? TEINTES.sauge, {
+      r: [0.02, 0.012, 0.02],
+      seg: 2,
+    });
+    a.boite(-W / 2 + p + 0.08, W / 2 - p - 0.08, y + 0.24, y + 0.33, D / 2 - p - 0.38, D / 2 - p - 0.06, 'linge', TEINTES.linge, {
+      r: [0.05, 0.04, 0.05],
+      seg: 2,
+    });
+  }
+  // La barrière du haut, côté pièce, sur la longueur que l'échelle laisse.
+  const zE0 = -D / 2 + p + 0.06;
+  const zE1 = zE0 + 0.4;
+  a.boite(-W / 2, -W / 2 + 0.03, yH + 0.3, yH + 0.4, zE1 + 0.04, D / 2 - p, 'bois', bois, { r: 0.006 });
+  a.boite(-W / 2, -W / 2 + 0.03, yH + 0.3, Math.min(H, yH + 0.4), -D / 2 + p, zE0 - 0.02, 'bois', bois, { r: 0.006 });
+  // L'échelle : deux montants, des barreaux.
+  for (const z of [zE0, zE1]) a.boite(-W / 2, -W / 2 + 0.03, 0, yH + 0.4, z - 0.02, z + 0.02, 'bois', bois, { r: 0.006 });
+  for (let y = 0.3; y < yH + 0.2; y += 0.26) {
+    a.tube([-W / 2 + 0.015, y, zE0 + 0.02], [-W / 2 + 0.015, y, zE1 - 0.02], 0.014, 0.014, 'bois', bois, { seg: 8, bouts: 'aucun' });
+  }
+}
+
+/** Le portant : deux pieds, une barre, des vêtements sur leurs cintres. */
+function portant(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const metal = TEINTES.noir;
+  const xm = W / 2 - 0.02;
+  for (const s of [-1, 1]) {
+    a.boite(s * xm - 0.02, s * xm + 0.02, 0, 0.03, -D / 2, D / 2, 'noir', metal, { r: 0.008 });
+    a.tube([s * xm, 0.03, 0], [s * xm, H - 0.012, 0], 0.012, 0.012, 'noir', metal, { seg: 10 });
+  }
+  a.tube([-xm, H - 0.03, 0], [xm, H - 0.03, 0], 0.012, 0.012, 'noir', metal, { seg: 10 });
+  const teintes = [TEINTES.linge, TEINTES.bleu, TEINTES.argile, TEINTES.sauge, TEINTES.anthracite, TEINTES.beige, '#7C8C6E', TEINTES.lin];
+  const n = Math.max(4, Math.floor((2 * xm - 0.12) / 0.11));
+  for (let k = 0; k < n; k++) {
+    const x = -xm + 0.08 + (k * (2 * xm - 0.16)) / (n - 1);
+    const y1 = H - 0.09;
+    const y0 = y1 - H * (0.38 + c.hasard() * 0.22);
+    a.boite(x - 0.02, x + 0.02, y0, y1, -D / 2 + 0.03, D / 2 - 0.03, 'tissu', teintes[k % teintes.length], { r: [0.015, 0.03, 0.06], seg: 2 });
+    // Le cintre : deux bras, du crochet aux épaules.
+    a.tube([x, y1 + 0.002, -D / 2 + 0.07], [x, H - 0.045, 0], 0.003, 0.003, 'bois', TEINTES.chene, { seg: 5 });
+    a.tube([x, y1 + 0.002, D / 2 - 0.07], [x, H - 0.045, 0], 0.003, 0.003, 'bois', TEINTES.chene, { seg: 5 });
+  }
+}
+
+/** Le transat : un piétement de bois, une toile tendue qui remonte en dossier. */
+function transat(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const toile = c.teinte ?? TEINTES.bleu;
+  const bois = TEINTES.chene;
+  const yS = Math.min(0.33, H * 0.38);
+  const zPli = -D / 2 + D * 0.42;
+  // L'assise, à plat, jusqu'au pli.
+  a.boite(-W / 2 + 0.03, W / 2 - 0.03, yS - 0.03, yS, -D / 2 + 0.02, zPli, 'tissu', toile, { r: 0.008 });
+  // Le dossier : la même toile, relevée jusqu'en haut.
+  const dy = H - yS - 0.03;
+  const dz = D / 2 - 0.08 - zPli;
+  const L = Math.hypot(dy, dz);
+  const angle = Math.atan2(dy, dz);
+  a.avec(tourner('x', -angle, [0, yS, zPli]), () => {
+    a.boite(-W / 2 + 0.03, W / 2 - 0.03, yS - 0.03, yS, zPli, zPli + L, 'tissu', toile, { r: 0.008 });
+  });
+  // Les longerons de bois, de chaque côté, sous la toile.
+  for (const s of [-1, 1]) {
+    const x = s * (W / 2 - 0.016);
+    a.tube([x, yS - 0.015, -D / 2 + 0.016], [x, yS - 0.015, zPli], 0.014, 0.014, 'bois', bois, { seg: 8 });
+    a.tube([x, yS - 0.015, zPli], [x, H - 0.02, D / 2 - 0.09], 0.014, 0.014, 'bois', bois, { seg: 8 });
+    // Les pieds : devant, et la béquille du dossier.
+    a.tube([x, 0.0, -D / 2 + 0.05], [x, yS - 0.03, -D / 2 + 0.05], 0.014, 0.014, 'bois', bois, { seg: 8 });
+    // Incliné, son bout s'enfonce d'un rayon : on le pose un centimètre plus haut.
+    a.tube([x, 0.01, D / 2 - 0.016], [x, (yS + H) * 0.5, (zPli + D / 2) * 0.5], 0.014, 0.014, 'bois', bois, { seg: 8 });
+  }
+}
+
+/** La jardinière : un bac de bois, sa terre, des touffes qui montent. */
+function jardiniere(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const hB = Math.min(0.35, H * 0.45);
+  a.boite(-W / 2, W / 2, 0, hB, -D / 2, D / 2, 'bois', c.teinte ?? TEINTES.chene, { r: 0.01, seg: 1 });
+  a.boite(-W / 2 + 0.025, W / 2 - 0.025, hB - 0.03, hB + 0.002, -D / 2 + 0.025, D / 2 - 0.025, 'terre', TEINTES.terreau);
+  const touffes = Math.max(3, Math.round(W / 0.22));
+  for (let t = 0; t < touffes; t++) {
+    const xc = -W / 2 + ((t + 0.5) * W) / touffes;
+    const tiges: V3[] = [];
+    for (let k = 0; k < 3; k++) {
+      const haut = t === 0 && k === 0 ? H - 0.012 : hB + (H - hB) * (0.55 + c.hasard() * 0.4);
+      const bout: V3 = [xc + (c.hasard() - 0.5) * 0.08, haut, (c.hasard() - 0.5) * (D - 0.12) * 0.6];
+      a.tube([xc, hB - 0.01, 0], bout, 0.004, 0.003, 'bois', '#5F7F45', { seg: 5 });
+      tiges.push(bout);
+    }
+    semerDesFeuilles(
+      a,
+      c,
+      { W, D, H },
+      34,
+      () => {
+        const tg = tiges[Math.floor(c.hasard() * tiges.length)];
+        const f = 0.3 + c.hasard() * 0.7;
+        const base: V3 = [xc + (tg[0] - xc) * f, hB + (tg[1] - hB) * f, tg[2] * f];
+        return { base, dir: [(c.hasard() - 0.5) * 1.2, 0.6, (c.hasard() - 0.5) * 1.2], long: 0.06 + c.hasard() * 0.06 };
+      },
+      hB,
+    );
+  }
+}
+
+/** Le parasol : un pied lesté, un mât, une toile à huit pans. */
+function parasol(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const R = Math.min(W, D) / 2 - 0.004;
+  a.tour([[0, 0], [0.24, 0, true], [0.24, 0.05], [0.06, 0.08], [0, 0.085]], 0, 0, 'noir', TEINTES.anthracite, { seg: 28 });
+  a.tube([0, 0.08, 0], [0, H - 0.06, 0], 0.018, 0.018, 'bois', TEINTES.chene, { seg: 10 });
+  a.tour([[0, H - 0.34], [R, H - 0.46, true], [R, H - 0.44, true], [0, H - 0.05]], 0, 0, 'tissu', c.teinte ?? TEINTES.linge, {
+    seg: 8,
+    sx: W / (2 * R + 0.008),
+    sz: D / (2 * R + 0.008),
+  });
+  a.tour([[0, H - 0.06], [0.025, H - 0.05], [0.02, H - 0.006], [0, H - 0.002]], 0, 0, 'bois', TEINTES.chene, { seg: 12 });
+}
+
+/** Le barbecue : la cuve, le couvercle bombé, ses pieds et sa tablette. */
+function barbecue(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  const fonte = c.teinte ?? TEINTES.noir;
+  const xb0 = -W / 2 + Math.min(0.24, W * 0.28);
+  for (const x of [xb0 + 0.03, W / 2 - 0.03]) {
+    for (const z of [-D / 2 + 0.03, D / 2 - 0.03]) {
+      a.tube([x, 0, z], [x, 0.62, z], 0.015, 0.015, 'noir', TEINTES.anthracite, { seg: 8 });
+    }
+  }
+  a.boite(xb0 + 0.01, W / 2 - 0.01, 0.22, 0.24, -D / 2 + 0.02, D / 2 - 0.02, 'bois', TEINTES.chene);
+  a.boite(xb0, W / 2, 0.6, 0.82, -D / 2 + 0.02, D / 2, 'noir', fonte, { r: 0.03, seg: 2 });
+  a.boite(xb0, W / 2, 0.82, H, -D / 2 + 0.02, D / 2, 'noir', fonte, { r: [0.05, 0.08, 0.1], seg: 3 });
+  // La poignée du couvercle, devant.
+  const xm = (xb0 + W / 2) / 2;
+  a.boite(xm - 0.12, xm + 0.12, 0.9, 0.925, -D / 2, -D / 2 + 0.02, 'inox', TEINTES.inox, { r: 0.008 });
+  // La tablette latérale.
+  a.boite(-W / 2, xb0, 0.76, 0.79, -D / 2 + 0.04, D / 2 - 0.04, 'bois', TEINTES.chene, { r: 0.004 });
+}
+
 export function fabriquer(categorie: string, g: Gabarit, c: Omit<Commande, 'categorie'>): ModeleLocal {
   const a = new Atelier();
   const cat = (categorie || '').toLowerCase();
@@ -2362,7 +2848,21 @@ export function fabriquer(categorie: string, g: Gabarit, c: Omit<Commande, 'cate
   else if (m.startsWith('clim') || cat.includes('climatiseur')) climatiseur(a, gab, cmd);
   else if (m.startsWith('ecran')) ecranPc(a, gab);
   else if (m.startsWith('cumulus') || cat.includes('chauffeeau')) chauffeEau(a, gab, cmd);
+  else if (m.startsWith('plantesuspendue')) planteSuspendue(a, gab, cmd);
+  else if (m.startsWith('jardiniere')) jardiniere(a, gab, cmd);
   else if (m.startsWith('plante') || cat.includes('plant')) plante(a, gab, cmd);
+  // La décoration et le dehors (voir « Pour plaire à chacun »).
+  else if (cat.includes('cadre')) cadre(a, gab, cmd);
+  else if (cat.includes('horloge')) horloge(a, gab, cmd);
+  else if (cat.includes('vase')) vase(a, gab, cmd);
+  else if (cat.includes('rideau')) rideaux(a, gab, cmd);
+  else if (cat.includes('piano')) piano(a, gab, cmd);
+  else if (cat.includes('aquarium')) aquarium(a, gab, cmd);
+  else if (cat.includes('poele')) poele(a, gab, cmd);
+  else if (cat.includes('portant')) portant(a, gab, cmd);
+  else if (cat.includes('transat')) transat(a, gab, cmd);
+  else if (cat.includes('parasol')) parasol(a, gab, cmd);
+  else if (cat.includes('barbecue')) barbecue(a, gab, cmd);
   else if (cat.includes('bed')) lit(a, gab, cmd);
   else if (cat.includes('sofa') || cat.includes('couch')) canape(a, gab, cmd);
   else if (cat.includes('chair') || cat.includes('stool')) chaise(a, gab, cmd);

@@ -37,8 +37,10 @@ import {
   PixelRatio,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import Svg, { Line as SvgLine, Rect as SvgRect } from 'react-native-svg';
@@ -388,6 +390,13 @@ export function FurnitureSheet({
     null,
   );
   /*
+    UNE FAMILLE À LA FOIS, SI L'ON VEUT — relevé du patron : « peaufine
+    l'aspect ameublement ». Le catalogue a dépassé les quatre-vingt-dix
+    articles ; une rangée de puces mène droit à la décoration ou au jardin
+    sans faire défiler les cuisines. « Tout » rend la liste entière.
+  */
+  const [familleChoisie, setFamilleChoisie] = React.useState<string | null>(null);
+  /*
     LE CATALOGUE S'EFFACE, IL NE SE FERME PAS.
 
     Fermer la fenêtre romprait le toucher en cours — et le meuble tomberait
@@ -408,6 +417,7 @@ export function FurnitureSheet({
     if (!visible) {
       setEnMain(null);
       setDoigt(null);
+      setFamilleChoisie(null);
     }
   }, [visible]);
 
@@ -455,9 +465,40 @@ export function FurnitureSheet({
               clearButtonMode="while-editing"
             />
             <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              style={familles.rangee}
+              contentContainerStyle={familles.contenu}>
+              {[null, ...CATALOGUE.map((f) => f.name)].map((nom) => {
+                const choisie = familleChoisie === nom;
+                return (
+                  <TouchableOpacity
+                    key={nom ?? 'tout'}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Famille ${nom ?? 'Tout'}`}
+                    accessibilityState={{ selected: choisie }}
+                    activeOpacity={0.7}
+                    style={[
+                      familles.puce,
+                      { backgroundColor: choisie ? teinte.blue : teinte.surfaceSunken },
+                    ]}
+                    onPress={() => {
+                      haptic('leger');
+                      setFamilleChoisie(nom);
+                    }}>
+                    <Text style={[familles.texte, choisie ? familles.texteChoisi : { color: teinte.ink }]}>
+                      {nom ?? 'Tout'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <ScrollView
               style={styles.catScroll}
               keyboardShouldPersistTaps="handled">
               {CATALOGUE.map((famille) => {
+                if (familleChoisie && famille.name !== familleChoisie) return null;
                 const trouves = famille.items.filter((i) => matchItem(i, quete));
                 if (trouves.length === 0) return null;
                 return (
@@ -505,3 +546,12 @@ export function FurnitureSheet({
     </Modal>
   );
 }
+
+/** La rangée des familles, sous la recherche. */
+const familles = StyleSheet.create({
+  rangee: { flexGrow: 0, marginTop: 8, marginBottom: 2 },
+  contenu: { gap: 6, paddingRight: 8 },
+  puce: { paddingHorizontal: 12, height: 30, borderRadius: 15, justifyContent: 'center' },
+  texte: { fontSize: 13, fontWeight: '600' },
+  texteChoisi: { color: '#FFFFFF' },
+});

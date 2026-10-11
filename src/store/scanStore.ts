@@ -85,6 +85,7 @@ import {
   type WallSeg,
 } from '../geometry/floorplan';
 import { avecCoffresDuLidar } from '../geometry/coffreLidar';
+import { reunirLesCanapesDAngle } from '../geometry/canapeAngle';
 import {
   catalogTransform,
   type CatalogItem,
@@ -5375,7 +5376,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       // Les sièges regardent la pièce, pas le mur : voir `orienterLesSieges`.
       const objects: ObjectData[] = orienterLesSieges(
         separerLeMobilier(
-          entrants.map((o) => ({
+          // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
+          reunirLesCanapesDAngle(entrants).map((o) => ({
             ...o,
             roomId: `room-${roomIndexAt(
               { x: o.transform[12], z: o.transform[14] },
@@ -5767,7 +5769,8 @@ export const useScanStore = create<ScanState>((set, get) => {
 
       const objects: ObjectData[] = orienterLesSieges(
         separerLeMobilier(
-          entrants.map((o) => {
+          // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
+          reunirLesCanapesDAngle(entrants).map((o) => {
             const t = [...o.transform];
             t[12] += dx;
             t[14] += dz;
@@ -5877,7 +5880,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       // Les sièges regardent la pièce, pas le mur : voir `orienterLesSieges`.
       const objects: ObjectData[] = orienterLesSieges(
         separerLeMobilier(
-          incomingObjects.map((o) => ({
+          // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
+          reunirLesCanapesDAngle(incomingObjects).map((o) => ({
             ...o,
             roomId: `room-${roomIndexAt(
               { x: o.transform[12], z: o.transform[14] },

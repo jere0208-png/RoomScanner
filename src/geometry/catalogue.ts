@@ -72,6 +72,9 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'dressing', label: 'Dressing', category: 'storage', w: 1.8, d: 0.6, h: 2.2 },
       { key: 'coiffeuse', label: 'Coiffeuse', category: 'table', w: 1.0, d: 0.45, h: 1.4 },
       { key: 'lampeChevet', label: 'Lampe de chevet', category: 'lampe', w: 0.26, d: 0.26, h: 0.45, base: 0.55 },
+      { key: 'litSuperpose', label: 'Lits superposés', category: 'bed', w: 0.98, d: 2.0, h: 1.6 },
+      { key: 'portant', label: 'Portant à vêtements', category: 'portant', w: 1.2, d: 0.45, h: 1.6 },
+      { key: 'bancLit', label: 'Banc de bout de lit', category: 'chair', w: 1.2, d: 0.4, h: 0.45 },
     ],
   },
   {
@@ -92,6 +95,7 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'caveVin', label: 'Cave à vin', category: 'refrigerator', w: 0.6, d: 0.6, h: 0.85 },
       { key: 'colonneFour', label: 'Colonne four', category: 'oven', w: 0.6, d: 0.6, h: 2.1 },
       { key: 'tabouret', label: 'Tabouret de bar', category: 'chair', w: 0.4, d: 0.4, h: 0.75 },
+      { key: 'tableHaute', label: 'Table haute', category: 'table', w: 1.2, d: 0.6, h: 1.05 },
     ],
   },
   {
@@ -117,6 +121,29 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'casiers4', label: 'Étagère à casiers 4×4', category: 'storage', w: 1.47, d: 0.39, h: 1.47 },
       { key: 'tapis', label: 'Tapis', category: 'tapis', w: 2.0, d: 1.4, h: 0.02 },
       { key: 'plante', label: 'Plante verte', category: 'plante', w: 0.45, d: 0.45, h: 1.4 },
+      { key: 'piano', label: 'Piano droit', category: 'piano', w: 1.5, d: 0.6, h: 1.25 },
+      { key: 'aquarium', label: 'Aquarium', category: 'aquarium', w: 1.0, d: 0.4, h: 1.3 },
+      { key: 'poeleBois', label: 'Poêle à bois', category: 'poele', w: 0.5, d: 0.45, h: 1.1 },
+    ],
+  },
+  /*
+    LA DÉCORATION — relevé du patron : « complète le catalogue par des
+    variétés de décorations, meubles, pour plaire à chacun ». Ce qui fait
+    qu'une pièce est habitée : un tableau, des cadres, un miroir rond, une
+    horloge, un vase, des plantes, des rideaux. Ce qui s'accroche au mur
+    est posé à sa hauteur (`base`).
+  */
+  {
+    name: 'Décoration',
+    items: [
+      { key: 'tableauMural', label: 'Tableau', category: 'cadre', w: 0.8, d: 0.03, h: 0.6, base: 1.25 },
+      { key: 'cadresPhotos', label: 'Cadres photo', category: 'cadre', w: 1.0, d: 0.03, h: 0.42, base: 1.4 },
+      { key: 'miroirRond', label: 'Miroir rond', category: 'miroir', w: 0.7, d: 0.03, h: 0.7, base: 1.2 },
+      { key: 'horloge', label: 'Horloge murale', category: 'horloge', w: 0.4, d: 0.05, h: 0.4, base: 1.75 },
+      { key: 'grandVase', label: 'Grand vase', category: 'vase', w: 0.3, d: 0.3, h: 0.9 },
+      { key: 'planteHaute', label: 'Grande plante', category: 'plante', w: 0.7, d: 0.7, h: 1.9 },
+      { key: 'planteSuspendue', label: 'Plante suspendue', category: 'plante', w: 0.4, d: 0.4, h: 0.8, base: 1.4 },
+      { key: 'rideaux', label: 'Rideaux', category: 'rideau', w: 1.4, d: 0.12, h: 2.4 },
     ],
   },
   {
@@ -168,6 +195,18 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'radiateur', label: 'Radiateur', category: 'radiateur', w: 0.8, d: 0.1, h: 0.6, base: 0.15 },
       { key: 'clim', label: 'Climatiseur', category: 'climatiseur', w: 0.8, d: 0.22, h: 0.3, base: 2.0 },
       { key: 'cumulus', label: 'Chauffe-eau', category: 'chauffeEau', w: 0.56, d: 0.56, h: 1.4, base: 0.6 },
+    ],
+  },
+  /* LE DEHORS — le balcon, la terrasse, le jardin : on y vit aussi. */
+  {
+    name: 'Balcon et jardin',
+    items: [
+      { key: 'tableJardin', label: 'Table de jardin', category: 'table', w: 1.4, d: 0.8, h: 0.74 },
+      { key: 'chaiseJardin', label: 'Chaise de jardin', category: 'chair', w: 0.55, d: 0.55, h: 0.88 },
+      { key: 'transat', label: 'Transat', category: 'transat', w: 0.62, d: 1.5, h: 0.9 },
+      { key: 'jardiniere', label: 'Jardinière', category: 'plante', w: 1.0, d: 0.35, h: 0.75 },
+      { key: 'parasol', label: 'Parasol', category: 'parasol', w: 2.0, d: 2.0, h: 2.3 },
+      { key: 'barbecue', label: 'Barbecue', category: 'barbecue', w: 0.9, d: 0.55, h: 1.0 },
     ],
   },
 ];
