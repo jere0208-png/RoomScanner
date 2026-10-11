@@ -46,7 +46,7 @@ import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { roomParts, segLength } from '../geometry/floorplan';
 import { reconstruirePlan, type PlanLu } from '../geometry/lecturePlan';
-import { importerUnPlan, scannerUnPlan, type PageDePlan } from '../native/lecturePlan';
+import { importerUnPlan, ouvrirUnFichier, pageDuPdf, scannerUnPlan, type PageDePlan } from '../native/lecturePlan';
 import { envoyerLePlan, type ReponseDeLecture } from '../net/lecturePlan';
 import { useAccountStore } from '../store/accountStore';
 import { useScanStore } from '../store/scanStore';
@@ -68,9 +68,35 @@ const ETAPES = ['Page redressée et textes lus', 'Lecture du plan par l’IA', '
 
 type Etat =
   | { phase: 'invitation' }
+  | { phase: 'apercu'; page: PageDePlan; charge?: boolean }
   | { phase: 'lecture'; page: PageDePlan; etape: number }
   | { phase: 'lu'; page: PageDePlan; plan: PlanLu; essai: boolean }
-  | { phase: 'echec'; page?: PageDePlan; motif: Extract<ReponseDeLecture, { ok: false }>['motif'] | 'plan'; message: string };
+  | {
+      phase: 'echec';
+      page?: PageDePlan;
+      motif: Extract<ReponseDeLecture, { ok: false }>['motif'] | 'plan' | 'fichier';
+      message: string;
+    };
+
+/**
+ * LA PAGE QUI ATTEND LA RECONNEXION — relevé du patron : « ils me disent "Un
+ * compte, d'abord" et me proposent de me connecter, bouton qui ne fait rien.
+ * Je suis pourtant connecté. »
+ *
+ * Le compte était là, sans jeton : la connexion s'était faite pendant que le
+ * serveur ne répondait pas, ou son jeton ne valait plus. Seule une nouvelle
+ * connexion en rend un. « Me reconnecter » ouvre donc la connexion — et la
+ * page déjà prise attend ici : de retour, on la relance sans rescanner.
+ */
+let pageARelire: PageDePlan | null = null;
+
+/** Pourquoi le fichier ne s'ouvre pas, en clair. */
+const MOTS_DU_FICHIER: Record<'format' | 'protege' | 'vide', string> = {
+  format: 'Il faut un PDF ou une image (JPEG, PNG, HEIC). Enregistrez le plan dans l’un de ces formats, puis ouvrez-le.',
+  protege:
+    'Ce PDF est protégé par un mot de passe : ouvrez-le, enregistrez-en une copie sans protection, puis choisissez cette copie.',
+  vide: 'Ce PDF ne contient aucune page.',
+};
 
 export function LecturePlanScreen() {
   const c = useTheme();
@@ -84,7 +110,21 @@ export function LecturePlanScreen() {
   const pro = useAccountStore((st) => st.pro);
   const proVia = useAccountStore((st) => st.proVia);
   const quitterInvite = useAccountStore((st) => st.quitterInvite);
-  const [etat, setEtat] = useState<Etat>({ phase: 'invitation' });
+  const [etat, setEtat] = useState<Etat>(() => {
+    // De retour de la connexion : la page prise avant attend sa lecture.
+    const p = pageARelire;
+    pageARelire = null;
+    return p && compte && jeton ? { phase: 'apercu', page: p } : { phase: 'invitation' };
+  });
+  const deconnecter = useAccountStore((st) => st.deconnecter);
+  /** Ce que dit l'écran quand le serveur ne nous reconnaît pas. */
+  const sansIdentite = (): Etat => ({
+    phase: 'echec',
+    motif: 'compte',
+    message: compte
+      ? 'Le serveur d’EchoPlan n’a pas validé votre connexion : elle s’est faite hors ligne, ou elle a expiré. Reconnectez-vous une fois, et vous reviendrez ici.'
+      : 'Connectez-vous pour faire lire un plan : la lecture d’essai est attachée à votre compte.',
+  });
   /** La lecture en cours : celle qu'on quitte ne doit plus rien écrire. */
   const enCours = useRef(0);
   useEffect(() => () => void (enCours.current += 1), []);
@@ -115,10 +155,55 @@ export function LecturePlanScreen() {
     setEtat({ phase: 'lu', page, plan: plan.plan, essai: r.essai });
   };
 
-  const prendre = async (source: 'scanner' | 'photo') => {
+  const prendre = async (source: 'scanner' | 'photo' | 'fichier') => {
     haptic('leger');
+    /*
+      L'IDENTITÉ D'ABORD, LA FEUILLE ENSUITE : scanner un plan pour
+      apprendre après coup qu'il faut se (re)connecter, c'est un geste perdu.
+    */
+    if (!compte || !jeton) {
+      setEtat(sansIdentite());
+      return;
+    }
+    if (source === 'fichier') {
+      const r = await ouvrirUnFichier();
+      if (!r) return;
+      if ('erreur' in r) {
+        haptic('alerte');
+        setEtat({ phase: 'echec', motif: 'fichier', message: MOTS_DU_FICHIER[r.erreur] });
+        return;
+      }
+      /*
+        UN PDF DE PLUSIEURS PAGES SE MONTRE AVANT DE PARTIR : une lecture
+        coûte, et la page de garde d'un dossier n'est pas un plan. Le natif
+        a retenu la page la plus cotée ; on en change d'un geste.
+      */
+      if ((r.pages ?? 1) > 1) {
+        setEtat({ phase: 'apercu', page: r });
+        return;
+      }
+      await lire(r);
+      return;
+    }
     const page = source === 'scanner' ? await scannerUnPlan() : await importerUnPlan();
     if (page) await lire(page);
+  };
+
+  const changerDePage = async (n: number) => {
+    if (etat.phase !== 'apercu') return;
+    const avant = etat.page;
+    setEtat({ phase: 'apercu', page: avant, charge: true });
+    const p = await pageDuPdf(n);
+    setEtat({ phase: 'apercu', page: p ?? avant });
+  };
+
+  const seReconnecter = (page?: PageDePlan) => {
+    pageARelire = page ?? null;
+    haptic('leger');
+    // Plus de compte à l'écran : la porte de connexion s'ouvre, et l'app
+    // revient sur cette page une fois reconnecté (`screen` n'a pas bougé).
+    if (compte) deconnecter();
+    else quitterInvite();
   };
 
   const creer = (plan: PlanLu) => {
@@ -150,6 +235,18 @@ export function LecturePlanScreen() {
             pro={pro}
             onScanner={() => void prendre('scanner')}
             onPhoto={() => void prendre('photo')}
+            onFichier={() => void prendre('fichier')}
+          />
+        )}
+        {etat.phase === 'apercu' && (
+          <Apercu
+            s={s}
+            c={c}
+            page={etat.page}
+            charge={!!etat.charge}
+            onPage={(n) => void changerDePage(n)}
+            onLire={() => void lire(etat.page)}
+            onAutre={() => setEtat({ phase: 'invitation' })}
           />
         )}
         {etat.phase === 'lecture' && <Lecture s={s} c={c} page={etat.page} etape={etat.etape} />}
@@ -169,20 +266,35 @@ export function LecturePlanScreen() {
               {etat.motif === 'pro'
                 ? 'Réservé au Pro'
                 : etat.motif === 'compte'
-                  ? 'Un compte, d’abord'
+                  ? compte
+                    ? 'Reconnectez-vous'
+                    : 'Un compte, d’abord'
                   : etat.motif === 'plan'
                     ? 'Ce plan ne se lit pas'
-                    : 'La lecture n’a pas abouti'}
+                    : etat.motif === 'fichier'
+                      ? 'Ce fichier ne s’ouvre pas'
+                      : 'La lecture n’a pas abouti'}
             </Text>
             <Text style={s.echecTexte}>{etat.message}</Text>
             {etat.motif === 'pro' && (
               <Bouton s={s} principal libelle="Passer au Pro" onPress={() => demanderLesTarifs()} />
             )}
-            {etat.motif === 'compte' && <Bouton s={s} principal libelle="Me connecter" onPress={() => quitterInvite()} />}
+            {etat.motif === 'compte' && (
+              <Bouton
+                s={s}
+                principal
+                libelle={compte ? 'Me reconnecter' : 'Me connecter'}
+                onPress={() => seReconnecter(etat.page)}
+              />
+            )}
             {(etat.motif === 'reseau' || etat.motif === 'refus') && etat.page && (
               <Bouton s={s} principal libelle="Réessayer" onPress={() => void lire(etat.page!)} />
             )}
-            <Bouton s={s} libelle="Reprendre une photo" onPress={() => setEtat({ phase: 'invitation' })} />
+            <Bouton
+              s={s}
+              libelle={etat.motif === 'fichier' ? 'Choisir un autre fichier' : 'Reprendre une photo'}
+              onPress={() => setEtat({ phase: 'invitation' })}
+            />
           </View>
         )}
       </ScrollView>
@@ -198,12 +310,14 @@ function Invitation({
   pro,
   onScanner,
   onPhoto,
+  onFichier,
 }: {
   s: ReturnType<typeof themed>;
   c: Palette;
   pro: boolean;
   onScanner: () => void;
   onPhoto: () => void;
+  onFichier: () => void;
 }) {
   return (
     <>
@@ -211,8 +325,9 @@ function Invitation({
         <FeuilleDessinee c={c} />
         <Text style={s.herosTitre}>Votre plan papier, en plan 2D</Text>
         <Text style={s.herosTexte}>
-          Photographiez la feuille : ses murs, ses cotes, ses pièces et ses symboles électriques sont lus, mis à
-          l’échelle et redessinés. Vous vérifiez, puis vous modifiez comme n’importe quel plan.
+          Photographiez la feuille, ou ouvrez le plan reçu en PDF : ses murs, ses cotes, ses pièces et ses symboles
+          électriques sont lus, mis à l’échelle et redessinés. Vous vérifiez, puis vous modifiez comme n’importe quel
+          plan.
         </Text>
       </View>
       {CONSEILS.map((k) => (
@@ -230,11 +345,13 @@ function Invitation({
       ))}
       <Bouton s={s} principal libelle="Scanner le plan" onPress={onScanner} />
       <Bouton s={s} libelle="Importer une photo" onPress={onPhoto} />
+      <Bouton s={s} libelle="Ouvrir un fichier" onPress={onFichier} />
+      <Text style={s.mention}>PDF ou image, depuis Fichiers, iCloud Drive ou une pièce jointe enregistrée.</Text>
       <Text style={s.mention}>
         {pro
           ? 'Compris dans votre abonnement Pro.'
           : 'Une lecture offerte pour essayer, puis réservée au Pro.'}{' '}
-        La photo est lue par une IA (Claude, d’Anthropic) : nous ne la gardons pas.
+        Le plan est lu par une IA (Claude, d’Anthropic) : nous ne le gardons pas.
       </Text>
     </>
   );
@@ -250,6 +367,63 @@ function FeuilleDessinee({ c }: { c: Palette }) {
       <Line x1={38} y1={24} x2={112} y2={24} stroke={c.inkFaint} strokeWidth={1} />
       <Path d={[coin(12, 6, 1, 1), coin(138, 6, -1, 1), coin(12, 112, 1, -1), coin(138, 112, -1, -1)].join(' ')} stroke={c.blue} strokeWidth={3} fill="none" strokeLinecap="round" />
     </Svg>
+  );
+}
+
+// ------------------------------------------------------------------ 1 bis. l'aperçu
+
+/**
+ * LA PAGE AVANT LA LECTURE — un PDF de plusieurs pages, ou la page qui
+ * attendait une reconnexion. On voit ce qui va partir, on change de page,
+ * et rien n'est envoyé avant « Lire ».
+ */
+function Apercu({
+  s,
+  c,
+  page,
+  charge,
+  onPage,
+  onLire,
+  onAutre,
+}: {
+  s: ReturnType<typeof themed>;
+  c: Palette;
+  page: PageDePlan;
+  charge: boolean;
+  onPage: (n: number) => void;
+  onLire: () => void;
+  onAutre: () => void;
+}) {
+  const { width } = useWindowDimensions();
+  const larg = Math.min(width - 44, 420);
+  const haut = Math.min(larg * (page.hauteur / Math.max(1, page.largeur)), 420);
+  const n = page.page ?? 1;
+  const total = page.pages ?? 1;
+  return (
+    <View testID="apercu-du-fichier">
+      <View style={[s.page, { width: larg, height: haut }]}>
+        <Image source={{ uri: `data:image/jpeg;base64,${page.base64}` }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+        {charge && (
+          <View style={[StyleSheet.absoluteFill, s.voile]}>
+            <ActivityIndicator color={c.blue} />
+          </View>
+        )}
+      </View>
+      {total > 1 && (
+        <>
+          <Text style={s.bilan}>
+            Page {n} sur {total}
+          </Text>
+          <Text style={s.mention}>Retenue : celle qui porte le plus de cotes. Changez-en si ce n’est pas le plan.</Text>
+          <View style={s.rangee}>
+            {n > 1 && <Bouton s={s} libelle="Page précédente" onPress={() => onPage(n - 1)} />}
+            {n < total && <Bouton s={s} libelle="Page suivante" onPress={() => onPage(n + 1)} />}
+          </View>
+        </>
+      )}
+      <Bouton s={s} principal libelle={total > 1 ? 'Lire cette page' : 'Lire ce plan'} onPress={onLire} />
+      <Bouton s={s} libelle="Choisir un autre plan" onPress={onAutre} />
+    </View>
   );
 }
 
@@ -584,6 +758,8 @@ const themed = (c: Palette) =>
     },
     boutonSecondTexte: { color: c.blue, fontSize: 15.5, fontWeight: '600' },
     mention: { color: c.inkSoft, fontSize: 12.5, lineHeight: 17, textAlign: 'center', marginTop: 14 },
+    rangee: { flexDirection: 'row', justifyContent: 'center', gap: 10, flexWrap: 'wrap' },
+    voile: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.55)' },
     page: {
       alignSelf: 'center',
       borderRadius: radius.md,

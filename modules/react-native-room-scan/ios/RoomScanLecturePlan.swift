@@ -1,7 +1,9 @@
 import Foundation
+import PDFKit
 import PhotosUI
 import React
 import UIKit
+import UniformTypeIdentifiers
 import Vision
 import VisionKit
 
@@ -24,17 +26,28 @@ import VisionKit
  *     L'IA les reçoit avec l'image : elle lit mieux un « 3,20 » qu'on lui
  *     confirme.
  *
+ *   — LE SÉLECTEUR DE FICHIERS (`UIDocumentPickerViewController`) — relevé
+ *     du patron : « on doit aussi pouvoir lire un fichier PDF ou image au
+ *     lieu de scanner le papier ». Le plan d'architecte arrive en PDF par
+ *     courriel : l'imprimer pour le photographier, c'était perdre sa
+ *     netteté. Un PDF se rend à haute définition (PDFKit), et sa page la
+ *     plus cotée est retenue — l'écran laisse en changer avant de lire.
+ *
  * L'image part réduite (2000 pixels au plus grand côté, JPEG 82 %) : assez
- * pour lire une cote, assez léger pour un envoi en 4G.
+ * pour lire une cote, assez léger pour un envoi en 4G. Les textes, eux, se
+ * lisent sur une page plus fine quand on l'a (un PDF rendu à 4500 pixels) :
+ * leur place est donnée en millièmes, elle ne dépend pas de la taille.
  *
  * UIKit sur le fil principal, la lecture du texte à côté : elle prend une
  * seconde, l'écran ne se fige pas.
  */
 @objc(RoomScanLecturePlan)
 class RoomScanLecturePlan: NSObject, VNDocumentCameraViewControllerDelegate,
-  PHPickerViewControllerDelegate
+  PHPickerViewControllerDelegate, UIDocumentPickerDelegate
 {
   private var rendreA: RCTPromiseResolveBlock?
+  /// Le PDF ouvert : on y change de page sans le rouvrir.
+  private var pdf: PDFDocument?
 
   @objc static func requiresMainQueueSetup() -> Bool { true }
 
@@ -97,6 +110,39 @@ class RoomScanLecturePlan: NSObject, VNDocumentCameraViewControllerDelegate,
     }
   }
 
+  /// Ouvre un plan reçu en fichier : un PDF, ou une image (JPEG, PNG, HEIC…).
+  @objc func ouvrirUnFichier(
+    _ resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    DispatchQueue.main.async {
+      guard let haut = self.sommet() else {
+        resolve(nil)
+        return
+      }
+      // Une COPIE : le fichier reste lisible sans droit d'accès à tenir ouvert.
+      let selecteur = UIDocumentPickerViewController(forOpeningContentTypes: [.pdf, .image], asCopy: true)
+      selecteur.delegate = self
+      selecteur.allowsMultipleSelection = false
+      self.rendreA = resolve
+      haut.present(selecteur, animated: true)
+    }
+  }
+
+  /// Une autre page du PDF ouvert (comptée à partir de 1).
+  @objc func pageDuPdf(
+    _ n: NSNumber,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    guard let doc = pdf, n.intValue >= 1, n.intValue <= doc.pageCount else {
+      resolve(nil)
+      return
+    }
+    rendreA = resolve
+    preparerLaPage(doc, n.intValue - 1)
+  }
+
   // ------------------------------------------------------------ le scanner
 
   func documentCameraViewController(
@@ -147,10 +193,147 @@ class RoomScanLecturePlan: NSObject, VNDocumentCameraViewControllerDelegate,
     }
   }
 
+  // ------------------------------------------------------------ le fichier
+
+  func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+    guard let url = urls.first else {
+      rendre(nil)
+      return
+    }
+    DispatchQueue.global(qos: .userInitiated).async {
+      self.lireLeFichier(url)
+    }
+  }
+
+  func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+    rendre(nil)
+  }
+
+  /// Un PDF : sa meilleure page, rendue. Une image : comme une photo.
+  private func lireLeFichier(_ url: URL) {
+    let estUnPdf =
+      UTType(filenameExtension: url.pathExtension)?.conforms(to: .pdf) ?? false
+    if estUnPdf {
+      guard let doc = PDFDocument(url: url) else {
+        rendre(["erreur": "format"])
+        return
+      }
+      if doc.isLocked {
+        rendre(["erreur": "protege"])
+        return
+      }
+      if doc.pageCount == 0 {
+        rendre(["erreur": "vide"])
+        return
+      }
+      pdf = doc
+      preparerLaPage(doc, Self.meilleurePage(doc))
+      return
+    }
+    pdf = nil
+    guard let donnees = try? Data(contentsOf: url), let image = UIImage(data: donnees) else {
+      // Un PDF arrivé sans son extension : on le reconnaît à son contenu.
+      if let doc = PDFDocument(url: url), !doc.isLocked, doc.pageCount > 0 {
+        pdf = doc
+        preparerLaPage(doc, Self.meilleurePage(doc))
+      } else {
+        rendre(["erreur": "format"])
+      }
+      return
+    }
+    // Une image reçue est souvent plus fine qu'une photo : ses textes se
+    // lisent avant la réduction.
+    preparer(image, lecture: 3000)
+  }
+
+  /// La page `i` du PDF, rendue à haute définition puis préparée.
+  private func preparerLaPage(_ doc: PDFDocument, _ i: Int) {
+    DispatchQueue.global(qos: .userInitiated).async {
+      guard let page = doc.page(at: i) else {
+        self.rendre(nil)
+        return
+      }
+      let image = Self.rendreLaPage(page, plusGrandCote: 4500)
+      self.preparer(image, lecture: 4500, enPlus: ["page": i + 1, "pages": doc.pageCount])
+    }
+  }
+
+  /**
+   * LA PAGE QUI PORTE LE PLUS DE COTES. Un dossier d'architecte s'ouvre sur
+   * une page de garde, une notice, un tableau des surfaces : le plan est
+   * celle où l'on compte le plus de nombres — « 3,20 », « 450 ». Un PDF
+   * scanné n'a pas de texte : sa première page, alors.
+   */
+  static func meilleurePage(_ doc: PDFDocument) -> Int {
+    guard doc.pageCount > 1,
+      let motif = try? NSRegularExpression(pattern: "\\b\\d{1,3}[,.]\\d{1,2}\\b|\\b\\d{2,4}\\b")
+    else { return 0 }
+    var meilleure = 0
+    var record = 0
+    for i in 0..<min(doc.pageCount, 60) {
+      guard let texte = doc.page(at: i)?.string, !texte.isEmpty else { continue }
+      let n = motif.numberOfMatches(in: texte, range: NSRange(texte.startIndex..., in: texte))
+      if n > record {
+        record = n
+        meilleure = i
+      }
+    }
+    return meilleure
+  }
+
+  /**
+   * LA PAGE PDF EN IMAGE, sur fond blanc, à `plusGrandCote` pixels — et dans
+   * le sens où on la lit : un plan A3 est souvent enregistré couché (/Rotate
+   * 90), PDFKit le redresse à l'écran, on le redresse ici aussi.
+   */
+  static func rendreLaPage(_ page: PDFPage, plusGrandCote: CGFloat) -> UIImage {
+    let boite = page.bounds(for: .cropBox)
+    let rotation = ((page.rotation % 360) + 360) % 360
+    let couchee = rotation == 90 || rotation == 270
+    let l = couchee ? boite.height : boite.width
+    let h = couchee ? boite.width : boite.height
+    let k = plusGrandCote / max(l, h, 1)
+    let taille = CGSize(width: floor(l * k), height: floor(h * k))
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    format.opaque = true
+    return UIGraphicsImageRenderer(size: taille, format: format).image { ctx in
+      UIColor.white.setFill()
+      ctx.fill(CGRect(origin: .zero, size: taille))
+      let g = ctx.cgContext
+      // Le repère du PDF : y vers le haut.
+      g.translateBy(x: 0, y: taille.height)
+      g.scaleBy(x: 1, y: -1)
+      // La rotation de la page, dans le sens horaire comme le veut /Rotate.
+      switch rotation {
+      case 90:
+        g.translateBy(x: 0, y: taille.height)
+        g.rotate(by: -.pi / 2)
+      case 180:
+        g.translateBy(x: taille.width, y: taille.height)
+        g.rotate(by: .pi)
+      case 270:
+        g.translateBy(x: taille.width, y: 0)
+        g.rotate(by: .pi / 2)
+      default:
+        break
+      }
+      g.scaleBy(x: k, y: k)
+      g.translateBy(x: -boite.minX, y: -boite.minY)
+      if let ref = page.pageRef {
+        g.drawPDFPage(ref)
+      } else {
+        page.draw(with: .cropBox, to: g)
+      }
+    }
+  }
+
   // ------------------------------------------------------------ la page prête
 
   /// Réduit la page, l'encode, lit ses textes — hors du fil principal.
-  private func preparer(_ image: UIImage?) {
+  /// `lecture` : la finesse à laquelle les textes se lisent, quand l'image
+  /// en a plus que les 2000 pixels qui partent.
+  private func preparer(_ image: UIImage?, lecture: CGFloat = 2000, enPlus: [String: Any] = [:]) {
     guard let image = image else {
       rendre(nil)
       return
@@ -161,12 +344,15 @@ class RoomScanLecturePlan: NSObject, VNDocumentCameraViewControllerDelegate,
         self.rendre(nil)
         return
       }
-      let resultat: [String: Any] = [
+      let pourLire =
+        lecture > 2000 ? (Self.reduire(image, plusGrandCote: lecture).cgImage ?? cg) : cg
+      var resultat: [String: Any] = [
         "base64": jpeg.base64EncodedString(),
         "largeur": cg.width,
         "hauteur": cg.height,
-        "textes": Self.lireLesTextes(cg),
+        "textes": Self.lireLesTextes(pourLire),
       ]
+      resultat.merge(enPlus) { garde, _ in garde }
       self.rendre(resultat)
     }
   }

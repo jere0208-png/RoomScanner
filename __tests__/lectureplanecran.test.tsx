@@ -22,9 +22,13 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 const mockScanner = jest.fn();
 const mockEnvoyer = jest.fn();
+const mockFichier = jest.fn();
+const mockPageDuPdf = jest.fn();
 jest.mock('../src/native/lecturePlan', () => ({
   scannerUnPlan: () => mockScanner(),
   importerUnPlan: () => mockScanner(),
+  ouvrirUnFichier: () => mockFichier(),
+  pageDuPdf: (n: number) => mockPageDuPdf(n),
   scannerDisponible: async () => true,
 }));
 jest.mock('../src/net/lecturePlan', () => ({
@@ -101,6 +105,8 @@ async function monter() {
 beforeEach(() => {
   mockScanner.mockReset();
   mockEnvoyer.mockReset();
+  mockFichier.mockReset();
+  mockPageDuPdf.mockReset();
   act(() => {
     useScanStore.getState().reset();
     useScanStore.setState({ screen: 'lecture', forcerTarifs: false } as never);
@@ -143,6 +149,9 @@ describe('la page', () => {
     }
     expect(bouton(t, 'Scanner le plan')).toBeDefined();
     expect(bouton(t, 'Importer une photo')).toBeDefined();
+    // Et la troisième : le plan reçu en fichier.
+    expect(bouton(t, 'Ouvrir un fichier')).toBeDefined();
+    expect(vu).toMatch(/PDF/);
     expect(vu).toMatch(/Une lecture offerte pour essayer, puis réservée au Pro/);
     act(() => t.unmount());
   });
@@ -209,13 +218,15 @@ describe('la page', () => {
     act(() => t.unmount());
   });
 
-  it('sans compte : la porte de la connexion', async () => {
+  it('sans compte : la porte de la connexion — AVANT de scanner, pas après', async () => {
     act(() => useAccountStore.setState({ compte: null, jeton: null, invite: true } as never));
     mockScanner.mockResolvedValue(PAGE);
-    mockEnvoyer.mockResolvedValue({ ok: false, motif: 'compte', message: 'Connectez-vous.' });
     const t = await monter();
     await act(async () => bouton(t, 'Scanner le plan').props.onPress());
-    expect(mockEnvoyer.mock.calls[0][1]).toBeNull();
+    // Pas de feuille prise pour rien.
+    expect(mockScanner).not.toHaveBeenCalled();
+    expect(mockEnvoyer).not.toHaveBeenCalled();
+    expect(textes(t)).toContain('Un compte, d’abord');
     act(() => bouton(t, 'Me connecter').props.onPress());
     expect(useAccountStore.getState().invite).toBe(false);
     act(() => t.unmount());
@@ -246,6 +257,150 @@ describe('la page', () => {
   });
 });
 
+/**
+ * « UN COMPTE, D'ABORD » ALORS QU'ON EST CONNECTÉ — relevé du patron : « ils
+ * me disent "Un compte, d'abord" et me proposent de me connecter, bouton qui
+ * ne fait rien. Je suis pourtant connecté. »
+ *
+ * Le compte était là, sans jeton valide : la connexion s'était faite quand le
+ * serveur ne répondait pas (l'app ouvre quand même, en local), ou le serveur
+ * ne reconnaît plus le jeton. « Me connecter » quittait le mode invité — où
+ * l'on n'était pas : il ne faisait rien. Seule une nouvelle connexion rend un
+ * jeton : le bouton l'ouvre, et ramène ici.
+ */
+describe('connecté, mais sans jeton que le serveur reconnaisse', () => {
+  it('connecté hors ligne : on le dit avant de scanner, et « Me reconnecter » ouvre la connexion', async () => {
+    act(() => useAccountStore.setState({ compte: { id: 'email:a@b.fr', prenom: 'A' } as never, jeton: null, invite: false } as never));
+    const t = await monter();
+    await act(async () => bouton(t, 'Scanner le plan').props.onPress());
+    expect(mockScanner).not.toHaveBeenCalled();
+    const vu = textes(t);
+    expect(vu).toContain('Reconnectez-vous');
+    expect(vu).not.toContain('Un compte, d’abord');
+    expect(bouton(t, 'Me connecter')).toBeUndefined();
+    act(() => bouton(t, 'Me reconnecter').props.onPress());
+    // La porte de connexion s'ouvre (plus de compte à l'écran), et l'app
+    // reviendra sur la lecture : l'écran courant n'a pas bougé.
+    expect(useAccountStore.getState().compte).toBeNull();
+    expect(useAccountStore.getState().invite).toBe(false);
+    expect(useScanStore.getState().screen).toBe('lecture');
+    act(() => t.unmount());
+  });
+
+  it('le serveur ne reconnaît plus le jeton : on se reconnecte, et la page prise attend sa lecture', async () => {
+    mockScanner.mockResolvedValue(PAGE);
+    mockEnvoyer.mockResolvedValueOnce({ ok: false, motif: 'compte', message: 'Votre session a expiré : reconnectez-vous, puis recommencez.' });
+    const t = await monter();
+    await act(async () => bouton(t, 'Scanner le plan').props.onPress());
+    expect(textes(t)).toContain('Reconnectez-vous');
+    act(() => bouton(t, 'Me reconnecter').props.onPress());
+    act(() => t.unmount());
+    // … la connexion rend un jeton neuf, l'app revient sur la page …
+    act(() => useAccountStore.setState({ compte: { id: 'email:a@b.fr', prenom: 'A' } as never, jeton: 'neuf', invite: false } as never));
+    mockEnvoyer.mockResolvedValueOnce({ ok: true, lecture: LECTURE, essai: false });
+    const t2 = await monter();
+    // La même page, prête : on la lit sans rescanner.
+    expect(t2.root.findAll((n) => n.props?.testID === 'apercu-du-fichier').length).toBeGreaterThan(0);
+    await act(async () => bouton(t2, 'Lire ce plan').props.onPress());
+    expect(mockScanner).toHaveBeenCalledTimes(1);
+    expect(mockEnvoyer).toHaveBeenCalledTimes(2);
+    expect(mockEnvoyer.mock.calls[1][0]).toBe(PAGE);
+    expect(mockEnvoyer.mock.calls[1][1]).toEqual({ identifiant: 'email:a@b.fr', jeton: 'neuf' });
+    expect(bouton(t2, 'Créer le plan')).toBeDefined();
+    act(() => t2.unmount());
+  });
+
+  it('et la page n’attend qu’une fois : rouvrir l’écran plus tard repart de l’invitation', async () => {
+    const t = await monter();
+    expect(bouton(t, 'Scanner le plan')).toBeDefined();
+    act(() => t.unmount());
+  });
+});
+
+/**
+ * UN FICHIER PLUTÔT QU'UNE PHOTO — relevé du patron : « on doit aussi
+ * pouvoir lire un fichier PDF ou image au lieu de scanner le papier à
+ * l'appareil photo ». Le plan d'un architecte arrive en PDF par courriel ;
+ * l'imprimer pour le photographier, c'était perdre sa netteté.
+ */
+describe('un fichier plutôt qu’une photo', () => {
+  it('une image : elle se lit tout de suite, comme une photo', async () => {
+    mockFichier.mockResolvedValue(PAGE);
+    mockEnvoyer.mockResolvedValue({ ok: true, lecture: LECTURE, essai: false });
+    const t = await monter();
+    await act(async () => bouton(t, 'Ouvrir un fichier').props.onPress());
+    expect(mockEnvoyer).toHaveBeenCalledTimes(1);
+    expect(mockEnvoyer.mock.calls[0][0]).toBe(PAGE);
+    expect(bouton(t, 'Créer le plan')).toBeDefined();
+    act(() => t.unmount());
+  });
+
+  it('un PDF d’une page : il se lit tout de suite aussi', async () => {
+    mockFichier.mockResolvedValue({ ...PAGE, page: 1, pages: 1 });
+    mockEnvoyer.mockResolvedValue({ ok: true, lecture: LECTURE, essai: false });
+    const t = await monter();
+    await act(async () => bouton(t, 'Ouvrir un fichier').props.onPress());
+    expect(mockEnvoyer).toHaveBeenCalledTimes(1);
+    act(() => t.unmount());
+  });
+
+  it('un PDF de plusieurs pages : on voit la page retenue, on peut en changer, RIEN ne part avant « Lire »', async () => {
+    // Le natif retient la page qui porte le plus de cotes : ici la 2e sur 5.
+    mockFichier.mockResolvedValue({ ...PAGE, base64: 'p2'.repeat(1000), page: 2, pages: 5 });
+    mockPageDuPdf.mockImplementation(async (n: number) => ({ ...PAGE, base64: `p${n}`.repeat(1000), page: n, pages: 5 }));
+    mockEnvoyer.mockResolvedValue({ ok: true, lecture: LECTURE, essai: false });
+    const t = await monter();
+    await act(async () => bouton(t, 'Ouvrir un fichier').props.onPress());
+    // Une lecture coûte : on ne la dépense pas sur la page de garde du dossier.
+    expect(mockEnvoyer).not.toHaveBeenCalled();
+    expect(t.root.findAll((n) => n.props?.testID === 'apercu-du-fichier').length).toBeGreaterThan(0);
+    expect(textes(t)).toContain('Page 2 sur 5');
+    await act(async () => bouton(t, 'Page suivante').props.onPress());
+    expect(mockPageDuPdf).toHaveBeenCalledWith(3);
+    expect(textes(t)).toContain('Page 3 sur 5');
+    await act(async () => bouton(t, 'Page précédente').props.onPress());
+    await act(async () => bouton(t, 'Page précédente').props.onPress());
+    expect(mockPageDuPdf).toHaveBeenLastCalledWith(1);
+    // À la première page, on ne recule plus.
+    expect(bouton(t, 'Page précédente')).toBeUndefined();
+    await act(async () => bouton(t, 'Lire cette page').props.onPress());
+    expect(mockEnvoyer).toHaveBeenCalledTimes(1);
+    expect(mockEnvoyer.mock.calls[0][0].base64).toBe('p1'.repeat(1000));
+    expect(bouton(t, 'Créer le plan')).toBeDefined();
+    act(() => t.unmount());
+  });
+
+  it('un PDF protégé par un mot de passe : dit en clair, sans rien envoyer', async () => {
+    mockFichier.mockResolvedValue({ erreur: 'protege' });
+    const t = await monter();
+    await act(async () => bouton(t, 'Ouvrir un fichier').props.onPress());
+    expect(mockEnvoyer).not.toHaveBeenCalled();
+    expect(textes(t)).toContain('Ce fichier ne s’ouvre pas');
+    expect(textes(t)).toMatch(/mot de passe/);
+    act(() => bouton(t, 'Choisir un autre fichier').props.onPress());
+    expect(bouton(t, 'Ouvrir un fichier')).toBeDefined();
+    act(() => t.unmount());
+  });
+
+  it('un fichier qui n’est ni un PDF ni une image : dit en clair', async () => {
+    mockFichier.mockResolvedValue({ erreur: 'format' });
+    const t = await monter();
+    await act(async () => bouton(t, 'Ouvrir un fichier').props.onPress());
+    expect(mockEnvoyer).not.toHaveBeenCalled();
+    expect(textes(t)).toMatch(/PDF ou une image/);
+    act(() => t.unmount());
+  });
+
+  it('renoncer au sélecteur ramène à l’invitation', async () => {
+    mockFichier.mockResolvedValue(null);
+    const t = await monter();
+    await act(async () => bouton(t, 'Ouvrir un fichier').props.onPress());
+    expect(mockEnvoyer).not.toHaveBeenCalled();
+    expect(bouton(t, 'Ouvrir un fichier')).toBeDefined();
+    act(() => t.unmount());
+  });
+});
+
 describe('ce qui la porte', () => {
   it('le serveur : l’action, l’essai, le plafond, la clé hors de l’app', () => {
     const api = lire('server', 'api.php');
@@ -270,6 +425,19 @@ describe('ce qui la porte', () => {
     expect(swift).toContain('requete.usesLanguageCorrection = false');
     expect(lire('modules', 'react-native-room-scan', 'ios', 'RoomScan.m')).toContain('RCT_EXTERN_MODULE(RoomScanLecturePlan, NSObject)');
     expect(lire('modules', 'react-native-room-scan', 'RoomScan.podspec')).toContain('"VisionKit"');
+  });
+
+  it('le natif : le sélecteur de fichiers d’iOS, et le PDF rendu à haute définition', () => {
+    const swift = lire('modules', 'react-native-room-scan', 'ios', 'RoomScanLecturePlan.swift');
+    expect(swift).toContain('UIDocumentPickerViewController(forOpeningContentTypes: [.pdf, .image], asCopy: true)');
+    expect(swift).toContain('PDFDocument(url: url)');
+    expect(swift).toContain('doc.isLocked');
+    // La page retenue : celle qui porte le plus de cotes.
+    expect(swift).toContain('static func meilleurePage(');
+    const m = lire('modules', 'react-native-room-scan', 'ios', 'RoomScan.m');
+    expect(m).toContain('RCT_EXTERN_METHOD(ouvrirUnFichier:');
+    expect(m).toContain('RCT_EXTERN_METHOD(pageDuPdf:');
+    expect(lire('modules', 'react-native-room-scan', 'RoomScan.podspec')).toContain('"PDFKit"');
   });
 
   it('la confidentialité le dit', () => {

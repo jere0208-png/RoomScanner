@@ -73,8 +73,9 @@ qu'une feuille web sécurisée.
 
 ## 4. Lecture des plans papier (10 min, après le 2)
 
-La photo d'un plan papier est lue par Claude (Anthropic) au travers de votre
-serveur : la clé reste sur le serveur, jamais dans l'app.
+La photo d'un plan papier (ou la page d'un PDF reçu) est lue par Claude
+(Anthropic) au travers de votre serveur : la clé reste sur le serveur, jamais
+dans l'app.
 
 1. **Créer la clé** : console.anthropic.com → API Keys → Create Key. Ajouter un
    moyen de paiement (Billing) : une lecture coûte quelques centimes avec

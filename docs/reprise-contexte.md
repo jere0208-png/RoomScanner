@@ -177,7 +177,10 @@ faces aux jonctions · `DEBORD_PLAQUE` (2 px) · `POIDS_ECART` (500) ·
 `HALO_PART` (0,30) · `EM_TEXTE` (0,52) · `RAYON_PLAFOND_MAX` /
 `ECART_SIGLE_PLAFOND` · `COURONNE_DU_FIL`.
 **Les 44 points du doigt** valent pour la CIBLE, jamais pour le dessin. Le
-**scan de plan papier** a été construit puis RETIRÉ — ne pas le relancer.
+**scan de plan papier**, un temps retiré, est REVENU à la demande du patron
+(octobre 2026) sous la forme « Lire un plan papier » : lecture par Claude via
+le serveur, reconstruction sur les cotes (`geometry/lecturePlan.ts`), scanner
+de documents, photo ou fichier PDF/image.
 
 ## Repères posés, à connaître avant de toucher au plan
 

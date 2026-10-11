@@ -45,10 +45,12 @@ const SECTIONS: { titre: string; texte: string }[] = [
     titre: 'La lecture d’un plan papier, et elle seule',
     texte:
       'Quand vous faites lire un plan papier, et seulement à ce moment-là, ' +
-      'la photo de la feuille part sur notre serveur, qui la fait lire par ' +
-      'une intelligence artificielle (Claude, d’Anthropic) : elle rend les ' +
-      'murs, les cotes, les pièces et les symboles qu’elle y voit. Nous ne ' +
-      'gardons ni la photo ni la lecture. Anthropic ne s’en sert pas pour ' +
+      'l’image de la feuille (sa photo, ou la page du PDF choisi) part sur ' +
+      'notre serveur, qui la fait lire par une intelligence artificielle ' +
+      '(Claude, d’Anthropic) : elle rend les murs, les cotes, les pièces et ' +
+      'les symboles qu’elle y voit. Nous ne gardons ni l’image ni la ' +
+      'lecture. Le fichier lui-même reste sur votre téléphone : seule la ' +
+      'page retenue part. Anthropic ne s’en sert pas pour ' +
       'entraîner ses modèles, et ne la conserve qu’un temps limité, pour ses ' +
       'contrôles de sécurité. Seul le nombre de lectures est compté sur ' +
       'votre compte : la première est offerte.',

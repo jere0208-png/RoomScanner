@@ -14285,6 +14285,60 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Lire un plan en fichier, et la reconnexion qui ne faisait rien
+
+**Le plan reçu en PDF ou en image.** Relevé du patron : « on doit aussi
+pouvoir lire un fichier PDF ou image au lieu de scanner le papier à
+l'appareil photo ». Le plan d'un architecte arrive en PDF par courriel ; le
+photographier imprimé, c'était perdre sa netteté.
+- **Une troisième porte**, « Ouvrir un fichier ». Elle passe par le
+  sélecteur de fichiers d'iOS : Fichiers, iCloud Drive, Dropbox, pièces
+  jointes enregistrées. Il prend des PDF et des images (JPEG, PNG, HEIC…).
+- **Le PDF est rendu à 4500 pixels** (`rendreLaPage`), redressé quand il est
+  enregistré couché (/Rotate). Ses textes se lisent à cette finesse. L'image
+  envoyée reste à 2000 pixels : les places des textes sont en millièmes et
+  ne dépendent pas de la taille.
+- **La page retenue est celle qui porte le plus de cotes** (`meilleurePage`).
+  Un dossier s'ouvre souvent sur une page de garde ou une notice.
+- **Un PDF de plusieurs pages se montre avant de partir.** On y lit
+  « Page 2 sur 5 », on en change d'un geste (`pageDuPdf`), et rien ne part
+  avant « Lire cette page » : une lecture coûte.
+- **Un fichier qui ne s'ouvre pas le dit, sans rien envoyer** : protégé par
+  un mot de passe, sans page, ou ni PDF ni image. Le pont garde la
+  différence entre renoncer (`null`) et ne pas pouvoir (`{ erreur }`).
+- **Le fichier reste sur le téléphone** : seule la page retenue part. La page
+  Confidentialité le dit.
+
+**« Un compte, d'abord » alors qu'on est connecté.** Relevé du patron : « ils
+me disent "Un compte, d'abord" et me proposent de me connecter, bouton qui ne
+fait rien. Je suis pourtant connecté. »
+- **La cause.** Le compte était là, sans jeton que le serveur reconnaisse. Il
+  y a deux façons d'en arriver là :
+  - la connexion s'est faite pendant que le serveur ne répondait pas, et
+    l'app s'ouvre alors en local, sans jeton ;
+  - le jeton ne vaut plus.
+- **Le bouton.** « Me connecter » quittait le mode invité, où l'on n'était
+  pas : il ne faisait rien.
+- **Le remède.**
+  - L'écran dit « Reconnectez-vous », et « Me reconnecter » ouvre la
+    connexion : seule une connexion rend un jeton.
+  - On revient ensuite sur la lecture, et la page déjà prise attend
+    (`pageARelire`) : on la lit sans rescanner.
+  - L'identité se vérifie AVANT d'ouvrir le scanner, plus après.
+- **Le serveur, vérifié.** Il répond, joint sa base et vérifie les jetons :
+  une reconnexion suffit.
+
+**Bancs.**
+- `lectureplanfichier` : le pont (pages, erreurs, renoncement).
+- `lectureplanecran` :
+  - l'image lue tout de suite ;
+  - le PDF d'une page lu tout de suite ;
+  - le PDF de cinq pages parcouru, sans rien envoyer avant « Lire » ;
+  - le PDF protégé ;
+  - le format inconnu ;
+  - la reconnexion, avant le scan ou après un refus du serveur, avec la
+    page qui attend.
+
 ## Les élévations : chaque face équipée, chaque mur à son vrai nom
 
 Suite de la revue du dossier par des architectes (voir la section suivante).
