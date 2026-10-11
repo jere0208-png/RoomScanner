@@ -14285,6 +14285,46 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les cotes de la 3D, à la façon d'un architecte
+
+Demande du patron : « rends les cotes 3D plus professionnelles, sans gêner
+le plan avec les délimitations et sans gros bloc blanc arrière ; un rendu
+clean et compréhensible ».
+
+**Ce qui n'allait pas** :
+- sur les perspectives du dossier, un pavé blanc « 3,00 m » se posait au
+  faîte de chaque mur, cloisons comprises : une vingtaine de pavés qui
+  cachaient ce qu'ils cotaient ;
+- dans l'app, le bouton « Cotes » de la 3D noircissait toutes les arêtes
+  du modèle ;
+- il posait aussi un chiffre détouré de blanc sur chaque mur, et une
+  hauteur sur chaque angle.
+
+**Ce que fait un dessinateur, et ce que fait maintenant l'app**
+(`geometry/cotes3d`, la même géométrie pour le PDF et pour l'app) :
+- seule l'enveloppe se cote, HORS du volume. Les cloisons se lisent sur le
+  plan coté, fait pour ça ;
+- la ligne de cote court parallèle à la façade, à 45 cm du nu du mur. Deux
+  lignes de rappel fines la relient au mur, et une petite oblique marque
+  chaque bout ;
+- le chiffre se pose sur la ligne, du côté extérieur, aligné sur elle,
+  sans fond ;
+- les façades qui font face à l'œil se cotent au sol, devant elles ; les
+  autres au faîte, derrière. Les unes comme les autres restent hors du
+  dessin ;
+- une façade coupée par un refend se cote en cotes chaînées ;
+- la hauteur se cote une fois, sur l'angle extrême du volume. Dans le
+  dossier, c'est du côté qui porte le moins de noms de pièces ;
+- le cadrage garde la place des cotes, qui débordent du volume.
+
+Dans l'app, le bouton « Cotes » ne noircit plus les arêtes : le modèle
+garde ses traits. Les cotes des menuiseries restent des cotes de détail,
+qui apparaissent quand on s'approche.
+
+Bancs : `cotes3dpro` (7, la géométrie et le dossier) et `cotes3dapp` (4,
+la 3D de l'app). `pdfcadre` admet, après les cotes, les traits fins
+(0,6 pt au plus) ; la maçonnerie y reste interdite.
+
 ## Le dossier d'un logement entier, signé de l'artisan
 
 Correctifs de l'audit « dans la peau d'un utilisateur », lot 2, seconde

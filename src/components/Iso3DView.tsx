@@ -26,6 +26,7 @@ import { maillageDesMeubles } from '../geometry/modeles3d';
 import { groupesDesAppareils, habillerLesTableaux } from '../geometry/appareils3d';
 import { railDuReleve } from '../geometry/existant';
 import { grouperTraces } from '../ui/traces';
+import { cotesExterieures } from '../geometry/cotes3d';
 import { mettreAPlat } from '../ui/canevas';
 import { estUnGlissement, estUnTap } from '../ui/geste';
 import { themedStyles, useTheme, type Palette } from '../theme';
@@ -1416,7 +1417,8 @@ export function Iso3DView({
     const st = Math.sin(rad(view.theta));
     const cp = Math.cos(rad(view.tilt));
     const sp = Math.sin(rad(view.tilt));
-    const scale = ((Math.min(layout.w, layout.h) * 0.44) / radius3d) * view.zoom;
+    // Les cotes courent hors du volume : allumées, le cadrage leur garde leur place.
+    const scale = ((Math.min(layout.w, layout.h) * 0.44) / (radius3d + (showMeasures ? 0.9 : 0))) * view.zoom;
 
     /*
       DEUX PROJECTIONS, UN SEUL RESTE.
@@ -1556,16 +1558,13 @@ export function Iso3DView({
             cutawayOpacity(face.normal, cam, masquesScene.get(face.panId ?? -1)?.cache)
           : 1;
 
-      // Mode cotes : toutes les arêtes en noir.
       // Un pan sans contour propre est bordé de SA PROPRE couleur : sans ça,
       // l'anticrénelage laisse une couture blanche entre deux bandes voisines
       // et le mur paraît fait de morceaux.
-      // Mode cotes : arêtes en noir — SAUF les passages, dont le bleu
-      // pointillé est justement ce qui les distingue d'un panneau.
-      const stroke =
-        showMeasures && !face.isFloor && !face.dashed && face.stroke
-          ? '#0B0D12'
-          : face.stroke ?? fill;
+      // Le mode cotes ne noircit plus les arêtes — relevé du patron : « sans
+      // gêner le plan avec les délimitations ». Le modèle garde ses traits ;
+      // les cotes, elles, courent hors du volume (voir plus bas).
+      const stroke = face.stroke ?? fill;
       return {
         proj,
         depth,
@@ -1769,6 +1768,16 @@ export function Iso3DView({
           /** Nom de la pièce, tel qu'il est posé sur le plan 2D. */
           name: string;
           area: string;
+        }
+      | {
+          /** Une cote d'architecte : ses traits, et son chiffre sur la ligne. */
+          kind: 'cote';
+          depth: number;
+          traits: { x1: number; y1: number; x2: number; y2: number; w: number }[];
+          x: number;
+          y: number;
+          angle: number;
+          text: string;
         };
     /*
       SOLS D'ABORD, PLAFONDS ENSUITE, LE RESTE PAR PROFONDEUR — dedans.
@@ -2290,19 +2299,57 @@ export function Iso3DView({
         edgeLabel(bas, pa, `${o.height.toFixed(2).replace('.', ',')} m`, true);
       }
 
-      const seenHeights = new Set<string>();
-      for (const w of walls) {
-        const pA = project({ x: w.a.x, y: w.height, z: w.a.z });
-        const pB = project({ x: w.b.x, y: w.height, z: w.b.z });
-        edgeLabel(pA, pB, `${segLength(w).toFixed(2).replace('.', ',')} m`);
-        // La hauteur sous plafond : une seule de loin — elle est la même
-        // partout —, puis celle de chaque mur quand on s'approche, sur son
-        // arête verticale.
-        const hKey = w.height.toFixed(2);
-        const premiere = !seenHeights.has(hKey);
-        seenHeights.add(hKey);
-        const p0 = project({ x: w.a.x, y: 0, z: w.a.z });
-        edgeLabel(p0, pA, `${hKey.replace('.', ',')} m`, !premiere);
+      /*
+        LES COTES DE L'ENVELOPPE, À LA FAÇON D'UN ARCHITECTE — relevé du
+        patron : « plus professionnelles, sans gêner le plan avec les
+        délimitations et sans gros bloc blanc arrière ». Un chiffre détouré
+        de blanc se posait au faîte de CHAQUE mur, cloisons comprises, et
+        une hauteur sur chaque angle. Seule l'enveloppe se cote, hors du
+        volume (voir `geometry/cotes3d`) : la ligne de cote parallèle à la
+        façade, deux rappels fins, une oblique à chaque bout, le chiffre sur
+        la ligne, côté extérieur, sans fond. La hauteur, une fois.
+      */
+      const centre = project(center);
+      for (const k of cotesExterieures(keptWalls, scene.rooms, { x: st, z: ct }, undefined, 'gauche')) {
+        const pa = project(k.a);
+        const pb = project(k.b);
+        const lx = pb.sx - pa.sx;
+        const ly = pb.sy - pa.sy;
+        const l = Math.hypot(lx, ly);
+        // Trop courte à l'écran, la cote ne porterait pas son chiffre.
+        if (l < 24) continue;
+        const traits = k.rappels.map(([r0, r1]) => {
+          const q0 = project(r0);
+          const q1 = project(r1);
+          return { x1: q0.sx, y1: q0.sy, x2: q1.sx, y2: q1.sy, w: 0.75 };
+        });
+        traits.push({ x1: pa.sx, y1: pa.sy, x2: pb.sx, y2: pb.sy, w: 1 });
+        // L'oblique d'architecte, à 45° de la ligne, à chaque bout.
+        const ux = lx / l;
+        const uy = ly / l;
+        const ox = (ux - uy) * Math.SQRT1_2 * 4;
+        const oy = (ux + uy) * Math.SQRT1_2 * 4;
+        for (const q of [pa, pb]) traits.push({ x1: q.sx - ox, y1: q.sy - oy, x2: q.sx + ox, y2: q.sy + oy, w: 1.3 });
+        // Le chiffre suit la ligne, lisible de gauche à droite, côté extérieur.
+        let angle = (Math.atan2(ly, lx) * 180) / Math.PI;
+        if (angle > 90) angle -= 180;
+        if (angle <= -90) angle += 180;
+        const rad3 = (angle * Math.PI) / 180;
+        // Le « haut » du texte à l'écran (l'axe y descend).
+        const haut = { x: Math.sin(rad3), y: -Math.cos(rad3) };
+        const mx = (pa.sx + pb.sx) / 2;
+        const my = (pa.sy + pb.sy) / 2;
+        const dehors = (mx - centre.sx) * haut.x + (my - centre.sy) * haut.y >= 0;
+        const decale = dehors ? 3.5 : -12.5;
+        items.push({
+          kind: 'cote',
+          depth: 1e6,
+          traits,
+          x: mx + haut.x * decale,
+          y: my + haut.y * decale,
+          angle,
+          text: k.texte,
+        });
       }
     }
 
@@ -3132,6 +3179,31 @@ export function Iso3DView({
                       )}
                     </>
                   )}
+                </G>
+              ) : item.kind === 'cote' ? (
+                <G key={i}>
+                  {item.traits.map((t, j) => (
+                    <Line
+                      key={j}
+                      x1={t.x1}
+                      y1={t.y1}
+                      x2={t.x2}
+                      y2={t.y2}
+                      stroke={c.inkSoft}
+                      strokeWidth={t.w}
+                      strokeLinecap="round"
+                    />
+                  ))}
+                  <SvgText
+                    x={item.x}
+                    y={item.y}
+                    fontSize={10.5}
+                    fontWeight="600"
+                    fill={c.ink}
+                    textAnchor="middle"
+                    transform={`rotate(${item.angle}, ${item.x}, ${item.y})`}>
+                    {item.text}
+                  </SvgText>
                 </G>
               ) : item.kind === 'area' ? (
                 (() => {

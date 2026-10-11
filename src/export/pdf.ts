@@ -121,6 +121,7 @@ import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
 import { ecarterLesGaines } from '../geometry/routing';
 import { matieresDesSols } from '../ui/maquette';
 import { accentsDesPieces, peinturesDesPieces, solsDesPieces } from '../ui/habillage';
+import { cotesExterieures, ECART_DE_COTE } from '../geometry/cotes3d';
 import { nomDeTeinte } from '../ui/peintures';
 
 const PAGE_W = 595;
@@ -1255,7 +1256,8 @@ function draw3DView(
   const margeG = marge(true);
   const margeD = marge(false);
   const cadre = { x: box.x + margeG, y: box.y, w: box.w - margeG - margeD, h: box.h };
-  const scale = ((Math.min(cadre.w, cadre.h) * 0.46) / r3) * zoom;
+  // Les cotes courent hors du volume : le cadrage leur garde leur place.
+  const scale = ((Math.min(cadre.w, cadre.h) * 0.46) / (r3 + (showDims ? ECART_DE_COTE + 0.35 : 0))) * zoom;
   const cx = cadre.x + cadre.w / 2 + view.fx * (box.w / 2);
   const cy = box.y + box.h / 2 - view.fy * (box.h / 2);
 
@@ -1340,45 +1342,12 @@ function draw3DView(
         dashed?: boolean;
         alpha?: number;
       }
-    | { kind: 'dot'; depth: number; x: number; y: number; color: string }
-    | { kind: 'label'; depth: number; x: number; y: number; text: string };
+    | { kind: 'dot'; depth: number; x: number; y: number; color: string };
   const items: Item[] = polys.map((p) => ({ kind: 'poly' as const, ...p }));
 
   // Les noms et les surfaces des pièces se posent en marge : voir plus bas.
 
-  for (const w of showDims ? walls : []) {
-    const mid = project({
-      x: (w.a.x + w.b.x) / 2,
-      y: w.height,
-      z: (w.a.z + w.b.z) / 2,
-    });
-    // Par-dessus la maçonnerie, comme les étiquettes de surface : insérée
-    // dans le tri de profondeur, une cote se faisait TRANCHER par le mur
-    // voisin du coin — « 3,00 m » sortait en « m » orphelin. Une cote est
-    // une annotation ; son halo blanc la détache de ce qu'elle survole.
-    items.push({
-      kind: 'label',
-      depth: Infinity,
-      x: mid.x,
-      y: mid.y + 5,
-      text: `${segLength(w).toFixed(2).replace('.', ',')} m`,
-    });
-  }
   items.sort((p, q) => p.depth - q.depth);
-  /** Le halo d'une annotation : un cartouche blanc sous le texte. */
-  const halo = (x: number, y: number, size: number, texte: string) => {
-    const demiW = (texte.length * size * 0.52) / 2 + 2;
-    d.poly(
-      [
-        { x: x - demiW, y: y - size * 0.25 },
-        { x: x + demiW, y: y - size * 0.25 },
-        { x: x + demiW, y: y + size * 0.8 },
-        { x: x - demiW, y: y + size * 0.8 },
-      ],
-      '#FFFFFF',
-      null,
-    );
-  };
   for (const item of items) {
     if (item.kind === 'poly') {
       if (item.pts.length === 2 && item.stroke) {
@@ -1401,11 +1370,64 @@ function draw3DView(
           item.alpha ?? 1,
         );
       }
-    } else if (item.kind === 'dot') {
-      d.circle(item.x, item.y, 0.55, item.color);
     } else {
-      halo(item.x, item.y, 8, item.text);
-      d.text(item.text, item.x, item.y, 8, '#2A3340');
+      d.circle(item.x, item.y, 0.55, item.color);
+    }
+  }
+
+  /*
+    LES COTES, À LA FAÇON D'UN ARCHITECTE — relevé du patron : « plus
+    professionnelles, sans gros bloc blanc arrière ». Un pavé blanc
+    « 3,00 m » se posait au faîte de chaque mur, cloisons comprises, et
+    cachait ce qu'il cotait. Seule l'enveloppe se cote, HORS du volume (voir
+    `geometry/cotes3d`) : la ligne de cote parallèle à la façade, deux
+    rappels fins, une petite oblique à chaque bout, et le chiffre posé sur
+    la ligne, côté extérieur, sans fond.
+  */
+  if (showDims) {
+    const COTE = '#3C4654';
+    const centre = project(ctr);
+    // La hauteur se cote du côté qui porte le moins de noms de pièces.
+    const aGauche = etiquettes.filter((e) => e.gauche).length;
+    const cotes = cotesExterieures(
+      walls,
+      roomParts(walls, opts.rooms),
+      { x: st, z: ct },
+      undefined,
+      aGauche <= etiquettes.length - aGauche ? 'gauche' : 'droite',
+    );
+    for (const c of cotes) {
+      const pa = project(c.a);
+      const pb = project(c.b);
+      const lx = pb.x - pa.x;
+      const ly = pb.y - pa.y;
+      const l = Math.hypot(lx, ly);
+      // Trop courte à l'écran, la cote ne porterait pas son chiffre.
+      if (l < 16) continue;
+      for (const [r0, r1] of c.rappels) {
+        const q0 = project(r0);
+        const q1 = project(r1);
+        d.line(q0.x, q0.y, q1.x, q1.y, 0.3, COTE);
+      }
+      d.line(pa.x, pa.y, pb.x, pb.y, 0.45, COTE);
+      // L'oblique d'architecte, à 45° de la ligne, à chaque bout.
+      const ux = lx / l;
+      const uy = ly / l;
+      const ox = (ux - uy) * Math.SQRT1_2 * 3;
+      const oy = (ux + uy) * Math.SQRT1_2 * 3;
+      for (const q of [pa, pb]) d.line(q.x - ox, q.y - oy, q.x + ox, q.y + oy, 0.6, COTE);
+      // Le chiffre suit la ligne, lisible de gauche à droite, côté extérieur.
+      let angle = (Math.atan2(ly, lx) * 180) / Math.PI;
+      if (angle > 90) angle -= 180;
+      if (angle <= -90) angle += 180;
+      const rad = (angle * Math.PI) / 180;
+      const haut = { x: -Math.sin(rad), y: Math.cos(rad) };
+      const mx = (pa.x + pb.x) / 2;
+      const my = (pa.y + pb.y) / 2;
+      const versDehors = (mx - centre.x) * haut.x + (my - centre.y) * haut.y >= 0;
+      const taille = 7.5;
+      const decale = versDehors ? 2.2 : -(taille + 1.2);
+      d.text(c.texte, mx + haut.x * decale, my + haut.y * decale, taille, '#2A3340', { angle });
     }
   }
 

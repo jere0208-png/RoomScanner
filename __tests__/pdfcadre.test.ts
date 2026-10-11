@@ -214,13 +214,15 @@ describe('la perspective du PDF montre ce que montre l’app', () => {
     const zone = flux.slice(flux.indexOf('W n'), flux.lastIndexOf('Q'));
     const premierCote = zone.search(/\(\d+,\d{2} m\) Tj/);
     expect(premierCote).toBeGreaterThan(0);
-    // Après la première cote : plus un seul pan. Seuls les halos blancs et
-    // le texte ont le droit de suivre — c'est ce qui garantit qu'aucune
-    // maçonnerie ne repassera par-dessus un nombre. Les noms de pièces en
-    // marge suivent aussi, avec leurs annotations : le trait de rappel (un
-    // filet de 0,5 pt) et le point qui marque la pièce (moins de 5 pt).
+    // Après la première cote : plus un seul pan. Seuls le texte et les
+    // traits fins des annotations ont le droit de suivre — c'est ce qui
+    // garantit qu'aucune maçonnerie ne repassera par-dessus un nombre. Les
+    // traits fins (0,6 pt au plus, quand la maçonnerie en fait 0,7) : les
+    // lignes de cote et leurs rappels, les filets qui mènent aux noms des
+    // pièces en marge ; et le point qui marque la pièce (moins de 5 pt).
     const annotation = (ligne: string) => {
-      if (/ 0\.5 w /.test(ligne) && / S$/.test(ligne.trim())) return true;
+      const trait = / ([\d.]+) w /.exec(ligne);
+      if (trait && Number(trait[1]) <= 0.6 && / S$/.test(ligne.trim())) return true;
       const nombres = [...ligne.matchAll(/(-?[\d.]+) (-?[\d.]+) [ml]/g)].map((m) => [Number(m[1]), Number(m[2])]);
       const xs = nombres.map((q) => q[0]);
       const ys = nombres.map((q) => q[1]);
