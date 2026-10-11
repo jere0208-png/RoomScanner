@@ -14285,6 +14285,37 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## L'habillage de la maquette : le sol, un mur d'accent, la couleur des meubles
+
+Relevé du patron, point 9 de la réflexion « grand public » : « plus de
+personnalisation en 3D : choix du sol, un mur d'une autre couleur, couleur
+des meubles ».
+
+La doctrine du nuancier tient : pas de sélecteur de couleur libre, des
+choix qu'on trouve en magasin (`ui/habillage.ts`). Tout habille la 3D
+(maquette et visite) et ne change rien au relevé ; tout est annulable et
+s'enregistre avec le plan.
+
+- **Le sol** : sous les murs, le nuancier « Peindre » d'une pièce porte
+  maintenant « Le sol » — chêne clair, bois blanchi, noyer (lattes),
+  carrelage clair, carreau ciment, ardoise (carreaux), béton ciré, moquette
+  (unis), ou « selon la pièce » (la matière devinée par le nom, comme
+  avant). Le sol choisi passe devant la matière devinée et devant le relevé
+  (`RoomEntry.sol`, `setRoomSol`, option `sols` de `buildScene`).
+- **Un mur d'accent** : la barre d'un mur porte « Peindre ». Un refend
+  regarde deux pièces : on choisit le côté, et seule la face qui regarde
+  cette pièce prend la teinte ; « comme la pièce » la lui rend
+  (`RoomEntry.accents`, `setMurAccent`, option `accents`).
+- **La couleur d'un meuble** : une pastille à côté de son nom, sur sa barre
+  — sa teinte, ou des hachures quand il est d'origine. Douze teintes : bois,
+  laques, tissus courants (`ObjectData.teinte`, `setObjectTeinte`). Elle
+  passe devant la matière et la couleur relevée.
+- Le nuancier (`PeintureSheet`) sert aux trois : titre, aide, palette et clé
+  « rien de choisi » se passent en propriétés ; la coche se pose en blanc
+  sur toute teinte foncée.
+
+Bancs : `habillage` (10), `peindrelespieces` inchangé.
+
 ## La règle libre : mesurer entre deux points du plan, et garder la cote
 
 Relevé du patron, point 7 de la réflexion « grand public » : « une règle

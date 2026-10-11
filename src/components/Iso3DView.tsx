@@ -79,6 +79,7 @@ import { ECLAT_LAMPE,
   matieresDesSols,
 } from '../ui/maquette';
 import { hexDePeinture } from '../ui/peintures';
+import { accentsDesPieces, solsDesPieces } from '../ui/habillage';
 import { useModeElec } from '../store/usage';
 import { parImage } from '../ui/parImage';
 import { haptic } from '../ui/haptic';
@@ -1097,6 +1098,9 @@ export function Iso3DView({
     enregistré par une version plus récente — ne donne rien : le mur retombe
     sur le blanc du dessin plutôt que sur une couleur tirée au sort.
   */
+  // Le sol choisi et les murs d'accent, pièce par pièce (point 9).
+  const sols = useMemo(() => solsDesPieces(rooms), [rooms]);
+  const accents = useMemo(() => accentsDesPieces(rooms), [rooms]);
   const peintures = useMemo(() => {
     const out: Record<string, string> = {};
     for (const r of rooms) {
@@ -1123,6 +1127,8 @@ export function Iso3DView({
         fixtures: e.fixtures,
         ceiling: showCeiling ? ceiling : [],
         peintures,
+        sols,
+        accents,
         routes: cableRoutes,
         routeHeights,
         coarse: true,
@@ -1140,6 +1146,8 @@ export function Iso3DView({
       ceiling,
       showCeiling,
       peintures,
+      sols,
+      accents,
       cableRoutes,
       routeHeights,
     ],
@@ -1185,6 +1193,8 @@ export function Iso3DView({
             matieres: matieresDesSols(rooms),
             // La peinture choisie, face par face : voir `ui/peintures`.
             peintures,
+            sols,
+            accents,
             routes: cableRoutes,
             routeHeights,
             /*
@@ -1230,6 +1240,8 @@ export function Iso3DView({
       floors,
       rooms,
       peintures,
+      sols,
+      accents,
       ceiling,
       showCeiling,
       fixtures,

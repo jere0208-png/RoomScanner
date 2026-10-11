@@ -186,6 +186,17 @@ export interface RoomEntry {
    */
   peinture?: string;
   /**
+   * LE SOL CHOISI — une clé de `ui/habillage` (`SOLS`). Absent : la
+   * maquette le devine d'après le nom de la pièce (parquet, carrelage).
+   */
+  sol?: string;
+  /**
+   * LES MURS D'ACCENT — identifiant de mur → clé de peinture. Seule la face
+   * qui regarde CETTE pièce prend la teinte : le mur d'accent du séjour ne
+   * déborde pas dans la chambre voisine.
+   */
+  accents?: Record<string, string>;
+  /**
    * L'ÉTAGE de la pièce. Absent = rez-de-chaussée, comme pour les murs.
    * Ne pas confondre avec `floor`, qui est la couleur du SOL.
    */
@@ -1325,6 +1336,12 @@ interface ScanState {
   setRoomName: (roomId: string, name: string) => void;
   /** Peint les murs d'une pièce. `null` la ramène au blanc du dessin. */
   setRoomPeinture: (roomId: string, cle: string | null) => void;
+  /** Choisit le sol d'une pièce. `null` le rend à la maquette. */
+  setRoomSol: (roomId: string, cle: string | null) => void;
+  /** Peint un mur d'une pièce, côté pièce. `null` lui rend la teinte de la pièce. */
+  setMurAccent: (roomId: string, wallId: string, cle: string | null) => void;
+  /** Teinte un meuble (#RRGGBB). `null` lui rend sa couleur d'origine. */
+  setObjectTeinte: (objectId: string, hex: string | null) => void;
   /** Cale une photo sur l'élévation de son mur. `null` la remet au neutre. */
   setPhotoCalage: (photoId: string, calage: Calage | null) => void;
   /** Retire une pièce du scan (sa géométrie part avec elle). */
@@ -2945,6 +2962,57 @@ export const useScanStore = create<ScanState>((set, get) => {
               // « jamais peinte ».
               : (({ peinture: _retiree, ...reste }) => reste)(r)
             : r,
+        ),
+        dirty: true,
+      });
+    },
+
+    /*
+      L'HABILLAGE — relevé du patron, point 9 de la réflexion « grand
+      public » : le sol, un mur d'accent, la couleur d'un meuble. Mêmes
+      règles que la peinture : annulable, et le champ s'EFFACE plutôt que de
+      valoir « null ».
+    */
+    setRoomSol: (roomId, cle) => {
+      const st = get();
+      const piece = st.rooms.find((r) => r.id === roomId);
+      if (!piece || (piece.sol ?? null) === cle) return;
+      pushHistory(`sol:${roomId}`);
+      set({
+        rooms: st.rooms.map((r) =>
+          r.id === roomId ? (cle ? { ...r, sol: cle } : (({ sol: _retire, ...reste }) => reste)(r)) : r,
+        ),
+        dirty: true,
+      });
+    },
+
+    setMurAccent: (roomId, wallId, cle) => {
+      const st = get();
+      const piece = st.rooms.find((r) => r.id === roomId);
+      if (!piece || (piece.accents?.[wallId] ?? null) === cle) return;
+      pushHistory(`accent:${roomId}:${wallId}`);
+      set({
+        rooms: st.rooms.map((r) => {
+          if (r.id !== roomId) return r;
+          const accents = { ...(r.accents ?? {}) };
+          delete accents[wallId];
+          if (cle) accents[wallId] = cle;
+          if (Object.keys(accents).length > 0) return { ...r, accents };
+          // Plus aucun mur d'accent : le champ s'efface, comme la peinture.
+          return (({ accents: _vides, ...reste }) => reste)(r);
+        }),
+        dirty: true,
+      });
+    },
+
+    setObjectTeinte: (objectId, hex) => {
+      const st = get();
+      const meuble = st.objects.find((o) => o.id === objectId);
+      if (!meuble || (meuble.teinte ?? null) === hex) return;
+      pushHistory(`teinte:${objectId}`);
+      set({
+        objects: st.objects.map((o) =>
+          o.id === objectId ? (hex ? { ...o, teinte: hex } : (({ teinte: _retiree, ...reste }) => reste)(o)) : o,
         ),
         dirty: true,
       });

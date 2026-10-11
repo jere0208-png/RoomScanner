@@ -36,6 +36,8 @@ import { TravauxSheet } from '../components/TravauxSheet';
 import { achats as achatsDe, coutDesAchats, travauxDesPieces } from '../geometry/travaux';
 import { surfacesHabitables } from '../geometry/habitable';
 import { accrocher, texteDeMesure } from '../geometry/regle';
+import { PEINTURES, hexDePeinture } from '../ui/peintures';
+import { TEINTES_MEUBLES, TEINTE_ORIGINE, cleDeTeinte, hexDeTeinte } from '../ui/habillage';
 import { useReglagesTravaux } from '../store/reglagesTravaux';
 import { LaserSheet } from './result/LaserSheet';
 import { ExportSheet } from './result/ExportSheet';
@@ -1437,6 +1439,13 @@ export function ResultScreen() {
   const [mesurant, setMesurant] = useState(false);
   const [regle, setRegle] = useState<{ a: Pt | null; b: Pt | null }>({ a: null, b: null });
   const [selMesure, setSelMesure] = useState<string | null>(null);
+  /*
+    L'HABILLAGE — relevé du patron, point 9 de la réflexion « grand public ».
+    Le mur dont on choisit la teinte (et le côté, la pièce qu'il regarde),
+    le meuble dont on choisit la couleur.
+  */
+  const [murAPeindre, setMurAPeindre] = useState<{ roomId: string; wallId: string } | null>(null);
+  const [meubleATeinter, setMeubleATeinter] = useState<string | null>(null);
   const toutesLesMesures = useScanStore((st) => st.mesures);
   /* Le bilan du relevé qui vient d'aboutir : voir `BilanDuReleve`. */
   const bilan = useBilanStore((st) => st.bilan);
@@ -4568,6 +4577,8 @@ export function ResultScreen() {
             onRotate={() => rotateObject(selectedObject.id)}
             onCancel={cancelObject}
             passage={verdictDePassage}
+            teinte={selectedObject.teinte ?? null}
+            onTeinte={() => setMeubleATeinter(selectedObject.id)}
             bloque={(() => {
               const porte = [...bloquages].find(([, ids]) => ids.includes(selectedObject.id))?.[0];
               const o = porte ? openings.find((x) => x.id === porte) : undefined;
@@ -5516,6 +5527,36 @@ export function ResultScreen() {
                 sansMot: true,
                 onPress: () => percerLeMur(selectedWall.id),
               },
+              /*
+                UN MUR D'ACCENT — relevé du patron, point 9 de la réflexion
+                « grand public ». Un refend regarde deux pièces : on dit
+                laquelle, car seule cette face-là se peint.
+              */
+              {
+                label: 'Peindre',
+                icone: SOLAIRES.rouleau,
+                sansMot: true,
+                onPress: () => {
+                  const wallId = selectedWall.id;
+                  const cotes = parts.filter((p2) => p2.walls.some((w2) => w2.id === wallId));
+                  const nomDe = (id: string) => rooms.find((r) => r.id === id)?.name || 'la pièce';
+                  if (cotes.length === 0) {
+                    alerte('Aucune pièce', 'Ce mur ne borde aucune pièce fermée : il n’a pas de face à peindre.');
+                  } else if (cotes.length === 1) {
+                    setMurAPeindre({ roomId: cotes[0].roomId, wallId });
+                  } else {
+                    setMenu({
+                      title: 'Peindre quel côté ?',
+                      subtitle: 'Seule la face qui regarde cette pièce prend la teinte.',
+                      actions: cotes.map((p2) => ({
+                        label: `Côté ${nomDe(p2.roomId)}`,
+                        icon: 'rouleau' as const,
+                        onPress: () => setMurAPeindre({ roomId: p2.roomId, wallId }),
+                      })),
+                    });
+                  }
+                },
+              },
               ...(modeElec
                 ? [
                     {
@@ -6156,7 +6197,70 @@ export function ResultScreen() {
           setPeignant(false);
         }}
         onClose={() => setPeignant(false)}
+        sol={{
+          choisi: targetRoom?.sol ?? null,
+          onChoisir: (cle) => {
+            if (targetRoom) {
+              useScanStore.getState().setRoomSol(targetRoom.id, cle);
+              haptic('leger');
+            }
+            setPeignant(false);
+          },
+        }}
       />
+
+      {/* ---------- Un mur d'accent, côté pièce ---------- */}
+      {(() => {
+        const piece = murAPeindre ? rooms.find((r) => r.id === murAPeindre.roomId) : null;
+        const nom = piece?.name ? piece.name.toLowerCase() : 'la pièce';
+        return (
+          <PeintureSheet
+            visible={!!murAPeindre && !!piece}
+            nomPiece={nom}
+            titre="Peindre ce mur"
+            aide={`Côté ${nom} seulement : l’autre face garde sa teinte. En 3D, rien ne change au relevé.`}
+            nuancier={[
+              { cle: 'piece', nom: 'Comme la pièce', hex: hexDePeinture(piece?.peinture) ?? '#FFFCF6' },
+              ...PEINTURES,
+            ]}
+            defaut="piece"
+            choisie={murAPeindre ? piece?.accents?.[murAPeindre.wallId] ?? null : null}
+            onChoisir={(cle) => {
+              if (murAPeindre) {
+                useScanStore.getState().setMurAccent(murAPeindre.roomId, murAPeindre.wallId, cle);
+                haptic('leger');
+              }
+              setMurAPeindre(null);
+            }}
+            onClose={() => setMurAPeindre(null)}
+          />
+        );
+      })()}
+
+      {/* ---------- La couleur d'un meuble ---------- */}
+      {(() => {
+        const meuble = meubleATeinter ? objects.find((o) => o.id === meubleATeinter) : null;
+        const nom = meuble ? frCategory(meuble.category ?? '').toLowerCase() : 'le meuble';
+        return (
+          <PeintureSheet
+            visible={!!meuble}
+            nomPiece={nom}
+            titre={`Couleur : ${nom}`}
+            aide="La teinte habille le meuble en 3D. Elle ne change rien au relevé."
+            nuancier={TEINTES_MEUBLES}
+            defaut={TEINTE_ORIGINE}
+            choisie={meuble?.teinte ? cleDeTeinte(meuble.teinte) : null}
+            onChoisir={(cle) => {
+              if (meuble) {
+                useScanStore.getState().setObjectTeinte(meuble.id, hexDeTeinte(cle));
+                haptic('leger');
+              }
+              setMeubleATeinter(null);
+            }}
+            onClose={() => setMeubleATeinter(null)}
+          />
+        );
+      })()}
 
       <FurnitureSheet
         visible={catalogue}

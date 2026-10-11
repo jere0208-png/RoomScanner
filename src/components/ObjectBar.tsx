@@ -179,6 +179,8 @@ export function ObjectBar({
   passage,
   bloque,
   onPassage,
+  teinte,
+  onTeinte,
 }: {
   object: ObjectData;
   /** Les styles de l'écran : le bandeau partage ceux des autres barres. */
@@ -222,6 +224,13 @@ export function ObjectBar({
   /** Le meuble heurte le battant d'une porte : la phrase qui le dit. */
   bloque?: string | null;
   onPassage?: () => void;
+  /**
+   * LA COULEUR DU MEUBLE EN 3D — relevé du patron, point 9 de la réflexion
+   * « grand public ». Une pastille à côté de son nom : sa teinte, ou des
+   * hachures quand il est d'origine. L'appui ouvre le nuancier.
+   */
+  teinte?: string | null;
+  onTeinte?: () => void;
 }) {
   /** Le dessous du meuble, au-dessus du sol. */
   const pose = object.transform[13] - object.height / 2;
@@ -341,6 +350,20 @@ export function ObjectBar({
             {frCategory(object.category)}
           </Text>
         </View>
+        {onTeinte && (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Couleur du meuble"
+            hitSlop={10}
+            style={[local.teinte, { backgroundColor: teinte ?? palette.surface, borderColor: palette.lineStrong }]}
+            onPress={onTeinte}>
+            {!teinte && (
+              <Svg width={22} height={22} viewBox="0 0 22 22">
+                <Path d="M2 20 L20 2 M-2 12 L12 -2 M8 24 L24 8" stroke={palette.inkFaint} strokeWidth={1.4} />
+              </Svg>
+            )}
+          </TouchableOpacity>
+        )}
         {/* Les deux gestes, poussés à droite : le nom prend la place qui
             reste, et les pastilles restent où l'œil les cherche. */}
         <View style={styles.bandeauGestes}>
@@ -472,4 +495,14 @@ const local = StyleSheet.create({
   },
   puceTexte: { fontSize: 12.5, fontWeight: '700', flexShrink: 1 },
   bloque: { fontSize: 12.5, fontWeight: '700', flexShrink: 1 },
+  teinte: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
 });

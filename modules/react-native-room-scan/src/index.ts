@@ -92,6 +92,11 @@ export interface ObjectData {
   /** La matière dominante (bois, tissu, blanc…) : elle habille la 3D. */
   matiere?: string;
   /**
+   * LA TEINTE CHOISIE pour ce meuble (#RRGGBB, voir `ui/habillage`) : elle
+   * passe devant la matière et la couleur relevée. Absente : d'origine.
+   */
+  teinte?: string;
+  /**
    * TAILLE DE RÉFÉRENCE, quand le meuble s'est ajusté à un recoin.
    *
    * Un meuble posé dans une niche plus étroite que lui s'y adapte au lieu

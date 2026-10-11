@@ -1422,6 +1422,16 @@ export interface SceneOptions {
    */
   peintures?: Record<string, string | undefined>;
   /**
+   * LE SOL CHOISI, pièce par pièce (`ui/habillage`) : sa teinte, et le
+   * dessin de ses joints. Il passe devant la matière devinée par le nom.
+   */
+  sols?: Record<string, { hex: string; motif: 'parquet' | 'carrelage' | null } | undefined>;
+  /**
+   * LES MURS D'ACCENT : pièce → mur → teinte. La face d'un mur qui regarde
+   * cette pièce prend cette teinte plutôt que celle de la pièce.
+   */
+  accents?: Record<string, Record<string, string> | undefined>;
+  /**
    * LES PLAFONDS DES PIÈCES — pour l'exploration à la première personne.
    *
    * La maquette se regarde d'en haut : un plafond n'y aurait aucun sens, il
@@ -1926,8 +1936,15 @@ export function buildScene(
       laissait deviner.
     */
     const releve = opts.showTextures ? matiereRelevee(floor?.texture) : null;
-    const matiere: 'parquet' | 'carrelage' | undefined =
-      releve?.type === 'lattes'
+    /*
+      LE SOL CHOISI PASSE DEVANT TOUT — relevé du patron, point 9 de la
+      réflexion « grand public ». Comme la peinture : le relevé dit ce qui
+      EST, le choix dit ce qu'on PROJETTE, et c'est lui qu'on veut voir.
+    */
+    const choisi = opts.sols?.[part.roomId];
+    const matiere: 'parquet' | 'carrelage' | undefined = choisi
+      ? choisi.motif ?? undefined
+      : releve?.type === 'lattes'
         ? 'parquet'
         : releve?.type === 'carreaux'
         ? 'carrelage'
@@ -1939,12 +1956,13 @@ export function buildScene(
         : matiere === 'carrelage'
         ? mixHex(pal.floor, '#E3E6E4', 0.6)
         : undefined;
-    const floorFill =
-      (opts.showTextures
-        ? couleurAuPic(floor?.texture, floor?.color)
-        : undefined) ??
-      fondMatiere ??
-      pal.floor;
+    const floorFill = choisi
+      ? mixHex(pal.floor, choisi.hex, 0.85)
+      : (opts.showTextures
+          ? couleurAuPic(floor?.texture, floor?.color)
+          : undefined) ??
+        fondMatiere ??
+        pal.floor;
     const surface = part.surface;
     if (surface && opts.plafonds) {
       /*
@@ -2540,8 +2558,9 @@ export function buildScene(
       pour laquelle on l'a choisie. Le côté qu'on n'a pas peint, lui, garde
       la parole du scan.
     */
+    // Un mur d'accent passe devant la peinture de la pièce, côté pièce.
     const peintureDe = (roomId: string | null) =>
-      roomId ? opts.peintures?.[roomId] : undefined;
+      roomId ? opts.accents?.[roomId]?.[w.id] ?? opts.peintures?.[roomId] : undefined;
     const peintPlus = peintureDe(pieceDuCote(1));
     const peintMoins = peintureDe(pieceDuCote(-1));
     const fondPlus = peintPlus ?? avg ?? pal.wall;
@@ -3322,7 +3341,9 @@ export function buildScene(
     const teinteMoelleuse = MEUBLE_MOELLEUX.test(obj.category ?? '')
       ? AMBRE_MEUBLE
       : undefined;
-    const skin = opts.showTextures ? obj.color : undefined;
+    // La teinte CHOISIE passe devant tout (point 9 de la réflexion « grand
+    // public ») ; sinon la couleur relevée, quand on la demande.
+    const skin = (source as { teinte?: string }).teinte ?? (opts.showTextures ? obj.color : undefined);
     /*
       LA MATIÈRE HABILLE LE MEUBLE — relevé du patron : « un réalisme
       profond ». Quinze volumes du même gris se ressemblent tous ; un frigo

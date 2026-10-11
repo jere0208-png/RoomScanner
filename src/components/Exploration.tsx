@@ -62,6 +62,7 @@ import { fixturePlacement, roomInputsOf } from '../geometry/nfc15100';
 import { mixHex } from '../geometry/appearance';
 import { MAQUETTE, matieresDesSols } from '../ui/maquette';
 import { hexDePeinture } from '../ui/peintures';
+import { accentsDesPieces, solsDesPieces } from '../ui/habillage';
 import {
   HAUTEUR_OEIL,
   deplacer,
@@ -346,6 +347,9 @@ export function Exploration({
     () => ({ ...MAQUETTE, door: teinte.amber, window: teinte.sky, passage: teinte.blue }),
     [teinte],
   );
+  // Le sol choisi et les murs d'accent, pièce par pièce (point 9).
+  const sols = useMemo(() => solsDesPieces(rooms), [rooms]);
+  const accents = useMemo(() => accentsDesPieces(rooms), [rooms]);
   const peintures = useMemo(() => {
     const out: Record<string, string> = {};
     for (const r of rooms) {
@@ -368,6 +372,8 @@ export function Exploration({
       ceiling,
       matieres: matieresDesSols(rooms),
       peintures,
+      sols,
+      accents,
     });
     // Les caisses restent au canevas : la visite a les vrais meubles, et la
     // vraie prise au mur (voir `appareils3d`).
@@ -396,6 +402,8 @@ export function Exploration({
     fixtures,
     ceiling,
     peintures,
+    sols,
+    accents,
     rail,
   ]);
   /*
