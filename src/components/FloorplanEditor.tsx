@@ -72,7 +72,7 @@ import { markColor } from '../geometry/schema';
 import { bleuFenetre, encreElectrique } from '../ui/encreElec';
 import { cheminDuPoche, pocheDesMurs } from '../geometry/poche';
 import { cibleDeFacade, cotesExterieurs } from '../geometry/cibleMur';
-import { CeilingLayer } from './CeilingLayer';
+import { CeilingLayer, rayonDuPointLumineux } from './CeilingLayer';
 import { FixtureLayer } from './FixtureLayer';
 import { OndeePose, useNaissances } from './Vivant';
 import { NotesLayer } from './NotesLayer';
@@ -548,6 +548,50 @@ interface Props {
  * En lecture : plan épuré, cotes discrètes. En édition : murs sélectionnables
  * et coins déplaçables (les murs soudés au même coin suivent).
  */
+/**
+ * LA TOILE DU PLAN, ET SA MARGE — un état À ELLE.
+ *
+ * Relevé du patron : « le plan 2D sur l'exemple saccade en le bougeant ».
+ * Le geste lui-même ne coûtait rien (une transformation native), mais la
+ * PRISE du doigt, si : pour ouvrir la toile (voir « LA TOILE S'OUVRE LE
+ * TEMPS DU GESTE »), l'éditeur passait un état à vrai — et se rendait tout
+ * entier, six cent quatre-vingt-dix balises sur l'exemple, au moment même où
+ * le doigt commençait à glisser. Le plan restait figé un instant, puis
+ * sautait sous le doigt.
+ *
+ * La marge vit donc ici. L'ouvrir ne rend que la toile : ses enfants sont
+ * les MÊMES éléments qu'au rendu d'avant, et React ne les reprend pas.
+ */
+function ToileDuPlan({
+  largeur,
+  hauteur,
+  ouvrir,
+  children,
+}: {
+  largeur: number;
+  hauteur: number;
+  /** Où l'éditeur trouve de quoi ouvrir (ou refermer) la toile, en points. */
+  ouvrir: React.MutableRefObject<((marge: number) => void) | null>;
+  children: React.ReactNode;
+}) {
+  const [marge, setMarge] = useState(0);
+  useLayoutEffect(() => {
+    ouvrir.current = setMarge;
+    return () => {
+      ouvrir.current = null;
+    };
+  }, [ouvrir]);
+  return (
+    <Svg
+      width={largeur + 2 * marge}
+      height={hauteur + 2 * marge}
+      viewBox={`${-marge} ${-marge} ${largeur + 2 * marge} ${hauteur + 2 * marge}`}
+      style={marge ? { marginLeft: -marge, marginTop: -marge } : undefined}>
+      {children}
+    </Svg>
+  );
+}
+
 export function FloorplanEditor({
   showMeasures,
   vueInitiale,
@@ -716,13 +760,8 @@ export function FloorplanEditor({
     comme l'autre ». On remonte donc la rotation, le zoom et le déplacement à
     l'écran qui les tient, et c'est lui qui les repasse à la vue d'à côté.
   */
-  /**
-   * Le plan est EN TRAIN d'être déplacé.
-   *
-   * Déclaré ici, au-dessus de l'effet qui l'attend : c'est lui qui décide
-   * quand la position remonte à l'écran.
-   */
-  const [navigating, setNavigating] = useState(false);
+  /** De quoi ouvrir la toile le temps du geste (voir `ToileDuPlan`). */
+  const ouvrirLaToile = useRef<((marge: number) => void) | null>(null);
   /*
     LE MEUBLE QU'ON NE PEUT PAS POSER LÀ.
 
@@ -746,13 +785,13 @@ export function FloorplanEditor({
     et sept feuilles comprises. Le plan, lui, n'y était pour rien.
 
     Or le parent n'a besoin de cette position qu'AU MOMENT DE BASCULER en
-    volume, c'est-à-dire une fois le geste fini. On attend donc la fin :
-    quand `navigating` retombe, l'effet part avec la vue finale.
+    volume, c'est-à-dire une fois le geste fini. Elle ne change d'ailleurs
+    qu'à ce moment-là : le geste vit dans `vueVive`, et l'état n'est posé
+    qu'au lâcher. L'effet part donc avec la vue finale, et elle seule.
   */
   useEffect(() => {
-    if (navigating) return;
     onView?.(view);
-  }, [view, navigating, onView]);
+  }, [view, onView]);
   const viewRef = useRef(view);
   viewRef.current = view;
 
@@ -967,7 +1006,16 @@ export function FloorplanEditor({
         return true;
       },
       onPanResponderGrant: (e, g) => {
-        setNavigating(true);
+        /*
+          LA TOILE NE S'OUVRE QUE SI LE DESSIN DÉBORDE. Un plan qui tient
+          tout entier à l'écran est déjà peint en entier : le glisser, le
+          pincer ou le tourner ne fait entrer aucun vide. Rien à rendre à la
+          prise — c'est le cas de l'exemple, cadré à l'ouverture.
+        */
+        if (debordeRef.current) {
+          const l = layoutRef.current;
+          ouvrirLaToile.current?.(Math.round(Math.max(l.w, l.h) * 0.8));
+        }
         vueVive.current = viewRef.current;
         // Le recalage repart de zero a chaque prise : le decalage se compte
         // en petits pas, et un geste qui commence herite du precedent.
@@ -981,11 +1029,11 @@ export function FloorplanEditor({
         position d'avant le temps d'une image.
       */
       onPanResponderRelease: () => {
-        setNavigating(false);
+        ouvrirLaToile.current?.(0);
         setView(vueVive.current);
       },
       onPanResponderTerminate: () => {
-        setNavigating(false);
+        ouvrirLaToile.current?.(0);
         setView(vueVive.current);
       },
       onPanResponderMove: (e, g) => {
@@ -1147,16 +1195,34 @@ export function FloorplanEditor({
     return <G pointerEvents="none">{traits}</G>;
   }, [showGrille, mapping, walls, c.line, c.lineStrong]);
   /*
-    LA MARGE DE LA TOILE : nulle au repos, large pendant le geste.
+    LA MARGE DE LA TOILE : nulle au repos, large pendant le geste — et
+    seulement si le dessin déborde de l'écran (voir la prise du doigt).
 
     Huit dixièmes de la plus grande dimension : un doigt ne traverse pas
     l'écran et demi d'un seul trait, donc son bord n'est jamais atteint. Un
     nombre ROND, arrondi au point, sinon le `viewBox` change à chaque
     fraction de pixel de mise en page.
+
+    LE DESSIN DÉBORDE-T-IL ? Un bout de mur à moins de trente-six points du
+    bord — la place d'une cote — suffit : ce qui l'entoure a pu ne pas être
+    peint. Le cadrage d'ouverture en laisse quarante (`makeMapping`) : un
+    plan qu'on n'a pas encore déplacé ne déborde jamais.
   */
-  const marge = navigating
-    ? Math.round(Math.max(layout.w, layout.h) * 0.8)
-    : 0;
+  const deborde = useMemo(() => {
+    if (!mapping) return false;
+    const BORD = 36;
+    for (const w of [...walls, ...(filigrane ?? [])]) {
+      for (const pt of [w.a, w.b]) {
+        const q = mapping.toPx(pt);
+        if (q.x < BORD || q.y < BORD || q.x > layout.w - BORD || q.y > layout.h - BORD) return true;
+      }
+    }
+    return false;
+  }, [mapping, walls, filigrane, layout.w, layout.h]);
+  const debordeRef = useRef(deborde);
+  debordeRef.current = deborde;
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
 
   /** Le geste lit le cadrage courant sans se reconstruire à chaque image. */
   const mappingRef = useRef(mapping);
@@ -2098,13 +2164,7 @@ export function FloorplanEditor({
             la prise du doigt, avant le premier mouvement — là où personne
             ne le voit.
           */}
-          <Svg
-            width={layout.w + 2 * marge}
-            height={layout.h + 2 * marge}
-            viewBox={`${-marge} ${-marge} ${layout.w + 2 * marge} ${
-              layout.h + 2 * marge
-            }`}
-            style={marge ? { marginLeft: -marge, marginTop: -marge } : undefined}>
+          <ToileDuPlan largeur={layout.w} hauteur={layout.h} ouvrir={ouvrirLaToile}>
             {/* Toucher le vide désélectionne. Posé tout au fond du dessin :
                 murs, meubles et cartouches gardent la priorité, et seul ce
                 qui n'appartient à rien tombe ici. `transparent` et non
@@ -3612,7 +3672,7 @@ export function FloorplanEditor({
                 }}
               />
             )}
-          </Svg>
+          </ToileDuPlan>
 
           {/* La poignée de l'appareil de plafond choisi : hors du SVG, comme
               celle d'un meuble — un PanResponder ne vit pas dans un tracé. */}
@@ -3625,7 +3685,7 @@ export function FloorplanEditor({
                 <CeilingDragHandle
                   id={cl.id}
                   center={q}
-                  rayon={Math.max(9, Math.min(15, mapping.scale * 0.14))}
+                  rayon={Math.max(8, rayonDuPointLumineux(mapping.scale))}
                   mapping={mapping}
                   at={cl.at}
                   onTap={() => onSelectCeiling?.(cl.id)}

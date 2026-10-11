@@ -6153,6 +6153,7 @@ export function ResultScreen() {
         onRetirer={(id) => useScanStore.getState().retirerDepart(id)}
         onDecrire={(t) => useScanStore.getState().decrireTableau(t)}
         onVider={() => useScanStore.getState().viderLeTableau()}
+        onRetirerRangee={(k) => useScanStore.getState().retirerLaRangee(k)}
         onDeplacer={(id, vers) => useScanStore.getState().deplacerDepart(id, vers)}
         surLePlan={
           tableauDuPlan

@@ -259,6 +259,42 @@ export function implanter(t: {
   };
 }
 
+/**
+ * LA RANGÉE QU'ON PEUT RETIRER — relevé du patron : « un tableau de trois
+ * rangées doit pouvoir se réduire à deux en enlevant le rail vide, pas
+ * forcément le troisième : j'ai vidé le premier rail et je ne pouvais pas
+ * passer à deux rangées ». N'importe quelle rangée vide se retire ; la plus
+ * basse d'abord, pour ne rien déplacer quand c'est possible. Aucune vide :
+ * `null`.
+ */
+export function rangeeVideARetirer(impl: Implantation): number | null {
+  for (let r = impl.rangees - 1; r >= 0; r--) {
+    if (!impl.modules.some((m) => m.rangee === r)) return r;
+  }
+  return null;
+}
+
+/**
+ * Le tableau sans sa rangée `k` : celles du dessous remontent d'un cran, et
+ * chaque organe garde sa place dans la sienne. Une rangée garnie ne se
+ * retire jamais : le tableau revient tel quel.
+ */
+export function sansLaRangee<T extends TableauExistant>(t: T, k: number): T {
+  const impl = implanter(t);
+  if (k < 0 || k >= impl.rangees || impl.modules.some((m) => m.rangee === k)) return t;
+  const rangeeDe = new Map(impl.modules.map((m) => [m.depart.id, m.rangee]));
+  return {
+    ...t,
+    rangees: impl.rangees - 1,
+    departs: t.departs.map((d) => {
+      const r = rangeeDe.get(d.id);
+      if (r === undefined) return d;
+      const voulue = r > k ? r - 1 : r;
+      return voulue === d.rangee ? d : { ...d, rangee: voulue };
+    }),
+  };
+}
+
 /** Les organes qu'un différentiel peut avoir sous lui. */
 const PROTEGEABLE = new Set<Organe>(['disjoncteur', 'fusible', 'contacteur', 'telerupteur', 'autre']);
 

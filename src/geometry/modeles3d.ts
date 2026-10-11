@@ -3048,6 +3048,26 @@ const composantesDe = (hex: string): [number, number, number] => {
   return [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
 };
 
+/**
+ * LE BLANC QUI NE FAIT PLUS MAL AUX YEUX — relevé du patron : « les meubles
+ * et portes blancs sont trop blancs et font mal aux yeux ; réduis le blanc ».
+ *
+ * Sous la lumière de la scène, un blanc pur — et les laques, céramiques et
+ * linges, entre 94 et 97 % — sortait à l'écran en blanc brûlé : plus aucun
+ * détail, un éclat qui fatigue l'œil. Les teintes très claires se tassent
+ * vers un blanc cassé : au-delà de 76 % de clarté, la part qui dépasse est
+ * réduite des deux tiers. Un blanc pur finit à 84 %, une laque à 82 % ; la
+ * nuance se garde (les trois composantes baissent ensemble), et rien de plus
+ * sombre ne bouge.
+ */
+export const SEUIL_DU_BLANC = 0.76;
+export function adoucirLeBlanc([r, g, b]: [number, number, number]): [number, number, number] {
+  const m = Math.max(r, g, b);
+  if (m <= SEUIL_DU_BLANC) return [r, g, b];
+  const k = (SEUIL_DU_BLANC + (m - SEUIL_DU_BLANC) / 3) / m;
+  return [r * k, g * k, b * k];
+}
+
 /** Les meubles qui ne POSENT pas une ombre : ce qui est à plat, ou au mur. */
 const SANS_OMBRE = /tapis|rug|miroir|mirror/i;
 
@@ -3077,7 +3097,7 @@ export function maillageDesMeubles(
   const groupe = (cle: string, code: number, couleur: string, rug: number, met: number) => {
     let g = groupes.get(cle);
     if (!g) {
-      g = { code, rgb: composantesDe(couleur), rug, met, v: [], i: [] };
+      g = { code, rgb: adoucirLeBlanc(composantesDe(couleur)), rug, met, v: [], i: [] };
       groupes.set(cle, g);
     }
     return g;

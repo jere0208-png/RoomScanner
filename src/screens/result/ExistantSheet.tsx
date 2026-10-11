@@ -49,6 +49,7 @@ import {
   grilleDuTableau,
   implanter,
   largeurDe,
+  rangeeVideARetirer,
   rattacher,
   RANGEES_MIN,
   type DepartExistant,
@@ -141,6 +142,7 @@ export function ExistantSheet({
   pieces,
   onVoirFini,
   onVider,
+  onRetirerRangee,
 }: {
   visible: boolean;
   existant: TableauExistant | null;
@@ -160,6 +162,8 @@ export function ExistantSheet({
   onVoirFini?: () => void;
   /** Retire tous les organes : on repart d'un coffret vide. */
   onVider?: () => void;
+  /** Retire la rangée `k`, vide, où qu'elle soit : celles du dessous remontent. */
+  onRetirerRangee?: (k: number) => void;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
@@ -271,6 +275,24 @@ export function ExistantSheet({
 
   const changerRangees = (n: number) => {
     if (n < 1 || n > 6) return;
+    /*
+      N'IMPORTE QUELLE RANGÉE VIDE SE RETIRE — relevé du patron : « j'ai vidé
+      le premier rail et je ne pouvais pas passer à deux rangées, car c'est le
+      troisième qu'il fallait vider ». Une de moins retire la rangée vide la
+      plus basse ; celles du dessous remontent d'un cran.
+    */
+    const vide = n < impl.rangees ? rangeeVideARetirer(impl) : null;
+    if (n < impl.rangees && vide === null) {
+      refuser('Chaque rangée porte encore des organes : videz-en une, n’importe laquelle, pour la retirer.');
+      return;
+    }
+    if (vide !== null && vide < impl.rangees - 1 && onRetirerRangee) {
+      onRetirerRangee(vide);
+      setRefus(n < RANGEES_MIN ? 'Une seule rangée : la norme en demande deux — c’est un point bloquant.' : null);
+      if (visee !== null) setVisee(Math.min(visee > vide ? visee - 1 : visee, n - 1));
+      haptic(n < RANGEES_MIN ? 'alerte' : 'leger');
+      return;
+    }
     const essai = implanter({ departs: departsBruts, rangees: n, parRangee: impl.parRangee });
     if (essai.horsRail.length > 0) {
       refuser(`La rangée ${impl.rangees} porte encore des organes : retirez-les ou déplacez-les d’abord.`);

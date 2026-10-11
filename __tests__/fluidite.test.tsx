@@ -411,37 +411,60 @@ describe('le plan glisse sans se redessiner', () => {
    * Au repos elle reprend sa taille — pas question de rastériser en
    * permanence trois fois la surface de l'écran pour un geste qui dure une
    * seconde.
+   *
+   * ET SEULEMENT SI LE DESSIN DÉBORDE — relevé du patron : « le plan 2D sur
+   * l'exemple saccade en le bougeant ». Ouvrir la toile rendait l'éditeur
+   * entier à la prise du doigt. Un plan qui tient à l'écran est déjà peint
+   * en entier : rien à ouvrir. Et quand il faut l'ouvrir, seule la toile se
+   * rend (voir `ToileDuPlan`) : le dessin, lui, ne bouge pas.
    */
-  it('dessine au-delà du cadre pendant le geste, pour qu’il puisse y revenir', () => {
+  /* La toile du plan : la plus grande des surfaces dessinées — les autres
+     sont les pastilles et les symboles, larges de vingt points. */
+  const toileDe = (tree: TestRenderer.ReactTestRenderer) =>
+    tree.root
+      .findAll((n) => typeof n.props?.bbWidth === 'number')
+      .sort((a, b) => b.props.bbWidth - a.props.bbWidth)[0];
+
+  it('un plan qui tient à l’écran : la prise ne rend rien', () => {
     const tree = planEquipe();
-    /* La toile du plan : la plus grande des surfaces dessinées — les
-       autres sont les pastilles et les symboles, larges de vingt points. */
-    const toile = () =>
-      tree.root
-        .findAll((n) => typeof n.props?.bbWidth === 'number')
-        .sort((a, b) => b.props.bbWidth - a.props.bbWidth)[0];
-    const auRepos = toile().props.bbWidth;
+    const auRepos = toileDe(tree).props.bbWidth;
+    const avant = empreinte(tree);
+    glisser(tree);
+    expect(toileDe(tree).props.bbWidth).toBe(auRepos);
+    expect(empreinte(tree)).toBe(avant);
+  });
+
+  it('un plan qui déborde : la toile s’ouvre le temps du geste, pour qu’il puisse revenir', () => {
+    const tree = planEquipe();
+    // Un premier geste le pousse à moitié hors de l'écran.
+    act(() => {
+      const zone = zoneDuPlan(tree);
+      zone.props.onMoveShouldSetResponder?.(doigt(400, 300));
+      zone.props.onResponderGrant?.(doigt(400, 300));
+      zone.props.onResponderMove?.(doigtDepuis(400, 300, 800, 300));
+      zone.props.onResponderRelease?.(doigtDepuis(400, 300, 800, 300));
+    });
+    const auRepos = toileDe(tree).props.bbWidth;
+    const avant = empreinte(tree);
 
     glisser(tree);
-    const enGeste = toile().props.bbWidth;
+    const enGeste = toileDe(tree).props.bbWidth;
     // Nettement plus large : de quoi ramener au centre ce qui était sorti.
     expect(enGeste).toBeGreaterThan(auRepos * 1.5);
     // Et la toile reste calée sur le dessin : c'est sa FENÊTRE qui s'ouvre,
-    // pas le plan qui se décale. Sans ce recalage, tout le dessin
-    // sauterait de la valeur de la marge à la prise du doigt.
-    // `react-native-svg` éclate le `viewBox` en quatre props : c'est
-    // `minX` qui porte le décalage du cadrage.
-    expect(toile().props.minX).toBe(-(enGeste - auRepos) / 2);
+    // pas le plan qui se décale. `react-native-svg` éclate le `viewBox` en
+    // quatre props : c'est `minX` qui porte le décalage du cadrage.
+    expect(toileDe(tree).props.minX).toBe(-(enGeste - auRepos) / 2);
+    // Le dessin n'a pas été repris pour autant : mêmes coordonnées.
+    expect(empreinte(tree)).toBe(avant);
 
     act(() => {
       zoneDuPlan(tree).props.onResponderRelease?.(
         doigtDepuis(400, 300, 460, 330),
       );
     });
-    // Au repos, la toile reprend sa taille : neuf fois la surface d'écran
-    // rastérisée en permanence pour un geste d'une seconde, c'est le
-    // contraire d'une optimisation.
-    expect(toile().props.bbWidth).toBe(auRepos);
+    // Au repos, la toile reprend sa taille.
+    expect(toileDe(tree).props.bbWidth).toBe(auRepos);
   });
 
   it('pose le cadrage pour de bon quand le doigt se lève', () => {

@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pasDeGeste } from './geste';
 import { catalogueDesPlans, deposerPlan, reprendrePlan, type Identite, retirerPlan } from '../net/coffrePlans';
-import { implanter, rattacher, type DepartExistant, type TableauExistant } from '../geometry/existant';
+import { implanter, rattacher, sansLaRangee, type DepartExistant, type TableauExistant } from '../geometry/existant';
 import { plafondDeLaPiece, solReleveDe, type PlafondDeLaPiece } from '../geometry/fichePiece';
 
 export type { TableauExistant };
@@ -1314,6 +1314,11 @@ interface ScanState {
   constituerLeTableau: (t: TableauExistant) => void;
   /** Repart d'un tableau vide (qui reste constitué : vide, il se dessine vide). */
   viderLeTableau: () => void;
+  /**
+   * Retire la rangée `k`, VIDE, où qu'elle soit : celles du dessous
+   * remontent (voir `sansLaRangee`). Une rangée garnie ne bouge pas.
+   */
+  retirerLaRangee: (k: number) => void;
   /**
    * Déplace un organe sur le rail : d'une place à gauche ou à droite dans sa
    * rangée (`pas`), ou dans une autre rangée, à la suite de ce qui y est.
@@ -5653,6 +5658,16 @@ export const useScanStore = create<ScanState>((set, get) => {
         }),
         dirty: true,
       });
+    },
+
+    retirerLaRangee: (k) => {
+      const ex = get().existant;
+      if (!ex) return;
+      const apres = sansLaRangee(ex, k);
+      // La garde AVANT le point de reprise : voir `annulerunefois`.
+      if (apres === ex) return;
+      pushHistory('retirerLaRangee');
+      set({ existant: rangerLeTableau(apres), dirty: true });
     },
 
     viderLeTableau: () => {

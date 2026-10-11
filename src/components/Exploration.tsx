@@ -61,7 +61,7 @@ import {
   type Lampe,
 } from '../geometry/lumieres';
 import { fixturePlacement, roomInputsOf } from '../geometry/nfc15100';
-import { mixHex } from '../geometry/appearance';
+import { mixHex, pointInPolygon } from '../geometry/appearance';
 import { MAQUETTE, matieresDesSols } from '../ui/maquette';
 import { hexDePeinture } from '../ui/peintures';
 import { accentsDesPieces, solsDesPieces } from '../ui/habillage';
@@ -674,12 +674,21 @@ export function Exploration({
     setEntree({ ...pose.current });
     setSecours(null);
   };
+  const partiesDesPieces = useMemo(() => roomParts(walls, rooms).filter((p) => p.surface), [walls, rooms]);
   const piecesNommees = useMemo(
     () =>
-      roomParts(walls, rooms)
-        .filter((p) => p.surface)
-        .map((p, i) => ({ id: p.roomId, nom: rooms.find((r) => r.id === p.roomId)?.name || `Pièce ${i + 1}` })),
-    [walls, rooms],
+      partiesDesPieces.map((p, i) => ({
+        id: p.roomId,
+        nom: rooms.find((r) => r.id === p.roomId)?.name || `Pièce ${i + 1}`,
+      })),
+    [partiesDesPieces, rooms],
+  );
+  /** La pièce où l'on se tient : sa pastille se teinte, et suit le visiteur. */
+  const pieceIci = useMemo(
+    () =>
+      partiesDesPieces.find((p) => p.surface && pointInPolygon({ x: carte.x, z: carte.z }, p.surface.pts))?.roomId ??
+      null,
+    [partiesDesPieces, carte.x, carte.z],
   );
 
   /*
@@ -966,25 +975,38 @@ export function Exploration({
           </Pressable>
         </View>
 
-        {/* Les pièces du niveau, pour y aller d'un appui. */}
+        {/*
+          LES PIÈCES, EN MARGE — relevé du patron : « réduis les boutons de
+          pièces et place-les plus intelligemment en gênant moins la visite,
+          et donne une couleur à celui de la pièce où l'on se trouve ». Une
+          rangée de grosses pilules barrait le haut de la vue, en plein
+          regard. Elles se rangent en colonne, petites et voilées, sous
+          « Terminer », contre le bord droit : le regard passe au milieu.
+          Celle de la pièce où l'on est se teinte, et suit le visiteur.
+        */}
         {piecesNommees.length > 1 && (
           <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={[styles.pieces, { top: marges.top + 130 }]}
-            contentContainerStyle={styles.piecesFond}>
-            {piecesNommees.map((p) => (
-              <Pressable
-                key={p.id}
-                accessibilityRole="button"
-                accessibilityLabel={`Aller dans : ${p.nom}`}
-                style={({ pressed }) => [styles.piece, pressed && styles.enfonce]}
-                onPress={() => allerDans(p.id)}>
-                <Text style={styles.pieceTexte} numberOfLines={1}>
-                  {p.nom}
-                </Text>
-              </Pressable>
-            ))}
+            testID="pieces-de-la-visite"
+            style={[styles.pieces, { top: marges.top + 58 }]}
+            contentContainerStyle={styles.piecesFond}
+            showsVerticalScrollIndicator={false}>
+            {piecesNommees.map((p) => {
+              const ici = p.id === pieceIci;
+              return (
+                <Pressable
+                  key={p.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Aller dans : ${p.nom}`}
+                  accessibilityState={{ selected: ici }}
+                  hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
+                  style={({ pressed }) => [styles.piece, ici && styles.pieceIci, pressed && styles.enfonce]}
+                  onPress={() => allerDans(p.id)}>
+                  <Text style={[styles.pieceTexte, ici && styles.pieceTexteIci]} numberOfLines={1}>
+                    {p.nom}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
         )}
 
@@ -1036,18 +1058,20 @@ const getStyles = themedStyles((c: Palette) =>
       ...ombreBouton,
     },
     terminerTexte: { color: c.blue, fontSize: 16, fontWeight: '600' },
-    pieces: { position: 'absolute', left: 0, right: 0 },
-    piecesFond: { paddingHorizontal: 14, gap: 8 },
+    /* Une colonne contre le bord droit : pas plus de deux cinquièmes de l'écran. */
+    pieces: { position: 'absolute', right: 14, maxHeight: '42%', maxWidth: 150 },
+    piecesFond: { alignItems: 'flex-end', gap: 6, paddingBottom: 4 },
     piece: {
-      height: 34,
-      paddingHorizontal: 14,
-      borderRadius: 17,
-      backgroundColor: c.surface,
+      height: 26,
+      paddingHorizontal: 10,
+      borderRadius: 13,
+      backgroundColor: c.surfaceVoile,
       alignItems: 'center',
       justifyContent: 'center',
-      ...ombreBouton,
     },
-    pieceTexte: { color: c.ink, fontSize: 14, fontWeight: '600' },
+    pieceIci: { backgroundColor: c.blue },
+    pieceTexte: { color: c.ink, fontSize: 12, fontWeight: '600' },
+    pieceTexteIci: { color: c.surface },
     enfonce: { opacity: 0.7 },
     consigne: {
       position: 'absolute',

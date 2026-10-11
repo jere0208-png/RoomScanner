@@ -332,10 +332,15 @@ final class RoomScanVisite: UIView {
       for n in diffuseurs[rang] ?? [] where n.geometry?.firstMaterial !== matiere {
         n.geometry?.materials = [matiere]
       }
-      if allume && source {
+      if allume {
         let p = SCNVector3(x: v[i + 4], y: v[i + 5], z: v[i + 6])
-        for l in lumieres(genre: genre, a: p, nx: v[i + 7], nz: v[i + 8]) {
-          eclairage.addChildNode(l)
+        // Toute lampe allumée a son halo — même loin, même sans source.
+        eclairage.addChildNode(halo(genre: genre, a: p, nx: v[i + 7], nz: v[i + 8]))
+        if source {
+          for l in lumieres(genre: genre, a: p, nx: v[i + 7], nz: v[i + 8]) {
+            eclairage.addChildNode(l)
+          }
+          eclairage.addChildNode(lueurDesMeubles(genre: genre, a: p, nx: v[i + 7], nz: v[i + 8]))
         }
       }
       i += 9
@@ -371,6 +376,16 @@ final class RoomScanVisite: UIView {
    bois virait au roux, le blanc au crème. La lumière garde sa chaleur, sans
    repeindre la pièce. Une portée de pièce : au-delà, elle s'éteint d'elle-
    même, sans éclairer la chambre d'à côté au travers.
+
+   PLUS DOUCES ENCORE, ET POUR LA PIÈCE SEULE — relevé du patron : « diminue
+   la lumière, son interrupteur allumé ; elle doit être plus perceptible sans
+   augmenter, au contraire elle doit moins impacter les meubles, qui
+   deviennent blancs sous lumière ». Les forces baissent d'un tiers, et les
+   faisceaux ne touchent plus que le bâti (`MASQUE_PIECE`) : les murs, les
+   sols, le plafond. Les meubles reçoivent leur part par une lueur à elle,
+   cinq fois plus faible (`lueurDesMeubles`). Ce qui rend la lumière
+   perceptible, c'est sa SOURCE : le halo autour du luminaire (`halo`), et la
+   nappe sur le mur et le sol — pas un meuble poussé au blanc.
    */
   private func lumieres(genre: Int, a p: SCNVector3, nx: Float, nz: Float) -> [SCNNode] {
     let chaud = UIColor(red: 1.0, green: 0.91, blue: 0.79, alpha: 1)
@@ -390,6 +405,7 @@ final class RoomScanVisite: UIView {
       l.attenuationEndDistance = portee
       l.attenuationFalloffExponent = 2
       l.castsShadow = false
+      l.categoryBitMask = Self.MASQUE_PIECE
       let n = SCNNode()
       n.light = l
       n.position = q
@@ -402,22 +418,23 @@ final class RoomScanVisite: UIView {
     case 1:
       let q = SCNVector3(x: p.x + nx * 0.06, y: p.y, z: p.z + nz * 0.06)
       return [
-        faisceau(versLeHaut: true, interieur: 40, exterieur: 130, intensite: 300, portee: 3.2, teinte: chaud, en: q),
-        faisceau(versLeHaut: false, interieur: 40, exterieur: 130, intensite: 240, portee: 3.0, teinte: chaud, en: q),
+        faisceau(versLeHaut: true, interieur: 40, exterieur: 130, intensite: 200, portee: 3.2, teinte: chaud, en: q),
+        faisceau(versLeHaut: false, interieur: 40, exterieur: 130, intensite: 160, portee: 3.0, teinte: chaud, en: q),
       ]
     case 2:
       return [faisceau(
-        versLeHaut: false, interieur: 24, exterieur: 72, intensite: 380, portee: 4.5, teinte: blanc,
+        versLeHaut: false, interieur: 24, exterieur: 72, intensite: 240, portee: 4.5, teinte: blanc,
         en: SCNVector3(x: p.x, y: p.y - 0.02, z: p.z))]
     case 3:
       let l = SCNLight()
       l.type = .omni
       l.color = chaud
-      l.intensity = 320
+      l.intensity = 210
       l.attenuationStartDistance = 0.3
       l.attenuationEndDistance = 4.5
       l.attenuationFalloffExponent = 2
       l.castsShadow = false
+      l.categoryBitMask = Self.MASQUE_PIECE
       let n = SCNNode()
       n.light = l
       // Au centre de l'ampoule (`DESCENTE_DE_LA_LUMIERE.dcl`), pas à la rosace.
@@ -425,15 +442,112 @@ final class RoomScanVisite: UIView {
       return [n]
     case 4:
       return [faisceau(
-        versLeHaut: false, interieur: 80, exterieur: 165, intensite: 400, portee: 5.5, teinte: neutre,
+        versLeHaut: false, interieur: 80, exterieur: 165, intensite: 250, portee: 5.5, teinte: neutre,
         en: SCNVector3(x: p.x, y: p.y - 0.07, z: p.z))]
     case 5:
       return [faisceau(
-        versLeHaut: false, interieur: 60, exterieur: 155, intensite: 340, portee: 5, teinte: chaud,
+        versLeHaut: false, interieur: 60, exterieur: 155, intensite: 220, portee: 5, teinte: chaud,
         en: SCNVector3(x: p.x, y: p.y - 0.37, z: p.z))]
     default:
       return []
     }
+  }
+
+  /*
+    QUI REÇOIT QUELLE LUMIÈRE. Le jour, l'ambiance et le contre-jour éclairent
+    tout (leur masque a tous les bits). Les faisceaux des lampes n'éclairent
+    que ce qui porte le bit de la PIÈCE — tout nœud le porte par défaut ; les
+    meubles et les appareils portent celui du MEUBLE à la place, et ne
+    reçoivent des lampes que leur lueur douce. Chaque nœud voit ainsi au plus
+    huit lumières : les trois du jour et cinq sources.
+  */
+  private static let MASQUE_PIECE = 1
+  private static let MASQUE_MEUBLE = 2
+
+  /** La part des meubles : une lueur sans faisceau, qui les réchauffe sans les blanchir. */
+  private func lueurDesMeubles(genre: Int, a p: SCNVector3, nx: Float, nz: Float) -> SCNNode {
+    let l = SCNLight()
+    l.type = .omni
+    l.color = UIColor(red: 1.0, green: 0.95, blue: 0.88, alpha: 1)
+    l.intensity = 60
+    l.attenuationStartDistance = 0.2
+    l.attenuationEndDistance = 3.2
+    l.attenuationFalloffExponent = 2
+    l.castsShadow = false
+    l.categoryBitMask = Self.MASQUE_MEUBLE
+    let n = SCNNode()
+    n.light = l
+    let descente: Float = genre == 1 ? 0 : genre == 3 ? 0.59 : 0.3
+    n.position = SCNVector3(x: p.x + nx * 0.1, y: p.y - descente, z: p.z + nz * 0.1)
+    return n
+  }
+
+  /// Le halo : un disque doux, d'un blanc chaud, plein au cœur, nul au bord.
+  private static let imageDuHalo: UIImage = {
+    let cote: CGFloat = 128
+    return UIGraphicsImageRenderer(size: CGSize(width: cote, height: cote)).image { ctx in
+      let couleurs = [
+        UIColor(red: 1.0, green: 0.9, blue: 0.7, alpha: 0.7).cgColor,
+        UIColor(red: 1.0, green: 0.86, blue: 0.62, alpha: 0.28).cgColor,
+        UIColor(red: 1.0, green: 0.84, blue: 0.58, alpha: 0).cgColor,
+      ] as CFArray
+      guard let g = CGGradient(
+        colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: couleurs, locations: [0, 0.32, 1])
+      else { return }
+      let c = CGPoint(x: cote / 2, y: cote / 2)
+      ctx.cgContext.drawRadialGradient(
+        g, startCenter: c, startRadius: 0, endCenter: c, endRadius: cote / 2, options: [])
+    }
+  }()
+
+  /// Une matière pour tous les halos : ni lumière, ni profondeur écrite.
+  private lazy var matiereDuHalo: SCNMaterial = {
+    let m = SCNMaterial()
+    m.lightingModel = .constant
+    m.diffuse.contents = Self.imageDuHalo
+    m.transparent.contents = Self.imageDuHalo
+    m.transparencyMode = .aOne
+    m.blendMode = .alpha
+    m.writesToDepthBuffer = false
+    m.readsFromDepthBuffer = true
+    m.isDoubleSided = true
+    return m
+  }()
+
+  /*
+    LA LUMIÈRE SE VOIT À SA SOURCE. Une lampe allumée se reconnaît d'abord à
+    l'éclat autour d'elle : un disque doux, toujours face au regard, qui
+    n'éclaire rien — il ne pousse aucun meuble au blanc. Le mur ou le
+    plafond le coupe là où il passe derrière (il lit la profondeur).
+  */
+  private func halo(genre: Int, a p: SCNVector3, nx: Float, nz: Float) -> SCNNode {
+    let diametre: CGFloat
+    let q: SCNVector3
+    switch genre {
+    case 1:
+      diametre = 0.55
+      q = SCNVector3(x: p.x + nx * 0.08, y: p.y, z: p.z + nz * 0.08)
+    case 2:
+      diametre = 0.32
+      q = SCNVector3(x: p.x, y: p.y - 0.04, z: p.z)
+    case 3:
+      diametre = 0.42
+      q = SCNVector3(x: p.x, y: p.y - 0.59, z: p.z)
+    case 4:
+      diametre = 0.75
+      q = SCNVector3(x: p.x, y: p.y - 0.08, z: p.z)
+    default:
+      diametre = 0.6
+      q = SCNVector3(x: p.x, y: p.y - 0.37, z: p.z)
+    }
+    let plan = SCNPlane(width: diametre, height: diametre)
+    plan.materials = [matiereDuHalo]
+    let n = SCNNode(geometry: plan)
+    n.position = q
+    n.constraints = [SCNBillboardConstraint()]
+    n.castsShadow = false
+    n.renderingOrder = 20
+    return n
   }
 
   /// Le fil du bois et la trame des tissus, dessinés une fois par teinte —
@@ -759,7 +873,11 @@ final class RoomScanVisite: UIView {
     if s.contains(.meubles) {
       Self.vider(gMeubles)
       diffuseurs.removeAll()
-      for n in noeudsDesMeubles() { gMeubles.addChildNode(n) }
+      for n in noeudsDesMeubles() {
+        // Les faisceaux des lampes ne les touchent pas : voir `MASQUE_MEUBLE`.
+        n.enumerateHierarchy { m, _ in m.categoryBitMask = Self.MASQUE_MEUBLE }
+        gMeubles.addChildNode(n)
+      }
     }
   }
 

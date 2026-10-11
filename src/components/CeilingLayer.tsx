@@ -40,6 +40,23 @@ import {
   type CeilingFixture,
 } from '../geometry/ceiling';
 
+/**
+ * LA TAILLE D'UN POINT LUMINEUX SUR LE PLAN — relevé du patron : « les
+ * points lumineux (croix + rond) sont légèrement trop grands ; si on dézoome
+ * le plan, les icônes doivent suivre le dézoom, et ne pas garder leur
+ * grandeur ». Ils tenaient neuf points au moins, quel que soit le zoom : sur
+ * la vue d'ensemble, ils grossissaient à mesure que le logement rapetissait.
+ *
+ * Ils sont maintenant une taille DU MONDE — dix-sept centimètres de rayon,
+ * la platine d'un point de centre —, bornée aux extrêmes : deux points et
+ * demi pour rester visibles de très loin, onze au plus de très près (quinze
+ * avant). La cible du doigt, elle, garde sa taille.
+ */
+const RAYON_POINT_LUMINEUX_M = 0.17;
+export function rayonDuPointLumineux(echelle: number): number {
+  return Math.min(11, Math.max(2.5, echelle * RAYON_POINT_LUMINEUX_M));
+}
+
 interface Mapping {
   scale: number;
   toPx: (p: Pt) => { x: number; y: number };
@@ -134,7 +151,7 @@ export function CeilingLayer({
         (ceiling ?? []).map((cl) => {
           const spec = CEILINGS[cl.kind];
           const q = mapping.toPx(cl.at);
-          const r = Math.max(9, Math.min(15, mapping.scale * 0.14));
+          const r = rayonDuPointLumineux(mapping.scale);
           const choisi =
             cl.id === selectedCeilingId ||
             (!!selectedCeilingRow && cl.row === selectedCeilingRow);
@@ -144,7 +161,8 @@ export function CeilingLayer({
               onPress={
                 onSelectCeiling ? () => onSelectCeiling(cl.id) : undefined
               }>
-              <Circle cx={q.x} cy={q.y} r={r + 6} fill="transparent" />
+              {/* La cible du doigt ne rapetisse pas avec le dessin. */}
+              <Circle cx={q.x} cy={q.y} r={Math.max(r + 6, 14)} fill="transparent" />
               {choisi && (
                 <Circle
                   cx={q.x}

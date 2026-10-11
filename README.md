@@ -14285,6 +14285,135 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le plan 2D ne saccade plus à la prise du doigt
+
+Relevé du patron : « le plan 2D sur l'exemple saccade en le bougeant. Il
+faut améliorer la fluidité. »
+
+Le geste lui-même ne coûtait rien : le plan glisse par une transformation
+native, sans se redessiner. C'était la **prise du doigt** qui coûtait :
+- pour ouvrir la toile le temps du geste, l'éditeur passait un état à vrai ;
+- il se rendait donc tout entier, six cent quatre-vingt-dix balises sur
+  l'exemple (75 ms sur le banc, davantage sur le téléphone) ;
+- et cela tombait au moment même où le doigt commençait à glisser : le plan
+  restait figé, puis sautait.
+
+Deux changements :
+- **la marge de la toile vit dans `ToileDuPlan`**, un composant à elle.
+  L'ouvrir ne rend que la toile : ses enfants sont les mêmes éléments qu'au
+  rendu d'avant, et React ne les reprend pas ;
+- **la toile ne s'ouvre que si le dessin déborde** de l'écran (un bout de
+  mur à moins de 36 points du bord). Un plan qui tient à l'écran est déjà
+  peint en entier : la prise ne rend rien du tout. C'est le cas de
+  l'exemple, cadré à l'ouverture.
+
+L'état `navigating` a disparu : il ne servait plus qu'à rendre. La position
+du plan remonte toujours à l'écran une seule fois, au lâcher.
+
+`fluidite.test.tsx`.
+
+## Des blancs qui ne font plus mal aux yeux
+
+Relevé du patron : « les meubles et portes blancs sont trop blancs et font
+mal aux yeux. Réduis le blanc. »
+
+Sous la lumière de la scène, un blanc pur, et les laques, céramiques et
+linges (de 94 à 97 %), sortaient à l'écran en blanc brûlé : plus aucun
+détail, un éclat qui fatigue.
+
+`adoucirLeBlanc` (`geometry/modeles3d`) tasse les teintes très claires vers
+un blanc cassé :
+- au-delà de 76 % de clarté, la part qui dépasse est réduite des deux tiers ;
+- un blanc pur finit à 84 %, une laque à 82 % ;
+- les trois composantes baissent ensemble : la nuance se garde ;
+- rien de plus sombre ne bouge.
+
+Toutes les teintes des meubles, des portes et des appareils y passent avant
+la carte graphique : la visite comme la maquette.
+
+`retouchesvisite.test.tsx`.
+
+## Les points lumineux du plan suivent le zoom
+
+Relevé du patron : « sur le plan 2D, les points lumineux (croix + rond) sont
+légèrement trop grands. Si on dézoome le plan, les icônes doivent être
+adaptées au dézoom, et ne pas garder leur grandeur. »
+
+Ils tenaient neuf points au moins, quel que soit le zoom. Sur la vue
+d'ensemble, ils grossissaient donc à mesure que le logement rapetissait.
+
+`rayonDuPointLumineux` (`components/CeilingLayer`) en fait une taille du
+monde :
+- dix-sept centimètres de rayon, la platine d'un point de centre ;
+- deux points et demi au moins, pour rester visibles de très loin ;
+- onze au plus de très près (quinze avant).
+
+La cible du doigt garde sa taille (quatorze points au moins), et la poignée
+d'un point choisi aussi.
+
+`retouchesvisite.test.tsx`.
+
+## Les pièces de la visite, en marge
+
+Relevé du patron : « lors de la visite, réduis les boutons de pièces et
+place-les plus intelligemment en gênant moins la visite, et donne une
+couleur à celui de la pièce où l'on se trouve. »
+
+Une rangée de grosses pilules barrait le haut de la vue, en plein regard.
+Les pièces se rangent maintenant :
+- **en colonne, contre le bord droit**, sous « Terminer » : le regard passe
+  au milieu ;
+- **petites et voilées** : 26 points de haut au lieu de 34, un texte de 12 ;
+- **sur deux cinquièmes de l'écran au plus**, et la colonne défile au-delà.
+
+**Celle de la pièce où l'on est se teinte en bleu**, et suit le visiteur pas
+à pas : la position de la mini-carte dit dans quelle pièce il se tient.
+
+`retouchesvisite.test.tsx`.
+
+## Une rangée vide se retire, où qu'elle soit
+
+Relevé du patron : « un tableau de trois rangées doit pouvoir se réduire à
+deux en enlevant le rail vide, pas forcément le troisième. J'ai vidé le
+premier rail et je ne pouvais pas passer à deux rangées, car c'est le
+troisième qu'il fallait vider. »
+
+« Une rangée de moins » retire maintenant **la rangée vide la plus basse**,
+quelle qu'elle soit :
+- celles du dessous remontent d'un cran, chaque organe à sa place dans la
+  sienne (`sansLaRangee`, `geometry/existant`) ;
+- s'il n'y en a aucune de vide, la feuille le dit : « Chaque rangée porte
+  encore des organes : videz-en une, n'importe laquelle, pour la retirer » ;
+- le geste s'annule comme les autres (`retirerLaRangee`).
+
+`retouchesvisite.test.tsx`.
+
+## La lumière de la visite, plus douce et pour la pièce
+
+Relevé du patron : « diminue la lumière de la scène visite, son interrupteur
+allumé. La lumière doit être plus perceptible sans augmenter ; au contraire
+elle doit moins impacter les meubles, qui deviennent blancs sous lumière. »
+
+**Les lampes baissent d'un tiers** : l'applique passe de 300 et 240 à 200 et
+160, le spot de 380 à 240, l'ampoule de 320 à 210, le plafonnier de 400 à
+250, le ventilateur de 340 à 220.
+
+**Leurs faisceaux n'éclairent plus que le bâti** : les murs, les sols, le
+plafond.
+- Les meubles et les appareils portent un autre masque de lumière
+  (`MASQUE_MEUBLE`) : ils ne reçoivent des lampes qu'une lueur douce, cinq
+  fois plus faible (`lueurDesMeubles`).
+- Chaque nœud voit au plus huit lumières, la limite de la carte graphique :
+  les trois du jour et cinq sources.
+
+**La lumière se voit à sa source** : toute lampe allumée a son halo.
+- C'est un disque doux d'un blanc chaud, toujours face au regard, et qui
+  n'éclaire rien.
+- Le mur ou le plafond le coupe là où il passe derrière.
+- Même une lampe trop loin pour avoir sa vraie lumière garde le sien.
+
+`retouchesvisite.test.tsx`.
+
 ## Le serveur dans son dossier
 
 Relevé du patron : « tous les fichiers sont désormais sur

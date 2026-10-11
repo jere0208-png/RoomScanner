@@ -43,8 +43,9 @@ describe('la visite garde les couleurs des meubles', () => {
     const natif = lire('modules/react-native-room-scan/ios/RoomScanVisite.swift');
     expect(natif).toContain('let chaud = UIColor(red: 1.0, green: 0.91, blue: 0.79, alpha: 1)');
     // Chaque luminaire a sa teinte : le plafonnier est neutre, le spot blanc.
-    expect(natif).toContain('intensite: 400, portee: 5.5, teinte: neutre');
-    expect(natif).toContain('intensite: 380, portee: 4.5, teinte: blanc');
+    // Adoucies une seconde fois : voir `retouchesvisite.test.tsx`.
+    expect(natif).toContain('intensite: 250, portee: 5.5, teinte: neutre');
+    expect(natif).toContain('intensite: 240, portee: 4.5, teinte: blanc');
     expect(natif).not.toContain('intensite: 700');
     expect(natif).not.toContain('intensite: 720');
   });
