@@ -61,6 +61,9 @@ async function api(
   corps: Record<string, unknown>,
 ): Promise<{ ok: boolean; [k: string]: unknown } | null> {
   if (!SERVEUR.url) return null;
+  // Le délai s'annule dès la réponse : un minuteur oublié tient l'app
+  // éveillée cinq secondes pour rien.
+  let delai: ReturnType<typeof setTimeout> | undefined;
   try {
     const reponse = await Promise.race([
       fetch(`${SERVEUR.url}/api.php`, {
@@ -68,13 +71,15 @@ async function api(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...corps }),
       }),
-      new Promise<never>((_, rej) =>
-        setTimeout(() => rej(new Error('délai')), 5000),
-      ),
+      new Promise<never>((_, rej) => {
+        delai = setTimeout(() => rej(new Error('délai')), 5000);
+      }),
     ]);
     return await reponse.json();
   } catch {
     return null;
+  } finally {
+    if (delai) clearTimeout(delai);
   }
 }
 
@@ -156,6 +161,16 @@ export interface Compte {
   methode: MethodeConnexion;
 }
 
+/**
+ * CE QUI PROUVE QU'ON EST BIEN LE TITULAIRE DU COMPTE — jamais gardé, il
+ * part une fois vers le serveur, qui le vérifie (voir server/api.php).
+ */
+export interface PreuveDeConnexion {
+  code?: string;
+  sig?: string;
+  jetonApple?: string;
+}
+
 interface AccountState {
   charge: boolean;
   compte: Compte | null;
@@ -225,7 +240,14 @@ interface AccountState {
    * Crée ou rouvre le compte. Refuse un compte DIFFÉRENT de celui que
    * l'appareil a déjà porté — c'est le verrou anti-remise-à-zéro.
    */
-  connecter: (compte: Compte) => Promise<{ ok: boolean; raison?: string }>;
+  /**
+   * Se connecte. `preuve` est ce que le serveur vérifie avant de délivrer un
+   * jeton : le code reçu par e-mail, la signature de la page Google, ou le
+   * jeton d'identité d'Apple.
+   */
+  connecter: (compte: Compte, preuve?: PreuveDeConnexion) => Promise<{ ok: boolean; raison?: string }>;
+  /** Demande le code de connexion à six chiffres pour cette adresse. */
+  demanderCodeEmail: (email: string) => Promise<{ ok: boolean; raison?: string; sansServeur?: boolean }>;
   connecterApple: () => Promise<{ ok: boolean; raison?: string }>;
   deconnecter: () => void;
   /**
@@ -437,7 +459,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     }
   },
 
-  connecter: async (compte) => {
+  connecter: async (compte, preuve) => {
     /*
       TOUS LES COMPTES SONT LES BIENVENUS — l'essai, lui, appartient au
       TÉLÉPHONE. L'ancien refus (« un compte par appareil ») bloquait le
@@ -472,6 +494,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       prenom: compte.prenom ?? '',
       email: compte.email ?? '',
       appareil: fusion.appareil ?? '',
+      ...(preuve ?? {}),
     });
     if (reponse && !reponse.ok) {
       // Un refus serveur reste possible (compte banni, base en rade côté
@@ -527,15 +550,27 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   connecterApple: async () => {
     try {
       const qui = await connexionApple();
-      return get().connecter({
-        id: `apple:${qui.id}`,
-        prenom: qui.prenom,
-        email: qui.email,
-        methode: 'apple',
-      });
+      return get().connecter(
+        {
+          id: `apple:${qui.id}`,
+          prenom: qui.prenom,
+          email: qui.email,
+          methode: 'apple',
+        },
+        { jetonApple: qui.jeton ?? '' },
+      );
     } catch (e) {
       return { ok: false, raison: (e as Error).message };
     }
+  },
+
+  demanderCodeEmail: async (email) => {
+    // Sans serveur configuré (développement), pas de code à envoyer : la
+    // connexion reste locale, sans jeton — elle n'ouvre rien à distance.
+    if (!SERVEUR.url) return { ok: true, sansServeur: true };
+    const r = await api('code_email', { email });
+    if (!r) return { ok: false, raison: 'Le serveur ne répond pas : vérifiez la connexion, puis réessayez.' };
+    return r.ok ? { ok: true } : { ok: false, raison: String(r.raison ?? 'Le code n’a pas pu partir.') };
   },
 
   entrerEnInvite: () => {
@@ -565,6 +600,15 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 
   supprimerCompte: async () => {
+    /*
+      LE SERVEUR D'ABORD — la page Confidentialité promet que supprimer son
+      compte l'efface de nos serveurs : le compte et les plans déposés
+      partent avec lui. Hors ligne, la suppression locale se fait quand même.
+    */
+    const s = get();
+    if (s.compte && s.jeton) {
+      await api('supprimer', { identifiant: s.compte.id, jeton: s.jeton });
+    }
     // L'identité sort du trousseau ; le compteur de plans y reste, et le
     // Pro tombe avec le compte.
     await fusionnerMarqueur({ compte: '', pro: undefined });
@@ -675,7 +719,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     alerte(
       'Créez un compte pour exporter',
       'Votre plan est prêt. Un compte sert à l’envoyer en PDF, ' +
-        'CSV ou DXF — et à retrouver vos plans après une réinstallation.',
+        'CSV ou DXF — et, avec le Pro, à garder vos plans en ligne.',
       [
         { label: 'Plus tard' },
         { label: 'Créer mon compte', onPress: () => get().quitterInvite() },

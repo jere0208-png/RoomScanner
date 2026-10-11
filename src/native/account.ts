@@ -29,6 +29,8 @@ export interface AppleIdentity {
   id: string;
   prenom?: string;
   email?: string;
+  /** Le jeton d'identité signé par Apple : la preuve que le serveur vérifie. */
+  jeton?: string;
 }
 
 const natif = () => NativeModules.RoomScanAccount as

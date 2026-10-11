@@ -227,6 +227,13 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
       return
     }
     var sortie: [String: Any] = ["id": cred.user]
+    /*
+      LA PREUVE : le jeton d'identité, signé par Apple. Le serveur le vérifie
+      avant de délivrer quoi que ce soit — l'identifiant seul ne prouve rien.
+    */
+    if let jeton = cred.identityToken.flatMap({ String(data: $0, encoding: .utf8) }) {
+      sortie["jeton"] = jeton
+    }
     if let prenom = cred.fullName?.givenName { sortie["prenom"] = prenom }
     if let email = cred.email { sortie["email"] = email }
     signInResolve?(sortie)

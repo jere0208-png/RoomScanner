@@ -24,3 +24,13 @@ const GOOGLE_REDIRECT = 'https://VOTRE-DOMAINE/echoplan/auth-google.php';
 
 // ---- Où l'app attend le retour (schéma d'URL déclaré dans Info.plist).
 const RETOUR_APP = 'echoplan://google';
+
+// ---- L'expéditeur des codes de connexion par e-mail (une adresse du
+// domaine de l'hébergement, sans quoi les messageries les classent en
+// indésirables). Vide : no-reply@<domaine>.
+const EMAIL_EXPEDITEUR = 'no-reply@VOTRE-DOMAINE';
+
+// ---- L'identifiant de l'app (« bundle ID ») pour lequel Apple émet ses
+// jetons de connexion. Vide : on vérifie la signature d'Apple, l'utilisateur
+// et l'expiration, mais pas l'application destinataire.
+const APPLE_BUNDLE_ID = '';

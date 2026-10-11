@@ -4,12 +4,7 @@ import { photosDesMurs } from '../geometry/photosAuto';
 import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pasDeGeste } from './geste';
-import {
-  catalogueDesPlans,
-  deposerPlan,
-  reprendrePlan,
-  type Identite,
-} from '../net/coffrePlans';
+import { catalogueDesPlans, deposerPlan, reprendrePlan, type Identite, retirerPlan } from '../net/coffrePlans';
 import { implanter, rattacher, type DepartExistant, type TableauExistant } from '../geometry/existant';
 import { plafondDeLaPiece, solReleveDe, type PlafondDeLaPiece } from '../geometry/fichePiece';
 
@@ -8085,6 +8080,9 @@ export const useScanStore = create<ScanState>((set, get) => {
     deleteSave: (id) => {
       const st = get();
       const parti = st.saves.find((s) => s.id === id);
+      // Un plan supprimé du téléphone ne reste pas sur le serveur.
+      const qui = identiteDuCompte();
+      if (qui) retirerPlan(qui, id).catch(() => {});
       const saves = st.saves.filter((s) => s.id !== id);
       // Les photos de repérage vivent dans les Documents de l'app : sans
       // ce ménage, elles s'accumulent pour toujours, sans que personne

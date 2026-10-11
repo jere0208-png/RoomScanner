@@ -6,8 +6,9 @@
  * (ASWebAuthenticationSession). Le fichier joue les deux temps du flux
  * OAuth : sans `code`, il envoie vers Google ; au retour, il échange le
  * code contre l'identité, puis renvoie vers l'app par son schéma d'URL
- * (`echoplan://google?...`), le tout SIGNÉ — l'app vérifie le HMAC avant
- * de créer le compte, personne ne forge une identité en tapant une URL.
+ * (`echoplan://google?...`), le tout SIGNÉ : l'app renvoie cette signature
+ * à `api.php` (action `connecter`), qui la VÉRIFIE avant de créer le compte
+ * ou de délivrer un jeton — personne ne forge une identité Google.
  */
 require __DIR__ . '/config-echoplan.php';
 
@@ -90,7 +91,7 @@ if ($sub === '') {
 $identifiant = 'google:' . $sub;
 $email = (string) ($charge['email'] ?? '');
 $prenom = (string) ($charge['given_name'] ?? '');
-// La signature que l'app vérifie : identité non forgeable par l'URL.
+// La signature que api.php vérifie à la connexion : identité non forgeable.
 $signature = hash_hmac('sha256', $identifiant . '|' . $email . '|' . $prenom, SECRET_HMAC);
 
 repartir(RETOUR_APP . '?' . http_build_query([

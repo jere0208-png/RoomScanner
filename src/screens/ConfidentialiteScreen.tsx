@@ -44,12 +44,13 @@ const SECTIONS: { titre: string; texte: string }[] = [
   {
     titre: 'Ce qui monte sous votre compte, et pourquoi',
     texte:
-      'Quand vous êtes connecté, le TEXTE de vos relevés — des murs, des ' +
+      'Avec l’abonnement Pro, le texte de vos relevés — des murs, des ' +
       'ouvertures, de l’appareillage, et les identifiants de vos photos — ' +
       'est déposé sous votre compte. Quelques dizaines de kilo-octets. ' +
       'C’est ce qui vous les rend après une réinstallation ou sur un ' +
-      'nouveau téléphone. Les images, elles, restent chez vous : le plan ne ' +
-      'porte que leurs renvois.',
+      'nouveau téléphone. Sans le Pro, rien ne monte : vos relevés restent ' +
+      'sur le téléphone. Les images, elles, restent toujours chez vous : le ' +
+      'plan ne porte que leurs renvois.',
   },
   {
     titre: 'Votre compte, et rien de plus',
@@ -57,9 +58,9 @@ const SECTIONS: { titre: string; texte: string }[] = [
       'Nous gardons votre identifiant de compte, votre prénom et votre ' +
       'adresse e-mail si vous les avez donnés, un identifiant d’appareil ' +
       '(qui sert à compter le relevé offert), et l’état de votre ' +
-      'abonnement. Aucun mot de passe : la connexion par e-mail n’en ' +
-      'demande pas, et « Se connecter avec Apple » ne nous transmet que ce ' +
-      'qu’Apple veut bien nous dire.',
+      'abonnement. Aucun mot de passe : la connexion par e-mail se prouve ' +
+      'par un code à six chiffres envoyé à l’adresse, et « Se connecter avec ' +
+      'Apple » ne nous transmet que ce qu’Apple veut bien nous dire.',
   },
   {
     titre: 'Le paiement passe par Apple, pas par nous',
@@ -79,8 +80,9 @@ const SECTIONS: { titre: string; texte: string }[] = [
   {
     titre: 'Ce que vous pouvez exiger',
     texte:
-      'Supprimer votre compte efface votre identité de nos serveurs et de ' +
-      'votre téléphone ; le geste est dans le menu « ⋯ » de la page profil. ' +
+      'Supprimer votre compte efface votre identité et vos relevés déposés ' +
+      'de nos serveurs, et votre identité de votre téléphone ; le geste est ' +
+      'dans le menu « ⋯ » de la page profil. ' +
       'Vos relevés déjà enregistrés restent sur l’appareil. Vous pouvez ' +
       'aussi demander une copie de ce que nous détenons, ou son ' +
       'effacement, en écrivant à l’adresse ci-dessous — nous répondons.',

@@ -14285,6 +14285,75 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Personne ne se connecte au compte d'un autre
+
+Constat de l'audit « dans la peau d'un utilisateur » : l'action `connecter`
+de `server/api.php` délivrait un jeton à **n'importe quel identifiant**,
+sans la moindre preuve : `email:quelquun@exemple.fr`, `apple:…`,
+`google:…`. Ce jeton ouvrait `catalogue` et `reprendre`, c'est-à-dire la
+liste et le contenu des plans déposés sous ce compte, noms et adresses des
+clients compris. Il suffisait de connaître l'e-mail de quelqu'un.
+
+**Chaque méthode apporte maintenant SA preuve**, vérifiée par le serveur
+avant de créer un compte ou de délivrer un jeton (`preuveRefusee`) :
+- **e-mail** : un code à six chiffres envoyé à l'adresse (action
+  `code_email`).
+  - Il est tiré au hasard et gardé en empreinte HMAC, jamais en clair.
+  - Il est valable quinze minutes, avec cinq essais, et ne sert qu'une
+    fois.
+  - Une minute au moins entre deux envois, cinq par heure au plus.
+  - L'écran de connexion passe en deux temps : « Recevoir un code »,
+    puis « Se connecter », avec « Renvoyer le code » et « Changer
+    d'adresse ». Le code se remplit tout seul depuis Mail (`oneTimeCode`).
+- **Google** : la signature HMAC que `auth-google.php` posait déjà sur
+  l'identité reçue de Google. Personne ne la vérifiait : son commentaire
+  disait « l'app vérifie », et l'app ne vérifiait rien. L'app la renvoie,
+  le serveur la vérifie.
+- **Apple** : le jeton d'identité signé par Apple (`identityToken`, rendu
+  par le natif). Le serveur vérifie :
+  - la signature RS256, avec les clés publiques d'Apple, gardées une
+    journée ;
+  - l'émetteur, l'expiration et l'utilisateur (`sub`) ;
+  - l'application destinataire, si `APPLE_BUNDLE_ID` est renseigné.
+
+  La reconstruction de la clé publique (JWK → PEM, en DER) a été rejouée
+  octet pour octet en Node : sur vingt clés RSA générées, chaque clé
+  reconstruite est identique à l'originale, chaque signature passe, et une
+  charge falsifiée est refusée.
+
+**Supprimer son compte l'efface aussi du serveur** (action `supprimer`) :
+ses plans déposés, puis le compte et ses appareils. La page Confidentialité
+le promettait ; le serveur n'avait pas de quoi le tenir. Un plan supprimé du
+téléphone est aussi retiré du serveur (action `retirer`).
+
+**Les textes tiennent parole** :
+- la page Confidentialité dit que les relevés ne montent qu'avec le Pro ;
+- l'alerte d'export de l'invité ne promet plus de retrouver ses plans après
+  une réinstallation sans le Pro ;
+- « Un seul compte par téléphone », qui n'était plus vrai, a disparu de
+  l'écran de connexion.
+
+**Le dépôt GitHub est public.** Le code promo qui débloque le Pro était
+écrit dans `schema.sql`, et relancer ce fichier le réactivait. Il n'y est
+plus ; sa désactivation en base est proposée, commentée, dans
+`migration-connexion.sql`.
+
+**À déployer sur le serveur**, l'app d'abord puis le serveur. La nouvelle
+app parle à l'ancien serveur sans rien casser, sauf l'e-mail ; l'ancienne
+app, elle, ne se connecte plus au nouveau serveur :
+- `server/api.php` et `server/auth-google.php` ;
+- dans `config-echoplan.php`, deux constantes (voir l'exemple) :
+  - `EMAIL_EXPEDITEUR`, une adresse du domaine ;
+  - `APPLE_BUNDLE_ID` ;
+- `server/migration-connexion.sql`, à importer une fois (table
+  `codes_email`).
+
+Les jetons déjà délivrés restent valables. Changer `SECRET_HMAC` les annule
+tous, et chacun se reconnecte.
+
+Banc : `connexionsure` (13). Mis à jour : `paywall` (la mention de l'écran
+de connexion).
+
 ## Le diagnostic qu'on écrit sans que le clavier le cache
 
 Relevé du patron, capture à l'appui : « lors d'un diagnostic de plan, la

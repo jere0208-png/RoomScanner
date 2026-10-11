@@ -42,6 +42,14 @@ export function SignInScreen() {
   const [parEmail, setParEmail] = useState(false);
   const [prenom, setPrenom] = useState('');
   const [email, setEmail] = useState('');
+  /*
+    LE CODE REÇU PAR E-MAIL — la preuve qu'on possède l'adresse. Sans lui,
+    n'importe qui se connectait au compte de n'importe qui en tapant son
+    e-mail. `codeEnvoye` : l'adresse à laquelle il est parti.
+  */
+  const [codeEnvoye, setCodeEnvoye] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const demanderCodeEmail = useAccountStore((st) => st.demanderCodeEmail);
 
   const refuse = (raison?: string) =>
     alerte(expliquer('connexion', raison).titre, expliquer('connexion', raison).message);
@@ -78,31 +86,67 @@ export function SignInScreen() {
         refuse('Le retour de Google est illisible.');
         return;
       }
-      const r = await connecter({
-        id,
-        prenom: champ('prenom') || undefined,
-        email: champ('email') || undefined,
-        methode: 'google',
-      });
+      const r = await connecter(
+        {
+          id,
+          prenom: champ('prenom') || undefined,
+          email: champ('email') || undefined,
+          methode: 'google',
+        },
+        // La signature de la page de connexion : le serveur la vérifie.
+        { sig: champ('sig') },
+      );
       if (!r.ok) refuse(r.raison);
     } catch (e) {
       refuse((e as Error).message);
     }
   };
 
+  const adresseSaisie = () => email.trim().toLowerCase();
+
+  /** Le compte par e-mail, une fois l'adresse prouvée (ou sans serveur). */
+  const entrerParEmail = async (adresse: string, preuve?: { code: string }) => {
+    const r = await connecter(
+      {
+        id: `email:${adresse}`,
+        prenom: prenom.trim() || undefined,
+        email: adresse,
+        methode: 'email',
+      },
+      preuve,
+    );
+    if (!r.ok) refuse(r.raison);
+  };
+
+  /** Premier temps : le code part à l'adresse. */
   const viaEmail = async () => {
-    const adresse = email.trim().toLowerCase();
+    const adresse = adresseSaisie();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(adresse)) {
       refuse('L’adresse e-mail ne ressemble pas à une adresse.');
       return;
     }
-    const r = await connecter({
-      id: `email:${adresse}`,
-      prenom: prenom.trim() || undefined,
-      email: adresse,
-      methode: 'email',
-    });
-    if (!r.ok) refuse(r.raison);
+    const r = await demanderCodeEmail(adresse);
+    if (!r.ok) {
+      refuse(r.raison);
+      return;
+    }
+    if (r.sansServeur) {
+      await entrerParEmail(adresse);
+      return;
+    }
+    setCode('');
+    setCodeEnvoye(adresse);
+  };
+
+  /** Second temps : le code reçu, qui part avec la connexion. */
+  const validerCode = async () => {
+    if (!codeEnvoye) return;
+    const chiffres = code.replace(/\D/g, '');
+    if (chiffres.length !== 6) {
+      refuse('Le code reçu par e-mail compte six chiffres.');
+      return;
+    }
+    await entrerParEmail(codeEnvoye, { code: chiffres });
   };
 
   /** L'onde derrière un bouton : le même ruban que l'accueil, en plus bas,
@@ -162,6 +206,42 @@ export function SignInScreen() {
               <Text style={s.btnClairTexte}>Continuer avec un e-mail</Text>
             </Pressable>
           </View>
+        ) : codeEnvoye ? (
+          <View style={s.formulaire}>
+            <Text style={s.codeEnvoye}>{`Code envoyé à ${codeEnvoye}. Il est valable quinze minutes.`}</Text>
+            <TextInput
+              style={s.champ}
+              placeholder="Code à 6 chiffres"
+              placeholderTextColor={c.inkFaint}
+              value={code}
+              onChangeText={setCode}
+              keyboardType="number-pad"
+              textContentType="oneTimeCode"
+              autoComplete="one-time-code"
+              maxLength={6}
+              returnKeyType="done"
+              onSubmitEditing={validerCode}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Se connecter"
+              style={({ pressed }) => [s.btn, s.btnBleu, pressed && s.enfonce]}
+              onPress={validerCode}>
+              <Text style={s.btnBleuTexte}>Se connecter</Text>
+            </Pressable>
+            <View style={s.codeActions}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Renvoyer le code" onPress={viaEmail} hitSlop={8}>
+                <Text style={s.codeLien}>Renvoyer le code</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Changer d’adresse"
+                onPress={() => setCodeEnvoye(null)}
+                hitSlop={8}>
+                <Text style={s.codeLien}>Changer d’adresse</Text>
+              </Pressable>
+            </View>
+          </View>
         ) : (
           <View style={s.formulaire}>
             <TextInput
@@ -184,10 +264,10 @@ export function SignInScreen() {
             />
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Créer mon compte"
+              accessibilityLabel="Recevoir un code"
               style={({ pressed }) => [s.btn, s.btnBleu, pressed && s.enfonce]}
               onPress={viaEmail}>
-              <Text style={s.btnBleuTexte}>Créer mon compte</Text>
+              <Text style={s.btnBleuTexte}>Recevoir un code</Text>
             </Pressable>
           </View>
         )}
@@ -210,8 +290,8 @@ export function SignInScreen() {
       </Pressable>
 
       <Text style={s.mentions}>
-        Un seul compte par téléphone. Scanner est gratuit et sans limite ;
-        le Pro envoie vos plans en PDF, DXF ou 3D.
+        Scanner est gratuit et sans limite ; le Pro envoie vos plans en PDF,
+        DXF ou 3D, et les garde en ligne.
       </Text>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -294,6 +374,9 @@ const themed = (c: Palette) =>
       textDecorationLine: 'underline',
     },
     formulaire: { gap: 10 },
+    codeEnvoye: { color: c.inkSoft, fontSize: 14, lineHeight: 19, textAlign: 'center' },
+    codeActions: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 },
+    codeLien: { color: c.blue, fontSize: 14, fontWeight: '600' },
     champ: {
       height: 48,
       borderRadius: 12,

@@ -70,6 +70,12 @@ export async function deposerPlan(
   return r?.ok === true;
 }
 
+/** Retire du compte un plan supprimé du téléphone. */
+export async function retirerPlan(qui: Identite, scan: string): Promise<boolean> {
+  const r = await api('retirer', { ...qui, scan });
+  return r?.ok === true;
+}
+
 /** Ce que le compte garde, sans le contenu : de quoi choisir. */
 export async function catalogueDesPlans(
   qui: Identite,

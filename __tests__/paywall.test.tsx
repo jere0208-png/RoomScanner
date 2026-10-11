@@ -428,8 +428,11 @@ describe('la porte d’entrée', () => {
     expect(bouton(t, 'Continuer avec Apple')).toBeTruthy();
     expect(bouton(t, 'Continuer avec Google')).toBeTruthy();
     expect(bouton(t, 'Continuer avec un e-mail')).toBeTruthy();
-    // Et elle annonce la règle du jeu : un compte par téléphone.
-    expect(textesDe(t)).toContain('Un seul compte par téléphone');
+    // Et elle annonce la règle du jeu — la vraie : le scan est libre, le Pro
+    // envoie et garde. « Un seul compte par téléphone » ne l'était plus : le
+    // serveur accueille tous les comptes.
+    expect(textesDe(t)).toContain('Scanner est gratuit et sans limite');
+    expect(textesDe(t)).not.toContain('Un seul compte par téléphone');
   });
 });
 

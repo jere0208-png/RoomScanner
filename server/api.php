@@ -3,12 +3,16 @@
  * EchoPlan — l'API des comptes, en un fichier.
  *
  * Une app ne parle JAMAIS à MySQL en direct : ce fichier est la seule
- * porte. Quatre actions, toutes en POST JSON :
+ * porte. Toutes les actions sont en POST JSON :
  *
- *   connecter  {identifiant, prenom?, email?, appareil}
+ *   code_email {email}                       → {ok} ou {ok:false, raison}
+ *              Envoie un code à six chiffres à l'adresse : c'est la preuve
+ *              qu'on la possède.
+ *   connecter  {identifiant, prenom?, email?, appareil, + SA PREUVE}
  *              → {ok, jeton, pro, plans} ou {ok:false, raison}
- *              Le verrou « un compte par téléphone » se juge ICI : un
- *              appareil déjà lié à un AUTRE identifiant est refusé.
+ *              La preuve dépend de la méthode : `code` pour l'e-mail,
+ *              `sig` pour Google (posée par auth-google.php), `jetonApple`
+ *              pour Apple (le jeton d'identité signé par Apple).
  *   etat       {identifiant, jeton}          → {ok, pro, plans}
  *   plan       {identifiant, jeton}          → {ok, plans}   (n += 1)
  *   code       {identifiant, jeton, code}    → {ok, pro}
@@ -16,9 +20,16 @@
  *              Le catalogue public des prix — sans compte, sans base.
 
  *
+ *   supprimer  {identifiant, jeton}          → {ok}  le compte ET ses plans
+ *   retirer    {identifiant, jeton, scan}    → {ok}  un plan déposé
+ *
  * Le jeton est un HMAC de l'identifiant : sans état côté serveur, il prouve
- * que l'appelant est bien passé par `connecter` — assez pour une API de
- * quota, sans gestion de sessions.
+ * que l'appelant est bien passé par `connecter`.
+ *
+ * PERSONNE NE SE CONNECTE AU COMPTE D'UN AUTRE. `connecter` délivrait ce
+ * jeton à n'importe quel identifiant, sans preuve : il suffisait de taper
+ * l'e-mail de quelqu'un pour lister et télécharger ses plans. Chaque méthode
+ * apporte maintenant SA preuve, vérifiée ici avant tout (`preuveRefusee`).
  */
 require __DIR__ . '/config-echoplan.php';
 
@@ -70,16 +81,85 @@ if ($action === 'tarifs') {
   sortir(['ok' => true, 'tarifs' => $brut]);
 }
 
+/** La base, ouverte une fois. */
+function base(): mysqli {
+  static $db = null;
+  if ($db === null) {
+    $db = mysqli_connect(DB_HOTE, DB_UTILISATEUR, DB_MOT_DE_PASSE, DB_BASE);
+    if (!$db) {
+      sortir(['ok' => false, 'raison' => 'Base injoignable.']);
+    }
+    mysqli_set_charset($db, 'utf8mb4');
+  }
+  return $db;
+}
+
+/** L'empreinte d'un code d'e-mail : le code lui-même n'est jamais gardé. */
+function empreinteDuCode(string $email, string $code): string {
+  return hash_hmac('sha256', 'code|' . $email . '|' . $code, SECRET_HMAC);
+}
+
+/*
+  LE CODE PAR E-MAIL — la preuve qu'on possède l'adresse.
+
+  Six chiffres tirés au hasard, gardés en EMPREINTE (jamais en clair), valables
+  quinze minutes, cinq essais. Une minute au moins entre deux envois, cinq
+  envois par heure au plus : on n'inonde pas la boîte de quelqu'un.
+  Nécessite la table `codes_email` — voir migration-connexion.sql.
+*/
+if ($action === 'code_email') {
+  $email = strtolower(trim((string) ($corps['email'] ?? '')));
+  if (strlen($email) > 191 || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    sortir(['ok' => false, 'raison' => 'Adresse e-mail invalide.']);
+  }
+  $db = base();
+  $maintenant = time();
+  $req = mysqli_prepare($db, 'SELECT envoye, envois, fenetre FROM codes_email WHERE email = ?');
+  mysqli_stmt_bind_param($req, 's', $email);
+  mysqli_stmt_execute($req);
+  $avant = mysqli_fetch_assoc(mysqli_stmt_get_result($req));
+  if ($avant && $maintenant - (int) $avant['envoye'] < 60) {
+    sortir(['ok' => false, 'raison' => 'Un code vient de partir : patientez une minute avant d’en demander un autre.']);
+  }
+  $memeHeure = $avant && $maintenant - (int) $avant['fenetre'] < 3600;
+  $envois = $memeHeure ? (int) $avant['envois'] + 1 : 1;
+  $fenetre = $memeHeure ? (int) $avant['fenetre'] : $maintenant;
+  if ($envois > 5) {
+    sortir(['ok' => false, 'raison' => 'Trop de codes demandés pour cette adresse : réessayez dans une heure.']);
+  }
+  $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+  $empreinte = empreinteDuCode($email, $code);
+  $expire = $maintenant + 900;
+  $req = mysqli_prepare(
+    $db,
+    'INSERT INTO codes_email (email, empreinte, expire, essais, envoye, envois, fenetre)
+     VALUES (?, ?, ?, 0, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE empreinte = VALUES(empreinte), expire = VALUES(expire),
+       essais = 0, envoye = VALUES(envoye), envois = VALUES(envois), fenetre = VALUES(fenetre)',
+  );
+  mysqli_stmt_bind_param($req, 'ssiiii', $email, $empreinte, $expire, $maintenant, $envois, $fenetre);
+  mysqli_stmt_execute($req);
+  $expediteur = defined('EMAIL_EXPEDITEUR') && EMAIL_EXPEDITEUR !== ''
+    ? EMAIL_EXPEDITEUR
+    : 'no-reply@' . preg_replace('/^www\./', '', (string) ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+  $sujet = '=?UTF-8?B?' . base64_encode('Votre code EchoPlan : ' . $code) . '?=';
+  $texte = "Bonjour,\r\n\r\nVotre code de connexion EchoPlan : " . $code . "\r\n\r\n" .
+    "Il est valable quinze minutes. Si vous n'avez rien demandé, ignorez ce message : " .
+    "sans ce code, personne ne peut se connecter à votre compte.\r\n";
+  $entetes = 'From: EchoPlan <' . $expediteur . ">\r\n" .
+    "MIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit";
+  if (!mail($email, $sujet, $texte, $entetes)) {
+    sortir(['ok' => false, 'raison' => 'Le code n’a pas pu partir. Réessayez dans un instant.']);
+  }
+  sortir(['ok' => true]);
+}
+
 $identifiant = trim((string) ($corps['identifiant'] ?? ''));
 if ($identifiant === '' || strlen($identifiant) > 191) {
   sortir(['ok' => false, 'raison' => 'Identifiant manquant.']);
 }
 
-$db = mysqli_connect(DB_HOTE, DB_UTILISATEUR, DB_MOT_DE_PASSE, DB_BASE);
-if (!$db) {
-  sortir(['ok' => false, 'raison' => 'Base injoignable.']);
-}
-mysqli_set_charset($db, 'utf8mb4');
+$db = base();
 
 /** Le compte, s'il existe. */
 function compteDe(mysqli $db, string $identifiant): ?array {
@@ -91,10 +171,168 @@ function compteDe(mysqli $db, string $identifiant): ?array {
   return $ligne ?: null;
 }
 
+/** base64url → octets. */
+function b64url(string $s): string {
+  return (string) base64_decode(strtr($s, '-_', '+/') . str_repeat('=', (4 - strlen($s) % 4) % 4));
+}
+
+/** Les clés publiques d'Apple, gardées une journée. */
+function clesApple(): array {
+  $cache = sys_get_temp_dir() . '/echoplan-apple-keys.json';
+  if (is_readable($cache) && time() - (int) filemtime($cache) < 86400) {
+    $lu = json_decode((string) file_get_contents($cache), true);
+    if (is_array($lu['keys'] ?? null)) {
+      return $lu['keys'];
+    }
+  }
+  $curl = curl_init('https://appleid.apple.com/auth/keys');
+  curl_setopt_array($curl, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6]);
+  $brut = (string) curl_exec($curl);
+  curl_close($curl);
+  $lu = json_decode($brut, true);
+  if (!is_array($lu['keys'] ?? null)) {
+    return [];
+  }
+  @file_put_contents($cache, $brut);
+  return $lu['keys'];
+}
+
+/** Une longueur DER. */
+function derLongueur(int $n): string {
+  if ($n < 128) {
+    return chr($n);
+  }
+  $octets = ltrim(pack('N', $n), "\0");
+  return chr(0x80 | strlen($octets)) . $octets;
+}
+
+/** Un entier DER (positif : un zéro devant si le bit de poids fort est levé). */
+function derEntier(string $octets): string {
+  $octets = ltrim($octets, "\0");
+  if ($octets === '' || ord($octets[0]) > 127) {
+    $octets = "\0" . $octets;
+  }
+  return "\x02" . derLongueur(strlen($octets)) . $octets;
+}
+
+/** La clé publique RSA d'une JWK (n, e), au format PEM qu'OpenSSL lit. */
+function pemDeJwk(string $n, string $e): string {
+  $rsa = derEntier(b64url($n)) . derEntier(b64url($e));
+  $rsa = "\x30" . derLongueur(strlen($rsa)) . $rsa;
+  // rsaEncryption (1.2.840.113549.1.1.1), paramètres NULL.
+  $algo = "\x30\x0d\x06\x09\x2a\x86\x48\x86\xf7\x0d\x01\x01\x01\x05\x00";
+  $bits = "\x03" . derLongueur(strlen($rsa) + 1) . "\x00" . $rsa;
+  $spki = "\x30" . derLongueur(strlen($algo) + strlen($bits)) . $algo . $bits;
+  return "-----BEGIN PUBLIC KEY-----\n" . chunk_split(base64_encode($spki), 64, "\n") . "-----END PUBLIC KEY-----\n";
+}
+
+/**
+ * LE JETON D'IDENTITÉ D'APPLE — signé RS256 par Apple, émis pour CET
+ * utilisateur (`sub`), pas encore expiré ; et pour cette application, si
+ * `APPLE_BUNDLE_ID` est renseigné dans la configuration.
+ */
+function jetonAppleValide(string $sub, string $jwt): bool {
+  $parts = explode('.', $jwt);
+  if (count($parts) !== 3) {
+    return false;
+  }
+  $entete = json_decode(b64url($parts[0]), true);
+  $charge = json_decode(b64url($parts[1]), true);
+  if (!is_array($entete) || !is_array($charge) || ($entete['alg'] ?? '') !== 'RS256') {
+    return false;
+  }
+  $cle = null;
+  foreach (clesApple() as $k) {
+    if (($k['kid'] ?? '') === ($entete['kid'] ?? '') && isset($k['n'], $k['e'])) {
+      $cle = $k;
+    }
+  }
+  if (!$cle) {
+    return false;
+  }
+  $signe = openssl_verify(
+    $parts[0] . '.' . $parts[1],
+    b64url($parts[2]),
+    pemDeJwk($cle['n'], $cle['e']),
+    OPENSSL_ALGO_SHA256,
+  );
+  if ($signe !== 1) {
+    return false;
+  }
+  if (($charge['iss'] ?? '') !== 'https://appleid.apple.com') {
+    return false;
+  }
+  if ((int) ($charge['exp'] ?? 0) < time()) {
+    return false;
+  }
+  if ((string) ($charge['sub'] ?? '') !== $sub) {
+    return false;
+  }
+  if (defined('APPLE_BUNDLE_ID') && APPLE_BUNDLE_ID !== '' && ($charge['aud'] ?? '') !== APPLE_BUNDLE_ID) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * LA PREUVE DE CHAQUE MÉTHODE — `null` si elle tient, sinon la raison du
+ * refus. Rien n'est créé, rien n'est délivré avant elle.
+ */
+function preuveRefusee(mysqli $db, string $identifiant, array $corps): ?string {
+  if (strncmp($identifiant, 'email:', 6) === 0) {
+    $email = substr($identifiant, 6);
+    $code = preg_replace('/\D/', '', (string) ($corps['code'] ?? ''));
+    if (strlen($code) !== 6) {
+      return 'Entrez le code reçu par e-mail.';
+    }
+    $req = mysqli_prepare($db, 'SELECT empreinte, expire, essais FROM codes_email WHERE email = ?');
+    mysqli_stmt_bind_param($req, 's', $email);
+    mysqli_stmt_execute($req);
+    $ligne = mysqli_fetch_assoc(mysqli_stmt_get_result($req));
+    if (!$ligne || (int) $ligne['expire'] < time()) {
+      return 'Ce code a expiré : demandez-en un nouveau.';
+    }
+    if ((int) $ligne['essais'] >= 5) {
+      return 'Trop d’essais : demandez un nouveau code.';
+    }
+    if (!hash_equals((string) $ligne['empreinte'], empreinteDuCode($email, $code))) {
+      $req = mysqli_prepare($db, 'UPDATE codes_email SET essais = essais + 1 WHERE email = ?');
+      mysqli_stmt_bind_param($req, 's', $email);
+      mysqli_stmt_execute($req);
+      return 'Code incorrect.';
+    }
+    // Un code ne sert qu'une fois.
+    $req = mysqli_prepare($db, 'UPDATE codes_email SET expire = 0 WHERE email = ?');
+    mysqli_stmt_bind_param($req, 's', $email);
+    mysqli_stmt_execute($req);
+    return null;
+  }
+  if (strncmp($identifiant, 'google:', 7) === 0) {
+    // La signature que auth-google.php a posée sur l'identité reçue de Google.
+    $attendue = hash_hmac(
+      'sha256',
+      $identifiant . '|' . (string) ($corps['email'] ?? '') . '|' . (string) ($corps['prenom'] ?? ''),
+      SECRET_HMAC,
+    );
+    return hash_equals($attendue, (string) ($corps['sig'] ?? '')) ? null : 'Connexion Google non vérifiée : recommencez.';
+  }
+  if (strncmp($identifiant, 'apple:', 6) === 0) {
+    return jetonAppleValide(substr($identifiant, 6), (string) ($corps['jetonApple'] ?? ''))
+      ? null
+      : 'Connexion Apple non vérifiée : recommencez.';
+  }
+  return 'Méthode de connexion inconnue.';
+}
+
 if ($action === 'connecter') {
   $appareil = trim((string) ($corps['appareil'] ?? ''));
   if ($appareil === '' || strlen($appareil) > 191) {
     sortir(['ok' => false, 'raison' => 'Appareil manquant.']);
+  }
+  // LA PREUVE AVANT TOUT : aucun compte créé, aucun jeton délivré sans elle.
+  $refus = preuveRefusee($db, $identifiant, $corps);
+  if ($refus !== null) {
+    sortir(['ok' => false, 'raison' => $refus]);
   }
 
   // TOUS les comptes sont accueillis. Ce que la base retient, c'est
@@ -276,6 +514,30 @@ if ($action === 'reprendre') {
     'contenu' => $ligne['contenu'],
     'maj' => (int) $ligne['maj'],
   ]);
+}
+
+/*
+  SUPPRIMER SON COMPTE L'EFFACE D'ICI AUSSI — ses plans d'abord, puis le
+  compte (ses appareils partent avec, par la clé étrangère). La page
+  Confidentialité le promettait ; le serveur n'avait pas de quoi le tenir.
+*/
+if ($action === 'supprimer') {
+  $req = mysqli_prepare($db, 'DELETE FROM plans WHERE identifiant = ?');
+  mysqli_stmt_bind_param($req, 's', $identifiant);
+  mysqli_stmt_execute($req);
+  $req = mysqli_prepare($db, 'DELETE FROM comptes WHERE id = ?');
+  mysqli_stmt_bind_param($req, 'i', $compte['id']);
+  mysqli_stmt_execute($req);
+  sortir(['ok' => true]);
+}
+
+// Un plan supprimé du téléphone ne reste pas sur le serveur.
+if ($action === 'retirer') {
+  $scan = trim((string) ($corps['scan'] ?? ''));
+  $req = mysqli_prepare($db, 'DELETE FROM plans WHERE identifiant = ? AND scan = ?');
+  mysqli_stmt_bind_param($req, 'ss', $identifiant, $scan);
+  mysqli_stmt_execute($req);
+  sortir(['ok' => true]);
 }
 
 sortir(['ok' => false, 'raison' => 'Action inconnue.']);

@@ -40,9 +40,9 @@ CREATE TABLE IF NOT EXISTS codes_promo (
   utilisations INT NOT NULL DEFAULT 0
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
-INSERT INTO codes_promo (code, pour_cent, actif)
-VALUES ('CARIDI12', 100, 1)
-ON DUPLICATE KEY UPDATE actif = 1;
+-- UN CODE QUI DÉBLOQUE LE PRO NE S'ÉCRIT PAS ICI : ce dépôt est public, et
+-- tout ce qu'il contient se lit. Créez-le directement dans phpMyAdmin :
+--   INSERT INTO codes_promo (code, pour_cent, actif) VALUES ('VOTRE-CODE', 100, 1);
 
 -- L'offre de bienvenue : -20 % sur la première souscription, portée par
 -- le popup « Surprise ! » de l'app. Une REMISE, pas un déverrouillage :
