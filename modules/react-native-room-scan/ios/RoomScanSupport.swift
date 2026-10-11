@@ -90,6 +90,65 @@ class RoomScanSupport: NSObject, MFMailComposeViewControllerDelegate,
     }
   }
 
+  /**
+   * LE DIAGNOSTIC D'UN PLAN — relevé du patron : « envoie les diagnostics
+   * complets d'un plan à echoplansupport@gmail.com ». Le même composeur,
+   * avec un dossier TEXTE joint (le plan entier, en JSON) : il ne passe pas
+   * par un fichier, et part sous son vrai type — `composeMail` étiquetait
+   * toute pièce jointe en image.
+   */
+  @objc func composeMailTexte(
+    _ destinataire: String,
+    subject: String,
+    body: String,
+    fileName: String,
+    content: String,
+    resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    DispatchQueue.main.async {
+      guard MFMailComposeViewController.canSendMail(), let haut = self.sommet()
+      else {
+        resolve("unavailable")
+        return
+      }
+      let vue = MFMailComposeViewController()
+      vue.mailComposeDelegate = self
+      vue.setToRecipients([destinataire])
+      vue.setSubject(subject)
+      vue.setMessageBody(body, isHTML: false)
+      if let donnees = content.data(using: .utf8) {
+        let type = fileName.lowercased().hasSuffix(".json") ? "application/json" : "text/plain"
+        vue.addAttachmentData(donnees, mimeType: type, fileName: fileName)
+      }
+      self.mailResolve = resolve
+      haut.present(vue, animated: true)
+    }
+  }
+
+  /**
+   * QUI ENVOIE : la version de l'application, son numéro de compilation, le
+   * modèle du téléphone (« iPhone15,2 ») et son système. Rien d'autre — ni
+   * nom, ni identifiant : c'est ce qu'il faut pour rejouer un défaut.
+   */
+  @objc func infos(
+    _ resolve: @escaping RCTPromiseResolveBlock,
+    reject: @escaping RCTPromiseRejectBlock
+  ) {
+    let info = Bundle.main.infoDictionary ?? [:]
+    var machine = utsname()
+    uname(&machine)
+    let modele = withUnsafePointer(to: &machine.machine) {
+      $0.withMemoryRebound(to: CChar.self, capacity: 1) { String(cString: $0) }
+    }
+    resolve([
+      "version": info["CFBundleShortVersionString"] as? String ?? "",
+      "build": info["CFBundleVersion"] as? String ?? "",
+      "modele": modele,
+      "systeme": "\(UIDevice.current.systemName) \(UIDevice.current.systemVersion)",
+    ])
+  }
+
   func mailComposeController(
     _ controller: MFMailComposeViewController,
     didFinishWith result: MFMailComposeResult,

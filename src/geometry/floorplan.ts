@@ -82,6 +82,13 @@ export interface WallSeg {
    */
   coffre?: number;
   /**
+   * CE QUE LE COFFRE AVANCE DANS LA PIÈCE (m) — mesuré dans le maillage
+   * LiDAR (voir `coffreLidar`). Absent pour un coffre déclaré à la main :
+   * un tunnel noyé dans la maçonnerie ne dépasse pas du mur. Présent, la 3D
+   * le dessine en volume au-dessus de la baie.
+   */
+  coffreSaillie?: number;
+  /**
    * DE QUEL BORD LA PORTE PIVOTE — quand quelqu'un l'a dit.
    *
    * Le plan le devine (`pivotsDesBattants` range les portes dos à dos pour

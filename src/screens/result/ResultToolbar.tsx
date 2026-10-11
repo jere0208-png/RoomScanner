@@ -729,7 +729,7 @@ export function Toolbar3D({
         {
           titre: 'Ambiance',
           lignes: [
-            { cle: 'couleurs', icone: 'colors', libelle: 'Couleurs relevées', aide: 'Les vraies images des murs et du sol', actif: showTextures, vide: colorsAvailable ? null : RIEN.couleurs, onBascule: () => setShowTextures(!showTextures) },
+            { cle: 'couleurs', icone: 'colors', libelle: 'Couleurs relevées', aide: 'La couleur de chaque mur et du sol, relevée au scan', actif: showTextures, vide: colorsAvailable ? null : RIEN.couleurs, onBascule: () => setShowTextures(!showTextures) },
             { cle: 'ouvertures', icone: 'ouvertures', libelle: 'Portes et fenêtres en couleur', aide: 'Les portes en ambre, les fenêtres en bleu', actif: showOpeningColors, onBascule: () => setShowOpeningColors(!showOpeningColors) },
             ...(modeElec
               ? [{ cle: 'nuit', icone: 'lune' as const, libelle: 'Nuit', aide: 'La maquette s’éteint : touchez un interrupteur', actif: nuit, vide: contenu.luminaires ? null : RIEN.nuit, onBascule: () => setNuit((v) => !v) }]

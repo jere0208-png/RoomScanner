@@ -113,7 +113,9 @@ describe('le natif', () => {
     expect(stop.indexOf('self.lancerLeMaillage()')).toBeGreaterThan(0);
     expect(stop.indexOf('self.lancerLeMaillage()')).toBeLessThan(stop.indexOf('captureSession.stop()'));
     // Et un maillage d'un arrêt précédent ne part jamais avec celui-ci.
-    expect(lancer).toContain('if generation == self.generationMaillage { self.maillageReleve = maillage }');
+    // Le maillage d'un arrêt précédent ne remplace jamais celui-ci (ses
+    // sommets, gardés pour lire les coffres de volet, non plus).
+    expect(lancer).toMatch(/if generation == self\.generationMaillage \{\s*self\.maillageReleve = maillage/);
     expect(m).toContain('hasPrefix("maillage-")');
     expect(m).toContain('removeItem');
     // Il voyage avec le résultat du scan (préparé hors du fil de l'interface).

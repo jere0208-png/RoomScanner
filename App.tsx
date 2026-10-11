@@ -6,6 +6,7 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { ScanScreen } from './src/screens/ScanScreen';
 import { ResultScreen } from './src/screens/ResultScreen';
 import { LibraryScreen } from './src/screens/LibraryScreen';
+import { DiagnosticPlanScreen } from './src/screens/DiagnosticPlanScreen';
 import { ExportScreen } from './src/screens/ExportScreen';
 import { DevisScreen } from './src/screens/DevisScreen';
 import { CameraScreen } from './src/screens/CameraScreen';
@@ -327,6 +328,11 @@ function Application() {
       {screen === 'library' && (
         <Scene entree="poussee">
           <LibraryScreen />
+        </Scene>
+      )}
+      {screen === 'diagnostic' && (
+        <Scene entree="poussee">
+          <DiagnosticPlanScreen />
         </Scene>
       )}
       {screen === 'export' && (

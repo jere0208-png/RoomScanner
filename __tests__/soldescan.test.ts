@@ -15,16 +15,14 @@
  * lumineuses du relevé et l'on peint leur teinte — la mesure reste une
  * mesure, on choisit juste le bon échantillon.
  *
- * ET LA MATIÈRE SE LIT DANS LA GRILLE : des lattes font varier la couleur
- * EN TRAVERS des lames et presque pas le long ; un carrelage varie dans les
- * deux sens ; un sol uni ne varie pas. L'anisotropie du relevé décide —
- * lattes, carreaux, ou rien — et le plan dessine les joints qui vont avec,
- * dans la teinte du scan.
+ * PLUS TARD, LA MATIÈRE N'Y SE LIT PLUS — relevé du patron : « enlève la
+ * récupération exacte des couleurs et des décors, c'est jamais qualitatif ;
+ * récupère simplement la couleur majoritaire ». Les lattes et les carreaux
+ * qu'on devinait dans la grille sont partis avec les orthophotos ; la
+ * couleur, elle, est devenue la MAJORITAIRE — sans oublier le violet :
+ * l'ombre profonde y vote moins fort (`couleurMajoritaire`).
  */
-import {
-  couleurAuPic,
-  matiereRelevee,
-} from '../src/geometry/appearance';
+import { couleurMajoritaire } from '../src/geometry/appearance';
 import { buildScene } from '../src/geometry/scene3d';
 import { MAQUETTE } from '../src/ui/maquette';
 import type { WallSeg } from '../src/geometry/floorplan';
@@ -46,14 +44,14 @@ const lum = (hex: string) => {
   return 0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255);
 };
 
-describe('la couleur au pic de luminosité', () => {
+describe('la couleur majoritaire, prise à la lumière', () => {
   it('ignore l’ombre : le chêne éclairé gagne sur le violet sombre', () => {
     const tex = grille([
       ['#4A4058', '#4A4058', '#C89A66', '#4A4058'],
       ['#4A4058', '#C89A66', '#4A4058', '#4A4058'],
       ['#4A4058', '#4A4058', '#4A4058', '#C89A66'],
     ]);
-    const pic = couleurAuPic(tex)!;
+    const pic = couleurMajoritaire(tex)!;
     // Nettement plus lumineuse que la moyenne, et du côté du chêne.
     expect(lum(pic)).toBeGreaterThan(lum('#7A6E60'));
     const n = parseInt(pic.slice(1), 16);
@@ -63,44 +61,8 @@ describe('la couleur au pic de luminosité', () => {
   });
 
   it('et sans relevé, le repli répond', () => {
-    expect(couleurAuPic(undefined, '#ABCDEF')).toBe('#ABCDEF');
-    expect(couleurAuPic(undefined)).toBeUndefined();
-  });
-});
-
-describe('la matière se lit dans la grille', () => {
-  const A = '#B98F5F';
-  const B = '#8A6A45';
-  it('des lattes : la couleur varie en travers, pas le long', () => {
-    const tex = grille([
-      [A, A, A, A, A, A],
-      [B, B, B, B, B, B],
-      [A, A, A, A, A, A],
-      [B, B, B, B, B, B],
-    ]);
-    const m = matiereRelevee(tex);
-    expect(m?.type).toBe('lattes');
-    // Les rangées courent en x : les lames aussi.
-    expect(m && 'sens' in m ? m.sens : null).toBe('x');
-  });
-
-  it('un damier : des carreaux', () => {
-    const tex = grille([
-      [A, B, A, B],
-      [B, A, B, A],
-      [A, B, A, B],
-      [B, A, B, A],
-    ]);
-    expect(matiereRelevee(tex)?.type).toBe('carreaux');
-  });
-
-  it('un sol uni ne prétend rien', () => {
-    const tex = grille([
-      [A, A, A],
-      [A, A, A],
-      [A, A, A],
-    ]);
-    expect(matiereRelevee(tex)).toBeNull();
+    expect(couleurMajoritaire(undefined, '#ABCDEF')).toBe('#ABCDEF');
+    expect(couleurMajoritaire(undefined)).toBeUndefined();
   });
 });
 
@@ -139,32 +101,17 @@ describe('la scène incorpore le relevé', () => {
       floors: { r1: { color: '#5A4E68', texture: lattes } },
     });
 
-  it('le sol n’est plus violet : il porte le pic du relevé', () => {
+  it('le sol n’est plus violet : il porte sa couleur majoritaire, à la lumière', () => {
     const sol = scene().faces.find((f) => f.isFloor && f.pts.length > 2)!;
     expect(sol.fill).not.toBe('#5A4E68');
     expect(lum(sol.fill!)).toBeGreaterThan(lum('#5A4E68'));
   });
 
-  it('et l’effet lattes est là, SANS matière déclarée : le relevé a parlé', () => {
-    const joints = scene().faces.filter((f) => f.isFloor && f.pts.length === 2);
-    expect(joints.length).toBeGreaterThan(4);
-    /*
-      Les ABOUTS sont courts et perpendiculaires — c'est le calepinage. Ce
-      qui dit le sens des lames, ce sont les GRANDES lignes : toutes celles
-      qui dépassent le mètre courent en x, comme les rangées du relevé.
-    */
-    const longues = joints.filter(
-      (f) => Math.hypot(f.pts[0].x - f.pts[1].x, f.pts[0].z - f.pts[1].z) > 1,
-    );
-    expect(longues.length).toBeGreaterThan(4);
-    for (const f of longues) {
-      expect(Math.abs(f.pts[0].x - f.pts[1].x)).toBeGreaterThan(
-        Math.abs(f.pts[0].z - f.pts[1].z),
-      );
-    }
+  it('et plus de lattes devinées dans la grille : sans matière déclarée, pas de joints', () => {
+    expect(scene().faces.filter((f) => f.isFloor && f.pts.length === 2)).toHaveLength(0);
   });
 
-  it('les murs relevés portent aussi leur pic, pas leur moyenne', () => {
+  it('les murs relevés portent leur couleur majoritaire, pas l’ombre', () => {
     const texMur = {
       cols: 4,
       rows: 2,

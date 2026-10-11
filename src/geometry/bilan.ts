@@ -28,7 +28,7 @@ import { roomSurface, type WallSeg } from './floorplan';
 /** Ce que le bilan lit d'une pièce. */
 export interface PieceDuBilan {
   id: string;
-  floor?: { ortho?: unknown } | null;
+  floor?: { texture?: { texels?: readonly unknown[] } } | null;
   releve?: { plafond?: unknown | null } | null;
 }
 
@@ -79,17 +79,22 @@ const BAREME: Record<
     conseil:
       'Quelques murs ont été vus de loin : un passage lent, à un mètre, les fiabilise.',
   },
+  /*
+    PLUS DE « VRAIE IMAGE » — relevé du patron : « enlève la récupération
+    exacte des couleurs et des décors ». Le relevé ne photographie plus les
+    murs ni le sol : ce qu'il note, c'est d'en avoir lu la couleur.
+  */
   murs: {
     sur: 20,
-    libelle: 'Murs en vraie image',
+    libelle: 'Couleur des murs',
     conseil:
-      'Balayez les murs de face, à un ou deux mètres : la 3D les reproduira à l’identique.',
+      'Balayez les murs à un ou deux mètres : leur couleur sera relevée.',
   },
   sol: {
     sur: 12,
-    libelle: 'Sol en vraie image',
+    libelle: 'Couleur du sol',
     conseil:
-      'Inclinez le téléphone vers le sol en marchant : son parquet ou son carrelage apparaîtra en 3D.',
+      'Inclinez le téléphone vers le sol en marchant : sa couleur sera relevée.',
   },
   plafond: {
     sur: 8,
@@ -134,11 +139,10 @@ export function bilanDuReleve(e: {
   const fractions: Record<CleDuCritere, number> = {
     structure: part(refermees, pieces),
     precision: murs.reduce((s, w) => s + confiance(w), 0) / murs.length,
-    murs: part(
-      murs.filter(w => (w.orthos?.length ?? 0) > 0).length,
-      murs.length,
-    ),
-    sol: part(e.rooms.filter(r => !!r.floor?.ortho).length, pieces),
+    murs: part(murs.filter(w => !!w.color).length, murs.length),
+    // Une couleur de sol RELEVÉE : sa grille le prouve (un sol sans relevé
+    // peut porter une teinte par défaut).
+    sol: part(e.rooms.filter(r => !!r.floor?.texture?.texels?.length).length, pieces),
     plafond: part(e.rooms.filter(r => !!r.releve?.plafond).length, pieces),
   };
   const criteres = ORDRE.map(cle => ({

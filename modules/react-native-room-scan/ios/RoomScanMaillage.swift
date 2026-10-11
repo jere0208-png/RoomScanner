@@ -213,6 +213,139 @@ enum RoomScanMaillage {
     }
   }
 
+  // MARK: - Le coffre de volet roulant
+
+  /// Tous les sommets du maillage, passés dans le monde — pour lire le
+  /// relief au-dessus des baies une fois la pièce assemblée.
+  static func sommetsDuMonde(_ ancres: [ARMeshAnchor]) -> [SIMD3<Float>] {
+    var out = [SIMD3<Float>]()
+    out.reserveCapacity(ancres.reduce(0) { $0 + $1.geometry.vertices.count })
+    for ancre in ancres {
+      let vs = ancre.geometry.vertices
+      let t = ancre.transform
+      let base = vs.buffer.contents().advanced(by: vs.offset)
+      for i in 0..<vs.count {
+        let p = base.advanced(by: i * vs.stride).assumingMemoryBound(to: Float.self)
+        let w = t * SIMD4<Float>(p[0], p[1], p[2], 1)
+        guard w.x.isFinite, w.y.isFinite, w.z.isFinite else { continue }
+        out.append(SIMD3<Float>(w.x, w.y, w.z))
+      }
+    }
+    return out
+  }
+
+  /// Une baie telle que RoomPlan la donne : son repère, sa largeur, sa hauteur.
+  struct Baie {
+    let id: String
+    let transform: simd_float4x4
+    let largeur: Float
+    let hauteur: Float
+  }
+
+  static let pasDuProfil: Float = 0.02
+  /// Le profil part dix centimètres sous le haut de la baie…
+  static let depuisLeHaut: Float = -0.10
+  /// … et monte d'un mètre en tout.
+  static let tranchesDuProfil = 50
+
+  /**
+   LE RELIEF AU-DESSUS DE CHAQUE BAIE — relevé du patron : « les coffrages de
+   volets roulants ne sont pas détectés ; pourtant il y a bien une forme
+   différente d'un mur plat ».
+
+   RoomPlan lisse le mur en un plan : le coffre y disparaît. Le maillage,
+   lui, l'a vu. Pour chaque baie, on range les sommets qui la surplombent
+   (sur sa largeur, dix centimètres retirés à chaque bout) en tranches de
+   deux centimètres, et l'on garde de chaque tranche l'ÉCART MÉDIAN au plan
+   de la baie, en centimètres, compté positif vers la pièce. Le même relevé
+   sur une bande du mur voisin (de 25 à 60 cm au-delà des tableaux) sert de
+   témoin : une saillie qui court aussi là est une retombée, pas un coffre.
+
+   Le côté de la pièce est celui où la caméra est passée (`trajet`, x et z
+   à la suite). Le JavaScript tranche (`geometry/coffreLidar`).
+   */
+  static func profilsAuDessus(
+    sommets: [SIMD3<Float>], baies: [Baie], trajet: [Float]
+  ) -> [String: [String: Any]] {
+    var out: [String: [String: Any]] = [:]
+    guard !sommets.isEmpty else { return out }
+    let n = tranchesDuProfil
+    for baie in baies {
+      let t = baie.transform
+      let c = SIMD3<Float>(t.columns.3.x, t.columns.3.y, t.columns.3.z)
+      var ex = SIMD3<Float>(t.columns.0.x, 0, t.columns.0.z)
+      guard simd_length(ex) > 1e-4, baie.largeur > 0.2 else { continue }
+      ex = simd_normalize(ex)
+      // La normale, à plat : perpendiculaire à la largeur.
+      var nz = SIMD3<Float>(-ex.z, 0, ex.x)
+      let demi = baie.largeur / 2
+      let haut = c.y + baie.hauteur / 2
+
+      // Le côté de la pièce : celui où la caméra est passée, à moins de 4 m.
+      var devant = 0
+      var derriere = 0
+      var i = 0
+      while i + 1 < trajet.count {
+        let dx = trajet[i] - c.x
+        let dz = trajet[i + 1] - c.z
+        if dx * dx + dz * dz < 16 {
+          let s = dx * nz.x + dz * nz.z
+          if s > 0.1 { devant += 1 } else if s < -0.1 { derriere += 1 }
+        }
+        i += 2
+      }
+      let oriente = devant + derriere >= 3 && devant != derriere
+      if oriente && derriere > devant { nz = -nz }
+
+      var baieT = [[Float]](repeating: [], count: n)
+      var temoinT = [[Float]](repeating: [], count: n)
+      for p in sommets {
+        let v = p.y - haut - depuisLeHaut
+        guard v >= 0 else { continue }
+        let k = Int(v / pasDuProfil)
+        guard k < n else { continue }
+        let dx = p.x - c.x
+        let dz = p.z - c.z
+        let w = dx * nz.x + dz * nz.z
+        guard abs(w) <= 0.6 else { continue }
+        let u = abs(dx * ex.x + dz * ex.z)
+        let e = oriente ? w : abs(w)
+        if u <= demi - 0.1 {
+          baieT[k].append(e)
+        } else if u >= demi + 0.25 && u <= demi + 0.6 {
+          temoinT[k].append(e)
+        }
+      }
+      func medianes(_ tranches: [[Float]]) -> ([Int], [Int]) {
+        var m = [Int]()
+        var comptes = [Int]()
+        for x in tranches {
+          comptes.append(x.count)
+          if x.isEmpty {
+            m.append(0)
+          } else {
+            let s = x.sorted()
+            m.append(Int((s[s.count / 2] * 100).rounded()))
+          }
+        }
+        return (m, comptes)
+      }
+      let (ecarts, nombres) = medianes(baieT)
+      let (temoin, nombresTemoin) = medianes(temoinT)
+      guard nombres.contains(where: { $0 > 0 }) else { continue }
+      out[baie.id] = [
+        "pas": pasDuProfil,
+        "depuis": depuisLeHaut,
+        "ecarts": ecarts,
+        "nombres": nombres,
+        "temoin": temoin,
+        "nombresTemoin": nombresTemoin,
+        "oriente": oriente,
+      ]
+    }
+    return out
+  }
+
   static func volume(sol: [Float], plafond: [SIMD2<Int32>: SIMD2<Float>]) -> [String: Any]? {
     guard sol.count >= 20, !plafond.isEmpty else { return nil }
     let tries = sol.sorted()

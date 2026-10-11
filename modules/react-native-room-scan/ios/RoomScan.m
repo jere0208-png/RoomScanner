@@ -197,6 +197,16 @@ RCT_EXTERN_METHOD(composeMail:(NSString *)destinataire
                   reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(pickImage:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
+/* Le diagnostic d'un plan : un dossier texte joint, et qui l'envoie. */
+RCT_EXTERN_METHOD(composeMailTexte:(NSString *)destinataire
+                  subject:(NSString *)subject
+                  body:(NSString *)body
+                  fileName:(NSString *)fileName
+                  content:(NSString *)content
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(infos:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 @end
 
 /*

@@ -14285,6 +14285,93 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le coffre de volet lu dans le maillage ; une couleur par mur, la majoritaire ; le diagnostic d'un plan, envoyé au support
+
+Relevés du patron : « les coffrages de volets roulants, au-dessus des baies,
+ne sont pas détectés par le lidar. Vois pourquoi » ; « enlève la récupération
+exacte des couleurs (et donc décors des pièces) car c'est jamais qualitatif,
+récupère simplement la couleur majoritaire d'un mur » ; « une pièce n'est
+pas fermée et ne veut pas se fermer après un scan : fais en sorte qu'on
+puisse diagnostiquer un plan, lire tous ses problèmes et ses données, et
+l'envoyer à echoplansupport@gmail.com, avec ce qui n'allait pas ».
+
+**Pourquoi le coffre n'était pas vu.** RoomPlan rend des MURS PLANS : un plan
+par paroi, et tout relief de moins de vingt ou trente centimètres y est lissé.
+Sa liste d'objets n'a pas de case pour un caisson de volet. Le maillage LiDAR
+brut, lui, a vu la saillie. Il était relevé à chaque scan, mais on n'en
+lisait que le sol et le plafond.
+
+**Le coffre, lu dans le maillage** (`RoomScanMaillage.profilsAuDessus`,
+`geometry/coffreLidar.ts`).
+- À la fin du scan, le natif garde les sommets du maillage. Au-dessus de
+  chaque baie (fenêtre, porte, passage), il range ceux qui la surplombent en
+  tranches de 2 cm, sur un mètre de haut, et garde de chaque tranche l'écart
+  médian au plan du mur, compté positif vers la pièce (le côté où la caméra
+  est passée).
+- La même mesure, sur une bande du mur voisin, sert de témoin.
+- Le JavaScript reconnaît un coffre à une saillie franche et régulière (6 à
+  50 cm), haute de 10 à 60 cm, partant du haut de la baie, et qui ne court
+  pas aussi le long du mur voisin : là, ce serait une retombée.
+- La baie reçoit sa hauteur de coffre (`coffre`, la même que celle qu'on
+  déclare à la main : élévation, dossier PDF et contrôle la lisaient déjà)
+  et sa saillie (`coffreSaillie`). La 3D le dessine en volume, côté pièce.
+- Un tablier à demi descendu faisait cadrer la baie dessous. Si le maillage
+  la montre encore en retrait jusqu'au coffre, elle remonte jusque sous lui.
+- Un coffre tunnel noyé dans la maçonnerie ne dépasse pas du mur : il ne se
+  voit pas, et se déclare toujours à la main.
+
+**Une couleur par mur, la majoritaire** (`couleurMajoritaire`).
+- Les cases du relevé se rangent par familles de teinte (Lab, la clarté
+  comptant pour moitié : l'ombre assombrit une peinture sans en changer la
+  teinte). La famille qui couvre le plus de surface l'emporte.
+- L'ombre profonde vote moins fort, sinon le « sol violet » revenait. La
+  famille gagnante rend sa couleur là où la lumière la montre : la moyenne de
+  sa moitié la plus claire.
+- Elle remplace la « couleur au pic » : un mur beige percé d'un cadre blanc
+  sortait blanc, il sort beige.
+- **Plus de décor recopié.** Les orthophotos (`RoomScanOrtho.swift`
+  supprimé), les lattes et carreaux devinés dans la grille du sol, et les
+  deux couleurs d'un meuble (dessus, côtés) disparaissent. Un ancien plan
+  garde ses images dans ses données, mais la 3D n'en pose plus.
+- Un scan dont les murs ont leur couleur ouvre la 3D en couleurs. Le bilan
+  du relevé note « Couleur des murs » et « Couleur du sol » au lieu des
+  « vraies images ».
+
+**Le diagnostic d'un plan** (`geometry/diagnosticPlan.ts`,
+`DiagnosticPlanScreen`). Dans « Mes scans », le « … » d'un plan propose
+« Diagnostiquer le plan ». La page montre :
+- **ce que l'application a vu**, et pour une pièce qui ne se ferme pas, le
+  POURQUOI, lu dans ses coins :
+  - deux murs qui se frôlent sans se toucher, avec l'écart au centimètre ;
+  - un morceau de mur qui manque ;
+  - une cloison qui bute au milieu d'un mur sans le couper ;
+  - un coin où trois murs se croisent ;
+  - un mur cité qui n'existe plus.
+
+  S'y ajoutent les points à corriger habituels (niveau par niveau), les
+  menuiseries posées sur aucun mur et les pièces sans mur ;
+- **les données du plan** : pièces (dont ouvertes), surface, murs, hauteur,
+  portes, fenêtres, meubles, appareils, niveaux, et chaque pièce ;
+- **ce qui n'allait pas** : dix cases à cocher (pièce qui ne se ferme pas,
+  mur manquant, cotes fausses, coffre ou retour absent, meuble mal reconnu,
+  couleurs…) et un champ libre.
+
+« Envoyer le diagnostic » ouvre le composeur d'iOS, adressé à
+echoplansupport@gmail.com. C'est l'utilisateur qui envoie. Il part avec :
+- un courrier lisible : ce qui a été coché, son message, ce que l'app a vu,
+  le résumé du plan, la version et le modèle d'iPhone ;
+- un dossier JSON joint (`composeMailTexte`, en `application/json`) : toutes
+  les données du plan, le diagnostic et le journal des pannes. Les
+  coordonnées du client n'y sont pas.
+
+Sans compte dans l'app Mail, le dossier passe par la feuille de partage, et
+la page donne l'adresse. La version de l'app et le modèle du téléphone sont
+lus en natif (`infos`).
+
+Bancs : `coffrelidar` (19), `couleurmajoritaire` (11), `diagnostiquerleplan`
+(13). Mis à jour : `soldescan`, `murunicouleur`, `moderne`, `maillage`, et
+`reproduction`, réduit aux vraies cotes des meubles.
+
 ## Allumer éclaire ; plus d'option Nord ; « Décorer » qui tourne ; symboles « ×3 » ; murs qui se touchent partout
 
 Relevés du patron : « l'éclairage en visite agit trop sur les meubles,

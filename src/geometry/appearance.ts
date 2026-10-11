@@ -543,18 +543,25 @@ export function pointInPolygon(p: Pt, poly: Pt[]): boolean {
  * d'environ `targetPx` à l'écran, sur une échelle « ronde » (0,125 m, 0,25 m…).
  */
 /**
- * LA COULEUR AU PIC DE LUMINOSITÉ — relevé du patron, capture d'un scan à
- * l'appui : « le sol dans un scan que j'ai fait est violet. La couleur doit
- * refléter la couleur du sol lors du scan, à son pic de luminosité. »
+ * LA COULEUR MAJORITAIRE D'UN MUR (ou d'un sol) — relevé du patron :
+ * « enlève la récupération exacte des couleurs (et donc décors des pièces)
+ * car c'est jamais qualitatif ; récupère simplement la couleur majoritaire
+ * d'un mur pour la reconstituer ».
  *
- * POURQUOI LE VIOLET : la couleur transmise est une MOYENNE, et la moyenne
- * d'un sol pris entre ombres et reflets tire vers un gris-violet qui
- * n'existe nulle part dans la pièce. Ce qu'on voit « en vrai », c'est la
- * matière là où la lumière la montre. On garde donc le QUART le plus
- * lumineux des cases du relevé et l'on moyenne CES cases-là : la mesure
- * reste une mesure — on choisit le bon échantillon, on n'invente rien.
+ * Les cases du relevé se rangent par FAMILLES DE TEINTE : deux cases sont
+ * de la même famille si leurs couleurs se ressemblent, la clarté comptant
+ * pour moitié — l'ombre assombrit une peinture sans en changer la teinte.
+ * La famille qui couvre le plus de surface l'emporte.
+ *
+ * MAIS L'OMBRE PROFONDE VOTE MOINS FORT. Une case très sombre dit plus la
+ * pénombre que la matière : c'était le « sol violet » (relevé du patron :
+ * « la couleur doit refléter celle du sol, à son pic de luminosité »). Le
+ * vote d'une case pèse donc selon sa clarté, et la famille gagnante rend sa
+ * couleur là où la lumière la montre : la moyenne de sa moitié la plus
+ * claire. La mesure reste une mesure — on choisit les bons échantillons,
+ * on n'invente rien.
  */
-export function couleurAuPic(
+export function couleurMajoritaire(
   tex: SurfaceTexture | undefined,
   repli?: string,
 ): string | undefined {
@@ -566,71 +573,66 @@ export function couleurAuPic(
       const r = (n >> 16) & 255;
       const g = (n >> 8) & 255;
       const b = n & 255;
-      return { r, g, b, lum: 0.2126 * r + 0.7152 * g + 0.0722 * b };
+      return { r, g, b, lab: versLab(r, g, b) };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
   if (lus.length === 0) return repli;
-  lus.sort((a, b) => b.lum - a.lum);
-  const garde = lus.slice(0, Math.max(1, Math.ceil(lus.length / 4)));
-  const moy = (v: (x: (typeof garde)[0]) => number) =>
-    Math.round(garde.reduce((t, x) => t + v(x), 0) / garde.length);
+
+  // Le poids d'un vote : plein au-dessus de 80 % de la case la plus claire,
+  // de moins en moins dessous.
+  const clartes = lus.map((x) => x.lab[0]);
+  const reference = Math.max(1, Math.max(...clartes) * 0.8);
+  const poids = (L: number) => Math.min(1, Math.max(0.02, L / reference)) ** 2.5;
+
+  type Famille = { L: number; a: number; b: number; n: number; votes: number; cases: typeof lus };
+  const familles: Famille[] = [];
+  // Les cases les plus sûres d'abord : ce sont elles qui fondent les familles.
+  for (const c of [...lus].sort((x, y) => y.lab[0] - x.lab[0])) {
+    const [L, a, b] = c.lab;
+    let proche: Famille | null = null;
+    let mieux = Infinity;
+    for (const f of familles) {
+      const d = Math.hypot((L - f.L) * 0.5, a - f.a, b - f.b);
+      if (d < mieux) {
+        mieux = d;
+        proche = f;
+      }
+    }
+    if (proche && mieux <= 14) {
+      proche.L = (proche.L * proche.n + L) / (proche.n + 1);
+      proche.a = (proche.a * proche.n + a) / (proche.n + 1);
+      proche.b = (proche.b * proche.n + b) / (proche.n + 1);
+      proche.n++;
+      proche.votes += poids(L);
+      proche.cases.push(c);
+    } else {
+      familles.push({ L, a, b, n: 1, votes: poids(L), cases: [c] });
+    }
+  }
+  const gagnante = familles.reduce((m, f) => (f.votes > m.votes + 1e-9 ? f : m), familles[0]);
+  const claires = [...gagnante.cases]
+    .sort((x, y) => y.lab[0] - x.lab[0])
+    .slice(0, Math.max(1, Math.ceil(gagnante.cases.length / 2)));
+  const moy = (v: (x: (typeof claires)[0]) => number) =>
+    Math.round(claires.reduce((t, x) => t + v(x), 0) / claires.length);
   const hex = (v: number) => v.toString(16).padStart(2, '0');
   return `#${hex(moy((x) => x.r))}${hex(moy((x) => x.g))}${hex(moy((x) => x.b))}`;
 }
 
-/**
- * LA MATIÈRE, LUE DANS LA GRILLE DU RELEVÉ — « détecter si on a des lattes,
- * des carreaux, ou autre et l'incorporer au plan ».
- *
- * Des lattes font varier la couleur EN TRAVERS des lames et presque pas le
- * long ; un carrelage varie dans les deux sens ; un sol uni ne varie pas.
- * On mesure donc l'ANISOTROPIE de la luminance : le gradient moyen le long
- * des colonnes contre celui le long des rangées. Trois verdicts, et un
- * refus franc — un relevé qui ne tranche pas ne prétend rien.
- */
-export function matiereRelevee(
-  tex: SurfaceTexture | undefined,
-): { type: 'lattes'; sens: 'x' | 'z' } | { type: 'carreaux' } | null {
-  if (!tex || tex.cols < 3 || tex.rows < 3) {
-    // Deux rangées suffisent pourtant à des lattes franches.
-    if (!tex || tex.cols < 2 || tex.rows < 2) return null;
-  }
-  const L: number[][] = [];
-  for (let r = 0; r < tex.rows; r++) {
-    const ligne: number[] = [];
-    for (let c = 0; c < tex.cols; c++) {
-      const n = parseInt(String(tex.texels[r * tex.cols + c] ?? '').replace('#', ''), 16);
-      if (!Number.isFinite(n)) return null;
-      ligne.push(0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255));
-    }
-    L.push(ligne);
-  }
-  let gx = 0;
-  let nx = 0;
-  let gz = 0;
-  let nz = 0;
-  for (let r = 0; r < tex.rows; r++) {
-    for (let c = 0; c + 1 < tex.cols; c++) {
-      gx += Math.abs(L[r][c + 1] - L[r][c]);
-      nx++;
-    }
-  }
-  for (let r = 0; r + 1 < tex.rows; r++) {
-    for (let c = 0; c < tex.cols; c++) {
-      gz += Math.abs(L[r + 1][c] - L[r][c]);
-      nz++;
-    }
-  }
-  gx = nx ? gx / nx : 0;
-  gz = nz ? gz / nz : 0;
-  const SEUIL = 6;
-  if (gx < SEUIL && gz < SEUIL) return null;
-  // Les rangées courent en x : si la couleur change de rangée en rangée
-  // (gz fort) et presque pas le long d'une rangée (gx faible), les lames
-  // courent en x.
-  if (gz > gx * 1.6) return { type: 'lattes', sens: 'x' };
-  if (gx > gz * 1.6) return { type: 'lattes', sens: 'z' };
-  return { type: 'carreaux' };
+/** sRGB (0–255) → CIELAB, blanc D65. */
+function versLab(r: number, g: number, b: number): [number, number, number] {
+  const lin = (v: number) => {
+    const c = v / 255;
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const R = lin(r);
+  const G = lin(g);
+  const B = lin(b);
+  const X = (0.4124 * R + 0.3576 * G + 0.1805 * B) / 0.95047;
+  const Y = 0.2126 * R + 0.7152 * G + 0.0722 * B;
+  const Z = (0.0193 * R + 0.1192 * G + 0.9505 * B) / 1.08883;
+  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  return [116 * f(Y) - 16, 500 * (f(X) - f(Y)), 200 * (f(Y) - f(Z))];
 }
 
 export function dotStep(scalePxPerM: number, targetPx = 15): number {

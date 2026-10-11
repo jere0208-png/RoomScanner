@@ -189,6 +189,24 @@ export interface ScanResult {
     volume?: VolumeReleve;
   };
   /**
+   * CE QUE LE MAILLAGE MONTRE AU-DESSUS DE CHAQUE BAIE, par identifiant de
+   * surface : l'écart au plan du mur, tranche par tranche — c'est là qu'on
+   * lit le coffre de volet roulant que RoomPlan lisse (voir
+   * `geometry/coffreLidar`).
+   */
+  dessus?: Record<
+    string,
+    {
+      pas: number;
+      depuis: number;
+      ecarts: number[];
+      nombres: number[];
+      temoin?: number[];
+      nombresTemoin?: number[];
+      oriente?: boolean;
+    }
+  >;
+  /**
    * LES SOLS QUE ROOMPLAN A MESURÉS (iOS 17) : le polygone exact de chacun,
    * à plat (`[x0, z0, x1, z1…]`), et sa hauteur.
    */

@@ -12,7 +12,6 @@ import {
 } from '../net/coffrePlans';
 import { implanter, rattacher, type DepartExistant, type TableauExistant } from '../geometry/existant';
 import { plafondDeLaPiece, solReleveDe, type PlafondDeLaPiece } from '../geometry/fichePiece';
-import { habillerLesMurs } from '../geometry/habillage';
 
 export type { TableauExistant };
 import {
@@ -85,6 +84,7 @@ import {
   type Pt,
   type WallSeg,
 } from '../geometry/floorplan';
+import { avecCoffresDuLidar } from '../geometry/coffreLidar';
 import {
   catalogTransform,
   type CatalogItem,
@@ -142,7 +142,12 @@ export type Screen =
   | 'camera'
   | 'profil'
   | 'notifications'
-  | 'confidentialite';
+  | 'confidentialite'
+  /*
+    LE DIAGNOSTIC D'UN PLAN — une page, pas une feuille : une liste de
+    problèmes, une liste à cocher et un champ de texte doivent défiler.
+  */
+  | 'diagnostic';
 
 /**
  * Une pièce du scan. La géométrie reste À PLAT dans `walls`/`openings`/
@@ -207,16 +212,6 @@ export interface RoomEntry {
    * son sol selon RoomPlan. Absent sur un relevé d'avant, ou dessiné.
    */
   releve?: { plafond?: PlafondDeLaPiece | null; surfaceSol?: number | null };
-}
-
-/**
- * LE SOL EN VRAIE IMAGE — l'orthophoto du relevé rejoint ses couleurs. Un
- * relevé sans couleurs mais photographié garde un gris neutre pour teinte.
- */
-function avecOrthoDuSol(floor: FloorData | null, r: ScanResult): FloorData | null {
-  const ortho = r.orthos?.sol;
-  if (!ortho) return floor;
-  return { ...(floor ?? { color: '#C9C4BC' }), ortho };
 }
 
 /**
@@ -1206,6 +1201,8 @@ export function defaultName(d: Date): string {
 
 interface ScanState {
   screen: Screen;
+  /** Le plan que la page du diagnostic examine (voir `ouvrirDiagnostic`). */
+  diagnosticId: string | null;
   /**
    * ON A TOUCHÉ LE PRIX SUR LE PLAN : le devis doit ALLER VOIR.
    *
@@ -1867,6 +1864,8 @@ interface ScanState {
   setShowTextures: (v: boolean) => void;
 
   setScreen: (s: Screen) => void;
+  /** Ouvre la page du diagnostic d'un plan enregistré. */
+  ouvrirDiagnostic: (id: string) => void;
   /** Le prix du plan a été touché : la prochaine ouverture du devis ira voir. */
   demanderLesTarifs: () => void;
   /** Lit la demande ET la baisse : elle ne vaut que pour une ouverture. */
@@ -2725,6 +2724,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
   return {
     screen: 'home',
+    diagnosticId: null,
     forcerTarifs: false,
     supported: null,
     scanning: false,
@@ -5260,6 +5260,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       }),
 
     setScreen: (screen) => set({ screen }),
+    ouvrirDiagnostic: (id) => set({ diagnosticId: id, screen: 'diagnostic' }),
     demanderLesTarifs: () => set({ forcerTarifs: true }),
     consommerLaDemandeDeTarifs: () => {
       const veut = get().forcerTarifs;
@@ -5335,7 +5336,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       const entrants = r.rooms?.length
         ? r.rooms.flatMap((x) => x.objects ?? [])
         : r.objects ?? [];
-      const segments = surfaces.map((x) => toSegment(x));
+      // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR.
+      const segments = avecCoffresDuLidar(surfaces.map((x) => toSegment(x)), r.dessus);
       /*
         LA CLOISON MITOYENNE EST VUE DEUX FOIS — une fois depuis chaque
         pièce. Sans les réunir, chaque arête doublée fausse le parcours des
@@ -5369,7 +5371,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const fixtures = reprojectFixtures(st.walls, walls, st.fixtures);
       const photos = reprojectAnchors(st.walls, walls, st.photos);
 
-      const floor = avecOrthoDuSol(r.floor ?? r.rooms?.[0]?.floor ?? st.rooms[0]?.floor ?? null, r);
+      const floor = r.floor ?? r.rooms?.[0]?.floor ?? st.rooms[0]?.floor ?? null;
       // Les sièges regardent la pièce, pas le mur : voir `orienterLesSieges`.
       const objects: ObjectData[] = orienterLesSieges(
         separerLeMobilier(
@@ -5439,7 +5441,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Le blanc remis d'aplomb, une fois pour toutes : voir
         // `blancsDAplomb`. Tout ce qui lit ces champs — 3D, plan, dossier,
         // export — voit désormais la même chose.
-        ...blancsDAplomb(habillerLesMurs(walls, r.orthos?.murs), objects),
+        ...blancsDAplomb(walls, objects),
         openings,
         fixtures: [...fixtures, ...viseMerge.fixtures],
         // Les photos de mur du scan sont refaites : la fusion a pu recoudre
@@ -5711,7 +5713,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       const entrants = r.rooms?.length
         ? r.rooms.flatMap((x) => x.objects ?? [])
         : r.objects ?? [];
-      const segments = surfaces.map((s) => toSegment(s));
+      // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR.
+      const segments = avecCoffresDuLidar(surfaces.map((s) => toSegment(s)), r.dessus);
       const bruts = mergeColinear(
         splitAtJunctions(
           weldCorners(
@@ -5847,9 +5850,10 @@ export const useScanStore = create<ScanState>((set, get) => {
       const incomingObjects = r.rooms?.length
         ? r.rooms.flatMap((x) => x.objects ?? [])
         : r.objects ?? [];
-      const floor = avecOrthoDuSol(r.floor ?? r.rooms?.[0]?.floor ?? null, r);
+      const floor = r.floor ?? r.rooms?.[0]?.floor ?? null;
 
-      const segments = surfaces.map((s) => toSegment(s));
+      // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR.
+      const segments = avecCoffresDuLidar(surfaces.map((s) => toSegment(s)), r.dessus);
       // Souder les coins, COUPER les murs là où une cloison vient buter
       // (sans ça aucun cycle ne passe par elle et tout l'appartement ressort
       // en une seule pièce), recoller les morceaux alignés, PUIS chercher les
@@ -5971,7 +5975,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Le blanc remis d'aplomb, une fois pour toutes : voir
         // `blancsDAplomb`. Tout ce qui lit ces champs — 3D, plan, dossier,
         // export — voit désormais la même chose.
-        ...blancsDAplomb(habillerLesMurs(walls, r.orthos?.murs), objects),
+        ...blancsDAplomb(walls, objects),
         openings,
         fixtures: vise.fixtures,
         photos: photosAuto,
@@ -5991,7 +5995,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Le blanc remis d'aplomb, une fois pour toutes : voir
         // `blancsDAplomb`. Tout ce qui lit ces champs — 3D, plan, dossier,
         // export — voit désormais la même chose.
-        ...blancsDAplomb(habillerLesMurs(walls, r.orthos?.murs), objects),
+        ...blancsDAplomb(walls, objects),
         openings,
         fixtures: vise.fixtures,
         photos: photosAuto,
@@ -6003,11 +6007,12 @@ export const useScanStore = create<ScanState>((set, get) => {
         /* Un plan qui s'ouvre repose ses calques. */
         ...CALQUES_DE_BASE,
         /*
-          LE RELEVÉ EN VRAIES IMAGES SE MONTRE D'EMBLÉE — relevé du patron :
-          « une reproduction à l'identique de ce que l'on scanne ». Un scan
-          qui a photographié ses murs et son sol ouvre ses couleurs.
+          LES COULEURS RELEVÉES SE MONTRENT D'EMBLÉE — relevé du patron :
+          « récupère la couleur majoritaire d'un mur pour la reconstituer ».
+          Plus d'images de décor (jamais qualitatives) : un scan qui a relevé
+          la couleur de ses murs ouvre ses couleurs.
         */
-        ...(r.orthos?.murs?.length || r.orthos?.sol ? { showTextures: true } : {}),
+        ...(walls.some((w) => !!w.color) ? { showTextures: true } : {}),
         screen: 'result',
         /*
           Le popup de fin de scan demandera quoi intégrer — même sans
@@ -7999,8 +8004,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         resultOrigin: 'library',
         /* Un plan qui s'ouvre repose ses calques. */
         ...CALQUES_DE_BASE,
-        // Un relevé photographié se rouvre en vraies images.
-        ...((save.walls ?? []).some((w) => w.orthos?.length) ? { showTextures: true } : {}),
+        // Un relevé qui a ses couleurs se rouvre en couleurs.
+        ...((save.walls ?? []).some((w) => !!w.color) ? { showTextures: true } : {}),
         screen: 'result',
       });
       clearHistory();

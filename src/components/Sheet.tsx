@@ -80,6 +80,7 @@ const ICONS = {
   murer: SOLAIRES.murer,
   rouleau: SOLAIRES.rouleau,
   tableau: SOLAIRES.tableau,
+  diagnostic: SOLAIRES.sirene,
 } satisfies { [cle: string]: string };
 
 export interface SheetAction {

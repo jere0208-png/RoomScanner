@@ -1075,6 +1075,18 @@ export function LibraryScreen() {
               },
             ]
           : []),
+        /*
+          LE DIAGNOSTIC DU PLAN — relevé du patron : « chaque utilisateur
+          pourra envoyer un diagnostic depuis les options des plans ». Ses
+          problèmes, ses données, ce qui n'allait pas — et l'envoi au
+          support.
+        */
+        {
+          label: 'Diagnostiquer le plan',
+          hint: 'Ce qui cloche, et nous le signaler.',
+          icon: 'diagnostic',
+          onPress: () => useScanStore.getState().ouvrirDiagnostic(item.id),
+        },
         {
           label: 'Supprimer',
           icon: 'supprimer',

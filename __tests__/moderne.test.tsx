@@ -52,15 +52,6 @@ const mur = (
   roomId: 'r1',
   ...extra,
 });
-const ortho = {
-  side: 1 as const,
-  path: '/m.jpg',
-  cx: 0,
-  cz: 0,
-  ux: 1,
-  uz: 0,
-  longueur: 4,
-};
 const PIECE = (extra: Partial<WallSeg> = {}) => [
   mur('n', 0, 0, 4, 0, extra),
   mur('e', 4, 0, 4, 3, extra),
@@ -80,11 +71,12 @@ describe('le bilan du relevé', () => {
       rooms: [
         {
           id: 'r1',
-          floor: { ortho: {} },
+          // La couleur du sol relevée (plus d'image : voir `couleurmajoritaire`).
+          floor: { texture: { texels: ['#C8B89A'] } },
           releve: { plafond: { hauteur: 2.5 } },
         },
       ],
-      walls: PIECE({ confidence: 'high', orthos: [ortho] }),
+      walls: PIECE({ confidence: 'high', color: '#D2BE9A' }),
       openings: [porte],
       objects: [],
     })!;
@@ -98,7 +90,7 @@ describe('le bilan du relevé', () => {
     expect(b.conseil).toBeNull();
   });
 
-  it('des murs mal vus et sans image : la note baisse, et le conseil vise ce qui manque le plus', () => {
+  it('des murs mal vus et sans couleur : la note baisse, et le conseil vise ce qui manque le plus', () => {
     const b = bilanDuReleve({
       rooms: [{ id: 'r1' }],
       walls: PIECE({ confidence: 'low' }),

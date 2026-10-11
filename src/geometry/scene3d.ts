@@ -5,7 +5,7 @@
  * de murs, mêmes bandes, mêmes couleurs relevées. Tout est donc calculé ici,
  * chaque rendu ne s'occupant plus que de projeter et de peindre.
  */
-import { habillerLaFace, habillerLeSol, type PieceHabillee } from './habillage';
+import type { PieceHabillee } from './habillage';
 import type { PoseDeMeuble } from './modeles3d';
 import { posesDUnLot, postesDuLot, type PoseDAppareil } from './appareils3d';
 import type { FloorData, ObjectData, SurfaceTexture } from 'react-native-room-scan';
@@ -28,7 +28,7 @@ import {
   type RoomSurface,
   type WallSeg,
 } from './floorplan';
-import { couleurAuPic, matiereRelevee, mixHex, pointInPolygon, sampleTexture } from './appearance';
+import { couleurMajoritaire, mixHex, pointInPolygon, sampleTexture } from './appearance';
 import { AMBRE_MEUBLE, MEUBLE_MOELLEUX } from '../ui/maquette';
 import { furnitureParts, type FurnPart } from './furniture3d';
 import { CEILINGS, type CeilingFixture } from './ceiling';
@@ -1928,14 +1928,12 @@ export function buildScene(
   const rooms: SceneRoom[] = parts.map((part) => {
     const floor = opts.floors?.[part.roomId] ?? null;
     /*
-      LE RELEVÉ A LE DERNIER MOT, MAIS AU PIC — relevé du patron : « le sol
-      dans un scan que j'ai fait est violet ». La couleur transmise est une
-      moyenne d'ombres ; on peint la teinte des cases les plus lumineuses
-      (`couleurAuPic`). Et la MATIÈRE se lit dans la grille : des lattes ou
-      des carreaux détectés au scan priment sur ce que le nom de la pièce
-      laissait deviner.
+      LE SOL GARDE UNE COULEUR, LA MAJORITAIRE — relevé du patron : « enlève
+      la récupération exacte des couleurs et des décors, c'est jamais
+      qualitatif ». Plus de lattes ni de carreaux devinés dans la grille du
+      relevé, plus d'image du sol : sa couleur majoritaire
+      (`couleurMajoritaire`), et la matière que le nom de la pièce suggère.
     */
-    const releve = opts.showTextures ? matiereRelevee(floor?.texture) : null;
     /*
       LE SOL CHOISI PASSE DEVANT TOUT — relevé du patron, point 9 de la
       réflexion « grand public ». Comme la peinture : le relevé dit ce qui
@@ -1944,12 +1942,7 @@ export function buildScene(
     const choisi = opts.sols?.[part.roomId];
     const matiere: 'parquet' | 'carrelage' | undefined = choisi
       ? choisi.motif ?? undefined
-      : releve?.type === 'lattes'
-        ? 'parquet'
-        : releve?.type === 'carreaux'
-        ? 'carrelage'
-        : opts.matieres?.[part.roomId];
-    const sensLattes = releve?.type === 'lattes' ? releve.sens : undefined;
+      : opts.matieres?.[part.roomId];
     const fondMatiere =
       matiere === 'parquet'
         ? mixHex(pal.floor, '#C89A66', 0.55)
@@ -1959,7 +1952,7 @@ export function buildScene(
     const floorFill = choisi
       ? mixHex(pal.floor, choisi.hex, 0.85)
       : (opts.showTextures
-          ? couleurAuPic(floor?.texture, floor?.color)
+          ? couleurMajoritaire(floor?.texture, floor?.color)
           : undefined) ??
         fondMatiere ??
         pal.floor;
@@ -1980,25 +1973,18 @@ export function buildScene(
         isCeiling: true,
       });
     }
-    // Un sol photographié se montre en 3D : c'est la reproduction du relevé.
-    const solEnImage = !!(opts.showTextures && opts.habillage !== false && floor?.ortho);
-    if (surface && ((opts.showSol ?? opts.showSurfaces) || solEnImage)) {
+    if (surface && (opts.showSol ?? opts.showSurfaces)) {
       const pts = surface.pts.map((p) => ({ x: p.x, y: 0, z: p.z }));
-      // Le sol en vraie image, quand le relevé l'a photographié d'en haut.
-      const habillage = solEnImage ? habillerLeSol(pts, floor?.ortho) : null;
       faces.push({
         pts,
         fill: floorFill,
         stroke: pal.floorStroke,
         isFloor: true,
         matiere,
-        sensLattes,
-        ...(habillage ? { habillage } : {}),
       });
-      // L'image a ses vrais joints : on ne dessine pas ceux d'une matière devinée.
-      if (matiere && !habillage) {
+      if (matiere) {
         const joint = mixHex(floorFill, '#0B0D12', 0.22);
-        for (const [a, b] of jointsDuSol(surface.pts, matiere, sensLattes)) {
+        for (const [a, b] of jointsDuSol(surface.pts, matiere, undefined)) {
           faces.push({
             pts: [
               { x: a.x, y: 0.004, z: a.z },
@@ -2549,7 +2535,7 @@ export function buildScene(
     */
     // Le pic du relevé, pas sa moyenne : même règle que le sol — la teinte
     // du mur là où la lumière le montre.
-    const avg = opts.showTextures ? couleurAuPic(w.texture, w.color) : undefined;
+    const avg = opts.showTextures ? couleurMajoritaire(w.texture, w.color) : undefined;
     /*
       LA PEINTURE CHOISIE PASSE DEVANT LE RELEVÉ.
 
@@ -2737,6 +2723,38 @@ export function buildScene(
         faces[k].menuiserie = true;
         if (enVolume) faces[k].enVolume = true;
       }
+      /*
+        LE COFFRE DE VOLET EN VOLUME — relevé du patron : « il y a bien un
+        coffrage, donc une forme différente d'un mur plat ». Quand le
+        maillage LiDAR l'a mesuré (`coffreLidar`), il avance de sa saillie
+        dans la pièce, au-dessus de la baie, sur sa largeur et cinq
+        centimètres de part et d'autre. Un coffre déclaré à la main n'a pas
+        de saillie : un tunnel noyé dans la maçonnerie ne se voit pas.
+      */
+      const saillie = hole.seg.coffreSaillie ?? 0;
+      const coffreH = hole.seg.coffre ?? 0;
+      if (q && saillie > 0.02 && coffreH > 0.02 && hole.y1 < w.height - 0.02) {
+        const nuA = plusIsInner ? q.a1 : q.a2;
+        const nuB = plusIsInner ? q.b1 : q.b2;
+        const devant = (p: Pt) => ({ x: p.x + versLaPiece.x * saillie, z: p.z + versLaPiece.z * saillie });
+        const marge = 0.05 / len;
+        pushWallBlock(
+          { a1: devant(nuA), b1: devant(nuB), b2: nuB, a2: nuA },
+          Math.max(0, hole.t0 - marge),
+          Math.min(1, hole.t1 + marge),
+          hole.y1,
+          Math.min(w.height, hole.y1 + coffreH),
+          {
+            fill: fondDedans,
+            top: arase,
+            stroke: pal.wallStroke,
+            topStroke: pal.wallTopStroke,
+            captured: !!teinteMur,
+            closeBottom: true,
+            depthY: w.height / 2,
+          },
+        );
+      }
     }
 
     // Tout ce que ce mur vient de poser — pans, chants, couronnement,
@@ -2746,19 +2764,12 @@ export function buildScene(
       faces[i].roomSide = versLaPiece;
       faces[i].wallId = w.id;
       /*
-        LE MUR EN VRAIE IMAGE — ses pans reçoivent les morceaux de leurs
-        orthophotos. Un côté qu'on a repeint garde sa peinture : elle dit ce
-        qu'on projette, l'image ce qui était.
+        PLUS DE MUR EN VRAIE IMAGE — relevé du patron : « enlève la
+        récupération exacte des couleurs et des décors, c'est jamais
+        qualitatif ». Les orthophotos d'un ancien plan restent dans ses
+        données, mais la 3D n'en pose plus : le mur porte sa couleur
+        majoritaire, ou la peinture choisie.
       */
-      if (opts.showTextures && opts.habillage !== false && w.orthos?.length && !faces[i].menuiserie) {
-        const pieces = habillerLaFace(faces[i], w);
-        if (pieces) {
-          const n = faces[i].normal!;
-          const L = Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) || 1;
-          const cote = n.x * -(w.b.z - w.a.z) / L + n.z * (w.b.x - w.a.x) / L > 0 ? 1 : -1;
-          if (!(cote === 1 ? peintPlus : peintMoins)) faces[i].habillage = pieces;
-        }
-      }
     }
   }
 
@@ -3600,8 +3611,8 @@ export function buildScene(
       cz: obj.cz,
       yaw: obj.yaw,
       yb,
+      // UNE couleur par meuble : plus de dessus ni de côtés relevés à part.
       color: skin,
-      couleurs: opts.showTextures ? (source as { couleurs?: { dessus?: string; cotes?: string } }).couleurs : undefined,
       attributes: (source as { attributes?: string[] }).attributes,
     });
     for (let i = avantMeuble; i < faces.length; i++) {
