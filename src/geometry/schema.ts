@@ -78,6 +78,7 @@ export function roleDuFil(code: string): WireRole | null {
  */
 /** Les appareils qui COMMANDENT : eux seuls appellent un retour de lampe. */
 export const COMMANDES: FixtureKind[] = [
+  'interGeneral',
   'inter',
   'inter2',
   'inter3',
@@ -347,9 +348,7 @@ export function multiWire(
     .map((id) => fixtures.find((f) => f.id === id))
     .filter((f): f is Fixture => !!f)
     .map((f) => ({ id: f.id, kind: f.kind, label: FIXTURES[f.kind].label }));
-  const commandes = devices.filter((d) =>
-    ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur'].includes(d.kind),
-  ).length;
+  const commandes = devices.filter((d) => COMMANDES.includes(d.kind)).length;
   const va = estVaEtVient(circuit, fixtures);
   /*
     UN BLOC PAR NATURE DE DÉPART, ET SEULEMENT CEUX QU'ON A.

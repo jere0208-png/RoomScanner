@@ -113,7 +113,7 @@ import {
 } from '../geometry/ceiling';
 import { planFrameAngle } from '../geometry/floorplan';
 import { assignOpenings } from '../geometry/scene3d';
-import { epaisseurDe, estDessine, etendueDeLaPiece, longueurCotee, pointOnSeg, wallRuns } from '../geometry/floorplan';
+import { epaisseurDe, estDessine, etendueDeLaPiece, longueurCotee, placeDuDetecteur, pointOnSeg, wallRuns } from '../geometry/floorplan';
 import {
   ajusterBlocs,
   masquesDeScene,
@@ -1905,7 +1905,7 @@ function planPage(
         teinte: ENCRE_ELEC,
         lignes: groupes.map((g) => ({
           texte: libelle(g.kinds),
-          symbole: { paths: g.symbole, color: ENCRE_ELEC },
+          symbole: { paths: g.symbole, color: FIXTURES[g.kinds[0]].teintePropre ?? ENCRE_ELEC },
           ...(g.fois ? { fois: g.fois } : {}),
         })),
       },
@@ -1928,6 +1928,11 @@ function planPage(
     }
     if (liensTraces && !extra?.hideLegend) {
       seconde.push({ lignes: [{ couleur: ENCRE_ELEC, tirete: true, texte: 'Lien de commande' }] });
+    }
+    if (!extra?.hideLegend && ctx.fixtures && ctx.openings.some((o) => o.detecteur)) {
+      seconde.push({
+        lignes: [{ symbole: { paths: [{ d: 'M-7 -4 H7 V4 H-7 Z' }], color: C_LED }, texte: 'Détecteur d’ouverture (DO)' }],
+      });
     }
     if (seconde.length > 0) colonnesLegende.push(seconde);
   }
@@ -3515,7 +3520,10 @@ function planPage(
           UN SYMBOLE, ET SON NOMBRE — relevé du patron : « si 3 prises en
           bloc de 3, mettre l'icône prise avec un "x3" en petit à côté ».
         */
-        drawSymbol(d, symbole, q.x, q.y, ECHELLE_SYMBOLE, ENCRE_ELEC, 0.9, versLeMur);
+        // L'interrupteur général garde son violet, comme dans la légende.
+        const teintePropre = FIXTURES[f.kind].teintePropre;
+        if (teintePropre) drawSymbol(d, symbole, q.x, q.y, ECHELLE_SYMBOLE, teintePropre, 0.9, versLeMur);
+        else drawSymbol(d, symbole, q.x, q.y, ECHELLE_SYMBOLE, ENCRE_ELEC, 0.9, versLeMur);
         /*
           LE MOT DE L'ARCHITECTE — « 2 », « RJ45 », « LV »… — écrit droit, à
           la place retenue avant les cotes (voir plus haut).
@@ -3542,6 +3550,20 @@ function planPage(
           align: 'left',
           bold: m.bold,
         });
+      }
+    }
+
+    /*
+      LES DÉTECTEURS D'OUVERTURE : « DO » en bleu, dans la baie, côté pièce —
+      ce que le plan d'architecte écrit en toutes lettres.
+    */
+    if (ctx.fixtures) {
+      for (const o of openings.filter((x) => x.detecteur)) {
+        const g = px(placeDuDetecteur(o, partOf.get(roomOf(o))?.labelAt));
+        if (!dansLeCadre(g)) continue;
+        const t = 4.2;
+        d.rect(g.x - t * 1.2, g.y - t * 0.65, t * 2.4, t * 1.3, '#FFFFFF', C_LED, 0.5);
+        d.text('DO', g.x, g.y - t * 0.36, t, C_LED, { bold: true, align: 'center' });
       }
     }
 
@@ -3649,11 +3671,18 @@ function planPage(
         */
         // Les mots des symboles (« RJ45 », « 2 ») : la cote s'interrompt
         // devant eux plutôt que de les barrer.
-        const disquesDesMots = [...motsDesSymboles.values()].map((mot) => {
-          const l = mot.texte.length * mot.taille * 0.5;
-          const h = mot.taille * 0.72;
-          return { x: mot.base.x, y: mot.base.y + h / 2, r: Math.hypot(l, h) / 2 + 0.8 };
-        });
+        const disquesDesMots = [
+          ...[...motsDesSymboles.values()].map((mot) => {
+            const l = mot.texte.length * mot.taille * 0.5;
+            const h = mot.taille * 0.72;
+            return { x: mot.base.x, y: mot.base.y + h / 2, r: Math.hypot(l, h) / 2 + 0.8 };
+          }),
+          // Et le « DO » d'un détecteur d'ouverture.
+          ...(ctx.fixtures ? openings.filter((o) => o.detecteur) : []).map((o) => {
+            const g = px(placeDuDetecteur(o, partOf.get(roomOf(o))?.labelAt));
+            return { x: g.x, y: g.y, r: 6.5 };
+          }),
+        ];
         for (const c of cotesDePlafond) {
           cotesPosees.add(cleCote(c.a, c.b));
           for (const morceau of horsDesDisques([c.a, c.b], disquesDesMots)) {

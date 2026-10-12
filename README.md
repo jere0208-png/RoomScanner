@@ -14285,6 +14285,38 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Interrupteur général, vidéophone, détecteur d'ouverture
+
+Les trois éléments de la légende de l'architecte (DCE « Romeo ») qui
+manquaient encore.
+
+**L'interrupteur général** (`interGeneral`, famille Commandes). Il coupe en
+sortant l'éclairage du logement, ou ses prises commandées.
+- Dessin : l'interrupteur, avec un point plein dans son rond.
+- Il garde son violet, comme dans la légende, même sur un plan électrique
+  tout en rouge (`teintePropre`), à l'écran comme dans le PDF.
+- C'est une commande comme les autres : il se relie aux points qu'il
+  allume, et entre dans leur circuit d'éclairage (`COMMANDES_MURALES`,
+  `COMMANDES`).
+
+**Le vidéophone** (`videophone`, famille Courants faibles).
+- Dessin : le rond « VP » de la légende.
+- Posé à 1,50 m, avec un écran sur sa vue de face.
+- Il se raccorde au coffret de communication avec les RJ45 et les prises
+  TV, sans disjoncteur à lui.
+
+**Le détecteur d'ouverture** (`WallSeg.detecteur`).
+- En mode Électricité, la barre d'une porte ou d'une fenêtre porte un
+  bouton (la sirène) qui le pose ou le retire, sous un seul « Annuler ».
+- Il s'écrit « DO » en bleu dans la baie, côté pièce
+  (`placeDuDetecteur`), à l'écran comme dans le PDF.
+- La légende du dossier le nomme, et les cotes du plafond s'interrompent
+  devant lui.
+- Il s'achète au bordereau : un contact magnétique par menuiserie
+  surveillée.
+
+Banc : `symbolesarchitecte`. `halodusymbole` suit la teinte propre.
+
 ## Les symboles du plan d'architecte, et le ruban LED
 
 Relevé du patron, DCE d'architecte à l'appui (projet « Romeo », plans Elec

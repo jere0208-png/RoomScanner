@@ -1690,7 +1690,7 @@ export function ResultScreen() {
         // recommandes pour chaque tirage selon nombre de fils aux normes ».
         fixtures,
       );
-      const tirage = { pull, buy: buyingList(pull, fixtures, ceiling) };
+      const tirage = { pull, buy: buyingList(pull, fixtures, ceiling, openings) };
       const bytes = buildMaterialPdf(scanName, list, tirage);
       await RoomScan.sharePDF(toBase64(bytes), materialFilename(scanName));
     } catch (e: any) {
@@ -5892,6 +5892,28 @@ export function ResultScreen() {
                         useScanStore
                           .getState()
                           .toggleCoffre(selectedOpening.id);
+                        haptic('succes');
+                      },
+                    },
+                  ]
+                : []),
+              /*
+                LE DÉTECTEUR D'OUVERTURE — le contact d'alarme que le plan
+                d'architecte écrit dans la baie. Pour l'électricien, sur une
+                porte ou une fenêtre (une baie libre n'a rien à surveiller).
+              */
+              ...(modeElec && selectedOpening.type !== 'opening'
+                ? [
+                    {
+                      label: selectedOpening.detecteur
+                        ? 'Retirer le détecteur d’ouverture'
+                        : 'Détecteur d’ouverture',
+                      mot: 'Alarme',
+                      icone: SOLAIRES.sirene,
+                      sansMot: true,
+                      ghost: !selectedOpening.detecteur,
+                      onPress: () => {
+                        useScanStore.getState().toggleDetecteurOuverture(selectedOpening.id);
                         haptic('succes');
                       },
                     },

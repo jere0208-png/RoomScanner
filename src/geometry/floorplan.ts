@@ -107,6 +107,13 @@ export interface WallSeg {
    */
   coffre?: number;
   /**
+   * UN DÉTECTEUR D'OUVERTURE SUR CETTE MENUISERIE — le contact d'alarme que
+   * le plan d'architecte écrit en bleu dans la baie (« détecteur
+   * d'ouverture »). Il se dessine « DO » dans la baie et s'achète au
+   * bordereau.
+   */
+  detecteur?: boolean;
+  /**
    * CE QUE LE COFFRE AVANCE DANS LA PIÈCE (m) — mesuré dans le maillage
    * LiDAR (voir `coffreLidar`). Absent pour un coffre déclaré à la main :
    * un tunnel noyé dans la maçonnerie ne dépasse pas du mur. Présent, la 3D
@@ -5231,6 +5238,18 @@ export function niveauDeReference(niveaux: number[], n: number): number | null {
  * Elle est large comme « 2D » : « Rez-de-chaussee » n'y entre pas. Les
  * plans de batiment ecrivent R+1, R+2 — on ecrit comme eux.
  */
+/**
+ * OÙ S'ÉCRIT LE « DO » D'UN DÉTECTEUR D'OUVERTURE : au milieu de la baie,
+ * un peu dans sa pièce — du côté du point où s'écrit le nom de la pièce.
+ */
+export function placeDuDetecteur(o: WallSeg, versLaPiece?: Pt): Pt {
+  const m = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+  const L = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z) || 1;
+  const n = { x: -(o.b.z - o.a.z) / L, z: (o.b.x - o.a.x) / L };
+  const sens = versLaPiece ? Math.sign((versLaPiece.x - m.x) * n.x + (versLaPiece.z - m.z) * n.z) || 1 : 1;
+  return { x: m.x + n.x * sens * 0.22, z: m.z + n.z * sens * 0.22 };
+}
+
 /** L'épaisseur d'un plancher : du plafond d'un niveau au sol du suivant. */
 export const DALLE = 0.2;
 

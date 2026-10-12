@@ -30,6 +30,9 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import { useScanStore } from '../src/store/scanStore';
 import { useAccountStore } from '../src/store/accountStore';
 import {
+  COMMANDES_MURALES,
+  C_GENERAL,
+  FIXTURES,
   FIXTURE_SYMBOL,
   libelleDuSymbole,
   porteeVersLeMur,
@@ -44,7 +47,8 @@ import {
   rubanPeripherique,
   zigzag,
 } from '../src/geometry/ruban';
-import { roomParts, type Pt } from '../src/geometry/floorplan';
+import { placeDuDetecteur, roomParts, type Pt } from '../src/geometry/floorplan';
+import { planCircuits } from '../src/geometry/nfc15100';
 import { buyingList } from '../src/geometry/conduits';
 
 const st = () => useScanStore.getState();
@@ -219,5 +223,45 @@ describe('le ruban LED', () => {
     expect(ruban.quantity).toBeCloseTo(Math.ceil((13.2 + 5) * 2) / 2, 9);
     expect(liste.find((l) => l.code === 'led-alimentation')?.quantity).toBe(2);
     expect(CEILINGS.led.commandable).toBe(true);
+  });
+});
+
+describe('les trois de plus de la légende', () => {
+  it('l’interrupteur général : une commande, qui garde son violet sur le plan à l’encre', () => {
+    expect(COMMANDES_MURALES).toContain('interGeneral');
+    expect(FIXTURES.interGeneral.teintePropre).toBe(C_GENERAL);
+    // Le dessin de l'interrupteur, son rond marqué d'un point.
+    expect(FIXTURE_SYMBOL.interGeneral.slice(0, FIXTURE_SYMBOL.inter.length)).toEqual(FIXTURE_SYMBOL.inter);
+    expect(FIXTURE_SYMBOL.interGeneral.some((s) => s.fill)).toBe(true);
+  });
+
+  it('le vidéophone : le rond « VP », raccordé au coffret de communication', () => {
+    expect(libelleDuSymbole(['videophone'], 'videophone')?.texte).toBe('VP');
+    const circuits = planCircuits(
+      [{ id: 'vp', kind: 'videophone', wallId: 'm', along: 1, height: 1.5, side: 1 }],
+      () => 'Entrée',
+      () => false,
+    );
+    expect(circuits.find((c) => c.nature === 'vdi')?.fixtureIds).toEqual(['vp']);
+  });
+
+  it('le détecteur d’ouverture : posé sur une menuiserie, écrit dans la baie, compté au bordereau', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(4, 3, 'Entrée', { auNu: true });
+    const porte = st().addOpening(st().walls[0].id, 'door')!;
+    st().toggleDetecteurOuverture(porte);
+    const o = st().openings.find((x) => x.id === porte)!;
+    expect(o.detecteur).toBe(true);
+    // Le « DO » s'écrit à 22 cm de la baie, du côté de la pièce.
+    const part = roomParts(st().walls, st().rooms)[0];
+    const p = placeDuDetecteur(o, part.labelAt);
+    const m = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+    expect(Math.hypot(p.x - m.x, p.z - m.z)).toBeCloseTo(0.22, 6);
+    expect(Math.hypot(p.x - part.labelAt.x, p.z - part.labelAt.z)).toBeLessThan(
+      Math.hypot(m.x - part.labelAt.x, m.z - part.labelAt.z),
+    );
+    expect(buyingList([], [], [], st().openings).find((l) => l.code === 'alarme-contact')?.quantity).toBe(1);
+    st().undo();
+    expect(st().openings.find((x) => x.id === porte)?.detecteur).toBeUndefined();
   });
 });

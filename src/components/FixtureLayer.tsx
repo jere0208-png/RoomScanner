@@ -344,6 +344,8 @@ export function FixtureLayer({
 
         return unites.map(({ f, face, x, postes }) => {
           const spec = FIXTURES[f.kind];
+          // L'interrupteur général garde son violet, même à l'encre unique.
+          const teinte = spec.teintePropre ?? encre ?? spec.color;
           const { symbole: symbol, fois } = symboleCompact(postes, f.kind);
           // Le mot de l'architecte (« 2 », « RJ45 », « LV »…) remplace le
           // sigle d'appoint, et le « ×2 » quand il dit déjà le nombre.
@@ -404,7 +406,7 @@ export function FixtureLayer({
                 entier dès que le doigt se lève.
               */}
               {navigating && (
-                <Circle cx={p.x} cy={p.y} r={3.4} fill={(encre ?? spec.color)} />
+                <Circle cx={p.x} cy={p.y} r={3.4} fill={teinte} />
               )}
               {!navigating && (
               <>
@@ -425,7 +427,7 @@ export function FixtureLayer({
                       y1={anchor.y}
                       x2={bout.x}
                       y2={bout.y}
-                      stroke={(encre ?? spec.color)}
+                      stroke={teinte}
                       strokeWidth={0.9}
                       opacity={0.8}
                     />
@@ -475,11 +477,11 @@ export function FixtureLayer({
                       <Path
                         key={si}
                         d={seg.d}
-                        stroke={(encre ?? spec.color)}
+                        stroke={teinte}
                         strokeWidth={1.4}
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        fill={seg.fill ? (encre ?? spec.color) : 'none'}
+                        fill={seg.fill ? teinte : 'none'}
                       />
                     ))}
                   </G>
@@ -510,7 +512,7 @@ export function FixtureLayer({
                         <SvgText
                           x={lx}
                           y={ly + fs * 0.36}
-                          fill={encre ?? spec.color}
+                          fill={teinte}
                           fontSize={fs}
                           fontWeight="700"
                           textAnchor="middle">
@@ -528,7 +530,7 @@ export function FixtureLayer({
                         width={rayon * (fois > 9 ? 1.9 : 1.45)}
                         height={rayon * 1.05}
                         rx={rayon * 0.52}
-                        fill={(encre ?? spec.color)}
+                        fill={teinte}
                       />
                       <SvgText
                         x={p.x + rayon * 0.75 + (rayon * (fois > 9 ? 1.9 : 1.45)) / 2}
@@ -552,7 +554,7 @@ export function FixtureLayer({
                       <SvgText
                         x={pose.x}
                         y={pose.y}
-                        fill={(encre ?? spec.color)}
+                        fill={teinte}
                         fontSize={taillePolice}
                         fontWeight="800">
                         {tag}

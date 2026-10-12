@@ -73,7 +73,7 @@ export function chiffrerLePlan(
     fixtures,
   );
   return chiffrer(
-    buyingList(pull, fixtures, ceiling),
+    buyingList(pull, fixtures, ceiling, openings),
     liste.circuits,
     liste.differentials,
     gamme,

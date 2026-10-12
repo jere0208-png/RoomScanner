@@ -32,6 +32,7 @@ import {
 import { pointInPolygon } from './appearance';
 import type { VolumeVerdict } from './volumes';
 import {
+  COMMANDES_MURALES,
   faceX,
   facePoint,
   wallFace,
@@ -1117,10 +1118,7 @@ export function checkElectrical(
     // Un point posé mais que rien n'allume : la moitié du travail.
     const commandes = fixtures.filter(
       (f) =>
-        roomOfFixture(f) === room.id &&
-        ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur'].includes(
-          f.kind,
-        ),
+        roomOfFixture(f) === room.id && COMMANDES_MURALES.includes(f.kind),
     );
     const relies = points.some((p) => (p.commands ?? []).length > 0);
     if (points.length > 0 && !relies && commandes.length === 0) {
@@ -1559,9 +1557,7 @@ export function planCircuits(
    * que faisait la première version, revenait à ne jamais compter le câble
    * des commandes — et à ne dessiner aucune gaine jusqu'à elles.
    */
-  const commandes = fixtures.filter((f) =>
-    ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur'].includes(f.kind),
-  );
+  const commandes = fixtures.filter((f) => COMMANDES_MURALES.includes(f.kind));
   const lumieres = fixtures.filter((f) => f.kind === 'applique');
   /**
    * LES POINTS DU PLAFOND COMPTENT AUSSI.
@@ -1629,16 +1625,16 @@ export function planCircuits(
     }),
   );
 
-  const vdi = fixtures.filter(
-    (f) => postsOf(f.kind).some((k) => k === 'rj45' || k === 'tv'),
-  );
+  // Le vidéophone aussi : il se raccorde au coffret, sans disjoncteur à lui.
+  const estVdi = (k: FixtureKind) => k === 'rj45' || k === 'tv' || k === 'videophone';
+  const vdi = fixtures.filter((f) => postsOf(f.kind).some(estVdi));
   if (vdi.length > 0) {
     add({
       label: 'Courants faibles',
       nature: 'vdi',
       points: vdi.reduce(
         (somme, f) =>
-          somme + postsOf(f.kind).filter((k) => k === 'rj45' || k === 'tv').length,
+          somme + postsOf(f.kind).filter(estVdi).length,
         0,
       ),
       section: null,

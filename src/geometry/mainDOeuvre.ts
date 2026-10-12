@@ -52,6 +52,8 @@ export const TEMPS_MUR: Record<FixtureKind, number> = {
   prise20: 1.2,
   prise32: 1.5,
   inter: 0.9,
+  interGeneral: 1.1,
+  videophone: 1.5,
   va: 1.1,
   poussoir: 0.9,
   variateur: 1.0,

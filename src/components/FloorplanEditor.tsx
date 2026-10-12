@@ -36,6 +36,7 @@ import {
   anglesRemarquables,
   deplier,
   massifsTechniques,
+  placeDuDetecteur,
   pivotsDesBattants,
   roomParts,
   segLength,
@@ -84,7 +85,7 @@ import {
 import type { Boite } from '../ui/ecarter';
 import { pointInPolygon as insidePoly } from '../geometry/appearance';
 import type { Fixture } from '../geometry/electrical';
-import type { CeilingFixture } from '../geometry/ceiling';
+import { C_LED, type CeilingFixture } from '../geometry/ceiling';
 import { CloseCross } from './CloseCross';
 import { CardinalRing, NorthBadge } from './CardinalRing';
 
@@ -3193,6 +3194,35 @@ export function FloorplanEditor({
                 </G>
               );
             })}
+
+            {/*
+              LE DÉTECTEUR D'OUVERTURE : « DO » en bleu, dans la baie, côté
+              pièce — comme le plan d'architecte l'écrit.
+            */}
+            {showFixtures &&
+              openings
+                .filter((o) => o.detecteur)
+                .map((o) => {
+                  const g = mapping.toPx(placeDuDetecteur(o, partOf.get(roomOf(o))?.labelAt));
+                  const t = Math.max(6, Math.min(10, mapping.scale * 0.1));
+                  return (
+                    <G key={`do-${o.id}`} pointerEvents="none">
+                      <Rect
+                        x={g.x - t * 1.2}
+                        y={g.y - t * 0.65}
+                        width={t * 2.4}
+                        height={t * 1.3}
+                        rx={t * 0.3}
+                        fill={c.surface}
+                        stroke={C_LED}
+                        strokeWidth={0.9}
+                      />
+                      <SvgText x={g.x} y={g.y + t * 0.36} fontSize={t} fontWeight="800" fill={C_LED} textAnchor="middle">
+                        DO
+                      </SvgText>
+                    </G>
+                  );
+                })}
 
             {/*
               LES GAINES : un filet tireté qui longe les murs, du tableau à

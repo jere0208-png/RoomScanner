@@ -26,6 +26,7 @@ import { longueurDuRuban } from './ruban';
 import { FIXTURES, postsOf, type Fixture } from './electrical';
 import type { Circuit } from './nfc15100';
 import type { TronconMetre } from './elecplan';
+import type { WallSeg } from './floorplan';
 import {
   estVaEtVient,
   wiresOf,
@@ -431,8 +432,22 @@ export function buyingList(
    * encore plus facilement que le luminaire lui-même.
    */
   ceiling: CeilingFixture[] = [],
+  /** Les menuiseries : leurs détecteurs d'ouverture s'achètent aussi. */
+  openings: WallSeg[] = [],
 ): BuyRow[] {
   const out: BuyRow[] = [];
+  const contacts = openings.filter((o) => o.detecteur).length;
+  if (contacts > 0) {
+    out.push({
+      family: 'Alarme',
+      code: 'alarme-contact',
+      label: 'Détecteur d’ouverture',
+      spec: 'Contact magnétique, filaire ou radio selon la centrale',
+      quantity: contacts,
+      unit: 'u',
+      note: 'un par porte ou fenêtre surveillée',
+    });
+  }
 
   /*
     QUAND LE TRACÉ MANQUE, ON ESTIME — ET ON L'ÉCRIT.

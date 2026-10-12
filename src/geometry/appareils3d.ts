@@ -542,6 +542,7 @@ function mecanisme(a: Atelier, kind: FixtureKind, cx: number, cy: number) {
       break;
     case 'inter':
     case 'va':
+    case 'interGeneral':
       bascule(a, cx, cy);
       break;
     case 'poussoir':

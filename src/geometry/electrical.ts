@@ -61,7 +61,11 @@ export type FixtureKind =
   | 'rjPrise2'
   | 'tvPrise'
   | 'inter2'
-  | 'inter3';
+  | 'inter3'
+  /** L'interrupteur général : celui qui éteint tout en sortant (légende de l'architecte). */
+  | 'interGeneral'
+  /** Le moniteur du vidéophone (« VP » de la légende de l'architecte). */
+  | 'videophone';
 
 /** Un appareil posé sur une face de mur. */
 export interface Fixture {
@@ -164,6 +168,7 @@ export const COMMANDES_MURALES: FixtureKind[] = [
   'va',
   'poussoir',
   'variateur',
+  'interGeneral',
 ];
 
 /**
@@ -210,6 +215,12 @@ export interface FixtureSpec {
   std: number;
   /** Ce qu'il faut savoir sur cette hauteur, en une ligne. */
   note: string;
+  /**
+   * LA TEINTE QUE GARDE LE SYMBOLE SUR UN PLAN À L'ENCRE UNIQUE — la
+   * légende de l'architecte dessine l'interrupteur général en violet, au
+   * milieu du rouge : c'est par là qu'on le trouve.
+   */
+  teintePropre?: string;
 }
 
 /**
@@ -350,6 +361,8 @@ const C_CMD = '#1E7FBF';
 const C_FAIBLE = '#7B3FC4';
 const C_LUM = '#A8820B';
 const C_DIVERS = '#D23B3B';
+/** Le violet de l'interrupteur général, celui de la légende de l'architecte. */
+export const C_GENERAL = '#7D3C98';
 
 export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
   prise: {
@@ -409,6 +422,29 @@ export const FIXTURES: Record<FixtureKind, FixtureSpec> = {
     color: C_CMD,
     std: 1.1,
     note: 'Manette entre 0,90 m et 1,30 m du sol.',
+  },
+  interGeneral: {
+    label: 'Interrupteur général',
+    short: 'IG',
+    family: 'Commandes',
+    w: 0.08,
+    h: 0.08,
+    depth: 0.022,
+    color: C_GENERAL,
+    std: 1.1,
+    note: 'Près de la porte d’entrée : il coupe en sortant l’éclairage (ou les prises commandées) de tout le logement.',
+    teintePropre: C_GENERAL,
+  },
+  videophone: {
+    label: 'Vidéophone',
+    short: 'VP',
+    family: 'Courants faibles',
+    w: 0.13,
+    h: 0.2,
+    depth: 0.025,
+    color: C_FAIBLE,
+    std: 1.5,
+    note: 'L’écran à hauteur des yeux, près de l’entrée ; la platine de rue se câble à part.',
   },
   volet: {
     /*
@@ -650,11 +686,11 @@ export const FIXTURE_FAMILIES: { name: string; kinds: FixtureKind[] }[] = [
   },
   {
     name: 'Commandes',
-    kinds: ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur', 'volet'],
+    kinds: ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur', 'volet', 'interGeneral'],
   },
   {
     name: 'Courants faibles',
-    kinds: ['rj45', 'rj2', 'rjPrise', 'rjPrise2', 'tv', 'tvPrise'],
+    kinds: ['rj45', 'rj2', 'rjPrise', 'rjPrise2', 'tv', 'tvPrise', 'videophone'],
   },
   { name: 'Éclairage', kinds: ['applique'] },
   { name: 'Divers', kinds: ['tableau', 'thermostat', 'sortieCable', 'boite'] },
@@ -675,6 +711,8 @@ const TAG_BASE: Partial<Record<FixtureKind, string>> = {
   prise20: 'PC 20A',
   prise32: 'PC 32A',
   inter: 'INT',
+  interGeneral: 'INT GÉNÉRAL',
+  videophone: 'VIDÉOPHONE',
   volet: 'VR',
   va: 'VV',
   poussoir: 'BP',
@@ -1228,6 +1266,11 @@ export const FIXTURE_SYMBOL: Record<FixtureKind, SymbolStroke[]> = {
   prise20: ROND_ALIM,
   prise32: [...ROND_ALIM, { d: 'M-6.5 10 H6.5' }],
   inter: MANETTE,
+  // L'interrupteur général : l'interrupteur, son rond marqué d'un point —
+  // et sa teinte violette (`teintePropre`), comme dans la légende.
+  interGeneral: [...MANETTE, { d: 'M0 7.6 m-1 0 a1 1 0 1 0 2 0 a1 1 0 1 0 -2 0', fill: true }],
+  // Le vidéophone : le rond « VP » de la légende (`libelleDuSymbole`).
+  videophone: ROND_ALIM,
   va: [...MANETTE, { d: 'M4.6 -1.1 L8.4 0.6' }],
   poussoir: [POINT_MUR, { d: 'M0 5.2 V-4' }, { d: 'M-5 -4 H5' }],
   variateur: [
@@ -1399,6 +1442,9 @@ export function libelleDuSymbole(
   if (ps.length === 1 && (ps[0] === 'prise20' || ps[0] === 'prise32')) {
     const texte = usage || (ps[0] === 'prise20' ? '20A' : '32A');
     return { texte, ou: { x: 0, y: 3 }, taille: texte.length > 2 ? 4.6 : 5.6, compte: false };
+  }
+  if (ps.length === 1 && ps[0] === 'videophone') {
+    return { texte: 'VP', ou: { x: 0, y: 3 }, taille: 5.6, compte: false };
   }
   if (ps.length === 1 && ps[0] === 'sortieCable') {
     return usage ? { texte: usage, ou: { x: 0, y: -8 }, taille: 6, compte: false } : null;

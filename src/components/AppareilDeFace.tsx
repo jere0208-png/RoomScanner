@@ -271,8 +271,17 @@ function Mecanisme({ kind, x, y, u }: { kind: FixtureKind; x: number; y: number;
         </G>
       );
     }
+    case 'videophone':
+      // L'écran du moniteur, et son bouton d'ouverture de porte.
+      return (
+        <G>
+          <Rect x={x - u(5)} y={y - u(6.5)} width={u(10)} height={u(7.5)} rx={u(0.6)} fill="#1E2328" />
+          <Circle cx={x} cy={y + u(4)} r={u(1.1)} fill="#F4F4F2" stroke={C.filet} strokeWidth={Math.max(0.3, u(0.04))} />
+        </G>
+      );
     case 'inter':
     case 'va':
+    case 'interGeneral':
       return (
         <G>
           {fen}

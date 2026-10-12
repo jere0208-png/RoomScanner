@@ -2422,6 +2422,8 @@ interface ScanState {
    * en décide autrement.
    */
   toggleCoffre: (id: string, hauteur?: number) => void;
+  /** Pose ou retire le détecteur d'ouverture d'une menuiserie (alarme). */
+  toggleDetecteurOuverture: (id: string) => void;
   removeOpening: (id: string) => void;
   /**
    * Pose un meuble du catalogue au point donné. Renvoie son identifiant,
@@ -5568,7 +5570,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const familleDe = (k: FixtureKind): string | null =>
         ['prise', 'prise2', 'prise3', 'rj45', 'rj2', 'rjPrise', 'rjPrise2', 'tv', 'tvPrise'].includes(k)
           ? 'prise'
-          : ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur', 'volet'].includes(k)
+          : ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur', 'volet', 'interGeneral'].includes(k)
             ? 'commande'
             : null;
       if (voisin && (familleDe(kind) === null || familleDe(kind) !== familleDe(voisin.kind))) {
@@ -8119,6 +8121,22 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (!memePose) pushHistory('coterOuverture');
       set({
         openings: st.openings.map((x) => (x.id === id ? { ...x, ...cote } : x)),
+        dirty: true,
+      });
+    },
+
+    toggleDetecteurOuverture: (id) => {
+      const st = get();
+      if (!st.openings.some((o) => o.id === id)) return;
+      pushHistory('detecteurOuverture');
+      set({
+        openings: st.openings.map((o) => {
+          if (o.id !== id) return o;
+          const neuf = { ...o };
+          if (o.detecteur) delete neuf.detecteur;
+          else neuf.detecteur = true;
+          return neuf;
+        }),
         dirty: true,
       });
     },
