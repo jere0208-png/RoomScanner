@@ -110,9 +110,11 @@ describe('le parcours complet d’un plan dessine', () => {
     st().openSave(id);
 
     // 7. TOUT est revenu : les murs, la porte a sa cote et a son sens, le
-    //    mot, et les cotes corrigees.
+    //    mot, et les cotes corrigees. Huit murs : le mur mitoyen s'est
+    //    allonge d'un prolongement qui borde le seul sejour — la chambre,
+    //    elle, garde ses coins (revues « Theo » et « Nicolas »).
     expect(st().rooms).toHaveLength(2);
-    expect(st().walls).toHaveLength(7);
+    expect(st().walls).toHaveLength(8);
     expect(st().notes).toHaveLength(1);
     expect(st().notes[0].text).toBe('Colonne montante ici');
     const o = st().openings[0];

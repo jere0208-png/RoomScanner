@@ -17,6 +17,10 @@ export const EPAISSEURS: { mot: string; m: number }[] = [
   { mot: 'Doublage', m: 0.1 },
   { mot: 'Mur', m: WALL_T },
   { mot: 'Porteur', m: 0.2 },
+  // Les murs d'une maison ancienne — revue « Karim » : ses porteurs de 45 cm
+  // étaient impossibles depuis l'écran.
+  { mot: 'Mur épais', m: 0.3 },
+  { mot: 'Mur ancien', m: 0.45 },
 ];
 
 /** L'épaisseur d'un mur : la sienne, ou celle de tous. */
@@ -55,6 +59,13 @@ export interface WallSeg {
   orthos?: OrthoDeFace[];
   /** Pièce à laquelle ce mur appartient (scan multi-pièces). */
   roomId?: string;
+  /**
+   * NE SÉPARE PAS DEUX PIÈCES — la cloison commune de deux pièces qu'on a
+   * fusionnées. Elle reste dessinée, mais la détection des pièces passe à
+   * travers : la fusion survit à « Redétecter » et à « Redresser » (revues
+   * « Camille » et « Karim »).
+   */
+  nonSeparateur?: boolean;
   /**
    * TRACÉ AUX COTES INTÉRIEURES — un mur dessiné à la main ou lu sur un plan
    * papier. Ses cotes se lisent et se tapent de nu à nu, et la pièce qu'il
@@ -1575,9 +1586,50 @@ export function longueurAuNu(walls: WallSeg[], w: WallSeg): number {
   return Math.max(0, segLength(w) - retraitDuCoin(walls, w, w.a) - retraitDuCoin(walls, w, w.b));
 }
 
-/** La cote d'un mur telle qu'on la lit sur le plan : au nu s'il est dessiné. */
-export function longueurCotee(walls: WallSeg[], w: WallSeg): number {
-  return w.auNu ? longueurAuNu(walls, w) : segLength(w);
+/**
+ * LA COTE D'UN MUR TELLE QU'ON LA LIT SUR LE PLAN : au nu s'il est dessiné.
+ *
+ * Lue d'abord SUR LA PIÈCE QU'IL BORDE — revue « Karim » : retirer un
+ * demi-mur à chaque bout ne vaut que pour un angle droit vu de l'intérieur.
+ * Sur un retour rentrant (le L), un pan coupé, un bow-window, la face est
+ * plus longue ou plus courte que ça : 2,36 s'affichait pour une face de
+ * 2,50, 0,918 pour un pan coupé de 1,000. Le côté du contour au nu de la
+ * pièce (`contourAuNu`) EST la face : on le prend tel quel. Sans pièce
+ * dessinée qui la porte, le calcul d'angle droit.
+ */
+export function longueurCotee(
+  walls: WallSeg[],
+  w: WallSeg,
+  parts?: ({ surface: RoomSurface | null; walls?: WallSeg[] })[],
+): number {
+  if (!w.auNu) return segLength(w);
+  const L = segLength(w);
+  if (parts && L > 1e-6) {
+    const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
+    const h = epaisseurDe(w) / 2;
+    let face = 0;
+    for (const part of parts) {
+      const nu = part.surface?.nu;
+      if (!nu || nu.length < 3) continue;
+      if (part.walls && !part.walls.some((x) => x.id === w.id)) continue;
+      for (let i = 0; i < nu.length; i++) {
+        const a = nu[i];
+        const b = nu[(i + 1) % nu.length];
+        const le = Math.hypot(b.x - a.x, b.z - a.z);
+        if (le < 1e-6) continue;
+        const ue = { x: (b.x - a.x) / le, z: (b.z - a.z) / le };
+        if (Math.abs(u.x * ue.z - u.z * ue.x) > 1e-3) continue;
+        const m = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+        const d = Math.abs((m.x - w.a.x) * u.z - (m.z - w.a.z) * u.x);
+        if (Math.abs(d - h) > 0.02) continue;
+        const t = ((m.x - w.a.x) * u.x + (m.z - w.a.z) * u.z) / L;
+        if (t < -0.01 || t > 1.01) continue;
+        face = Math.max(face, le);
+      }
+    }
+    if (face > 0) return face;
+  }
+  return longueurAuNu(walls, w);
 }
 
 /** Complète une pièce : contour, centre, et point de pose du cartouche. */
@@ -3452,6 +3504,20 @@ function sliceTexture(
  */
 export function splitAtJunctions(walls: WallSeg[], tol = 0.08): WallSeg[] {
   const out: WallSeg[] = [];
+  /*
+    UN NOM QUE PERSONNE NE PORTE — revue « Camille » : un couloir déjà coupé
+    au scan (`X`, `X#1`) qu'on recoupait pour une cloison refaisait un
+    `X#1`. Deux murs du même nom : le recollage en jetait un, et le WC
+    disparaissait, couloir ouvert, porte dans le vide.
+  */
+  const pris = new Set(walls.map((w) => w.id));
+  const nomLibre = (base: string, n: number) => {
+    let k = n;
+    while (pris.has(`${base}#${k}`)) k++;
+    const id = `${base}#${k}`;
+    pris.add(id);
+    return id;
+  };
   for (const w of walls) {
     const len = segLength(w);
     if (len < 1e-6) {
@@ -3485,7 +3551,7 @@ export function splitAtJunctions(walls: WallSeg[], tol = 0.08): WallSeg[] {
       });
       out.push({
         ...w,
-        id: n === 0 ? w.id : `${w.id}#${n}`,
+        id: n === 0 ? w.id : nomLibre(w.id, n),
         a: at(prev),
         b: at(t),
         texture: sliceTexture(w.texture, prev, t),
@@ -3723,7 +3789,9 @@ export function facesFermees(walls: WallSeg[]): DetectedRoom[] {
  * que tout local technique d'appartement, et de toute façon le plus exigu
  * des WC a sa porte pour lui.
  */
-const AIRE_SANS_PORTE = 2;
+// Un WC de 0,90 × 1,50 fait 1,35 m² : en dessous, une gaine ou un placard
+// (revue « Léa » : le WC de 1,58 m² n'apparaissait qu'avec sa porte).
+const AIRE_SANS_PORTE = 1.2;
 
 /** Les murs sur lesquels une menuiserie est posée : porte, fenêtre, baie. */
 function mursOuverts(walls: WallSeg[], openings: WallSeg[]): Set<string> {
@@ -3930,6 +3998,39 @@ export function mergeColinear(
 ): WallSeg[] {
   const cosMin = Math.cos((angleDeg * Math.PI) / 180);
   const out: WallSeg[] = [];
+  /*
+    DEUX MURS DU MÊME NOM NE S'ANNULENT PAS — le parcours les reconnaît à
+    leur identifiant, et le second était jeté sans bruit. Un doublon (venu
+    d'un relevé ou d'une sauvegarde d'avant) prend un nom à lui d'abord.
+  */
+  const vus = new Set<string>();
+  walls = walls.map((w) => {
+    if (!vus.has(w.id)) {
+      vus.add(w.id);
+      return w;
+    }
+    let k = 1;
+    while (vus.has(`${w.id}~${k}`)) k++;
+    const id = `${w.id}~${k}`;
+    vus.add(id);
+    return { ...w, id };
+  });
+
+  /*
+    UN NŒUD OÙ ARRIVE UN TROISIÈME MUR NE SE RECOLLE PAS, quel que soit son
+    groupe — revues « Nicolas » et « Théo ». Les bras se comptaient groupe
+    par groupe : la cloison posée dans une pièce ACCOLÉE (son groupe à elle)
+    ne comptait pas au nœud du mur du séjour (le groupe du séjour). Le mur,
+    coupé au pied de la cloison, se recollait aussitôt, et la pièce ne se
+    scindait jamais.
+  */
+  const brasDuPlan = new Map<string, number>();
+  for (const w of walls) {
+    for (const end of ['a', 'b'] as const) {
+      const k = nodeKey(w[end]);
+      brasDuPlan.set(k, (brasDuPlan.get(k) ?? 0) + 1);
+    }
+  }
 
   for (const { items } of groupByRoom(walls)) {
     // Bras par nœud : une fusion demande exactement deux murs qui s'y touchent.
@@ -3946,9 +4047,17 @@ export function mergeColinear(
     /** Le mur qui prolonge `w` au nœud `end`, s'il le prolonge vraiment. */
     const nextAt = (w: WallSeg, end: 'a' | 'b'): WallSeg | null => {
       const list = arms.get(nodeKey(w[end])) ?? [];
-      if (list.length !== 2) return null;
+      if (list.length !== 2 || brasDuPlan.get(nodeKey(w[end])) !== 2) return null;
       const other = list.find((x) => x.wall.id !== w.id);
       if (!other) return null;
+      /*
+        DEUX MURS D'ÉPAISSEURS DIFFÉRENTES RESTENT DEUX MURS — revue
+        « Karim » : un porteur de 45 cm prolongé d'un mur de 14 se recollait
+        en un seul mur de 45, et la pièce perdait 0,31 m². Un mur tracé au
+        nu ne se recolle pas non plus à un mur relevé.
+      */
+      if (Math.abs(epaisseurDe(other.wall) - epaisseurDe(w)) > 1e-6) return null;
+      if (!!other.wall.auNu !== !!w.auNu) return null;
       if (Math.abs(other.wall.height - w.height) > heightTol) return null;
       const u = unit(w);
       const v = unit(other.wall);
@@ -4324,7 +4433,7 @@ export interface SaisieCoupe {
 }
 
 /** Le repère d'une pièce : son grand axe, son petit, et leurs étendues. */
-function repereDePiece(pts: Pt[]) {
+export function repereDePiece(pts: Pt[]) {
   const { angle } = roomExtent(pts);
   const u = { x: Math.cos(angle), z: Math.sin(angle) };
   const v = { x: -u.z, z: u.x };

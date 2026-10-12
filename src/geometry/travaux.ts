@@ -202,7 +202,13 @@ export function travauxDesPieces(
     const surface = part.surface;
     if (!surface || !(surface.area > 0)) return;
     const hauteur = roomHeight(part.walls) || HAUTEUR_PAR_DEFAUT;
-    const tour = perimetre(surface.pts);
+    /*
+      LE TOUR DE LA PIÈCE, AU NU — revues « Sophie » et « Karim » : compté à
+      l'axe des murs, il ajoutait 6 % de peinture et de plinthes (séjour
+      19,20 m au lieu de 18,54). Une pièce dessinée a son contour au nu.
+    */
+    const contour = surface.nu ?? surface.pts;
+    const tour = perimetre(contour);
     const siennes = baiesDeLaPiece(part, baies);
     let seuils = 0;
     let portes = 0;
@@ -217,7 +223,7 @@ export function travauxDesPieces(
       }
     }
     // Une baie ne monte pas plus haut que le mur qui la porte.
-    const murs = mursNetsDe(surface.pts, hauteur, siennes);
+    const murs = mursNetsDe(contour, hauteur, siennes);
     const decor = decorDe?.(part.roomId);
     out.push({
       roomId: part.roomId,

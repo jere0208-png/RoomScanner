@@ -1,0 +1,431 @@
+/**
+ * DES PLANS CONSTRUITS DE BOUT EN BOUT — troisième tournée d'utilisateurs.
+ *
+ * Six profils ont construit eux-mêmes des plans en 2D et les ont regardés en
+ * 3D. Ce banc tient ce qu'ils ont trouvé.
+ *
+ * Revue « Théo » (aménager un 2 pièces) :
+ *   — un meuble plaqué pile contre le mur était jugé « dans le mur » à
+ *     l'arrondi près, et glissait de 12 à 18 cm vers le milieu ;
+ *   — un meuble qu'on faisait pivoter contre un mur entrait dans la
+ *     maçonnerie de 53 à 66 cm ;
+ *   — « tv », « table manger », « canape angle » ne trouvaient rien.
+ *
+ * Revues « Théo », « Nicolas » et « Léa » (pièces accolées) :
+ *   — la pièce accolée prenait toute la longueur du mur, la largeur tapée
+ *     était ignorée ;
+ *   — la retailler déformait la voisine (un mur en biais, 25,00 → 19,97 m²) ;
+ *   — une cloison posée dedans ne la coupait jamais : le mur du voisin, d'un
+ *     autre groupe, se recollait au pied de la cloison.
+ *
+ * Revue « Léa » (maison à étage dessinée) : on ne pouvait pas créer d'étage
+ * sans scanner, et ce qu'on posait à l'étage atterrissait au
+ * rez-de-chaussée — fenêtres, meubles, cotes de baies, hauteurs.
+ *
+ * Revue « Nicolas » (électricien) : sur la face de derrière d'un mur, les
+ * retours de maçonnerie tombaient en miroir.
+ *
+ * Revue « Karim » (métreur, formes irrégulières) : les cotes affichées
+ * retiraient un demi-mur à chaque bout quel que soit l'angle (2,36 pour une
+ * face de 2,50 sur le retour d'un L) ; deux murs d'épaisseurs différentes se
+ * recollaient en un seul ; la fusion ne survivait pas à « Redétecter ».
+ *
+ * Revue « Sophie » (T3 dessiné à la main) : épaissir un mur mordait la pièce,
+ * une cloison tapée nu à nu jusqu'à un mur épais ne fermait rien, « 0,90 »
+ * tapé dans un champ en centimètres donnait une porte de 0,9 cm.
+ *
+ * Revue « Camille » (agente immobilière, scans corrigés à la main) :
+ *   — recouper un mur déjà coupé refaisait un nom déjà pris (`X#1`), et le
+ *     recollage jetait le doublon : le WC disparaissait, le couloir s'ouvrait,
+ *     une porte flottait dans le vide ;
+ *   — retirer un mur d'un plan scanné effaçait TOUTES les pièces : la règle
+ *     ne regardait que l'étiquette `roomId`, que les murs scannés n'ont pas.
+ */
+const mockMagasin = new Map<string, string>();
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(async (k: string) => mockMagasin.get(k) ?? null),
+  setItem: jest.fn(async (k: string, v: string) => {
+    mockMagasin.set(k, v);
+  }),
+  removeItem: jest.fn(async (k: string) => {
+    mockMagasin.delete(k);
+  }),
+}));
+
+import type { SurfaceData } from 'react-native-room-scan';
+import { useScanStore } from '../src/store/scanStore';
+import { useAccountStore } from '../src/store/accountStore';
+import {
+  etendueDeLaPiece,
+  longueurCotee,
+  filtrerAuNiveau,
+  niveauDe,
+  wallRuns,
+  mergeColinear,
+  roomParts,
+  segLength,
+  splitAtJunctions,
+  type WallSeg,
+} from '../src/geometry/floorplan';
+import { poserLibre } from '../src/geometry/poser';
+import { masonryRuns, wallFace } from '../src/geometry/electrical';
+import { lireCm } from '../src/components/MurNeufSheet';
+import { CATALOG_ITEMS, type CatalogItem } from '../src/geometry/catalogue';
+import { matchItem } from '../src/screens/result/FurnitureSheet';
+
+const st = () => useScanStore.getState();
+const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
+  id, type: 'wall', a: { x: ax, z: az }, b: { x: bx, z: bz }, height: 2.5, yCenter: 1.25,
+});
+const uuid = (k: number) => `${String(k).padStart(8, '0')}-AAAA-4BBB-8CCC-DDDDDDDDDDDD`;
+const surface = (id: string, cx: number, cz: number, length: number, alongZ = false): SurfaceData => ({
+  id, type: 'wall', length, height: 2.5,
+  transform: alongZ
+    ? [0, 0, 1, 0, 0, 1, 0, 0, -1, 0, 0, 0, cx, 1.25, cz, 1]
+    : [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, cx, 1.25, cz, 1],
+});
+
+beforeEach(() => {
+  mockMagasin.clear();
+  useAccountStore.setState({ plansUtilises: 0, pro: true, bonusEssais: 0 });
+  st().reset();
+  useScanStore.setState({ saves: [], currentSaveId: null });
+});
+
+describe('un mur recoupé garde tous ses morceaux', () => {
+  it('chaque morceau a un nom à lui, et rien ne se perd au recollage', () => {
+    // Le couloir déjà coupé au scan : X et X#1. Une cloison neuve vient buter sur X.
+    const murs = [
+      mur('X', 0, 0, 2, 0),
+      mur('X#1', 2, 0, 4, 0),
+      mur('t', 2, 0, 2, 2),
+      mur('c', 1, 0, 1, -2),
+    ];
+    const coupes = splitAtJunctions(murs);
+    const ids = coupes.map((w) => w.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    const recolles = mergeColinear(coupes);
+    const horizontaux = recolles.filter((w) => Math.abs(w.a.z) < 1e-9 && Math.abs(w.b.z) < 1e-9);
+    expect(horizontaux.reduce((s, w) => s + segLength(w), 0)).toBeCloseTo(4, 9);
+  });
+
+  it('deux murs du même nom ne s’annulent plus au recollage', () => {
+    const recolles = mergeColinear([mur('A', 0, 0, 3, 0), mur('A', 5, 0, 5, 3)]);
+    expect(recolles).toHaveLength(2);
+  });
+});
+
+describe('retirer un mur d’un plan scanné', () => {
+  it('garde les pièces qui ont encore leurs murs, et leurs noms', () => {
+    st().finalize({
+      modelPath: '/tmp/a.usdz',
+      surfaces: [
+        surface(uuid(1), 2.5, 0, 5), surface(uuid(2), 2.5, 4, 5),
+        surface(uuid(3), 0, 2, 4, true), surface(uuid(4), 5, 2, 4, true),
+        surface(uuid(5), 6.5, 0, 3), surface(uuid(6), 6.5, 4, 3),
+        surface(uuid(7), 8, 2, 4, true),
+      ],
+      objects: [],
+    });
+    st().oublierArrivage();
+    expect(st().rooms.length).toBe(2);
+    st().setRoomName(st().rooms[0].id, 'Séjour');
+    // Un mur fantôme, au milieu de rien, puis retiré.
+    useScanStore.setState({ walls: [...st().walls, { ...mur(uuid(9), 2, 1.5, 2.4, 1.5) }] });
+    st().removeWall(uuid(9));
+    expect(st().rooms.length).toBe(2);
+    expect(st().rooms.map((r) => r.name)).toContain('Séjour');
+  });
+});
+
+describe('un meuble collé au mur', () => {
+  const salon = () => {
+    const murs = [mur('n', 0, 0, 4.5, 0), mur('e', 4.5, 0, 4.5, 3.8), mur('s', 4.5, 3.8, 0, 3.8), mur('w', 0, 3.8, 0, 0)].map(
+      (w) => ({ ...w, roomId: 'r1' }),
+    );
+    useScanStore.setState({
+      walls: murs,
+      rooms: [{ id: 'r1', name: 'Séjour', floor: null, wallIds: murs.map((w) => w.id) }] as never,
+      objects: [],
+      openings: [],
+      fixtures: [],
+    });
+    return murs;
+  };
+  const CANAPE: CatalogItem = { key: 'canape3', label: 'Canapé 3 places', w: 2.28, d: 0.95, h: 0.85, category: 'sofa' } as CatalogItem;
+  const centre = (id: string) => {
+    const o = st().objects.find((x) => x.id === id)!;
+    return { x: o.transform[12], z: o.transform[14] };
+  };
+
+  it('posé au ras du nu, il y reste', () => {
+    const murs = salon();
+    const id = st().addObject(CANAPE, 2.25, 1.5);
+    const auRas = 0.07 + 0.95 / 2;
+    expect(poserLibre({ x: 2.25, z: auRas }, { width: 2.28, depth: 0.95, yaw: 0 }, murs).valide).toBe(true);
+    st().rangerMeuble(id, 2.25, auRas);
+    expect(centre(id).z).toBeCloseTo(auRas, 3);
+    expect(centre(id).x).toBeCloseTo(2.25, 3);
+  });
+
+  it('tourné contre le mur, il ne rentre pas dans la maçonnerie', () => {
+    const murs = salon();
+    const id = st().addObject(CANAPE, 2.25, 1.5);
+    st().rangerMeuble(id, 2.25, 0.07 + 0.95 / 2);
+    st().rotateObject(id, 1);
+    const o = st().objects.find((x) => x.id === id)!;
+    const yaw = Math.atan2(o.transform[2], o.transform[0]);
+    expect(poserLibre(centre(id), { width: o.width, depth: o.depth, yaw }, murs).valide).toBe(true);
+  });
+});
+
+describe('chercher un meuble', () => {
+  const trouve = (q: string) => CATALOG_ITEMS.filter((it) => matchItem(it, q)).map((it) => it.label);
+  it('mot par mot, et avec les mots de tous les jours', () => {
+    expect(trouve('tv')).toContain('Télévision');
+    expect(trouve('table manger')).toContain('Table à manger');
+    expect(trouve('canape angle')).toContain('Canapé d’angle');
+    expect(trouve('')).toHaveLength(CATALOG_ITEMS.length);
+  });
+});
+
+describe('une pièce accolée', () => {
+  const aire = (nom: string) => {
+    const r = st().rooms.find((x) => x.name === nom)!;
+    return roomParts(st().walls, st().rooms).find((p) => p.roomId === r.id)!.surface!;
+  };
+  const sejourEtMurEst = () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(4.5, 3.8, 'Séjour', { auNu: true });
+    const xs = st().walls.flatMap((w) => [w.a.x, w.b.x]);
+    const xMax = Math.max(...xs);
+    return st().walls.find((w) => Math.abs(w.a.x - xMax) < 1e-6 && Math.abs(w.b.x - xMax) < 1e-6)!;
+  };
+
+  it('tient la largeur tapée, et laisse la voisine telle quelle', () => {
+    const est = sejourEtMurEst();
+    st().addRoomBox(3.2, 3, 'Chambre', est.id, { auNu: true });
+    const e = etendueDeLaPiece(aire('Chambre'));
+    expect([e.width, e.depth].map((v) => Math.round(v * 100) / 100).sort()).toEqual([3, 3.2]);
+    expect(aire('Séjour').area).toBeCloseTo(17.1, 6);
+  });
+
+  it('se retaille sans déformer la voisine', () => {
+    const est = sejourEtMurEst();
+    st().addRoomBox(3.8, 3, 'Chambre', est.id, { auNu: true });
+    const id = st().rooms.find((r) => r.name === 'Chambre')!.id;
+    const e = etendueDeLaPiece(aire('Chambre'));
+    // Le long du mur partagé, elle passe de 3,80 à 3,00.
+    const [l, p] = e.width > e.depth ? [e.width, e.depth] : [e.depth, e.width];
+    expect(l).toBeCloseTo(3.8, 6);
+    st().resizeRoom(id, p, 3, { auNu: true });
+    expect(aire('Séjour').area).toBeCloseTo(17.1, 6);
+    const apres = etendueDeLaPiece(aire('Chambre'));
+    expect(Math.min(apres.width, apres.depth)).toBeCloseTo(3, 2);
+  });
+
+  it('se coupe d’une cloison', () => {
+    const est = sejourEtMurEst();
+    st().addRoomBox(3.8, 3, 'Chambre', est.id, { auNu: true });
+    const id = st().rooms.find((r) => r.name === 'Chambre')!.id;
+    const avant = st().rooms.length;
+    expect(st().couperPiece(id, { sens: 'longueur', depuis: 1.5, epaisseur: 0.07 })).toBe(true);
+    expect(st().rooms.length).toBe(avant + 1);
+    expect(aire('Séjour').area).toBeCloseTo(17.1, 6);
+  });
+});
+
+describe('une maison à étage dessinée', () => {
+  const emprise = (n: number) => {
+    const ws = st().walls.filter((w) => niveauDe(w) === n);
+    const xs = ws.flatMap((w) => [w.a.x, w.b.x]);
+    const zs = ws.flatMap((w) => [w.a.z, w.b.z]);
+    return [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
+  };
+  const maison = () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(9, 7, 'Rez', { auNu: true });
+    st().allerAuNiveau(1);
+    st().addRoomLibre(9, 7, 'Étage', { auNu: true });
+  };
+  const murNord = (n: number) => {
+    const ws = st().walls.filter((w) => niveauDe(w) === n);
+    const z0 = Math.min(...ws.flatMap((w) => [w.a.z, w.b.z]));
+    return ws.find((w) => Math.abs(w.a.z - z0) < 1e-6 && Math.abs(w.b.z - z0) < 1e-6)!;
+  };
+
+  it('le premier étage se pose d’aplomb sur le rez-de-chaussée', () => {
+    maison();
+    expect(emprise(1)).toEqual(emprise(0));
+    expect(st().rooms.find((r) => r.name === 'Étage')!.niveau).toBe(1);
+  });
+
+  it('« Dessiner un étage » est au menu du plan', () => {
+    const ecran = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'src', 'screens', 'ResultScreen.tsx'), 'utf8');
+    expect(ecran).toMatch(/label: 'Dessiner un étage'/);
+  });
+
+  it('une fenêtre posée à l’étage y reste, et se cote sur le mur de l’étage', () => {
+    maison();
+    const nord = murNord(1);
+    const id = st().addOpening(nord.id, 'window')!;
+    const o = st().openings.find((x) => x.id === id)!;
+    expect(niveauDe(o)).toBe(1);
+    const jeu = (n: number) =>
+      filtrerAuNiveau({ walls: st().walls, openings: st().openings, rooms: st().rooms, fixtures: [], photos: [], objects: [], ceiling: [] }, n);
+    expect(jeu(1).openings.map((x) => x.id)).toContain(id);
+    expect(jeu(0).openings.map((x) => x.id)).not.toContain(id);
+    st().coterOuverture(id, { largeur: 1, hauteur: 1.15, depuis: 4.57, allege: 0.95 } as never);
+    const apres = st().openings.find((x) => x.id === id)!;
+    const xMin = Math.min(apres.a.x, apres.b.x) - Math.min(nord.a.x, nord.b.x);
+    // 4,57 depuis le nu du coin : 4,57 + 7 cm de demi-mur.
+    expect(xMin).toBeCloseTo(4.57 + 0.07, 2);
+  });
+
+  it('glisser une pièce de l’étage ne la soude pas au rez-de-chaussée', () => {
+    maison();
+    const rez = JSON.stringify(st().walls.filter((w) => niveauDe(w) === 0));
+    const etage = st().rooms.find((r) => r.name === 'Étage')!;
+    st().moveRoom(etage.id, 0.03, 0.02);
+    expect(JSON.stringify(st().walls.filter((w) => niveauDe(w) === 0))).toBe(rez);
+    expect(st().walls.filter((w) => niveauDe(w) === 1).length).toBe(4);
+  });
+
+  it('un meuble posé à l’étage appartient à une pièce de l’étage', () => {
+    maison();
+    const id = st().addObject({ key: 'lit140', label: 'Lit 140', w: 1.4, d: 1.9, h: 0.5, category: 'bed' } as never, 4.5, 3.5);
+    const o = st().objects.find((x) => x.id === id)!;
+    expect(o.roomId).toBe(st().rooms.find((r) => r.name === 'Étage')!.id);
+  });
+
+  it('la hauteur de l’étage ne touche pas le rez-de-chaussée', () => {
+    maison();
+    st().setAllRoomHeights(2.4);
+    expect(st().walls.filter((w) => niveauDe(w) === 1).every((w) => w.height === 2.4)).toBe(true);
+    expect(st().walls.filter((w) => niveauDe(w) === 0).every((w) => w.height === 2.5)).toBe(true);
+    // Et la pièce suivante de l'étage naît à 2,40.
+    st().addRoomLibre(3, 3, 'Chambre', { auNu: true });
+    const ch = st().rooms.find((r) => r.name === 'Chambre')!;
+    expect(st().walls.find((w) => w.id === ch.wallIds![0])!.height).toBe(2.4);
+  });
+});
+
+describe('la face de derrière d’un mur', () => {
+  it('ses retours tombent où sont les baies, pas en miroir', () => {
+    const m = mur('m', 0, 0, 5, 0);
+    const porte = { ...mur('p', 0.5, 0, 1.33, 0), type: 'door' as const };
+    const face = wallFace(m, undefined, -1);
+    const runs = masonryRuns(wallRuns(m, [porte]), segLength(m), face);
+    // Vue de derrière, la porte est entre 3,67 et 4,50 depuis la gauche.
+    const dansLaPorte = (x: number) => runs.some((r) => x > r.x0 + 1e-6 && x < r.x1 - 1e-6);
+    expect(dansLaPorte(4.0)).toBe(false);
+    expect(dansLaPorte(1.0)).toBe(true);
+  });
+});
+
+describe('les formes de Karim', () => {
+  const muNu = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({ ...mur(id, ax, az, bx, bz), auNu: true, roomId: 'L' });
+  const enL = () => {
+    const pts = [[0, 0], [7, 0], [7, 3], [4.5, 3], [4.5, 5], [0, 5]];
+    const murs = pts.map((p, i) => {
+      const q = pts[(i + 1) % pts.length];
+      return muNu(`l${i}`, p[0], p[1], q[0], q[1]);
+    });
+    useScanStore.setState({ walls: murs, rooms: [{ id: 'L', name: 'Séjour', floor: null, wallIds: murs.map((w) => w.id) }] as never });
+    return murs;
+  };
+
+  it('le retour rentrant d’un L se cote à sa face : 2,50, pas 2,36', () => {
+    const murs = enL();
+    const parts = roomParts(murs, st().rooms);
+    const retour = murs.find((w) => w.id === 'l2')!;
+    expect(longueurCotee(murs, retour, parts)).toBeCloseTo(2.5, 6);
+    // La surface au nu du L, pour mémoire : 7 × 5 − 2,5 × 2, moins les demi-murs.
+    expect(parts[0].surface!.area).toBeGreaterThan(28);
+  });
+
+  it('deux murs alignés d’épaisseurs différentes restent deux murs', () => {
+    const recolles = mergeColinear([{ ...mur('p', 0, 0, 3.1, 0), epaisseur: 0.45 }, mur('c', 3.1, 0, 5.13, 0)]);
+    expect(recolles).toHaveLength(2);
+  });
+
+  it('la fusion survit à « Redétecter »', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(4, 3, 'Séjour', { auNu: true });
+    const xs = st().walls.flatMap((w) => [w.a.x, w.b.x]);
+    const est = st().walls.find((w) => Math.abs(w.a.x - Math.max(...xs)) < 1e-6 && Math.abs(w.b.x - Math.max(...xs)) < 1e-6)!;
+    st().addRoomBox(3, 3, 'Salon', est.id, { auNu: true });
+    const [a, b] = st().rooms;
+    st().mergeRooms(a.id, b.id);
+    expect(st().rooms).toHaveLength(1);
+    st().redetectRooms();
+    expect(st().rooms).toHaveLength(1);
+  });
+});
+
+describe('les murs de Sophie', () => {
+  it('épaissir un mur dessiné garde la face de la pièce', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(4.2, 5.1, 'Séjour', { auNu: true });
+    const nord = [...st().walls].sort((p, q) => Math.min(p.a.z, p.b.z) - Math.min(q.a.z, q.b.z))[0];
+    st().setEpaisseurMur(nord.id, 0.2);
+    const r = st().rooms[0];
+    const e = etendueDeLaPiece(roomParts(st().walls, st().rooms).find((p) => p.roomId === r.id)!.surface!);
+    expect(Math.max(e.width, e.depth)).toBeCloseTo(5.1, 6);
+    expect(Math.min(e.width, e.depth)).toBeCloseTo(4.2, 6);
+  });
+
+  it('une cloison tapée nu à nu jusqu’à un mur épais ferme la pièce', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(6, 4, 'Séjour', { auNu: true });
+    const murs = st().walls;
+    for (const w of murs) st().setEpaisseurMur(w.id, 0.2);
+    const zs = st().walls.flatMap((w) => [w.a.z, w.b.z]);
+    const z0 = Math.min(...zs) + 0.1;
+    const z1 = Math.max(...zs) - 0.1;
+    const x = Math.min(...st().walls.flatMap((w) => [w.a.x, w.b.x])) + 2.5;
+    st().addWallBetween({ x, z: z0 }, { x, z: z1 }, { epaisseur: 0.07 });
+    expect(st().rooms).toHaveLength(2);
+  });
+
+  it('« 0,90 » dans un champ en centimètres, ce sont 90 cm', () => {
+    expect(lireCm('0,90')).toBeCloseTo(0.9, 9);
+    expect(lireCm('90')).toBeCloseTo(0.9, 9);
+    expect(lireCm('83,5')).toBeCloseTo(0.835, 9);
+    expect(lireCm('2,00')).toBeCloseTo(2, 9);
+  });
+
+  it('deux meubles posés au même endroit ne s’empilent pas', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(5, 4, 'Séjour', { auNu: true });
+    const item = { key: 'chaise', label: 'Chaise', w: 0.45, d: 0.5, h: 0.9, category: 'chair' } as never;
+    const a = st().addObject(item, 2.5, 2);
+    const b = st().addObject(item, 2.5, 2);
+    const pa = st().objects.find((o) => o.id === a)!.transform;
+    const pb = st().objects.find((o) => o.id === b)!.transform;
+    expect(Math.hypot(pa[12] - pb[12], pa[14] - pb[14])).toBeGreaterThan(0.44);
+  });
+});
+
+describe('les retouches de Camille', () => {
+  it('une porte déclarée n’est plus un passage', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(4, 3, 'Séjour', { auNu: true });
+    const id = st().addOpening(st().walls[0].id, 'opening')!;
+    useScanStore.setState({ openings: st().openings.map((o) => (o.id === id ? { ...o, open: true } : o)) });
+    st().setOpeningType(id, 'door');
+    expect(st().openings.find((o) => o.id === id)!.open).toBeUndefined();
+  });
+
+  it('« Scinder » coupe en travers du grand côté', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(5.2, 2.4, 'Couloir', { auNu: true });
+    st().splitRoom(st().rooms[0].id);
+    const parts = roomParts(st().walls, st().rooms);
+    expect(parts).toHaveLength(2);
+    for (const p of parts) {
+      const e = etendueDeLaPiece(p.surface!);
+      expect(Math.max(e.width, e.depth)).toBeLessThan(3);
+    }
+  });
+});

@@ -107,7 +107,7 @@ import {
 } from '../geometry/ceiling';
 import { planFrameAngle } from '../geometry/floorplan';
 import { assignOpenings } from '../geometry/scene3d';
-import { epaisseurDe, etendueDeLaPiece, pointOnSeg, wallRuns } from '../geometry/floorplan';
+import { epaisseurDe, etendueDeLaPiece, longueurCotee, pointOnSeg, wallRuns } from '../geometry/floorplan';
 import {
   ajusterBlocs,
   masquesDeScene,
@@ -3100,7 +3100,8 @@ function planPage(
         const n = normalePage(w, sgn);
         const E = (epaisseurDe(w) / 2 + SUREPAISSEUR_FACADE) * scale;
         const angle = angleDe(a, b);
-        const L = segLength(w);
+        // Au nu pour un mur dessiné : la cote de l'écran (revue « Léa »).
+        const L = longueurCotee(walls, w);
 
         // La chaîne des murs : la longueur de chacun.
         const A2 = plus(a, n, E + RANG_MURS);
@@ -3264,7 +3265,7 @@ function planPage(
         const u = unitaire({ x: b.x - a.x, y: b.y - a.y });
         const angle = angleDe(a, b);
         const F = (epaisseurDe(w) / 2) * scale;
-        const txt = `${frLen(segLength(w))} m`;
+        const txt = `${frLen(longueurCotee(walls, w))} m`;
         let mieux: { A: Pt; B: Pt; n: Pt; texte: Pt; cout: number; taille: number } | null = null;
         for (const sgn of [1, -1]) {
           const n = normalePage(w, sgn);

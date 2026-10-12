@@ -1525,19 +1525,20 @@ function commode(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   tiroirs(a, -W / 2 + 0.015, W / 2 - 0.015, hPied + 0.015, H - 0.025, zF, new Array(n).fill(1), TEINTES.laque, 'laque', true);
 }
 
+// La couleur choisie habille tout le meuble, pas seulement ses côtés (revue « Théo »).
 function chevet(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   const hPied = Math.min(0.16, H * 0.28);
-  pieds(a, [-W / 2 + 0.03, W / 2 - 0.03], [-D / 2 + 0.03, D / 2 - 0.03], 0, hPied, 0.015, 0.01, 'bois', c.cotes ?? TEINTES.chene);
+  pieds(a, [-W / 2 + 0.03, W / 2 - 0.03], [-D / 2 + 0.03, D / 2 - 0.03], 0, hPied, 0.015, 0.01, 'bois', c.teinte ?? c.cotes ?? TEINTES.chene);
   const e = 0.016;
   const zF = -D / 2 + SAILLIE_BOUTON;
   // La caisse ouverte : dessus, dessous, flancs, fond — et la niche se voit.
-  a.boite(-W / 2, W / 2, H - e, H, -D / 2, D / 2, 'bois', c.dessus ?? c.cotes ?? TEINTES.chene, { r: 0.004 });
-  a.boite(-W / 2, W / 2, hPied, hPied + e, zF, D / 2, 'bois', c.cotes ?? TEINTES.chene);
-  a.boite(-W / 2, -W / 2 + e, hPied, H - e, zF, D / 2, 'bois', c.cotes ?? TEINTES.chene);
-  a.boite(W / 2 - e, W / 2, hPied, H - e, zF, D / 2, 'bois', c.cotes ?? TEINTES.chene);
-  a.boite(-W / 2 + e, W / 2 - e, hPied, H - e, D / 2 - 0.008, D / 2, 'bois', c.cotes ?? TEINTES.chene);
+  a.boite(-W / 2, W / 2, H - e, H, -D / 2, D / 2, 'bois', c.dessus ?? c.teinte ?? c.cotes ?? TEINTES.chene, { r: 0.004 });
+  a.boite(-W / 2, W / 2, hPied, hPied + e, zF, D / 2, 'bois', c.teinte ?? c.cotes ?? TEINTES.chene);
+  a.boite(-W / 2, -W / 2 + e, hPied, H - e, zF, D / 2, 'bois', c.teinte ?? c.cotes ?? TEINTES.chene);
+  a.boite(W / 2 - e, W / 2, hPied, H - e, zF, D / 2, 'bois', c.teinte ?? c.cotes ?? TEINTES.chene);
+  a.boite(-W / 2 + e, W / 2 - e, hPied, H - e, D / 2 - 0.008, D / 2, 'bois', c.teinte ?? c.cotes ?? TEINTES.chene);
   const hT = Math.min(0.15, (H - hPied) * 0.4);
-  a.boite(-W / 2 + e, W / 2 - e, H - e - hT, H - e, zF, D / 2 - 0.01, 'laque', TEINTES.laque, { sans: ['arriere'] });
+  a.boite(-W / 2 + e, W / 2 - e, H - e - hT, H - e, zF, D / 2 - 0.01, 'laque', c.teinte ?? TEINTES.laque, { sans: ['arriere'] });
   bouton(a, 0, H - e - hT / 2, zF);
 }
 
@@ -1562,20 +1563,20 @@ function meubleTv(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   // Suspendu, il n'a pas de pieds : il tient au mur.
   const suspendu = c.modele.startsWith('meubletvsuspendu');
   const hPied = suspendu ? 0 : Math.min(0.12, H * 0.3);
-  if (!suspendu) pieds(a, [-W / 2 + 0.05, W / 2 - 0.05], [-D / 2 + 0.05, D / 2 - 0.05], 0, hPied, 0.017, 0.012, 'bois', c.cotes ?? TEINTES.chene);
+  if (!suspendu) pieds(a, [-W / 2 + 0.05, W / 2 - 0.05], [-D / 2 + 0.05, D / 2 - 0.05], 0, hPied, 0.017, 0.012, 'bois', c.teinte ?? c.cotes ?? TEINTES.chene);
   const zF = -D / 2 + SAILLIE_BOUTON;
   const e = 0.018;
-  a.boite(-W / 2, W / 2, H - e, H, -D / 2, D / 2, 'bois', c.dessus ?? c.cotes ?? TEINTES.chene, { r: 0.004 });
-  a.boite(-W / 2, W / 2, hPied, hPied + e, zF, D / 2, 'bois', c.cotes ?? TEINTES.chene);
-  a.boite(-W / 2, -W / 2 + e, hPied, H - e, zF, D / 2, 'bois', c.cotes ?? TEINTES.chene);
-  a.boite(W / 2 - e, W / 2, hPied, H - e, zF, D / 2, 'bois', c.cotes ?? TEINTES.chene);
-  a.boite(-W / 2 + e, W / 2 - e, hPied, H - e, D / 2 - 0.008, D / 2, 'bois', c.cotes ?? TEINTES.chene);
+  a.boite(-W / 2, W / 2, H - e, H, -D / 2, D / 2, 'bois', c.dessus ?? c.teinte ?? c.cotes ?? TEINTES.chene, { r: 0.004 });
+  a.boite(-W / 2, W / 2, hPied, hPied + e, zF, D / 2, 'bois', c.teinte ?? c.cotes ?? TEINTES.chene);
+  a.boite(-W / 2, -W / 2 + e, hPied, H - e, zF, D / 2, 'bois', c.teinte ?? c.cotes ?? TEINTES.chene);
+  a.boite(W / 2 - e, W / 2, hPied, H - e, zF, D / 2, 'bois', c.teinte ?? c.cotes ?? TEINTES.chene);
+  a.boite(-W / 2 + e, W / 2 - e, hPied, H - e, D / 2 - 0.008, D / 2, 'bois', c.teinte ?? c.cotes ?? TEINTES.chene);
   // Deux tiroirs, une niche ouverte au milieu.
   const tiers = (W - 2 * e) / 3;
-  tiroirs(a, -W / 2 + e, -W / 2 + e + tiers, hPied + e, H - e, zF, [1], TEINTES.laque, 'laque', true);
-  tiroirs(a, W / 2 - e - tiers, W / 2 - e, hPied + e, H - e, zF, [1], TEINTES.laque, 'laque', true);
-  a.boite(-W / 2 + e + tiers, -W / 2 + e + tiers + e, hPied + e, H - e, zF, D / 2 - 0.008, 'bois', c.cotes ?? TEINTES.chene);
-  a.boite(W / 2 - e - tiers - e, W / 2 - e - tiers, hPied + e, H - e, zF, D / 2 - 0.008, 'bois', c.cotes ?? TEINTES.chene);
+  tiroirs(a, -W / 2 + e, -W / 2 + e + tiers, hPied + e, H - e, zF, [1], c.teinte ?? TEINTES.laque, 'laque', true);
+  tiroirs(a, W / 2 - e - tiers, W / 2 - e, hPied + e, H - e, zF, [1], c.teinte ?? TEINTES.laque, 'laque', true);
+  a.boite(-W / 2 + e + tiers, -W / 2 + e + tiers + e, hPied + e, H - e, zF, D / 2 - 0.008, 'bois', c.teinte ?? c.cotes ?? TEINTES.chene);
+  a.boite(W / 2 - e - tiers - e, W / 2 - e - tiers, hPied + e, H - e, zF, D / 2 - 0.008, 'bois', c.teinte ?? c.cotes ?? TEINTES.chene);
 }
 
 function buffet(a: Atelier, { W, D, H }: Gabarit, c: Commande) {

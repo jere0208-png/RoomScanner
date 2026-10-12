@@ -172,7 +172,8 @@ export function LaserSheet({
             </Text>
             {cible?.actuelle ? (
               <Text style={styles.reference}>
-                {`Le scan avait relevé ${fr(cible.actuelle, 2)} m`}
+                {/* Un plan dessiné n'a pas de scan : c'est la cote actuelle (revues « Hugo » et « Karim »). */}
+                {`Cote actuelle : ${fr(cible.actuelle, 2)} m`}
               </Text>
             ) : null}
           </View>

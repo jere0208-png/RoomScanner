@@ -48,7 +48,6 @@ import {
   castToWall,
   pushOutOfWalls,
   snapSideToWalls,
-  roomExtent,
   roomHeight,
   roomOf,
   roomParts,
@@ -71,11 +70,13 @@ import {
   weldCorners,
   fusionnerMursDoubles,
   estDessine,
-  longueurAuNu,
+  longueurCotee,
+  repereDePiece,
   epaisseurDe,
   NIVEAU_RDC,
   niveauDe,
   niveauxPresents,
+  niveauDeReference,
   filtrerAuNiveau,
   partRecouverte,
   estRecouvert,
@@ -651,6 +652,16 @@ function groupeDesMurs(murs: { roomId?: string }[]): { roomId?: string } {
 }
 
 /**
+ * LA HAUTEUR D'UNE PIÈCE NEUVE : celle de SON niveau — revue « Léa » : les
+ * pièces dessinées à l'étage prenaient la hauteur du rez-de-chaussée (le
+ * premier mur du plan). Sans mur à ce niveau, celle du plan ; sans plan,
+ * 2,50 m.
+ */
+function hauteurDuNiveau(walls: WallSeg[], n: number): number {
+  return (walls.find((w) => w.type === 'wall' && niveauDe(w) === n) ?? walls[0])?.height ?? 2.5;
+}
+
+/**
  * Un nom de plan que personne ne porte encore : « Version A », sinon
  * « Version A — version 2 », « — version 3 »…
  */
@@ -719,7 +730,9 @@ function rabattreSousLePlafond(
   const parId = new Map(murs.map((w) => [w.id, w]));
   const murDe = new Map<string, WallSeg>();
   for (const w of murs) {
-    for (const o of openingsOn([w], openings)) murDe.set(o.id, w);
+    // Les baies de SON niveau : une chambre de l'étage mise à 2,20 rabotait
+    // les fenêtres du séjour en dessous (revue « Léa »).
+    for (const o of openingsOn([w], openings.filter((x) => niveauDe(x) === niveauDe(w)))) murDe.set(o.id, w);
   }
   return {
     fixtures: fixtures.map((f) => {
@@ -877,6 +890,27 @@ function migrateSave(brut: SavedScan): SavedScan {
   if ((s.openings ?? []).length > 0) {
     const recalees = baiesHorsDesAngles(s.openings, s.walls ?? []);
     if (recalees !== s.openings) s = { ...s, openings: recalees };
+  }
+  /*
+    LES BAIES D'AVANT PRENNENT LE NIVEAU DE LEUR MUR — revue « Léa » : posées
+    à l'étage, elles n'en portaient aucun et se rangeaient au
+    rez-de-chaussée. On ne tranche que quand un seul niveau a un mur sous la
+    baie ; deux niveaux superposés au même endroit, on ne devine pas.
+  */
+  if ((s.openings ?? []).some((o) => o.niveau === undefined) && (s.walls ?? []).some((w) => niveauDe(w) !== NIVEAU_RDC)) {
+    const murs = (s.walls ?? []).filter((w) => w.type === 'wall');
+    let change = false;
+    const baies = s.openings.map((o) => {
+      if (o.niveau !== undefined) return o;
+      const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+      const niveaux = new Set(murs.filter((w) => pointOnSeg(mid, w.a, w.b).dist < 0.3).map((w) => niveauDe(w)));
+      if (niveaux.size !== 1) return o;
+      const n = [...niveaux][0];
+      if (n === NIVEAU_RDC) return o;
+      change = true;
+      return { ...o, niveau: n };
+    });
+    if (change) s = { ...s, openings: baies };
   }
   if (s.retouche?.plan?.walls) {
     const r = sansEclats(s.retouche.plan.walls, s.retouche.plan.rooms ?? []);
@@ -2195,7 +2229,7 @@ interface ScanState {
    * `aimant` à faux : le décalage tapé au chiffre se pose tel quel, sans
    * être rattrapé par la cloison voisine.
    */
-  moveWall: (id: string, dx: number, dz: number, aimant?: boolean) => void;
+  moveWall: (id: string, dx: number, dz: number, aimant?: boolean, cle?: string) => void;
   /**
    * DESSOUDE UN MUR DE SES VOISINS.
    *
@@ -2366,7 +2400,12 @@ interface ScanState {
    * ne se traversent pas. Rien ne l'attire : au large, il ne bouge pas d'un
    * millimètre. Voir l'implémentation pour l'ordre des quatre passes.
    */
-  rangerMeuble: (id: string, x: number, z: number) => void;
+  /**
+   * Range un meuble lâché en (x, z) : hors des murs, hors des voisins. `cle`
+   * : la clé d'historique du geste dont il est la queue (le glisser par
+   * défaut, la rotation quand on vient de tourner).
+   */
+  rangerMeuble: (id: string, x: number, z: number, cle?: string, sansHistorique?: boolean) => void;
   resizeObject: (id: string, width: number, depth: number) => void;
   /**
    * LA TROISIÈME COTE, et la hauteur à laquelle elle commence.
@@ -2853,8 +2892,9 @@ export const useScanStore = create<ScanState>((set, get) => {
       (w) => (n === NIVEAU_RDC || w.niveau === n ? w : { ...w, niveau: n }),
     );
     // Les menuiseries départagent une petite PIÈCE d'une gaine technique :
-    // ce qui s'ouvre est une pièce, si petit soit-il.
-    const shapes = detectRooms(walls, undefined, jeu.openings);
+    // ce qui s'ouvre est une pièce, si petit soit-il. La cloison de deux
+    // pièces fusionnées ne sépare plus rien (voir `nonSeparateur`).
+    const shapes = detectRooms(walls.filter((w) => !w.nonSeparateur), undefined, jeu.openings);
     if (shapes.length === 0) return false;
     /*
       LA GARDE PASSE AVANT LE POINT DE REPRISE.
@@ -3239,8 +3279,23 @@ export const useScanStore = create<ScanState>((set, get) => {
         doigt, et c'est le bord OPPOSE qui ne bouge pas. Un seul calcul,
         deux gestes.
       */
-      const ax = origine?.x ?? x0;
-      const az = origine?.z ?? z0;
+      /*
+        AU CLAVIER, LE CÔTÉ MITOYEN NE BOUGE PAS — revue « Théo » : retailler
+        une pièce ne doit jamais retailler sa voisine. Le coin haut-gauche
+        reste l'appui, sauf quand c'est le bord d'en face qui est partagé et
+        que celui-ci ne l'est pas : on s'appuie alors sur le mitoyen.
+      */
+      const voisines = st.rooms.filter((r) => r.id !== roomId);
+      const estPartage = (id: string) => voisines.some((r) => (r.wallIds ?? []).includes(id));
+      const surX = (x: number) => (w: WallSeg) => Math.abs(w.a.x - x) < 1e-3 && Math.abs(w.b.x - x) < 1e-3;
+      const surZ = (z: number) => (w: WallSeg) => Math.abs(w.a.z - z) < 1e-3 && Math.abs(w.b.z - z) < 1e-3;
+      const bordPartage = (garde: (w: WallSeg) => boolean) => murs.some((w) => garde(w) && estPartage(w.id));
+      let ax = origine?.x ?? x0;
+      let az = origine?.z ?? z0;
+      if (!origine) {
+        if (bordPartage(surX(x1)) && !bordPartage(surX(x0))) ax = x1 - L;
+        if (bordPartage(surZ(z1)) && !bordPartage(surZ(z0))) az = z1 - P;
+      }
       const place = (
         v: number,
         min: number,
@@ -3263,6 +3318,65 @@ export const useScanStore = create<ScanState>((set, get) => {
         murs2.map((w) => [w.id, Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z)]),
       );
       const neufs = new Map(murs2.map((w) => [w.id, w]));
+
+      /*
+        UN MUR PARTAGÉ NE SE DÉFORME PAS POUR LA VOISINE — revues « Théo » et
+        « Nicolas » : retailler la chambre accolée glissait les bouts du mur
+        mitoyen ; le séjour prenait un mur en biais et passait de 25,00 à
+        19,97 m².
+
+        Quand un mur que borde une autre pièce change de LONGUEUR sans
+        quitter sa ligne, la voisine le garde tel quel : on le coupe aux
+        nouveaux coins, la pièce retaillée prend la part qui la borde (et un
+        prolongement s'il le faut), et les bouts de la voisine ne bougent
+        pas. Un mur partagé qu'on POUSSE (il quitte sa ligne) emmène la
+        voisine, comme avant : c'est déplacer une cloison.
+      */
+      const fixes: Pt[] = [];
+      const ajouts: WallSeg[] = [];
+      const pourLaPiece = new Map<string, string[]>();
+      const pourLesVoisines = new Map<string, string[]>();
+      const pris = new Set(st.walls.map((w) => w.id));
+      const nomLibre = (base: string) => {
+        let k = 1;
+        while (pris.has(`${base}#${k}`)) k++;
+        const id = `${base}#${k}`;
+        pris.add(id);
+        return id;
+      };
+      for (const w of murs) {
+        if (!estPartage(w.id)) continue;
+        const w2 = neufs.get(w.id)!;
+        const L0 = segLength(w);
+        if (L0 < 1e-6) continue;
+        const u = { x: (w.b.x - w.a.x) / L0, z: (w.b.z - w.a.z) / L0 };
+        const ecart = (q: Pt) => Math.abs((q.x - w.a.x) * u.z - (q.z - w.a.z) * u.x);
+        if (ecart(w2.a) > 1e-6 || ecart(w2.b) > 1e-6) continue;
+        const t = (q: Pt) => (q.x - w.a.x) * u.x + (q.z - w.a.z) * u.z;
+        const s0 = Math.min(t(w2.a), t(w2.b));
+        const s1 = Math.max(t(w2.a), t(w2.b));
+        if (Math.abs(s0) < 1e-6 && Math.abs(s1 - L0) < 1e-6) continue;
+        fixes.push(w.a, w.b);
+        const at = (s: number): Pt => ({ x: w.a.x + u.x * s, z: w.a.z + u.z * s });
+        const coupes = [0, ...[s0, s1].filter((s) => s > 1e-6 && s < L0 - 1e-6), L0].sort((m, q) => m - q);
+        const morceaux = coupes.slice(1).map((fin, i) => ({ de: coupes[i], a: fin }));
+        const ids = morceaux.map((_, i) => (i === 0 ? w.id : nomLibre(w.id)));
+        morceaux.forEach((m, i) => {
+          const seg: WallSeg = { ...w, id: ids[i], a: at(m.de), b: at(m.a) };
+          if (i === 0) neufs.set(w.id, seg);
+          else ajouts.push(seg);
+        });
+        const prolongements: WallSeg[] = [];
+        if (s0 < -1e-6) prolongements.push({ ...w, id: nomLibre(w.id), a: at(s0), b: at(0) });
+        if (s1 > L0 + 1e-6) prolongements.push({ ...w, id: nomLibre(w.id), a: at(L0), b: at(s1) });
+        ajouts.push(...prolongements);
+        pourLaPiece.set(w.id, [
+          ...ids.filter((_, i) => morceaux[i].de >= s0 - 1e-6 && morceaux[i].a <= s1 + 1e-6),
+          ...prolongements.map((x) => x.id),
+        ]);
+        pourLesVoisines.set(w.id, ids);
+      }
+      const fixe = (q: Pt) => fixes.some((f) => Math.hypot(f.x - q.x, f.z - q.z) < 0.02);
 
       /*
         CE QUI EST POSÉ SUR UN MUR RACCOURCI REVIENT DEDANS.
@@ -3297,6 +3411,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       const SOUDE = 0.02;
       /** Le point d'arrivée d'un coin déplacé, s'il en est un. */
       const suivre = (p: Pt): Pt | null => {
+        // Les bouts que garde la voisine ne suivent personne (voir plus haut).
+        if (fixe(p)) return null;
         for (const w of murs) {
           for (const bout of [w.a, w.b] as const) {
             if (Math.hypot(bout.x - p.x, bout.z - p.z) > SOUDE) continue;
@@ -3313,7 +3429,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         const b = suivre(w.b);
         return a || b ? { ...w, a: a ?? w.a, b: b ?? w.b } : w;
       };
-      const mursApres = st.walls.map(recousu);
+      const mursApres = [...st.walls.map(recousu), ...ajouts];
 
       /*
         LES MENUISERIES SUIVENT LEUR MUR — relevé du patron : « au
@@ -3332,7 +3448,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       */
       const bouges: { avant: WallSeg; apres: WallSeg }[] = [];
       for (let i = 0; i < st.walls.length; i++) {
-        if (st.walls[i] !== mursApres[i]) {
+        // Un mur mitoyen coupé n'a pas bougé : ses percements restent où ils sont.
+        if (st.walls[i] !== mursApres[i] && !pourLesVoisines.has(st.walls[i].id)) {
           bouges.push({ avant: st.walls[i], apres: mursApres[i] });
         }
       }
@@ -3376,8 +3493,26 @@ export const useScanStore = create<ScanState>((set, get) => {
         { x: Math.min(...xs2), z: Math.max(...zs2) },
       ];
 
+      // L'appareillage d'un mur mitoyen coupé passe sur son morceau, par sa position.
+      const coupes = new Set(pourLesVoisines.keys());
+      const reportes = new Map(
+        reprojectFixtures(st.walls, mursApres, st.fixtures.filter((f) => coupes.has(f.wallId))).map((f) => [f.id, f]),
+      );
       set({
         walls: mursApres,
+        rooms:
+          pourLesVoisines.size === 0
+            ? st.rooms
+            : st.rooms.map((r) =>
+                !r.wallIds
+                  ? r
+                  : {
+                      ...r,
+                      wallIds: r.wallIds.flatMap((id) =>
+                        (r.id === roomId ? pourLaPiece.get(id) : pourLesVoisines.get(id)) ?? [id],
+                      ),
+                    },
+              ),
         openings: st.openings.map(emporter),
         ceiling: st.ceiling.map((cl) =>
           cl.roomId === roomId
@@ -3385,7 +3520,11 @@ export const useScanStore = create<ScanState>((set, get) => {
             : cl,
         ),
         fixtures: st.fixtures.map((f) =>
-          neufs.has(f.wallId) ? { ...f, along: recaler(f.along, f.wallId) } : f,
+          coupes.has(f.wallId)
+            ? reportes.get(f.id) ?? f
+            : neufs.has(f.wallId)
+              ? { ...f, along: recaler(f.along, f.wallId) }
+              : f,
         ),
         dirty: true,
       });
@@ -3818,7 +3957,8 @@ export const useScanStore = create<ScanState>((set, get) => {
           a: { x: w.a.x + dx, z: w.a.z + dz },
           b: { x: w.b.x + dx, z: w.b.z + dz },
         }));
-      const autres = murs.filter((w) => !mesMurs.has(w.id));
+      // L'aimant ne cherche qu'à SON niveau (revue « Léa » : l'étage se soudait au rez-de-chaussée).
+      const autres = murs.filter((w) => !mesMurs.has(w.id) && niveauDe(w) === niveauDe(piece));
       let cale = { x: 0, z: 0 };
       let mieux = AIMANT;
       for (const m of bouges) {
@@ -3866,7 +4006,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         const A = { x: w.a.x + ddx, z: w.a.z + ddz };
         const B = { x: w.b.x + ddx, z: w.b.z + ddz };
         for (const o of murs) {
-          if (mesMurs.has(o.id)) continue;
+          if (mesMurs.has(o.id) || niveauDe(o) !== niveauDe(piece)) continue;
           // Mêmes extrémités, à cinq centimètres près, dans un sens ou dans
           // l'autre : c'est la même maçonnerie.
           const memeSens =
@@ -3912,7 +4052,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Les menuiseries de ces murs suivent, sinon elles restent en l'air.
         openings: st.openings.map((o) => {
           const proche = nearestWall(o, murs.filter((w) => mesMurs.has(w.id)));
-          return proche.dist < 0.4
+          return proche.dist < 0.4 && niveauDe(o) === niveauDe(piece)
             ? {
                 ...o,
                 a: { x: o.a.x + ddx, z: o.a.z + ddz },
@@ -4022,7 +4162,11 @@ export const useScanStore = create<ScanState>((set, get) => {
       const wallIds = [...new Set([...inA, ...inB])].filter(
         (id) => !(inA.has(id) && inB.has(id)),
       );
+      // La cloison commune reste dessinée, mais ne sépare plus : la fusion
+      // survit à « Redétecter » et à « Redresser » (voir `nonSeparateur`).
+      const communs = new Set([...inA].filter((id) => inB.has(id)));
       set({
+        walls: st.walls.map((w) => (communs.has(w.id) ? { ...w, nonSeparateur: true } : w)),
         rooms: st.rooms
           .filter((r) => r.id !== bId)
           .map((r) => (r.id === aId ? { ...r, wallIds } : r)),
@@ -4065,7 +4209,8 @@ export const useScanStore = create<ScanState>((set, get) => {
           : {}),
       };
       set({ walls: [...st.walls, wall], dirty: true });
-      get().redetectRooms(niveauDe(wall));
+      // Sous le même point de reprise que la cloison : un « Annuler » défait le tout (revue « Nicolas »).
+      redetecterUnNiveau(niveauDe(wall), false);
       return true;
     },
 
@@ -4090,8 +4235,13 @@ export const useScanStore = create<ScanState>((set, get) => {
       // le point le plus au large. Ses deux bouts s'arrêtent EXACTEMENT sur
       // le contour : sans ça rien ne se soude, aucun nœud n'apparaît et la
       // redétection ne voit pas la coupure. On la déplace ensuite au doigt.
-      const { angle } = roomExtent(part.surface.pts);
-      const dir = { x: -Math.sin(angle), z: Math.cos(angle) };
+      /*
+        EN TRAVERS DU GRAND CÔTÉ — revue « Camille » : l'angle du contour
+        suit l'arête retenue, pas le grand axe, et une pièce de 5,2 × 2,4 se
+        coupait en deux bandes de 5,2 × 1,2. Le repère de « Couper » sait
+        lequel est le grand côté.
+      */
+      const dir = repereDePiece(part.surface.pts).court;
       const a = castToOutline(part.labelAt, dir, part.surface.pts);
       const b = castToOutline(
         part.labelAt,
@@ -4123,7 +4273,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         ...(estDessine(part.walls) ? { auNu: true } : {}),
       };
       set({ walls: [...st.walls, wall], dirty: true });
-      get().redetectRooms(niveauDe(wall));
+      // Sous le même point de reprise que la cloison : un « Annuler » défait le tout (revue « Nicolas »).
+      redetecterUnNiveau(niveauDe(wall), false);
     },
 
     straightenPlan: () => {
@@ -4139,7 +4290,22 @@ export const useScanStore = create<ScanState>((set, get) => {
       // Même clé que la redétection qui suit : les deux ne comptent que pour
       // une annulation, l'utilisateur n'a fait qu'un geste.
       pushHistory('redetect');
-      const droits = straightenWalls(jeu.walls);
+      /*
+        JUSQU'À CE QUE ÇA TIENNE — revue « Camille » : la soudure des coins
+        qui suit le redressement rebiaisait le plan (1,95° → 2,29°), et il
+        fallait un second appui. On redresse et l'on soude jusqu'à ce que
+        plus rien ne bouge, trois fois au plus.
+      */
+      let droits = straightenWalls(jeu.walls);
+      for (let k = 0; k < 2; k++) {
+        const soudes = straightenWalls(weldCorners(droits));
+        const bouge = soudes.some((w, i) => {
+          const v = droits[i];
+          return !v || Math.hypot(w.a.x - v.a.x, w.a.z - v.a.z) > 1e-4 || Math.hypot(w.b.x - v.b.x, w.b.z - v.b.z) > 1e-4;
+        });
+        if (!bouge || soudes.length !== droits.length) break;
+        droits = soudes;
+      }
       /*
         LE PLAFOND PREND LE MÊME BLOC QUE SA PIÈCE — relevé du patron :
         « au redressage d'une pièce, les spots se décentrent ». Un spot est
@@ -4316,6 +4482,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           a: { x: o.a.x + dx, z: o.a.z + dz },
           b: { x: o.b.x + dx, z: o.b.z + dz },
           roomId: neufId,
+          niveau: st.niveauCourant,
         }));
 
       const appareils = st.fixtures
@@ -4388,13 +4555,25 @@ export const useScanStore = create<ScanState>((set, get) => {
         qui il reste un pan est une pièce en cours de retouche, pas une
         pièce morte.
       */
-      const vivantes = new Set(walls.map((w) => w.roomId).filter(Boolean));
+      /*
+        VIVANTE SI IL LUI RESTE UN MUR — par son contour (`wallIds`), et par
+        l'étiquette seulement pour les pièces d'avant les contours. Revue
+        « Camille » : la règle ne regardait que l'étiquette `roomId`, que les
+        murs SCANNÉS n'ont pas — retirer un mur fantôme d'un relevé effaçait
+        toutes les pièces, leurs noms et leurs rattachements.
+      */
+      const restants = new Set(walls.map((w) => w.id));
+      const etiquettes = new Set(walls.map((w) => w.roomId).filter(Boolean));
       const rooms = st.rooms
-        .filter((r) => vivantes.has(r.id))
         .map((r) => ({
           ...r,
           wallIds: r.wallIds?.filter((id) => id !== wallId),
-        }));
+        }))
+        // Un seul mur ne fait pas une pièce : une pièce accolée qui a perdu
+        // ses trois murs à elle s'en va, même s'il lui reste le mitoyen.
+        .filter((r) =>
+          r.wallIds ? r.wallIds.filter((id) => restants.has(id)).length >= 2 : etiquettes.has(r.id),
+        );
       set({
         walls,
         rooms,
@@ -4433,10 +4612,32 @@ export const useScanStore = create<ScanState>((set, get) => {
         : undefined;
       // La hauteur de son mur de départ : un muret de cuisine prolongé
       // reste un muret. Sinon celle du plan.
-      const h = depart?.height ?? st.walls[0]?.height ?? 2.5;
+      const h = depart?.height ?? hauteurDuNiveau(st.walls, st.niveauCourant);
       const id = `mur-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const e = opts?.epaisseur;
       const n = depart ? niveauDe(depart) : st.niveauCourant;
+      /*
+        LE BOUT QUI BUTE SUR LE NU D'UN MUR VA JUSQU'À SON AXE — revues
+        « Sophie » et « Karim » : une cloison tapée nu à nu (6,00) jusqu'à un
+        mur de 20 cm s'arrêtait à 10 cm de son axe, et rien ne se fermait ;
+        une cloison en T contre le mur mitoyen d'une pièce accolée, à 7 cm.
+        À moins d'une demi-épaisseur (et 3 cm) d'un mur de son niveau, le
+        bout se pose sur l'axe de ce mur.
+      */
+      const versLAxe = (p: Pt): Pt => {
+        let mieux: { q: Pt; d: number } | null = null;
+        for (const w of st.walls) {
+          if (w.type !== 'wall' || niveauDe(w) !== n) continue;
+          const { dist, t } = pointOnSeg(p, w.a, w.b);
+          if (t < -1e-6 || t > 1 + 1e-6 || dist > epaisseurDe(w) / 2 + 0.03 || dist < 1e-9) continue;
+          if (!mieux || dist < mieux.d) {
+            mieux = { q: { x: w.a.x + (w.b.x - w.a.x) * t, z: w.a.z + (w.b.z - w.a.z) * t }, d: dist };
+          }
+        }
+        return mieux ? mieux.q : p;
+      };
+      a = versLAxe(a);
+      b = versLAxe(b);
       /** Les murs de son niveau que touche ce bout. */
       const touche = (p: Pt) =>
         st.walls.filter(
@@ -4511,8 +4712,9 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (!w) return;
       // Trois centimètres (une plaque collée) à soixante (un mur de pierre).
       const e = Math.min(Math.max(epaisseur, 0.03), 0.6);
-      if (Math.abs((w.epaisseur ?? WALL_T) - e) < 1e-6) return;
-      pushHistory('epaisseur');
+      const e0 = w.epaisseur ?? WALL_T;
+      if (Math.abs(e0 - e) < 1e-6) return;
+      pushHistory(`epaisseur:${id}`);
       set({
         walls: st.walls.map((x) => {
           if (x.id !== id) return x;
@@ -4524,6 +4726,25 @@ export const useScanStore = create<ScanState>((set, get) => {
         }),
         dirty: true,
       });
+      /*
+        LA FACE DE LA PIÈCE NE BOUGE PAS — revues « Sophie » et « Karim » : un
+        mur dessiné aux cotes intérieures qu'on épaississait gardait son axe,
+        et mordait la pièce (séjour 5,10 → 5,07, la maison −1 m²). Un mur qui
+        ne borde qu'UNE pièce s'épaissit vers le dehors : son axe recule
+        d'une demi-différence, et ses voisins le suivent. Une cloison entre
+        deux pièces garde son axe : elle prend sur les deux.
+      */
+      if (w.auNu) {
+        const bordees = st.rooms.filter((r) => (r.wallIds ?? []).includes(id) && niveauDe(r) === niveauDe(w));
+        const L = segLength(w);
+        if (bordees.length === 1 && L > 1e-6) {
+          const dedans = interiorSide(w, st.walls, st.rooms);
+          const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
+          const recul = (e - e0) / 2;
+          // `dedans` dit le côté de la pièce par rapport à (−uz, ux) : on recule de l'autre.
+          get().moveWall(id, u.z * dedans * recul, -u.x * dedans * recul, false, `epaisseur:${id}`);
+        }
+      }
     },
 
     comblerTrou: (trou) => {
@@ -4531,7 +4752,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const ecart = Math.hypot(trou.b.x - trou.a.x, trou.b.z - trou.a.z);
       if (ecart < 0.02) return;
       pushHistory('comblerTrou');
-      const h = st.walls[0]?.height ?? 2.5;
+      const h = hauteurDuNiveau(st.walls, st.niveauCourant);
       const mur: WallSeg = {
         id: `mur-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type: 'wall',
@@ -4559,6 +4780,7 @@ export const useScanStore = create<ScanState>((set, get) => {
                 id: `op-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 type: 'door',
                 roomId: mur.roomId,
+                ...(niveauDe(mur) !== NIVEAU_RDC ? { niveau: niveauDe(mur) } : {}),
                 a: { ...trou.a },
                 b: { ...trou.b },
                 height: Math.min(2.05, h * 0.85),
@@ -4620,8 +4842,27 @@ export const useScanStore = create<ScanState>((set, get) => {
       const auNiveau = st.walls.filter((w) => niveauDe(w) === st.niveauCourant);
       const xs = auNiveau.flatMap((w) => [w.a.x, w.b.x]);
       const zs = auNiveau.flatMap((w) => [w.a.z, w.b.z]);
-      const cx = xs.length > 0 ? (Math.min(...xs) + Math.max(...xs)) / 2 : l / 2;
-      const cz = zs.length > 0 ? (Math.min(...zs) + Math.max(...zs)) / 2 : p / 2;
+      /*
+        LA PREMIÈRE PIÈCE D'UN NIVEAU VIDE SE POSE D'APLOMB — revue « Léa » :
+        elle se posait à onze mètres, à côté du rez-de-chaussée, et il
+        fallait la ramener au doigt, à deux millimètres près. Elle part du
+        coin de l'emprise du niveau de référence (le dessous, à défaut le
+        dessus) : une enveloppe aux mêmes cotes tombe pile dessus.
+      */
+      const ref = auNiveau.length === 0
+        ? niveauDeReference(niveauxPresents(st.walls, st.rooms), st.niveauCourant)
+        : null;
+      const sous = ref === null ? [] : st.walls.filter((w) => niveauDe(w) === ref);
+      const cx = xs.length > 0
+        ? (Math.min(...xs) + Math.max(...xs)) / 2
+        : sous.length > 0
+          ? Math.min(...sous.flatMap((w) => [w.a.x, w.b.x])) + l / 2
+          : l / 2;
+      const cz = zs.length > 0
+        ? (Math.min(...zs) + Math.max(...zs)) / 2
+        : sous.length > 0
+          ? Math.min(...sous.flatMap((w) => [w.a.z, w.b.z])) + p / 2
+          : p / 2;
       /*
         ELLE SE POSE SOUS LES YEUX, MAIS PAS SUR LES AUTRES.
 
@@ -4636,7 +4877,9 @@ export const useScanStore = create<ScanState>((set, get) => {
         PROCHE de ce milieu. Si le logement est plein, elle revient au
         milieu : mieux vaut une pièce à déplacer qu'une pièce invisible.
       */
-      const prises = roomParts(st.walls, st.rooms)
+      // Les pièces de CE niveau seulement : celles des autres ne prennent pas la place.
+      const jeuIci = jeuDuNiveau(st, st.niveauCourant);
+      const prises = roomParts(jeuIci.walls, jeuIci.rooms)
         .filter((r) => r.surface && r.surface.pts.length > 2)
         .map((r) => {
           const px = r.surface!.pts.map((q) => q.x);
@@ -4709,7 +4952,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (x1 - x0 < 0.5 || z1 - z0 < 0.5) return null;
 
       pushHistory('addRoom');
-      const h = st.walls[0]?.height ?? 2.5;
+      const h = hauteurDuNiveau(st.walls, st.niveauCourant);
       const cle = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const roomId = `piece-${cle}`;
       const coins: Pt[] = [
@@ -4729,7 +4972,8 @@ export const useScanStore = create<ScanState>((set, get) => {
        */
       const dejaLa = (p: Pt, q: Pt) =>
         st.walls.find((w) => {
-          if (w.type !== 'wall') return false;
+          // Un mur d'un autre niveau, même pile au-dessus, n'est pas celui-ci (revue « Léa »).
+          if (w.type !== 'wall' || niveauDe(w) !== st.niveauCourant) return false;
           const memeSens =
             Math.hypot(w.a.x - p.x, w.a.z - p.z) < 0.12 &&
             Math.hypot(w.b.x - q.x, w.b.z - q.z) < 0.12;
@@ -4787,7 +5031,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       nom = nom?.slice(0, NOM_PIECE_MAX);
       pushHistory('addRoom');
-      const h = st.walls[0]?.height ?? 2.5;
+      const h = hauteurDuNiveau(st.walls, st.niveauCourant);
       const cle = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const roomId = `piece-${cle}`;
 
@@ -4860,10 +5104,22 @@ export const useScanStore = create<ScanState>((set, get) => {
           const n = { x: u.z * dedans, z: -u.x * dedans };
           // Une profondeur intérieure : du nu du mur mitoyen au nu du mur du fond.
           const p = Math.max(0.6, profondeur) + (opts?.auNu ? (epaisseurDe(contre) + WALL_T) / 2 : 0);
-          const c1 = { x: contre.b.x + n.x * p, z: contre.b.z + n.z * p };
+          /*
+            LA LARGEUR TAPÉE EST TENUE — revues « Théo » et « Nicolas » : la
+            pièce accolée prenait toute la longueur du mur choisi, et la
+            largeur tapée était ignorée sans un mot (3,20 × 3,00 demandée,
+            3,00 × 3,80 obtenue). Plus courte que le mur, elle part de son
+            début, et le mur mitoyen se COUPE là où elle s'arrête : la part
+            partagée garde son nom, le reste en prend un, et la voisine garde
+            les deux — son contour ne bouge pas.
+          */
+          const W = Math.max(0.6, largeur) + (opts?.auNu ? WALL_T : 0);
+          const partielle = !!opts?.auNu && W < len - 0.3;
+          const fin = partielle ? { x: contre.a.x + u.x * W, z: contre.a.z + u.z * W } : contre.b;
+          const c1 = { x: fin.x + n.x * p, z: fin.z + n.z * p };
           const c2 = { x: contre.a.x + n.x * p, z: contre.a.z + n.z * p };
           const murs = [
-            { a: contre.b, b: c1 },
+            { a: fin, b: c1 },
             { a: c1, b: c2 },
             { a: c2, b: contre.a },
           ].map((seg, i) => ({
@@ -4886,10 +5142,33 @@ export const useScanStore = create<ScanState>((set, get) => {
             // Tracé à la main : voir `WallSeg.auNu`.
             auNu: true,
           }));
+          let walls: WallSeg[] = [...st.walls, ...murs];
+          let rooms = st.rooms;
+          let fixtures = st.fixtures;
+          let photos = st.photos;
+          if (partielle) {
+            const pris = new Set(st.walls.map((w) => w.id));
+            let k = 1;
+            while (pris.has(`${contre.id}#${k}`)) k++;
+            const resteId = `${contre.id}#${k}`;
+            const partage: WallSeg = { ...contre, b: fin };
+            const reste: WallSeg = { ...contre, id: resteId, a: fin };
+            walls = [...st.walls.flatMap((w) => (w.id === contre.id ? [partage, reste] : [w])), ...murs];
+            rooms = st.rooms.map((r) =>
+              r.wallIds?.includes(contre.id)
+                ? { ...r, wallIds: r.wallIds.flatMap((id) => (id === contre.id ? [id, resteId] : [id])) }
+                : r,
+            );
+            // Ce qui était posé sur le reste du mur passe sur son morceau.
+            fixtures = reprojectFixtures(st.walls, walls, st.fixtures);
+            photos = reprojectAnchors(st.walls, walls, st.photos);
+          }
           set({
-            walls: [...st.walls, ...murs],
+            walls,
+            fixtures,
+            photos,
             rooms: [
-              ...st.rooms,
+              ...rooms,
               {
                 id: roomId,
                 name: nom,
@@ -5855,6 +6134,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         st.fixtures,
         st.openings,
       );
+      // (`rabattreSousLePlafond` ne touche que les baies du niveau de chaque mur.)
       set({ walls, ...suite, dirty: true });
     },
 
@@ -5882,10 +6162,17 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       // Rien à changer, rien à annuler : un pas d'historique pour rien est
       // une annulation qui ne défait rien, et le geste paraît perdu.
-      if (st.walls.every((w) => Math.abs(w.height - height) < 1e-6)) return;
+      /*
+        LE NIVEAU QU'ON REGARDE, ET LUI SEUL — revue « Léa » : « tout le
+        logement à 2,40 » mettait aussi le rez-de-chaussée à 2,40 m. Chaque
+        niveau a son plancher.
+      */
+      const n = st.niveauCourant;
+      const ici = (w: WallSeg) => niveauDe(w) === n;
+      if (st.walls.every((w) => !ici(w) || Math.abs(w.height - height) < 1e-6)) return;
       pushHistory('height');
-      const walls = st.walls.map((w) => ({ ...w, height, yCenter: height / 2 }));
-      const suite = rabattreSousLePlafond(walls, st.fixtures, st.openings);
+      const walls = st.walls.map((w) => (ici(w) ? { ...w, height, yCenter: height / 2 } : w));
+      const suite = rabattreSousLePlafond(walls.filter(ici), st.fixtures, st.openings);
       set({ walls, ...suite, dirty: true });
     },
 
@@ -6891,7 +7178,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
     },
 
-    moveWall: (id, dx, dz, aimant = true) => {
+    moveWall: (id, dx, dz, aimant = true, cle) => {
       if (!sontFinis(dx, dz)) return;
       const st = get();
       const wall = st.walls.find((w) => w.id === id);
@@ -6945,7 +7232,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         plan qui coïncidait avec un bout du mur — c'est la même règle que
         pour un coin tiré à la main.
       */
-      pushHistory(`moveWall:${id}`);
+      pushHistory(cle ?? `moveWall:${id}`);
       const colle = (p: Pt, ref: Pt) => Math.hypot(p.x - ref.x, p.z - ref.z) < 1e-4;
       const glisse = (p: Pt) => ({ x: p.x + ddx, z: p.z + ddz });
       set({
@@ -7040,8 +7327,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (!wall || length <= 0) return;
       // De nu à nu, sur un mur dessiné : l'axe a en plus le demi-mur qui le ferme à chaque bout.
       if (opts?.auNu && wall.auNu) {
-        const memes = st.walls.filter((w) => niveauDe(w) === niveauDe(wall));
-        length += segLength(wall) - longueurAuNu(memes, wall);
+        const jeu = jeuDuNiveau(st, niveauDe(wall));
+        length += segLength(wall) - longueurCotee(jeu.walls, wall, roomParts(jeu.walls, jeu.rooms));
       }
       /*
         NEUF CENT QUATRE-VINGT-DIX-NEUF MÈTRES.
@@ -7389,6 +7676,12 @@ export const useScanStore = create<ScanState>((set, get) => {
         id: `op-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type: nature,
         roomId: roomOf(wall),
+        /*
+          À L'ÉTAGE DE SON MUR — revue « Léa » : sans niveau, une fenêtre
+          posée au premier se rangeait au rez-de-chaussée, invisible à
+          l'étage, déduite des murs du bas dans le métré.
+        */
+        ...(niveauDe(wall) !== NIVEAU_RDC ? { niveau: niveauDe(wall) } : {}),
         a: { x: mid.x - (ux * len) / 2, z: mid.z - (uz * len) / 2 },
         b: { x: mid.x + (ux * len) / 2, z: mid.z + (uz * len) / 2 },
         height: h,
@@ -7403,7 +7696,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       const o = st.openings.find((x) => x.id === id);
       if (!o) return;
-      const cote = ouvertureCotee(o, st.walls, s);
+      // Les murs de SON niveau : la cote tombait sur le mur d'un autre étage (revue « Léa »).
+      const cote = ouvertureCotee(o, st.walls.filter((w) => niveauDe(w) === niveauDe(o)), s);
       // La garde AVANT le point de reprise : voir `annulerunefois`.
       if (!cote) return;
       pushHistory('coterOuverture');
@@ -7493,6 +7787,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       let best = Infinity;
       const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
       for (const w of st.walls) {
+        if (niveauDe(w) !== niveauDe(o)) continue;
         const d = pointOnSeg(mid, w.a, w.b).dist;
         if (d < best) {
           best = d;
@@ -7642,7 +7937,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       pushHistory(`nature:${id}`);
       const base = o.yCenter - o.height / 2;
       // Le SOL DU MUR, pas le zéro du repère : voir `murPorteurDe`.
-      const { sol, hauteur: plafond } = murPorteurDe(o, st.walls);
+      const { sol, hauteur: plafond } = murPorteurDe(o, st.walls.filter((w) => niveauDe(w) === niveauDe(o)));
       let nouvelleBase = base;
       if (type === 'door') nouvelleBase = sol;
       else if (type === 'window' && base - sol < 0.05) {
@@ -7654,7 +7949,13 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({
         openings: st.openings.map((x) =>
           x.id === id
-            ? { ...x, type, yCenter: nouvelleBase + x.height / 2 }
+            ? {
+                ...x,
+                type,
+                yCenter: nouvelleBase + x.height / 2,
+                // Une PORTE déclarée n'est plus un passage qu'on traverse (revue « Camille »).
+                ...(type !== 'opening' ? { open: undefined } : {}),
+              }
             : x,
         ),
         dirty: true,
@@ -7678,7 +7979,9 @@ export const useScanStore = create<ScanState>((set, get) => {
       // qui devaient l'arrêter — et dès que le doigt sortait de la pièce,
       // plus aucun mur ne le retenait. Il traversait donc la cloison au
       // moment précis où on cherchait à l'y plaquer.
-      const accueil = roomParts(st.walls, st.rooms).find((p) =>
+      // La pièce du niveau qu'on regarde (revue « Léa » : le lit de l'étage allait au séjour du bas).
+      const ici = jeuDuNiveau(st, st.niveauCourant);
+      const accueil = roomParts(ici.walls, ici.rooms).find((p) =>
         pointInPolygon({ x, z }, p.surface?.pts ?? []),
       );
       set({
@@ -7700,11 +8003,20 @@ export const useScanStore = create<ScanState>((set, get) => {
             // Sur LE sol du scan, pas sur l'altitude zéro : ARKit place le
             // plancher où il l'a trouvé, souvent un demi-mètre plus bas, et
             // le meuble se retrouvait sinon suspendu en l'air.
-            transform: catalogTransform(item, x, z, solDe(st.walls)),
+            transform: catalogTransform(item, x, z, solDe(ici.walls.length > 0 ? ici.walls : st.walls)),
           },
         ],
         dirty: true,
       });
+      /*
+        UN MEUBLE POSÉ NE S'EMPILE PAS — revue « Théo » : six appuis brefs
+        dans le séjour posaient six meubles au même point, quinze
+        chevauchements. S'il y a déjà des meubles dans la pièce, il se range
+        aussitôt, comme au lâcher, sous le même « Annuler » que la pose.
+      */
+      if (accueil && st.objects.some((o) => o.roomId === accueil.roomId)) {
+        get().rangerMeuble(id, x, z, undefined, true);
+      }
       return id;
     },
 
@@ -7725,6 +8037,13 @@ export const useScanStore = create<ScanState>((set, get) => {
         }),
         dirty: true,
       });
+      /*
+        TOURNÉ, IL SE RANGE — revue « Théo » : un canapé plaqué au mur qu'on
+        faisait pivoter entrait de 53 à 66 cm dans la maçonnerie. Le quart de
+        tour finit comme un glisser, sous la même annulation.
+      */
+      const o = get().objects.find((x) => x.id === id);
+      if (o) get().rangerMeuble(id, o.transform[12], o.transform[14], `rotate:${id}`);
     },
 
     setObjectYaw: (id, yaw) => {
@@ -7969,7 +8288,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       pour changer une commode de pièce est LE geste que le doigt sait faire.
       Le ranger dans son ancienne pièce le ferait revenir sur ses pas.
     */
-    rangerMeuble: (id, x, z) => {
+    rangerMeuble: (id, x, z, cle, sansHistorique) => {
       /*
         LA MÊME CLÉ QUE LE GLISSEMENT — le lâcher en est la QUEUE, pas un
         geste de plus.
@@ -7996,7 +8315,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         C'est l'un des rares défauts qu'on ne signale jamais, parce qu'on
         croit avoir mal appuyé. Voir `annulerunefois`.
       */
-      pushHistory(`moveObject:${id}`);
+      if (!sansHistorique) pushHistory(cle ?? `moveObject:${id}`);
       const yaw = Math.atan2(obj.transform[2], obj.transform[0]);
       const box = {
         width: obj.baseWidth ?? obj.width,
@@ -8005,7 +8324,10 @@ export const useScanStore = create<ScanState>((set, get) => {
       };
       /** D'où il vient : c'est ce qui dit de quel côté chaque mur repousse. */
       const ici = { x: obj.transform[12], z: obj.transform[14] };
-      const parts = roomParts(st.walls, st.rooms);
+      // Le niveau du meuble — celui de sa pièce, à défaut celui qu'on regarde.
+      const niveauDuMeuble = niveauDe(st.rooms.find((r) => r.id === obj.roomId)) ?? st.niveauCourant;
+      const jeu = jeuDuNiveau(st, st.rooms.some((r) => r.id === obj.roomId) ? niveauDuMeuble : st.niveauCourant);
+      const parts = roomParts(jeu.walls, jeu.rooms);
       const dansUnePiece = parts.find((p) => pointInPolygon({ x, z }, p.surface?.pts ?? []));
       /*
         LE RENFONCEMENT QU'AUCUNE PIÈCE NE FERME — relevé du patron : « un
@@ -8023,7 +8345,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const entoure =
         !dansUnePiece &&
         Array.from({ length: 8 }, (_, k) => (k * Math.PI) / 4).filter((a) => {
-          const d = castToWall({ x, z }, { x: Math.cos(a), z: Math.sin(a) }, st.walls);
+          const d = castToWall({ x, z }, { x: Math.cos(a), z: Math.sin(a) }, jeu.walls);
           return d !== null && d < 3;
         }).length >= 6;
       const part = entoure
@@ -8034,7 +8356,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       // Sans pièce reconnue — un plan dont les contours ne se referment pas
       // — les murs arrêtent quand même : c'est le mur qui fait la collision,
       // la pièce ne fait que dire de quel côté.
-      const murs = part ? part.walls : st.walls;
+      const murs = part ? part.walls : jeu.walls;
       // Dans un renfoncement ouvert, c'est le point lâché qui dit le côté.
       const depuis = entoure ? { x, z } : ici;
       const ancre = part ? part.labelAt : depuis;

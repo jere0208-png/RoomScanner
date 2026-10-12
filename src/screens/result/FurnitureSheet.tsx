@@ -60,10 +60,30 @@ import { getStyles } from './styles';
 const sansAccent = (s: string) =>
   s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
+/**
+ * Ce qu'on tape pour dire la même chose — revue « Théo » : « tv » ne
+ * trouvait pas la télévision.
+ */
+const SYNONYMES: Record<string, string[]> = {
+  tv: ['television', 'tele'],
+  tele: ['television', 'tv'],
+  frigo: ['refrigerateur'],
+  sdb: ['salle de bain', 'baignoire', 'douche'],
+  wc: ['toilette'],
+  sofa: ['canape'],
+  divan: ['canape'],
+};
+
+/**
+ * MOT PAR MOT — revue « Théo » : « table manger » et « canape angle » ne
+ * trouvaient rien, parce que la recherche voulait la suite exacte. Chaque
+ * mot tapé doit se retrouver, dans n'importe quel ordre.
+ */
 export function matchItem(item: CatalogItem, quete: string): boolean {
-  const q = sansAccent(quete.trim());
-  if (!q) return true;
-  return sansAccent(`${item.label} ${item.category}`).includes(q);
+  const mots = sansAccent(quete.trim()).split(/[\s'’-]+/).filter(Boolean);
+  if (mots.length === 0) return true;
+  const texte = sansAccent(`${item.label} ${item.category}`);
+  return mots.every((m) => texte.includes(m) || (SYNONYMES[m] ?? []).some((s) => texte.includes(s)));
 }
 
 /**

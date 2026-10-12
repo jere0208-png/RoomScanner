@@ -129,7 +129,15 @@ export function poserLibre(
       coins du meuble se répartissent des deux côtés de cette bande — ou
       dedans — c'est qu'il mord dans la maçonnerie, et on ne lâche pas là.
     */
-    if (min < demi && max > -demi) {
+    /*
+      AU RAS DU NU, CE N'EST PAS DANS LE MUR — revue « Théo » : un meuble
+      plaqué pile contre le mur tombait, à l'arrondi près, d'un dixième de
+      millimètre dans la bande ; il était jugé « dans le mur », et le
+      rangement le faisait glisser vers le milieu de la pièce : 12 à 18 cm
+      de jour derrière un canapé qu'on venait de coller. Un millimètre de
+      tolérance.
+    */
+    if (min < demi - 1e-3 && max > -demi + 1e-3) {
       dansLeMur = true;
       // Un seul mur mordu suffit à refuser : rien ne sert de mesurer les
       // autres. C'est aussi ce qui rend la boucle rapide sur un plan chargé,

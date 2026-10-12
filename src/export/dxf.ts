@@ -27,6 +27,7 @@ import {
   pivotsDesBattants,
   roomParts,
   segLength,
+  longueurCotee,
   wallQuadsOf,
   type Pt,
   type WallSeg,
@@ -387,7 +388,8 @@ export function buildDxf(plan: PlanPourDxf): string {
 
   /* La cote de chaque mur, sur son calque : elle se relit, elle ne se calcule pas. */
   for (const w of plan.walls) {
-    const L = segLength(w);
+    // La cote du plan : au nu pour un mur dessiné (revue « Léa »).
+    const L = longueurCotee(plan.walls, w);
     if (L < 0.2) continue;
     out += texte(
       CALQUE.cotes,

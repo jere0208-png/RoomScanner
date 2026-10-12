@@ -25,7 +25,7 @@
  * avec leurs moyens.
  */
 import { pointInPolygon } from './appearance';
-import { epaisseurDe, segLength, type Pt, type RoomPart, type WallSeg } from './floorplan';
+import { epaisseurDe, longueurCotee, segLength, type Pt, type RoomPart, type WallSeg } from './floorplan';
 
 export interface P3 {
   x: number;
@@ -96,7 +96,8 @@ export function cotesExterieures(
         [ici(w.a, nu + 0.06), ici(w.a, loin + 0.12)],
         [ici(w.b, nu + 0.06), ici(w.b, loin + 0.12)],
       ],
-      texte: enMetres(L),
+      // La cote du plan, au nu pour un mur dessiné (revues « Sophie » et « Karim »).
+      texte: enMetres(longueurCotee(walls, w, parts as RoomPart[])),
       genre: 'longueur',
     });
     bouts.push({ p: w.a, dehors, nu, hauteur: w.height });

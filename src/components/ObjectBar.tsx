@@ -16,6 +16,7 @@ import Svg, { Path } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
 import { CarteDuMenu, IconeBandeau } from './StripBar';
 import { frCategory } from '../geometry/furniture';
+import { catalogItem } from '../geometry/catalogue';
 import type { PromptData } from './Sheet';
 import type { VerdictDePassage } from '../geometry/passage';
 import type { Palette } from '../theme';
@@ -361,7 +362,8 @@ export function ObjectBar({
         <IconeBandeau icone={SOLAIRES.meubles} styles={styles} />
         <View style={styles.bandeauTexte}>
           <Text style={styles.bandeauTitre} numberOfLines={1}>
-            {frCategory(object.category)}
+            {/* Son nom du catalogue — « Meuble TV », pas « Rangement » (revue « Théo »). */}
+            {object.nom || (object.modele && catalogItem(object.modele)?.label) || frCategory(object.category)}
           </Text>
         </View>
         {onTeinte && (

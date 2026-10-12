@@ -43,15 +43,25 @@ import {
 } from '../ui/cotesCourantes';
 
 /** « 83,5 » → 0.835 m ; rien de lisible → null. */
+/*
+  DES MÈTRES TAPÉS DANS UN CHAMP EN CENTIMÈTRES — revues « Sophie » et
+  « Hugo » : « 0,90 » donnait une porte de 0,9 cm, « 2,00 » une cote de
+  2 cm, sans un mot. Un nombre à virgule sous 5 n'est pas une cote en
+  centimètres dans un logement : c'est une cote en mètres.
+*/
+const enMetresDeTrop = (t: string, v: number) => v > 0 && v < 5 && /[.,]/.test(t);
+
 export const lireCm = (t: string): number | null => {
   const v = parseFloat(t.replace(',', '.').replace(/\s/g, ''));
-  return isFinite(v) && v > 0 ? v / 100 : null;
+  if (!isFinite(v) || v <= 0) return null;
+  return enMetresDeTrop(t, v) ? v : v / 100;
 };
 
 /** Comme `lireCm`, mais zéro est une cote : « collé au mur ». */
 export const lireCote = (t: string): number | null => {
   const v = parseFloat(t.replace(',', '.').replace(/\s/g, ''));
-  return isFinite(v) && v >= 0 ? v / 100 : null;
+  if (!isFinite(v) || v < 0) return null;
+  return enMetresDeTrop(t, v) ? v : v / 100;
 };
 
 /** 0.835 m → « 83,5 ». */

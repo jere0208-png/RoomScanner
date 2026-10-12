@@ -14285,6 +14285,103 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Troisième tournée : des plans construits de bout en bout, en 2D et en 3D
+
+Six profils ont construit eux-mêmes des plans, puis les ont regardés en 3D :
+- Sophie : un T3 de 64 m² dessiné d'après son plan papier ;
+- Théo : un 2 pièces à meubler ;
+- Karim : une maison ancienne aux formes irrégulières ;
+- Léa : une maison à étage dessinée ;
+- Nicolas : un électricien sur un plan dessiné ;
+- Camille : des scans imparfaits corrigés à la main.
+
+Banc : `plansconstruits`.
+
+**Rien ne disparaît plus en silence**
+- Recouper un mur déjà coupé ne refait plus un nom déjà pris (`X#1`). Le
+  recollage jetait le doublon, et le WC disparaissait.
+- Retirer un mur d'un plan scanné ne vide plus la liste des pièces. Une
+  pièce vit tant qu'il lui reste deux murs de son contour.
+- La fusion de deux pièces survit à « Redétecter » et à « Redresser ». Leur
+  cloison commune reste dessinée mais ne sépare plus (`nonSeparateur`).
+
+**Les pièces accolées se dessinent comme on les tape**
+- La largeur tapée est tenue. Le mur mitoyen se coupe là où la pièce
+  s'arrête, et la voisine garde son contour.
+- Retailler une pièce (« Cotes ») ne déforme plus sa voisine : le mur
+  partagé se coupe ou se prolonge au lieu de glisser.
+- Une cloison posée dans une pièce accolée la scinde. Les bras d'un nœud se
+  comptent sur tout le niveau, plus groupe par groupe, et le mur n'est donc
+  plus recollé au pied de la cloison.
+- Une cloison tapée nu à nu jusqu'à un mur épais va jusqu'à son axe, et la
+  pièce se ferme.
+
+**Les cotes au nu, partout**
+- Pour un mur dessiné, la cote se lit sur la face de la pièce qu'il borde
+  (`longueurCotee` avec les pièces). Un retour rentrant, un pan coupé ou un
+  bow-window affichent leur vraie face : 2,50 pour un retour de 2,50, au
+  lieu de 2,36.
+- La même cote est utilisée partout : plan, bandeau du mur, « Longueur du
+  mur », laser (« Cote actuelle »), cotes 3D, PDF et DXF.
+- Le tour des pièces et les murs à peindre (« Ce qu'il faut acheter », fiche
+  de la pièce) se comptent au nu.
+- Épaissir un mur dessiné qui ne borde qu'une pièce garde sa face
+  intérieure : le mur s'épaissit vers le dehors. Les épaisseurs 30 cm et
+  45 cm s'ajoutent.
+- Deux murs alignés d'épaisseurs différentes ne se recollent plus en un seul.
+- « Cotes » de la pièce propose la largeur gauche-droite puis la profondeur
+  haut-bas. Valider sans rien changer ne fait plus pivoter la pièce.
+- Dans un champ en centimètres, « 0,90 » se lit 90 cm et non 0,9 cm.
+
+**Les niveaux dessinés** (revue « Léa »)
+- « Dessiner un étage » et « Dessiner un sous-sol » ouvrent un niveau vide.
+  La première pièce s'y pose d'aplomb sur le niveau d'à côté, sans reprendre
+  ses murs.
+- Ce qu'on pose à un niveau y reste : les menuiseries portent leur niveau
+  (et les plans d'avant le retrouvent quand un seul mur les porte), la cote
+  d'une baie se prend sur le mur de son niveau, et les meubles vont à une
+  pièce de leur niveau.
+- Déplacer une pièce ne la soude plus aux murs d'un autre niveau.
+- La hauteur se règle par niveau (« Tout le 1er étage à 2,40 m »), et une
+  pièce neuve prend la hauteur de son niveau.
+- Un WC de 1,35 m² est une pièce, même sans porte.
+
+**Les meubles** (revue « Théo »)
+- Un meuble posé pile au ras du nu y reste. Un arrondi le jugeait « dans le
+  mur » et le faisait glisser de 12 à 18 cm.
+- Tourné (d'un toucher ou au doigt), il se range et ne rentre plus dans le
+  mur.
+- Posé là où il y en a déjà un, il ne s'empile plus.
+- La couleur choisie habille tout le meuble TV et le chevet en 3D.
+- La recherche se fait mot par mot, avec quelques mots courants (« tv »).
+- La barre du meuble dit son nom (« Meuble TV ») au lieu de sa catégorie.
+
+**Le reste**
+- La face de derrière d'un mur n'a plus ses retours en miroir. Une prise
+  n'est plus acceptée au milieu d'une porte (revue « Nicolas »).
+- Couper une pièce s'annule d'un seul appui.
+- Une porte déclarée n'est plus un passage.
+- « Scinder » coupe en travers du grand côté.
+- « Redresser » soude et redresse jusqu'à ce que rien ne bouge.
+- « Fusionner » ne s'offre que s'il y a une voisine.
+- Un seul nom pour la salle de bains, et plus de bouton vide dans « Où
+  poser ? ».
+
+**Reste à faire, trop gros pour cette livraison**
+- La 3D et l'OBJ de toute la maison empilée, avec une altitude par niveau et
+  une dalle.
+- L'escalier et la trémie.
+- Une « face de pièce » qui enchaîne les morceaux de mur pour l'établi et
+  « Répéter ».
+- Les angles saisis au chiffre par rapport au mur voisin, et un « pan coupé »
+  en un geste.
+- « Mesures » et « Décaler » qui font glisser les voisins le long de leur
+  mur.
+- Le tableau projeté qui confond des circuits de même libellé.
+- Le canapé d'angle dessiné en L partout.
+- Le recadrage du plan quand il s'agrandit.
+- Les doublons de murs entre pièces glissées l'une contre l'autre.
+
 ## Un plan dessiné se compte à l'intérieur ; le tableau existant se relève tel qu'il est
 
 Décisions du patron, après la deuxième tournée d'utilisateurs.

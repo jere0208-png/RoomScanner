@@ -383,10 +383,11 @@ export function ResultScreen() {
       ],
     );
   /** Les étages du dossier, du haut vers le bas — le sélecteur les montre. */
-  const niveaux = useMemo(
-    () => niveauxPresents(tousLesMurs, toutesLesPieces),
-    [tousLesMurs, toutesLesPieces],
-  );
+  const niveaux = useMemo(() => {
+    const ns = niveauxPresents(tousLesMurs, toutesLesPieces);
+    // Le niveau qu'on dessine existe avant sa première pièce : la pastille le montre.
+    return ns.includes(niveauCourant) ? ns : [...ns, niveauCourant].sort((a, b) => b - a);
+  }, [tousLesMurs, toutesLesPieces, niveauCourant]);
   /*
     LE FILIGRANE DU NIVEAU DU DESSOUS.
 
@@ -1924,8 +1925,9 @@ export function ResultScreen() {
       setMenu({
         title: `Où poser ${item.label.toLowerCase()} ?`,
         subtitle: 'Le meuble se pose au centre de la pièce choisie.',
-        actions: possibles.map((p) => ({
-          label: rooms.find((r) => r.id === p.roomId)?.name ?? 'Pièce',
+        actions: possibles.map((p, i) => ({
+          // Une pièce tapée « Sur mesure » n'a pas encore de nom : jamais un bouton vide (revue « Théo »).
+          label: rooms.find((r) => r.id === p.roomId)?.name || `Pièce ${i + 1}`,
           hint: `${fr(p.surface?.area ?? 0, 1)} m² au sol`,
           icon: 'piece' as const,
           onPress: () => poserDans(item, p),
@@ -2761,19 +2763,23 @@ export function ResultScreen() {
           poser une question dont on connaît déjà la réponse, c'est un
           geste de plus pour rien.
         */
+        // Le niveau qu'on regarde : chaque niveau a son plancher (revue « Léa »).
         const reste = useScanStore
           .getState()
-          .walls.filter((w) => Math.abs(w.height - v) > 0.01);
+          .walls.filter((w) => niveauDe(w) === niveauCourant && Math.abs(w.height - v) > 0.01);
         if (reste.length === 0) return;
         const cote = v.toFixed(2).replace('.', ',');
+        const plusieurs = niveaux.length > 1;
         setMenu({
-          title: 'Et le reste du logement ?',
+          title: plusieurs ? 'Et le reste du niveau ?' : 'Et le reste du logement ?',
           subtitle:
             'Une retombée de poutre ou une sous-pente se règle ensuite, ' +
             'mur par mur.',
           actions: [
             {
-              label: `Tout le logement à ${cote} m`,
+              label: plusieurs
+                ? `Tout le ${nomDuNiveau(niveauCourant).toLowerCase()} à ${cote} m`
+                : `Tout le logement à ${cote} m`,
               icon: 'hauteur' as const,
               onPress: () => {
                 useScanStore.getState().setAllRoomHeights(v);
@@ -2824,12 +2830,22 @@ export function ResultScreen() {
     // Une pièce dessinée se cote à l'intérieur, de mur à mur.
     const auNu = !!targetPart && estDessine(targetPart.walls);
     const nb = (t: string) => parseFloat(t.replace(',', '.'));
+    /*
+      GAUCHE-DROITE, PUIS HAUT-BAS — revue « Sophie » : la largeur proposée
+      était le plus GRAND côté, appliquée à l'horizontale ; valider sans rien
+      toucher faisait pivoter la pièce. On propose ce que le geste applique.
+    */
+    const contour = targetPart?.surface ? targetPart.surface.nu ?? targetPart.surface.pts : [];
+    const etendue = (k: 'x' | 'z') =>
+      contour.length > 0 ? Math.max(...contour.map((q) => q[k])) - Math.min(...contour.map((q) => q[k])) : 0;
+    const enX = etendue('x') || targetExtent.width;
+    const enZ = etendue('z') || targetExtent.depth;
     setPrompt({
-      title: auNu ? 'Largeur intérieure' : 'Largeur de la pièce',
+      title: auNu ? 'Largeur intérieure (gauche-droite)' : 'Largeur de la pièce (gauche-droite)',
       subtitle: auNu
         ? 'De mur à mur, au mètre. Le coin haut-gauche ne bouge pas : la pièce s’étend vers la droite et vers le bas.'
         : 'Le coin haut-gauche ne bouge pas : la pièce s’étend vers la droite et vers le bas.',
-      value: targetExtent.width.toFixed(2).replace('.', ','),
+      value: enX.toFixed(2).replace('.', ','),
       unit: 'm',
       numeric: true,
       okLabel: 'Suivant',
@@ -2837,9 +2853,9 @@ export function ResultScreen() {
         const L = nb(t);
         if (!(L > 0)) return;
         setPrompt({
-          title: auNu ? 'Profondeur intérieure' : 'Profondeur de la pièce',
+          title: auNu ? 'Profondeur intérieure (haut-bas)' : 'Profondeur de la pièce (haut-bas)',
           subtitle: `Largeur retenue : ${L.toFixed(2).replace('.', ',')} m.`,
-          value: targetExtent.depth.toFixed(2).replace('.', ','),
+          value: enZ.toFixed(2).replace('.', ','),
           unit: 'm',
           numeric: true,
           onSubmit: (t2) => {
@@ -3005,7 +3021,7 @@ export function ResultScreen() {
       subtitle: auNu
         ? 'De nu à nu. Le bout de gauche (ou du haut) reste ; le mur d’en bout se décale, d’équerre.'
         : 'Le bout de gauche (ou du haut) reste ; le mur d’en bout se décale, d’équerre.',
-      value: longueurCotee(walls, w).toFixed(2).replace('.', ','),
+      value: longueurCotee(walls, w, parts).toFixed(2).replace('.', ','),
       unit: 'm',
       numeric: true,
       onSubmit: (t) => {
@@ -3551,6 +3567,32 @@ export function ResultScreen() {
                     hint: 'Cave, garage : il se range sous le plan.',
                     onPress: () => {
                       demarrerEtage(Math.min(...niveaux) - 1).catch(refusDuScan);
+                    },
+                  },
+                  {
+                    /*
+                      DESSINER UN NIVEAU — revue « Léa » : sans LiDAR, aucun
+                      chemin ne menait à un étage. Le niveau s'ouvre vide, la
+                      feuille « Ajouter une pièce » avec lui, et la première
+                      pièce se pose d'aplomb sur le niveau d'à côté.
+                    */
+                    label: 'Dessiner un étage',
+                    icon: 'etage' as const,
+                    hint: 'Un niveau vide au-dessus : ses pièces se posent aux cotes, d’aplomb.',
+                    onPress: () => {
+                      useScanStore.getState().allerAuNiveau(Math.max(...niveaux) + 1);
+                      haptic('leger');
+                      ouvrirApres(() => setAjoutPiece(true));
+                    },
+                  },
+                  {
+                    label: 'Dessiner un sous-sol',
+                    icon: 'soussol' as const,
+                    hint: 'Un niveau vide en dessous, dessiné de la même façon.',
+                    onPress: () => {
+                      useScanStore.getState().allerAuNiveau(Math.min(...niveaux) - 1);
+                      haptic('leger');
+                      ouvrirApres(() => setAjoutPiece(true));
                     },
                   },
                   {
@@ -5318,7 +5360,8 @@ export function ResultScreen() {
                  dernière pièce d'un plan ne se retire pas : le bandeau ne
                  montre pas un geste qui ne peut pas aboutir. */
               onFusionner={
-                rooms.filter((r) => r.id !== selectedRoomId).length > 0
+                // Seulement s'il y a une VOISINE : le menu s'ouvrait vide (revues « Sophie » et « Camille »).
+                selectedRoomId && voisinesDe(selectedRoomId).length > 0
                   ? promptMerge
                   : undefined
               }
@@ -5635,7 +5678,8 @@ export function ResultScreen() {
               la note dit ce que c'est. La hauteur, qui se faisait couper, se
               lit en entier.
             */
-            strong={`${fr(segLength(selectedWall), 2)} × ${fr(
+            /* La cote du plan : au nu pour un mur dessiné (revues « Sophie » et « Karim »). */
+            strong={`${fr(longueurCotee(walls, selectedWall, parts), 2)} × ${fr(
               selectedWall.height,
               2,
             )} m`}
@@ -5696,7 +5740,7 @@ export function ResultScreen() {
                 onPress: () =>
                   setLaser({
                     nom: 'ce mur',
-                    actuelle: segLength(selectedWall),
+                    actuelle: longueurCotee(walls, selectedWall, parts),
                     appliquer: (m: number) =>
                       setWallLength(selectedWall.id, m, { auNu: !!selectedWall.auNu }),
                   }),

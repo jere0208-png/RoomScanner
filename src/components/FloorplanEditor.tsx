@@ -2636,7 +2636,7 @@ export function FloorplanEditor({
                 }
                 measureAt={cotesArbitrees.poses.get(`w:${w.id}`)}
                 measureOpacity={1 - detail}
-                longueur={longueurCotee(walls, w)}
+                longueur={longueurCotee(walls, w, parts)}
                 selected={editable && w.id === selectedWallId}
                 onPress={
                   editable
@@ -4804,6 +4804,14 @@ export function RotateHandle({
           if (!seuil.franchi(g.dx, g.dy)) {
             useScanStore.getState().rotateObject(objectId, 1);
             haptic('accroche');
+          } else {
+            // Tourné au doigt, il se range lui aussi (voir `rotateObject`).
+            const o = useScanStore.getState().objects.find((x) => x.id === objectId);
+            if (o) {
+              useScanStore
+                .getState()
+                .rangerMeuble(objectId, o.transform[12], o.transform[14], `yaw:${objectId}`);
+            }
           }
           setAngle(null);
         },

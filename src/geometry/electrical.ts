@@ -1551,7 +1551,7 @@ export interface Masonry {
 export function masonryRuns(
   runs: { kind: string; t0: number; t1: number }[],
   wallLength: number,
-  face: { len: number },
+  face: { len: number; s0?: number; s1?: number },
 ): Masonry[] {
   if (wallLength < 1e-6) return [{ x0: 0, x1: face.len }];
   const pleins = runs.filter((r) => r.kind === 'mur');
@@ -1559,12 +1559,25 @@ export function masonryRuns(
   // Le décalage entre l'axe et la face : la face commence à `marge` sur
   // l'axe, et se termine à `wallLength - marge`.
   const marge = (wallLength - face.len) / 2;
+  /*
+    LA FACE DE DERRIÈRE VA DANS L'AUTRE SENS — revue « Nicolas » : vue côté
+    −1, la face court de b vers a ; la formule la lisait de a vers b, et les
+    retours tombaient en miroir — une prise acceptée au milieu d'une porte,
+    des appareils repoussés de dix à vingt centimètres sans raison. Avec les
+    abscisses de la face (`s0`, `s1`), chaque fraction se place juste, et
+    l'onglet de chaque bout compte pour ce qu'il est.
+  */
+  const enX = (t: number) =>
+    face.s0 !== undefined && face.s1 !== undefined
+      ? face.s0 + (face.s1 - face.s0) * t
+      : t * wallLength - marge;
   const out: Masonry[] = [];
   for (const r of pleins) {
-    const x0 = Math.max(0, r.t0 * wallLength - marge);
-    const x1 = Math.min(face.len, r.t1 * wallLength - marge);
+    const x0 = Math.max(0, Math.min(enX(r.t0), enX(r.t1)));
+    const x1 = Math.min(face.len, Math.max(enX(r.t0), enX(r.t1)));
     if (x1 - x0 > 0.01) out.push({ x0, x1 });
   }
+  out.sort((m, q) => m.x0 - q.x0);
   return out.length > 0 ? out : [{ x0: 0, x1: face.len }];
 }
 

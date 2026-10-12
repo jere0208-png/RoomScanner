@@ -119,7 +119,14 @@ describe('redimensionner une pièce', () => {
  * les quatre coins a la fois.
  */
 describe('redimensionner ne dechire pas le plan', () => {
-  it('emmene les murs des pieces voisines accrochees aux coins', () => {
+  /*
+    LA VOISINE NE SE DÉFORME PLUS — revues « Théo » et « Nicolas ». Le coin
+    partagé suivait le séjour : la chambre prenait un mur en biais. Le mur
+    mitoyen s'allonge maintenant d'un prolongement qui borde le seul séjour,
+    et la chambre garde ses coins. Le plan reste cousu : la ligne commune
+    court d'un bout à l'autre, sans fente.
+  */
+  it('reste cousu, sans déformer la pièce voisine', () => {
     st().reset();
     st().commencerAuClavier();
     st().addRoomBox(5, 4, 'Sejour');
@@ -127,13 +134,17 @@ describe('redimensionner ne dechire pas le plan', () => {
     const sejour = st().rooms.find((r) => r.name === 'Sejour')!;
     st().resizeRoom(sejour.id, 5.18, 4.05);
 
-    // Le coin partage : il n'existe qu'UNE fois dans le plan.
-    const coins = st()
-      .walls.flatMap((w) => [w.a, w.b])
-      .filter((p) => Math.abs(p.z) < 1e-6 && p.x > 4);
-    expect(coins.length).toBeGreaterThan(0);
-    for (const p of coins) {
-      expect(p.x).toBeCloseTo(5.18, 3);
+    // La ligne commune (z = 0) va sans interruption de 0 à 5,18.
+    const commune = st().walls.filter((w) => Math.abs(w.a.z) < 1e-6 && Math.abs(w.b.z) < 1e-6);
+    const xs = commune.flatMap((w) => [w.a.x, w.b.x]);
+    expect(Math.min(...xs)).toBeCloseTo(0, 6);
+    expect(Math.max(...xs)).toBeCloseTo(5.18, 3);
+    expect(commune.reduce((t, w) => t + Math.abs(w.b.x - w.a.x), 0)).toBeCloseTo(5.18, 3);
+    // Et la chambre n'a pas un mur de biais.
+    const chambre = st().rooms.find((r) => r.name === 'Chambre')!;
+    for (const id of chambre.wallIds ?? []) {
+      const w = st().walls.find((x) => x.id === id)!;
+      expect(Math.abs(w.a.x - w.b.x) < 1e-6 || Math.abs(w.a.z - w.b.z) < 1e-6).toBe(true);
     }
   });
 

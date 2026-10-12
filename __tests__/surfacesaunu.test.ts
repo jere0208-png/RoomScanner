@@ -153,7 +153,7 @@ describe('l’écran tape et lit au nu', () => {
     expect(ecran).toMatch(/setWallLength\(wallId, v, \{ auNu \}\)/);
   });
   it('le plan écrit la cote au nu des murs dessinés', () => {
-    expect(editeur).toMatch(/longueur=\{longueurCotee\(walls, w\)\}/);
+    expect(editeur).toMatch(/longueur=\{longueurCotee\(walls, w, parts\)\}/);
     expect(editeur).toMatch(/etendueDeLaPiece\(part\.surface\)/);
   });
 });

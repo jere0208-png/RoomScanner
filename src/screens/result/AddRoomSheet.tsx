@@ -26,7 +26,7 @@ const MODELES = [
   { nom: 'Chambre', largeur: 3.4, profondeur: 3 },
   { nom: 'Séjour', largeur: 5, profondeur: 4 },
   { nom: 'Cuisine', largeur: 3.2, profondeur: 2.6 },
-  { nom: 'Salle de bain', largeur: 2.4, profondeur: 2 },
+  { nom: 'Salle de bains', largeur: 2.4, profondeur: 2 },
   { nom: 'WC', largeur: 1.4, profondeur: 1 },
   { nom: 'Dégagement', largeur: 3, profondeur: 1.2 },
   { nom: 'Bureau', largeur: 3, profondeur: 2.6 },
@@ -101,11 +101,11 @@ export function AddRoomSheet({
 
   const sousTitre = surMesure
     ? accolee
-      ? 'Cotes intérieures : la profondeur se prend du nu du mur choisi au nu du mur du fond.'
+      ? 'Cotes intérieures : la largeur le long du mur choisi, depuis son début ; la profondeur, du nu de ce mur au nu du mur du fond.'
       : 'Cotes intérieures, de mur à mur, en mètres — celles du mètre ruban.'
     : accolee
-      ? 'Elle s’accole au mur choisi et le partage avec lui : ' +
-        'elle en prend la longueur, et vous donnez la profondeur.'
+      ? 'Elle s’accole au mur choisi et le partage avec lui, depuis son début : ' +
+        'la largeur se prend le long du mur, la profondeur s’en éloigne.'
       : planVide
         ? 'Choisissez un gabarit, puis ajustez ses cotes — ou tapez-les avec « Sur mesure ».'
         : 'Elle se pose à côté du plan. Pour l’accoler, touchez ' +
