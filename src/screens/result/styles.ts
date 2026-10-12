@@ -714,11 +714,15 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
    * une légende, elle ne doit pas se disputer le regard avec le geste.
    */
   bandeauCellule: { alignItems: 'center', gap: 2 },
+  /*
+    LE MOT SOUS LE BOUTON SE LIT — revue « Bernard » : gris pâle à 75 %
+    d'opacité, « Centrer », « Retirer », « Terminer » tombaient à un
+    contraste de 1,99:1. L'encre douce, pleine : plus de 6:1 sur fond clair.
+  */
   bandeauMot: {
-    color: c.inkFaint,
+    color: c.inkSoft,
     fontSize: 10,
     fontWeight: '600',
-    opacity: 0.75,
     /*
       ET IL NE TIRE PLUS LA CELLULE.
 

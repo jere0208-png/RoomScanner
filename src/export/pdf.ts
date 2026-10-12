@@ -4404,6 +4404,7 @@ function metrePage(
       releve: (r as { releve?: { plafond?: PlafondDeLaPiece | null } | null }).releve,
     })),
     parts,
+    ctx.objects,
   );
   if (hab.pieces.length > 0) {
     y -= 22;
@@ -6086,7 +6087,15 @@ function elevationWalls(
     const appareils = (ctx.fixtures ?? []).filter((f) => f.wallId === w.id);
     const devant = appareils.some((f) => f.side === interieur);
     const derriere = appareils.some((f) => f.side !== interieur);
-    if (toutes || devant || photographies.has(w.id)) out.push({ wall: w, cote: interieur });
+    /*
+      « TOUS LES MURS », PAS LES ÉCLATS — revue « Claire » : 33 élévations,
+      dont des joues de cheminée de 0,28 m et deux murs fantômes derrière
+      un pan coupé. Un mur nu de moins de 60 cm, ou qui ne borde aucune
+      pièce, n'a pas sa feuille ; équipé ou photographié, si.
+    */
+    const borde = (ctx.rooms ?? []).some((r) => (r.wallIds ?? []).includes(w.id)) || !(ctx.rooms ?? []).some((r) => r.wallIds);
+    const digne = segLength(w) >= 0.6 && borde;
+    if ((toutes && digne) || devant || photographies.has(w.id)) out.push({ wall: w, cote: interieur });
     if (derriere) out.push({ wall: w, cote: interieur === 1 ? -1 : 1 });
   }
   return out;
@@ -7215,6 +7224,7 @@ function gardePage(
         releve: (r as { releve?: { plafond?: PlafondDeLaPiece | null } | null }).releve,
       })),
       parts,
+      c.objects,
     );
     habitable += hab.total;
     avecHabitable = avecHabitable || hab.pieces.length > 0;

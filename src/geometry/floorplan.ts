@@ -3170,12 +3170,19 @@ export function posesDeMur(
   tol = 0.15,
 ): PoseDeMur[] {
   const pleins = walls.filter((w) => w.type === 'wall' && segLength(w) > 0.1);
+  /*
+    LE PIED D'UN T N'EST PAS UN BOUT LIBRE — revue « Claire » : une cloison
+    qui s'arrête sur le FLANC d'un mur porteur recevait trois fantômes
+    « Ajouter un mur », dont deux couchés sur le porteur ; en toucher un
+    posait un doublon. Un bout posé contre un autre mur est tenu.
+  */
   const libre = (w: WallSeg, p: Pt) =>
     !pleins.some(
       (o) =>
         o.id !== w.id &&
         (Math.hypot(o.a.x - p.x, o.a.z - p.z) < tol ||
-          Math.hypot(o.b.x - p.x, o.b.z - p.z) < tol),
+          Math.hypot(o.b.x - p.x, o.b.z - p.z) < tol ||
+          pointOnSeg(p, o.a, o.b).dist < Math.max(tol / 3, epaisseurDe(o) / 2 + 0.01)),
     );
   const out: PoseDeMur[] = [];
   for (const w of pleins) {

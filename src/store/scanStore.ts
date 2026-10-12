@@ -21,6 +21,7 @@ import { ICONE_DEFAUT, estUneIcone, poserIcone } from '../ui/icone';
 import { astuce } from '../ui/astuce';
 import { identiteDuCompte, useAccountStore } from './accountStore';
 import {
+  CEILINGS,
   insetOnRing,
   type CeilingFixture,
   type CeilingKind,
@@ -6312,7 +6313,15 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     toggleCeilingCommand: (ceilingId, fixtureId) => {
-      pushHistory('ceilingCommand');
+      const cl = get().ceiling.find((c) => c.id === ceilingId);
+      if (!cl || !CEILINGS[cl.kind].commandable) return;
+      /*
+        UNE LIGNE DE SPOTS SE RELIE, ET SE DÉLIE, EN UN SEUL « ANNULER » —
+        revue « Mehdi » : relier quatre spots à leur interrupteur en
+        demandait quatre. La clé nomme la commande : les liens noués d'un
+        même geste se fondent.
+      */
+      pushHistory(`ceilingCommand:${fixtureId}`);
       set({
         ceiling: get().ceiling.map((c) => {
           if (c.id !== ceilingId) return c;
@@ -6351,7 +6360,10 @@ export const useScanStore = create<ScanState>((set, get) => {
       const sAllume = (id: string) => {
         const f = mural(id);
         if (f) return seCommande(f.kind);
-        return !!plafond(id);
+        // Un détecteur de fumée, une bouche de VMC ne s'allument pas (revue
+        // « Mehdi » : on pouvait relier le détecteur à un interrupteur).
+        const c = plafond(id);
+        return !!c && CEILINGS[c.kind].commandable;
       };
       const [commande, cible] = estCommande(aId)
         ? [aId, bId]

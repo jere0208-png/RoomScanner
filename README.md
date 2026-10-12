@@ -14285,6 +14285,35 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les mots lisibles, les liens justes, l'escalier hors de l'habitable
+
+**Les mots sous les boutons se lisent** (Bernard). « Centrer », « Retirer »
+ou « Terminer » étaient écrits en gris pâle à 75 % d'opacité : un contraste
+de 1,99:1. Ils passent à l'encre douce, pleine, au-delà de 6:1 sur fond
+clair (`bandeauMot`).
+
+**Les liens de commande** (Mehdi) :
+- un détecteur de fumée ou une bouche de VMC ne se relie plus à un
+  interrupteur : seul ce qui s'allume se commande ;
+- les liens noués d'un même geste se défont en un seul « Annuler ». Relier
+  une ligne de quatre spots en demandait quatre.
+
+**Le PDF n'imprime plus d'élévation d'un éclat de mur** (Claire). En
+« tous les murs », un mur nu de moins de 60 cm, ou qui ne borde aucune
+pièce, n'a pas sa feuille ; équipé ou photographié, si. Le dossier de
+Claire en comptait 33, dont des joues de cheminée de 0,28 m.
+
+**Plus de fantômes au pied d'une cloison en T** (Claire). Le pied d'une
+cloison posée contre le flanc d'un mur n'est pas un bout libre. Il recevait
+trois propositions « Ajouter un mur », dont deux couchées sur le mur
+porteur ; en toucher une posait un doublon.
+
+**L'escalier sort de la surface habitable** (Sébastien). Reconnu dans la
+fiche, il restait compté (2,25 m²). Son emprise est maintenant déduite de
+l'habitable de sa pièce, à l'écran comme dans le PDF.
+
+Banc : `tournee4details`.
+
 ## Le four sous plaque, le canapé d'angle, la LED dans le DXF
 
 **Le four sous plaque** (Bernard). Le four du catalogue se pose en colonne,

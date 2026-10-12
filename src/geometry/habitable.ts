@@ -19,6 +19,7 @@
  */
 import type { RoomPart } from './floorplan';
 import { hauteurDeLaPiece } from './floorplan';
+import { pointInPolygon } from './appearance';
 import type { PlafondDeLaPiece } from './fichePiece';
 import { HAUTEUR_HABITABLE } from './fichePiece';
 
@@ -62,10 +63,25 @@ export interface SurfacesHabitables {
 
 const arrondi = (v: number) => Math.round(v * 100) / 100;
 
+/** Un meuble vu d'en haut, avec sa catégorie : l'escalier se reconnaît à elle. */
+export interface MeubleAuSol {
+  category: string;
+  transform: number[];
+  width: number;
+  depth: number;
+}
+
 export function surfacesHabitables(
   rooms: { id: string; name?: string; releve?: { plafond?: PlafondDeLaPiece | null } | null }[],
   parts: RoomPart[],
+  /**
+   * LES MEUBLES DU NIVEAU — pour l'escalier. Revue « Sébastien » : reconnu
+   * dans la fiche, il restait compté dans le sol habitable (2,25 m²). La
+   * surface d'un escalier et de sa trémie ne compte pas.
+   */
+  meubles: readonly MeubleAuSol[] = [],
 ): SurfacesHabitables {
+  const escaliers = meubles.filter((m) => /stairs/i.test(m.category));
   const pieces: PieceHabitable[] = [];
   for (const part of parts) {
     const sol = part.surface?.area ?? 0;
@@ -106,6 +122,15 @@ export function surfacesHabitables(
       */
       aVerifier = true;
       raison = 'des murs sous 1,80 m : la part basse reste à mesurer';
+    }
+    // L'escalier posé dans la pièce : son emprise sort de l'habitable.
+    const contour = part.surface?.nu ?? part.surface?.pts ?? [];
+    const sousEscalier = escaliers
+      .filter((m) => contour.length >= 3 && pointInPolygon({ x: m.transform[12], z: m.transform[14] }, contour))
+      .reduce((t, m) => t + m.width * m.depth, 0);
+    if (sousEscalier > 0 && habitable > 0) {
+      habitable = Math.max(0, habitable - sousEscalier);
+      raison = raison ?? 'l’escalier et sa trémie ne comptent pas';
     }
     pieces.push({
       roomId: part.roomId,

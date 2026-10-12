@@ -2160,7 +2160,7 @@ export function ResultScreen() {
     LA SURFACE HABITABLE DU LOGEMENT — relevé du patron, point 2 de la
     réflexion « grand public » : le chiffre qu'on écrit dans une annonce.
   */
-  const habitable = useMemo(() => surfacesHabitables(rooms, parts), [rooms, parts]);
+  const habitable = useMemo(() => surfacesHabitables(rooms, parts, objects), [rooms, parts, objects]);
   /*
     LE TOTAL DE LA MAISON — revue « Léa » : l'en-tête ne disait que le niveau
     affiché, et les 122 m² de la maison ne paraissaient qu'en page de garde
