@@ -9,6 +9,9 @@
  * - « Normes auto » comptait les prises simples (un séjour à 12 socles sur
  *   12 recevait 4 prises de plus) et posait un interrupteur au WC qui avait
  *   un détecteur de présence.
+ * - Huit socles par circuit de 2,5 mm² (c'est douze, six en cuisine), et
+ *   des différentiels sans regard pour la surface du logement — corrigés
+ *   avec l'accord du patron.
  * Et « Sébastien » : le métré du PDF n'avait qu'une décimale.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -19,7 +22,15 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { checkElectrical, planCircuits, wallToRooms } from '../src/geometry/nfc15100';
+import {
+  MAX_SOCLES,
+  MAX_SOCLES_CUISINE,
+  checkElectrical,
+  minimumAC,
+  planCircuits,
+  planDifferentials,
+  wallToRooms,
+} from '../src/geometry/nfc15100';
 import { poserAuxNormes } from '../src/geometry/auto';
 import { buildScanPdf } from '../src/export/pdf';
 import type { Fixture } from '../src/geometry/electrical';
@@ -156,3 +167,37 @@ describe('le plan 2D', () => {
     expect(plan).toContain('o.teinte ?? c.blueSoft');
   });
 });
+
+describe('les plafonds de la norme', () => {
+  const prises = (n: number) => Array.from({ length: n }, (_, i) => f(`p${i}`, 'prise'));
+
+  it('douze socles sur un circuit de prises en 2,5 mm², six en cuisine', () => {
+    expect(MAX_SOCLES).toBe(12);
+    expect(MAX_SOCLES_CUISINE).toBe(6);
+    const sejour = (n: number) =>
+      planCircuits(prises(n), () => 'Séjour', () => false).filter((c) => c.nature === 'prises');
+    expect(sejour(12)).toHaveLength(1);
+    expect(sejour(13)).toHaveLength(2);
+    const cuisine = planCircuits(prises(7), () => 'Cuisine', () => true).filter((c) => c.nature === 'prises');
+    expect(cuisine.map((c) => c.points)).toEqual([6, 1]);
+  });
+
+  it('les différentiels suivent la surface du logement', () => {
+    expect(minimumAC(30)).toEqual({ nombre: 1, calibre: 25 });
+    expect(minimumAC(80)).toEqual({ nombre: 2, calibre: 40 });
+    expect(minimumAC(132)).toEqual({ nombre: 3, calibre: 40 });
+    const circuits = planCircuits(
+      [...prises(20), f('i', 'inter'), f('pl', 'prise32'), f('lv', 'prise20', 'LV')],
+      () => 'Séjour',
+      () => false,
+    );
+    const types = (s: number) => planDifferentials(circuits, s).map((d) => `${d.type}${d.rating}`);
+    expect(types(30)).toEqual(['A40', 'AC25']);
+    expect(types(80)).toEqual(['A40', 'AC40', 'AC40']);
+    // 132 m², la maison de Mehdi : trois AC et un A.
+    expect(types(132)).toEqual(['A40', 'AC40', 'AC40', 'AC40']);
+    // Chaque AC reçoit des circuits : ils se répartissent.
+    expect(planDifferentials(circuits, 132).every((d) => d.circuits.length > 0)).toBe(true);
+  });
+});
+

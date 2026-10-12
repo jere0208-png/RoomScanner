@@ -14285,6 +14285,42 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Douze socles par circuit, des différentiels à la surface, l'habitable sous combles
+
+**Les plafonds de la NF C 15-100**, relevés par Mehdi et confirmés par le
+patron.
+- **Douze socles** par circuit de prises en 2,5 mm² sous 20 A
+  (`MAX_SOCLES`), et **six** sur le circuit de la cuisine
+  (`MAX_SOCLES_CUISINE`). L'app en comptait huit, la limite du 1,5 mm² sous
+  16 A, et posait des circuits et des disjoncteurs en trop. Les sorties de
+  câble communes restent groupées par huit.
+- **Les différentiels suivent la surface du logement** (`minimumAC`) :
+
+  | Surface du logement | Type AC | Type A |
+  |---|---|---|
+  | jusqu'à 35 m² | un 25 A | un 40 A |
+  | de 35 à 100 m² | deux 40 A | un 40 A |
+  | au-delà de 100 m² | trois 40 A | un 40 A |
+
+  Les circuits se répartissent à tour de rôle entre les AC. La surface
+  vient de toutes les pièces, niveau par niveau (`surfaceDuLogement`),
+  pour la liste du matériel comme pour le tableau projeté.
+
+**La surface habitable sous combles** (Sébastien) :
+- **Sans plafond relevé**, une pièce qui a des murs sous 1,80 m (des
+  jambettes) est dite « à vérifier ». Elle comptait tout son sol, soit
+  +44,8 %. Le métré du PDF le dit, et la page de garde porte
+  « (à vérifier) ».
+- **Sous un rampant relevé**, l'habitable suit la retouche : la part basse
+  vue au LiDAR reste la même, et ce qu'on ajoute en reculant un pignon
+  compte (`solAuReleve`). Avant, le sol passait de 30,00 à 30,60 m² et
+  l'habitable restait à 22,50.
+- **Une pièce habitée le reste**, même « Chambre sous combles », « Combles
+  aménagés » ou « Bureau (ancien garage) ». Jardin d'hiver, remise et
+  sous-sol rejoignent les annexes.
+
+Bancs : `tournee4normes`, `tournee4habitable`.
+
 ## Le sigle décide du circuit, la légende par sigle, le métré à deux décimales
 
 Suite de la revue « Mehdi », électricien.

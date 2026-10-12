@@ -243,8 +243,26 @@ export function circuitsDuLogement(
  * Celui qu'on a constitué s'il existe (même vide : c'est un choix) ; sinon
  * celui que le plan appelle ; sinon rien.
  */
-export function tableauDeReference(existant: TableauExistant | null | undefined, circuits: Circuit[]): TableauExistant | null {
+export function tableauDeReference(
+  existant: TableauExistant | null | undefined,
+  circuits: Circuit[],
+  /** La surface du logement : elle fixe le nombre de différentiels. */
+  surface?: number,
+): TableauExistant | null {
   if (existant) return existant;
   if (!circuits.some((c) => c.breaker !== null)) return null;
-  return tableauDepuisLePlan(circuits, planDifferentials(circuits));
+  return tableauDepuisLePlan(circuits, planDifferentials(circuits, surface));
+}
+
+/** La surface au sol du logement, tous niveaux : chaque niveau découpé chez lui. */
+export function surfaceDuLogement(
+  walls: WallSeg[],
+  rooms: (RoomShape & { id: string; niveau?: number })[],
+): number {
+  let total = 0;
+  for (const n of niveauxPresents(walls, rooms)) {
+    const x = filtrerAuNiveau({ walls, openings: [], rooms, fixtures: [], photos: [], objects: [], ceiling: [] }, n);
+    for (const p of roomParts(x.walls, x.rooms)) total += p.surface?.area ?? 0;
+  }
+  return total;
 }

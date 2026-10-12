@@ -24,7 +24,16 @@ import { HAUTEUR_HABITABLE } from './fichePiece';
 
 /** Ce qui ne compte pas, d'après le nom qu'on a donné à la pièce. */
 const HORS_LOGEMENT =
-  /garage|cave|cellier|local|chaufferie|buanderie ext|balcon|terrasse|loggia|v[ée]randa|combles?|grenier|abri|atelier ext/i;
+  /garage|cave|cellier|local|chaufferie|buanderie ext|balcon|terrasse|loggia|v[ée]randa|jardin d.hiver|remise|sous-sol|combles?|grenier|abri|atelier ext/i;
+/*
+  MAIS UNE PIÈCE HABITÉE LE RESTE — revue « Sébastien » : « Chambre sous
+  combles », « Combles aménagés », « Grenier aménagé », « Bureau (ancien
+  garage) » tombaient à 0 m² sur un seul mot. Le nom d'une pièce où l'on vit
+  l'emporte sur celui de l'annexe.
+*/
+const HABITEE =
+  /chambre|s[ée]jour|salon|bureau|cuisine|salle|sdb|wc|toilette|entr[ée]e|couloir|d[ée]gagement|dressing|mezzanine|palier|am[ée]nag[ée]/i;
+const horsLogement = (nom: string) => HORS_LOGEMENT.test(nom) && !HABITEE.test(nom);
 
 export interface PieceHabitable {
   roomId: string;
@@ -34,6 +43,11 @@ export interface PieceHabitable {
   habitable: number;
   /** Pourquoi une partie ne compte pas — null si tout compte. */
   raison: string | null;
+  /**
+   * À VÉRIFIER : des murs sous 1,80 m, et pas de plafond relevé pour dire
+   * quelle part du sol est trop basse.
+   */
+  aVerifier?: boolean;
 }
 
 export interface SurfacesHabitables {
@@ -42,6 +56,8 @@ export interface SurfacesHabitables {
   sol: number;
   /** Surface habitable du logement (m²). */
   total: number;
+  /** Combien de pièces sont à vérifier (voir `PieceHabitable.aVerifier`). */
+  aVerifier: number;
 }
 
 const arrondi = (v: number) => Math.round(v * 100) / 100;
@@ -59,21 +75,50 @@ export function surfacesHabitables(
     const plafond = room?.releve?.plafond ?? null;
     let habitable = sol;
     let raison: string | null = null;
-    if (HORS_LOGEMENT.test(nom)) {
+    let aVerifier = false;
+    if (horsLogement(nom)) {
       habitable = 0;
       raison = `${nom} : garage, cave, balcon et annexes ne comptent pas`;
     } else if (plafond?.rampant && plafond.surfaceHabitable !== null) {
-      habitable = Math.min(sol, plafond.surfaceHabitable);
+      /*
+        L'HABITABLE SUIT LA RETOUCHE — revue « Sébastien » : un pignon reculé
+        de 10 cm faisait passer le sol de 30,00 à 30,60 m², et l'habitable
+        restait à 22,50, figé au relevé. La part BASSE (sous 1,80 m) est
+        celle que le LiDAR a vue ; ce qu'on ajoute ou retire en déplaçant un
+        mur se reporte sur le reste.
+      */
+      const basse =
+        plafond.solAuReleve !== undefined ? Math.max(0, plafond.solAuReleve - plafond.surfaceHabitable) : null;
+      habitable = basse !== null ? Math.max(0, sol - basse) : Math.min(sol, plafond.surfaceHabitable);
       raison = 'la part sous 1,80 m ne compte pas';
     } else if ((plafond?.hMax ?? roomHeight(part.walls)) < HAUTEUR_HABITABLE) {
       habitable = 0;
       raison = 'moins de 1,80 m sous plafond';
+    } else if (
+      !plafond?.rampant &&
+      part.walls.some((w) => w.type === 'wall' && w.height < HAUTEUR_HABITABLE - 1e-6)
+    ) {
+      /*
+        DES MURS SOUS 1,80 M, ET RIEN POUR DIRE OÙ PASSE LA LIGNE — revue
+        « Sébastien » : sans plafond relevé, une chambre sous combles aux
+        jambettes de 1,00 m comptait tout son sol (+44,8 %). La surface
+        reste celle du sol, mais elle est DITE à vérifier.
+      */
+      aVerifier = true;
+      raison = 'des murs sous 1,80 m : la part basse reste à mesurer';
     }
-    pieces.push({ roomId: part.roomId, sol: arrondi(sol), habitable: arrondi(habitable), raison });
+    pieces.push({
+      roomId: part.roomId,
+      sol: arrondi(sol),
+      habitable: arrondi(habitable),
+      raison,
+      ...(aVerifier ? { aVerifier } : {}),
+    });
   }
   return {
     pieces,
     sol: arrondi(pieces.reduce((t, p) => t + p.sol, 0)),
     total: arrondi(pieces.reduce((t, p) => t + p.habitable, 0)),
+    aVerifier: pieces.filter((p) => p.aVerifier).length,
   };
 }

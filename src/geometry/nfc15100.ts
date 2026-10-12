@@ -634,7 +634,7 @@ export function fixturePlacement(
  *
  * Une remarque de vocabulaire, parce qu'elle a son importance : la norme ne
  * fixe **aucun maximum de socles par pièce**. Ce qui est plafonné, c'est le
- * nombre de points par CIRCUIT — huit socles sur un 20 A. Poser dix prises
+ * nombre de points par CIRCUIT — douze socles sur un 20 A, six en cuisine. Poser dix prises
  * dans une cuisine n'est donc pas une faute : il faut un deuxième circuit,
  * et l'app le prévoit toute seule. Ce cas ressort en simple information,
  * jamais en alerte.
@@ -867,18 +867,22 @@ export function checkElectrical(
 
     // Trop de socles pour un seul circuit : ce n'est pas une faute, c'est
     // un circuit de plus. On le dit, sans crier.
-    if (socles > MAX_SOCLES) {
+    const maxIci = use === 'cuisine' ? MAX_SOCLES_CUISINE : MAX_SOCLES;
+    if (socles > maxIci) {
       out.push({
         code: 'circuits',
         roomId: room.id,
         severity: 'info',
         message:
           `${label} : ${socles} socles, soit ` +
-          `${Math.ceil(socles / MAX_SOCLES)} circuits`,
+          `${Math.ceil(socles / maxIci)} circuits`,
         regle:
-          `Un circuit de prises 16 A en 2,5 mm² protégé par un disjoncteur ` +
-          `20 A porte ${MAX_SOCLES} socles au maximum. Au-delà, il en faut ` +
-          `un second — la liste du matériel le prévoit déjà.`,
+          use === 'cuisine'
+            ? `Le circuit des prises de la cuisine porte ${MAX_SOCLES_CUISINE} socles au maximum. ` +
+              `Au-delà, il en faut un second — la liste du matériel le prévoit déjà.`
+            : `Un circuit de prises 16 A en 2,5 mm² protégé par un disjoncteur ` +
+              `20 A porte ${MAX_SOCLES} socles au maximum. Au-delà, il en faut ` +
+              `un second — la liste du matériel le prévoit déjà.`,
       });
     }
 
@@ -1407,8 +1411,19 @@ export function roomsInAlert(issues: ElecIssue[]): Set<string> {
 
 // -------------------------------------------------------------- circuits
 
-/** Points maximum sur un circuit de prises 16 A (2,5 mm², 20 A). */
-export const MAX_SOCLES = 8;
+/**
+ * Socles maximum sur un circuit de prises 16 A en 2,5 mm² sous 20 A : DOUZE.
+ *
+ * Revue « Mehdi », confirmée par le patron : l'app en comptait huit, la
+ * limite du 1,5 mm² sous 16 A. Depuis l'amendement A5, le 2,5 mm² sous
+ * 20 A en porte douze — huit faisait poser des circuits et des disjoncteurs
+ * en trop.
+ */
+export const MAX_SOCLES = 12;
+/** Socles maximum sur le circuit des prises de la CUISINE : six. */
+export const MAX_SOCLES_CUISINE = 6;
+/** Sorties de câble regroupées sur un même circuit commun. */
+const MAX_SORTIES = 8;
 /** Points maximum sur un circuit d'éclairage (1,5 mm², 16 A). */
 export const MAX_LUMIERE = 8;
 /** Circuits maximum derrière un même interrupteur différentiel. */
@@ -1588,7 +1603,7 @@ export function planCircuits(
   const socles = fixtures.filter((f) => socketsOf(f.kind) > 0);
   const cuisine = socles.filter(isKitchen);
   const ailleurs = socles.filter((f) => !isKitchen(f));
-  chunkByLoad(cuisine, MAX_SOCLES, (f) => socketsOf(f.kind)).forEach((lot, i) =>
+  chunkByLoad(cuisine, MAX_SOCLES_CUISINE, (f) => socketsOf(f.kind)).forEach((lot, i) =>
     add({
       label: `Prises cuisine ${i + 1}`,
       nature: 'prises',
@@ -1597,7 +1612,7 @@ export function planCircuits(
       breaker: 20,
       rooms: roomsOf(lot),
       fixtureIds: lot.map((f) => f.id),
-      note: 'Les prises de cuisine ne partagent pas leur circuit.',
+      note: 'Les prises de cuisine ne partagent pas leur circuit : six socles au plus.',
     }),
   );
   chunkByLoad(ailleurs, MAX_SOCLES, (f) => socketsOf(f.kind)).forEach((lot, i) =>
@@ -1704,7 +1719,7 @@ export function planCircuits(
     add({ ...reste, label: `${nom} — ${nomDe(f)}`, points: 1, rooms: [nomDe(f)], fixtureIds: [f.id] });
   }
   const sorties = fixtures.filter((f) => f.kind === 'sortieCable' && !(f.usage && DEDIEES[f.usage]));
-  chunk(sorties, MAX_SOCLES).forEach((lot, i) =>
+  chunk(sorties, MAX_SORTIES).forEach((lot, i) =>
     add({
       label: `Sorties de câble ${i + 1}`,
       nature: 'sortie',
@@ -1779,7 +1794,25 @@ export function circuitsDuDifferentiel(d: Differential, circuits: Circuit[]): Ci
  * type AC ne voit pas. Les autres circuits vont derrière des type AC, huit
  * au maximum par appareil.
  */
-export function planDifferentials(circuits: Circuit[]): Differential[] {
+/**
+ * LES INTERRUPTEURS DIFFÉRENTIELS, À LA SURFACE DU LOGEMENT — revue
+ * « Mehdi », confirmée par le patron. La norme en fixe le nombre minimal
+ * selon la surface :
+ *   - jusqu'à 35 m² : un 25 A type AC et un 40 A type A ;
+ *   - de 35 à 100 m² : deux 40 A type AC et un 40 A type A ;
+ *   - au-delà de 100 m² : trois 40 A type AC et un 40 A type A.
+ * Sans surface connue, on s'en tient au nombre de circuits (huit au plus
+ * derrière chacun). Les circuits se RÉPARTISSENT entre les AC, au lieu de
+ * remplir le premier.
+ */
+export function minimumAC(surface: number | undefined): { nombre: number; calibre: number } {
+  if (surface === undefined || !(surface > 0)) return { nombre: 1, calibre: 40 };
+  if (surface <= 35) return { nombre: 1, calibre: 25 };
+  if (surface <= 100) return { nombre: 2, calibre: 40 };
+  return { nombre: 3, calibre: 40 };
+}
+
+export function planDifferentials(circuits: Circuit[], surface?: number): Differential[] {
   const proteges = circuits.filter((c) => c.nature !== 'vdi');
   if (proteges.length === 0) return [];
   const typeA = proteges.filter(
@@ -1796,15 +1829,24 @@ export function planDifferentials(circuits: Circuit[]): Differential[] {
       circuitIds: lot.map((c) => c.id),
     }),
   );
-  chunk(reste, MAX_PAR_DIFF).forEach((lot, i) =>
-    out.push({
-      label: `Différentiel type AC ${i + 1}`,
-      type: 'AC',
-      rating: 40,
-      circuits: lot.map((c) => c.label),
-      circuitIds: lot.map((c) => c.id),
-    }),
-  );
+  if (reste.length > 0) {
+    const mini = minimumAC(surface);
+    const nombre = Math.max(surface !== undefined ? mini.nombre : 1, Math.ceil(reste.length / MAX_PAR_DIFF));
+    // Réparti à tour de rôle : un circuit sur chaque différentiel, puis on recommence.
+    const lots: Circuit[][] = Array.from({ length: nombre }, () => []);
+    reste.forEach((c, i) => lots[i % nombre].push(c));
+    lots
+      .filter((lot) => lot.length > 0)
+      .forEach((lot, i) =>
+        out.push({
+          label: `Différentiel type AC ${i + 1}`,
+          type: 'AC',
+          rating: mini.calibre,
+          circuits: lot.map((c) => c.label),
+          circuitIds: lot.map((c) => c.id),
+        }),
+      );
+  }
   // Un logement sans circuit spécialisé n'aurait aucun type A : la norme en
   // impose un de toute façon.
   if (!out.some((d) => d.type === 'A')) {
@@ -1911,7 +1953,11 @@ export function materialList(
     (f) => firstRoom(f)?.id,
     ceiling,
   );
-  const differentials = planDifferentials(circuits);
+  // La surface du logement fixe le nombre de différentiels.
+  const differentials = planDifferentials(
+    circuits,
+    rooms.reduce((s, r) => s + (r.area > 0 ? r.area : 0), 0) || undefined,
+  );
 
   const breakers = new Map<number, number>();
   for (const c of circuits) {

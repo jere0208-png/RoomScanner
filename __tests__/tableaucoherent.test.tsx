@@ -27,7 +27,7 @@ import { Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { appartementExemple } from '../src/data/exemple';
 import { railDuReleve, type TableauExistant } from '../src/geometry/existant';
-import { circuitsDuLogement, tableauDeReference } from '../src/geometry/tableauFini';
+import { circuitsDuLogement, surfaceDuLogement, tableauDeReference } from '../src/geometry/tableauFini';
 import { useTableauDeReference } from '../src/store/tableauDeReference';
 import { useScanStore } from '../src/store/scanStore';
 import { ExistantSheet } from '../src/screens/result/ExistantSheet';
@@ -74,7 +74,10 @@ describe('le tableau de référence', () => {
     expect(tableau!.departs.filter((d) => d.organe === 'disjoncteur').length).toBeGreaterThan(3);
     // Le même que celui qu'on calcule à la main sur tout le logement.
     const circuits = circuitsDuLogement(ex.walls, ex.rooms, ex.fixtures, ex.ceiling);
-    expect(signature(tableau)).toEqual(signature(tableauDeReference(null, circuits)));
+    // À la surface du logement : elle fixe le nombre de différentiels.
+    expect(signature(tableau)).toEqual(
+      signature(tableauDeReference(null, circuits, surfaceDuLogement(ex.walls, ex.rooms))),
+    );
   });
 
   it('un tableau constitué, même vide, passe devant le plan', () => {

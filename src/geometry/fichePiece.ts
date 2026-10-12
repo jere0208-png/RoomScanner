@@ -57,6 +57,11 @@ export interface PlafondDeLaPiece {
   surfaceHabitable: number | null;
   /** Pourquoi une partie de la pièce ne compte pas — null si tout compte. */
   raisonHabitable?: string | null;
+  /**
+   * LE SOL DE LA PIÈCE AU MOMENT DU RELEVÉ (m²) — pour que l'habitable suive
+   * une retouche (revue « Sébastien »). Absent des relevés d'avant.
+   */
+  solAuReleve?: number;
 }
 
 const arrondi = (v: number, pas = 0.01) => Math.round(v / pas) * pas;
@@ -107,6 +112,7 @@ export function plafondDeLaPiece(
     couverture: arrondi(couverture),
     rampant: assezVu && hMax - hMin >= ECART_RAMPANT,
     surfaceHabitable: assezVu ? arrondi(surface * debout) : null,
+    solAuReleve: arrondi(surface),
   };
 }
 

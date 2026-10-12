@@ -4410,9 +4410,11 @@ function metrePage(
     const exclues = hab.pieces.filter((p) => p.raison).length;
     y -= 13;
     d.text(
-      exclues > 0
-        ? 'Hors garage, cave, balcon et annexes, et hors hauteur sous 1,80 m. Estimation tirée du relevé, pas un mesurage certifié.'
-        : 'Estimation tirée du relevé (hauteur sous plafond d’au moins 1,80 m), pas un mesurage certifié.',
+      hab.aVerifier > 0
+        ? `À vérifier : ${hab.aVerifier} pièce${hab.aVerifier > 1 ? 's ont' : ' a'} des murs sous 1,80 m, et la part basse n’a pas été mesurée. Estimation tirée du relevé, pas un mesurage certifié.`
+        : exclues > 0
+          ? 'Hors garage, cave, balcon et annexes, et hors hauteur sous 1,80 m. Estimation tirée du relevé, pas un mesurage certifié.'
+          : 'Estimation tirée du relevé, pas un mesurage certifié.',
       x0,
       y,
       8,
@@ -7200,6 +7202,7 @@ function gardePage(
   let sol = 0;
   let habitable = 0;
   let avecHabitable = false;
+  let aVerifier = 0;
   for (const c of niveaux ? niveaux.map((x) => x.ctx) : [ctx]) {
     const parts = roomParts(c.walls, c.rooms);
     nPieces += parts.length;
@@ -7214,14 +7217,17 @@ function gardePage(
     );
     habitable += hab.total;
     avecHabitable = avecHabitable || hab.pieces.length > 0;
+    aVerifier += hab.aVerifier;
   }
   const cases: [string, string][] = [
     ['Pièces', String(nPieces)],
     ['Surface au sol', `${fr1(sol)} m²`],
     // Seulement quand elle dit AUTRE CHOSE que la surface au sol : deux
     // cases au même chiffre se lisaient comme une erreur (revues du dossier).
-    ...(avecHabitable && Math.abs(habitable - sol) >= 0.05
-      ? ([['Habitable estimée', `≈ ${fr1(habitable)} m²`]] as [string, string][])
+    ...(avecHabitable && (Math.abs(habitable - sol) >= 0.05 || aVerifier > 0)
+      ? ([
+          ['Habitable estimée', `≈ ${fr1(habitable)} m²${aVerifier > 0 ? ' (à vérifier)' : ''}`],
+        ] as [string, string][])
       : []),
   ];
   y -= 14;

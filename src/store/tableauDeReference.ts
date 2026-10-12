@@ -7,7 +7,7 @@
  */
 import { useMemo } from 'react';
 import type { TableauExistant } from '../geometry/existant';
-import { circuitsDuLogement, tableauDeReference } from '../geometry/tableauFini';
+import { circuitsDuLogement, surfaceDuLogement, tableauDeReference } from '../geometry/tableauFini';
 import { useScanStore } from './scanStore';
 
 export function useTableauDeReference(): { tableau: TableauExistant | null; projete: boolean } {
@@ -18,7 +18,11 @@ export function useTableauDeReference(): { tableau: TableauExistant | null; proj
   const ceiling = useScanStore((s) => s.ceiling);
   return useMemo(() => {
     if (existant) return { tableau: existant, projete: false };
-    const tableau = tableauDeReference(null, circuitsDuLogement(walls, rooms, fixtures, ceiling));
+    const tableau = tableauDeReference(
+      null,
+      circuitsDuLogement(walls, rooms, fixtures, ceiling),
+      surfaceDuLogement(walls, rooms) || undefined,
+    );
     return { tableau, projete: tableau !== null };
   }, [existant, walls, rooms, fixtures, ceiling]);
 }
