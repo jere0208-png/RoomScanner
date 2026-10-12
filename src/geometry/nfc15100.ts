@@ -43,6 +43,7 @@ import {
   postsOf,
   rjOf,
   socketsOf,
+  USAGES,
   type Fixture,
   type FixtureKind,
 } from './electrical';
@@ -924,8 +925,14 @@ export function checkElectrical(
    */
   const cuisines = rooms.filter((r) => estCuisine(r.name, r.kind));
   if (cuisines.length > 0) {
+    /*
+      Une sortie de câble ne compte que si elle peut servir de spécialisé :
+      celle d'un sèche-serviettes, d'une climatisation ou d'une plaque, non
+      (revue « Mehdi » : un lave-vaisselle, un sèche-serviettes et une
+      climatisation faisaient « 3/3 »).
+    */
     const dedies = fixtures.filter(
-      (f) => f.kind === 'prise20' || f.kind === 'sortieCable',
+      (f) => f.kind === 'prise20' || (f.kind === 'sortieCable' && !f.usage),
     ).length;
     if (dedies < 3) {
       out.push({
@@ -1563,9 +1570,11 @@ export function planCircuits(
       note: 'Circuit dédié à la plaque de cuisson.',
     });
   }
+  // L'appareil qu'il alimente, quand le sigle le dit (« Lave-vaisselle »).
+  const appareilDe = (f: Fixture) => USAGES.find((u) => u.sigle === f.usage)?.label;
   for (const f of fixtures.filter((x) => x.kind === 'prise20')) {
     add({
-      label: `Spécialisé 20 A — ${nomDe(f)}`,
+      label: `${appareilDe(f) ?? 'Spécialisé 20 A'} — ${nomDe(f)}`,
       nature: 'specialise',
       points: 1,
       section: 2.5,
@@ -1666,7 +1675,35 @@ export function planCircuits(
     }
   }
 
-  const sorties = fixtures.filter((f) => f.kind === 'sortieCable');
+  /*
+    LE SIGLE DÉCIDE DU CIRCUIT — revue « Mehdi » : la plaque (PL), le
+    chauffe-eau (CU) et la borne de recharge (VE) partaient tous sur un seul
+    « Sorties de câble » en 20 A / 2,5 mm², plaque comprise. Chacun a son
+    circuit dédié, à sa section ; le reste (sèche-serviettes,
+    climatisation, sortie sans sigle) garde le circuit commun.
+  */
+  const DEDIEES: Record<string, Omit<Circuit, 'id' | 'rooms' | 'fixtureIds' | 'points' | 'label'> & { nom: string }> = {
+    PL: { nom: 'Cuisson', nature: 'cuisson', section: 6, breaker: 32, note: 'Circuit dédié à la plaque de cuisson.' },
+    CU: {
+      nom: 'Chauffe-eau',
+      nature: 'specialise',
+      section: 2.5,
+      breaker: 20,
+      note: 'Circuit dédié, commandé par un contacteur heures creuses.',
+    },
+    VE: {
+      nom: 'Borne de recharge',
+      nature: 'specialise',
+      section: 10,
+      breaker: 40,
+      note: 'Circuit dédié (7,4 kW), différentiel 30 mA type A ou F ; section à vérifier selon la longueur.',
+    },
+  };
+  for (const f of fixtures.filter((x) => x.kind === 'sortieCable' && !!x.usage && !!DEDIEES[x.usage])) {
+    const { nom, ...reste } = DEDIEES[f.usage!];
+    add({ ...reste, label: `${nom} — ${nomDe(f)}`, points: 1, rooms: [nomDe(f)], fixtureIds: [f.id] });
+  }
+  const sorties = fixtures.filter((f) => f.kind === 'sortieCable' && !(f.usage && DEDIEES[f.usage]));
   chunk(sorties, MAX_SOCLES).forEach((lot, i) =>
     add({
       label: `Sorties de câble ${i + 1}`,

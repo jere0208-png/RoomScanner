@@ -2337,8 +2337,15 @@ export function FloorplanEditor({
               />
             ))}
 
-            {/* Objets (empreintes au sol) */}
-            {objects.map((o) => {
+            {/*
+              Objets (empreintes au sol). LES TAPIS D'ABORD — revue
+              « Yasmine » : dessinés dans l'ordre d'ajout, le tapis posé
+              après la table la recouvrait, sur l'image même qu'on envoie au
+              client. Un tapis est sous les meubles ; il se dessine dessous.
+            */}
+            {[...objects]
+              .sort((a, b) => (a.category === 'tapis' ? 0 : 1) - (b.category === 'tapis' ? 0 : 1))
+              .map((o) => {
               const f = footprintOf(o, partOf);
               const ctr = mapping.toPx({ x: f.cx, z: f.cz });
               const w = f.width * mapping.scale;
@@ -2358,15 +2365,21 @@ export function FloorplanEditor({
                     y={-d / 2}
                     width={w}
                     height={d}
+                    /*
+                      LA TEINTE CHOISIE SE VOIT AUSSI EN 2D — revue « Yasmine » :
+                      le canapé vert sauge de « Décorer » restait bleu pâle sur
+                      le plan. Hors plan électrique, le meuble prend sa teinte,
+                      adoucie pour que son symbole se lise encore.
+                    */
                     fill={
                       poseRefusee && o.id === selectedObjectId
                         ? c.danger
                         : planElec
                           ? c.surface
-                          : c.blueSoft
+                          : o.teinte ?? c.blueSoft
                     }
                     fillOpacity={
-                      poseRefusee && o.id === selectedObjectId ? 0.35 : 1
+                      poseRefusee && o.id === selectedObjectId ? 0.35 : !planElec && o.teinte ? 0.55 : 1
                     }
                     // Et ce qui en chevauche un autre GARDE son trait rouge
                     // une fois lâché (revue « Théo ») : le contrôle le dit

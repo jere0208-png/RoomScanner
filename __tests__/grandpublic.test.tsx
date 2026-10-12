@@ -404,7 +404,8 @@ describe('5 — une seule surface de murs', () => {
         { metre: true },
       ),
     );
-    expect(pdf).toContain(`(${attendu.toFixed(1).replace('.', ',')})`);
+    // Deux décimales au métré (revue « Sébastien »), comme le tableur.
+    expect(pdf).toContain(`(${attendu.toFixed(2).replace('.', ',')})`);
     // L'écran passe au tableur le chiffre de « Travaux ».
     expect(lire('src/screens/ResultScreen.tsx')).toContain('mursNets: travaux?.murs ?? null,');
   });

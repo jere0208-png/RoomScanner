@@ -23,7 +23,7 @@
  *   3. ON DIT CE QU'ON A FAIT. Le rapport nomme chaque pose, pièce par pièce,
  *      et se tait pour dire que tout était déjà conforme.
  */
-import { FIXTURES, type Fixture, type FixtureKind } from './electrical';
+import { COMMANDES_MURALES, FIXTURES, socketsOf, type Fixture, type FixtureKind } from './electrical';
 import type { CeilingFixture } from './ceiling';
 import type { Pt, WallSeg } from './floorplan';
 import { segLength, perpOf } from './floorplan';
@@ -196,6 +196,21 @@ export function poserAuxNormes(input: {
       (f) => input.placement.get(f.id) === room.id,
     );
     const compte = (k: FixtureKind) => dedans.filter((f) => f.kind === k).length;
+    /*
+      LES SOCLES, PAS LES PRISES SIMPLES — revue « Mehdi » : un séjour à
+      12 socles sur 12 (en doubles et triples) recevait 4 prises de plus,
+      chaque chambre à 3 sur 3 une de plus. On compte comme le contrôle
+      (`socketsOf`), sans les prises d'appareil (hotte, réfrigérateur).
+    */
+    const socles = dedans.reduce((n, f) => n + (f.usage ? 0 : socketsOf(f.kind)), 0);
+    /*
+      TOUTE COMMANDE COMPTE — double, variateur, interrupteur général,
+      poussoir — et le détecteur de présence au plafond en est une : le WC
+      qui en avait un recevait un interrupteur.
+    */
+    const commandes =
+      dedans.filter((f) => COMMANDES_MURALES.includes(f.kind)).length +
+      input.ceiling.filter((c) => c.roomId === room.id && c.kind === 'detecteur').length;
     const murs = input.walls.filter((w) => room.wallIds.includes(w.id));
     if (murs.length === 0) continue;
     const objets = input.objects.filter((o) => !o.roomId || o.roomId === room.id);
@@ -227,7 +242,7 @@ export function poserAuxNormes(input: {
       return fait;
     };
 
-    const manqueSocles = Math.max(0, besoin.socles - compte('prise'));
+    const manqueSocles = Math.max(0, besoin.socles - socles);
     if (manqueSocles > 0) {
       const fait = poser('prise', manqueSocles, H_PRISE);
       if (fait > 0) pose.push(`${fait} socle${fait > 1 ? 's' : ''} 16 A`);
@@ -247,7 +262,7 @@ export function poserAuxNormes(input: {
     }
     // Une commande d'éclairage par pièce : sans elle, le point lumineux ne
     // s'allume pas, et c'est le premier réflexe d'un contrôle.
-    if (compte('inter') + compte('va') === 0 && poser('inter', 1, H_INTER) > 0) {
+    if (commandes === 0 && poser('inter', 1, H_INTER) > 0) {
       pose.push('1 interrupteur');
     }
     // Un point lumineux au centre, s'il n'y en a aucun.

@@ -14285,6 +14285,52 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le sigle décide du circuit, la légende par sigle, le métré à deux décimales
+
+Suite de la revue « Mehdi », électricien.
+
+**Le sigle décide du circuit.** La plaque (PL), le chauffe-eau (CU) et la
+borne de recharge (VE) partaient sur un seul « Sorties de câble » en 20 A /
+2,5 mm², plaque comprise. Chacun a maintenant son circuit dédié :
+
+| Sigle | Circuit | Protection | Section | Précision |
+|---|---|---|---|---|
+| PL | Cuisson | 32 A | 6 mm² | |
+| CU | Chauffe-eau | 20 A | 2,5 mm² | sur contacteur heures creuses |
+| VE | Borne de recharge | 40 A | 10 mm² | différentiel type A ou F ; section à vérifier selon la longueur |
+
+Les autres sorties gardent le circuit commun : sèche-serviettes,
+climatisation, et sortie sans sigle. Un spécialisé 20 A porte le nom de son
+appareil : « Lave-vaisselle — Cuisine ».
+
+**Le contrôle des trois spécialisés.** Une sortie de câble à sigle (plaque,
+sèche-serviettes, climatisation…) n'y compte plus. Un lave-vaisselle, un
+sèche-serviettes et une climatisation faisaient « 3 sur 3 ».
+
+**La légende du dossier, par sigle.** Le plan écrivait LV, LL, PL ; la
+légende disait « Prise 20 A ». Une alimentation à sigle se légende
+maintenant « Alim. lave-vaisselle (LV) », avec son mot dans le rond. Un
+type posé uniquement sous sigles n'a plus sa ligne générique.
+
+**« Normes auto » compte comme le contrôle.**
+- Il compte les socles et non les prises simples : un séjour à 12 socles
+  sur 12 recevait 4 prises de plus. Les prises d'appareil n'y comptent pas.
+- Toute commande compte, y compris un double interrupteur, un variateur,
+  l'interrupteur général, un poussoir ou le détecteur de présence au
+  plafond : le WC qui en avait un recevait un interrupteur.
+
+**Le métré du PDF à deux décimales** (Sébastien). Il affichait 22,9 au
+PDF, contre 22,95 à la fiche et au tableur. Le plan, qui est un dessin,
+garde une décimale.
+
+**Le plan 2D** (Yasmine) :
+- les tapis se dessinent sous les meubles ; posé après la table, le tapis
+  la recouvrait ;
+- un meuble prend la teinte choisie dans « Décorer », adoucie, hors plan
+  électrique.
+
+Banc : `tournee4normes`.
+
 ## Les prix qui manquaient, et la rangée du devis qui tient dans sa carte
 
 **Les articles à 0 € ont un prix.** Choix du patron : « les plus utilisés,

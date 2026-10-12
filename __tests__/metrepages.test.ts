@@ -77,7 +77,8 @@ describe('le métré d’un grand logement', () => {
     expect(tous.filter((t) => t === 'Total')).toHaveLength(1);
     const derniere = feuilles[feuilles.length - 1].map((m) => m.texte);
     expect(derniere).toContain('Total');
-    expect(derniere).toContain('360,0');
+    // Deux décimales au métré (revue « Sébastien »).
+    expect(derniere).toContain('360,00');
   });
 
   it('rien ne descend dans le cartouche, même une dernière feuille pleine', () => {

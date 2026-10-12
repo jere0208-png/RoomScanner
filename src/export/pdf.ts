@@ -63,6 +63,7 @@ import {
   FIXTURE_TAG,
   libelleDuSymbole,
   motDansLeRond,
+  USAGES,
   pointDuSymbole,
   porteeVersLeMur,
   assemblySymbol,
@@ -1636,6 +1637,12 @@ function draw3DView(
 // -------------------------------------------------------------- pages
 
 const fr1 = (v: number) => v.toFixed(1).replace('.', ',');
+/**
+ * DEUX DÉCIMALES AU MÉTRÉ — revue « Sébastien » : 22,9 au PDF, 22,95 à
+ * l'écran de la fiche et au tableur. Le plan garde une décimale (c'est un
+ * dessin) ; le tableau des surfaces, qui se recopie, en porte deux.
+ */
+const fr2 = (v: number) => v.toFixed(2).replace('.', ',');
 const frLen = (v: number) => v.toFixed(2).replace('.', ',');
 
 /** Ce qui est commun à toutes les feuilles d'un même export. */
@@ -1867,6 +1874,21 @@ function planPage(
   const kindsLegende = extra?.hideLegend
     ? []
     : [...new Set((ctx.fixtures ?? []).map((f) => f.kind))];
+  /*
+    UNE LIGNE PAR SIGLE — revue « Mehdi » : le plan écrivait LV, LL, SL, PL
+    dans les ronds, la légende disait « Prise 20 A » et « 20A ». Une
+    alimentation à sigle se légende « Alim. lave-vaisselle (LV) », avec son
+    mot, comme le plan d'architecte.
+  */
+  const siglesLegende = extra?.hideLegend
+    ? []
+    : [
+        ...new Map(
+          (ctx.fixtures ?? [])
+            .filter((f) => !!f.usage)
+            .map((f) => [`${f.kind}|${f.usage}`, { kind: f.kind, usage: f.usage! }] as const),
+        ).values(),
+      ];
   const plafondLegende = extra?.hideLegend
     ? []
     : [...new Set((ctx.ceiling ?? []).map((c) => c.kind))];
@@ -1921,7 +1943,9 @@ function planPage(
       fois: number | null;
       mot: ReturnType<typeof motDansLeRond>;
     }[] = [];
-    for (const k of kindsLegende) {
+    // Sans sigle, la ligne du type ; un type posé QUE sous sigles n'a pas la sienne.
+    const sansSigle = new Set((ctx.fixtures ?? []).filter((f) => !f.usage).map((f) => f.kind));
+    for (const k of kindsLegende.filter((x) => sansSigle.has(x))) {
       const { symbole, fois } = symboleCompact(postsOf(k), k);
       // Le mot du rond compte : un vidéophone n'est pas une prise 20 A.
       const mot = motDansLeRond(k);
@@ -1940,12 +1964,24 @@ function planPage(
       {
         titre: 'APPAREILLAGE',
         teinte: ENCRE_ELEC,
-        lignes: groupes.map((g) => ({
-          texte: libelle(g.kinds),
-          symbole: { paths: g.symbole, color: FIXTURES[g.kinds[0]].teintePropre ?? ENCRE_ELEC },
-          ...(g.fois ? { fois: g.fois } : {}),
-          ...(g.mot ? { mot: g.mot } : {}),
-        })),
+        lignes: [
+          ...groupes.map((g) => ({
+            texte: libelle(g.kinds),
+            symbole: { paths: g.symbole, color: FIXTURES[g.kinds[0]].teintePropre ?? ENCRE_ELEC },
+            ...(g.fois ? { fois: g.fois } : {}),
+            ...(g.mot ? { mot: g.mot } : {}),
+          })),
+          ...siglesLegende.map(({ kind, usage }) => {
+            const { symbole } = symboleCompact(postsOf(kind), kind);
+            const appareil = USAGES.find((u) => u.sigle === usage)?.label ?? usage;
+            const mot = motDansLeRond(kind, usage);
+            return {
+              texte: `Alim. ${appareil.charAt(0).toLowerCase()}${appareil.slice(1)} (${usage})`,
+              symbole: { paths: symbole, color: FIXTURES[kind].teintePropre ?? ENCRE_ELEC },
+              ...(mot ? { mot } : {}),
+            };
+          }),
+        ],
       },
     ]);
   }
@@ -4290,10 +4326,10 @@ function metrePage(
     const cells = [
       fitText(name, 10, cols[1] - cols[0] - 6),
       `${frLen(ext.width)} × ${frLen(ext.depth)}`,
-      part.surface ? `${part.surface.exact ? '' : '≈ '}${fr1(part.surface.area)}` : '—',
-      fr1(perim),
+      part.surface ? `${part.surface.exact ? '' : '≈ '}${fr2(part.surface.area)}` : '—',
+      fr2(perim),
       frLen(h),
-      fr1(nets),
+      fr2(nets),
       ...(avecEclairage
         ? [
             lum && lum.points > 0
@@ -4343,8 +4379,8 @@ function metrePage(
   y -= 26;
   d.line(x0, y + 12, x0 + w, y + 12, 0.8, INK);
   d.text('Total', cols[0], y, 10, INK, { align: 'left', bold: true });
-  d.text(fr1(totalArea2), cols[2], y, 10, INK, { align: 'left', bold: true });
-  d.text(fr1(totalWalls), cols[5], y, 10, INK, { align: 'left', bold: true });
+  d.text(fr2(totalArea2), cols[2], y, 10, INK, { align: 'left', bold: true });
+  d.text(fr2(totalWalls), cols[5], y, 10, INK, { align: 'left', bold: true });
   if (avecEclairage && totalPoints > 0) {
     d.text(
       `${totalPoints} point${totalPoints > 1 ? 's' : ''}`,
@@ -4370,7 +4406,7 @@ function metrePage(
   );
   if (hab.pieces.length > 0) {
     y -= 22;
-    d.text(`Surface habitable estimée : ${fr1(hab.total)} m²`, x0, y, 10, INK, { align: 'left', bold: true });
+    d.text(`Surface habitable estimée : ${fr2(hab.total)} m²`, x0, y, 10, INK, { align: 'left', bold: true });
     const exclues = hab.pieces.filter((p) => p.raison).length;
     y -= 13;
     d.text(
