@@ -449,7 +449,12 @@ export function WallElevation({
     if (!modeElec) return null;
     const inputs = roomInputsOf(rooms, roomParts(walls, rooms));
     const w2r = wallToRooms(inputs);
-    const mien = inputs.find(r => (w2r.get(wallId) ?? []).includes(r.id));
+    // Sur une cloison, la pièce de la face qu'on regarde — pas la première
+    // trouvée : vue de la cuisine, la pastille comptait les socles du séjour.
+    const vue = wall ? pieceDuCote(wall, side, walls, rooms) : null;
+    const mien =
+      inputs.find(r => r.id === vue && (w2r.get(wallId) ?? []).includes(r.id)) ??
+      inputs.find(r => (w2r.get(wallId) ?? []).includes(r.id));
     if (!mien) return null;
     const req = requirementFor(roomUse(mien.name, mien.kind), mien.area);
     if (req.socles === 0) return null;
@@ -487,7 +492,7 @@ export function WallElevation({
       */
       inconnu: !usageConnu(mien.name, mien.kind),
     };
-  }, [modeElec, rooms, walls, fixtures, wallId]);
+  }, [modeElec, rooms, walls, fixtures, wallId, wall, side]);
 
   /**
    * Les autres constats de la pièce — ceux que le bandeau d'objectif et

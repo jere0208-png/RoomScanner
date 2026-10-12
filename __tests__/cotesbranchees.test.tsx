@@ -160,7 +160,7 @@ describe('les cotes courantes, depuis l’ecran', () => {
     act(() => plan.props.onSelectRoom?.('r1'));
     toucher(t, 'Hauteur sous plafond');
     expect(proposees(t)).toEqual([
-      'Cote 2,30',
+      'Cote 2,40',
       'Cote 2,50',
       'Cote 2,60',
       'Cote 2,70',

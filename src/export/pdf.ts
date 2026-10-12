@@ -107,7 +107,7 @@ import {
 } from '../geometry/ceiling';
 import { planFrameAngle } from '../geometry/floorplan';
 import { assignOpenings } from '../geometry/scene3d';
-import { epaisseurDe, etendueDeLaPiece, longueurCotee, pointOnSeg, wallRuns } from '../geometry/floorplan';
+import { epaisseurDe, estDessine, etendueDeLaPiece, longueurCotee, pointOnSeg, wallRuns } from '../geometry/floorplan';
 import {
   ajusterBlocs,
   masquesDeScene,
@@ -1135,7 +1135,10 @@ function drawSheetChrome(
 
   // Bloc projet
   d.text('PROJET', cols[0] + 12, ty + 50, 6.5, GREY_LIGHT, { align: 'left' });
-  d.text(fitText(info.project, 10.5, width(0)), cols[0] + 12, ty + 37, 10.5, INK, {
+  // Le titre se resserre avant de se couper : « Plan du 12/10/2026 — Rez-d… »
+  // perdait justement le niveau (revue « Léa »).
+  const corpsProjet = [10.5, 9.5, 8.5].find((t) => fitText(info.project, t, width(0)) === info.project) ?? 8.5;
+  d.text(fitText(info.project, corpsProjet, width(0)), cols[0] + 12, ty + 37, corpsProjet, INK, {
     bold: true,
     align: 'left',
   });
@@ -3862,7 +3865,7 @@ function planPage(
   const exact = surfaces.every((p) => p.surface?.exact);
   const mentionSurface =
     totalM2 > 0
-      ? ` \u00b7 Surface relev\u00e9e : ${exact ? '' : '\u2248 '}${totalM2
+      ? ` \u00b7 Surface ${estDessine(walls) ? 'au nu' : 'relev\u00e9e'} : ${exact ? '' : '\u2248 '}${totalM2
           .toFixed(1)
           .replace('.', ',')} m\u00b2`
       : '';
@@ -3871,7 +3874,9 @@ function planPage(
       (ctx.ceiling && ctx.ceiling.length > 0
         ? 'Murs, ouvertures et surfaces, avec l\u2019appareillage et le plafond \u2014 ' +
           'cotes en m\u00e8tres, cotes d\u2019appareil en centim\u00e8tres.'
-        : 'Murs, ouvertures et surfaces relev\u00e9s au scan \u2014 cotes en m\u00e8tres.')) +
+        : estDessine(walls)
+          ? 'Murs, ouvertures et surfaces aux cotes int\u00e9rieures \u2014 cotes en m\u00e8tres.'
+          : 'Murs, ouvertures et surfaces relev\u00e9s au scan \u2014 cotes en m\u00e8tres.')) +
     (extra?.sub ? '' : mentionSurface);
   d.text(titre, FRAME.x + 24, TETE, 13, INK, {
     bold: true,
@@ -6813,6 +6818,8 @@ export function pdfFilename(name: string): string {
   const clean = latin1(name)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    // « 12/10/2026 » devient « 12-10-2026 », comme dans le DXF (revue « Léa »).
+    .replace(/[\\/:]+/g, ' ')
     .replace(/[^\w\-+ ]/g, '')
     .trim()
     .replace(/\s+/g, '-');

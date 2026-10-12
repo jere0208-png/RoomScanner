@@ -682,7 +682,7 @@ function jeuDuNiveau(
  * UUID, suffixé quand un étage ou un découpage l'a repris. Ce qui a été
  * tracé ou posé à la main porte le nôtre (`mur-`, `cl-`, `mb-`…).
  */
-function duReleve(id: string): boolean {
+export function duReleve(id: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(id);
 }
 

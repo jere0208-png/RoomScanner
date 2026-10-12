@@ -119,6 +119,8 @@ import {
   roomParts,
   segLength,
   totalArea,
+  toFootprint,
+  meublesQuiSeChevauchent,
   type RoomPart,
   solDesMurs,
   perimetreDesPieces,
@@ -177,7 +179,7 @@ import {
   pieceDuCote,
 } from '../geometry/electrical';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { nomDeVersion, useScanStore } from '../store/scanStore';
+import { duReleve, nomDeVersion, useScanStore } from '../store/scanStore';
 import { useAccountStore } from '../store/accountStore';
 import { demarrerComplement, demarrerEtage, lancerUnScan } from '../native/useRoomScan';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
@@ -2100,6 +2102,28 @@ export function ResultScreen() {
     réflexion « grand public » : le chiffre qu'on écrit dans une annonce.
   */
   const habitable = useMemo(() => surfacesHabitables(rooms, parts), [rooms, parts]);
+  /*
+    LE TOTAL DE LA MAISON — revue « Léa » : l'en-tête ne disait que le niveau
+    affiché, et les 122 m² de la maison ne paraissaient qu'en page de garde
+    du PDF. Avec deux niveaux ou plus, il s'ajoute aux chiffres du niveau.
+  */
+  const surfaceMaison = useMemo(() => {
+    if (niveaux.length < 2) return null;
+    let area = 0;
+    let exact = true;
+    for (const n of niveaux) {
+      const t = totalArea(
+        roomParts(
+          tousLesMurs.filter((w) => niveauDe(w) === n),
+          toutesLesPieces.filter((r) => niveauDe(r) === n),
+        ),
+      );
+      if (!t) continue;
+      area += t.area;
+      exact = exact && t.exact;
+    }
+    return area > 0 ? { area, exact } : null;
+  }, [niveaux, tousLesMurs, toutesLesPieces]);
   const mesuresDuNiveau = useMemo(
     () => toutesLesMesures.filter((m) => (m.niveau ?? 0) === niveauCourant),
     [toutesLesMesures, niveauCourant],
@@ -2421,6 +2445,31 @@ export function ResultScreen() {
       fige.openings,
     ],
   );
+  /*
+    LES MEUBLES QUI SE CHEVAUCHENT, l'un au moins posé à la main — revue
+    « Théo ». Le contrôle le dit, et le plan garde leur trait rouge.
+  */
+  const chevauchements = useMemo(
+    () =>
+      meublesQuiSeChevauchent(
+        fige.objects.map((o) => {
+          const f = toFootprint(o);
+          return {
+            id: o.id,
+            cx: f.cx,
+            cz: f.cz,
+            width: f.width,
+            depth: f.depth,
+            yaw: f.yaw,
+            y0: f.yCenter - f.height / 2,
+            y1: f.yCenter + f.height / 2,
+            category: o.category,
+          };
+        }),
+      ).filter(([a, b]) => !duReleve(a) || !duReleve(b)),
+    [fige.objects],
+  );
+  const meublesEnConflit = useMemo(() => new Set(chevauchements.flat()), [chevauchements]);
   const issues: Constat[] = useMemo(
     () => [
       ...checkPlan(fige.walls, fige.rooms, fige.openings).map((i, n) => ({
@@ -2467,6 +2516,26 @@ export function ResultScreen() {
         code: i.code,
       })),
       /*
+        DEUX MEUBLES QUI SE CHEVAUCHENT — revue « Théo ». Seulement quand
+        l'un des deux a été posé à la main : deux boîtes du scan qui se
+        frôlent sont l'imprécision ordinaire du relevé.
+      */
+      ...chevauchements.map(([a, b], n) => {
+        const ma = fige.objects.find((o) => o.id === a);
+        const mb = fige.objects.find((o) => o.id === b);
+        const na = ma ? nomDuMeuble(ma) : 'Un meuble';
+        const nb = mb ? nomDuMeuble(mb).toLowerCase() : 'un autre';
+        return {
+          key: `m${n}`,
+          message: `${na} et ${nb} se chevauchent`,
+          hint: 'Glissez l’un des deux, ou « Placer au centimètre » à 0 cm de l’autre.',
+          severity: 'alerte',
+          code: 'meuble',
+          roomId: ma?.roomId,
+          objectId: duReleve(a) ? b : a,
+        };
+      }),
+      /*
         UNE PORTE QU'UN MEUBLE GÊNE — relevé du patron, point 6 de la
         réflexion « grand public ». Une information : un meuble relevé au
         scan peut être à dix centimètres de sa place réelle.
@@ -2476,6 +2545,14 @@ export function ResultScreen() {
           const porte = fige.openings.find((o) => o.id === porteId)!;
           const nom = nomDeLaPorte(porte, fige.rooms);
           const meuble = fige.objects.find((o) => o.id === ids[0]);
+          /*
+            POSÉ À LA MAIN, C'EST UNE ALERTE — revue « Théo » : le canapé
+            d'angle dans le débattement de la porte d'entrée ne comptait pas
+            dans la pastille. Un meuble relevé au scan peut être à dix
+            centimètres de sa place : une information. Un meuble qu'on a
+            posé soi-même est où on l'a mis : la porte ne s'ouvrira pas.
+          */
+          const aLaMain = ids.some((id) => !duReleve(id));
           return {
             key: `b${n}`,
             message: `${nom.charAt(0).toUpperCase()}${nom.slice(1)} : ${
@@ -2484,14 +2561,14 @@ export function ResultScreen() {
             hint:
               'Le vantail heurte le meuble avant d’être grand ouvert. Décalez le meuble, ' +
               'ou faites ouvrir la porte de l’autre côté depuis son menu.',
-            severity: 'info',
+            severity: aLaMain ? 'alerte' : 'info',
             code: 'porte',
             roomId: porte ? roomOf(porte) : undefined,
           };
         },
       ),
     ],
-    [fige.walls, fige.rooms, fige.openings, fige.objects, elecIssues, modeElec, cheminements],
+    [fige.walls, fige.rooms, fige.openings, fige.objects, elecIssues, modeElec, cheminements, chevauchements],
   );
   const alertes = useMemo(
     () => issues.filter((i) => i.severity === 'alerte').length,
@@ -2591,7 +2668,12 @@ export function ResultScreen() {
     setTab('2d');
     setEditMode(true);
     setSelectedObjectId(null);
-    if (issue.wallId) {
+    if (issue.objectId) {
+      // Le meuble posé à la main : c'est lui qu'on déplace.
+      setSelectedWallId(null);
+      setSelectedRoomId(null);
+      setSelectedObjectId(issue.objectId);
+    } else if (issue.wallId) {
       setSelectedRoomId(null);
       setSelectedWallId(issue.wallId);
     } else if (issue.roomId) {
@@ -3287,6 +3369,9 @@ export function ResultScreen() {
     ...(habitable.pieces.length > 0 &&
     (!modeElec || Math.abs(habitable.total - habitable.sol) >= 0.5)
       ? [{ value: `${surface && !surface.exact ? '≈ ' : ''}${fr(habitable.total)}`, label: 'm² hab.' }]
+      : []),
+    ...(surfaceMaison
+      ? [{ value: `${surfaceMaison.exact ? '' : '≈ '}${fr(surfaceMaison.area)}`, label: 'm² maison' }]
       : []),
     { value: fr(perimeter), label: 'm périm.' },
     ...(objects.length > 0
@@ -4069,6 +4154,7 @@ export function ResultScreen() {
               useScanStore.getState().comblerTrou(trou);
               haptic('succes');
             }}
+            meublesEnConflit={meublesEnConflit}
             /*
               LE RECOIN EN NOIR SE DÉCLARE — revue « Karim » : un placard
               fermé sans porte comptait comme une gaine, hors des surfaces.

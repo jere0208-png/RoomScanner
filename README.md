@@ -14285,6 +14285,48 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les meubles qui se chevauchent se voient ; la maison se totalise
+
+Suite de la troisième tournée, du plus gênant au moins gênant.
+
+**L'aménagement** (revue « Théo »)
+- Deux meubles qui se chevauchent se signalent, dont l'un au moins posé à la
+  main. Le rouge ne paraissait que pendant le geste : une chaise lâchée
+  57 cm dans la table restait ainsi sans rien pour le dire. Maintenant :
+  - le contrôle le dit (« Chaise et table se chevauchent ») et l'appui
+    sélectionne le meuble ;
+  - le plan garde son trait rouge.
+- Ce qui ne compte pas comme chevauchement :
+  - deux meubles qui se touchent ;
+  - la télé posée sur le meuble bas ;
+  - une chaise rangée jusqu'à 30 cm sous une table ou un bureau.
+  Le plan d'exemple ne s'accuse pas lui-même.
+- Un meuble posé à la main dans le débattement d'une porte est une alerte.
+  Un meuble relevé au scan reste une information : il peut être à dix
+  centimètres de sa place.
+- Le plan se recadre quand une pièce arrive ou s'en va. La chambre ajoutée
+  à côté du séjour sortait de l'écran. Le nombre de pièces ne bouge pas
+  pendant qu'on tire un coin : le plan ne « respire » pas sous le doigt.
+
+**La maison à étage** (revue « Léa »)
+- Avec deux niveaux ou plus, l'en-tête ajoute le total de la maison
+  (« m² maison »). Il ne paraissait qu'en page de garde du PDF.
+- Les fichiers d'un même dossier portent le même nom, quel que soit le
+  format : « Plan-du-12-10-2026 » pour le PDF, l'OBJ et le DXF (le PDF et
+  l'OBJ écrivaient « 12102026 »).
+- Le titre du cartouche se resserre avant de se couper. « Plan du
+  12/10/2026 — Rez-d » perdait justement le niveau.
+- Le PDF d'un plan dessiné ne dit plus « relevés au scan » : il parle de
+  cotes intérieures et de surface au nu.
+- La hauteur sous plafond propose 2,40 m (l'étage d'une maison récente) à
+  la place de 2,30, qui se tape à la main.
+
+**L'électricien** (revue « Nicolas »). Sur une cloison, la pastille de
+l'établi compte les socles de la pièce qu'on regarde. Vue de la cuisine,
+elle comptait ceux du séjour.
+
+Bancs : `plansconstruits`, `cotesbranchees`.
+
 ## Un plan d'équerre à l'ouverture, des noms sans doublon, des meubles au ras
 
 Suite de la troisième tournée, du plus gênant au moins gênant.

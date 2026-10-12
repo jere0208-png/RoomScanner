@@ -444,6 +444,8 @@ interface Props {
    * mur à la main, au pixel près.
    */
   onComblerTrou?: (trou: TrouDeReleve) => void;
+  /** Les meubles qui en chevauchent un autre : leur trait reste rouge. */
+  meublesEnConflit?: Set<string>;
   /**
    * Appui sur un recoin poché en noir : `at` est un point dedans. Il sert à
    * le déclarer (« C'est un placard »).
@@ -660,6 +662,7 @@ export function FloorplanEditor({
   onSelectOpening,
   onSelectObject,
   onComblerTrou,
+  meublesEnConflit,
   onRecoin,
   showObjectDims,
   onToggleObjectDims,
@@ -1145,12 +1148,19 @@ export function FloorplanEditor({
     l'écran et le repère fuyait hors du cadre, c'est-à-dire que l'on perdait
     la seule chose qui aide. L'échelle est plafonnée par ailleurs
     (`ECHELLE_MAX_PLAN`) : deux murs ne se grossissent pas jusqu'au bord.
+
+    ET IL SE REFAIT QUAND UNE PIÈCE ARRIVE (ou s'en va) — revue « Théo » :
+    la chambre ajoutée à côté du séjour sortait de l'écran (507 points de
+    plan pour 390 d'écran), et rien ne ramenait le plan entier sous les
+    yeux. Le nombre de pièces ne bouge pas pendant qu'on tire un coin : le
+    plan ne respire toujours pas sous le doigt.
   */
+  const nbPieces = rooms.length;
   const baseMapping = useMemo(() => {
     if (layout.w === 0 || layout.h === 0) return null;
     return makeMapping(bounds([...walls, ...(filigrane ?? [])]), layout.w, layout.h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSaveId, niveauCourant, layout.w, layout.h]);
+  }, [currentSaveId, niveauCourant, layout.w, layout.h, nbPieces]);
 
   // Cadrage composite : ajustement au canevas + navigation utilisateur.
   const mapping = useMemo(() => {
@@ -2357,16 +2367,21 @@ export function FloorplanEditor({
                     fillOpacity={
                       poseRefusee && o.id === selectedObjectId ? 0.35 : 1
                     }
+                    // Et ce qui en chevauche un autre GARDE son trait rouge
+                    // une fois lâché (revue « Théo ») : le contrôle le dit
+                    // aussi, mais c'est sur le plan qu'on le corrige.
                     stroke={
                       poseRefusee && o.id === selectedObjectId
                         ? c.danger
                         : o.id === selectedObjectId
                         ? c.blue
-                        : planElec
-                          ? c.line
-                          : c.lineStrong
+                        : meublesEnConflit?.has(o.id)
+                          ? c.danger
+                          : planElec
+                            ? c.line
+                            : c.lineStrong
                     }
-                    strokeWidth={o.id === selectedObjectId ? 2.5 : 1}
+                    strokeWidth={o.id === selectedObjectId ? 2.5 : meublesEnConflit?.has(o.id) ? 1.6 : 1}
                     rx={3}
                   />
                   {/*

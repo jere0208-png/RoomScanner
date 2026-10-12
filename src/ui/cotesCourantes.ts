@@ -65,10 +65,11 @@ export const ALLEGES_COURANTES = [0, 0.45, 0.95, 1.1];
  * Les hauteurs sous plafond.
  *
  * 2,50 partout depuis les années soixante ; 2,70 et au-delà dans l'ancien ;
- * 2,30 sous une sous-pente ou dans un garage aménagé. La quatrième, 2,60,
- * est celle des logements des années 2000.
+ * 2,60 dans les logements des années 2000. La quatrième, 2,40, est celle de
+ * l'étage d'une maison récente (revue « Léa » : elle manquait, et 2,30 —
+ * une sous-pente — se tape à la main).
  */
-export const HAUTEURS_SOUS_PLAFOND = [2.3, 2.5, 2.6, 2.7];
+export const HAUTEURS_SOUS_PLAFOND = [2.4, 2.5, 2.6, 2.7];
 
 /**
  * Une cote, telle qu'elle se lit sur une pastille et telle qu'elle entre

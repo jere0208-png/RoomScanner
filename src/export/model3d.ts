@@ -119,6 +119,8 @@ export function objFilename(name: string): string {
   const clean = name
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
+    // « 12/10/2026 » devient « 12-10-2026 », comme dans le DXF (revue « Léa »).
+    .replace(/[\\/:]+/g, ' ')
     .replace(/[^\w\-+ ]/g, '')
     .trim()
     .replace(/\s+/g, '-');

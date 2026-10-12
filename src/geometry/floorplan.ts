@@ -1040,6 +1040,62 @@ export function pushOutOfObjects(
 }
 
 /**
+ * LES MEUBLES QUI SE CHEVAUCHENT, tels qu'ils sont — revue « Théo » : le
+ * rouge ne paraissait que pendant le geste ; une chaise lâchée 57 cm dans la
+ * table, deux chevets entrés l'un dans l'autre restaient ainsi, sans rien
+ * pour le dire. Deux meubles se chevauchent quand aucun axe ne les sépare à
+ * `seuil` près (deux centimètres : deux meubles qui se touchent ne se
+ * chevauchent pas), et qu'ils partagent un même volume en hauteur (la télé
+ * posée sur le meuble bas ne compte pas).
+ */
+export function meublesQuiSeChevauchent(
+  objets: {
+    id: string;
+    cx: number;
+    cz: number;
+    width: number;
+    depth: number;
+    yaw: number;
+    y0: number;
+    y1: number;
+    category?: string;
+  }[],
+  seuil = 0.02,
+): [string, string][] {
+  /*
+    UNE CHAISE SE RANGE SOUS LA TABLE : le fauteuil du bureau d'exemple y
+    entrait de quinze centimètres, et le plan s'accusait lui-même. Jusqu'à
+    trente centimètres sous une table ou un bureau, une chaise est rangée ;
+    au-delà (la chaise de Théo, 57 cm), elle est dedans.
+  */
+  const RANGEE_SOUS_LA_TABLE = 0.3;
+  const sousLaTable = (x: (typeof objets)[number], y: (typeof objets)[number]) =>
+    x.category === 'chair' && y.category === 'table';
+  const demi = (e: (typeof objets)[number], n: Pt) =>
+    Math.abs(Math.cos(e.yaw) * n.x + Math.sin(e.yaw) * n.z) * (e.width / 2) +
+    Math.abs(-Math.sin(e.yaw) * n.x + Math.cos(e.yaw) * n.z) * (e.depth / 2);
+  const out: [string, string][] = [];
+  for (let i = 0; i < objets.length; i++) {
+    for (let j = i + 1; j < objets.length; j++) {
+      const a = objets[i];
+      const b = objets[j];
+      if (Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) < 0.05) continue;
+      const axes = [a.yaw, b.yaw].flatMap((t) => [
+        { x: Math.cos(t), z: Math.sin(t) },
+        { x: -Math.sin(t), z: Math.cos(t) },
+      ]);
+      const tolere = sousLaTable(a, b) || sousLaTable(b, a) ? RANGEE_SOUS_LA_TABLE : seuil;
+      const separe = axes.some((n) => {
+        const d = Math.abs((b.cx - a.cx) * n.x + (b.cz - a.cz) * n.z);
+        return d - demi(a, n) - demi(b, n) > -tolere;
+      });
+      if (!separe) out.push([a.id, b.id]);
+    }
+  }
+  return out;
+}
+
+/**
  * DÉSENCHÊTRER LE RELEVÉ — quand deux meubles occupent le même volume.
  *
  * Le scanner rend des boîtes, et il lui arrive de les faire se traverser : sur

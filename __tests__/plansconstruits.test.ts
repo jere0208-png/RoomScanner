@@ -76,6 +76,8 @@ import {
   ecartsAuxMurs,
   centrePourEcart,
   clampFootprint,
+  meublesQuiSeChevauchent,
+  toFootprint,
   type WallSeg,
 } from '../src/geometry/floorplan';
 import { poserLibre } from '../src/geometry/poser';
@@ -83,10 +85,13 @@ import { masonryRuns, wallFace } from '../src/geometry/electrical';
 import { lireCm } from '../src/components/MurNeufSheet';
 import { planDifferentials, type Circuit } from '../src/geometry/nfc15100';
 import { tableauDepuisLePlan } from '../src/geometry/tableauFini';
-import { boardRows } from '../src/export/pdf';
+import { boardRows, pdfFilename } from '../src/export/pdf';
+import { objFilename } from '../src/export/model3d';
+import { dxfFilename } from '../src/export/dxf';
 import { CATALOG_ITEMS, type CatalogItem } from '../src/geometry/catalogue';
 import { matchItem } from '../src/screens/result/FurnitureSheet';
 import { useAstuce } from '../src/ui/astuce';
+import { appartementExemple } from '../src/data/exemple';
 import { pocheDesMurs, SUREPAISSEUR_FACADE } from '../src/geometry/poche';
 
 const st = () => useScanStore.getState();
@@ -777,5 +782,61 @@ describe('le meuble collé de Théo', () => {
     ];
     const f = clampFootprint({ id: 'bahut', category: 'storage', cx: 0.035 + 0.3, cz: 1.5, width: 0.6, depth: 1.2, height: 0.8, yCenter: 0.4, yaw: 0 }, murs, { x: 2, z: 1.5 });
     expect(f.cx - 0.3 - 0.035).toBeLessThan(0.0025);
+  });
+});
+
+describe('les fichiers de Léa', () => {
+  it('le même dossier donne le même nom de fichier, quel que soit le format', () => {
+    const nom = 'Plan du 12/10/2026';
+    expect(pdfFilename(nom)).toBe('Plan-du-12-10-2026.pdf');
+    expect(objFilename(`${nom} R+1`)).toBe('Plan-du-12-10-2026-R+1.obj');
+    expect(dxfFilename(`${nom} R+1`)).toBe('Plan-du-12-10-2026-R+1.dxf');
+  });
+});
+
+describe('les chevauchements de Théo', () => {
+  const boite = (id: string, cx: number, cz: number, width: number, depth: number, y0 = 0, y1 = 0.8, yaw = 0) => ({
+    id, cx, cz, width, depth, yaw, y0, y1,
+  });
+  it('une chaise lâchée dans la table se signale ; deux meubles qui se touchent, non', () => {
+    const table = boite('table', 2, 2, 1.6, 0.9);
+    const chaise = boite('chaise', 2, 2.5, 0.45, 0.5);
+    const voisine = boite('voisine', 2, 2 + 0.45 + 0.25, 0.45, 0.5);
+    expect(meublesQuiSeChevauchent([table, chaise])).toEqual([['table', 'chaise']]);
+    expect(meublesQuiSeChevauchent([table, voisine])).toEqual([]);
+  });
+
+  it('une chaise rangée sous la table ne compte pas ; enfoncée dedans, si', () => {
+    const table = { ...boite('table', 2, 2, 1.6, 0.9, 0, 0.75), category: 'table' };
+    // Le bord de la chaise passe 15 cm sous le plateau : rangée.
+    const rangee = { ...boite('rangee', 2, 2 + 0.45 + 0.25 - 0.15, 0.45, 0.5, 0, 0.9), category: 'chair' };
+    expect(meublesQuiSeChevauchent([table, rangee])).toEqual([]);
+    const dedans = { ...boite('dedans', 2, 2.1, 0.45, 0.5, 0, 0.9), category: 'chair' };
+    expect(meublesQuiSeChevauchent([table, dedans])).toEqual([['table', 'dedans']]);
+  });
+
+  it('le plan d’exemple ne s’accuse pas lui-même', () => {
+    const ex = appartementExemple();
+    const boites = ex.objects.map((o) => {
+      const f = toFootprint(o);
+      return {
+        id: o.id, cx: f.cx, cz: f.cz, width: f.width, depth: f.depth, yaw: f.yaw,
+        y0: f.yCenter - f.height / 2, y1: f.yCenter + f.height / 2, category: o.category,
+      };
+    });
+    expect(meublesQuiSeChevauchent(boites)).toEqual([]);
+  });
+
+  it('la télé posée sur le meuble bas ne compte pas', () => {
+    const meuble = boite('meuble', 2, 2, 1.6, 0.45, 0, 0.5);
+    const tele = boite('tele', 2, 2, 1.2, 0.2, 0.5, 1.2);
+    expect(meublesQuiSeChevauchent([meuble, tele])).toEqual([]);
+  });
+
+  it('deux meubles de biais qui ne se touchent que par l’axe de l’un ne se chevauchent pas', () => {
+    const a = boite('a', 0, 0, 1, 1);
+    const b = boite('b', 1.25, 0, 1, 1, 0, 0.8, Math.PI / 4);
+    // Le losange de b déborde de 0,707 − 0,5 vers a : 0,25 − 0,207 de jour.
+    expect(meublesQuiSeChevauchent([a, b])).toEqual([]);
   });
 });
