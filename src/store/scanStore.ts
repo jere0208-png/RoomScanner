@@ -35,6 +35,7 @@ import type {
 import {
   DEFAULT_ROOM_ID,
   detectRooms,
+  massifsTechniques,
   mergeColinear,
   sansEclats,
   baiesVitrees,
@@ -226,6 +227,13 @@ export interface RoomEntry {
    * Ne pas confondre avec `floor`, qui est la couleur du SOL.
    */
   niveau?: number;
+  /**
+   * UN RECOIN QU'ON A DIT ÊTRE UNE PIÈCE — revue « Karim » : un placard
+   * fermé, sans porte et sous 1,2 m², se lisait comme une gaine technique —
+   * poché en noir, hors des surfaces. « C'est un placard » le déclare : il
+   * reste une pièce à chaque redétection.
+   */
+  declaree?: boolean;
   /**
    * CE QUE LE SCAN A MESURÉ DE LA PIÈCE, au-delà de ses murs : son plafond
    * relevé au LiDAR (hauteurs, rampant, surface habitable) et la surface de
@@ -1738,6 +1746,12 @@ interface ScanState {
    */
   comblerTrou: (trou: TrouDeReleve) => void;
   /**
+   * « C'EST UN PLACARD » — le recoin fermé qui contient `at`, poché en noir
+   * comme une gaine, devient une pièce (`RoomEntry.declaree`), sous un seul
+   * « Annuler ».
+   */
+  declarerRecoin: (at: Pt, nom?: string) => void;
+  /**
    * AJOUTE UNE PIÈCE RECTANGULAIRE au plan, et rend son identifiant.
    *
    * Un logement ne se scanne pas toujours d'un trait : on relève le séjour,
@@ -2891,10 +2905,15 @@ export const useScanStore = create<ScanState>((set, get) => {
    * place. Les identifiants d'étage portent leur niveau (`room-1-2`), comme
    * ceux d'un étage scanné.
    */
-  const redetecterUnNiveau = (n: number, historique = true): boolean => {
+  const redetecterUnNiveau = (n: number, historique = true, declarerEn?: Pt): boolean => {
     const st = get();
     const jeu = jeuDuNiveau(st, n);
     const olds = roomParts(jeu.walls, jeu.rooms);
+    // Les recoins déclarés restent des pièces : un point dans chacun.
+    const declarees = olds
+      .filter((p) => jeu.rooms.find((r) => r.id === p.roomId)?.declaree)
+      .map((p) => p.labelAt);
+    if (declarerEn) declarees.push(declarerEn);
     // Le graphe a pu changer (cloison ajoutée, coin déplacé) : on le
     // renettoie avant d'y rechercher les faces.
     const walls = sansEclats(mergeColinear(splitAtJunctions(weldCorners(jeu.walls))), []).walls.map(
@@ -2903,7 +2922,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     // Les menuiseries départagent une petite PIÈCE d'une gaine technique :
     // ce qui s'ouvre est une pièce, si petit soit-il. La cloison de deux
     // pièces fusionnées ne sépare plus rien (voir `nonSeparateur`).
-    const shapes = detectRooms(walls.filter((w) => !w.nonSeparateur), undefined, jeu.openings);
+    const shapes = detectRooms(walls.filter((w) => !w.nonSeparateur), undefined, jeu.openings, declarees);
     if (shapes.length === 0) return false;
     /*
       LA GARDE PASSE AVANT LE POINT DE REPRISE.
@@ -2963,6 +2982,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       const kept = previous
         ? jeu.rooms.find((r) => r.id === previous.roomId)
         : undefined;
+      const declaree =
+        kept?.declaree || declarees.some((p) => pointInPolygon(p, s.outline));
       return {
         id: idPiece(i),
         name: kept?.name || auto[i],
@@ -2972,6 +2993,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         kind: kept?.kind ?? kinds[i] ?? undefined,
         floor,
         ...(n === NIVEAU_RDC ? {} : { niveau: n }),
+        ...(declaree ? { declaree: true } : {}),
       };
     });
     // Deux pièces peuvent hériter du même nom : on renumérote les doublons.
@@ -4653,6 +4675,42 @@ export const useScanStore = create<ScanState>((set, get) => {
         }
         return mieux ? mieux.q : p;
       };
+      /*
+        UN MUR POSÉ AU BOUT D'UN AUTRE EN FAIT UN COIN — revues « Hugo » et
+        « Karim ». La longueur tapée du premier pan allait jusqu'à son bout
+        d'axe ; le second, centré sur ce bout, lui mangeait une
+        demi-épaisseur : la salle d'eau tapée à 1,60 faisait 1,565 à
+        l'intérieur, le L 29,825 m² au lieu de 30. Posé à l'équerre au bout
+        LIBRE de son mur de départ, le mur neuf le prolonge d'une
+        demi-épaisseur (la sienne), et se décale d'autant : la face
+        intérieure tombe à la cote tapée.
+      */
+      let prolonge: WallSeg | null = null;
+      if (depart && depart.type === 'wall') {
+        const ldep = segLength(depart);
+        const bout = Math.hypot(a.x - depart.b.x, a.z - depart.b.z) < 1e-3
+          ? 'b'
+          : Math.hypot(a.x - depart.a.x, a.z - depart.a.z) < 1e-3
+            ? 'a'
+            : null;
+        const lneuf = Math.hypot(b.x - a.x, b.z - a.z);
+        if (bout && ldep > 1e-6 && lneuf > 1e-6) {
+          const E = depart[bout];
+          const autre = bout === 'b' ? depart.a : depart.b;
+          const libreAuBout = !st.walls.some(
+            (w) => w.id !== depart.id && niveauDe(w) === n && pointOnSeg(E, w.a, w.b).dist < 1e-3,
+          );
+          const dehors = { x: (E.x - autre.x) / ldep, z: (E.z - autre.z) / ldep };
+          const uNeuf = { x: (b.x - a.x) / lneuf, z: (b.z - a.z) / lneuf };
+          if (libreAuBout && Math.abs(dehors.x * uNeuf.z - dehors.z * uNeuf.x) > 0.5) {
+            const d = (e && e > 0 ? Math.min(Math.max(e, 0.03), 0.6) : WALL_T) / 2;
+            const glisse = (q: Pt): Pt => ({ x: q.x + dehors.x * d, z: q.z + dehors.z * d });
+            prolonge = { ...depart, [bout]: glisse(E) } as WallSeg;
+            a = glisse(a);
+            b = glisse(b);
+          }
+        }
+      }
       a = versLAxe(a);
       b = versLAxe(b);
       /** Les murs de son niveau que touche ce bout. */
@@ -4665,7 +4723,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const groupe = depart?.roomId ? { roomId: depart.roomId } : groupeDesMurs(auxBouts);
       set({
         walls: [
-          ...st.walls,
+          ...(prolonge ? st.walls.map((w) => (w.id === prolonge!.id ? prolonge! : w)) : st.walls),
           {
             id,
             type: 'wall',
@@ -4695,7 +4753,30 @@ export const useScanStore = create<ScanState>((set, get) => {
         on relit son niveau, sous le même « Annuler » que le tracé, et on
         dit ce qui est apparu.
       */
-      if (touche(a).length === 0 || touche(b).length === 0) return id;
+      if (touche(a).length === 0 || touche(b).length === 0) {
+        /*
+          UNE CLOISON QUI NE FERME RIEN APPARTIENT À LA PIÈCE OÙ ELLE EST —
+          revue « Karim » : le retour d'une niche n'était à personne, et la
+          chambre gardait sous lui ses 6 dm² de sol. Elle entre dans la liste
+          de la pièce qui la contient ; la surface au nu la retire.
+        */
+        const s = get();
+        const milieu = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+        const jeu = jeuDuNiveau(s, n);
+        const chez = new Set(
+          roomParts(jeu.walls, jeu.rooms)
+            .filter((p) => p.surface && pointInPolygon(milieu, p.surface.pts))
+            .map((p) => p.roomId),
+        );
+        if (chez.size > 0) {
+          set({
+            rooms: s.rooms.map((r) =>
+              chez.has(r.id) && r.wallIds && !r.wallIds.includes(id) ? { ...r, wallIds: [...r.wallIds, id] } : r,
+            ),
+          });
+        }
+        return id;
+      }
       const avant = st.rooms.filter((r) => niveauDe(r) === n).length;
       if (!redetecterUnNiveau(n, false)) return id;
       const s = get();
@@ -4717,6 +4798,26 @@ export const useScanStore = create<ScanState>((set, get) => {
             `Nouvelle pièce : ${neuve.surface.area.toFixed(1).replace('.', ',')} m². Touchez-la pour la nommer.`,
             { icone: 'rooms' },
           );
+        }
+      } else if (lui) {
+        /*
+          LE PLACARD QU'ON VIENT DE FERMER — revue « Karim » : sans porte et
+          sous 1,2 m², il se lit comme une gaine (poché noir, hors des
+          surfaces), et rien ne le disait. On le dit, avec de quoi le compter.
+        */
+        const jeu = jeuDuNiveau(s, n);
+        const recoin = massifsTechniques(jeu.walls, jeu.openings, jeu.rooms).find((c) =>
+          c.some((p) => pointOnSeg(p, lui.a, lui.b).dist < 0.01),
+        );
+        if (recoin) {
+          const at = {
+            x: recoin.reduce((t, p) => t + p.x, 0) / recoin.length,
+            z: recoin.reduce((t, p) => t + p.z, 0) / recoin.length,
+          };
+          astuce('Recoin fermé sans porte : compté comme une gaine, en noir.', {
+            icone: 'rooms',
+            action: { label: 'C’est un placard', faire: () => get().declarerRecoin(at) },
+          });
         }
       }
       return lui?.id ?? id;
@@ -4764,11 +4865,52 @@ export const useScanStore = create<ScanState>((set, get) => {
       }
     },
 
+    declarerRecoin: (at, nom = 'Placard') => {
+      const n = get().niveauCourant;
+      pushHistory('declarerRecoin');
+      if (!redetecterUnNiveau(n, false, at)) return;
+      const s = get();
+      const lui = roomParts(s.walls, s.rooms).find(
+        (p) =>
+          p.surface &&
+          pointInPolygon(at, p.surface.pts) &&
+          s.rooms.find((r) => r.id === p.roomId && niveauDe(r) === n)?.declaree,
+      );
+      if (!lui) return;
+      const pris = new Set(
+        s.rooms.filter((r) => niveauDe(r) === n && r.id !== lui.roomId).map((r) => r.name),
+      );
+      let nomLibre = nom;
+      for (let k = 2; pris.has(nomLibre); k++) nomLibre = `${nom} ${k}`;
+      set({ rooms: s.rooms.map((r) => (r.id === lui.roomId ? { ...r, name: nomLibre } : r)) });
+    },
+
     comblerTrou: (trou) => {
       const st = get();
       const ecart = Math.hypot(trou.b.x - trou.a.x, trou.b.z - trou.a.z);
       if (ecart < 0.02) return;
       pushHistory('comblerTrou');
+      const n = niveauDe(st.walls.find((w) => w.id === trou.wallA));
+      /*
+        LE COIN RATÉ SE FERME EN PROLONGEANT LES DEUX MURS jusqu'à leur point
+        de rencontre (voir `TrouDeReleve.coin`), et la pièce qu'il ouvrait
+        réapparaît aussitôt, sous le même « Annuler ».
+      */
+      if (trou.coin) {
+        const c = trou.coin;
+        const pres = (p: Pt, q: Pt) => Math.hypot(p.x - q.x, p.z - q.z) < 1e-4;
+        set({
+          walls: st.walls.map((w) => {
+            if (niveauDe(w) !== n) return w;
+            const a = pres(w.a, trou.a) || pres(w.a, trou.b) ? { ...c } : w.a;
+            const b = pres(w.b, trou.a) || pres(w.b, trou.b) ? { ...c } : w.b;
+            return a === w.a && b === w.b ? w : { ...w, a, b };
+          }),
+          dirty: true,
+        });
+        redetecterUnNiveau(n, false);
+        return;
+      }
       const h = hauteurDuNiveau(st.walls, st.niveauCourant);
       const mur: WallSeg = {
         id: `mur-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -4810,6 +4952,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings: [...st.openings, ...porte],
         dirty: true,
       });
+      // Le contour s'est refermé : la pièce se relit, sous le même « Annuler ».
+      redetecterUnNiveau(n, false);
     },
 
     /*
@@ -5348,7 +5492,32 @@ export const useScanStore = create<ScanState>((set, get) => {
       let x = at ?? faceX(face, f.along);
       let group: string | undefined;
       const voisin = surUnAutre(x);
-      if (voisin) {
+      /*
+        SOUS UNE MÊME PLAQUE, SEULEMENT CE QUI S'Y MET — revue « Nicolas » :
+        la prise 20 A du four, posée sur la prise de crédence, passait sans
+        un mot sous sa plaque ; en la descendant à 25 cm, la crédence
+        suivait. Des prises avec des prises (et leurs RJ, leurs TV), des
+        commandes avec des commandes. Un circuit spécialisé, un tableau, une
+        sortie de câble ont leur boîte à eux : ils s'écartent, sans plaque.
+      */
+      const familleDe = (k: FixtureKind): string | null =>
+        ['prise', 'prise2', 'prise3', 'rj45', 'rj2', 'rjPrise', 'rjPrise2', 'tv', 'tvPrise'].includes(k)
+          ? 'prise'
+          : ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur', 'volet'].includes(k)
+            ? 'commande'
+            : null;
+      if (voisin && (familleDe(kind) === null || familleDe(kind) !== familleDe(voisin.kind))) {
+        for (let k = 1; k <= 30; k++) {
+          const essais = [x + k * 0.05, x - k * 0.05].filter(
+            (px) => px - spec.w / 2 >= 0 && px + spec.w / 2 <= face.len,
+          );
+          const libre = essais.find((px) => !surUnAutre(px));
+          if (libre !== undefined) {
+            x = libre;
+            break;
+          }
+        }
+      } else if (voisin) {
         // On cherche la place libre la plus proche, par pas d'entraxe, à
         // droite d'abord — le sens de lecture d'un tableau d'appareillage.
         let place: number | null = null;
@@ -7429,9 +7598,17 @@ export const useScanStore = create<ScanState>((set, get) => {
       const nb = tourne(wall.b);
       pushHistory(`setWallAngle:${id}`);
       const colle = (p: Pt, ref: Pt) => Math.hypot(p.x - ref.x, p.z - ref.z) < 1e-4;
+      // Un angle tapé hors de l'équerre est voulu : « Redresser » le garde.
+      const reste = ((deg % 90) + 90) % 90;
+      const dEquerre = Math.min(reste, 90 - reste) < 1e-6;
       set({
         walls: st.walls.map((w) => {
-          if (w.id === id) return { ...w, a: na, b: nb };
+          if (w.id === id) {
+            const neuf: WallSeg = { ...w, a: na, b: nb };
+            if (dEquerre) delete neuf.angleVoulu;
+            else neuf.angleVoulu = true;
+            return neuf;
+          }
           if (niveauDe(w) !== niveauDe(wall)) return w;
           // Les voisins suivent le bout auquel ils sont soudés : le contour
           // reste fermé, quitte à ce qu'ils s'allongent ou raccourcissent.

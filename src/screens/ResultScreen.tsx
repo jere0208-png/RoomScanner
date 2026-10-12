@@ -4061,6 +4061,23 @@ export function ResultScreen() {
               useScanStore.getState().comblerTrou(trou);
               haptic('succes');
             }}
+            /*
+              LE RECOIN EN NOIR SE DÉCLARE — revue « Karim » : un placard
+              fermé sans porte comptait comme une gaine, hors des surfaces.
+            */
+            onRecoin={(at) =>
+              alerte(
+                'Recoin fermé sans porte',
+                'Il compte comme une gaine technique : en noir, hors des surfaces. Si c’est un placard, il entre dans le métré.',
+                [
+                  { label: 'Laisser en gaine' },
+                  {
+                    label: 'C’est un placard',
+                    onPress: () => useScanStore.getState().declarerRecoin(at),
+                  },
+                ],
+              )
+            }
             showObjectDims={objDims}
             onToggleObjectDims={() => setObjDims((v) => !v)}
             selectedWallId={selectedWallId}

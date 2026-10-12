@@ -543,8 +543,23 @@ describe('closedLoop + loopAreaM2', () => {
     expect(closedLoop(rect.slice(0, 3))).toBeNull();
   });
 
-  it('renvoie null quand un coin porte trois murs', () => {
-    expect(closedLoop([...rect, seg('x', { x: 0, z: 0 }, { x: -2, z: 0 })])).toBeNull();
+  /*
+    UN MUR QUI PEND NE L'EMPÊCHE PLUS DE SE FERMER — revues « Karim » et
+    « Camille » : une niche ouverte, un fantôme accroché au séjour rendaient
+    la surface « ≈ » et fausse. Ce qui pend s'écarte ; trois murs qui
+    ferment vraiment deux boucles, eux, ne font toujours pas UNE boucle.
+  */
+  it('écarte un mur qui pend d’un coin, mais refuse deux boucles collées', () => {
+    const boucle = closedLoop([...rect, seg('x', { x: 0, z: 0 }, { x: -2, z: 0 })]);
+    expect(boucle).not.toBeNull();
+    expect(loopAreaM2(boucle!)).toBeCloseTo(loopAreaM2(closedLoop(rect)!), 9);
+    const deux = [
+      ...rect,
+      seg('y1', { x: 0, z: 0 }, { x: -2, z: 0 }),
+      seg('y2', { x: -2, z: 0 }, { x: -2, z: 3 }),
+      seg('y3', { x: -2, z: 3 }, { x: 0, z: 3 }),
+    ];
+    expect(closedLoop(deux)).toBeNull();
   });
 });
 
@@ -1794,12 +1809,17 @@ describe('les trous du relevé', () => {
     expect(trousDuRelevé(murs)).toHaveLength(0);
   });
 
-  it('refuse de relier un angle : les deux murs doivent se suivre', () => {
+  it('refuse de relier un angle par une diagonale : c’est un coin à fermer', () => {
     // Deux murs perpendiculaires dont les bouts sont proches : c'est un
-    // coin à souder, pas un trou à combler — et les relier créerait une
-    // diagonale en travers de la pièce.
+    // coin à souder, pas un trou à combler — les relier créerait une
+    // diagonale en travers de la pièce. Il se signale donc comme un COIN
+    // (revue « Camille » : un coin raté effaçait un séjour sans alerte).
     const murs = [mur('a', 0, 0, 3, 0), mur('b', 3.2, 0.2, 3.2, 3)];
-    expect(trousDuRelevé(murs)).toHaveLength(0);
+    const trous = trousDuRelevé(murs);
+    expect(trous.filter((t) => !t.coin)).toHaveLength(0);
+    expect(trous).toHaveLength(1);
+    expect(trous[0].coin!.x).toBeCloseTo(3.2, 9);
+    expect(trous[0].coin!.z).toBeCloseTo(0, 9);
   });
 
   it('ne rend qu’UNE fois le même trou', () => {

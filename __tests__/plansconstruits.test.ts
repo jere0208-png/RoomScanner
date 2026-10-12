@@ -56,6 +56,7 @@ import type { SurfaceData } from 'react-native-room-scan';
 import { useScanStore } from '../src/store/scanStore';
 import { useAccountStore } from '../src/store/accountStore';
 import {
+  trousDuRelevé,
   etendueDeLaPiece,
   longueurCotee,
   filtrerAuNiveau,
@@ -65,6 +66,13 @@ import {
   roomParts,
   segLength,
   splitAtJunctions,
+  planFrameAngle,
+  straightenWalls,
+  posesEnT,
+  posesDeMur,
+  murNeufCote,
+  massifsTechniques,
+  type PoseDeMur,
   type WallSeg,
 } from '../src/geometry/floorplan';
 import { poserLibre } from '../src/geometry/poser';
@@ -75,6 +83,7 @@ import { tableauDepuisLePlan } from '../src/geometry/tableauFini';
 import { boardRows } from '../src/export/pdf';
 import { CATALOG_ITEMS, type CatalogItem } from '../src/geometry/catalogue';
 import { matchItem } from '../src/screens/result/FurnitureSheet';
+import { useAstuce } from '../src/ui/astuce';
 
 const st = () => useScanStore.getState();
 const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
@@ -469,5 +478,178 @@ describe('la face où l’on pose', () => {
       const id = st().addFixture('prise', cloison.id, 1, cote)!;
       expect(st().fixtures.find((f) => f.id === id)!.side).toBe(cote);
     }
+  });
+});
+
+describe('le coin raté de Camille', () => {
+  it('se signale, et se ferme d’un appui : la pièce réapparaît', () => {
+    const murs = [
+      mur('n', 0, 0, 5, 0),
+      mur('e', 5, 0, 5, 4),
+      mur('s', 5, 4, 0.165, 4),
+      mur('w', 0, 3.835, 0, 0),
+    ];
+    useScanStore.setState({ walls: murs, rooms: [], openings: [] });
+    const trous = trousDuRelevé(murs);
+    const coin = trous.find((t) => t.coin)!;
+    expect(coin).toBeTruthy();
+    expect(coin.coin!.x).toBeCloseTo(0, 6);
+    expect(coin.coin!.z).toBeCloseTo(4, 6);
+    st().comblerTrou(coin);
+    const parts = roomParts(st().walls, st().rooms);
+    expect(parts).toHaveLength(1);
+    expect(parts[0].surface?.exact).toBe(true);
+    expect(parts[0].surface!.area).toBeCloseTo(20, 6);
+  });
+});
+
+describe('la plaque commune de Nicolas', () => {
+  it('la prise du four ne passe pas sous la plaque de la crédence', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(4, 3, 'Cuisine', { auNu: true });
+    const m = st().walls[0];
+    const credence = st().addFixture('prise', m.id, 1)!;
+    st().moveFixture(credence, st().fixtures.find((f) => f.id === credence)!.along, 1.1);
+    const four = st().addFixture('prise20', m.id, 1)!;
+    const f4 = st().fixtures.find((f) => f.id === four)!;
+    const fc = st().fixtures.find((f) => f.id === credence)!;
+    expect(f4.group).toBeUndefined();
+    expect(fc.group).toBeUndefined();
+    // Descendre le four laisse la crédence où elle est.
+    st().moveFixture(four, f4.along, 0.25);
+    expect(st().fixtures.find((f) => f.id === credence)!.height).toBeCloseTo(1.1, 6);
+  });
+
+  it('deux prises côte à côte partagent toujours leur plaque', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(4, 3, 'Séjour', { auNu: true });
+    const m = st().walls[0];
+    const a = st().addFixture('prise', m.id, 1)!;
+    const b = st().addFixture('prise', m.id, 1)!;
+    const ga = st().fixtures.find((f) => f.id === a)!.group;
+    expect(ga).toBeTruthy();
+    expect(st().fixtures.find((f) => f.id === b)!.group).toBe(ga);
+  });
+});
+
+describe('un mur posé au bout d’un autre', () => {
+  it('le prolonge d’une demi-épaisseur : la face intérieure tombe à la cote tapée', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(6, 4, 'Studio', { auNu: true });
+    const haut = [...st().walls].sort((p, q) => Math.min(p.a.z, p.b.z) - Math.min(q.a.z, q.b.z))[0];
+    const z0 = haut.a.z;
+    // Le premier pan d'une cloison : son bout libre là où la salle d'eau doit finir.
+    const pan = st().addWallBetween({ x: 2, z: z0 }, { x: 2, z: z0 + 1.6 }, { depuis: haut.id, epaisseur: 0.07 })!;
+    const retour = st().addWallBetween({ x: 2, z: z0 + 1.6 }, { x: 0.5, z: z0 + 1.6 }, { depuis: pan, epaisseur: 0.07 })!;
+    const p = st().walls.find((w) => w.id === pan)!;
+    const r = st().walls.find((w) => w.id === retour)!;
+    expect(Math.max(p.a.z, p.b.z)).toBeCloseTo(z0 + 1.635, 6);
+    expect(r.a.z).toBeCloseTo(z0 + 1.635, 6);
+    // La face du retour côté salle d'eau : à 1,60 de l'axe du mur du haut.
+    expect(r.a.z - 0.035 - z0).toBeCloseTo(1.6, 6);
+  });
+});
+
+describe('« Redresser » chez Karim', () => {
+  it('un mur à 80° ne fait plus tourner la maison', () => {
+    // Un logement d'équerre et une chambre trapézoïdale : son mur du fond à 80°.
+    const murs = [
+      mur('h1', 0, 0, 8, 0), mur('h2', 0, 6, 8, 6),
+      mur('v1', 0, 0, 0, 6), mur('v2', 8, 0, 8, 6),
+      mur('biais', 8, 0, 8 + 4 * Math.cos((80 * Math.PI) / 180), 4 * Math.sin((80 * Math.PI) / 180)),
+    ];
+    expect(planFrameAngle(murs)).toBeCloseTo(0, 9);
+    const droits = straightenWalls(murs);
+    const h1 = droits.find((w) => w.id === 'h1')!;
+    expect(h1.a.z).toBeCloseTo(h1.b.z, 9);
+    const v1 = droits.find((w) => w.id === 'v1')!;
+    expect(v1.a.x).toBeCloseTo(v1.b.x, 9);
+    const b = droits.find((w) => w.id === 'biais')!;
+    expect((Math.atan2(b.b.z - b.a.z, b.b.x - b.a.x) * 180) / Math.PI).toBeCloseTo(80, 6);
+  });
+
+  it('un angle tapé reste tel qu’on l’a voulu', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(5, 4, 'Chambre', { auNu: true });
+    // Le mur de droite, tourné de 4° : dans la tolérance de l'équerre, mais voulu.
+    const droite = [...st().walls].sort(
+      (p, q) => Math.max(q.a.x, q.b.x) + Math.min(q.a.x, q.b.x) - Math.max(p.a.x, p.b.x) - Math.min(p.a.x, p.b.x),
+    )[0];
+    const angle = (w: WallSeg) => (Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI;
+    const voulu = angle(droite) + 4;
+    st().setWallAngle(droite.id, voulu);
+    st().straightenPlan();
+    const apres = st().walls.find((w) => w.id === droite.id) ?? st().walls.find((w) => w.angleVoulu)!;
+    expect(apres.angleVoulu).toBe(true);
+    // Ses voisins, eux, se remettent d'équerre : à 0,005° près, il reste à 94°.
+    expect(angle(apres)).toBeCloseTo(voulu, 1);
+    // Les autres murs restent d'aplomb.
+    for (const w of st().walls) {
+      if (w.angleVoulu) continue;
+      const a = ((angle(w) % 90) + 90) % 90;
+      expect(Math.min(a, 90 - a)).toBeLessThan(1e-6);
+    }
+  });
+});
+
+describe('le placard de Karim', () => {
+  const poserMur = (pose: PoseDeMur, saisie: Parameters<typeof murNeufCote>[2]) => {
+    const seg = murNeufCote(st().walls, pose, saisie);
+    return seg ? st().addWallBetween(seg.a, seg.b, { epaisseur: saisie.epaisseur, depuis: pose.wallId }) : undefined;
+  };
+  const chambre = () => {
+    st().commencerAuClavier();
+    const ch = st().addRoomLibre(3.4, 3.0, 'Chambre', { auNu: true })!;
+    st().arreterPiece(ch);
+  };
+  const astuces = () => {
+    const a = useAstuce.getState();
+    return [...(a.courante ? [a.courante] : []), ...a.file];
+  };
+  beforeEach(() => useAstuce.setState({ courante: null, file: [] }));
+
+  it('fermé sans porte, il se dit ; « C’est un placard » le compte, et Redétecter le garde', () => {
+    chambre();
+    // 0,60 × 1,20 dans l'angle : une cloison en T depuis le mur de gauche, puis l'équerre.
+    const gauche = st().walls.find((w) => w.a.x === 0 && w.b.x === 0)!;
+    const pose = posesEnT(gauche).find((p) => p.b.x > p.a.x)!;
+    const t1 = poserMur(pose, { longueur: 1.2, epaisseur: 0.07, depuis: 0.6, depuisB: gauche.b.z < gauche.a.z })!;
+    const T = st().walls.find((w) => w.id === t1)!;
+    const versHaut = posesDeMur(st().walls, 1)
+      .filter((p) => Math.hypot(p.a.x - T.b.x, p.a.z - T.b.z) < 1e-6)
+      .find((p) => p.b.z < p.a.z - 0.5)!;
+    poserMur(versHaut, { longueur: 0.6, epaisseur: 0.07 });
+    expect(massifsTechniques(st().walls, st().openings, st().rooms)).toHaveLength(1);
+    const dit = astuces().find((a) => a.texte.startsWith('Recoin fermé'));
+    expect(dit?.action).toBeTruthy();
+    dit!.action!.faire();
+    expect(massifsTechniques(st().walls, st().openings, st().rooms)).toHaveLength(0);
+    const aires = () =>
+      Object.fromEntries(
+        roomParts(st().walls, st().rooms).map((p) => [st().rooms.find((r) => r.id === p.roomId)!.name, p.surface!.area]),
+      );
+    expect(aires().Placard).toBeCloseTo(0.72, 3);
+    expect(aires().Chambre).toBeCloseTo(10.2 - 1.27 * 0.67, 3);
+    st().redetectRooms();
+    expect(aires().Placard).toBeCloseTo(0.72, 3);
+    // « Annuler » la redétection, puis la déclaration : il redevient une gaine.
+    st().undo();
+    expect(massifsTechniques(st().walls, st().openings, st().rooms)).toHaveLength(0);
+    st().undo();
+    expect(massifsTechniques(st().walls, st().openings, st().rooms)).toHaveLength(1);
+  });
+
+  it('une niche ouverte ne fausse pas la chambre à la redétection', () => {
+    chambre();
+    const haut = st().walls.find((w) => w.a.z === 0 && w.b.z === 0)!;
+    const pose = posesEnT(haut).find((p) => p.b.z > p.a.z)!;
+    // Un retour de 0,60 en 10 cm, à 1,20 du coin, qui ne ferme rien.
+    poserMur(pose, { longueur: 0.6, epaisseur: 0.1, depuis: 1.2 });
+    // Les 6 dm² sous la cloison sortent du sol, tout de suite et après Redétecter.
+    expect(roomParts(st().walls, st().rooms)[0].surface!.area).toBeCloseTo(10.2 - 0.06, 3);
+    st().redetectRooms();
+    const [p] = roomParts(st().walls, st().rooms);
+    expect(p.surface!.exact).toBe(true);
+    expect(p.surface!.area).toBeCloseTo(10.2 - 0.06, 3);
   });
 });

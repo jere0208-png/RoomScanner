@@ -444,6 +444,11 @@ interface Props {
    * mur à la main, au pixel près.
    */
   onComblerTrou?: (trou: TrouDeReleve) => void;
+  /**
+   * Appui sur un recoin poché en noir : `at` est un point dedans. Il sert à
+   * le déclarer (« C'est un placard »).
+   */
+  onRecoin?: (at: Pt) => void;
   /** Ouverture sélectionnée : elle se retaille en largeur et en hauteur. */
   selectedOpeningId?: string | null;
   onSelectOpening?: (id: string | null) => void;
@@ -655,6 +660,7 @@ export function FloorplanEditor({
   onSelectOpening,
   onSelectObject,
   onComblerTrou,
+  onRecoin,
   showObjectDims,
   onToggleObjectDims,
 }: Props) {
@@ -2541,6 +2547,16 @@ export function FloorplanEditor({
                   .map((p) => `${p.x},${p.y}`)
                   .join(' ')}
                 fill={c.ink}
+                // Un placard fermé sans porte se poche aussi : un appui le déclare.
+                onPress={
+                  editable && onRecoin
+                    ? () =>
+                        onRecoin({
+                          x: contour.reduce((t, p) => t + p.x, 0) / contour.length,
+                          z: contour.reduce((t, p) => t + p.z, 0) / contour.length,
+                        })
+                    : undefined
+                }
               />
             ))}
 
@@ -2668,13 +2684,13 @@ export function FloorplanEditor({
               trous.map((t, i) => {
                 const p0 = mapping.toPx(t.a);
                 const p1 = mapping.toPx(t.b);
+                // Un coin raté se dessine par son coin : les deux bouts y vont.
+                const pts = t.coin ? [p0, mapping.toPx(t.coin), p1] : [p0, p1];
                 return (
-                  <Line
+                  <Polyline
                     key={`trou-${i}`}
-                    x1={p0.x}
-                    y1={p0.y}
-                    x2={p1.x}
-                    y2={p1.y}
+                    points={pts.map((p) => `${p.x},${p.y}`).join(' ')}
+                    fill="none"
                     stroke={c.danger}
                     strokeWidth={2.4}
                     strokeDasharray="5 4"
@@ -3939,8 +3955,9 @@ export function FloorplanEditor({
               const dPastille = taillePastilleTrou(mapping.scale);
               const p0 = mapping.toPx(t.a);
               const p1 = mapping.toPx(t.b);
-              const mx = (p0.x + p1.x) / 2;
-              const my = (p0.y + p1.y) / 2;
+              const pc = t.coin ? mapping.toPx(t.coin) : null;
+              const mx = pc ? pc.x : (p0.x + p1.x) / 2;
+              const my = pc ? pc.y : (p0.y + p1.y) / 2;
               return (
                 <TouchableOpacity
                   key={`combler-${i}`}
@@ -3954,9 +3971,11 @@ export function FloorplanEditor({
                       top: my - dPastille / 2,
                     },
                   ]}
-                  accessibilityLabel={`Combler le trou de ${Math.round(
-                    t.ecart * 100,
-                  )} cm`}
+                  accessibilityLabel={
+                    t.coin
+                      ? `Fermer le coin ouvert de ${Math.round(t.ecart * 100)} cm`
+                      : `Combler le trou de ${Math.round(t.ecart * 100)} cm`
+                  }
                   /*
                     CE QU'ON VISE EST PETIT, CE QU'ON TOUCHE RESTE LARGE.
 

@@ -1907,10 +1907,11 @@ describe('le trou laissé par le scan', () => {
     expect(cible).toBeDefined();
     // Le libellé dit la largeur du manque : on sait ce qu'on va poser.
     expect(cible!.props.accessibilityLabel).toContain('90');
-    const avant = useScanStore.getState().walls.length;
     act(() => cible!.props.onPress());
     const st = useScanStore.getState();
-    expect(st.walls).toHaveLength(avant + 1);
+    // Le mur tendu referme la pièce, qui se relit aussitôt (les morceaux
+    // alignés se recollent au passage).
+    expect(st.rooms).toHaveLength(1);
     // Quatre-vingt-dix centimètres : c'est une porte, et elle est posée.
     expect(st.openings).toHaveLength(1);
     expect(st.openings[0].type).toBe('door');

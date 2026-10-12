@@ -14285,6 +14285,56 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les coins ratés se ferment ; le placard se compte ; « Redresser » garde les angles voulus
+
+Suite de la troisième tournée, toujours du plus gênant au moins gênant.
+
+**Le coin raté** (revue « Camille »). Deux murs qui devaient se rejoindre en
+coin s'arrêtaient à seize centimètres l'un de l'autre, au-delà de la soudure
+automatique. Un séjour de 27 m² disparaissait du plan sans aucune alerte.
+- Le coin manquant se signale comme un trou, en pointillé rouge jusqu'au
+  coin (`TrouDeReleve.coin`).
+- Un appui prolonge les deux murs jusqu'à ce coin, et la pièce réapparaît
+  sous le même « Annuler ».
+- Combler un trou de porte relit aussi le niveau : la pièce refermée
+  apparaît tout de suite.
+
+**Les cloisons qui ne ferment rien** (revue « Karim »)
+- Le contour d'une pièce met de côté les bouts de mur pendants. Avant, une
+  niche ouverte faisait passer la chambre en surface approchée (« ≈ 11,12
+  m² »).
+- La cloison d'une niche appartient à la pièce qui la contient. Ses 6 dm² de
+  sol sortent de la surface au nu, dès la pose.
+
+**Le placard fermé sans porte** (revue « Karim »). Sous 1,2 m² et sans
+ouverture, un placard se lisait comme une gaine technique : poché en noir et
+hors des surfaces.
+- Le fermer le dit, avec « C'est un placard » pour le compter.
+- Un appui sur un recoin noir propose la même chose.
+- Le placard déclaré reste une pièce à chaque redétection
+  (`RoomEntry.declaree`), et « Annuler » le rend à la gaine.
+
+**Un mur posé au bout d'un autre en fait un coin** (revues « Hugo » et
+« Karim »). Le second pan mangeait une demi-épaisseur au premier : la salle
+d'eau tapée à 1,60 en faisait 1,565, le placard tapé à 1,20 en faisait 1,165.
+Posé à l'équerre au bout libre du mur de départ, le mur neuf le prolonge
+d'une demi-épaisseur. La face intérieure tombe alors à la cote tapée.
+
+**La plaque commune** (revue « Nicolas »). La prise du four se rangeait sous
+la plaque de la crédence, et descendre l'une emportait l'autre. Deux
+appareils ne partagent plus leur plaque que s'ils sont de la même famille :
+prises entre elles, commandes entre elles. Sinon, le nouveau se pose à côté.
+
+**« Redresser » ne fait plus tourner la maison** (revue « Karim »)
+- Un seul mur à 80° tirait la trame du logement de 0,57°, et plus aucun mur
+  ne restait d'aplomb.
+- La trame se vote maintenant en deux tours : au second, seuls les murs à
+  moins de 5° de la première estimation comptent.
+- Un angle tapé dans « Angle du mur » est voulu (`WallSeg.angleVoulu`).
+  « Redresser » ne le remet pas d'équerre, et il ne vote pas pour la trame.
+
+Bancs : `plansconstruits`, `floorplan`, `diagnostiquerleplan`, `bandeaux`.
+
 ## Un seul mur entre deux pièces ; décaler sans tordre ; le tableau projeté juste
 
 La suite de la troisième tournée, du plus gênant au moins gênant.

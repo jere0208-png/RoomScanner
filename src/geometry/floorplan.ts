@@ -75,6 +75,12 @@ export interface WallSeg {
    */
   auNu?: boolean;
   /**
+   * UN ANGLE TAPÉ, PAS UN DÉFAUT DE RELEVÉ — posé par « Angle du mur ».
+   * « Redresser » ne le remet pas d'équerre, et il ne vote pas pour la trame
+   * du logement (revue « Karim »).
+   */
+  angleVoulu?: boolean;
+  /**
    * Ouverture qu'on TRAVERSE : baie sans porte, ou porte détectée ouverte.
    * Elle ne se dessine pas comme un panneau mais comme un vide.
    */
@@ -342,10 +348,27 @@ export function toFootprint(o: ObjectData): ObjectFootprint {
  * Sert au calcul de surface et au sol de la vue 3D.
  */
 export function closedLoop(tous: WallSeg[]): { x: number; z: number }[] | null {
-  // Un éclat de 0 cm sur un coin n'est pas un mur : il ne compte pas.
-  const walls = tous.filter((w) => segLength(w) >= ECLAT);
-  if (walls.length < 3) return null;
   const key = (p: { x: number; z: number }) => `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
+  // Un éclat de 0 cm sur un coin n'est pas un mur : il ne compte pas.
+  let walls = tous.filter((w) => segLength(w) >= ECLAT);
+  /*
+    LES BOUTS PENDANTS NE FONT PAS LE CONTOUR — revues « Karim » et
+    « Camille ». Un retour qui ne ferme rien (une niche ouverte, un mur
+    fantôme accroché au séjour) laissait un coin à trois murs : plus de
+    boucle, la surface devenait « ≈ » et fausse (+9,6 % sur une chambre). On
+    retire ce qui pend, jusqu'à ce que plus rien ne pende ; une pièce
+    vraiment ouverte (un mur manque) n'y gagne rien, elle reste ouverte.
+  */
+  for (;;) {
+    const degre = new Map<string, number>();
+    for (const w of walls) {
+      for (const p of [w.a, w.b]) degre.set(key(p), (degre.get(key(p)) ?? 0) + 1);
+    }
+    const tenus = walls.filter((w) => (degre.get(key(w.a)) ?? 0) > 1 && (degre.get(key(w.b)) ?? 0) > 1);
+    if (tenus.length === walls.length) break;
+    walls = tenus;
+  }
+  if (walls.length < 3) return null;
   const adj = new Map<string, { wallId: string; to: { x: number; z: number } }[]>();
   for (const w of walls) {
     for (const [from, to] of [
@@ -1638,7 +1661,20 @@ function makePart(roomId: string, items: WallSeg[]): RoomPart {
   // Une pièce dessinée se compte au nu : voir `contourAuNu`.
   if (surface?.exact && estDessine(items)) {
     const nu = contourAuNu(surface.pts, items);
-    surface = { ...surface, nu, area: loopAreaM2(nu) };
+    /*
+      LA CLOISON QUI NE FERME RIEN PREND AUSSI SA PLACE AU SOL — revue
+      « Karim » : le retour de 0,60 en 10 cm d'une niche laissait la chambre
+      à 10,20 m², alors que 6 dm² de sol sont sous la cloison. Un mur de la
+      pièce dont le milieu tombe DANS le contour au nu est une cloison
+      intérieure : on retire ce qu'elle couvre.
+    */
+    let area = loopAreaM2(nu);
+    for (const w of items) {
+      if (w.type !== 'wall') continue;
+      if (!dansLeContour({ x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 }, nu)) continue;
+      area -= longueurDedans(w.a, w.b, nu) * epaisseurDe(w);
+    }
+    surface = { ...surface, nu, area: Math.max(area, 0) };
   }
   const centroid = wallsCentroid(items);
   return {
@@ -2634,6 +2670,12 @@ export interface TrouDeReleve {
   wallB: string;
   /** Largeur du manque, en mètres. */
   ecart: number;
+  /**
+   * UN COIN RATÉ, pas une porte manquée : les deux murs ne se suivent pas,
+   * ils devaient se rejoindre ICI. On le ferme en prolongeant chacun
+   * jusqu'à ce point, sans poser de mur.
+   */
+  coin?: Pt;
 }
 
 /**
@@ -2693,7 +2735,35 @@ export function trousDuRelevé(
       // Les deux murs se suivent : leurs axes sont parallèles…
       const ua = A.u;
       const ub = B.u;
-      if (Math.abs(ua.x * ub.x + ua.z * ub.z) < 0.9) continue;
+      if (Math.abs(ua.x * ub.x + ua.z * ub.z) < 0.9) {
+        /*
+          …OU ILS DEVAIENT SE REJOINDRE EN UN COIN — revue « Camille » : un
+          coin raté de seize centimètres (au-delà de la soudure automatique)
+          faisait disparaître un séjour de 27 m², sans aucune alerte. Les
+          deux droites se croisent tout près des deux bouts, devant chacun :
+          c'est un coin à fermer.
+        */
+        if (ecart > 0.6) continue;
+        const den = ua.x * ub.z - ua.z * ub.x;
+        if (Math.abs(den) < 1e-6) continue;
+        const dx = B.p.x - A.p.x;
+        const dz = B.p.z - A.p.z;
+        const s = (dx * ub.z - dz * ub.x) / den;
+        const t = (dx * ua.z - dz * ua.x) / den;
+        if (s < -0.02 || s > 0.5 || t < -0.02 || t > 0.5) continue;
+        const cleCoin = [A.wall.id, B.wall.id].sort().join('|');
+        if (pris.has(cleCoin)) continue;
+        pris.add(cleCoin);
+        out.push({
+          a: { ...A.p },
+          b: { ...B.p },
+          wallA: A.wall.id,
+          wallB: B.wall.id,
+          ecart,
+          coin: { x: A.p.x + ua.x * s, z: A.p.z + ua.z * s },
+        });
+        continue;
+      }
       // …et chacun continue VERS l'autre, sinon ils se tournent le dos.
       const versB = { x: (B.p.x - A.p.x) / ecart, z: (B.p.z - A.p.z) / ecart };
       if (ua.x * versB.x + ua.z * versB.z < 0.9) continue;
@@ -3247,24 +3317,43 @@ export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
  * dire — ils dépendent de l'endroit où le scan a commencé.
  */
 export function planFrameAngle(walls: WallSeg[]): number {
-  let sx = 0;
-  let sy = 0;
-  for (const w of walls) {
-    const len = segLength(w);
-    if (len < 0.2) continue;
-    const a = Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x);
-    // Période de 90° : on quadruple l'angle pour en faire un tour complet,
-    // on moyenne les vecteurs, puis on revient. Un mur et son perpendiculaire
-    // votent ainsi pour la MÊME trame.
-    sx += len * Math.cos(4 * a);
-    sy += len * Math.sin(4 * a);
-  }
-  if (sx === 0 && sy === 0) return 0;
-  let t = Math.atan2(sy, sx) / 4;
   const q = Math.PI / 2;
-  while (t < 0) t += q;
-  while (t >= q) t -= q;
-  return t;
+  /** La trame que votent ces murs, pondérés par leur longueur. */
+  const vote = (garde: (a: number) => boolean): number | null => {
+    let sx = 0;
+    let sy = 0;
+    for (const w of walls) {
+      const len = segLength(w);
+      if (len < 0.2 || w.angleVoulu) continue;
+      const a = Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x);
+      if (!garde(a)) continue;
+      // Période de 90° : on quadruple l'angle pour en faire un tour complet,
+      // on moyenne les vecteurs, puis on revient. Un mur et son perpendiculaire
+      // votent ainsi pour la MÊME trame.
+      sx += len * Math.cos(4 * a);
+      sy += len * Math.sin(4 * a);
+    }
+    if (sx === 0 && sy === 0) return null;
+    let t = Math.atan2(sy, sx) / 4;
+    while (t < 0) t += q;
+    while (t >= q) t -= q;
+    return t;
+  };
+  const brute = vote(() => true);
+  if (brute === null) return 0;
+  /*
+    UN MUR VOLONTAIREMENT DE BIAIS NE VOTE PAS — revue « Karim » : un seul mur
+    à 80° (une chambre trapézoïdale) tirait toute la trame de 0,57°, et
+    « Redresser » faisait tourner la maison : plus un seul mur d'aplomb. Au
+    second tour, seuls votent les murs à moins de 5° de la première trame ;
+    un pan coupé, un mur à 80°, un bow-window n'y comptent plus.
+  */
+  const ecartALaTrame = (a: number) => {
+    let d = (a - brute) % q;
+    if (d < 0) d += q;
+    return Math.min(d, q - d);
+  };
+  return vote((a) => ecartALaTrame(a) < (5 * Math.PI) / 180) ?? brute;
 }
 
 /** Union-find minimal sur des clés de nœud. */
@@ -3334,6 +3423,8 @@ export function straightenWalls(
   const uz = makeUnion();
   const tol = (toleranceDeg * Math.PI) / 180;
   for (const w of walls) {
+    // Un angle tapé reste tel qu'on l'a voulu.
+    if (w.angleVoulu) continue;
     const ka = keyOf(w.a);
     const kb = keyOf(w.b);
     const A = nodes.get(ka)!;
@@ -3868,8 +3959,9 @@ export function massifsTechniques(
   const listes = rooms
     .map((r) => new Set(r.wallIds ?? []))
     .filter((l) => l.size > 0);
+  // Le morceau d'un mur déjà recoupé (`X#1`) se compare aussi tel quel.
   const reclamee = (ids: string[]) =>
-    listes.some((liste) => ids.every((id) => liste.has(id.split('#')[0])));
+    listes.some((liste) => ids.every((id) => liste.has(id) || liste.has(id.split('#')[0])));
   return facesFermees(propres)
     .filter(
       (f) =>
@@ -3914,15 +4006,61 @@ export function detectRooms(
   walls: WallSeg[],
   minArea = 0.5,
   openings: WallSeg[] = [],
+  /**
+   * CE QU'ON A DIT ÊTRE UNE PIÈCE — un point dans chaque recoin déclaré
+   * (« C'est un placard ») : la face qui le contient reste une pièce, sans
+   * porte et si petite soit-elle.
+   */
+  declarees: Pt[] = [],
 ): DetectedRoom[] {
   const ouverts = mursOuverts(walls, openings);
   return facesFermees(walls)
     .filter(
       (f) =>
-        f.area >= minArea &&
-        (f.area >= AIRE_SANS_PORTE || f.wallIds.some((id) => ouverts.has(id))),
+        (f.area > 0.02 && declarees.some((p) => dansLeContour(p, f.outline))) ||
+        (f.area >= minArea &&
+          (f.area >= AIRE_SANS_PORTE || f.wallIds.some((id) => ouverts.has(id)))),
     )
     .sort((a, b) => b.area - a.area);
+}
+
+/** La longueur du segment [a, b] qui passe dans le contour. */
+function longueurDedans(a: Pt, b: Pt, pts: Pt[]): number {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const ts = [0, 1];
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const q = pts[(i + 1) % pts.length];
+    const ex = q.x - p.x;
+    const ez = q.z - p.z;
+    const den = dx * ez - dz * ex;
+    if (Math.abs(den) < 1e-12) continue;
+    const t = ((p.x - a.x) * ez - (p.z - a.z) * ex) / den;
+    const s = ((p.x - a.x) * dz - (p.z - a.z) * dx) / den;
+    if (t > 0 && t < 1 && s >= 0 && s <= 1) ts.push(t);
+  }
+  ts.sort((x, y) => x - y);
+  const len = Math.hypot(dx, dz);
+  let dedans = 0;
+  for (let i = 0; i + 1 < ts.length; i++) {
+    const m = (ts[i] + ts[i + 1]) / 2;
+    if (dansLeContour({ x: a.x + dx * m, z: a.z + dz * m }, pts)) dedans += (ts[i + 1] - ts[i]) * len;
+  }
+  return dedans;
+}
+
+/** Le point est-il dans le contour ? Parité des croisements d'un rayon. */
+function dansLeContour(p: Pt, pts: Pt[]): boolean {
+  let dedans = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i];
+    const b = pts[j];
+    if (a.z > p.z !== b.z > p.z && p.x < ((b.x - a.x) * (p.z - a.z)) / (b.z - a.z) + a.x) {
+      dedans = !dedans;
+    }
+  }
+  return dedans;
 }
 
 // ------------------------------------------- fusion des murs colinéaires

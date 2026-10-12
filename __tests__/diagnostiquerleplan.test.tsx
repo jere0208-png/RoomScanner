@@ -26,6 +26,7 @@ import {
   REMARQUES,
   diagnostiquerPlan,
   dossierDuDiagnostic,
+  pourquoiOuverte,
   rapportDuDiagnostic,
 } from '../src/geometry/diagnosticPlan';
 import type { WallSeg } from '../src/geometry/floorplan';
@@ -88,9 +89,13 @@ describe('pourquoi une pièce ne se ferme pas', () => {
 
   it('une cloison qui bute au milieu d’un mur sans le couper', () => {
     const plan = { ...FERME, walls: [...FERME.walls, mur('c', 2, 0.0, 2, 1.5)] };
-    plan.rooms = [{ id: 'r1', name: 'Séjour', wallIds: ['n', 'e', 's', 'o', 'c'] }];
-    const d = diagnostiquerPlan(plan);
-    expect(d.pieces[0].raisons.join(' ')).toMatch(/bute au milieu/);
+    const ids = ['n', 'e', 's', 'o', 'c'];
+    plan.rooms = [{ id: 'r1', name: 'Séjour', wallIds: ids }];
+    // Elle ne l'empêche plus de se fermer : une cloison qui ne ferme rien
+    // (une niche, un retour) se met de côté pour le contour.
+    expect(diagnostiquerPlan(plan).pieces[0].fermee).toBe(true);
+    // Le constat, lui, se dit toujours quand on demande pourquoi.
+    expect(pourquoiOuverte(plan.walls, ids, new Set(ids)).join(' ')).toMatch(/bute au milieu/);
   });
 
   it('le résumé compte ce que le plan contient', () => {
