@@ -50,7 +50,7 @@ import {
   pushOutOfWalls,
   nearestOnRing,
   snapSideToWalls,
-  roomHeight,
+  hauteurDeLaPiece,
   roomOf,
   roomParts,
   coupeDePiece,
@@ -235,6 +235,11 @@ export interface RoomEntry {
    * reste une pièce à chaque redétection.
    */
   declaree?: boolean;
+  /**
+   * SA HAUTEUR SOUS PLAFOND À ELLE (m) — un faux plafond qui ne touche pas
+   * aux murs partagés avec ses voisines. Voir `hauteurDeLaPiece`.
+   */
+  hauteur?: number;
   /**
    * CE QUE LE SCAN A MESURÉ DE LA PIÈCE, au-delà de ses murs : son plafond
    * relevé au LiDAR (hauteurs, rampant, surface habitable) et la surface de
@@ -3145,6 +3150,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         ...(n === NIVEAU_RDC ? {} : { niveau: n }),
         ...(declaree ? { declaree: true } : {}),
         ...(kept?.peinture ? { peinture: kept.peinture } : {}),
+        ...(kept?.hauteur ? { hauteur: kept.hauteur } : {}),
         ...(kept?.sol ? { sol: kept.sol } : {}),
         ...(accents ? { accents } : {}),
         ...(seule && kept?.releve ? { releve: kept.releve } : {}),
@@ -4359,7 +4365,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       // La garde AVANT le point de reprise : voir `splitRoom`.
       if (!seg) return false;
       pushHistory('splitRoom');
-      const h = roomHeight(part.walls) || 2.5;
+      const h = hauteurDeLaPiece(part) || 2.5;
       const e = saisie.epaisseur;
       const wall: WallSeg = {
         id: `cl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -4417,7 +4423,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         part.surface.pts,
       );
       if (!a || !b) return;
-      const h = roomHeight(part.walls) || 2.5;
+      const h = hauteurDeLaPiece(part) || 2.5;
       const wall: WallSeg = {
         id: `cl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type: 'wall',
@@ -6575,9 +6581,33 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       pushHistory('height');
       const ids = new Set(st.rooms.find((r) => r.id === roomId)?.wallIds ?? []);
-      const walls = st.walls.map((w) =>
-        ids.has(w.id) ? { ...w, height, yCenter: height / 2 } : w,
+      /*
+        UN FAUX PLAFOND RESTE DANS SA PIÈCE — revue « Claire ». Baisser le
+        couloir à 2,60 m abaissait aussi les murs qu'il partage avec le double
+        séjour à 3,20 m. Un mur MITOYEN ne descend pas sous la hauteur de sa
+        voisine : il garde la sienne, et la pièce porte sa hauteur à elle
+        (`hauteur`, lue par `hauteurDeLaPiece`). Ses murs à elle seule suivent.
+      */
+      const mitoyens = new Set(
+        st.rooms.filter((r) => r.id !== roomId).flatMap((r) => (r.wallIds ?? []).filter((id) => ids.has(id))),
       );
+      const walls = st.walls.map((w) => {
+        if (!ids.has(w.id)) return w;
+        if (mitoyens.has(w.id) && w.height > height) return w;
+        return { ...w, height, yCenter: height / 2 };
+      });
+      const rooms = st.rooms.map((r) => {
+        if (r.id !== roomId) return r;
+        const siens = walls.filter((w) => ids.has(w.id));
+        // Tous ses murs à cette hauteur : la pièce n'a pas besoin de la sienne.
+        if (siens.every((w) => Math.abs(w.height - height) < 1e-6)) {
+          if (r.hauteur === undefined) return r;
+          const sans = { ...r };
+          delete sans.hauteur;
+          return sans;
+        }
+        return { ...r, hauteur: height };
+      });
       // Les prises et les menuiseries de CES murs-là suivent leur plafond.
       const suite = rabattreSousLePlafond(
         walls.filter((w) => ids.has(w.id)),
@@ -6585,7 +6615,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         st.openings,
       );
       // (`rabattreSousLePlafond` ne touche que les baies du niveau de chaque mur.)
-      set({ walls, ...suite, dirty: true });
+      set({ walls, rooms, ...suite, dirty: true });
     },
 
     /*
@@ -6623,7 +6653,14 @@ export const useScanStore = create<ScanState>((set, get) => {
       pushHistory('height');
       const walls = st.walls.map((w) => (ici(w) ? { ...w, height, yCenter: height / 2 } : w));
       const suite = rabattreSousLePlafond(walls.filter(ici), st.fixtures, st.openings);
-      set({ walls, ...suite, dirty: true });
+      // Tout le niveau à la même hauteur : les faux plafonds de ses pièces s'effacent.
+      const rooms = st.rooms.map((r) => {
+        if (r.hauteur === undefined || niveauDe(r) !== n) return r;
+        const sans = { ...r };
+        delete sans.hauteur;
+        return sans;
+      });
+      set({ walls, rooms, ...suite, dirty: true });
     },
 
     setWallHeight: (wallId, height) => {

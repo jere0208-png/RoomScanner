@@ -613,6 +613,12 @@ function ToileDuPlan({
   );
 }
 
+/** Un nom de pièce raccourci pour un cartouche serré : huit lettres et « … ». */
+function couperNom(nom: string): string {
+  const lettres = Array.from(nom);
+  return lettres.length <= 9 ? nom : `${lettres.slice(0, 8).join('').trimEnd()}…`;
+}
+
 export function FloorplanEditor({
   showMeasures,
   vueInitiale,
@@ -1825,6 +1831,16 @@ export function FloorplanEditor({
       */
       const variantes = [textes];
       if (textes.length > 2) variantes.push(textes.slice(0, 2));
+      /*
+        LE NOM S'ABRÈGE AVANT QUE LA SURFACE NE PARTE — revue « Hugo » : sur
+        un iPhone SE, une seule pièce sur neuf gardait ses m², et c'est eux
+        qu'une colocation compare. « Chambre Léa » devient « Chambre… », et
+        la surface reste ; elle ne cède qu'en dernier.
+      */
+      const nomCourt = couperNom(roomName);
+      if (textes.length > 1 && textes[0].role === 'nom' && textes[1].role === 'aire' && nomCourt !== roomName) {
+        variantes.push([{ t: nomCourt, role: 'nom' }, textes[1]]);
+      }
       if (textes.length > 1) variantes.push(textes.slice(0, 1));
       const dernier = variantes[variantes.length - 1];
       let retenues = dernier;

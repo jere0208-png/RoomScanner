@@ -18,7 +18,7 @@
  * documents le disent.
  */
 import type { RoomPart } from './floorplan';
-import { roomHeight } from './floorplan';
+import { hauteurDeLaPiece } from './floorplan';
 import type { PlafondDeLaPiece } from './fichePiece';
 import { HAUTEUR_HABITABLE } from './fichePiece';
 
@@ -91,7 +91,7 @@ export function surfacesHabitables(
         plafond.solAuReleve !== undefined ? Math.max(0, plafond.solAuReleve - plafond.surfaceHabitable) : null;
       habitable = basse !== null ? Math.max(0, sol - basse) : Math.min(sol, plafond.surfaceHabitable);
       raison = 'la part sous 1,80 m ne compte pas';
-    } else if ((plafond?.hMax ?? roomHeight(part.walls)) < HAUTEUR_HABITABLE) {
+    } else if ((plafond?.hMax ?? hauteurDeLaPiece(part)) < HAUTEUR_HABITABLE) {
       habitable = 0;
       raison = 'moins de 1,80 m sous plafond';
     } else if (

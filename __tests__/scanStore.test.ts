@@ -12,6 +12,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import type { ObjectData, SurfaceData } from 'react-native-room-scan';
 import {
   roomExtent,
+  hauteurDeLaPiece,
   roomHeight,
   roomParts,
   totalArea,
@@ -320,8 +321,10 @@ describe('retoucher les pièces à la main', () => {
     useScanStore.getState().setRoomHeight('room-2', 2.2);
     const st = useScanStore.getState();
     const parts = roomParts(st.walls, st.rooms);
-    expect(roomHeight(parts[1].walls)).toBeCloseTo(2.2);
-    // Le salon garde la sienne (la cloison est partagée, elle suit la cuisine).
+    // La cuisine porte sa hauteur à elle (revue « Claire » : un faux plafond
+    // reste dans sa pièce).
+    expect(hauteurDeLaPiece(parts[1])).toBeCloseTo(2.2);
+    // Le salon garde la sienne : la cloison partagée ne descend plus.
     expect(roomHeight(parts[0].walls)).toBeCloseTo(2.5);
   });
 

@@ -117,7 +117,7 @@ import {
   roomOf,
   wallQuadsOf,
   roomExtent,
-  roomHeight,
+  hauteurDeLaPiece,
   roomParts,
   segLength,
   totalArea,
@@ -1758,7 +1758,7 @@ export function ResultScreen() {
           area: p.surface?.area ?? null,
           habitable: habitable.pieces.find((x) => x.roomId === p.roomId)?.habitable ?? null,
           perimeter: pts.length > 0 ? tour : null,
-          height: roomHeight(p.walls),
+          height: hauteurDeLaPiece(p),
           walls: p.walls.length,
           // La surface murale de « Travaux » : la même qu'au PDF et à l'écran.
           mursNets: travaux?.murs ?? null,
@@ -2813,7 +2813,7 @@ export function ResultScreen() {
             if (!p) return;
             setLaser({
               nom: 'la hauteur sous plafond',
-              actuelle: roomHeight(p.walls),
+              actuelle: hauteurDeLaPiece(p),
               appliquer: (m: number) => setRoomHeight(roomId, m),
             });
           },
@@ -2904,7 +2904,7 @@ export function ResultScreen() {
     setPrompt({
       title: 'Hauteur sous plafond',
       subtitle: 'Elle sert au volume, aux vues 3D et au métré.',
-      value: roomHeight(targetPart.walls).toFixed(2).replace('.', ','),
+      value: hauteurDeLaPiece(targetPart).toFixed(2).replace('.', ','),
       unit: 'm',
       numeric: true,
       choix: pastilles(HAUTEURS_SOUS_PLAFOND, 'm'),
@@ -5738,7 +5738,7 @@ export function ResultScreen() {
               room={targetRoom}
               surface={targetPart?.surface ?? null}
               extent={targetExtent}
-              hauteur={roomHeight(targetPart?.walls ?? [])}
+              hauteur={targetPart ? hauteurDeLaPiece(targetPart) : 0}
               styles={stylesBarres}
             onFermer={fermerLaCarte}
               onName={() => setNaming(true)}

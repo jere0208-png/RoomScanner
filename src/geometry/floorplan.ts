@@ -1606,6 +1606,8 @@ export function roomSurface(walls: WallSeg[]): RoomSurface | null {
 export interface RoomPart {
   roomId: string;
   walls: WallSeg[];
+  /** Sa hauteur sous plafond à elle, si la pièce en a une (faux plafond). */
+  hauteur?: number;
   surface: RoomSurface | null;
   centroid: Pt;
   /** Où poser le cartouche : au large, jamais dans un mur ni contre lui. */
@@ -1773,6 +1775,11 @@ export interface RoomShape {
   id: string;
   /** Murs qui la bordent. Absent = anciens scans, on retombe sur `roomId`. */
   wallIds?: string[];
+  /**
+   * SA HAUTEUR SOUS PLAFOND À ELLE (m) — un faux plafond. Absente : celle de
+   * ses murs. Voir `hauteurDeLaPiece`.
+   */
+  hauteur?: number;
 }
 
 /**
@@ -1821,7 +1828,8 @@ export function roomParts(walls: WallSeg[], rooms?: RoomShape[]): RoomPart[] {
       ) {
         return garde.part;
       }
-      const part = makePart(r.id, items);
+      const brute = makePart(r.id, items);
+      const part = r.hauteur ? { ...brute, hauteur: r.hauteur } : brute;
       partsGardees.set(r, { items, part });
       return part;
     });
@@ -2143,6 +2151,17 @@ export function wallAreaM2(walls: WallSeg[], openings: WallSeg[]): number {
 export function roomHeight(walls: WallSeg[]): number {
   if (walls.length === 0) return 0;
   return Math.max(...walls.map((w) => w.height));
+}
+
+/**
+ * LA HAUTEUR SOUS PLAFOND D'UNE PIÈCE — la sienne si elle en a une (un faux
+ * plafond), sinon celle de ses murs. Revue « Claire » : un faux plafond à
+ * 2,60 m dans le couloir abaissait les murs qu'il partageait avec le double
+ * séjour (3,20 m) ; l'élévation du séjour disait « sous 2,60 m » et la 3D
+ * laissait un vide de 60 cm. La hauteur est une donnée de la PIÈCE.
+ */
+export function hauteurDeLaPiece(part: { walls: WallSeg[]; hauteur?: number }): number {
+  return part.hauteur ?? roomHeight(part.walls);
 }
 
 /** Barycentre des extrémités de murs : « l'intérieur » de la pièce. */

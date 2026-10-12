@@ -22,7 +22,7 @@
  * face de la cloison, et chacun la perd sur la largeur de la porte.
  */
 import type { Pt, RoomPart, WallSeg } from './floorplan';
-import { roomHeight } from './floorplan';
+import { hauteurDeLaPiece } from './floorplan';
 
 /** Les hypothèses du calcul — dites à l'écran, sous les chiffres. */
 export interface HypothesesTravaux {
@@ -201,7 +201,7 @@ export function travauxDesPieces(
   parts.forEach((part, rang) => {
     const surface = part.surface;
     if (!surface || !(surface.area > 0)) return;
-    const hauteur = roomHeight(part.walls) || HAUTEUR_PAR_DEFAUT;
+    const hauteur = hauteurDeLaPiece(part) || HAUTEUR_PAR_DEFAUT;
     /*
       LE TOUR DE LA PIÈCE, AU NU — revues « Sophie » et « Karim » : compté à
       l'axe des murs, il ajoutait 6 % de peinture et de plinthes (séjour

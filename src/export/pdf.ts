@@ -14,7 +14,7 @@ import type { FloorData, ObjectData } from 'react-native-room-scan';
 import {
   castToWall,
   clampFootprint,
-  roomHeight,
+  hauteurDeLaPiece,
   roomOf,
   roomParts,
   segLength,
@@ -4308,7 +4308,7 @@ function metrePage(
       le tableur prenaient le tour intérieur. Même calcul partout
       (`mursNetsDe`), et le périmètre du contour, comme au tableur.
     */
-    const h = roomHeight(part.walls);
+    const h = hauteurDeLaPiece(part);
     // Au nu des murs quand la pièce l'a — revues « Fatou » et « Claire » : la
     // feuille annonçait le « tour intérieur » et mesurait l'axe (30,2 m pour 28,4).
     const tourInterieur = part.surface ? part.surface.nu ?? part.surface.pts : null;

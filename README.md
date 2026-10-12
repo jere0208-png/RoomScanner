@@ -14285,6 +14285,27 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le faux plafond reste dans sa pièce, le nom s'abrège avant la surface
+
+**La hauteur sous plafond est une donnée de la pièce** (Claire). Un faux
+plafond à 2,60 m dans le couloir d'un haussmannien à 3,20 m abaissait aussi
+les murs que le couloir partage avec le double séjour. L'élévation du
+séjour disait « sous 2,60 m », et la 3D laissait un vide de 60 cm.
+- `setRoomHeight` ne descend plus un mur mitoyen sous la hauteur qu'il
+  a déjà. La pièce porte sa hauteur à elle (`RoomEntry.hauteur`).
+- Cette hauteur est lue par `hauteurDeLaPiece` : métré du PDF et du
+  tableur, travaux, surface habitable, plafond de la 3D, cotes de la
+  pièce.
+- Remontée à la hauteur de ses murs, elle s'efface. « Tout le niveau à… »
+  efface celles du niveau. Elle survit à « Redétecter ».
+
+**Sur un petit écran, le nom s'abrège avant que la surface ne parte**
+(Hugo). Sur un iPhone SE, une seule pièce sur neuf gardait ses m², alors
+que c'est eux qu'une colocation compare. Le cartouche essaie maintenant
+« Chambre… » avec sa surface avant de garder le nom seul.
+
+Banc : `fauxplafond`. `scanStore` suit la hauteur de la pièce.
+
 ## Douze socles par circuit, des différentiels à la surface, l'habitable sous combles
 
 **Les plafonds de la NF C 15-100**, relevés par Mehdi et confirmés par le

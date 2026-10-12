@@ -15,7 +15,7 @@ import {
   pointOnSeg,
   pivotsDesBattants,
   roomOf,
-  roomHeight,
+  hauteurDeLaPiece,
   roomParts,
   toFootprint,
   wallQuads,
@@ -1988,7 +1988,7 @@ export function buildScene(
         sommets pour que la face regarde vers le bas, et la normale le dit
         aussi : c'est elle que lit la règle des faces de dos.
       */
-      const hp = roomHeight(part.walls) || 2.5;
+      const hp = hauteurDeLaPiece(part) || 2.5;
       faces.push({
         pts: [...surface.pts].reverse().map((p) => ({ x: p.x, y: hp, z: p.z })),
         fill: mixHex(pal.wall, '#FFFFFF', 0.35),
