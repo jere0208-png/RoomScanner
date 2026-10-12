@@ -35,6 +35,7 @@ import { RetourGlisse } from '../components/RetourGlisse';
 import { Bouton } from '../components/Bouton';
 import { dark, ombreBouton, radius, themedStyles, useTheme, type Palette } from '../theme';
 import { useScanStore } from '../store/scanStore';
+import { sansPerdreLeReleve } from '../ui/releveInterrompu';
 import { useAccountStore } from '../store/accountStore';
 import { messagesVisibles, useNotifications } from '../store/notifications';
 import type { GenreMessage, Message } from '../net/messages';
@@ -168,7 +169,8 @@ export function NotificationsScreen() {
       return;
     }
     if (a.ecran === 'pro') useAccountStore.getState().ouvrirPaywall();
-    else if (a.ecran === 'exemple') useScanStore.getState().ouvrirExemple();
+    else if (a.ecran === 'exemple')
+      sansPerdreLeReleve(() => useScanStore.getState().ouvrirExemple(), 'L’exemple', 'Voir l’exemple');
     else if (a.ecran === 'bibliotheque') setScreen('library');
     else if (a.ecran === 'profil') setScreen('profil');
   };

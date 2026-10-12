@@ -31,7 +31,7 @@ import { PremierLancement } from './src/components/PremierLancement';
 import { Scene } from './src/components/Scene';
 import { usePremieresFois } from './src/store/premieresFois';
 import { useUsage } from './src/store/usage';
-import { useScanStore } from './src/store/scanStore';
+import { brouillonAuDepart, useScanStore } from './src/store/scanStore';
 import { prendreLaDemande, suiteDuRaccourci } from './src/ui/raccourci';
 import { indexerLesPlans } from './src/ui/spotlight';
 import { astuce } from './src/ui/astuce';
@@ -196,6 +196,10 @@ function Application() {
         // Et la boîte se relit au retour : un message publié pendant que
         // l'app dormait doit allumer la pastille sans relancer l'app.
         useNotifications.getState().rafraichir().catch(() => {});
+      } else {
+        // Un appel, la batterie, iOS qui ferme l'app : le filet s'écrit
+        // maintenant, pas dans trente secondes.
+        brouillonAuDepart();
       }
     });
     return () => {

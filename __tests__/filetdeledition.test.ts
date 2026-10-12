@@ -169,18 +169,25 @@ describe('la reprise', () => {
 });
 
 describe('l’enregistrement replie le filet', () => {
-  it('sur-le-champ, pas au prochain tour de minuterie', () => {
+  it('dès que le plan est écrit, pas au prochain tour de minuterie', async () => {
     /*
       LA FENÊTRE DE TRENTE SECONDES ÉTAIT UN PIÈGE : on enregistre, on ferme
       l'app — et le brouillon d'AVANT l'enregistrement traîne sur le disque.
       Au prochain démarrage, l'accueil propose de « reprendre » un relevé
       déjà rangé, et la reprise fabrique le clone qu'on vient d'éviter.
+
+      MAIS PAS AVANT QUE LE PLAN SOIT ÉCRIT — revue « Agathe » : le filet
+      se repliait six cents millisecondes avant l'écriture du plan, et même
+      quand elle échouait. Il tient jusqu'à l'écriture, puis s'en va.
     */
     useScanStore.getState().openSave('dupont-1');
     retoucher();
     jest.advanceTimersByTime(31000);
     expect(surLeDisque()).not.toBeNull();
     useScanStore.getState().commitCurrent();
+    expect(surLeDisque()).not.toBeNull();
+    jest.advanceTimersByTime(700);
+    for (let i = 0; i < 5; i++) await Promise.resolve();
     expect(surLeDisque()).toBeNull();
   });
 });

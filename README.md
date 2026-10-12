@@ -14285,6 +14285,89 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Deuxième tournée d'utilisateurs : rien ne se perd, les niveaux restent à leur place
+
+Six profils ont parcouru l'application, chacun avec son but : Chloé (premier
+appartement), Lucas (repeindre), Agathe (électricienne sur chantier, sans
+réseau), Marc (électricien, remise aux normes), Inès (architecte
+d'intérieur, maison sur trois niveaux) et Hugo (iPhone 13 sans LiDAR, studio
+dessiné au mètre ruban). Cette livraison corrige d'abord ce qui faisait
+perdre du travail, puis ce qui bloquait le plan dessiné aux cotes.
+
+**Les niveaux ne s'écrasent plus** (revue « Inès », vérifiée sur le vrai
+magasin) :
+- « Redétecter les pièces », « Redresser » et « Scinder » ne travaillent
+  plus que sur le niveau affiché (`redetecterUnNiveau`, `jeuDuNiveau`,
+  `remplacer`). Avant, trois niveaux devenaient une seule pièce au
+  rez-de-chaussée. Les pièces refaites gardent leur niveau, et leurs
+  identifiants le portent (`room-1-2`) ;
+- la cloison de « Scinder » naît au niveau de sa pièce et dans le groupe de
+  ses murs. Sans groupe, le nettoyage recollait le mur coupé, et une pièce
+  dessinée ne se scindait jamais, même au rez-de-chaussée ;
+- une retouche ne touche que son niveau : l'aimant, les voisins entraînés,
+  la trame, les baies qui suivent. Allonger un mur du premier ne déplace
+  plus celui du dessous.
+
+**« Scanner une pièce » ne remplace plus le plan** (revues « Agathe » et
+« Inès »). L'iPhone ne garde ses passages qu'en mémoire : après un
+redémarrage il n'en a plus aucun, et après un autre chantier ce sont ceux de
+cet autre chantier. Le résultat remplaçait pourtant toute la maison.
+Désormais :
+- un relevé scanné porte une clé (`cleDuReleve`, enregistrée avec le plan),
+  et l'app sait de quel relevé et de quel niveau sont les passages de
+  l'iPhone (`passagesNatifs`). Le scan additif ne repart de ces passages que
+  s'ils sont ceux du plan et du niveau à l'écran ; sinon il scanne à neuf ;
+- un passage seul, ou un relevé qui ne retrouve pas au moins la moitié des
+  murs déjà là (`partRecouverte`), ne remplace rien. La pièce s'ajoute à
+  côté du plan, et un bandeau invite à la glisser à sa place ;
+- quand la réunion a lieu, elle ne touche que le niveau affiché. Ce qui a
+  été tracé ou posé à la main (cloison, porte, meuble) reste, et les
+  passages d'un étage gardent leur pré-calage.
+
+**Rien ne s'efface sans vous** (revue « Agathe ») :
+- « Enregistrer » écrit aussi le tableau existant ;
+- le brouillon garde le client, l'adresse et le nord. Un brouillon d'avant
+  les reprend à son dossier ;
+- les modifications d'un plan enregistré n'expirent plus au bout de 12 h :
+  elles attendent qu'on les enregistre ou qu'on les abandonne ;
+- le brouillon ne s'efface qu'une fois le plan écrit sur le disque
+  (`apresEcriture`). Si l'écriture échoue, le plan redevient « à
+  enregistrer » et le bouton revient avec le message ;
+- un scan neuf lancé de l'accueil n'hérite plus des notes, des cotes, du
+  tableau, du devis ni de l'étage du chantier d'avant (`repartirANeuf`) ;
+- « Dessiner », « Voir un exemple », « Lire un plan papier », l'action
+  « exemple » d'une notification et Siri demandent avant de remplacer un
+  relevé interrompu (`sansPerdreLeReleve`) ;
+- le brouillon s'écrit dès que l'app passe en arrière-plan, et un scan en
+  cours se met en pause (un appel, la batterie, iOS qui ferme l'app).
+
+**Le plan dessiné aux cotes** (revue « Hugo ») :
+- un mur dont les deux bouts touchent le plan relit son niveau : la
+  cloison qui referme la salle d'eau la fait apparaître, avec sa surface,
+  sous le même « Annuler » que le tracé ;
+- « Cotes » de la pièce retrouve ses murs par son contour (`mursDeLaPiece`).
+  Elle marchait seulement tant qu'aucune cloison n'était posée ;
+- « Longueur du mur » pose exactement la cote tapée, sans aimant. Le mur
+  d'en bout se décale d'équerre, et le coin de gauche (ou du haut) reste
+  fixe, comme pour « Cotes » ;
+- « Sur mesure » se tape dans la feuille « Ajouter une pièce » : deux
+  champs numériques en mètres, et l'erreur se dit sous le champ
+  (« 600 » : « Vouliez-vous dire 6,00 m ? »). La feuille s'annule, et sur
+  un plan vide elle ne parle plus d'un plan absent ;
+- une ouverture cotée depuis une cloison part du nu de la cloison, et non
+  d'un morceau du même mur dans son prolongement (`retraitDuCoin`) ;
+- « Pièce principale » et « Salle d'eau » sont proposées, et le contrôle des
+  normes reconnaît la salle d'eau quelle que soit l'apostrophe.
+
+Bancs : `niveauxintacts`, `rienneseperd`, `planauxcotes`. `misedecote`
+est mis à jour pour la nouvelle règle des retouches.
+
+**Reste à trancher avec le patron.** Hugo demande que les m² d'un plan
+dessiné soient comptés à l'intérieur des murs, cloisons déduites, pour
+pouvoir les comparer à son bail. C'est la même question que la mesure au
+mètre ruban toujours en attente : le trait du plan est-il l'axe du mur ou sa
+face ?
+
 ## La porte collée à l'angle ne s'enfonce plus dans le mur
 
 Relevé du patron, diagnostic du scan du 12/10 à 08h57 à l'appui : « la porte

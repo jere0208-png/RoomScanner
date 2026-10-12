@@ -73,6 +73,9 @@ import {
   NIVEAU_RDC,
   niveauDe,
   niveauxPresents,
+  filtrerAuNiveau,
+  partRecouverte,
+  estRecouvert,
   murPorteurDe,
   recadrerAuCadre,
   type RoomPart,
@@ -338,6 +341,17 @@ export interface BrouillonScan {
    */
   devis?: DevisEnregistre;
   /**
+   * LE CARTOUCHE ET LE NORD — revue « Agathe » : la reprise d'un relevé
+   * interrompu rendait un client, une adresse et un nord VIDES, et le premier
+   * enregistrement les effaçait du dossier. Le PDF partait sans cartouche.
+   * Absents des brouillons d'avant : on les reprend alors au dossier.
+   */
+  client?: string;
+  address?: string;
+  north?: number;
+  /** Voir `cleDuReleve` : les passages de l'iPhone se reconnaissent après une reprise. */
+  cleDuReleve?: string;
+  /**
    * LE DOSSIER DONT CE BROUILLON EST LA RETOUCHE, s'il en a un.
    *
    * Sans lui, la reprise d'un dossier de bibliothèque renaissait en plan
@@ -426,6 +440,7 @@ export type ContenuDuPlan = Pick<
   | 'modelPath'
   | 'devis'
   | 'existant'
+  | 'cleDuReleve'
 >;
 
 /**
@@ -498,6 +513,13 @@ export interface SavedScan {
    * comme ils l'ont toujours fait.
    */
   devis?: DevisEnregistre;
+  /**
+   * L'IDENTITÉ DU RELEVÉ SCANNÉ, telle que les passages de l'iPhone la
+   * portent (voir `passagesNatifs`). Un dossier rouvert dans la même session
+   * se reconnaît : « Scanner une pièce » y réunit ses passages. Absent des
+   * plans dessinés et des relevés d'avant.
+   */
+  cleDuReleve?: string;
   /** Dossier qui contient ce scan. Absent = à la racine. */
   folderId?: string;
   /**
@@ -566,6 +588,68 @@ function castToOutline(
   }
   if (!isFinite(best)) return null;
   return { x: from.x + dir.x * best, z: from.z + dir.z * best };
+}
+
+/**
+ * REMPLACE UNE TRANCHE D'UNE LISTE, À SA PLACE.
+ *
+ * Un geste fait sur un niveau rend la tranche de ce niveau refaite ; le
+ * reste de la liste ne bouge pas, et la tranche reprend la place qu'elle
+ * avait — un plan de plain-pied garde l'ordre exact d'avant.
+ */
+function remplacer<T>(tout: T[], tranche: T[], neufs: T[]): T[] {
+  if (tranche.length === tout.length) return neufs;
+  const dedans = new Set(tranche);
+  const reste = tout.filter((x) => !dedans.has(x));
+  const i = tout.findIndex((x) => dedans.has(x));
+  const at = i < 0 ? reste.length : tout.slice(0, i).filter((x) => !dedans.has(x)).length;
+  return [...reste.slice(0, at), ...neufs, ...reste.slice(at)];
+}
+
+/** Ce que montre un niveau du plan à l'écran : le filtre du plan lui-même. */
+function jeuDuNiveau(
+  st: Pick<ScanState, 'walls' | 'openings' | 'rooms' | 'fixtures' | 'photos' | 'objects' | 'ceiling'>,
+  n: number,
+) {
+  return filtrerAuNiveau(
+    {
+      walls: st.walls,
+      openings: st.openings,
+      rooms: st.rooms,
+      fixtures: st.fixtures,
+      photos: st.photos,
+      objects: st.objects,
+      ceiling: st.ceiling,
+    },
+    n,
+  );
+}
+
+/**
+ * CE QUI VIENT DU RELEVÉ porte l'identifiant que RoomPlan lui a donné — un
+ * UUID, suffixé quand un étage ou un découpage l'a repris. Ce qui a été
+ * tracé ou posé à la main porte le nôtre (`mur-`, `cl-`, `mb-`…).
+ */
+function duReleve(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(id);
+}
+
+/**
+ * Le groupe (`roomId`) que portent les murs d'une pièce, s'ils en portent un
+ * — celui du plus grand nombre. Une pièce scannée n'en a pas : rien.
+ */
+function groupeDesMurs(murs: { roomId?: string }[]): { roomId?: string } {
+  const compte = new Map<string, number>();
+  for (const w of murs) if (w.roomId) compte.set(w.roomId, (compte.get(w.roomId) ?? 0) + 1);
+  let roomId: string | undefined;
+  let max = 0;
+  for (const [id, k] of compte) if (k > max) [roomId, max] = [id, k];
+  return roomId ? { roomId } : {};
+}
+
+/** Une clé de relevé : unique, courte, sans signification. */
+function nouvelleCle(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 /**
@@ -1100,6 +1184,16 @@ function arreterBrouillon() {
  * appel, et tout était perdu. Exactement le scénario que le brouillon avait
  * été construit pour empêcher.
  */
+/**
+ * LE BROUILLON S'ÉCRIT QUAND L'APP PASSE EN ARRIÈRE-PLAN — revue « Agathe » :
+ * il ne s'écrivait que toutes les trente secondes, et un appel, une batterie
+ * à plat ou iOS qui ferme l'app coûtaient jusqu'à trente secondes de pose.
+ * Seulement quand le filet est armé : un plan ouvert, pas l'accueil.
+ */
+export function brouillonAuDepart(): void {
+  if (draftTimer) useScanStore.getState().ecrireBrouillon();
+}
+
 function armerBrouillon(tick: () => void) {
   arreterBrouillon();
   draftTimer = setInterval(tick, DRAFT_PERIODE);
@@ -1153,9 +1247,31 @@ function estUneCote(v: number): boolean {
   return Number.isFinite(v) && v > 0 && v < 12;
 }
 
+/**
+ * CE QUE L'ÉCRITURE A DONNÉ — revue « Agathe ».
+ *
+ * Le plan se disait enregistré, et le brouillon s'effaçait, AVANT que
+ * l'écriture ait lieu (elle part six cents millisecondes plus tard) — et
+ * même quand elle échouait : disque plein, le message disait « touchez
+ * Enregistrer » sous un bouton déjà disparu, et le filet n'était plus là.
+ * `apresEcriture` dit, une fois sur le disque, si tout ce qui a été demandé
+ * jusqu'ici y est ; `surEchecDEcriture` rend le plan « à enregistrer ».
+ */
+let ecritureEnVol: Promise<boolean> = Promise.resolve(true);
+let enAttenteDEcriture: ((ok: boolean) => void)[] = [];
+let surEchecDEcriture: (id: string) => void = () => {};
+function apresEcriture(): Promise<boolean> {
+  if (persistTimer) return new Promise((r) => enAttenteDEcriture.push(r));
+  return ecritureEnVol;
+}
+
 function persistSoon(saves: SavedScan[]) {
   if (persistTimer) clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
+    persistTimer = null;
+    const attente = enAttenteDEcriture;
+    enAttenteDEcriture = [];
+    const ecritures: Promise<boolean>[] = [];
     try {
       const vus = new Set<string>();
       for (const s of saves) {
@@ -1170,38 +1286,55 @@ function persistSoon(saves: SavedScan[]) {
           continue;
         }
         ecrits.set(s.id, { ref: s, quand: s.updatedAt, empreinte });
-        AsyncStorage.setItem(scanKey(s.id), json).catch((e) => {
-          // Écriture perdue : on oublie ce qu'on croyait avoir écrit, la
-          // prochaine sauvegarde réessaiera — et on le DIT.
-          ecrits.delete(s.id);
-          signalerPanne({
-            quand: Date.now(),
-            message:
-              `« ${s.name} » n'a pas pu être enregistré : ` +
-              `${e?.message ?? 'stockage indisponible'}. ` +
-              'Libérez de la place, puis touchez Enregistrer.',
-          });
-        });
+        ecritures.push(
+          AsyncStorage.setItem(scanKey(s.id), json).then(
+            () => true,
+            (e) => {
+              // Écriture perdue : on oublie ce qu'on croyait avoir écrit, la
+              // prochaine sauvegarde réessaiera — et on le DIT.
+              ecrits.delete(s.id);
+              // « Enregistrer » revient : la consigne du message se suit.
+              surEchecDEcriture(s.id);
+              signalerPanne({
+                quand: Date.now(),
+                message:
+                  `« ${s.name} » n'a pas pu être enregistré : ` +
+                  `${e?.message ?? 'stockage indisponible'}. ` +
+                  'Libérez de la place, puis touchez Enregistrer.',
+              });
+              return false;
+            },
+          ),
+        );
       }
       for (const id of [...ecrits.keys()]) {
         if (vus.has(id)) continue;
         ecrits.delete(id);
         AsyncStorage.removeItem(scanKey(id)).catch(() => {});
       }
-      AsyncStorage.setItem(
-        INDEX_KEY,
-        JSON.stringify(saves.map((s) => s.id)),
-      ).catch((e) => {
-        signalerPanne({
-          quand: Date.now(),
-          message:
-            `La liste des scans n'a pas pu être écrite : ` +
-            `${e?.message ?? 'stockage indisponible'}.`,
-        });
-      });
+      ecritures.push(
+        AsyncStorage.setItem(
+          INDEX_KEY,
+          JSON.stringify(saves.map((s) => s.id)),
+        ).then(
+          () => true,
+          (e) => {
+            signalerPanne({
+              quand: Date.now(),
+              message:
+                `La liste des scans n'a pas pu être écrite : ` +
+                `${e?.message ?? 'stockage indisponible'}.`,
+            });
+            return false;
+          },
+        ),
+      );
     } catch {
       // Un scan illisible ne doit pas emporter les autres.
+      ecritures.push(Promise.resolve(false));
     }
+    ecritureEnVol = Promise.all(ecritures).then((oks) => oks.every(Boolean));
+    ecritureEnVol.then((ok) => attente.forEach((f) => f(ok)));
   }, 600);
 }
 
@@ -1302,6 +1435,26 @@ interface ScanState {
    * une pièce de plus, et l'appareillage déjà posé doit survivre.
    */
   complementEnCours: boolean;
+  /**
+   * L'IDENTITÉ DU RELEVÉ À L'ÉCRAN, côté passages de l'iPhone.
+   *
+   * Revue « Agathe » : « Scanner une pièce » réunissait la pièce du jour aux
+   * passages que l'iPhone gardait EN MÉMOIRE — ceux de la veille avant un
+   * redémarrage (aucun), ceux d'un autre chantier scanné entre-temps. Le
+   * plan ne montrait plus que la pièce neuve, ou les pièces d'un autre
+   * client. Un relevé scanné reçoit une clé ; les passages de l'iPhone
+   * portent celle du relevé qui les a faits (`passagesNatifs`). Seuls des
+   * passages À CE PLAN se réunissent.
+   */
+  cleDuReleve: string | null;
+  /**
+   * Les passages que l'iPhone garde : de quel relevé, de quel niveau, et de
+   * combien ils ont été décalés en entrant dans le plan (le pré-calage d'un
+   * étage). Non persisté : un redémarrage les efface, côté iPhone aussi.
+   */
+  passagesNatifs: { cle: string; niveau: number; dx: number; dz: number } | null;
+  /** Les passages de l'iPhone sont ceux du plan et du niveau à l'écran. */
+  passagesDuPlanOuvert: () => boolean;
   /**
    * L'ÉTAGE qu'on regarde. Le plan, le métré et l'établi ne montrent que
    * lui ; le niveau du dessous s'affiche en filigrane, pour se repérer.
@@ -1428,6 +1581,8 @@ interface ScanState {
   moveRoom: (roomId: string, dx: number, dz: number) => void;
   /** Réunit deux pièces en une : la cloison qui les sépare cesse de les séparer. */
   mergeRooms: (a: string, b: string) => void;
+  /** Oublie le chantier d'avant (voir `reset`) sans changer d'écran : un scan neuf commence. */
+  repartirANeuf: () => void;
   /** Pose une cloison en travers d'une pièce, puis redétecte : elle se scinde. */
   splitRoom: (roomId: string) => void;
   /**
@@ -1436,9 +1591,12 @@ interface ScanState {
    * pièce (rien n'est alors touché, pas même l'historique).
    */
   couperPiece: (roomId: string, saisie: SaisieCoupe) => boolean;
-  /** Relit le graphe des murs et refait la liste des pièces. */
-  redetectRooms: () => void;
-  /** Redresse le plan sur sa propre trame : les angles redeviennent droits. */
+  /**
+   * Relit le graphe des murs et refait la liste des pièces — d'UN niveau,
+   * celui qu'on regarde à défaut d'un autre. Les autres n'en savent rien.
+   */
+  redetectRooms: (niveau?: number) => void;
+  /** Redresse le niveau affiché sur sa propre trame : les angles redeviennent droits. */
   straightenPlan: () => void;
   /** Hauteur sous plafond d'une pièce (applique à tous ses murs). */
   setRoomHeight: (roomId: string, height: number) => void;
@@ -1977,11 +2135,15 @@ interface ScanState {
    * UN PASSAGE DE PLUS, réuni au relevé courant.
    *
    * Le logement se scanne pièce par pièce, et `StructureBuilder` (iOS 17)
-   * aligne les passages : le résultat REMPLACE la géométrie. Mais
-   * l'électricien a pu poser vingt prises entre-temps — les perdre parce
-   * qu'il ajoute une chambre serait pire que tout. On remplace donc les
-   * murs, les ouvertures et les meubles ; on GARDE l'appareillage, le
-   * plafond et les photos, en reprojetant ce qui s'accroche à un mur.
+   * aligne les passages : le résultat REMPLACE la géométrie DU NIVEAU
+   * affiché. Mais l'électricien a pu poser vingt prises entre-temps — les
+   * perdre parce qu'il ajoute une chambre serait pire que tout. On remplace
+   * donc les murs, les ouvertures et les meubles du relevé ; on GARDE
+   * l'appareillage, le plafond, les photos, ce qui a été tracé ou posé à la
+   * main, et les autres niveaux.
+   *
+   * Des passages qui ne sont pas ceux du plan (l'iPhone les a oubliés, ou
+   * ce sont ceux d'un autre) ne remplacent rien : la pièce s'ajoute à côté.
    *
    * Et l'on ne consomme aucun essai : c'est le MÊME plan qu'on complète.
    */
@@ -2364,6 +2526,9 @@ export const useScanStore = create<ScanState>((set, get) => {
     if (p && get().panne) return;
     set({ panne: p });
   };
+  surEchecDEcriture = (id) => {
+    if (get().currentSaveId === id) set({ dirty: true });
+  };
   /**
    * Photographie le plan avant de le modifier. `key` regroupe les appels
    * rapprochés d'un même geste : un glissement de coin ne doit produire
@@ -2600,6 +2765,15 @@ export const useScanStore = create<ScanState>((set, get) => {
       modelPath: st.modelPath,
       // Le chiffrage suit le plan : voir `DevisEnregistre`.
       devis: devisDuPlan(st),
+      /*
+        LE TABLEAU EXISTANT S'ENREGISTRE AVEC LE PLAN — revue « Agathe » :
+        « Enregistrer » sur un plan déjà en bibliothèque (c'est le cas de
+        tout plan scanné) écrivait tout SAUF lui. L'écran disait « Dernière
+        MAJ », le brouillon s'effaçait, et le relevé des départs — ce quart
+        d'heure devant le tableau — manquait à la réouverture.
+      */
+      existant: st.existant ?? undefined,
+      cleDuReleve: st.cleDuReleve ?? undefined,
     };
   };
 
@@ -2630,6 +2804,354 @@ export const useScanStore = create<ScanState>((set, get) => {
   };
 
   /**
+   * LA REDÉTECTION D'UN NIVEAU — et d'un seul.
+   *
+   * Revue « Inès », vérifiée sur le vrai magasin : la redétection nettoyait
+   * et cherchait les pièces sur les murs de TOUS les niveaux mélangés, puis
+   * renumérotait `room-1…` sans niveau. Avec trois niveaux, il ne restait
+   * qu'une pièce, au rez-de-chaussée ; l'étage et la cave perdaient leurs
+   * pièces, leurs surfaces et leurs meubles. Et ce sont précisément les
+   * gestes de correction — « Redétecter », « Redresser », « Scinder ».
+   *
+   * On prend la tranche du niveau (le filtre du plan : murs et pièces à leur
+   * niveau, le reste suit son support), on la refait, et on la remet à sa
+   * place. Les identifiants d'étage portent leur niveau (`room-1-2`), comme
+   * ceux d'un étage scanné.
+   */
+  const redetecterUnNiveau = (n: number, historique = true): boolean => {
+    const st = get();
+    const jeu = jeuDuNiveau(st, n);
+    const olds = roomParts(jeu.walls, jeu.rooms);
+    // Le graphe a pu changer (cloison ajoutée, coin déplacé) : on le
+    // renettoie avant d'y rechercher les faces.
+    const walls = sansEclats(mergeColinear(splitAtJunctions(weldCorners(jeu.walls))), []).walls.map(
+      (w) => (n === NIVEAU_RDC || w.niveau === n ? w : { ...w, niveau: n }),
+    );
+    // Les menuiseries départagent une petite PIÈCE d'une gaine technique :
+    // ce qui s'ouvre est une pièce, si petit soit-il.
+    const shapes = detectRooms(walls, undefined, jeu.openings);
+    if (shapes.length === 0) return false;
+    /*
+      LA GARDE PASSE AVANT LE POINT DE REPRISE.
+
+      `pushHistory` veut dire « retiens l'état d'avant ». Appelé puis suivi
+      d'un renoncement, il laisse dans l'historique un point qui ne
+      correspond à AUCUN changement — et au doigt, cela donne : on touche
+      « Annuler », il ne se passe rien, on touche une seconde fois, et là
+      ça revient en arrière.
+
+      C'est l'un des rares défauts qu'on ne signale jamais, parce qu'on
+      croit avoir mal appuyé. Voir `annulerunefois`.
+
+      Un geste qui a déjà le sien (le mur qui referme une pièce) n'en
+      ajoute pas : un appui sur « Annuler » défait le tout.
+    */
+    if (historique) pushHistory('redetect');
+    const idPiece = (i: number) => (n === NIVEAU_RDC ? `room-${i + 1}` : `room-${n}-${i + 1}`);
+    /**
+     * Le graphe vient d'être recousu : un mur coupé en deux ne garde son
+     * identifiant que sur le premier morceau, un mur fusionné que celui
+     * du plus long. Tout ce qui s'accroche à un mur doit donc être
+     * reporté sur le nouveau jeu, par sa POSITION — sans quoi une prise
+     * de la seconde moitié d'un mur se dessine hors du mur, et une prise
+     * de mur fusionné disparaît de l'écran, des comptages et du métré.
+     */
+    const fixtures = reprojectFixtures(jeu.walls, walls, jeu.fixtures);
+    const photos = reprojectAnchors(jeu.walls, walls, jeu.photos);
+    const floor = jeu.rooms[0]?.floor ?? st.rooms[0]?.floor ?? null;
+    const contours = shapes.map((s) => s.outline);
+    const objects = jeu.objects.map((o) => ({
+      ...o,
+      roomId: idPiece(roomIndexAt({ x: o.transform[12], z: o.transform[14] }, contours)),
+    }));
+    const kinds = shapes.map((_, i) =>
+      deduceRoomKind(
+        objects
+          .filter((o) => o.roomId === idPiece(i))
+          .map((o) => o.category),
+      ),
+    );
+    const auto = nameRooms(kinds);
+    // Les noms donnés à la main survivent : on rattache chaque nouvelle
+    // pièce à l'ancienne dont le point de cartouche tombe dedans.
+    /*
+      QUELLE ANCIENNE PIÈCE DEVIENT QUELLE NOUVELLE : le lien sert deux
+      fois — garder les noms donnés à la main, et REPOSER le plafond. La
+      soudure des coins (`weldCorners`) vient peut-être de tirer un pan de
+      mur de plusieurs centimètres pour refermer un interstice : la pièce
+      s'est recalée, ses spots doivent se recaler du même coup.
+    */
+    const liens = shapes.map((s) =>
+      olds.find((p) => pointInPolygon(p.labelAt, s.outline)),
+    );
+    const rooms: RoomEntry[] = shapes.map((s, i) => {
+      const previous = liens[i];
+      const kept = previous
+        ? jeu.rooms.find((r) => r.id === previous.roomId)
+        : undefined;
+      return {
+        id: idPiece(i),
+        name: kept?.name || auto[i],
+        wallIds: s.wallIds,
+        // Le type relevé par RoomPlan au scan survit au recalcul : les
+        // meubles seuls en savent moins que lui.
+        kind: kept?.kind ?? kinds[i] ?? undefined,
+        floor,
+        ...(n === NIVEAU_RDC ? {} : { niveau: n }),
+      };
+    });
+    // Deux pièces peuvent hériter du même nom : on renumérote les doublons.
+    const seen = new Map<string, number>();
+    for (const r of rooms) {
+      const k = (seen.get(r.name) ?? 0) + 1;
+      seen.set(r.name, k);
+      if (k > 1) r.name = `${r.name} ${k}`;
+    }
+    /*
+      LE PLAFOND SUIT LA RENUMÉROTATION. Les pièces reçoivent de
+      nouveaux identifiants : un point lumineux qui garderait l'ancien
+      deviendrait orphelin — la pièce ressortait « sans point lumineux »
+      avec un DCL au plafond, et « Poser le DCL » en posait un deuxième.
+      Chaque point se rattache à la pièce qui contient son ancrage.
+    */
+    const ceiling = jeu.ceiling.map((cl) => {
+      /*
+        LE POINT SE REPOSE D'ABORD, PUIS SE RATTACHE. Sa pièce d'avant se
+        retrouve par son identifiant, ou à défaut par le polygone qui le
+        contient (les identifiants d'avant la détection) ; sa pièce
+        d'après est celle que le lien désigne. Entre les deux boîtes, il
+        garde sa position relative — le centre reste le centre.
+      */
+      const vieille =
+        olds.find((r) => r.roomId === cl.roomId) ??
+        olds.find((r) => r.surface && pointInPolygon(cl.at, r.surface.pts));
+      const j = vieille ? liens.findIndex((l) => l === vieille) : -1;
+      const at =
+        vieille?.surface && j >= 0
+          ? recadrerAuCadre(cl.at, vieille.surface.pts, shapes[j].outline)
+          : cl.at;
+      return { ...cl, at, roomId: idPiece(roomIndexAt(at, contours)) };
+    });
+    set({
+      walls: remplacer(st.walls, jeu.walls, walls),
+      rooms: remplacer(st.rooms, jeu.rooms, rooms),
+      objects: remplacer(st.objects, jeu.objects, objects),
+      fixtures: remplacer(st.fixtures, jeu.fixtures, fixtures),
+      photos: remplacer(st.photos, jeu.photos, photos),
+      ceiling: remplacer(st.ceiling, jeu.ceiling, ceiling),
+      dirty: true,
+    });
+    return true;
+  };
+
+  /**
+   * UN RELEVÉ QUI S'AJOUTE AU DOSSIER SANS RIEN REMPLACER.
+   *
+   * Deux chemins y mènent : l'ÉTAGE qu'on monte (`finalizeEtage`), pré-calé
+   * centre sur centre sur le niveau du dessous ; et la PIÈCE que l'iPhone ne
+   * sait plus réunir au plan (`finalizeMerge`, passages oubliés ou
+   * étrangers) — elle se pose à droite de ce qui existe, comme une pièce
+   * dessinée, et se glisse ensuite à sa place.
+   *
+   * Deux précautions qui viennent du terrain :
+   *
+   * — les identifiants portent le niveau (`room-1-3`) — et, pour la pièce
+   *   posée à côté, une marque à elle : détectés séparément, deux relevés
+   *   produisaient chacun un « room-1 », le meuble du salon se rattachait à
+   *   la chambre du dessus, et le métré comptait deux fois la même pièce ;
+   *
+   * — l'étage est PRÉ-CALÉ sur celui du dessous. ARKit repart de l'endroit
+   *   où l'on a appuyé sur « Scanner » : après l'escalier, le relevé du haut
+   *   tombe à vingt mètres de celui du bas. On aligne les emprises pour
+   *   partir d'un empilement plausible ; le recalage fin se fait ensuite à
+   *   la main, sur le filigrane.
+   */
+  const empilerUnReleve = (r: ScanResult, n: number, aCote: boolean) => {
+    const st = get();
+    const surfaces = r.rooms?.length
+      ? r.rooms.flatMap((x) => x.surfaces ?? [])
+      : r.surfaces ?? [];
+    const entrants = r.rooms?.length
+      ? r.rooms.flatMap((x) => x.objects ?? [])
+      : r.objects ?? [];
+    // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR.
+    const segments = avecCoffresDuLidar(surfaces.map((s) => toSegment(s)), r.dessus);
+    const bruts = sansEclats(
+      mergeColinear(
+        splitAtJunctions(
+          weldCorners(
+            fusionnerMursDoubles(segments.filter((s) => s.type === 'wall')),
+          ),
+        ),
+      ),
+      [],
+    ).walls;
+    if (bruts.length === 0) {
+      set({ processing: false, scanning: false, etageEnCours: null });
+      return;
+    }
+    const ouverturesBrutes = segments.filter((s) => s.type !== 'wall');
+
+    const emprise = (ws: WallSeg[]) => {
+      const xs = ws.flatMap((w) => [w.a.x, w.b.x]);
+      const zs = ws.flatMap((w) => [w.a.z, w.b.z]);
+      return { x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs) };
+    };
+    const venu = emprise(bruts);
+    let dx = 0;
+    let dz = 0;
+    if (aCote) {
+      /* À droite du niveau, un demi-mètre plus loin, alignée sur son haut. */
+      const ici = st.walls.filter((w) => niveauDe(w) === n);
+      if (ici.length > 0) {
+        const e = emprise(ici);
+        dx = e.x1 + 0.5 - venu.x0;
+        dz = e.z0 - venu.z0;
+      }
+    } else {
+      /* Le pré-calage : les deux emprises, centre sur centre. */
+      const dessous = st.walls.filter((w) => niveauDe(w) === n - 1);
+      const reference = dessous.length > 0 ? dessous : st.walls;
+      if (reference.length > 0) {
+        const cible = emprise(reference);
+        dx = (cible.x0 + cible.x1) / 2 - (venu.x0 + venu.x1) / 2;
+        dz = (cible.z0 + cible.z1) / 2 - (venu.z0 + venu.z1) / 2;
+      }
+    }
+    const marque = aCote ? `p${Date.now().toString(36)}` : `n${n}`;
+    const pose = <T extends WallSeg>(ws: T[]): T[] =>
+      ws.map((w) => ({
+        ...w,
+        id: `${w.id}-${marque}`,
+        a: { x: w.a.x + dx, z: w.a.z + dz },
+        b: { x: w.b.x + dx, z: w.b.z + dz },
+        niveau: n,
+      }));
+    const walls = pose(bruts);
+    const openings = baiesHorsDesAngles(baiesVitrees(pose(ouverturesBrutes), walls), walls);
+
+    const detected = detectRooms(walls, undefined, openings);
+    const shapes =
+      detected.length > 0
+        ? detected
+        : [{ outline: [], wallIds: walls.map((w) => w.id), area: 0 }];
+    const idPiece = (i: number) => (aCote ? `room-${n}-${marque}-${i + 1}` : `room-${n}-${i + 1}`);
+
+    const objects: ObjectData[] = calerLesMeubles(orienterLesSieges(
+      separerLeMobilier(
+        // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
+        reunirLesCanapesDAngle(entrants).map((o) => {
+          const t = [...o.transform];
+          t[12] += dx;
+          t[14] += dz;
+          return {
+            ...o,
+            id: `${o.id}-${marque}`,
+            transform: t,
+            roomId: idPiece(
+              roomIndexAt(
+                { x: t[12], z: t[14] },
+                shapes.map((s) => s.outline),
+              ),
+            ),
+          };
+        }),
+      ),
+      walls,
+    ), walls);
+    const kinds = shapes.map((sh, i) =>
+      deduireLaPiece(
+        // Les sections arrivent brutes : elles se décalent comme les murs.
+        (r.sections ?? [])
+          .filter(
+            (x) => sh.outline.length >= 3 && pointInPolygon({ x: x.x + dx, z: x.z + dz }, sh.outline),
+          )
+          .map((x) => x.label),
+        objects
+          .filter((o) => o.roomId === idPiece(i))
+          .map((o) => o.category),
+      ),
+    );
+    const noms = nameRooms(kinds);
+    const pieces: RoomEntry[] = shapes.map((s, i) => ({
+      id: idPiece(i),
+      name: noms[i],
+      wallIds: s.wallIds,
+      kind: kinds[i] ?? undefined,
+      floor: r.floor ?? r.rooms?.[0]?.floor ?? null,
+      niveau: n,
+    }));
+
+    /* Ce que le viseur a posé pendant le relevé arrive avec lui. */
+    const vise = ancrerElec(
+      r.elec ?? [],
+      walls,
+      pieces.map((x, i) => ({ id: x.id, outline: shapes[i]?.outline })),
+      (prefixe, k) => `${prefixe}-${Date.now().toString(36)}-${marque}-${k}`,
+    );
+
+    const cleDuPlan = st.cleDuReleve ?? nouvelleCle();
+    pushHistory(aCote ? 'completerReleve' : 'ajouterEtage');
+    set({
+      walls: [...st.walls, ...walls],
+      openings: [...st.openings, ...openings],
+      rooms: [...st.rooms, ...pieces],
+      objects: [...st.objects, ...objects],
+      fixtures: [...st.fixtures, ...vise.fixtures],
+      ceiling: [...st.ceiling, ...vise.ceiling],
+      photos: [
+        ...st.photos,
+        ...photosDesMurs(r.photosMurs ?? [], surfaces, walls, { decalage: { dx, dz } }),
+      ],
+      // On travaille au niveau qu'on vient de relever, pas à celui qu'on a
+      // quitté.
+      niveauCourant: n,
+      etageEnCours: null,
+      processing: false,
+      scanning: false,
+      screen: 'result',
+      planVierge: false,
+      dirty: true,
+      cleDuReleve: cleDuPlan,
+      /*
+        LES PASSAGES QUE GARDE L'IPHONE sont désormais ceux de cet étage,
+        dans leur repère brut : un passage de plus y sera décalé du même
+        pré-calage. La pièce posée à côté n'a pas de place sûre — le
+        passage suivant repartira à neuf.
+      */
+      passagesNatifs: aCote ? null : { cle: cleDuPlan, niveau: n, dx, dz },
+    });
+    if (aCote) {
+      astuce(
+        'L’iPhone n’avait plus les passages de ce plan : la pièce est posée à côté. Glissez-la à sa place.',
+        { icone: 'rooms' },
+      );
+    }
+  };
+
+  /**
+   * LES MURS D'UNE PIÈCE — son contour d'abord, l'étiquette ensuite.
+   *
+   * Revue « Hugo » : « Cotes » de la pièce ne faisait plus rien dès qu'une
+   * cloison était posée. Les gestes cherchaient les murs par l'étiquette
+   * posée à la création (`roomId`) ; la redétection renomme les pièces
+   * sans réécrire les murs, la cloison hérite de l'étiquette du studio, et
+   * la pièce accolée partage un mur qui n'est pas « à elle ». Le contour
+   * (`wallIds`) est ce que l'écran montre, et ce que le bouton « Cotes »
+   * regarde déjà : le magasin regarde la même chose.
+   */
+  const mursDeLaPiece = (roomId: string): WallSeg[] => {
+    const st = get();
+    const piece = st.rooms.find((r) => r.id === roomId);
+    if (piece?.wallIds?.length) {
+      const ids = new Set(piece.wallIds);
+      const contour = st.walls.filter((w) => ids.has(w.id));
+      if (contour.length > 0) return contour;
+    }
+    return st.walls.filter((w) => w.roomId === roomId);
+  };
+
+  /**
    * REPOSE UNE PIECE RECTANGULAIRE a de nouvelles cotes.
    *
    * Le fond commun de deux gestes : taper « 5,18 x 4,05 » dans le
@@ -2646,7 +3168,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     cle: string,
   ) => {
       const st = get();
-      const murs = st.walls.filter((w) => w.roomId === roomId);
+      const murs = mursDeLaPiece(roomId);
       if (murs.length !== 4) return;
       // Une cote nulle ou négative n'est pas une intention, c'est une
       // saisie ratée : on ne la borne pas, on l'ignore.
@@ -2843,6 +3365,13 @@ export const useScanStore = create<ScanState>((set, get) => {
     murDouteux: null,
     trouContour: 0,
     complementEnCours: false,
+    cleDuReleve: null,
+    passagesNatifs: null,
+    passagesDuPlanOuvert: () => {
+      const st = get();
+      const p = st.passagesNatifs;
+      return !!p && !!st.cleDuReleve && p.cle === st.cleDuReleve && p.niveau === st.niveauCourant;
+    },
     wallCount: 0,
     objectCount: 0,
     doorCount: 0,
@@ -3487,12 +4016,14 @@ export const useScanStore = create<ScanState>((set, get) => {
         height: h,
         yCenter: h / 2,
         niveau: part.walls[0]?.niveau,
+        // Le groupe de ses murs : voir `splitRoom`.
+        ...groupeDesMurs(part.walls),
         ...(Math.abs(e - WALL_T) > 1e-6
           ? { epaisseur: Math.min(Math.max(e, 0.03), 0.6) }
           : {}),
       };
       set({ walls: [...st.walls, wall], dirty: true });
-      get().redetectRooms();
+      get().redetectRooms(niveauDe(wall));
       return true;
     },
 
@@ -3534,17 +4065,37 @@ export const useScanStore = create<ScanState>((set, get) => {
         b,
         height: h,
         yCenter: h / 2,
+        // À L'ÉTAGE DE LA PIÈCE — revue « Inès » : sans niveau, la cloison
+        // d'une chambre du premier tombait au rez-de-chaussée.
+        niveau: part.walls[0]?.niveau,
+        /*
+          ET DANS LE GROUPE DE SES MURS. La redétection recoud les murs
+          alignés groupe par groupe (`mergeColinear`) : une cloison sans
+          groupe, posée dans une pièce DESSINÉE (dont les murs en ont un),
+          ne comptait pas comme un bras au nœud — le mur coupé se recollait,
+          et la pièce ne se scindait jamais. Seules les pièces scannées, sans
+          groupe, le faisaient.
+        */
+        ...groupeDesMurs(part.walls),
       };
       set({ walls: [...st.walls, wall], dirty: true });
-      get().redetectRooms();
+      get().redetectRooms(niveauDe(wall));
     },
 
     straightenPlan: () => {
       const st = get();
+      /*
+        LE NIVEAU AFFICHÉ, ET LUI SEUL — revue « Inès » : redresser la maison
+        entière cherchait UNE trame pour trois niveaux relevés à trois caps
+        différents, et la redétection qui suit mêlait leurs murs.
+      */
+      const n = st.niveauCourant;
+      const jeu = jeuDuNiveau(st, n);
+      if (jeu.walls.length === 0) return;
       // Même clé que la redétection qui suit : les deux ne comptent que pour
       // une annulation, l'utilisateur n'a fait qu'un geste.
       pushHistory('redetect');
-      const droits = straightenWalls(st.walls);
+      const droits = straightenWalls(jeu.walls);
       /*
         LE PLAFOND PREND LE MÊME BLOC QUE SA PIÈCE — relevé du patron :
         « au redressage d'une pièce, les spots se décentrent ». Un spot est
@@ -3552,139 +4103,35 @@ export const useScanStore = create<ScanState>((set, get) => {
         recale les murs, il garde sa position relative dans la boîte —
         `recadrerAuCadre`.
       */
-      const avantParts = roomParts(st.walls, st.rooms);
-      const apresParts = roomParts(droits, st.rooms);
+      const avantParts = roomParts(jeu.walls, jeu.rooms);
+      const apresParts = roomParts(droits, jeu.rooms);
       const cadreDe = (parts: RoomPart[], roomId: string) =>
         parts.find((r) => r.roomId === roomId)?.surface?.pts;
       set({
-        walls: droits,
+        walls: remplacer(st.walls, jeu.walls, droits),
         // Les portes et fenêtres suivent leur mur : sans ça elles restaient
         // sur place, décalées, et le rendu ne les rattachait plus.
-        openings: reprojectOpenings(st.walls, droits, st.openings),
+        openings: remplacer(st.openings, jeu.openings, reprojectOpenings(jeu.walls, droits, jeu.openings)),
         // L'appareillage et les photos aussi : ils sont accrochés à un
         // identifiant de mur, et le redressement le change.
-        fixtures: reprojectFixtures(st.walls, droits, st.fixtures),
-        photos: reprojectAnchors(st.walls, droits, st.photos),
-        ceiling: st.ceiling.map((cl) => {
-          const v = cadreDe(avantParts, cl.roomId);
-          const n = cadreDe(apresParts, cl.roomId);
-          return v && n ? { ...cl, at: recadrerAuCadre(cl.at, v, n) } : cl;
-        }),
+        fixtures: remplacer(st.fixtures, jeu.fixtures, reprojectFixtures(jeu.walls, droits, jeu.fixtures)),
+        photos: remplacer(st.photos, jeu.photos, reprojectAnchors(jeu.walls, droits, jeu.photos)),
+        ceiling: remplacer(
+          st.ceiling,
+          jeu.ceiling,
+          jeu.ceiling.map((cl) => {
+            const v = cadreDe(avantParts, cl.roomId);
+            const nv = cadreDe(apresParts, cl.roomId);
+            return v && nv ? { ...cl, at: recadrerAuCadre(cl.at, v, nv) } : cl;
+          }),
+        ),
         dirty: true,
       });
-      get().redetectRooms();
+      get().redetectRooms(n);
     },
 
-    redetectRooms: () => {
-      const st = get();
-      const olds = roomParts(st.walls, st.rooms);
-      // Le graphe a pu changer (cloison ajoutée, coin déplacé) : on le
-      // renettoie avant d'y rechercher les faces.
-      const walls = sansEclats(mergeColinear(splitAtJunctions(weldCorners(st.walls))), []).walls;
-      // Les menuiseries départagent une petite PIÈCE d'une gaine technique :
-      // ce qui s'ouvre est une pièce, si petit soit-il.
-      const shapes = detectRooms(walls, undefined, st.openings);
-      if (shapes.length === 0) return;
-      /*
-        LA GARDE PASSE AVANT LE POINT DE REPRISE.
-
-        `pushHistory` veut dire « retiens l'état d'avant ». Appelé puis suivi
-        d'un renoncement, il laisse dans l'historique un point qui ne
-        correspond à AUCUN changement — et au doigt, cela donne : on touche
-        « Annuler », il ne se passe rien, on touche une seconde fois, et là
-        ça revient en arrière.
-
-        C'est l'un des rares défauts qu'on ne signale jamais, parce qu'on
-        croit avoir mal appuyé. Voir `annulerunefois`.
-      */
-      pushHistory('redetect');
-      /**
-       * Le graphe vient d'être recousu : un mur coupé en deux ne garde son
-       * identifiant que sur le premier morceau, un mur fusionné que celui
-       * du plus long. Tout ce qui s'accroche à un mur doit donc être
-       * reporté sur le nouveau jeu, par sa POSITION — sans quoi une prise
-       * de la seconde moitié d'un mur se dessine hors du mur, et une prise
-       * de mur fusionné disparaît de l'écran, des comptages et du métré.
-       */
-      const fixtures = reprojectFixtures(st.walls, walls, st.fixtures);
-      const photos = reprojectAnchors(st.walls, walls, st.photos);
-      const floor = st.rooms[0]?.floor ?? null;
-      const objects = st.objects.map((o) => ({
-        ...o,
-        roomId: `room-${roomIndexAt(
-          { x: o.transform[12], z: o.transform[14] },
-          shapes.map((s) => s.outline),
-        ) + 1}`,
-      }));
-      const kinds = shapes.map((_, i) =>
-        deduceRoomKind(
-          objects
-            .filter((o) => o.roomId === `room-${i + 1}`)
-            .map((o) => o.category),
-        ),
-      );
-      const auto = nameRooms(kinds);
-      // Les noms donnés à la main survivent : on rattache chaque nouvelle
-      // pièce à l'ancienne dont le point de cartouche tombe dedans.
-      /*
-        QUELLE ANCIENNE PIÈCE DEVIENT QUELLE NOUVELLE : le lien sert deux
-        fois — garder les noms donnés à la main, et REPOSER le plafond. La
-        soudure des coins (`weldCorners`) vient peut-être de tirer un pan de
-        mur de plusieurs centimètres pour refermer un interstice : la pièce
-        s'est recalée, ses spots doivent se recaler du même coup.
-      */
-      const liens = shapes.map((s) =>
-        olds.find((p) => pointInPolygon(p.labelAt, s.outline)),
-      );
-      const rooms: RoomEntry[] = shapes.map((s, i) => {
-        const previous = liens[i];
-        const kept = previous
-          ? st.rooms.find((r) => r.id === previous.roomId)
-          : undefined;
-        return {
-          id: `room-${i + 1}`,
-          name: kept?.name || auto[i],
-          wallIds: s.wallIds,
-          // Le type relevé par RoomPlan au scan survit au recalcul : les
-          // meubles seuls en savent moins que lui.
-          kind: kept?.kind ?? kinds[i] ?? undefined,
-          floor,
-        };
-      });
-      // Deux pièces peuvent hériter du même nom : on renumérote les doublons.
-      const seen = new Map<string, number>();
-      for (const r of rooms) {
-        const n = (seen.get(r.name) ?? 0) + 1;
-        seen.set(r.name, n);
-        if (n > 1) r.name = `${r.name} ${n}`;
-      }
-      /*
-        LE PLAFOND SUIT LA RENUMÉROTATION. Les pièces reçoivent de
-        nouveaux identifiants : un point lumineux qui garderait l'ancien
-        deviendrait orphelin — la pièce ressortait « sans point lumineux »
-        avec un DCL au plafond, et « Poser le DCL » en posait un deuxième.
-        Chaque point se rattache à la pièce qui contient son ancrage.
-      */
-      const ceiling = st.ceiling.map((cl) => {
-        /*
-          LE POINT SE REPOSE D'ABORD, PUIS SE RATTACHE. Sa pièce d'avant se
-          retrouve par son identifiant, ou à défaut par le polygone qui le
-          contient (les identifiants d'avant la détection) ; sa pièce
-          d'après est celle que le lien désigne. Entre les deux boîtes, il
-          garde sa position relative — le centre reste le centre.
-        */
-        const vieille =
-          olds.find((r) => r.roomId === cl.roomId) ??
-          olds.find((r) => r.surface && pointInPolygon(cl.at, r.surface.pts));
-        const j = vieille ? liens.findIndex((l) => l === vieille) : -1;
-        const at =
-          vieille?.surface && j >= 0
-            ? recadrerAuCadre(cl.at, vieille.surface.pts, shapes[j].outline)
-            : cl.at;
-        const idx = roomIndexAt(at, shapes.map((s) => s.outline));
-        return { ...cl, at, roomId: `room-${idx + 1}` };
-      });
-      set({ walls, rooms, objects, fixtures, photos, ceiling, dirty: true });
+    redetectRooms: (niveau) => {
+      redetecterUnNiveau(niveau ?? get().niveauCourant);
     },
 
     /*
@@ -3734,7 +4181,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       deplacement, pas un etirement.
     */
     resizeRoomSide: (roomId, cote, distance, depuis) => {
-      const murs = get().walls.filter((w) => w.roomId === roomId);
+      const murs = mursDeLaPiece(roomId);
       if (murs.length !== 4) return;
       const xs = murs.flatMap((w) => [w.a.x, w.b.x]);
       const zs = murs.flatMap((w) => [w.a.z, w.b.z]);
@@ -3767,7 +4214,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     duplicateRoom: (roomId) => {
       const st = get();
       const source = st.rooms.find((r) => r.id === roomId);
-      const mursSource = st.walls.filter((w) => w.roomId === roomId);
+      const mursSource = mursDeLaPiece(roomId);
       if (!source || mursSource.length === 0) return null;
 
       /*
@@ -3945,6 +4392,15 @@ export const useScanStore = create<ScanState>((set, get) => {
       const h = depart?.height ?? st.walls[0]?.height ?? 2.5;
       const id = `mur-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       const e = opts?.epaisseur;
+      const n = depart ? niveauDe(depart) : st.niveauCourant;
+      /** Les murs de son niveau que touche ce bout. */
+      const touche = (p: Pt) =>
+        st.walls.filter(
+          (w) => w.type === 'wall' && niveauDe(w) === n && pointOnSeg(p, w.a, w.b).dist < 0.08,
+        );
+      const auxBouts = [...touche(a), ...touche(b)];
+      // Sans mur de départ, le groupe de ce qu'il touche : voir `splitRoom`.
+      const groupe = depart?.roomId ? { roomId: depart.roomId } : groupeDesMurs(auxBouts);
       set({
         walls: [
           ...st.walls,
@@ -3957,7 +4413,7 @@ export const useScanStore = create<ScanState>((set, get) => {
             yCenter: h / 2,
             // Il naît à l'étage où l'on travaille : voir `addRoomBox`.
             niveau: depart?.niveau ?? st.niveauCourant,
-            ...(depart?.roomId ? { roomId: depart.roomId } : {}),
+            ...groupe,
             ...(e && e > 0 && Math.abs(e - WALL_T) > 1e-6
               ? { epaisseur: Math.min(Math.max(e, 0.03), 0.6) }
               : {}),
@@ -3965,7 +4421,41 @@ export const useScanStore = create<ScanState>((set, get) => {
         ],
         dirty: true,
       });
-      return id;
+      /*
+        LE MUR QUI REFERME UNE PIÈCE LA FAIT APPARAÎTRE — revue « Hugo » :
+        les deux pans de la cloison de sa salle d'eau posés, le plan disait
+        toujours « 1 pièce, 24,0 m² ». Il fallait deviner « … » puis
+        « Redétecter les pièces », et rien ne le suggérait.
+
+        Un mur dont les DEUX bouts touchent le plan peut refermer une pièce :
+        on relit son niveau, sous le même « Annuler » que le tracé, et on
+        dit ce qui est apparu.
+      */
+      if (touche(a).length === 0 || touche(b).length === 0) return id;
+      const avant = st.rooms.filter((r) => niveauDe(r) === n).length;
+      if (!redetecterUnNiveau(n, false)) return id;
+      const s = get();
+      // Recousu, le mur a pu changer de nom : c'est celui qui porte son milieu.
+      const milieu = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+      const lui =
+        s.walls.find((w) => w.id === id) ??
+        s.walls.find((w) => niveauDe(w) === n && pointOnSeg(milieu, w.a, w.b).dist < 0.01);
+      if (s.rooms.filter((r) => niveauDe(r) === n).length > avant && lui) {
+        const bordees = roomParts(s.walls, s.rooms).filter(
+          (p) => p.surface && s.rooms.find((r) => r.id === p.roomId)?.wallIds?.includes(lui.id),
+        );
+        const neuve = bordees.reduce<RoomPart | null>(
+          (m, p) => (!m || p.surface!.area < m.surface!.area ? p : m),
+          null,
+        );
+        if (neuve?.surface) {
+          astuce(
+            `Nouvelle pièce : ${neuve.surface.area.toFixed(1).replace('.', ',')} m². Touchez-la pour la nommer.`,
+            { icone: 'rooms' },
+          );
+        }
+      }
+      return lui?.id ?? id;
     },
 
     setEpaisseurMur: (id, epaisseur) => {
@@ -5453,21 +5943,34 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     finalizeMerge: (r) => {
       const st = get();
+      const n = st.niveauCourant;
       const surfaces = r.rooms?.length
         ? r.rooms.flatMap((x) => x.surfaces ?? [])
         : r.surfaces ?? [];
       const entrants = r.rooms?.length
         ? r.rooms.flatMap((x) => x.objects ?? [])
         : r.objects ?? [];
+      /*
+        LE REPÈRE DES PASSAGES. Ceux d'un étage sont entrés dans le plan
+        décalés du pré-calage (voir `empilerUnReleve`) : le passage de plus,
+        rendu dans le repère brut de l'iPhone, prend le même décalage.
+      */
+      const cale = st.passagesNatifs?.niveau === n ? st.passagesNatifs : null;
+      const dx = cale?.dx ?? 0;
+      const dz = cale?.dz ?? 0;
+      const decaler = <T extends WallSeg>(w: T): T =>
+        dx === 0 && dz === 0
+          ? w
+          : { ...w, a: { x: w.a.x + dx, z: w.a.z + dz }, b: { x: w.b.x + dx, z: w.b.z + dz } };
       // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR.
-      const segments = avecCoffresDuLidar(surfaces.map((x) => toSegment(x)), r.dessus);
+      const segments = avecCoffresDuLidar(surfaces.map((x) => toSegment(x)), r.dessus).map(decaler);
       /*
         LA CLOISON MITOYENNE EST VUE DEUX FOIS — une fois depuis chaque
         pièce. Sans les réunir, chaque arête doublée fausse le parcours des
         faces, et le logement ressort en une seule pièce, ou en aucune.
       */
       // Les éclats de 0 cm que la soudure des coins laisse s'en vont (voir `ECLAT`).
-      const walls = sansEclats(
+      const venus = sansEclats(
         mergeColinear(
           splitAtJunctions(
             weldCorners(
@@ -5477,11 +5980,61 @@ export const useScanStore = create<ScanState>((set, get) => {
         ),
         [],
       ).walls;
-      if (walls.length === 0) return;
+      if (venus.length === 0) {
+        // Rien d'exploitable : on rend le plan tel qu'il était.
+        set({ processing: false, scanning: false, screen: 'result' });
+        return;
+      }
+      const jeu = jeuDuNiveau(st, n);
+      /*
+        CES PASSAGES SONT-ILS CEUX DU PLAN ? — revues « Agathe » et « Inès ».
+
+        L'iPhone ne garde ses passages qu'en mémoire : après un redémarrage,
+        il n'en a plus aucun, et le relevé ne rend que la pièce du jour ;
+        après un autre chantier, ce sont les siens. Le résultat REMPLAÇAIT
+        quand même le plan : trois pièces disparues, les prises entassées
+        sur les murs de la seule pièce neuve, et l'enregistrement automatique
+        partait une seconde et demie plus tard.
+
+        Un passage seul, ou un relevé qui ne retrouve pas les murs déjà là,
+        ne remplace rien : la pièce s'ajoute à côté.
+      */
+      if ((r.passages ?? 2) < 2 || partRecouverte(jeu.walls, venus) < 0.5) {
+        empilerUnReleve(r, n, true);
+        return;
+      }
+      /*
+        CE QUI A ÉTÉ TRACÉ OU POSÉ À LA MAIN RESTE. Le relevé remplace ce
+        qu'il a vu — ses murs, ses baies, ses meubles, qui portent les
+        identifiants de RoomPlan — pas la cloison qu'on a dessinée, la
+        porte qu'il avait manquée, le canapé qu'on a posé.
+      */
+      const idsVenus = new Set(venus.map((w) => w.id));
+      const tracesALaMain = jeu.walls.filter(
+        (w) => !duReleve(w.id) && !idsVenus.has(w.id) && !estRecouvert(w, venus),
+      );
+      const auNiveau = <T extends WallSeg>(w: T): T =>
+        n === NIVEAU_RDC || w.niveau === n ? w : { ...w, niveau: n };
+      const walls = (
+        tracesALaMain.length > 0
+          ? sansEclats(mergeColinear(splitAtJunctions(weldCorners([...venus, ...tracesALaMain]))), []).walls
+          : venus
+      ).map(auNiveau);
       // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`),
       // et la porte collée à l'angle, dégagée du mur d'angle (voir
       // `baiesHorsDesAngles`).
-      const openings = baiesHorsDesAngles(baiesVitrees(segments.filter((x) => x.type !== 'wall'), walls), walls);
+      const baiesVenues = baiesHorsDesAngles(baiesVitrees(segments.filter((x) => x.type !== 'wall'), walls), walls);
+      const milieu = (o: WallSeg) => ({ x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 });
+      const baiesALaMain = jeu.openings.filter(
+        (o) =>
+          !duReleve(o.id) &&
+          !baiesVenues.some((v) => {
+            const p = milieu(v);
+            const q = milieu(o);
+            return Math.hypot(p.x - q.x, p.z - q.z) < 0.4;
+          }),
+      );
+      const openings = [...baiesVenues, ...baiesALaMain].map(auNiveau);
       pushHistory('completerReleve');
 
       const detected = detectRooms(walls, undefined, openings);
@@ -5489,6 +6042,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         detected.length > 0
           ? detected
           : [{ outline: [], wallIds: walls.map((w) => w.id), area: 0 }];
+      const contours = shapes.map((x) => x.outline);
+      const idPiece = (i: number) => (n === NIVEAU_RDC ? `room-${i + 1}` : `room-${n}-${i + 1}`);
 
       /*
         CE QUI S'ACCROCHE À UN MUR SE REPOSE SUR LE NOUVEAU JEU.
@@ -5498,54 +6053,67 @@ export const useScanStore = create<ScanState>((set, get) => {
         se retrouverait sur un mur qui n'existe plus — disparue de l'écran,
         des comptages et du métré.
       */
-      const fixtures = reprojectFixtures(st.walls, walls, st.fixtures);
-      const photos = reprojectAnchors(st.walls, walls, st.photos);
+      const fixtures = reprojectFixtures(jeu.walls, walls, jeu.fixtures);
+      const photos = reprojectAnchors(jeu.walls, walls, jeu.photos);
 
-      const floor = r.floor ?? r.rooms?.[0]?.floor ?? st.rooms[0]?.floor ?? null;
+      const floor = r.floor ?? r.rooms?.[0]?.floor ?? jeu.rooms[0]?.floor ?? st.rooms[0]?.floor ?? null;
       // Les sièges regardent la pièce, pas le mur : voir `orienterLesSieges`.
-      const objects: ObjectData[] = calerLesMeubles(orienterLesSieges(
+      const meublesVenus: ObjectData[] = calerLesMeubles(orienterLesSieges(
         separerLeMobilier(
           // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
-          reunirLesCanapesDAngle(entrants).map((o) => ({
-            ...o,
-            roomId: `room-${roomIndexAt(
-              { x: o.transform[12], z: o.transform[14] },
-              shapes.map((x) => x.outline),
-            ) + 1}`,
-          })),
+          reunirLesCanapesDAngle(entrants).map((o) => {
+            const t = [...o.transform];
+            t[12] += dx;
+            t[14] += dz;
+            return {
+              ...o,
+              transform: t,
+              roomId: idPiece(roomIndexAt({ x: t[12], z: t[14] }, contours)),
+            };
+          }),
         ),
         walls,
       ), walls);
+      const meublesALaMain = jeu.objects
+        .filter((o) => !duReleve(o.id))
+        .map((o) => ({
+          ...o,
+          roomId: idPiece(roomIndexAt({ x: o.transform[12], z: o.transform[14] }, contours)),
+        }));
+      const objects = [...meublesVenus, ...meublesALaMain];
       // Ce que RoomPlan dit de chaque pièce d'abord, le mobilier ensuite.
       const kinds = shapes.map((sh, i) =>
         deduireLaPiece(
           (r.sections ?? [])
-            .filter((x) => sh.outline.length >= 3 && pointInPolygon({ x: x.x, z: x.z }, sh.outline))
+            .filter((x) => sh.outline.length >= 3 && pointInPolygon({ x: x.x + dx, z: x.z + dz }, sh.outline))
             .map((x) => x.label),
           objects
-            .filter((o) => o.roomId === `room-${i + 1}`)
+            .filter((o) => o.roomId === idPiece(i))
             .map((o) => o.category),
         ),
       );
       const auto = nameRooms(kinds);
       // Les noms donnés à la main survivent au second passage : on rattache
       // chaque pièce neuve à l'ancienne dont le cartouche tombe dedans.
-      const anciennes = roomParts(st.walls, st.rooms);
+      const anciennes = roomParts(jeu.walls, jeu.rooms);
       const kept: RoomEntry[] = shapes.map((sh, i) => {
         const avant = anciennes.find((pa) =>
           pointInPolygon(pa.labelAt, sh.outline),
         );
         const garde = avant
-          ? st.rooms.find((x) => x.id === avant.roomId)
+          ? jeu.rooms.find((x) => x.id === avant.roomId)
           : undefined;
-        // Le plafond relevé par ce passage, ou celui du passage d'avant.
-        const releve = releveDeLaPiece(r, sh.outline, sh.area) ?? garde?.releve;
+        // Le plafond relevé par ce passage (dans le repère de l'iPhone), ou
+        // celui du passage d'avant.
+        const brut = sh.outline.map((p) => ({ x: p.x - dx, z: p.z - dz }));
+        const releve = releveDeLaPiece(r, brut, sh.area) ?? garde?.releve;
         return {
-          id: `room-${i + 1}`,
+          id: idPiece(i),
           name: garde?.name || auto[i],
           wallIds: sh.wallIds,
           kind: kinds[i] ?? undefined,
           floor,
+          ...(n === NIVEAU_RDC ? {} : { niveau: n }),
           ...(releve ? { releve } : {}),
         };
       });
@@ -5553,35 +6121,37 @@ export const useScanStore = create<ScanState>((set, get) => {
         LE PLAFOND SUIT SA PIÈCE, par la position de son ancrage : les
         identifiants de pièce sont refaits à neuf.
       */
-      const ceiling = st.ceiling.map((cl) => ({
+      const ceiling = jeu.ceiling.map((cl) => ({
         ...cl,
-        roomId: `room-${roomIndexAt(cl.at, shapes.map((x) => x.outline)) + 1}`,
+        roomId: idPiece(roomIndexAt(cl.at, contours)),
       }));
 
       /* Ce que le viseur a posé PENDANT ce passage vient s'ajouter. */
       const viseMerge = ancrerElec(
-        r.elec ?? [],
+        (r.elec ?? []).map((v) => ({ ...v, x: v.x + dx, z: v.z + dz })),
         walls,
         kept.map((x, i) => ({ id: x.id, outline: shapes[i]?.outline })),
-        (prefixe, n) => `${prefixe}-${Date.now().toString(36)}-${n}`,
+        (prefixe, k) => `${prefixe}-${Date.now().toString(36)}-${k}`,
       );
 
+      // Le blanc remis d'aplomb, une fois pour toutes : voir
+      // `blancsDAplomb`. Tout ce qui lit ces champs — 3D, plan, dossier,
+      // export — voit désormais la même chose.
+      const aplomb = blancsDAplomb(walls, objects);
       set({
         modelPath: r.modelPath ?? st.modelPath,
-        rooms: kept,
-        // Le blanc remis d'aplomb, une fois pour toutes : voir
-        // `blancsDAplomb`. Tout ce qui lit ces champs — 3D, plan, dossier,
-        // export — voit désormais la même chose.
-        ...blancsDAplomb(walls, objects),
-        openings,
-        fixtures: [...fixtures, ...viseMerge.fixtures],
+        rooms: remplacer(st.rooms, jeu.rooms, kept),
+        walls: remplacer(st.walls, jeu.walls, aplomb.walls),
+        objects: remplacer(st.objects, jeu.objects, aplomb.objects),
+        openings: remplacer(st.openings, jeu.openings, openings),
+        fixtures: remplacer(st.fixtures, jeu.fixtures, [...fixtures, ...viseMerge.fixtures]),
         // Les photos de mur du scan sont refaites : la fusion a pu recoudre
         // les murs, et le natif les a gardées toutes, passage après passage.
-        photos: [
+        photos: remplacer(st.photos, jeu.photos, [
           ...photos.filter((ph) => !ph.auto),
-          ...photosDesMurs(r.photosMurs ?? [], surfaces, walls),
-        ],
-        ceiling: [...ceiling, ...viseMerge.ceiling],
+          ...photosDesMurs(r.photosMurs ?? [], surfaces, walls, { decalage: { dx, dz } }),
+        ]),
+        ceiling: remplacer(st.ceiling, jeu.ceiling, [...ceiling, ...viseMerge.ceiling]),
         north: typeof r.north === 'number' ? r.north : st.north,
         processing: false,
         scanning: false,
@@ -5873,145 +6443,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         pour partir d'un empilement plausible ; le recalage fin se fait
         ensuite à la main, sur le filigrane.
     */
-    finalizeEtage: (r, n) => {
-      const st = get();
-      const surfaces = r.rooms?.length
-        ? r.rooms.flatMap((x) => x.surfaces ?? [])
-        : r.surfaces ?? [];
-      const entrants = r.rooms?.length
-        ? r.rooms.flatMap((x) => x.objects ?? [])
-        : r.objects ?? [];
-      // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR.
-      const segments = avecCoffresDuLidar(surfaces.map((s) => toSegment(s)), r.dessus);
-      const bruts = sansEclats(
-        mergeColinear(
-          splitAtJunctions(
-            weldCorners(
-              fusionnerMursDoubles(segments.filter((s) => s.type === 'wall')),
-            ),
-          ),
-        ),
-        [],
-      ).walls;
-      if (bruts.length === 0) {
-        set({ processing: false, scanning: false, etageEnCours: null });
-        return;
-      }
-      const ouverturesBrutes = segments.filter((s) => s.type !== 'wall');
-
-      /* Le pré-calage : les deux emprises, centre sur centre. */
-      const emprise = (ws: WallSeg[]) => {
-        const xs = ws.flatMap((w) => [w.a.x, w.b.x]);
-        const zs = ws.flatMap((w) => [w.a.z, w.b.z]);
-        return {
-          x: (Math.min(...xs) + Math.max(...xs)) / 2,
-          z: (Math.min(...zs) + Math.max(...zs)) / 2,
-        };
-      };
-      const dessous = st.walls.filter((w) => niveauDe(w) === n - 1);
-      const reference = dessous.length > 0 ? dessous : st.walls;
-      let dx = 0;
-      let dz = 0;
-      if (reference.length > 0) {
-        const cible = emprise(reference);
-        const venu = emprise(bruts);
-        dx = cible.x - venu.x;
-        dz = cible.z - venu.z;
-      }
-      const pose = <T extends WallSeg>(ws: T[]): T[] =>
-        ws.map((w) => ({
-          ...w,
-          id: `${w.id}-n${n}`,
-          a: { x: w.a.x + dx, z: w.a.z + dz },
-          b: { x: w.b.x + dx, z: w.b.z + dz },
-          niveau: n,
-        }));
-      const walls = pose(bruts);
-      const openings = baiesHorsDesAngles(baiesVitrees(pose(ouverturesBrutes), walls), walls);
-
-      const detected = detectRooms(walls, undefined, openings);
-      const shapes =
-        detected.length > 0
-          ? detected
-          : [{ outline: [], wallIds: walls.map((w) => w.id), area: 0 }];
-      const idPiece = (i: number) => `room-${n}-${i + 1}`;
-
-      const objects: ObjectData[] = calerLesMeubles(orienterLesSieges(
-        separerLeMobilier(
-          // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
-          reunirLesCanapesDAngle(entrants).map((o) => {
-            const t = [...o.transform];
-            t[12] += dx;
-            t[14] += dz;
-            return {
-              ...o,
-              id: `${o.id}-n${n}`,
-              transform: t,
-              roomId: idPiece(
-                roomIndexAt(
-                  { x: t[12], z: t[14] },
-                  shapes.map((s) => s.outline),
-                ),
-              ),
-            };
-          }),
-        ),
-        walls,
-      ), walls);
-      const kinds = shapes.map((sh, i) =>
-        deduireLaPiece(
-          // Les sections arrivent brutes : elles se décalent comme les murs.
-          (r.sections ?? [])
-            .filter(
-              (x) => sh.outline.length >= 3 && pointInPolygon({ x: x.x + dx, z: x.z + dz }, sh.outline),
-            )
-            .map((x) => x.label),
-          objects
-            .filter((o) => o.roomId === idPiece(i))
-            .map((o) => o.category),
-        ),
-      );
-      const noms = nameRooms(kinds);
-      const pieces: RoomEntry[] = shapes.map((s, i) => ({
-        id: idPiece(i),
-        name: noms[i],
-        wallIds: s.wallIds,
-        kind: kinds[i] ?? undefined,
-        floor: r.floor ?? r.rooms?.[0]?.floor ?? null,
-        niveau: n,
-      }));
-
-      /* Ce que le viseur a posé pendant la montée arrive avec l'étage. */
-      const vise = ancrerElec(
-        r.elec ?? [],
-        walls,
-        pieces.map((x, i) => ({ id: x.id, outline: shapes[i]?.outline })),
-        (prefixe, k) => `${prefixe}-${Date.now().toString(36)}-n${n}-${k}`,
-      );
-
-      pushHistory('ajouterEtage');
-      set({
-        walls: [...st.walls, ...walls],
-        openings: [...st.openings, ...openings],
-        rooms: [...st.rooms, ...pieces],
-        objects: [...st.objects, ...objects],
-        fixtures: [...st.fixtures, ...vise.fixtures],
-        ceiling: [...st.ceiling, ...vise.ceiling],
-        photos: [
-          ...st.photos,
-          ...photosDesMurs(r.photosMurs ?? [], surfaces, walls, { decalage: { dx, dz } }),
-        ],
-        // On travaille à l'étage qu'on vient de scanner, pas au
-        // rez-de-chaussée qu'on a quitté.
-        niveauCourant: n,
-        etageEnCours: null,
-        processing: false,
-        scanning: false,
-        screen: 'result',
-        planVierge: false,
-        dirty: true,
-      });
-    },
+    finalizeEtage: (r, n) => empilerUnReleve(r, n, false),
 
     finalize: (r) => {
       // Le scan est d'un seul tenant : une liste de surfaces, une liste de
@@ -6150,8 +6582,10 @@ export const useScanStore = create<ScanState>((set, get) => {
       // supprimer un relevé ne rend pas le quota.
       useAccountStore.getState().noterPlanCree();
       dejaCompte = true;
+      const cle = nouvelleCle();
       const now = new Date();
       const save: SavedScan = {
+        cleDuReleve: cle,
         id: `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
         name: defaultName(now),
         createdAt: now.getTime(),
@@ -6188,6 +6622,9 @@ export const useScanStore = create<ScanState>((set, get) => {
         ceiling: vise.ceiling,
         north: typeof r.north === 'number' ? r.north : null,
         saves,
+        // Les passages que garde l'iPhone sont ceux de CE relevé, au rez-de-chaussée.
+        cleDuReleve: cle,
+        passagesNatifs: { cle, niveau: NIVEAU_RDC, dx: 0, dz: 0 },
         processing: false,
         scanning: false,
         /* Un plan qui s'ouvre repose ses calques. */
@@ -6253,7 +6690,15 @@ export const useScanStore = create<ScanState>((set, get) => {
       // Le magnétisme se règle sur la trame du LOGEMENT, jamais sur les axes
       // du repère ARKit — ceux-ci dépendent de l'endroit où le scan a
       // commencé, et le magnétisme ne se déclenchait alors que par hasard.
-      const frame = planFrameAngle(walls);
+      /*
+        SON NIVEAU, ET LUI SEUL — revue « Inès » : changer la longueur d'un
+        mur du premier déplaçait le mur du rez-de-chaussée juste en dessous,
+        dès que leurs coins se superposaient — ce qui est précisément le but
+        du recalage. L'aimant, les voisins entraînés et la trame ne
+        regardent que les murs du niveau du mur.
+      */
+      const memes = walls.filter((w) => niveauDe(w) === niveauDe(wall));
+      const frame = planFrameAngle(memes);
       /*
         LA SOUDURE PASSE AVANT TOUT LE RESTE.
 
@@ -6268,8 +6713,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         intention : on s'y pose EXACTEMENT, et on ne redresse plus rien
         après — l'équerre déferait la jonction qu'on vient de faire.
       */
-      const soudure = soudureAuBout(p, walls, 0.25, old);
-      const aligned = soudure ?? snapToNeighbours(p, walls, frame, 0.12, old);
+      const soudure = soudureAuBout(p, memes, 0.25, old);
+      const aligned = soudure ?? snapToNeighbours(p, memes, frame, 0.12, old);
       const snapped = soudure ?? snapAngle(fixed, aligned, 5, frame);
       const room = roomOf(wall);
       /*
@@ -6312,6 +6757,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           return rendreSolidaire ? { ...bouge, libre: undefined } : bouge;
         }
         if (seul) return w;
+        if (niveauDe(w) !== niveauDe(wall)) return w;
         // Seuls les murs de la MÊME pièce suivent le coin : la cloison
         // d'en face garde la sienne, même si les deux se touchent.
         if (roomOf(w) !== room) return w;
@@ -6330,9 +6776,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         walls: murs,
         openings: get().openings.map((o) => {
           const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
-          const sur = bouges.find(
-            (m) => pointOnSeg(mid, m.avant.a, m.avant.b).dist < 0.4,
-          );
+          const sur =
+            niveauDe(o) === niveauDe(wall)
+              ? bouges.find((m) => pointOnSeg(mid, m.avant.a, m.avant.b).dist < 0.4)
+              : undefined;
           return sur ? reporterOuverture(o, sur.avant, sur.apres, sur.ancre) : o;
         }),
         // Pas de sauvegarde automatique : le bouton d'enregistrement apparaît.
@@ -6403,7 +6850,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       let cale = 0;
       let mieux = AIMANT;
       for (const o of st.walls) {
-        if (o.id === id) continue;
+        // L'aimant ne cherche qu'à son niveau : voir `moveWallPoint`.
+        if (o.id === id || niveauDe(o) !== niveauDe(wall)) continue;
         const lo = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z) || 1;
         const uo = { x: (o.b.x - o.a.x) / lo, z: (o.b.z - o.a.z) / lo };
         if (Math.abs(um.x * uo.z - um.z * uo.x) > 0.05) continue;
@@ -6435,6 +6883,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({
         walls: st.walls.map((w) => {
           if (w.id === id) return { ...w, a: glisse(w.a), b: glisse(w.b) };
+          if (niveauDe(w) !== niveauDe(wall)) return w;
           const suit = (p: Pt) =>
             colle(p, wall.a) || colle(p, wall.b) ? glisse(p) : p;
           return { ...w, a: suit(w.a), b: suit(w.b) };
@@ -6443,7 +6892,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         // arrière serait une baie dans le vide.
         openings: st.openings.map((o) => {
           const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
-          return pointOnSeg(mid, wall.a, wall.b).dist < 0.4
+          return niveauDe(o) === niveauDe(wall) && pointOnSeg(mid, wall.a, wall.b).dist < 0.4
             ? { ...o, a: glisse(o.a), b: glisse(o.b) }
             : o;
         }),
@@ -6498,6 +6947,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({
         walls: st.walls.map((w) => {
           if (w.id === id) return { ...w, a: na, b: nb };
+          if (niveauDe(w) !== niveauDe(wall)) return w;
           // Les voisins suivent le bout auquel ils sont soudés : le contour
           // reste fermé, quitte à ce qu'ils s'allongent ou raccourcissent.
           const suit = (p: Pt) =>
@@ -6506,7 +6956,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         }),
         openings: st.openings.map((o) => {
           const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
-          return pointOnSeg(mid, wall.a, wall.b).dist < 0.4
+          return niveauDe(o) === niveauDe(wall) && pointOnSeg(mid, wall.a, wall.b).dist < 0.4
             ? { ...o, a: tourne(o.a), b: tourne(o.b) }
             : o;
         }),
@@ -6514,11 +6964,11 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
     },
 
-    /** Modifie la longueur d'un mur en déplaçant son extrémité B le long de sa direction. */
+    /** Donne au mur la longueur tapée : voir plus bas. */
     setWallLength: (id, length) => {
       if (!sontFinis(length)) return;
-      const { walls, moveWallPoint } = get();
-      const wall = walls.find((w) => w.id === id);
+      const st = get();
+      const wall = st.walls.find((w) => w.id === id);
       if (!wall || length <= 0) return;
       /*
         NEUF CENT QUATRE-VINGT-DIX-NEUF MÈTRES.
@@ -6534,13 +6984,62 @@ export const useScanStore = create<ScanState>((set, get) => {
         n'est plus une cote, c'est une faute de frappe.
       */
       length = Math.min(length, MUR_MAX_M);
-      const dx = wall.b.x - wall.a.x;
-      const dz = wall.b.z - wall.a.z;
-      const cur = Math.hypot(dx, dz);
+      const cur = segLength(wall);
       if (cur < 1e-6) return;
-      moveWallPoint(id, 'b', {
-        x: wall.a.x + (dx / cur) * length,
-        z: wall.a.z + (dz / cur) * length,
+      /*
+        LE COIN DE GAUCHE — OU DU HAUT — NE BOUGE PAS. Revue « Hugo » : le
+        bout qui bougeait était celui où le tracé finissait, donc le droit
+        sur le mur du haut et le gauche sur le mur du bas. Comme « Cotes »
+        de la pièce, le mur grandit vers la droite, ou vers le bas.
+      */
+      const horizontal = Math.abs(wall.b.x - wall.a.x) >= Math.abs(wall.b.z - wall.a.z);
+      const aBouge = horizontal ? wall.a.x > wall.b.x : wall.a.z > wall.b.z;
+      const fixe = aBouge ? wall.b : wall.a;
+      const mobile = aBouge ? wall.a : wall.b;
+      const u = { x: (mobile.x - fixe.x) / cur, z: (mobile.z - fixe.z) / cur };
+      const delta = length - cur;
+      if (Math.abs(delta) < 1e-6) return;
+      /*
+        LA COTE TAPÉE N'EST PAS AIMANTÉE, ET LA PIÈCE RESTE D'ÉQUERRE —
+        revue « Hugo » : 6,05, 6,10, 5,92 redevenaient 6,00 (l'aimant du
+        doigt, à vingt-cinq centimètres, s'appliquait à ce qu'on avait
+        TAPÉ), et au-delà le mur d'en bout pivotait autour de son autre
+        coin : la pièce n'était plus un rectangle, et « Cotes » disparaissait.
+
+        Le mur d'en bout se DÉCALE de toute la différence, comme « Décaler »,
+        et ce qui lui est accroché suit. Rien au bout : le bout libre
+        s'allonge seul, exactement.
+      */
+      const n = niveauDe(wall);
+      const colle = (q: Pt) => Math.hypot(q.x - mobile.x, q.z - mobile.z) < 1e-3;
+      const auBout = st.walls.find((w) => {
+        if (w.id === id || w.type !== 'wall' || niveauDe(w) !== n) return false;
+        if (!colle(w.a) && !colle(w.b)) return false;
+        const lw = segLength(w) || 1;
+        const v = { x: (w.b.x - w.a.x) / lw, z: (w.b.z - w.a.z) / lw };
+        // Un prolongement dans l'alignement n'est pas un mur d'en bout.
+        return Math.abs(u.x * v.z - u.z * v.x) > 0.5;
+      });
+      if (auBout) {
+        get().moveWall(auBout.id, u.x * delta, u.z * delta, false);
+        return;
+      }
+      pushHistory(`setWallLength:${id}`);
+      const cible = { x: fixe.x + u.x * length, z: fixe.z + u.z * length };
+      const apres = { ...wall, [aBouge ? 'a' : 'b']: cible } as WallSeg;
+      set({
+        walls: st.walls.map((w) => {
+          if (w.id === id) return apres;
+          if (niveauDe(w) !== n) return w;
+          return { ...w, a: colle(w.a) ? cible : w.a, b: colle(w.b) ? cible : w.b };
+        }),
+        openings: st.openings.map((o) => {
+          const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+          return niveauDe(o) === n && pointOnSeg(mid, wall.a, wall.b).dist < 0.4
+            ? reporterOuverture(o, wall, apres, aBouge ? 'b' : 'a')
+            : o;
+        }),
+        dirty: true,
       });
     },
 
@@ -6768,19 +7267,14 @@ export const useScanStore = create<ScanState>((set, get) => {
       const partis = st.saves.filter(
         (x) => x.id !== ouvert && !!x.supprimeLe && x.supprimeLe <= maintenant,
       );
-      const retouchesEchues = st.saves.some(
-        (x) =>
-          x.id !== ouvert && !!x.retouche && x.retouche.jusqua <= maintenant,
-      );
-      if (retouchesEchues) {
-        const saves = st.saves.map((x) =>
-          x.id !== ouvert && x.retouche && x.retouche.jusqua <= maintenant
-            ? { ...x, retouche: undefined }
-            : x,
-        );
-        set({ saves });
-        persistSoon(saves);
-      }
+      /*
+        LES MODIFICATIONS D'UN PLAN ENREGISTRÉ NE S'EFFACENT JAMAIS SEULES —
+        revue « Agathe ». Elles partaient au bout de douze heures, sans un
+        mot : en mode Électricité, tout ce qui suit le scan en est (les
+        prises, les pièces scannées en plus, les étages), et une journée de
+        pose s'effaçait entre le vendredi et le lundi. Elles attendent qu'on
+        les enregistre ou qu'on les abandonne — c'est tout.
+      */
       // `deleteSave` fait aussi le ménage des photos et du modèle 3D.
       for (const x of partis) get().deleteSave(x.id);
       return partis.length;
@@ -7964,7 +8458,16 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (st.walls.length === 0 || (st.currentSaveId && !st.dirty)) {
         if (draftEcrit !== '') {
           draftEcrit = '';
-          AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
+          /*
+            LE FILET NE SE REPLIE QU'UNE FOIS LE PLAN SUR LE DISQUE — revue
+            « Agathe » : il s'effaçait tout de suite, le plan n'était écrit
+            que six cents millisecondes plus tard (pour un plan dessiné,
+            c'était sa PREMIÈRE écriture), et un disque plein ne l'écrivait
+            jamais. Un brouillon réécrit entre-temps n'est pas touché.
+          */
+          apresEcriture().then((ok) => {
+            if (ok && draftEcrit === '') AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
+          });
         }
         return;
       }
@@ -7984,6 +8487,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         photos: st.photos,
         modelPath: st.modelPath,
         devis: devisDuPlan(st),
+        client: st.client || undefined,
+        address: st.address || undefined,
+        north: st.north ?? undefined,
+        cleDuReleve: st.cleDuReleve ?? undefined,
       };
       // L'horodatage change à chaque tick : on compare SANS lui, sinon on
       // réécrirait un relevé identique toutes les trente secondes.
@@ -8000,7 +8507,18 @@ export const useScanStore = create<ScanState>((set, get) => {
     reprendreBrouillon: () => {
       const b = get().brouillon;
       if (!b) return;
+      // Le dossier dont c'est la retouche : il rend le cartouche aux brouillons d'avant.
+      const dossier = b.saveId ? get().saves.find((s) => s.id === b.saveId) : undefined;
       set({
+        /*
+          LE CARTOUCHE REVIENT AVEC LE RELEVÉ — revue « Agathe » : repris
+          vides, le client, l'adresse et le nord étaient effacés du dossier
+          au premier enregistrement, et le PDF partait sans cartouche.
+        */
+        client: b.client ?? dossier?.client ?? '',
+        address: b.address ?? dossier?.address ?? '',
+        north: b.north ?? dossier?.north ?? null,
+        cleDuReleve: b.cleDuReleve ?? null,
         /* Un plan qui s'ouvre repose ses calques. */
         ...CALQUES_DE_BASE,
         screen: 'result',
@@ -8224,6 +8742,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         client: save.client ?? '',
         address: save.address ?? '',
         currentSaveId: save.id,
+        // Rouvert dans la même session, il reconnaît encore ses passages.
+        cleDuReleve: save.cleDuReleve ?? null,
         rooms: save.rooms,
         walls: save.walls,
         openings: save.openings,
@@ -8308,6 +8828,19 @@ export const useScanStore = create<ScanState>((set, get) => {
           : null),
       });
       persistSoon(saves);
+    },
+
+    repartirANeuf: () => {
+      /*
+        UN SCAN NEUF N'HÉRITE DE RIEN — revue « Agathe » : lancé de
+        l'accueil, il gardait les notes, les cotes à la règle, le tableau
+        existant, le devis et l'étage du chantier d'avant, qui
+        s'imprimaient dans le PDF du nouveau client. `reset` sait tout ce
+        qu'il faut oublier ; on garde seulement l'écran où l'on est.
+      */
+      const ecran = get().screen;
+      get().reset();
+      set({ screen: ecran });
     },
 
     commencerAuClavier: () => {
@@ -8418,6 +8951,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         murDouteux: null,
         trouContour: 0,
         complementEnCours: false,
+        // Un autre relevé commence : les passages de l'iPhone ne sont plus les siens.
+        cleDuReleve: null,
         wallCount: 0,
         objectCount: 0,
         doorCount: 0,

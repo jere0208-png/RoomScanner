@@ -209,9 +209,12 @@ export const ROOM_NAME_CHOICES: string[] = [
   'Séjour',
   'Salon',
   'Salle à manger',
+  // Le studio : une pièce qui est tout à la fois (revue « Hugo »).
+  'Pièce principale',
   'Cuisine',
   'Chambre',
   'Salle de bains',
+  'Salle d’eau',
   'WC',
   'Bureau',
   'Entrée',

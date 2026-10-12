@@ -3134,6 +3134,7 @@ export function ResultScreen() {
         <AddRoomSheet
           visible={ajoutPiece}
           accolee={false}
+          planVide
           onClose={() => setAjoutPiece(false)}
           onChoose={(largeur, profondeur, nom) => {
             // Rien au plan : elle se pose à l'origine, et elle est CHOISIE
@@ -3142,30 +3143,6 @@ export function ResultScreen() {
             setAjoutPiece(false);
             setEditMode(true);
             haptic('succes');
-          }}
-          onCustom={() => {
-            setAjoutPiece(false);
-            setPrompt({
-              title: 'Cotes de la pièce',
-              subtitle:
-                'Largeur et profondeur en mètres, séparées par un × ' +
-                '(par exemple 3,60 x 2,80).',
-              value: '3,60 x 2,80',
-              onSubmit: (t) => {
-                const [l, p] = t
-                  .replace(',', '.')
-                  .replace(',', '.')
-                  .split(/[x×*]/i)
-                  .map((v) => parseFloat(v.replace(',', '.').trim()));
-                if (!isFinite(l) || !isFinite(p) || l <= 0 || p <= 0) {
-                  haptic('alerte');
-                  return;
-                }
-                setSelectedRoomId(addRoomLibre(l, p, ''));
-                setEditMode(true);
-                haptic('succes');
-              },
-            });
           }}
         />
         <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
@@ -6113,37 +6090,6 @@ export function ResultScreen() {
           setSelectedRoomId(id);
           setEditMode(true);
           haptic('succes');
-        }}
-        onCustom={() => {
-          setAjoutPiece(false);
-          apresFermeture(() =>
-            setPrompt({
-              title: 'Pièce sur mesure',
-              subtitle:
-                'Largeur et profondeur en mètres, séparées par un × ' +
-                '(par exemple 3,60 x 2,80).',
-              value: '3,60 x 2,80',
-              onSubmit: (t) => {
-                const [l, p] = t
-                  .replace(',', '.')
-                  .replace(',', '.')
-                  .split(/[x×*]/i)
-                  .map((v) => parseFloat(v.replace(',', '.').trim()));
-                if (!isFinite(l) || !isFinite(p) || l <= 0 || p <= 0) {
-                  haptic('alerte');
-                  return;
-                }
-                const id = selectedWallId
-                  ? addRoomBox(l, p, '', selectedWallId)
-                  : addRoomLibre(l, p, '');
-                seuleSelection('piece');
-                fermerPiecesNeuves(id);
-                setSelectedRoomId(id);
-                setEditMode(true);
-                haptic('succes');
-              },
-            }),
-          );
         }}
       />
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   ScrollView,
   StyleSheet,
   Text,
@@ -75,6 +76,23 @@ export function ScanScreen() {
   /* Ce que le post-traitement a refusé de faire : il faut bien le dire. */
   const error = useScanStore((s) => s.error);
   const { pause, resume, stop, cancel } = useRoomScan();
+  /*
+    UN APPEL EN PLEIN SCAN — revue « Agathe ». Rien ne réagissait au passage
+    en arrière-plan : au retour, la session était tombée, et le relevé avec.
+    Le scan se met en pause dès que l'app quitte le premier plan ; au retour,
+    l'écran de pause propose de reprendre ou de terminer, et les passages
+    sont gardés.
+  */
+  const pauseRef = useRef(pause);
+  pauseRef.current = pause;
+  useEffect(() => {
+    const abonne = AppState.addEventListener('change', (etat) => {
+      if (etat === 'active') return;
+      const s = useScanStore.getState();
+      if (s.scanning && !s.paused && !s.processing) pauseRef.current();
+    });
+    return () => abonne.remove();
+  }, []);
   /*
     LE VISEUR EST UN OUTIL D'ÉLECTRICIEN.
 

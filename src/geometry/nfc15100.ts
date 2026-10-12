@@ -62,6 +62,9 @@ const sansAccent = (s: string) =>
   s
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
+    // L'apostrophe de l'app (’) comme celle du clavier (') : « Salle d’eau »,
+    // le nom que l'app propose, n'était pas reconnu (revue « Hugo »).
+    .replace(/[’‘`´]/g, "'")
     .toLowerCase();
 
 /**
@@ -70,7 +73,7 @@ const sansAccent = (s: string) =>
  */
 export function roomUse(name: string, kind?: RoomKind | null): RoomUse {
   const n = sansAccent(name);
-  if (/sejour|salon|salle a manger|living/.test(n)) return 'sejour';
+  if (/sejour|salon|salle a manger|living|piece principale|piece a vivre/.test(n)) return 'sejour';
   if (/cuisine/.test(n)) return 'cuisine';
   if (/chambre/.test(n)) return 'chambre';
   if (/bureau/.test(n)) return 'bureau';

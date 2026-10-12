@@ -2886,14 +2886,29 @@ export interface SaisieMurNeuf {
  * voisin. Une cote prise au mètre dans un angle part de ce nu.
  */
 function retraitDuCoin(walls: WallSeg[], hote: WallSeg, coin: Pt): number {
-  const voisin = walls.find(
-    (o) =>
-      o.id !== hote.id &&
-      o.type === 'wall' &&
-      (Math.hypot(o.a.x - coin.x, o.a.z - coin.z) < 0.05 ||
-        Math.hypot(o.b.x - coin.x, o.b.z - coin.z) < 0.05),
-  );
-  return voisin ? epaisseurDe(voisin) / 2 : 0;
+  /*
+    LE MUR QUI FAIT LE COIN, PAS LE PREMIER VENU — revue « Hugo » : sa
+    fenêtre cotée « à 80 cm de la cloison » tombait à 83,5. Au bout du mur,
+    deux voisins : la cloison de 7 cm qui fait le coin, et le morceau du
+    même mur de 14 cm, dans son prolongement — le premier trouvé. Un
+    prolongement ne ferme rien : seul compte le mur qui part de travers, à
+    ce niveau ; s'il y en a deux, le plus épais.
+  */
+  const L = segLength(hote) || 1;
+  const u = { x: (hote.b.x - hote.a.x) / L, z: (hote.b.z - hote.a.z) / L };
+  let retrait = 0;
+  for (const o of walls) {
+    if (o.id === hote.id || o.type !== 'wall' || niveauDe(o) !== niveauDe(hote)) continue;
+    if (
+      Math.hypot(o.a.x - coin.x, o.a.z - coin.z) >= 0.05 &&
+      Math.hypot(o.b.x - coin.x, o.b.z - coin.z) >= 0.05
+    ) continue;
+    const lo = segLength(o) || 1;
+    const v = { x: (o.b.x - o.a.x) / lo, z: (o.b.z - o.a.z) / lo };
+    if (Math.abs(u.x * v.z - u.z * v.x) < 0.5) continue;
+    retrait = Math.max(retrait, epaisseurDe(o) / 2);
+  }
+  return retrait;
 }
 
 /** La cote par défaut d'une cloison en T : celle du milieu du mur, au nu. */
@@ -4584,6 +4599,67 @@ function auNiveau<T>(liste: T[], support: object, n: number, garde: (x: T) => bo
   const out = f.length === liste.length ? liste : f;
   parNiveau.set(n, out);
   return out;
+}
+
+/**
+ * LA LONGUEUR D'UN MUR QU'UN RELEVÉ RECOUVRE — même direction (à 10° près),
+ * même ligne (à 25 cm près), sur la partie où ils se font face.
+ *
+ * C'est la question que pose « Scanner une pièce » : les passages que rend
+ * l'iPhone sont-ils bien ceux du plan à l'écran, dans son repère ? Si oui,
+ * les murs déjà relevés s'y retrouvent, à quelques centimètres près — le
+ * temps que `StructureBuilder` réaligne les passages.
+ */
+function longueurRecouverte(w: WallSeg, venus: WallSeg[], tol = 0.25): number {
+  const L = segLength(w);
+  if (L < 1e-6) return 0;
+  const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
+  const cosMin = Math.cos((10 * Math.PI) / 180);
+  const bouts: [number, number][] = [];
+  for (const v of venus) {
+    if (v.type !== 'wall') continue;
+    const lv = segLength(v);
+    if (lv < 1e-6) continue;
+    const uv = { x: (v.b.x - v.a.x) / lv, z: (v.b.z - v.a.z) / lv };
+    if (Math.abs(u.x * uv.x + u.z * uv.z) < cosMin) continue;
+    // Les deux bouts du mur déjà là, à la ligne du mur venu.
+    const ecart = (q: Pt) => Math.abs((q.x - v.a.x) * uv.z - (q.z - v.a.z) * uv.x);
+    if (ecart(w.a) > tol || ecart(w.b) > tol) continue;
+    const t = (q: Pt) => (q.x - w.a.x) * u.x + (q.z - w.a.z) * u.z;
+    const t0 = Math.max(0, Math.min(t(v.a), t(v.b)));
+    const t1 = Math.min(L, Math.max(t(v.a), t(v.b)));
+    if (t1 > t0) bouts.push([t0, t1]);
+  }
+  bouts.sort((p, q) => p[0] - q[0]);
+  let total = 0;
+  let debut = 0;
+  let fin = -Infinity;
+  for (const [a, b] of bouts) {
+    if (a > fin) {
+      if (fin > -Infinity) total += fin - debut;
+      debut = a;
+      fin = b;
+    } else fin = Math.max(fin, b);
+  }
+  if (fin > -Infinity) total += fin - debut;
+  return total;
+}
+
+/** Ce mur a son pendant dans le relevé venu, sur au moins la moitié de sa longueur. */
+export function estRecouvert(w: WallSeg, venus: WallSeg[]): boolean {
+  const L = segLength(w);
+  return L > 1e-6 && longueurRecouverte(w, venus) >= 0.5 * L;
+}
+
+/**
+ * La part des murs déjà là (en longueur, de 0 à 1) que le relevé venu
+ * recouvre. Rien à recouvrir, c'est tout recouvert.
+ */
+export function partRecouverte(existants: WallSeg[], venus: WallSeg[]): number {
+  const murs = existants.filter((w) => w.type === 'wall');
+  const total = murs.reduce((s, w) => s + segLength(w), 0);
+  if (total < 1e-6) return 1;
+  return murs.reduce((s, w) => s + longueurRecouverte(w, venus), 0) / total;
 }
 
 /**

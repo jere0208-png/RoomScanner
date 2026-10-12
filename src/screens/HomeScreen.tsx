@@ -54,6 +54,7 @@ import { useRoomScan } from '../native/useRoomScan';
 import { SOLAIRES } from '../ui/solaires';
 import { haptic } from '../ui/haptic';
 import { alerte } from '../ui/alerte';
+import { sansPerdreLeReleve } from '../ui/releveInterrompu';
 import { pourChercher } from '../ui/mots';
 import { PlanThumb, detailsDuScan } from './LibraryScreen';
 import { etatDAttente, useMaintenant } from '../ui/miseDeCote';
@@ -186,7 +187,8 @@ export function HomeScreen() {
       ouvrirSurprise();
       return;
     }
-    start();
+    // Siri passait outre la question : voir `sansPerdreLeReleve`.
+    sansPerdreLeReleve(start, 'Un nouveau scan', 'Nouveau scan');
   }, [raccourciEnAttente, supported, setRaccourciEnAttente, peutCreerPlan, ouvrirSurprise, start]);
 
   const scanner = () => {
@@ -198,19 +200,7 @@ export function HomeScreen() {
       UN RELEVÉ INTERROMPU ATTEND — correctif de l'audit : un nouveau scan
       l'effaçait sans prévenir. On demande.
     */
-    if (brouillon) {
-      alerte(
-        'Un relevé interrompu vous attend',
-        'Un nouveau scan le remplacera. Vous pouvez aussi le reprendre là où il en était.',
-        [
-          { label: 'Annuler' },
-          { label: 'Reprendre', onPress: reprendreBrouillon },
-          { label: 'Nouveau scan', danger: true, onPress: start },
-        ],
-      );
-      return;
-    }
-    start();
+    sansPerdreLeReleve(start, 'Un nouveau scan', 'Nouveau scan');
   };
   /** Jeter un relevé interrompu se confirme : il ne revient pas. */
   const jeterLeBrouillon = () =>
@@ -227,7 +217,7 @@ export function HomeScreen() {
       ouvrirSurprise();
       return;
     }
-    commencerAuClavier();
+    sansPerdreLeReleve(commencerAuClavier, 'Un plan vierge', 'Plan vierge');
   };
   /** Un plan lu est un plan créé : le même palier que les autres. */
   const lirePlanPapier = () => {
@@ -235,8 +225,9 @@ export function HomeScreen() {
       ouvrirSurprise();
       return;
     }
-    setScreen('lecture');
+    sansPerdreLeReleve(() => setScreen('lecture'), 'Un plan lu', 'Lire un plan');
   };
+  const voirLExemple = () => sansPerdreLeReleve(ouvrirExemple, 'L’exemple', 'Voir l’exemple');
 
   /* Les plans : les derniers touchés, ou ceux que la recherche retient. */
   const [cherche, setCherche] = useState('');
@@ -403,7 +394,7 @@ export function HomeScreen() {
                     titre={'Voir un\nexemple'}
                     sous="Un T2 de 48 m² à visiter"
                     label="Voir un exemple"
-                    onPress={ouvrirExemple}
+                    onPress={voirLExemple}
                   />
                 </Animated.View>
               </View>

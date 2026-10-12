@@ -14,7 +14,8 @@
  *     l'enregistrer d'un appui ; ensuite il s'en va seul. C'est tout : la
  *     liste le dit, rien d'autre ne le répète ;
  *
- *   — LES MODIFICATIONS D'UN PLAN ENREGISTRÉ sont gardées à côté de lui. Une
+ *   — LES MODIFICATIONS D'UN PLAN ENREGISTRÉ sont gardées à côté de lui, sans
+ *     échéance (revue « Agathe » : elles s'effaçaient au bout de douze heures). Une
  *     pastille passe en bas de l'écran — elle ne prend pas le doigt, ne
  *     bloque rien — avec de quoi les enregistrer sur-le-champ ; et la ligne
  *     du plan porte un rappel ambré tant qu'elles attendent.
@@ -62,12 +63,12 @@ export function etatDAttente(
     };
   }
   if (scan.retouche) {
-    const d = delaiRestant(scan.retouche.jusqua, maintenant);
+    // Elles n'expirent plus (voir `purgerLesEchus`) : pas de compte à rebours.
     return {
       sorte: 'retouche',
       titre: 'Modifications non enregistrées',
-      delai: `Perdues dans ${d}`,
-      texte: `Modifications non enregistrées · perdues dans ${d}`,
+      delai: 'Gardées à côté du plan',
+      texte: 'Modifications non enregistrées · gardées à côté du plan',
     };
   }
   return null;
@@ -114,7 +115,7 @@ export function rangerLeTravail(): void {
   const id = st.currentSaveId;
   const sorte = st.mettreDeCote();
   if (sorte !== 'retouche' || !id) return;
-  astuce('Modifications gardées 12 h : enregistrez-les pour ne pas les perdre.', {
+  astuce('Modifications gardées à côté du plan : enregistrez-les quand vous voulez.', {
     icone: 'save',
     action: {
       label: 'Enregistrer',

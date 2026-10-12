@@ -230,14 +230,19 @@ describe('les modifications d’un plan enregistré', () => {
     expect(useScanStore.getState().saves[0].retouche).toBeUndefined();
   });
 
-  it('passées douze heures, elles s’en vont — le plan reste', () => {
-    retouche();
+  /*
+    ELLES NE S'EN VONT PLUS SEULES — revue « Agathe » : passées douze
+    heures, elles s'effaçaient sans un mot, et une journée de pose partait
+    entre le vendredi et le lundi. Elles attendent qu'on décide.
+  */
+  it('passées douze heures, elles sont toujours là — le plan aussi', () => {
+    const autres = retouche();
     useScanStore.getState().mettreDeCote();
     useScanStore.getState().setScreen('library');
     useScanStore.getState().purgerLesEchus(Date.now() + 13 * H);
     const st = useScanStore.getState();
     expect(st.saves).toHaveLength(1);
-    expect(st.saves[0].retouche).toBeUndefined();
+    expect(st.saves[0].retouche!.plan.walls).toBe(autres);
     expect(st.saves[0].walls).toBe(SNAPSHOT_WALLS);
   });
 
@@ -253,7 +258,7 @@ describe('les modifications d’un plan enregistré', () => {
     const autres = retouche();
     rangerLeTravail();
     const a = useAstuce.getState().courante!;
-    expect(a.texte).toMatch(/enregistrez-les pour ne pas les perdre/);
+    expect(a.texte).toMatch(/gardées à côté du plan : enregistrez-les quand vous voulez/);
     expect(a.action?.label).toBe('Enregistrer');
     a.action!.faire();
     expect(useScanStore.getState().saves[0].walls).toEqual(autres);
@@ -276,7 +281,7 @@ describe('ce que la liste en dit', () => {
     expect(delaiRestant(t + 20000, t)).toBe('moins d’une minute');
   });
 
-  it('« autosuppression dans » pour un plan neuf, « perdues dans » pour des modifications', () => {
+  it('« autosuppression dans » pour un plan neuf, aucune échéance pour des modifications', () => {
     const t = Date.now();
     expect(etatDAttente({ ...enregistre('a'), supprimeLe: t + 3 * H }, t)!.texte).toBe(
       'Non enregistré · autosuppression dans 3 h 00',
@@ -286,7 +291,7 @@ describe('ce que la liste en dit', () => {
       t,
     )!;
     expect(r.sorte).toBe('retouche');
-    expect(r.texte).toBe('Modifications non enregistrées · perdues dans 5 min');
+    expect(r.texte).toBe('Modifications non enregistrées · gardées à côté du plan');
     expect(etatDAttente(enregistre('c'), t)).toBeNull();
   });
 

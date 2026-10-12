@@ -31,8 +31,17 @@ const INSTRUCTIONS_FR: Record<string, string> = {
  * sans avoir à s'abonner au flux du scan, dont il n'a que faire.
  */
 export async function demarrerComplement(): Promise<void> {
-  await RoomScan.startAdditional();
   const st = useScanStore.getState();
+  /*
+    ADDITIF SEULEMENT AVEC LES PASSAGES DU PLAN — revue « Agathe ». L'iPhone
+    ne garde les passages qu'en mémoire : après un redémarrage il n'en a
+    plus, après un autre chantier ce sont ceux de l'autre. Réunir la pièce
+    du jour à ceux-là remplaçait le plan, ou y faisait entrer les pièces
+    d'un autre client. Sans les passages du plan à l'écran, on scanne à
+    neuf, et la pièce s'ajoute à côté (voir `finalizeMerge`).
+  */
+  if (st.passagesDuPlanOuvert()) await RoomScan.startAdditional();
+  else await RoomScan.start();
   st.setComplement(true);
   st.setScreen('scan');
   st.setScanning(true);
@@ -106,6 +115,8 @@ export async function lancerUnScan(): Promise<void> {
     st.setScreen('camera');
     return;
   }
+  // Un relevé neuf : rien du chantier d'avant (voir `repartirANeuf`).
+  st.repartirANeuf();
   st.setError(null);
   st.beginScan();
   await RoomScan.start();
@@ -216,6 +227,8 @@ function resumerLeReleve() {
 }
 
   const begin = async () => {
+    // Un relevé neuf : rien du chantier d'avant (voir `repartirANeuf`).
+    store.repartirANeuf();
     store.setError(null);
     store.beginScan();
     await RoomScan.start();
