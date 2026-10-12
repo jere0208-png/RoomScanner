@@ -278,6 +278,13 @@ interface AccountState {
   exportOuvert: () => boolean;
   noterPlanCree: () => void;
   ouvrirPaywall: () => void;
+  /**
+   * Le serveur accepte-t-il ses codes internes ? Vrai le temps du
+   * développement seulement (sa config, `CODES_INTERNES`).
+   */
+  codesInternes: boolean;
+  /** Applique un code interne : le Pro, par le code, si le serveur l'accepte. */
+  appliquerCodeInterne: (code: string) => Promise<{ ok: boolean; raison?: string }>;
   fermerPaywall: () => void;
   ouvrirSurprise: () => void;
   fermerSurprise: () => void;
@@ -333,6 +340,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   proVia: null,
   plansUtilises: 0,
   paywallVisible: false,
+  codesInternes: false,
   surpriseVisible: false,
   offres: null,
   bonusEssais: 0,
@@ -450,6 +458,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       });
       if (etat?.ok) {
         set({
+          codesInternes: etat.codes === true,
           pro: s.pro || etat.pro === 'code' || etat.pro === 'abonnement',
           proVia:
             s.proVia ??
@@ -508,6 +517,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     set({
       compte,
       jeton: reponse?.ok ? String(reponse.jeton ?? '') : null,
+      codesInternes: reponse?.ok ? reponse.codes === true : false,
       plansUtilises: Math.max(get().plansUtilises, marqueur?.plans ?? 0),
     });
     if (reponse?.ok) {
@@ -784,6 +794,23 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   */
   ouvrirPaywall: () => {
     set({ paywallVisible: true });
+  },
+  appliquerCodeInterne: async (code) => {
+    const s = get();
+    if (!s.compte || !s.jeton) {
+      return { ok: false, raison: 'Votre connexion n’est pas validée par le serveur : reconnectez-vous, puis recommencez.' };
+    }
+    const r = await api('code', {
+      identifiant: s.compte.id,
+      jeton: s.jeton,
+      code: code.trim().toUpperCase(),
+    });
+    if (!r) return { ok: false, raison: 'Le serveur ne répond pas : vérifiez la connexion, puis recommencez.' };
+    if (!r.ok) return { ok: false, raison: String(r.raison ?? 'Code refusé.') };
+    set({ pro: true, proVia: 'code', paywallVisible: false });
+    persister(get());
+    fusionnerMarqueur({ pro: 'code' }).catch(() => {});
+    return { ok: true };
   },
   fermerPaywall: () => set({ paywallVisible: false }),
   /*

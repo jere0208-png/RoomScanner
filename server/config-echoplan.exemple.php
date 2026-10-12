@@ -44,3 +44,8 @@ const ANTHROPIC_CLE = 'À_REMPLIR';
 const ANTHROPIC_MODELE = 'claude-sonnet-5-5';
 // Le plafond de lectures par compte et par jour (chaque lecture est payée).
 const LECTURES_PAR_JOUR = 20;
+
+// LES CODES INTERNES (table codes_promo) : true le temps du développement,
+// pour donner le Pro sans l'App Store ; false AVANT la publication — la
+// règle 3.1.1 d'Apple interdit un code maison dans l'app publiée.
+const CODES_INTERNES = false;

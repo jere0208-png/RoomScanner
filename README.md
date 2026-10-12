@@ -14285,6 +14285,39 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les codes internes, le temps du développement
+
+Relevé du patron : « ça demande le plan Pro, alors que mon compte l'était.
+L'app n'est pas encore sur le store Apple. Ça demande une connexion sur le
+store lors d'une application de coupon… l'app est encore en dev. »
+
+**Pourquoi.**
+- **La base du serveur est neuve** depuis le déménagement, et le compte du
+  patron n'y était pas Pro. La reconnexion qui lui a rendu son jeton a
+  aussi retiré le Pro local.
+- **« J'ai un code » ouvre la feuille des codes d'offre d'Apple.** Elle
+  n'existe que pour une app publiée : en développement, c'est une impasse.
+
+**Le remède.**
+- **Le serveur rouvre ses codes maison** (table `codes_promo`), mais
+  seulement quand sa config le dit : `CODES_INTERNES` à true le temps des
+  essais, à false avant la publication. La règle 3.1.1 d'Apple interdit
+  un code maison dans l'app publiée.
+- **Le serveur le fait savoir à l'app** : `codes` dans les réponses à
+  `connecter` et `etat`, puis `codesInternes` dans l'app.
+- **Codes ouverts, « J'ai un code » ouvre notre propre saisie** (« Code
+  interne »), dans la fenêtre de la page Pro. Le code part au serveur
+  (`appliquerCodeInterne`), qui accorde le Pro (`pro = 'code'`). Un refus
+  s'écrit sous les liens. Codes fermés, c'est la feuille d'Apple, comme
+  avant.
+- **Le serveur refuse tout code** quand les codes internes sont fermés.
+
+**En attendant, pour rendre le Pro au compte du patron**, une requête dans
+phpMyAdmin : `UPDATE comptes SET pro = 'code' WHERE email = '…'`. L'app le
+reprend à l'ouverture suivante (`etat`).
+
+Banc : `codesinternes`.
+
 ## Le plan d'électricien sans cotes : deux lectures, et les pièces qui tiennent les murs
 
 Relevé du patron, photo à l'appui d'un plan d'électricien très chargé, sans

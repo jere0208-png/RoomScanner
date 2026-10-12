@@ -35,6 +35,7 @@ import { BadgePro } from '../components/BadgePro';
 import { LightRibbon, RIBBON_H } from '../components/LightRibbon';
 import { ContourVif, TexteVif } from '../components/ContourVif';
 import { SOLAIRES } from '../ui/solaires';
+import { PromptSheet, type PromptData } from '../components/Sheet';
 import { useModeElec } from '../store/usage';
 import {
   MOIS_OFFERTS,
@@ -146,6 +147,12 @@ export function PaywallScreen() {
   const visible = useAccountStore((st) => st.paywallVisible);
   const fermer = useAccountStore((st) => st.fermerPaywall);
   const codeOffre = useAccountStore((st) => st.codeOffre);
+  const codesInternes = useAccountStore((st) => st.codesInternes);
+  const appliquerCodeInterne = useAccountStore((st) => st.appliquerCodeInterne);
+  /** La saisie du code interne, dans NOTRE fenêtre (voir plus bas). */
+  const [demandeDeCode, setDemandeDeCode] = useState<PromptData | null>(null);
+  /** Ce que le serveur a répondu à un code refusé. */
+  const [motDuCode, setMotDuCode] = useState<string | null>(null);
   const offres = useAccountStore((st) => st.offres);
   const chargerOffres = useAccountStore((st) => st.chargerOffres);
   const acheterPro = useAccountStore((st) => st.acheterPro);
@@ -398,13 +405,33 @@ export function PaywallScreen() {
               accessibilityLabel="J’ai un code"
               hitSlop={8}
               // La feuille d'Apple : les codes d'offre se créent dans App
-              // Store Connect et se saisissent là, jamais chez nous.
+              // Store Connect et se saisissent là, jamais chez nous — SAUF le
+              // temps du développement, quand le serveur ouvre ses codes
+              // internes (relevé du patron : « l'app est encore en dev »).
               onPress={() => {
+                if (codesInternes) {
+                  setMotDuCode(null);
+                  setDemandeDeCode({
+                    title: 'Code interne',
+                    subtitle: 'Le code donné pour les essais de l’app.',
+                    value: '',
+                    okLabel: 'Appliquer',
+                    onSubmit: (t) => {
+                      appliquerCodeInterne(t)
+                        .then((r) => {
+                          if (!r.ok) setMotDuCode(r.raison ?? 'Code refusé.');
+                        })
+                        .catch(() => setMotDuCode('Le code n’a pas pu être appliqué.'));
+                    },
+                  });
+                  return;
+                }
                 codeOffre().catch(() => {});
               }}>
               <Text style={s.lien}>J’ai un code</Text>
             </Pressable>
           </View>
+          {motDuCode ? <Text style={s.motDuCode}>{motDuCode}</Text> : null}
 
           {/*
             CE QU'ON ACHÈTE, EN TOUTES LETTRES — règle 3.1.2 d'Apple. Le nom,
@@ -484,6 +511,9 @@ export function PaywallScreen() {
         </View>
 
       </RetourGlisse>
+      {/* La saisie du code interne vit DANS la fenêtre de la page Pro : iOS ne
+          présente pas une feuille de l'app par-dessus une fenêtre ouverte. */}
+      <PromptSheet data={demandeDeCode} onClose={() => setDemandeDeCode(null)} />
     </Modal>
   );
 }
@@ -637,6 +667,7 @@ const themed = (c: Palette) =>
       marginTop: 14,
     },
     lien: { color: c.blue, fontSize: 13, fontWeight: '600' },
+    motDuCode: { color: c.danger, fontSize: 13, textAlign: 'center', marginTop: 6 },
     lienPoint: { color: c.inkFaint, fontSize: 13 },
     mentions: {
       color: c.inkFaint,

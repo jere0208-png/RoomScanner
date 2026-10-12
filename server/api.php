@@ -43,6 +43,18 @@ function sortir(array $reponse): void {
   exit;
 }
 
+/**
+ * LES CODES INTERNES SONT-ILS OUVERTS ? — relevé du patron : « l'app est
+ * encore en dev ». Le code maison donne le Pro sans passer par l'App Store :
+ * c'est ce qu'il faut pendant le développement (l'app n'est pas publiée, la
+ * feuille des codes d'Apple n'existe pas pour elle), et ce que la règle
+ * 3.1.1 interdit une fois l'app publiée. La config en décide :
+ * `CODES_INTERNES` à true le temps des essais, à false avant la publication.
+ */
+function codesInternesOuverts(): bool {
+  return defined('CODES_INTERNES') && CODES_INTERNES === true;
+}
+
 function jeton(string $identifiant): string {
   return hash_hmac('sha256', $identifiant, SECRET_HMAC);
 }
@@ -376,6 +388,7 @@ if ($action === 'connecter') {
     'jeton' => jeton($identifiant),
     'pro' => $compte['pro'],
     'plans' => max((int) $compte['plans'], $duTelephone),
+    'codes' => codesInternesOuverts(),
   ]);
 }
 
@@ -389,7 +402,7 @@ if (!$compte) {
 }
 
 if ($action === 'etat') {
-  sortir(['ok' => true, 'pro' => $compte['pro'], 'plans' => (int) $compte['plans']]);
+  sortir(['ok' => true, 'pro' => $compte['pro'], 'plans' => (int) $compte['plans'], 'codes' => codesInternesOuverts()]);
 }
 
 if ($action === 'plan') {
@@ -410,6 +423,9 @@ if ($action === 'plan') {
 }
 
 if ($action === 'code') {
+  if (!codesInternesOuverts()) {
+    sortir(['ok' => false, 'raison' => 'Les codes internes sont fermés.']);
+  }
   $code = strtoupper(trim((string) ($corps['code'] ?? '')));
   $req = mysqli_prepare(
     $db,
