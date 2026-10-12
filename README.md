@@ -14285,6 +14285,34 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Une lecture de plan refusée dit pourquoi
+
+Relevé du patron, photo d'un plan d'électricien à l'appui : « la lecture
+n'a pas abouti pour ce plan, vois pourquoi. Il la refuse directement. »
+
+Le serveur rendait la même phrase pour toute réponse de l'API d'Anthropic
+autre que 200 : « Le lecteur de plans a refusé la photo ». Plusieurs causes
+s'y confondaient pourtant :
+- une clé refusée ;
+- un compte sans crédit ;
+- un modèle inconnu ;
+- une image illisible.
+
+Un refus immédiat désigne presque toujours la clé ou le crédit. Une clé
+neuve ne fonctionne qu'une fois du crédit ajouté dans « Billing ».
+
+`raisonDuRefus` donne à chaque cause sa phrase, celle qui dit quoi faire :
+- crédit épuisé → console.anthropic.com › Billing ;
+- clé refusée → ANTHROPIC_CLE, sans espace ni retour à la ligne ;
+- modèle inconnu → ANTHROPIC_MODELE ;
+- photo trop lourde ou illisible ;
+- sinon, le code de l'API.
+
+Le détail technique s'écrit dans le journal d'erreurs de PHP (`error_log`),
+que le manager OVH montre et qui n'est pas public.
+
+Banc : `lectureplanecran` (« ce qui la porte »).
+
 ## Six nouveaux utilisateurs : ce qui les a bloqués, réparé
 
 Relevé du patron : « lance des agents sur l'application, ils auront chacun

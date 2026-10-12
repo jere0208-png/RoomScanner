@@ -414,6 +414,12 @@ describe('ce qui la porte', () => {
     expect(lecteur).toContain("'tool_choice' => ['type' => 'tool', 'name' => 'plan_lu']");
     expect(lecteur).toContain("'x-api-key: ' . ANTHROPIC_CLE");
     expect(lecteur).not.toMatch(/sk-ant-/);
+    // Un refus de l'API dit SA cause : crédit, clé, modèle, image (relevé du
+    // patron : « il la refuse directement », sans dire pourquoi).
+    expect(lecteur).toContain('function raisonDuRefus(');
+    expect(lecteur).toContain("stripos($message, 'credit balance')");
+    expect(lecteur).toContain('vérifiez ANTHROPIC_CLE');
+    expect(lecteur).toContain("error_log('EchoPlan lecture-plan : HTTP '");
     expect(lire('server', 'config-echoplan.exemple.php')).toContain("const ANTHROPIC_CLE = 'À_REMPLIR';");
     expect(lire('server', 'migration-lecture.sql')).toMatch(/ADD COLUMN lectures INT/);
     expect(lire('server', 'schema.sql')).toMatch(/lectures INT NOT NULL DEFAULT 0/);

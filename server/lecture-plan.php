@@ -129,6 +129,40 @@ function outilPlanLu(): array {
 }
 
 /**
+ * POURQUOI L'API A DIT NON, EN CLAIR — relevé du patron : « la lecture n'a
+ * pas abouti pour ce plan, il la refuse directement ». Toute réponse autre
+ * que 200 donnait la même phrase, « a refusé la photo » : une clé refusée,
+ * un compte sans crédit, un modèle inconnu et une image illisible se
+ * ressemblaient. Chacune a maintenant sa phrase — celle qui dit quoi faire —
+ * et le détail technique part dans le journal d'erreurs de PHP (le manager
+ * OVH le montre ; il n'est pas public).
+ */
+function raisonDuRefus(int $code, $reponse, string $modele): string {
+  $type = is_array($reponse) ? (string) ($reponse['error']['type'] ?? '') : '';
+  $message = is_array($reponse) ? (string) ($reponse['error']['message'] ?? '') : '';
+  error_log('EchoPlan lecture-plan : HTTP ' . $code . ' ' . $type . ' — ' . mb_substr($message, 0, 300));
+  if (stripos($message, 'credit balance') !== false || stripos($message, 'billing') !== false) {
+    return 'La lecture est suspendue : le compte Anthropic du serveur n’a plus de crédit (console.anthropic.com › Billing).';
+  }
+  if ($code === 401 || $type === 'authentication_error') {
+    return 'La clé Anthropic du serveur est refusée : vérifiez ANTHROPIC_CLE dans config-echoplan.php (sans espace ni retour à la ligne).';
+  }
+  if ($code === 403 || $type === 'permission_error') {
+    return 'La clé Anthropic du serveur n’a pas accès au modèle « ' . $modele . ' ».';
+  }
+  if ($code === 404 || $type === 'not_found_error') {
+    return 'Le modèle de lecture « ' . $modele . ' » est inconnu : vérifiez ANTHROPIC_MODELE dans config-echoplan.php.';
+  }
+  if ($code === 413 || $type === 'request_too_large') {
+    return 'La photo est trop lourde pour le lecteur : reprenez-la de plus près, ou importez-la en JPEG.';
+  }
+  if (stripos($message, 'image') !== false) {
+    return 'Le lecteur n’a pas pu ouvrir la photo : reprenez-la, ou importez-la en JPEG.';
+  }
+  return 'Le lecteur de plans a refusé la demande (code ' . $code . ($type !== '' ? ', ' . $type : '') . ') : réessayez dans un instant.';
+}
+
+/**
  * Lit le plan. `$image` : le JPEG en base64 ; `$textes` : ce que l'iPhone a
  * reconnu (Vision), [{t, x, y}] en millièmes. Rend ['ok' => true, 'lecture'
  * => …] ou ['ok' => false, 'raison' => …] — une raison qu'on peut montrer.
@@ -198,7 +232,7 @@ function lirePlanPapier(string $image, string $media, array $textes): array {
     return ['ok' => false, 'raison' => 'Le lecteur de plans est très demandé : réessayez dans une minute.'];
   }
   if ($code !== 200 || !is_array($reponse)) {
-    return ['ok' => false, 'raison' => 'Le lecteur de plans a refusé la photo : réessayez, ou importez-la autrement.'];
+    return ['ok' => false, 'raison' => raisonDuRefus($code, $reponse, $modele)];
   }
   if (($reponse['stop_reason'] ?? '') === 'max_tokens') {
     return ['ok' => false, 'raison' => 'Ce plan est trop chargé pour être lu d’un coup : photographiez-le en deux moitiés.'];
