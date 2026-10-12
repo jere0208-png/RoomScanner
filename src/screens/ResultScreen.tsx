@@ -122,6 +122,7 @@ import {
   type RoomPart,
   solDesMurs,
   perimetreDesPieces,
+  niveauDeReference,
 } from '../geometry/floorplan';
 import { hasCapturedColors, pointInPolygon } from '../geometry/appearance';
 import { planRoutes } from '../geometry/elecplan';
@@ -172,7 +173,7 @@ import {
   type FixtureKind,
 } from '../geometry/electrical';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useScanStore } from '../store/scanStore';
+import { nomDeVersion, useScanStore } from '../store/scanStore';
 import { useAccountStore } from '../store/accountStore';
 import { demarrerComplement, demarrerEtage, lancerUnScan } from '../native/useRoomScan';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
@@ -391,9 +392,11 @@ export function ResultScreen() {
     repère commun entre deux relevés qu'ARKit a démarrés à deux endroits
     différents.
   */
+  // Le dessous, ou à défaut le dessus : la cave se cale sur le rez-de-chaussée.
+  const niveauRef = niveauDeReference(niveaux, niveauCourant);
   const filigrane = useMemo(
-    () => tousLesMurs.filter((w) => niveauDe(w) === niveauCourant - 1),
-    [tousLesMurs, niveauCourant],
+    () => (niveauRef === null ? [] : tousLesMurs.filter((w) => niveauDe(w) === niveauRef)),
+    [tousLesMurs, niveauRef],
   );
   const addCeiling = useScanStore((s) => s.addCeiling);
   const notes = useScanStore((s) => s.notes);
@@ -713,18 +716,20 @@ export function ResultScreen() {
           haptic('leger');
         },
       })),
-      ...(niveauCourant !== Math.min(...niveaux)
+      ...(niveauDeReference(niveaux, niveauCourant) !== null
         ? [
             {
               /*
-                RECALER — seulement s il y a un niveau EN DESSOUS.
-
-                Recaler le rez-de-chaussee sur rien n aurait pas de sens :
-                c est lui la reference, et le filigrane qu on suit est
-                toujours celui du dessous.
+                RECALER — sur le niveau du dessous, ou à défaut sur celui
+                du dessus : la cave, le plus bas, se cale sur le
+                rez-de-chaussée (revue « Inès »). Un seul niveau : rien à
+                caler.
               */
               label: 'Recaler cet étage',
-              hint: 'Glissez le plan sur le filigrane du niveau du dessous.',
+              hint:
+                (niveauDeReference(niveaux, niveauCourant) ?? 0) < niveauCourant
+                  ? 'Glissez le plan sur le filigrane du niveau du dessous.'
+                  : 'Glissez le plan sur le filigrane du niveau du dessus.',
               icon: 'regle' as const,
               onPress: () => {
                 setRecalage(true);
@@ -1591,7 +1596,15 @@ export function ResultScreen() {
         { walls, openings, objects, rooms, fixtures },
         scanName,
       );
-      await RoomScan.shareText(obj, objFilename(scanName));
+      // Le niveau dans le nom, comme le DXF (revue « Inès »).
+      await RoomScan.shareText(
+        obj,
+        objFilename(
+          niveaux.length > 1
+            ? `${scanName} ${abregerNiveau(niveauCourant)}`
+            : scanName,
+        ),
+      );
     } catch (e: any) {
       alerte(expliquer('export', e).titre, expliquer('export', e).message);
     }
@@ -3175,6 +3188,29 @@ export function ResultScreen() {
     // Le cadre du plan prend ses marges, la rangée ses dix points de bord.
     return total > winLargeur - 2 * 16 - 20;
   })();
+  /*
+    « EXPLORER » GARDE SON MOT — revue « Chloé » : c'est la fonction qu'on
+    cherche le plus, et serrée, la rangée n'en laissait qu'un bonhomme blanc
+    sur fond bleu. « Travaux » perd le sien d'abord ; s'il manque encore de
+    la place, « Explorer » se dit « Visite », plus court.
+  */
+  const explorerCourt =
+    rangeeSerree &&
+    (() => {
+      const largeurs = [
+        !modeElec && piecesTravaux.length > 0 ? 34 : 0,
+        modeElec && totalDevis !== null && totalDevis > 0 ? 96 : 0,
+        modeElec ? 34 : 0,
+        !modeElec && alertesDePlan > 0 ? 34 : 0,
+        walls.length > 0 && tab === '2d' ? 34 : 0,
+        walls.length > 0 ? 118 : 0,
+        walls.length > 0 && tab === '3d' ? 66 : 0,
+        niveaux.length > 1 ? 74 : 0,
+        70,
+      ].filter((l) => l > 0);
+      const total = largeurs.reduce((t, l) => t + l, 0) + 8 * (largeurs.length - 1);
+      return total > winLargeur - 2 * 16 - 20;
+    })();
 
   const metrics = [
     ...(rooms.length > 1
@@ -3685,6 +3721,34 @@ export function ResultScreen() {
                           },
                         },
                       ]),
+                  {
+                    /*
+                      UNE AUTRE VERSION, SANS PERDRE CELLE-CI — revue
+                      « Chloé » : rien dans le plan ne permettait de garder
+                      la version A avant d'essayer la B, et quitter le plan
+                      l'enregistrait par-dessus. On range la version
+                      actuelle telle qu'elle est, puis on ouvre sa copie.
+                    */
+                    label: 'Dupliquer pour essayer une autre version',
+                    icon: 'sauver' as const,
+                    hint: 'Le plan actuel reste intact.',
+                    onPress: () =>
+                      ouvrirApres(() =>
+                        setPrompt({
+                          title: 'Nom de la nouvelle version',
+                          subtitle: `« ${scanName} » reste tel quel.`,
+                          value: nomDeVersion(
+                            scanName,
+                            useScanStore.getState().saves.map((x) => x.name),
+                          ),
+                          onSubmit: (t) => {
+                            const s = useScanStore.getState();
+                            if (s.dirty && s.currentSaveId) s.commitCurrent();
+                            saveAsCopy(t);
+                          },
+                        }),
+                      ),
+                  },
                   {
                     label: 'Renommer le scan',
                     icon: 'renommer' as const,
@@ -4584,7 +4648,7 @@ export function ResultScreen() {
             )}
             {walls.length > 0 && (
               <TouchableOpacity
-                style={[styles.vuePastille, styles.explorerPastille, rangeeSerree && styles.pastilleIcone]}
+                style={[styles.vuePastille, styles.explorerPastille]}
                 accessibilityLabel="Explorer"
                 accessibilityHint="Entrer dans la pièce et s’y promener"
                 onPress={() => {
@@ -4594,7 +4658,7 @@ export function ResultScreen() {
                 <Svg width={16} height={16} viewBox="0 0 24 24">
                   <Trace d={SOLAIRES.marcher} fill="#FFFFFF" fillRule="evenodd" />
                 </Svg>
-                {!rangeeSerree && <Text style={styles.explorerPastilleTexte}>Explorer</Text>}
+                <Text style={styles.explorerPastilleTexte}>{explorerCourt ? 'Visite' : 'Explorer'}</Text>
               </TouchableOpacity>
             )}
             {/*

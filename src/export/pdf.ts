@@ -6802,8 +6802,15 @@ export function materialFilename(name: string): string {
 }
 
 export function pdfFilename(name: string): string {
+  /*
+    « É » DEVIENT « E », IL NE DISPARAÎT PAS — revue « Inès » : « 1er étage »
+    donnait « 1er-tage », « Rez-de-chaussée » « Rez-de-chausse ». Et le
+    « + » de « R+1 » reste.
+  */
   const clean = latin1(name)
-    .replace(/[^\w\- ]/g, '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\w\-+ ]/g, '')
     .trim()
     .replace(/\s+/g, '-');
   return `${clean || 'echoplan'}.pdf`;

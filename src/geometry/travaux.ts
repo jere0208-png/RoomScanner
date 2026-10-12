@@ -256,7 +256,8 @@ export interface Achats {
      * Teinte par teinte, dès qu'une couleur est choisie : chacune s'achète à
      * part, et `pots` en fait la somme. `cle` vaut `''` sans choix.
      */
-    parTeinte?: { cle: string; surface: number; litres: number; pots: number }[];
+    /** Les pièces de chaque teinte, pour savoir où va le pot (revue « Lucas »). */
+    parTeinte?: { cle: string; surface: number; litres: number; pots: number; pieces: string[] }[];
   };
   plafonds: { surface: number; litres: number; pots: number };
   sol: { surface: number; avecChute: number; paquets: number };
@@ -286,9 +287,13 @@ export function achats(pieces: PieceTravaux[], h: HypothesesTravaux = HYPOTHESES
   let murs: Achats['murs'] = peinture(somme((p) => p.murs));
   if (pieces.some((p) => p.teintes?.some((t) => t.cle !== ''))) {
     const parCle = new Map<string, number>();
+    const ou = new Map<string, string[]>();
     for (const p of pieces) {
       for (const t of p.teintes ?? [{ cle: '', surface: p.murs }]) {
         parCle.set(t.cle, (parCle.get(t.cle) ?? 0) + t.surface);
+        const noms = ou.get(t.cle) ?? [];
+        if (t.surface > 0 && !noms.includes(p.nom)) noms.push(p.nom);
+        ou.set(t.cle, noms);
       }
     }
     const parTeinte = [...parCle.entries()]
@@ -300,6 +305,7 @@ export function achats(pieces: PieceTravaux[], h: HypothesesTravaux = HYPOTHESES
           surface: auDixieme(s),
           litres: auDixieme(litres),
           pots: litres > 0 ? Math.ceil(litres / h.pot - 1e-9) : 0,
+          pieces: ou.get(cle) ?? [],
         };
       });
     murs = { ...murs, pots: parTeinte.reduce((t, x) => t + x.pots, 0), parTeinte };

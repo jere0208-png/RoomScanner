@@ -4663,6 +4663,22 @@ export function partRecouverte(existants: WallSeg[], venus: WallSeg[]): number {
 }
 
 /**
+ * LE NIVEAU SUR LEQUEL ON CALE CELUI QU'ON REGARDE — celui du dessous, ou à
+ * défaut celui du dessus.
+ *
+ * Revue « Inès » : « Recaler cet étage » ne s'offrait qu'aux niveaux qui
+ * en avaient un en dessous ; la cave, le plus bas, ne se recalait jamais,
+ * alors qu'elle arrive avec le cap quelconque de son scan. Elle se cale sur
+ * le rez-de-chaussée. Un seul niveau : rien à caler.
+ */
+export function niveauDeReference(niveaux: number[], n: number): number | null {
+  const dessous = niveaux.filter((x) => x < n);
+  if (dessous.length > 0) return Math.max(...dessous);
+  const dessus = niveaux.filter((x) => x > n);
+  return dessus.length > 0 ? Math.min(...dessus) : null;
+}
+
+/**
  * Le nom COURT d'un niveau, pour la pastille du plan.
  *
  * Elle est large comme « 2D » : « Rez-de-chaussee » n'y entre pas. Les

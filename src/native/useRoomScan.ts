@@ -30,8 +30,19 @@ const INSTRUCTIONS_FR: Record<string, string> = {
  * Fonction LIBRE, pas une commande du hook : l'écran des résultats l'appelle
  * sans avoir à s'abonner au flux du scan, dont il n'a que faire.
  */
+/**
+ * LE SCAN EST PARTI D'UN PLAN — et l'abandon y ramène, même après un échec.
+ *
+ * Revue « Inès » : un scan de cave raté désarmait le niveau en cours ;
+ * « Quitter le scan » ne savait plus d'où l'on venait, remettait tout à zéro
+ * et renvoyait à l'accueil, dossier refermé, brouillon effacé. On retient
+ * le départ jusqu'à la sortie, quelle qu'elle soit.
+ */
+let partiDUnPlan = false;
+
 export async function demarrerComplement(): Promise<void> {
   const st = useScanStore.getState();
+  partiDUnPlan = true;
   /*
     ADDITIF SEULEMENT AVEC LES PASSAGES DU PLAN — revue « Agathe ». L'iPhone
     ne garde les passages qu'en mémoire : après un redémarrage il n'en a
@@ -89,6 +100,7 @@ export async function demarrerEtage(n: number): Promise<void> {
   }
   st.scannerUnEtage(n);
   st.beginScan();
+  partiDUnPlan = true;
   try {
     await RoomScan.start();
   } catch (e) {
@@ -117,6 +129,7 @@ export async function lancerUnScan(): Promise<void> {
   }
   // Un relevé neuf : rien du chantier d'avant (voir `repartirANeuf`).
   st.repartirANeuf();
+  partiDUnPlan = false;
   st.setError(null);
   st.beginScan();
   await RoomScan.start();
@@ -229,6 +242,7 @@ function resumerLeReleve() {
   const begin = async () => {
     // Un relevé neuf : rien du chantier d'avant (voir `repartirANeuf`).
     store.repartirANeuf();
+    partiDUnPlan = false;
     store.setError(null);
     store.beginScan();
     await RoomScan.start();
@@ -320,6 +334,8 @@ function resumerLeReleve() {
           complémentaire — et ils convergent trois lignes plus haut. L'écran,
           lui, ne saurait pas d'où l'on vient.
         */
+        // Arrivé au plan : le prochain scan dira lui-même d'où il part.
+        partiDUnPlan = false;
         montrerLeBilan();
         annoncerLaDepense(result);
         if (ecartes) direCeQuiEstEcarte(ecartes);
@@ -365,7 +381,8 @@ function resumerLeReleve() {
     cancel: () => {
       RoomScan.pause();
       const s = useScanStore.getState();
-      if (s.complementEnCours || s.etageEnCours !== null) {
+      if (partiDUnPlan || s.complementEnCours || s.etageEnCours !== null) {
+        partiDUnPlan = false;
         s.setComplement(false);
         // Sans ça, le scan SUIVANT atterrirait à l'étage qu'on vient
         // d'abandonner : c'est la même précaution que sur l'échec du

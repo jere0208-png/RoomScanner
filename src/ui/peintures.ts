@@ -81,5 +81,11 @@ export function nomDePeinture(cle: string | null | undefined): string | null {
  * « Décorer » (la clé vide).
  */
 export function nomDeTeinte(cle: string): string {
-  return nomDePeinture(cle) ?? 'Sans teinte choisie';
+  /*
+    SANS CHOIX, C'EST LE BLANC CASSÉ — revue « Lucas » : choisir « Blanc
+    cassé » dans Décorer n'enregistre rien (c'est la teinte de départ), et
+    la liste d'achats écrivait « Sans teinte choisie ». Le mur, lui, est
+    bien peint en blanc cassé : on le dit.
+  */
+  return nomDePeinture(cle || PEINTURE_DEFAUT) ?? 'Sans teinte choisie';
 }

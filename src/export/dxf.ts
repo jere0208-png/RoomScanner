@@ -362,18 +362,27 @@ export function buildDxf(plan: PlanPourDxf): string {
     out += texte(CALQUE.elec, { x: p.x + 0.1, z: p.z }, 100, f.kind);
   }
 
-  /* Les meubles : leur emprise au sol, rien de plus. */
+  /*
+    Les meubles : leur emprise au sol, TOURNÉE COMME SUR LE PLAN — revue
+    « Inès » : un banc de 2 × 0,5 m tourné d'un quart de tour sortait couché
+    en x. Les deux axes du meuble (colonnes x et z de sa matrice) donnent
+    ses quatre coins, quel que soit l'angle.
+  */
   for (const o of plan.objects ?? []) {
-    const cx = o.transform[12];
-    const cz = o.transform[14];
+    const t = o.transform;
+    const cx = t[12];
+    const cz = t[14];
+    const lx = Math.hypot(t[0], t[2]) || 1;
+    const lz = Math.hypot(t[8], t[10]) || 1;
+    const ux = { x: t[0] / lx, z: t[2] / lx };
+    const uz = { x: t[8] / lz, z: t[10] / lz };
     const w = o.width / 2;
     const d = o.depth / 2;
-    out += polyligne(CALQUE.meubles, [
-      { x: cx - w, z: cz - d },
-      { x: cx + w, z: cz - d },
-      { x: cx + w, z: cz + d },
-      { x: cx - w, z: cz + d },
-    ]);
+    const coin = (sx: number, sz: number) => ({
+      x: cx + ux.x * w * sx + uz.x * d * sz,
+      z: cz + ux.z * w * sx + uz.z * d * sz,
+    });
+    out += polyligne(CALQUE.meubles, [coin(-1, -1), coin(1, -1), coin(1, 1), coin(-1, 1)]);
   }
 
   /* La cote de chaque mur, sur son calque : elle se relit, elle ne se calcule pas. */
@@ -395,7 +404,8 @@ export function buildDxf(plan: PlanPourDxf): string {
 
 /** Le nom du fichier : celui du dossier, débarrassé de ce qu'un disque refuse. */
 export function dxfFilename(nom: string): string {
-  const base = sansAccent(nom).trim().replace(/[^A-Za-z0-9 _-]/g, ' ');
+  // Le « + » reste : « R+1 » devenait « R-1 », lu comme un sous-sol (revue « Inès »).
+  const base = sansAccent(nom).trim().replace(/[^A-Za-z0-9 _+-]/g, ' ');
   const propre = base.replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
   return `${propre || 'plan'}.dxf`;
 }

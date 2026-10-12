@@ -197,9 +197,10 @@ describe('la peinture, teinte par teinte', () => {
   it('chaque teinte a ses pots, achetés à part', () => {
     const a = achats(pieces, HYPOTHESES);
     // Sauge : 65 m² → 13 L → 6 pots de 2,5 L. Terracotta : 7,5 m² → 1,5 L → 1 pot.
+    // Et chacune dit où elle va (revue « Lucas »).
     expect(a.murs.parTeinte).toEqual([
-      { cle: 'sauge', surface: 65, litres: 13, pots: 6 },
-      { cle: 'terracotta', surface: 7.5, litres: 1.5, pots: 1 },
+      { cle: 'sauge', surface: 65, litres: 13, pots: 6, pieces: ['Chambre', 'Séjour'] },
+      { cle: 'terracotta', surface: 7.5, litres: 1.5, pots: 1, pieces: ['Chambre'] },
     ]);
     // Sept pots, quand le compte d'un seul bloc (14,5 L) en donnait six.
     expect(a.murs.pots).toBe(7);

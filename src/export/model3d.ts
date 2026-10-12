@@ -89,10 +89,17 @@ export function buildObj(model: ModelForExport, name = 'EchoPlan'): string {
     // Un contour n'est pas une surface ; une arête isolée non plus.
     if (face.fill === null || face.pts.length < 3) continue;
     const [rouge, vert, bleu] = rgbDe(face.fill);
+    /*
+      LE Z DU PLAN EST LE Z DU FICHIER — revue « Inès » : il s'écrivait
+      retourné, un seul axe, et la maison s'ouvrait dans Blender en miroir
+      de son plan (le DXF, lui, était juste). Le repère de l'iPhone est déjà
+      celui de l'OBJ — y vers le haut, main droite. Les faces se lisent dans
+      l'autre sens pour garder leur endroit tourné du même côté qu'avant.
+    */
     for (const p of face.pts) {
-      verts.push(`v ${n3(p.x)} ${n3(p.y)} ${n3(-p.z)} ${n3(rouge)} ${n3(vert)} ${n3(bleu)}`);
+      verts.push(`v ${n3(p.x)} ${n3(p.y)} ${n3(p.z)} ${n3(rouge)} ${n3(vert)} ${n3(bleu)}`);
     }
-    const idx = face.pts.map((_, i) => base + i).join(' ');
+    const idx = face.pts.map((_, i) => base + i).reverse().join(' ');
     const g = groupOf(face);
     const list = byGroup.get(g) ?? [];
     list.push(`f ${idx}`);
@@ -112,7 +119,7 @@ export function objFilename(name: string): string {
   const clean = name
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
-    .replace(/[^\w\- ]/g, '')
+    .replace(/[^\w\-+ ]/g, '')
     .trim()
     .replace(/\s+/g, '-');
   return `${clean || 'echoplan'}.obj`;

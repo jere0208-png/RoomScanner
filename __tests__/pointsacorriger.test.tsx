@@ -53,7 +53,8 @@ describe('le nord à orienter se dit en clair', () => {
   it('le prix du devis ne sort plus de l’écran : la rangée se serre quand elle déborde', () => {
     const ecran = lire('src/screens/ResultScreen.tsx');
     expect(ecran).toContain('return total > winLargeur - 2 * 16 - 20;');
-    expect(ecran).toContain('{!rangeeSerree && <Text style={styles.explorerPastilleTexte}>Explorer</Text>}');
+    // « Explorer » garde son mot (revue « Chloé ») : serré, il se dit « Visite ».
+    expect(ecran).toContain("<Text style={styles.explorerPastilleTexte}>{explorerCourt ? 'Visite' : 'Explorer'}</Text>");
     expect(ecran).toContain('{!rangeeSerree && <Text style={styles.vuePastilleTexte}>Travaux</Text>}');
   });
 });

@@ -14285,6 +14285,48 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Deuxième tournée, suite : exports justes, versions, Décorer avec des noms
+
+La suite de la deuxième tournée d'utilisateurs, une fois les pertes de
+travail réglées.
+
+**Les exports d'Inès** (architecte, maison sur trois niveaux) :
+- le DXF tourne les meubles comme le plan : leurs quatre coins viennent des
+  deux axes de leur matrice. Un banc tourné d'un quart de tour ne sort plus
+  couché ;
+- l'OBJ n'est plus en miroir : le z du plan est écrit tel quel (le repère
+  de l'iPhone est déjà celui de l'OBJ), et les faces se lisent dans l'autre
+  sens pour garder leur endroit ;
+- les noms de fichiers gardent « R+1 » (il devenait « R-1 », lu comme un
+  sous-sol). Les accents des PDF deviennent des lettres simples
+  (« 1er-etage » au lieu de « 1er-tage »). L'OBJ porte son niveau, comme le
+  DXF ;
+- la cave se recale : chaque niveau se cale sur celui du dessous, ou à
+  défaut sur celui du dessus (`niveauDeReference`), et le filigrane suit ;
+- un scan d'étage ou de cave qui échoue ramène au plan, et non plus à
+  l'accueil avec le dossier refermé.
+
+**Les versions de Chloé** (premier appartement) :
+- « Dupliquer pour essayer une autre version » dans le menu du plan. La
+  version actuelle est enregistrée telle quelle, puis sa copie s'ouvre ;
+- une copie prend un nom libre (« … — version 2 », `nomDeVersion`), et un
+  bandeau dit dans quel plan on se trouve ;
+- dans Décorer, chaque teinte et chaque sol portent leur nom sous le rond,
+  et la section dit ce qui est pris (« Les murs : Vert sauge ») ;
+- « Explorer » garde toujours son mot. Quand la rangée est serrée,
+  « Travaux » perd le sien d'abord, puis « Explorer » devient « Visite » ;
+- un toucher sur la poignée de rotation d'un meuble le tourne d'un quart de
+  tour. Le glisser garde l'angle libre.
+
+**Les achats de Lucas** (repeindre) :
+- le prix d'un pot, d'un paquet, d'une barre suit sa taille, au même prix
+  au litre (au m², au mètre). Passer aux pots de 10 L ne divise plus le
+  budget par trois ;
+- « Blanc cassé », la teinte de départ, se dit dans la liste au lieu de
+  « Sans teinte choisie », et chaque teinte nomme les pièces où elle va.
+
+Banc : `secondetournee`.
+
 ## Deuxième tournée d'utilisateurs : rien ne se perd, les niveaux restent à leur place
 
 Six profils ont parcouru l'application, chacun avec son but : Chloé (premier

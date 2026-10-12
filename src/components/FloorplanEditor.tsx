@@ -4789,7 +4789,19 @@ export function RotateHandle({
           const deg = Math.round(((yaw - vr) * 180) / Math.PI);
           setAngle(((deg % 360) + 360) % 360);
         },
-        onPanResponderRelease: () => setAngle(null),
+        /*
+          UN TOUCHER TOURNE D'UN QUART — revue « Chloé » : toucher la flèche
+          ne faisait rien, il fallait la tirer, et l'on croyait la rotation
+          en panne. Le glisser garde l'angle libre ; le toucher, lui, fait le
+          geste qu'on attend d'une flèche qui tourne.
+        */
+        onPanResponderRelease: (_e, g) => {
+          if (!seuil.franchi(g.dx, g.dy)) {
+            useScanStore.getState().rotateObject(objectId, 1);
+            haptic('accroche');
+          }
+          setAngle(null);
+        },
         onPanResponderTerminate: () => setAngle(null),
       }),
     [objectId, seuil],

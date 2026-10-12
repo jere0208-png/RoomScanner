@@ -38,7 +38,7 @@ import {
   type PrixTravaux,
 } from '../geometry/travaux';
 import { useReglagesTravaux } from '../store/reglagesTravaux';
-import { hexDePeinture, nomDeTeinte } from '../ui/peintures';
+import { PEINTURE_DEFAUT, hexDePeinture, nomDeTeinte } from '../ui/peintures';
 
 const COCHE = 'M6 12.5 l4 4 l8 -9';
 
@@ -187,9 +187,9 @@ export function TravauxSheet({
               key={t.cle || 'aucune'}
               style={s.teinte}
               accessibilityLabel={`${nomDeTeinte(t.cle)} : ${t.pots} pot${t.pots > 1 ? 's' : ''}`}>
-              <View style={[s.teintePastille, { backgroundColor: hexDePeinture(t.cle) ?? c.line }]} />
+              <View style={[s.teintePastille, { backgroundColor: hexDePeinture(t.cle || PEINTURE_DEFAUT) ?? c.line }]} />
               <Text style={s.teinteNom} numberOfLines={1}>
-                {nomDeTeinte(t.cle)}
+                {t.pieces.length > 0 ? `${nomDeTeinte(t.cle)} · ${t.pieces.join(', ')}` : nomDeTeinte(t.cle)}
               </Text>
               <Text style={s.teinteDetail}>
                 {`${t.pots} pot${t.pots > 1 ? 's' : ''} · ${nombre(t.litres)} L pour ${nombre(t.surface)} m²`}

@@ -647,6 +647,19 @@ function groupeDesMurs(murs: { roomId?: string }[]): { roomId?: string } {
   return roomId ? { roomId } : {};
 }
 
+/**
+ * Un nom de plan que personne ne porte encore : « Version A », sinon
+ * « Version A — version 2 », « — version 3 »…
+ */
+export function nomDeVersion(nom: string, pris: string[]): string {
+  const deja = new Set(pris.map((x) => x.trim().toLowerCase()));
+  if (!deja.has(nom.trim().toLowerCase())) return nom.trim();
+  const base = nom.trim().replace(/ — version \d+$/, '');
+  let k = 2;
+  while (deja.has(`${base} — version ${k}`.toLowerCase())) k++;
+  return `${base} — version ${k}`;
+}
+
 /** Une clé de relevé : unique, courte, sans signification. */
 function nouvelleCle(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -8383,7 +8396,13 @@ export const useScanStore = create<ScanState>((set, get) => {
       // Une copie est un plan : voir `placePourUnPlanDePlus`.
       if (!placePourUnPlanDePlus()) return;
       const now = Date.now();
-      const clean = name.trim() || `${st.scanName} (copie)`;
+      /*
+        UNE COPIE PORTE UN NOM À ELLE — revue « Chloé » : le champ gardait le
+        nom du plan, et « Mes scans » montrait deux « Version A » sans dire
+        laquelle on modifiait. Un nom déjà pris devient « … — version 2 ».
+      */
+      const ancien = st.scanName;
+      const clean = nomDeVersion(name.trim() || ancien || 'Plan', st.saves.map((x) => x.name));
       const save: SavedScan = {
         id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
         name: clean,
@@ -8406,9 +8425,17 @@ export const useScanStore = create<ScanState>((set, get) => {
         devis: devisDuPlan(st),
       };
       const saves = [save, ...st.saves];
+      const avaitUneEntree = !!st.currentSaveId;
       set({ saves, currentSaveId: save.id, scanName: clean, dirty: false });
       persistSoon(saves);
       deposerPlusTard(save.id);
+      // L'écran bascule sur la copie : on le dit (revue « Chloé »).
+      astuce(
+        avaitUneEntree
+          ? `Vous êtes dans « ${clean} ». « ${ancien} » n’a pas bougé.`
+          : `Copie créée : vous êtes dans « ${clean} ».`,
+        { icone: 'save' },
+      );
     },
 
     addFolder: (name) => {

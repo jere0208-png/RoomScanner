@@ -153,9 +153,15 @@ export function DecorSheet({
     <View style={s.nuancier}>
       {liste.map((p) => {
         const on = p.cle === prise;
+        /*
+          LE NOM SOUS LE ROND — revue « Chloé » : sept blancs et beiges
+          indiscernables sur fond blanc, deux gris unis pour le béton ciré et
+          la moquette, et rien pour dire « vert sauge et chêne clair » à
+          quelqu'un. La grille des peintures du mur l'écrivait déjà.
+        */
         return (
+          <View key={p.cle} style={[s.teinte, { width: taille + 18 }]}>
           <Pressable
-            key={p.cle}
             accessibilityRole="button"
             accessibilityLabel={dire(p)}
             accessibilityState={{ selected: on }}
@@ -192,10 +198,16 @@ export function DecorSheet({
               </Svg>
             )}
           </Pressable>
+            <Text style={[s.teinteNom, on && s.teinteNomPrise]} numberOfLines={2}>
+              {p.nom}
+            </Text>
+          </View>
         );
       })}
     </View>
   );
+  /** « Les murs : Vert sauge » — ce qui est pris se lit sans chercher la coche. */
+  const nomPris = (liste: Peinture[], cle: string) => liste.find((p) => p.cle === cle)?.nom;
 
   const st = useScanStore.getState;
   return (
@@ -238,14 +250,18 @@ export function DecorSheet({
             )}
             {piece && (
               <>
-                <Text style={s.section}>Les murs</Text>
+                <Text style={s.section}>
+                  {`Les murs : ${nomPris(PEINTURES, piece.peinture ?? PEINTURE_DEFAUT) ?? ''}`}
+                </Text>
                 {nuancier(
                   PEINTURES,
                   piece.peinture ?? PEINTURE_DEFAUT,
                   (p) => `Murs : ${p.nom}`,
                   (cle) => st().setRoomPeinture(piece.id, cle === PEINTURE_DEFAUT ? null : cle),
                 )}
-                <Text style={s.section}>Le sol</Text>
+                <Text style={s.section}>
+                  {`Le sol : ${nomPris(SOLS, piece.sol ?? SOL_DEFAUT) ?? ''}`}
+                </Text>
                 {nuancier(
                   SOLS,
                   piece.sol ?? SOL_DEFAUT,
@@ -320,7 +336,10 @@ const getStyles = themedStyles((c: Palette) =>
       marginTop: 16,
       marginBottom: 8,
     },
-    nuancier: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+    nuancier: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, rowGap: 8 },
+    teinte: { alignItems: 'center' },
+    teinteNom: { color: c.inkSoft, fontSize: 10.5, lineHeight: 13, marginTop: 4, textAlign: 'center' },
+    teinteNomPrise: { color: c.ink, fontWeight: '800' },
     pastille: {
       borderWidth: 1,
       borderColor: c.line,

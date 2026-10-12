@@ -136,7 +136,26 @@ export const useReglagesTravaux = create<Etat>((set, get) => ({
   },
 
   regler: (h) => {
-    set({ hypotheses: { ...get().hypotheses, ...h } });
+    const avant = get().hypotheses;
+    const apres = { ...avant, ...h };
+    /*
+      LE PRIX SUIT LA CONTENANCE — revue « Lucas » : un pot coûtait 35 €
+      qu'il fasse 2,5 L ou 10 L, et passer aux pots de 10 L divisait le
+      budget par trois. Le prix d'unité est celui d'un pot, d'un paquet,
+      d'une barre DE LA TAILLE RÉGLÉE : la taille change, le prix suit,
+      au même prix au litre (au m², au mètre).
+    */
+    const k = (cle: 'pot' | 'paquet' | 'barre') =>
+      avant[cle] > 0 && apres[cle] !== avant[cle] ? apres[cle] / avant[cle] : 1;
+    const p = get().prix;
+    const prix = {
+      ...p,
+      potMurs: Math.round(p.potMurs * k('pot')),
+      potPlafond: Math.round(p.potPlafond * k('pot')),
+      paquetSol: Math.round(p.paquetSol * k('paquet')),
+      barrePlinthe: Math.round(p.barrePlinthe * k('barre')),
+    };
+    set({ hypotheses: apres, prix });
     ecrire(get());
   },
 
