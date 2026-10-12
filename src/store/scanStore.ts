@@ -2486,6 +2486,8 @@ interface ScanState {
   addObject: (item: CatalogItem, x: number, z: number) => string;
   /** Fait pivoter un meuble d'un quart de tour. */
   rotateObject: (id: string, quarts?: number) => void;
+  /** Le côté de la méridienne d'un canapé d'angle (revue « Yasmine »). */
+  setMeridienne: (id: string, cote: 'gauche' | 'droite') => void;
   /** Oriente un meuble à l'angle donné (radians). */
   setObjectYaw: (id: string, yaw: number) => void;
   /**
@@ -8639,6 +8641,20 @@ export const useScanStore = create<ScanState>((set, get) => {
         get().rangerMeuble(id, x, z, undefined, true);
       }
       return id;
+    },
+
+    setMeridienne: (id, cote) => {
+      const st = get();
+      const o = st.objects.find((x) => x.id === id);
+      if (!o) return;
+      const autres = (o.attributes ?? []).filter((a) => !/^(SofaType|SofaAngle):/i.test(a));
+      pushHistory(`meridienne:${id}`);
+      set({
+        objects: st.objects.map((x) =>
+          x.id === id ? { ...x, attributes: [...autres, 'SofaType:lShaped', `SofaAngle:${cote}`] } : x,
+        ),
+        dirty: true,
+      });
     },
 
     rotateObject: (id, quarts = 1) => {

@@ -138,7 +138,7 @@ import {
   type P3,
   type ScenePalette,
 } from '../geometry/scene3d';
-import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
+import { frCategory, furnKind, furnitureStrokes, meridienneDe } from '../geometry/furniture';
 import { ecarterLesGaines } from '../geometry/routing';
 import { matieresDesSols } from '../ui/maquette';
 import { accentsDesPieces, peinturesDesPieces, solsDesPieces } from '../ui/habillage';
@@ -2300,7 +2300,7 @@ function planPage(
         [hw, hd],
         [-hw, hd],
       ].map(([lx, lz]) => loc(lx, lz));
-      const traits = furnitureStrokes(furnKind(o.category), o.width, o.depth).map(
+      const traits = furnitureStrokes(furnKind(o.category), o.width, o.depth, meridienneDe(ob)).map(
         (line) => line.map((q) => loc(q.x, q.y)),
       );
       return { o, loc, contour, traits };

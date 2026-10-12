@@ -142,7 +142,7 @@ import {
   type VolumeVerdict,
 } from '../geometry/volumes';
 import { buyingList, pullSchedule } from '../geometry/conduits';
-import { frCategory } from '../geometry/furniture';
+import { frCategory, meridienneDe } from '../geometry/furniture';
 import {
   battantsDesPortes,
   meublesQuiBloquent,
@@ -1788,7 +1788,9 @@ export function ResultScreen() {
               )
             : null,
         ),
-        metreFilename(scanName),
+        // Un niveau parmi plusieurs se dit dans le nom (revue « Sébastien » :
+        // les deux niveaux sortaient sous le même nom de fichier).
+        metreFilename(niveaux.length > 1 ? `${scanName} — ${nomDuNiveau(niveauCourant)}` : scanName),
       );
     } catch (e: any) {
       alerte(expliquer('export', e).titre, expliquer('export', e).message);
@@ -1813,7 +1815,8 @@ export function ResultScreen() {
     if (!exportOuvert('le DXF')) return;
     try {
       await RoomScan.shareText(
-        buildDxf({ walls, openings, rooms, fixtures, objects }),
+        // Le plafond (rubans LED compris) en mode Électricité, là où il existe.
+        buildDxf({ walls, openings, rooms, fixtures, objects, ceiling: modeElec ? ceiling : [] }),
         dxfFilename(
           niveaux.length > 1
             ? `${scanName} ${abregerNiveau(niveauCourant)}`
@@ -5294,6 +5297,17 @@ export function ResultScreen() {
               setDraftObject(null);
             }}
             onRotate={() => rotateObject(selectedObject.id)}
+            onMeridienne={(() => {
+              const cote = meridienneDe(selectedObject);
+              if (!cote) return undefined;
+              return {
+                cote,
+                basculer: () => {
+                  useScanStore.getState().setMeridienne(selectedObject.id, cote === 'droite' ? 'gauche' : 'droite');
+                  haptic('succes');
+                },
+              };
+            })()}
             onCancel={cancelObject}
             passage={verdictDePassage}
             teinte={selectedObject.teinte ?? null}

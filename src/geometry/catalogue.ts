@@ -95,6 +95,14 @@ export const CATALOGUE: CatalogFamily[] = [
       { key: 'evier', label: 'Évier', category: 'sink', w: 0.8, d: 0.6, h: 0.9 },
       { key: 'plaque', label: 'Plaque de cuisson', category: 'stove', w: 0.6, d: 0.52, h: 0.9 },
       { key: 'four', label: 'Four', category: 'oven', w: 0.6, d: 0.6, h: 0.6, base: 0.6 },
+      /*
+        LE FOUR SOUS LA PLAQUE, D'UN BLOC — revue « Bernard » : le four du
+        catalogue va de 0,60 à 1,20 m (en colonne), la plaque est un meuble
+        bas ; posés l'un sur l'autre, ils se cognaient et le four partait
+        52 cm en avant. Le « four sous plaque » est le meuble entier : four
+        encastré, manettes, table de cuisson.
+      */
+      { key: 'fourEtPlaque', label: 'Four sous plaque', category: 'stove', w: 0.6, d: 0.6, h: 0.9 },
       { key: 'microOndes', label: 'Micro-ondes', category: 'oven', w: 0.5, d: 0.4, h: 0.3, base: 1.0 },
       { key: 'frigo', label: 'Réfrigérateur', category: 'refrigerator', w: 0.6, d: 0.65, h: 1.85 },
       { key: 'lv', label: 'Lave-vaisselle', category: 'dishwasher', w: 0.6, d: 0.6, h: 0.85 },

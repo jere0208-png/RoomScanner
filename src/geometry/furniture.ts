@@ -323,10 +323,25 @@ const AUTRES: Record<string, string> = {
  * l'EXACT OPPOSÉ de la 3D — la chaise du chantier tournait le dos au mur sur
  * le plan et à la pièce dans le volume.
  */
+/**
+ * DE QUEL CÔTÉ AVANCE LA MÉRIDIENNE d'un canapé d'angle — `null` pour un
+ * canapé droit. Le catalogue (`canapeAngle`) ou le scan (`SofaType:lShaped`)
+ * disent que c'est un angle ; `SofaAngle:gauche|droite` dit le côté, à
+ * droite par défaut, comme la 3D.
+ */
+export function meridienneDe(o: { modele?: string; attributes?: string[] }): 'gauche' | 'droite' | null {
+  const attrs = o.attributes ?? [];
+  const angle = o.modele === 'canapeAngle' || attrs.some((a) => /^SofaType:lShaped$/i.test(a));
+  if (!angle) return null;
+  return attrs.some((a) => /^SofaAngle:gauche$/i.test(a)) ? 'gauche' : 'droite';
+}
+
 export function furnitureStrokes(
   kind: FurnKind,
   w: number,
   d: number,
+  /** Le côté de la méridienne, pour un canapé d'angle (`meridienneDe`). */
+  meridienne?: 'gauche' | 'droite' | null,
 ): { x: number; y: number }[][] {
   const hw = w / 2;
   const hd = d / 2;
@@ -380,6 +395,23 @@ export function furnitureStrokes(
       permet — deux places ou trois, ça se voit sur un plan.
     */
     case 'sofa': {
+      /*
+        LE CANAPÉ D'ANGLE SE DESSINE EN L — revue « Yasmine » : sur le plan,
+        dans le PDF et sur la vignette, il sortait en canapé droit de trois
+        places. Le dossier, l'assise courte, et la méridienne qui avance
+        jusqu'au bord, du côté choisi.
+      */
+      if (meridienne) {
+        const s = meridienne === 'gauche' ? -1 : 1;
+        const lx = (x: number) => s * x;
+        return [
+          rect(-1, 0.55, 1, 1),
+          rect(lx(-1), -0.15, lx(-0.82), 0.55),
+          trait(lx(-0.82), -0.15, lx(0.35), -0.15),
+          rect(lx(0.35), -1, lx(1), 0.55),
+          trait(lx(-0.24), -0.15, lx(-0.24), 0.55),
+        ];
+      }
       const dessin = [
         // Dossier, côté dos.
         rect(-1, 0.45, 1, 1),

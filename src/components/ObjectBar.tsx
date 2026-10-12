@@ -185,6 +185,7 @@ export function ObjectBar({
   onPassage,
   teinte,
   onTeinte,
+  onMeridienne,
 }: {
   object: ObjectData;
   /** Les styles de l'écran : le bandeau partage ceux des autres barres. */
@@ -201,6 +202,11 @@ export function ObjectBar({
    */
   onHeight?: (height?: number, base?: number) => void;
   onRotate: () => void;
+  /**
+   * LA MÉRIDIENNE D'UN CANAPÉ D'ANGLE, À GAUCHE OU À DROITE — revue
+   * « Yasmine » : elle était toujours à droite.
+   */
+  onMeridienne?: { cote: 'gauche' | 'droite'; basculer: () => void };
   /**
    * PLACER AU CENTIMÈTRE — « le lit à quarante centimètres du mur ». Les
    * flèches avancent d'un centimètre, et il fallait en compter quarante.
@@ -389,6 +395,14 @@ export function ObjectBar({
           {onDupliquer &&
             geste('Dupliquer le meuble', 'Dupliquer', SOLAIRES.dupliquer, palette.blue, onDupliquer)}
           {geste('Pivoter', 'Pivoter', SOLAIRES.pivoter, palette.blue, onRotate)}
+          {onMeridienne &&
+            geste(
+              onMeridienne.cote === 'droite' ? 'Méridienne à gauche' : 'Méridienne à droite',
+              onMeridienne.cote === 'droite' ? 'À gauche' : 'À droite',
+              onMeridienne.cote === 'droite' ? SOLAIRES.flecheGauche : SOLAIRES.flecheDroite,
+              palette.blue,
+              onMeridienne.basculer,
+            )}
           {/*
             « RETIRER », pas « Annuler » — le mot dit ce que le geste fait.
             La croix rouge ne défait pas une saisie : elle enlève le meuble du

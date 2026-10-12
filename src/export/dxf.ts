@@ -32,7 +32,9 @@ import {
   type Pt,
   type WallSeg,
 } from '../geometry/floorplan';
-import type { Fixture } from '../geometry/electrical';
+import { FIXTURES, type Fixture } from '../geometry/electrical';
+import { CEILINGS, type CeilingFixture } from '../geometry/ceiling';
+import { longueurDuRuban } from '../geometry/ruban';
 
 /** Un calque du fichier : son nom, et sa couleur d'index AutoCAD. */
 export interface CalqueDxf {
@@ -69,6 +71,8 @@ export const DXF_CALQUES: CalqueDxf[] = [
   { nom: 'ECHOPLAN-FENETRES', couleur: 4 },
   { nom: 'ECHOPLAN-MEUBLES', couleur: 8 },
   { nom: 'ECHOPLAN-ELEC', couleur: 1 },
+  // Le plafond : points lumineux et rubans LED (revue « Claire »).
+  { nom: 'ECHOPLAN-ECLAIRAGE', couleur: 5 },
   { nom: 'ECHOPLAN-PIECES', couleur: 3 },
   { nom: 'ECHOPLAN-COTES', couleur: 4 },
 ];
@@ -80,6 +84,7 @@ const CALQUE = {
   fenetres: 'ECHOPLAN-FENETRES',
   meubles: 'ECHOPLAN-MEUBLES',
   elec: 'ECHOPLAN-ELEC',
+  eclairage: 'ECHOPLAN-ECLAIRAGE',
   pieces: 'ECHOPLAN-PIECES',
   cotes: 'ECHOPLAN-COTES',
 } as const;
@@ -97,6 +102,11 @@ export interface PlanPourDxf {
   */
   fixtures: Pick<Fixture, 'id' | 'kind' | 'wallId' | 'along'>[];
   objects?: { id: string; transform: number[]; width: number; depth: number }[];
+  /**
+   * LE PLAFOND — revue « Claire » : le ruban LED n'existait jamais en DXF.
+   * Ce qui y est posé, sur son calque ; un ruban, à son tracé.
+   */
+  ceiling?: Pick<CeilingFixture, 'id' | 'kind' | 'at' | 'trace' | 'ferme'>[];
 }
 
 /**
@@ -160,13 +170,13 @@ function ligne(calque: string, a: Pt, b: Pt): string {
  * VERTEX que de sommets, puis un SEQEND. C'est verbeux, et c'est ce que tous
  * les logiciels savent relire.
  */
-function polyligne(calque: string, points: Pt[]): string {
+function polyligne(calque: string, points: Pt[], fermee = true): string {
   if (points.length < 2) return '';
   let out =
     paire(0, 'POLYLINE') +
     paire(8, calque) +
     paire(66, 1) +
-    paire(70, 1) +
+    paire(70, fermee ? 1 : 0) +
     paire(10, '0.0') +
     paire(20, '0.0') +
     paire(30, '0.0');
@@ -360,7 +370,25 @@ export function buildDxf(plan: PlanPourDxf): string {
       z: mur.a.z + (mur.b.z - mur.a.z) * t,
     };
     out += cercle(CALQUE.elec, p, 60);
-    out += texte(CALQUE.elec, { x: p.x + 0.1, z: p.z }, 100, f.kind);
+    // En toutes lettres (revue « Claire » : « inter », « prise2 », « rjPrise »).
+    out += texte(CALQUE.elec, { x: p.x + 0.1, z: p.z }, 100, FIXTURES[f.kind].label);
+  }
+
+  /* Le plafond : chaque point à sa place, chaque ruban à son tracé. */
+  for (const c of plan.ceiling ?? []) {
+    if (c.trace && c.trace.length >= 2) {
+      out += polyligne(CALQUE.eclairage, c.trace, !!c.ferme);
+      const L = longueurDuRuban(c.trace, c.ferme);
+      out += texte(
+        CALQUE.eclairage,
+        { x: c.trace[0].x + 0.1, z: c.trace[0].z },
+        100,
+        `LED ${L.toFixed(2).replace('.', ',')} m`,
+      );
+      continue;
+    }
+    out += cercle(CALQUE.eclairage, c.at, 80);
+    out += texte(CALQUE.eclairage, { x: c.at.x + 0.12, z: c.at.z }, 100, CEILINGS[c.kind].label);
   }
 
   /*

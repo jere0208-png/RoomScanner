@@ -14285,6 +14285,36 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le four sous plaque, le canapé d'angle, la LED dans le DXF
+
+**Le four sous plaque** (Bernard). Le four du catalogue se pose en colonne,
+de 0,60 à 1,20 m ; la plaque est un meuble bas. Posés l'un sur l'autre,
+ils se cognaient, et le four partait 52 cm en avant. Le catalogue de la
+cuisine a maintenant un « Four sous plaque » d'un bloc (`fourEtPlaque`),
+que la 3D dessine en cuisinière : four, manettes, table de cuisson.
+
+**Le canapé d'angle se dessine en L et choisit son côté** (Yasmine) :
+- le bandeau du meuble porte « À gauche / À droite » (`setMeridienne`,
+  annulable). Il pose l'attribut que la 3D savait déjà lire
+  (`SofaAngle`) ;
+- le plan 2D et le PDF le dessinent en L (`meridienneDe`) : dossier,
+  assise courte, et méridienne jusqu'au bord avant, du côté choisi. Ils
+  le dessinaient en canapé droit de trois places.
+
+**Le DXF porte l'éclairage** (Claire) :
+- un calque de plus, `ECHOPLAN-ECLAIRAGE`, avec les points du plafond à
+  leur place et chaque ruban LED à son tracé (ouvert ou fermé), annoncé
+  à sa longueur (« LED 3,60 m ») ;
+- en mode Électricité seulement, là où le plafond existe ;
+- l'appareillage s'y écrit en toutes lettres (« Prise triple ») : il
+  sortait sous ses noms internes (« prise3 », « rjPrise »).
+
+**Le tableur d'une maison à étages dit son niveau dans le nom du fichier**
+(Sébastien), par exemple « Métré - Maison — Étage 1.csv ». Les deux
+niveaux sortaient sous le même nom.
+
+Banc : `tournee4objets`.
+
 ## Va-et-vient d'après les liens, pièces superposées, historique juste
 
 **Le va-et-vient se lit sur les liens tracés** (`Circuit.vaEtVient`), revue

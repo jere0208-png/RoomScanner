@@ -68,7 +68,7 @@ import {
   interiorSide,
   wallFace,
 } from '../geometry/electrical';
-import { frCategory, furnKind, furnitureStrokes } from '../geometry/furniture';
+import { frCategory, furnKind, furnitureStrokes, meridienneDe } from '../geometry/furniture';
 import { markColor } from '../geometry/schema';
 import { bleuFenetre, encreElectrique } from '../ui/encreElec';
 import { cheminDuPoche, pocheDesMurs } from '../geometry/poche';
@@ -2430,7 +2430,7 @@ export function FloorplanEditor({
                     meuble suffit, et le détail revient au relâcher.
                   */}
                   {
-                    furnitureStrokes(furnKind(f.category), w, d).map((line, li) => (
+                    furnitureStrokes(furnKind(f.category), w, d, meridienneDe(o)).map((line, li) => (
                       <Path
                         key={`s${li}`}
                         d={line
