@@ -38,6 +38,7 @@ import {
   mergeColinear,
   sansEclats,
   baiesVitrees,
+  baiesHorsDesAngles,
   LARGEUR_DE_BAIE,
   solDesMurs,
   openingsOn,
@@ -767,6 +768,15 @@ function migrateSave(brut: SavedScan): SavedScan {
       .filter((c) => c.length >= 3);
     const ouvertures = baiesVitrees(s.openings, s.walls ?? [], contours);
     if (ouvertures !== s.openings) s = { ...s, openings: ouvertures };
+  }
+  /*
+    LA PORTE D'UN PLAN D'AVANT, ENFONCÉE DANS LE MUR D'ANGLE — relevé du
+    patron : « la porte est imbriquée dans le mur, cachant une partie ». Elle
+    se dégage à l'ouverture du plan (voir `baiesHorsDesAngles`).
+  */
+  if ((s.openings ?? []).length > 0) {
+    const recalees = baiesHorsDesAngles(s.openings, s.walls ?? []);
+    if (recalees !== s.openings) s = { ...s, openings: recalees };
   }
   if (s.retouche?.plan?.walls) {
     const r = sansEclats(s.retouche.plan.walls, s.retouche.plan.rooms ?? []);
@@ -5468,8 +5478,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         [],
       ).walls;
       if (walls.length === 0) return;
-      // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`).
-      const openings = baiesVitrees(segments.filter((x) => x.type !== 'wall'), walls);
+      // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`),
+      // et la porte collée à l'angle, dégagée du mur d'angle (voir
+      // `baiesHorsDesAngles`).
+      const openings = baiesHorsDesAngles(baiesVitrees(segments.filter((x) => x.type !== 'wall'), walls), walls);
       pushHistory('completerReleve');
 
       const detected = detectRooms(walls, undefined, openings);
@@ -5915,7 +5927,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           niveau: n,
         }));
       const walls = pose(bruts);
-      const openings = baiesVitrees(pose(ouverturesBrutes), walls);
+      const openings = baiesHorsDesAngles(baiesVitrees(pose(ouverturesBrutes), walls), walls);
 
       const detected = detectRooms(walls, undefined, openings);
       const shapes =
@@ -6031,8 +6043,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         ),
         [],
       ).walls;
-      // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`).
-      const openings = baiesVitrees(segments.filter((s) => s.type !== 'wall'), walls);
+      // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`),
+      // et la porte collée à l'angle, dégagée du mur d'angle (voir
+      // `baiesHorsDesAngles`).
+      const openings = baiesHorsDesAngles(baiesVitrees(segments.filter((s) => s.type !== 'wall'), walls), walls);
 
       // Détection automatique : les pièces sont les faces du graphe des murs.
       // Si rien ne se referme (scan trop partiel), tout tient en une pièce.

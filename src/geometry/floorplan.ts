@@ -2374,6 +2374,60 @@ export function baiesVitrees<O extends WallSeg>(openings: O[], walls: WallSeg[],
   });
 }
 
+/**
+ * UNE BAIE NE S'ENFONCE PAS DANS LE MUR D'ANGLE — relevé du patron,
+ * diagnostic à l'appui : « la porte est imbriquée dans le mur, cachant une
+ * partie ».
+ *
+ * RoomPlan voit la porte à 2 cm de l'angle. Le plan, lui, pose le trait d'un
+ * mur sur son AXE : le mur d'angle s'épaissit d'une demi-épaisseur vers la
+ * pièce, et son nu tombait dans l'ouverture — le gond, le dormant et le
+ * battant mangés par la maçonnerie.
+ *
+ * Une baie qui empiète se recale contre le nu du mur d'angle, en gardant le
+ * petit jeu que le scan avait mesuré entre elle et l'angle (cinq centimètres
+ * au plus) ; elle garde sa largeur. Plus large que l'espace libre entre les
+ * deux nus, elle s'y réduit. Une baie qui ne touche aucun angle ne bouge pas,
+ * et la liste rendue est la même quand rien n'a bougé.
+ */
+export function baiesHorsDesAngles<O extends WallSeg>(openings: O[], walls: WallSeg[]): O[] {
+  let change = false;
+  const out = openings.map((o) => {
+    const mur = murDeLOuverture(o, walls);
+    if (!mur) return o;
+    const L = segLength(mur);
+    if (L < 1e-6) return o;
+    const u = { x: (mur.b.x - mur.a.x) / L, z: (mur.b.z - mur.a.z) / L };
+    const t = (p: Pt) => (p.x - mur.a.x) * u.x + (p.z - mur.a.z) * u.z;
+    const ta = t(o.a);
+    const tb = t(o.b);
+    const t0 = Math.min(ta, tb);
+    const t1 = Math.max(ta, tb);
+    const largeur = t1 - t0;
+    const rA = retraitDuCoin(walls, mur, mur.a);
+    const rB = retraitDuCoin(walls, mur, mur.b);
+    if (L - rA - rB < 0.3) return o;
+    let n0 = t0;
+    let n1 = t1;
+    if (n0 < rA - 1e-4) {
+      n0 = rA + Math.max(0, Math.min(t0, 0.05));
+      n1 = n0 + largeur;
+    }
+    if (n1 > L - rB + 1e-4) {
+      n1 = L - rB - Math.max(0, Math.min(L - t1, 0.05));
+      n0 = Math.max(rA, n1 - largeur);
+    }
+    if (Math.abs(n0 - t0) < 1e-4 && Math.abs(n1 - t1) < 1e-4) return o;
+    change = true;
+    // Chaque bout glisse le long du mur ; l'écart à l'axe reste celui du scan.
+    const glisse = (p: Pt, de: number, vers: number): Pt => ({ x: p.x + u.x * (vers - de), z: p.z + u.z * (vers - de) });
+    return ta <= tb
+      ? { ...o, a: glisse(o.a, ta, n0), b: glisse(o.b, tb, n1) }
+      : { ...o, a: glisse(o.a, ta, n1), b: glisse(o.b, tb, n0) };
+  });
+  return change ? out : openings;
+}
+
 /** Hauteur par défaut d'un coffre de volet — le tunnel courant, 25 cm. */
 export const COFFRE_H = 0.25;
 

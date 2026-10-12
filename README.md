@@ -14285,6 +14285,30 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## La porte collée à l'angle ne s'enfonce plus dans le mur
+
+Relevé du patron, diagnostic du scan du 12/10 à 08h57 à l'appui : « la porte
+est imbriquée dans le mur, cachant une partie ».
+
+**Pourquoi.** RoomPlan avait vu la porte à 2 cm de l'angle. Le plan pose le
+trait d'un mur sur son axe : le mur d'angle s'épaissit de 7 cm vers la pièce,
+et son nu tombait 5 cm dans l'ouverture. Le gond, le dormant et le battant
+étaient mangés par la maçonnerie.
+
+**Le remède** (`baiesHorsDesAngles`) :
+- une baie qui empiète sur le mur d'angle se recale contre son nu, en
+  gardant le petit jeu que le scan avait mesuré (5 cm au plus), et elle
+  garde sa largeur ;
+- plus large que l'espace libre entre les deux nus, elle s'y réduit ;
+- une baie qui laisse déjà son jeu ne bouge pas.
+
+Le recalage se fait à l'import des scans (les trois chemins : scan, pièce
+ajoutée, étage) et à l'ouverture d'un plan déjà enregistré (`migrateSave`).
+Le scan du diagnostic se corrige donc tout seul.
+
+Banc : `baiesdangle`, avec les murs et les portes du diagnostic, au
+millimètre.
+
 ## Les codes internes, le temps du développement
 
 Relevé du patron : « ça demande le plan Pro, alors que mon compte l'était.
