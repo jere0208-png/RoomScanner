@@ -48,6 +48,7 @@ import {
   separerMeubles,
   castToWall,
   pushOutOfWalls,
+  nearestOnRing,
   snapSideToWalls,
   roomHeight,
   roomOf,
@@ -483,6 +484,14 @@ export interface SavedScan {
    * date. Absent = un plan enregistré, qui ne s'efface jamais seul.
    */
   supprimeLe?: number;
+  /**
+   * MIS À LA CORBEILLE CE JOUR-LÀ (ms) — revues « Fatou » et « Hugo ».
+   * Supprimer effaçait pour de bon, copie en ligne comprise, après un
+   * bandeau de 4,5 s ; en supprimer un second pendant ce temps emportait le
+   * premier sans retour. Le plan attend désormais 30 jours à la corbeille,
+   * sa copie en ligne avec lui, et se restaure d'un geste.
+   */
+  corbeille?: number;
   /** Des modifications laissées sans être enregistrées. */
   retouche?: RetoucheEnAttente;
   modelPath: string | null;
@@ -708,6 +717,13 @@ function groupeDesMurs(murs: { roomId?: string }[]): { roomId?: string } {
 function hauteurDuNiveau(walls: WallSeg[], n: number): number {
   return (walls.find((w) => w.type === 'wall' && niveauDe(w) === n) ?? walls[0])?.height ?? 2.5;
 }
+
+/** Le temps qu'un plan attend à la corbeille avant de s'effacer : 30 jours. */
+export const CORBEILLE_MS = 30 * 24 * 3600 * 1000;
+
+/** Les plans de la bibliothèque, hors corbeille. */
+export const horsCorbeille = <T extends { corbeille?: number }>(saves: T[]): T[] =>
+  saves.some((x) => x.corbeille) ? saves.filter((x) => !x.corbeille) : saves;
 
 /**
  * COUPER UN NOM SANS CASSER UN CARACTÈRE — revue « Hugo » : la coupe à 40
@@ -2606,6 +2622,12 @@ interface ScanState {
   repriseAuBesoin: () => Promise<number>;
   openSave: (id: string) => void;
   deleteSave: (id: string) => void;
+  /** Met un plan à la corbeille : il y attend 30 jours (`CORBEILLE_MS`). */
+  mettreALaCorbeille: (id: string) => void;
+  /** Le rend à la bibliothèque. */
+  restaurerDeLaCorbeille: (id: string) => void;
+  /** Efface pour de bon tout ce qui est à la corbeille. */
+  viderLaCorbeille: () => void;
   reset: () => void;
   /**
    * OUVRE UN PLAN VIERGE, SANS SCANNER.
@@ -2920,7 +2942,9 @@ export const useScanStore = create<ScanState>((set, get) => {
         // dans le téléphone (il y est déjà écrit), et rien ne monte.
         if (!useAccountStore.getState().pro) return;
         // Un plan gardé douze heures n'est pas enregistré : il ne monte pas.
-        if (get().saves.find((x) => x.id === id)?.supprimeLe) return;
+        // Un plan à la corbeille non plus : sa copie en ligne l'attend telle quelle.
+        const plan = get().saves.find((x) => x.id === id);
+        if (plan?.supprimeLe || plan?.corbeille) return;
         get()
           .deposerAuCompte(id, identiteDuCompte())
           .catch(() => {
@@ -5893,7 +5917,8 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     renameSave: (id, name) => {
-      const clean = name.trim();
+      // Soixante caractères, comme l'en-tête (revue « Hugo » : 300 passaient).
+      const clean = couperLeNom(name.trim(), 60);
       if (!clean) return;
       const st = get();
       const saves = st.saves.map((x) =>
@@ -5905,6 +5930,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         scanName: st.currentSaveId === id ? clean : st.scanName,
       });
       persistSoon(saves);
+      // Le nouveau nom monte aussi en ligne (revue « Fatou »).
+      deposerPlusTard(id);
     },
 
     /**
@@ -5945,6 +5972,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       saves.splice(i + 1, 0, copie);
       set({ saves });
       persistSoon(saves);
+      // La copie a sa sauvegarde en ligne, comme tout plan (revue « Fatou »).
+      deposerPlusTard(copie.id);
     },
 
     restoreFixtures: (list) => {
@@ -8140,7 +8169,10 @@ export const useScanStore = create<ScanState>((set, get) => {
       // Le plan qu'on a sous les yeux ne s'efface pas sous le doigt.
       const ouvert = st.screen === 'result' ? st.currentSaveId : null;
       const partis = st.saves.filter(
-        (x) => x.id !== ouvert && !!x.supprimeLe && x.supprimeLe <= maintenant,
+        (x) =>
+          (x.id !== ouvert && !!x.supprimeLe && x.supprimeLe <= maintenant) ||
+          // La corbeille se vide seule au bout de 30 jours.
+          (!!x.corbeille && x.corbeille + CORBEILLE_MS <= maintenant),
       );
       /*
         LES MODIFICATIONS D'UN PLAN ENREGISTRÉ NE S'EFFACENT JAMAIS SEULES —
@@ -8895,9 +8927,24 @@ export const useScanStore = create<ScanState>((set, get) => {
       // — les murs arrêtent quand même : c'est le mur qui fait la collision,
       // la pièce ne fait que dire de quel côté.
       const murs = part ? part.walls : jeu.walls;
-      // Dans un renfoncement ouvert, c'est le point lâché qui dit le côté.
-      const depuis = entoure ? { x, z } : ici;
-      const ancre = part ? part.labelAt : depuis;
+      /*
+        Dans un renfoncement ouvert, c'est le point lâché qui dit le côté.
+        LÂCHÉ AU-DELÀ D'UNE FAÇADE, il revient dans sa pièce — revue
+        « Yasmine » : pendant le glissé, « d'où il venait » est la position
+        de l'image d'avant, déjà au-delà du mur ; la collision le gardait de
+        ce côté-là, collé à la façade, dehors (8 lâchers sur 19). Hors de
+        toute pièce, il est censé venir de l'intérieur, juste en face :
+        le point lâché, reflété dans le contour (l'ancre de la pièce, au
+        milieu d'un L, tromperait le mur).
+      */
+      const enFace = (() => {
+        if (dansUnePiece || entoure || !part?.surface) return null;
+        const q = nearestOnRing({ x, z }, part.surface.pts);
+        const reflet = { x: 2 * q.x - x, z: 2 * q.z - z };
+        return pointInPolygon(reflet, part.surface.pts) ? reflet : null;
+      })();
+      const depuis = entoure ? { x, z } : dansUnePiece ? ici : enFace ?? undefined;
+      const ancre = part ? part.labelAt : depuis ?? ici;
       const contour = part?.surface?.pts;
       const arrete = pushOutOfWalls({ x, z }, box, murs, ancre, contour, depuis);
       /*
@@ -9323,11 +9370,14 @@ export const useScanStore = create<ScanState>((set, get) => {
       */
       const ancien = st.scanName;
       const clean = nomDeVersion(name.trim() || ancien || 'Plan', st.saves.map((x) => x.name));
+      // La copie reste dans le dossier de l'original (revue « Fatou »).
+      const dossier = st.saves.find((x) => x.id === st.currentSaveId)?.folderId;
       const save: SavedScan = {
         id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
         name: clean,
         createdAt: now,
         updatedAt: now,
+        ...(dossier ? { folderId: dossier } : {}),
         modelPath: st.modelPath,
         rooms: st.rooms,
         walls: st.walls,
@@ -9397,6 +9447,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       );
       set({ saves });
       persistSoon(saves);
+      deposerPlusTard(scanId);
     },
 
     ecrireBrouillon: () => {
@@ -9725,6 +9776,34 @@ export const useScanStore = create<ScanState>((set, get) => {
       clearHistory();
       // Vingt prises ajoutées sur place méritent le même filet qu'un scan.
       armerBrouillon(() => get().ecrireBrouillon());
+    },
+
+    mettreALaCorbeille: (id) => {
+      const st = get();
+      if (!st.saves.some((x) => x.id === id && !x.corbeille)) return;
+      const saves = st.saves.map((x) => (x.id === id ? { ...x, corbeille: Date.now() } : x));
+      set({
+        saves,
+        ...(st.currentSaveId === id ? { currentSaveId: null, arrivage: null } : null),
+      });
+      persistSoon(saves);
+    },
+
+    restaurerDeLaCorbeille: (id) => {
+      const st = get();
+      if (!st.saves.some((x) => x.id === id && x.corbeille)) return;
+      const saves = st.saves.map((x) => {
+        if (x.id !== id) return x;
+        const rendu: SavedScan = { ...x, updatedAt: Date.now() };
+        delete rendu.corbeille;
+        return rendu;
+      });
+      set({ saves });
+      persistSoon(saves);
+    },
+
+    viderLaCorbeille: () => {
+      for (const x of get().saves.filter((s) => s.corbeille)) get().deleteSave(x.id);
     },
 
     deleteSave: (id) => {

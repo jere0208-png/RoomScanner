@@ -571,7 +571,7 @@ const styles = getStyles(c);
   const doExport = async () => {
     /* L'aperçu est libre, l'export est Pro : la barrière est ici — voir
        `exportOuvert`. */
-    if (!exportOuvert()) return;
+    if (!exportOuvert('le dossier PDF')) return;
     try {
       /**
        * Les photos, relues et réduites AVANT de bâtir le document.

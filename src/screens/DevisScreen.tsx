@@ -773,7 +773,7 @@ export function DevisScreen() {
     autre. L'export est la barrière, comme pour le dossier (`exportOuvert`).
   */
   const exporterLeDevis = async () => {
-    if (!exportOuvert()) return;
+    if (!exportOuvert('le devis')) return;
     const envoyer = async () => {
       try {
         let numero = useScanStore.getState().devisNumero;

@@ -1632,7 +1632,7 @@ export function ResultScreen() {
   const shareObj = async () => {
     /* L'invité regarde, le compte exporte : la barrière est ici — voir
        `exportOuvert`. */
-    if (!exportOuvert()) return;
+    if (!exportOuvert('la 3D')) return;
     try {
       /*
         PLUSIEURS NIVEAUX : LA MAISON ENTIÈRE, EMPILÉE (revue « Léa »), un
@@ -1682,7 +1682,7 @@ export function ResultScreen() {
   const shareMaterial = async () => {
     /* L'invité regarde, le compte exporte : la barrière est ici — voir
        `exportOuvert`. */
-    if (!exportOuvert()) return;
+    if (!exportOuvert('la liste du matériel')) return;
     try {
       const list = materialList(
         roomInputs,
@@ -1724,7 +1724,7 @@ export function ResultScreen() {
   const shareCsv = async () => {
     /* L'invité regarde, le compte exporte : la barrière est ici — voir
        `exportOuvert`. */
-    if (!exportOuvert()) return;
+    if (!exportOuvert('le tableur')) return;
     try {
       const list = materialList(
         roomInputs,
@@ -1776,6 +1776,15 @@ export function ResultScreen() {
           retenues.length > 0
             ? { achats: a, cout: reglages.avecPrix ? coutDesAchats(a, reglages.prix) : null }
             : null,
+          // Le bordereau, ruban LED compris (revue « Fatou »).
+          modeElec
+            ? buyingList(
+                pullSchedule(list.circuits, cheminements?.metre, cheminements?.approx, fixtures),
+                fixtures,
+                ceiling,
+                openings,
+              )
+            : null,
         ),
         metreFilename(scanName),
       );
@@ -1799,7 +1808,7 @@ export function ResultScreen() {
   const shareDxf = async () => {
     /* L'invité regarde, le compte exporte : la barrière est ici — voir
        `exportOuvert`. */
-    if (!exportOuvert()) return;
+    if (!exportOuvert('le DXF')) return;
     try {
       await RoomScan.shareText(
         buildDxf({ walls, openings, rooms, fixtures, objects }),
@@ -4003,22 +4012,27 @@ export function ResultScreen() {
                     label: 'Dupliquer pour essayer une autre version',
                     icon: 'sauver' as const,
                     hint: 'Le plan actuel reste intact.',
+                    /*
+                      INTACT, VRAIMENT — revue « Fatou » : les modifications
+                      en cours s'enregistraient dans la version A avant la
+                      copie. Elles partent dans la nouvelle version ; A garde
+                      sa dernière version enregistrée.
+                    */
                     onPress: () =>
-                      ouvrirApres(() =>
+                      ouvrirApres(() => {
+                        const enCours = useScanStore.getState().dirty && !!useScanStore.getState().currentSaveId;
                         setPrompt({
                           title: 'Nom de la nouvelle version',
-                          subtitle: `« ${scanName} » reste tel quel.`,
+                          subtitle: enCours
+                            ? `« ${scanName} » garde sa dernière version enregistrée ; vos modifications en cours partent dans la nouvelle.`
+                            : `« ${scanName} » reste tel quel.`,
                           value: nomDeVersion(
                             scanName,
                             useScanStore.getState().saves.map((x) => x.name),
                           ),
-                          onSubmit: (t) => {
-                            const s = useScanStore.getState();
-                            if (s.dirty && s.currentSaveId) s.commitCurrent();
-                            saveAsCopy(t);
-                          },
-                        }),
-                      ),
+                          onSubmit: (t) => saveAsCopy(t),
+                        });
+                      }),
                   },
                   {
                     label: 'Renommer le scan',

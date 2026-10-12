@@ -27,6 +27,7 @@ import type {
   MaterialList,
 } from '../geometry/nfc15100';
 import { nombre, type Achats, type CoutAchats } from '../geometry/travaux';
+import type { BuyRow } from '../geometry/conduits';
 import { nomDeTeinte } from '../ui/peintures';
 
 /** Le métré d'une pièce, tel que le plan le connaît. */
@@ -103,6 +104,12 @@ export function buildMetreCsv(
    * section suit le métré, pour chiffrer ses travaux dans le même fichier.
    */
   travaux?: { achats: Achats; cout?: CoutAchats | null } | null,
+  /**
+   * LE BORDEREAU — revue « Fatou » : le tableur ne disait pas un mètre du
+   * ruban LED, ni rien de ce qui se commande (gaines, boîtes, rouleaux).
+   * Le même que la liste du matériel en PDF (`buyingList`).
+   */
+  bordereau?: BuyRow[] | null,
 ): string {
   const out: string[] = [];
   const section = (titre: string, entete: string[]) => {
@@ -243,6 +250,14 @@ export function buildMetreCsv(
   // cellule reste vide plutôt que d'écrire un « 0 » qui s'additionnerait.
   for (const b of list.board) {
     out.push(ligne([b.label, b.quantity > 0 ? b.quantity : '']));
+  }
+
+  // ------------------------------------------------------------ bordereau
+  if (bordereau && bordereau.length > 0) {
+    section('BORDEREAU', ['Rayon', 'Article', 'Précision', 'Quantité', 'Unité', 'D’où sort la quantité']);
+    for (const b of bordereau) {
+      out.push(ligne([b.family, b.label, b.spec ?? '', b.quantity, b.unit, b.note ?? '']));
+    }
   }
 
   // ----------------------------------------------------------- conformité

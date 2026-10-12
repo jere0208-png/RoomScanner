@@ -275,7 +275,8 @@ interface AccountState {
    * compte pour l'ouvrir avec. » Rend vrai si l'export peut partir ; sinon
    * pose la proposition de compte et rend faux.
    */
-  exportOuvert: () => boolean;
+  /** `quoi` : ce qu'on envoie (« le PDF », « le DXF »…), pour le dire. */
+  exportOuvert: (quoi?: string) => boolean;
   noterPlanCree: () => void;
   ouvrirPaywall: () => void;
   /**
@@ -730,7 +731,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     return true;
   },
 
-  exportOuvert: () => {
+  exportOuvert: (quoi = 'le PDF') => {
     const s = get();
     if (s.compte && s.pro) return true;
     if (s.compte) {
@@ -752,12 +753,17 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       page payante. Le PDF, le DXF et la 3D sont Pro ; l'image du plan,
       elle, part gratuitement, sans compte.
     */
+    /*
+      LE FORMAT QU'ON VOULAIT, NOMMÉ — revue « Inès » : le titre parlait du
+      PDF quand on touchait le DXF, la 3D ou le tableur, et le tableur
+      n'était pas cité. L'image gratuite est dite en premier.
+    */
     alerte(
-      'L’envoi en PDF fait partie du Pro',
+      `Envoyer ${quoi} fait partie du Pro`,
       'Votre plan est prêt. L’image du plan, avec ses cotes, s’envoie ' +
-        'gratuitement, sans compte. Le PDF coté, le DXF et la 3D font ' +
-        'partie d’EchoPlan Pro, qui se prend avec un compte (création ' +
-        'gratuite).',
+        'gratuitement, sans compte (« Exporter », puis « Image du plan »). ' +
+        'Le PDF coté, le tableur, le DXF, la 3D et le devis font partie ' +
+        'd’EchoPlan Pro, qui se prend avec un compte (création gratuite).',
       [
         { label: 'Plus tard' },
         { label: 'Créer mon compte', onPress: () => get().quitterInvite() },

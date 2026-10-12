@@ -252,7 +252,8 @@ describe('l’invité scanne librement, et paie à l’export', () => {
     const src =
       readFileSync(join(__dirname, '..', 'src', 'screens', 'ResultScreen.tsx'), 'utf8') +
       readFileSync(join(__dirname, '..', 'src', 'screens', 'ExportScreen.tsx'), 'utf8');
-    const gardes = src.match(/if \(!exportOuvert\(\)\) return;/g) ?? [];
+    // Elle nomme ce qu'on envoie (revue « Inès ») : `exportOuvert('le DXF')`.
+    const gardes = src.match(/if \(!exportOuvert\('[^']+'\)\) return;/g) ?? [];
     expect(gardes.length).toBeGreaterThanOrEqual(5);
   });
 });

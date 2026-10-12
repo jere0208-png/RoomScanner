@@ -103,7 +103,8 @@ export function ProfilScreen() {
   const setIconePref = useScanStore((st) => st.setIconePref);
   const setAccentPref = useScanStore((st) => st.setAccentPref);
   const setThemePref = useScanStore((st) => st.setThemePref);
-  const saves = useScanStore((st) => st.saves);
+  // Le compte des plans ne compte pas la corbeille.
+  const saves = useScanStore((st) => st.saves).filter((x) => !x.corbeille);
   const compte = useAccountStore((st) => st.compte);
   const pro = useAccountStore((st) => st.pro);
   const [journal, setJournal] = useState(false);

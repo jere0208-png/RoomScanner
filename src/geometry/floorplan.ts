@@ -1516,7 +1516,7 @@ export function snapSideToWalls(
 }
 
 /** Point du contour le plus proche : la sortie de secours d'un point égaré. */
-function nearestOnRing(p: Pt, ring: Pt[]): Pt {
+export function nearestOnRing(p: Pt, ring: Pt[]): Pt {
   let best = ring[0];
   let d2 = Infinity;
   for (let i = 0; i < ring.length; i++) {

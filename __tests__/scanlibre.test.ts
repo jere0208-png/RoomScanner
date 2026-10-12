@@ -168,10 +168,10 @@ describe('ce qui se vend : envoyer son plan', () => {
     );
     for (const f of ['shareObj', 'shareMaterial', 'shareCsv', 'shareDxf']) {
       const corps = src.slice(src.indexOf(`const ${f} = async`), src.indexOf(`const ${f} = async`) + 400);
-      expect(`${f} : ${corps.includes('exportOuvert()')}`).toBe(`${f} : true`);
+      expect(`${f} : ${corps.includes('exportOuvert(')}`).toBe(`${f} : true`);
     }
     const image = src.slice(src.indexOf('const shareImage = async'), src.indexOf('const shareObj = async'));
-    expect(image).not.toContain('exportOuvert()');
+    expect(image).not.toContain('exportOuvert(');
   });
 
   it('le devis détaillé est Pro : la pastille ouvre l’offre à sa place', () => {

@@ -12,6 +12,8 @@
  *   pièces du rez-de-chaussée.
  * - « Fatou » et « Claire » : le métré du PDF et du tableur se prenait à
  *   l'axe des murs.
+ * - « Yasmine » : un meuble lâché un peu au-delà d'une façade se posait
+ *   dehors, collé au mur (8 lâchers sur 19).
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -30,6 +32,8 @@ import {
   type WallSeg,
 } from '../src/geometry/floorplan';
 import { placerAuxNiveaux } from '../src/geometry/devisplan';
+import { catalogItem } from '../src/geometry/catalogue';
+import { pointInPolygon } from '../src/geometry/appearance';
 import type { SurfaceData } from 'react-native-room-scan';
 
 const st = () => useScanStore.getState();
@@ -198,5 +202,25 @@ describe('le métré au nu des murs', () => {
     st().commencerAuClavier();
     st().addRoomLibre(4, 3, 'Chambre', { auNu: true });
     expect(perimetreDesPieces(roomParts(st().walls, st().rooms))).toBeCloseTo(14, 6);
+  });
+});
+
+describe('un meuble lâché au-delà d’une façade', () => {
+  it.each([0, -0.05, -0.1, -0.2])('revient dans sa pièce, contre le mur (lâché à x = %s)', (x) => {
+    st().reset();
+    st().commencerAuClavier();
+    st().addRoomLibre(6, 4, 'Séjour', { auNu: true });
+    const part = roomParts(st().walls, st().rooms)[0];
+    const item = catalogItem('biblio')!;
+    const id = st().addObject(item, part.labelAt.x, part.labelAt.z);
+    st().rotateObject(id, 1);
+    // Glissé vers le mur de gauche, puis lâché au-delà.
+    st().setObjectCenter(id, 0.3, 2, true);
+    st().rangerMeuble(id, 0.3, 2);
+    st().setObjectCenter(id, x, 2, true);
+    st().rangerMeuble(id, x, 2);
+    const o = st().objects.find((m) => m.id === id)!;
+    expect(pointInPolygon({ x: o.transform[12], z: o.transform[14] }, part.surface!.pts)).toBe(true);
+    expect(o.transform[14]).toBeCloseTo(2, 6);
   });
 });

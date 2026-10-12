@@ -288,9 +288,11 @@ describe('la bibliothèque des relevés', () => {
     act(() => {
       jest.advanceTimersByTime(DELAI_ANNULER + 100);
     });
-    const restants = useScanStore.getState().saves;
+    // À la corbeille, pas effacé (revues « Fatou » et « Hugo »).
+    const restants = useScanStore.getState().saves.filter((s) => !s.corbeille);
     expect(restants).toHaveLength(1);
     expect(restants[0].name).toBe('Chantier Martin');
+    expect(useScanStore.getState().saves).toHaveLength(2);
   });
 
   it('lève la bulle DANS un dossier, pour l’en sortir par le haut', () => {

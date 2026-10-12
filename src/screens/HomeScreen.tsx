@@ -46,7 +46,7 @@ import { GlisserPourSupprimer } from '../components/GlisserPourSupprimer';
 import { BandeauAnnuler, useSuppressionDifferee } from '../components/BandeauAnnuler';
 import { Avatar } from '../components/Avatar';
 import { LogoEcho } from '../components/LogoMark';
-import { useScanStore, type SavedScan } from '../store/scanStore';
+import { horsCorbeille, useScanStore, type SavedScan } from '../store/scanStore';
 import { useAccountStore } from '../store/accountStore';
 import { nombreNonLus, useNotifications } from '../store/notifications';
 import { CLOCHE } from './NotificationsScreen';
@@ -234,7 +234,7 @@ export function HomeScreen() {
   // Les comptes à rebours des plans non enregistrés avancent ici aussi.
   const maintenant = useMaintenant();
   const recents = useMemo(
-    () => [...saves].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)),
+    () => horsCorbeille(saves).sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)),
     [saves],
   );
   /*
@@ -243,9 +243,9 @@ export function HomeScreen() {
     La ligne part tout de suite ; le plan, lui, attend quelques secondes
     qu'on se ravise (voir `BandeauAnnuler`).
   */
-  const deleteSave = useScanStore((s) => s.deleteSave);
-  const enLigne = useAccountStore((st) => !!st.compte && !!st.jeton && st.pro);
-  const suppression = useSuppressionDifferee(deleteSave);
+  // À la corbeille, pas effacé : il s'y restaure pendant 30 jours.
+  const mettreALaCorbeille = useScanStore((s) => s.mettreALaCorbeille);
+  const suppression = useSuppressionDifferee(mettreALaCorbeille);
   const montres = useMemo(() => {
     const q = pourChercher(cherche.trim());
     const vivants = recents.filter((s) => s.id !== suppression.masque);
@@ -254,7 +254,7 @@ export function HomeScreen() {
   }, [recents, cherche, suppression.masque]);
 
   const prenom = compte?.prenom?.trim().split(/\s+/)[0];
-  const question = questionDuJour({ brouillon: !!brouillon, plans: saves.length });
+  const question = questionDuJour({ brouillon: !!brouillon, plans: recents.length });
 
 
   const scanIndisponible = supported === false;
@@ -582,13 +582,8 @@ export function HomeScreen() {
       </ScrollView>
       {suppression.enAttente && (
         <BandeauAnnuler
-          // Revue « Thomas » : le plan partait AUSSI de la sauvegarde en
-          // ligne, et le bandeau ne le disait pas.
-          texte={
-            enLigne
-              ? `« ${suppression.enAttente.nom} » supprimé, ici et de votre sauvegarde en ligne`
-              : `« ${suppression.enAttente.nom} » supprimé`
-          }
+          // La corbeille le garde 30 jours, copie en ligne comprise.
+          texte={`« ${suppression.enAttente.nom} » mis à la corbeille`}
           bas={insets.bottom + 18}
           onAnnuler={suppression.annuler}
         />

@@ -14285,6 +14285,47 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Tournée n°4 : la corbeille, des versions intactes, le bordereau au tableur
+
+**La corbeille** (Fatou, Hugo). Supprimer un plan l'effaçait pour de bon,
+copie en ligne comprise, après un bandeau de 4,5 s. En supprimer un second
+pendant ce temps emportait le premier sans retour.
+- Le glissé et le menu mettent maintenant le plan à la corbeille
+  (`mettreALaCorbeille`). Il y attend 30 jours, et sa copie en ligne
+  attend avec lui.
+- « Mes plans » montre une ligne « Corbeille ». On y restaure un plan d'un
+  appui, ou on la vide pour de bon, après confirmation.
+- La corbeille se vide seule au bout de 30 jours (`purgerLesEchus`).
+- Ses plans sortent des listes et du compte du profil (`horsCorbeille`).
+
+**Une nouvelle version laisse la première intacte** (Fatou).
+« Dupliquer pour essayer une autre version » enregistrait les
+modifications en cours dans la version A avant de copier. Elles partent
+maintenant dans la nouvelle version, et A garde sa dernière version
+enregistrée. La copie reste dans le dossier de l'original.
+
+**Les gestes de la bibliothèque montent en ligne.** Dupliquer, renommer et
+ranger dans un dossier déposent le plan. Un nom de plan tient en 60
+caractères : 300 passaient (Hugo).
+
+**Le tableur porte le bordereau** (Fatou). C'est le même que la liste du
+matériel en PDF : gaines, boîtes, rouleaux de ruban LED et leurs
+alimentations.
+
+**La barrière d'export nomme ce qu'on envoie** (Inès). Le titre disait « Le
+PDF » devant le DXF, la 3D ou le tableur. Il dit maintenant « Envoyer le
+DXF fait partie du Pro », et rappelle d'abord que l'image du plan part
+gratuitement.
+
+**Un meuble lâché au-delà d'une façade revient dans sa pièce** (Yasmine).
+Pendant le glissé, « d'où il venait » est la position de l'image d'avant,
+déjà au-delà du mur : la collision le gardait dehors, collé à la façade
+(8 lâchers sur 19). Hors de toute pièce, il vient maintenant du point
+reflété dans le contour, juste en face. L'ancre de la pièce, au milieu
+d'un L, aurait trompé le mur.
+
+Bancs : `tournee4biblio`, `glisserplan`, `tournee4plan`.
+
 ## Tournée n°4 : la déco gardée, la cuisine ouverte, la façade juste, des noms uniques
 
 **La déco survit à « Redétecter » et « Redresser »** (Yasmine). La peinture,

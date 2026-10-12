@@ -27,7 +27,9 @@ import {
   wallToRooms,
 } from '../geometry/nfc15100';
 import { useAccountStore } from '../store/accountStore';
-import { useScanStore, type SavedScan, type ScanFolder } from '../store/scanStore';
+import { horsCorbeille, useScanStore, type SavedScan, type ScanFolder } from '../store/scanStore';
+import { haptic } from '../ui/haptic';
+import { alerte } from '../ui/alerte';
 import { useModeElec } from '../store/usage';
 import {
   ActionSheet,
@@ -720,7 +722,10 @@ function ScanRow({
 }
 
 export function LibraryScreen() {
-  const saves = useScanStore((s) => s.saves);
+  const tousLesPlans = useScanStore((s) => s.saves);
+  // La bibliothèque montre ce qui n'est pas à la corbeille ; la corbeille a sa ligne.
+  const saves = useMemo(() => horsCorbeille(tousLesPlans), [tousLesPlans]);
+  const aLaCorbeille = useMemo(() => tousLesPlans.filter((x) => !!x.corbeille), [tousLesPlans]);
   const folders = useScanStore((s) => s.folders);
   const setScreen = useScanStore((s) => s.setScreen);
   const openSave = useScanStore((s) => s.openSave);
@@ -743,7 +748,7 @@ export function LibraryScreen() {
   // Les comptes à rebours avancent, et ce qui a passé son heure s'en va.
   const maintenant = useMaintenant();
 
-  const deleteSave = useScanStore((s) => s.deleteSave);
+  const mettreALaCorbeille = useScanStore((s) => s.mettreALaCorbeille);
   /*
     UN PLAN SE JETTE D'UN GLISSÉ — relevé du patron : « on doit pouvoir
     supprimer un plan en slidant comme les notifications, sur la gauche ».
@@ -751,7 +756,7 @@ export function LibraryScreen() {
     la même chance de se raviser.
   */
   const enLigne = useAccountStore((st) => !!st.compte && !!st.jeton && st.pro);
-  const suppression = useSuppressionDifferee(deleteSave);
+  const suppression = useSuppressionDifferee(mettreALaCorbeille);
   const marges = useSafeAreaInsets();
   const addFolder = useScanStore((s) => s.addFolder);
   const renameFolder = useScanStore((s) => s.renameFolder);
@@ -1408,6 +1413,59 @@ export function LibraryScreen() {
               )}
             </GlisserPourSupprimer>
           ))}
+
+          {/*
+            LA CORBEILLE — revues « Fatou » et « Hugo ». Un plan supprimé y
+            attend 30 jours, avec sa copie en ligne : il se restaure d'un
+            geste, ou s'efface pour de bon.
+          */}
+          {!dossierOuvert && aLaCorbeille.length > 0 && (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Corbeille"
+              onPress={() =>
+                setMenu({
+                  title: 'Corbeille',
+                  subtitle: enLigne
+                    ? 'Effacés au bout de 30 jours, ici et de votre sauvegarde en ligne.'
+                    : 'Effacés au bout de 30 jours.',
+                  actions: [
+                    ...aLaCorbeille.map((x) => ({
+                      label: x.name,
+                      hint: `Restaurer · supprimé le ${new Date(x.corbeille!).toLocaleDateString('fr-FR')}`,
+                      onPress: () => {
+                        useScanStore.getState().restaurerDeLaCorbeille(x.id);
+                        haptic('succes');
+                      },
+                    })),
+                    {
+                      label: 'Vider la corbeille',
+                      hint: 'Efface ces plans pour de bon',
+                      danger: true,
+                      onPress: () =>
+                        alerte(
+                          'Vider la corbeille ?',
+                          `${aLaCorbeille.length} plan${aLaCorbeille.length > 1 ? 's' : ''} ${
+                            aLaCorbeille.length > 1 ? 'seront effacés' : 'sera effacé'
+                          } pour de bon${enLigne ? ', ici et de votre sauvegarde en ligne' : ''}.`,
+                          [
+                            { label: 'Annuler' },
+                            {
+                              label: 'Vider',
+                              danger: true,
+                              onPress: () => useScanStore.getState().viderLaCorbeille(),
+                            },
+                          ],
+                        ),
+                    },
+                  ],
+                })
+              }>
+              <Text style={styles.emptyFolder}>
+                {`Corbeille · ${aLaCorbeille.length} plan${aLaCorbeille.length > 1 ? 's' : ''}, restaurables 30 jours`}
+              </Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       )}
 
@@ -1415,13 +1473,8 @@ export function LibraryScreen() {
       <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
       {suppression.enAttente && (
         <BandeauAnnuler
-          // Revue « Thomas » : le plan partait AUSSI de la sauvegarde en
-          // ligne, et le bandeau ne le disait pas.
-          texte={
-            enLigne
-              ? `« ${suppression.enAttente.nom} » supprimé, ici et de votre sauvegarde en ligne`
-              : `« ${suppression.enAttente.nom} » supprimé`
-          }
+          // La corbeille le garde 30 jours, copie en ligne comprise.
+          texte={`« ${suppression.enAttente.nom} » mis à la corbeille`}
           bas={marges.bottom + 18}
           onAnnuler={suppression.annuler}
         />

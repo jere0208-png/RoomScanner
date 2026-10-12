@@ -194,10 +194,12 @@ describe('le travail ne se perd plus (Sophie, Karim, Nadia, Marie)', () => {
     expect(magasin).toMatch(/if \(repris < 0\) return 0;/);
   });
 
-  it('supprimer un plan dit qu’il part aussi de la sauvegarde en ligne', () => {
+  it('supprimer un plan dit où il part — la corbeille, sauvegarde en ligne comprise', () => {
+    // Revues « Fatou » et « Hugo » : il part à la corbeille, 30 jours.
     for (const ecran of ['LibraryScreen.tsx', 'HomeScreen.tsx']) {
-      expect(lire('src', 'screens', ecran)).toMatch(/sauvegarde en ligne/);
+      expect(lire('src', 'screens', ecran)).toMatch(/mis à la corbeille/);
     }
+    expect(lire('src', 'screens', 'LibraryScreen.tsx')).toMatch(/de votre sauvegarde en ligne/);
   });
 });
 
