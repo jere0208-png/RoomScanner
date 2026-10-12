@@ -14285,6 +14285,24 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le mot dans le rond, partout
+
+Relevé du patron : « écris le VP dans la légende aussi… un rond peut être
+confondu ». Le vidéophone, la prise 20 A et la prise 32 A se dessinent tous
+d'un rond. Sur le plan, leur mot y était écrit (« VP », « 20A », « LV »…) ;
+là où le symbole se montrait seul, il ne l'était pas.
+
+Le mot s'écrit maintenant aussi dans le rond (`motDansLeRond`) :
+- dans la légende du dossier, sur un fond blanc ;
+- dans l'insigne du catalogue de pose ;
+- dans la pastille d'attente ;
+- dans le devis.
+
+Dans la légende, le vidéophone et la prise 20 A ne se regroupent plus sur une
+même ligne : le mot du rond compte pour les départager.
+
+Banc : `symbolesarchitecte`.
+
 ## Interrupteur général, vidéophone, détecteur d'ouverture
 
 Les trois éléments de la légende de l'architecte (DCE « Romeo ») qui

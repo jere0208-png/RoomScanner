@@ -62,6 +62,7 @@ import {
   FIXTURES,
   FIXTURE_TAG,
   libelleDuSymbole,
+  motDansLeRond,
   pointDuSymbole,
   porteeVersLeMur,
   assemblySymbol,
@@ -841,6 +842,8 @@ interface LegendLine {
   symbole?: { paths: SymbolStroke[]; color: string };
   /** Son nombre, comme sur le plan : « ×2 » pour une double prise. */
   fois?: number;
+  /** Le mot écrit dans son rond (« VP », « 20A ») : voir `motDansLeRond`. */
+  mot?: { texte: string; x: number; y: number; taille: number };
 }
 
 interface LegendSection {
@@ -978,6 +981,11 @@ function drawLegendBox(
             mixHex(ligne.symbole.color, '#FFFFFF', 0.9),
             null,
           );
+          // Le rond qui porte un mot se lit sur du blanc, comme sur le plan.
+          if (ligne.mot) {
+            const c0 = pointDuSymbole({ x: ligne.mot.x, y: ligne.mot.y }, tx + 6.5, base + 2.5, 0.4);
+            d.circle(c0.x, c0.y, 6.5 * 0.4, '#FFFFFF');
+          }
           drawSymbol(
             d,
             ligne.symbole.paths,
@@ -987,6 +995,12 @@ function drawLegendBox(
             ligne.symbole.color,
             0.9,
           );
+          // Un rond seul se confond : il porte son mot, comme sur le plan.
+          if (ligne.mot) {
+            const t = ligne.mot.taille * 0.4;
+            const c = pointDuSymbole({ x: ligne.mot.x, y: ligne.mot.y }, tx + 6.5, base + 2.5, 0.4);
+            d.text(ligne.mot.texte, c.x, c.y - t * 0.36, t, ligne.symbole.color, { bold: true, align: 'center' });
+          }
           if (ligne.fois) {
             d.text(`×${ligne.fois}`, tx + 14, base + 0.5, 4.6, ligne.symbole.color, {
               align: 'left',
@@ -1885,13 +1899,21 @@ function planPage(
       plan et son « ×2 » ; et ce qui se dessine pareil ne s'écrit qu'une
       fois — une RJ45, seule ou avec ses prises, c'est le même logo.
     */
-    const groupes: { cle: string; kinds: FixtureKind[]; symbole: SymbolStroke[]; fois: number | null }[] = [];
+    const groupes: {
+      cle: string;
+      kinds: FixtureKind[];
+      symbole: SymbolStroke[];
+      fois: number | null;
+      mot: ReturnType<typeof motDansLeRond>;
+    }[] = [];
     for (const k of kindsLegende) {
       const { symbole, fois } = symboleCompact(postsOf(k), k);
-      const cle = `${JSON.stringify(symbole)}|${fois ?? 1}`;
+      // Le mot du rond compte : un vidéophone n'est pas une prise 20 A.
+      const mot = motDansLeRond(k);
+      const cle = `${JSON.stringify(symbole)}|${fois ?? 1}|${mot?.texte ?? ''}`;
       const deja = groupes.find((g) => g.cle === cle);
       if (deja) deja.kinds.push(k);
-      else groupes.push({ cle, kinds: [k], symbole, fois });
+      else groupes.push({ cle, kinds: [k], symbole, fois, mot });
     }
     const libelle = (kinds: FixtureKind[]) => {
       if (kinds.length === 1) return FIXTURES[kinds[0]].label;
@@ -1907,6 +1929,7 @@ function planPage(
           texte: libelle(g.kinds),
           symbole: { paths: g.symbole, color: FIXTURES[g.kinds[0]].teintePropre ?? ENCRE_ELEC },
           ...(g.fois ? { fois: g.fois } : {}),
+          ...(g.mot ? { mot: g.mot } : {}),
         })),
       },
     ]);

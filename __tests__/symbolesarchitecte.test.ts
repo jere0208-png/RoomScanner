@@ -35,6 +35,7 @@ import {
   FIXTURES,
   FIXTURE_SYMBOL,
   libelleDuSymbole,
+  motDansLeRond,
   porteeVersLeMur,
   symbolPolylines,
   usagesPour,
@@ -49,6 +50,7 @@ import {
 } from '../src/geometry/ruban';
 import { placeDuDetecteur, roomParts, type Pt } from '../src/geometry/floorplan';
 import { planCircuits } from '../src/geometry/nfc15100';
+import { buildScanPdf } from '../src/export/pdf';
 import { buyingList } from '../src/geometry/conduits';
 
 const st = () => useScanStore.getState();
@@ -263,5 +265,33 @@ describe('les trois de plus de la légende', () => {
     expect(buyingList([], [], [], st().openings).find((l) => l.code === 'alarme-contact')?.quantity).toBe(1);
     st().undo();
     expect(st().openings.find((x) => x.id === porte)?.detecteur).toBeUndefined();
+  });
+});
+
+describe('le mot dans le rond, partout où le symbole est seul', () => {
+  it('« VP », « 20A », « LV » : un rond seul ne se confond plus', () => {
+    expect(motDansLeRond('videophone')?.texte).toBe('VP');
+    expect(motDansLeRond('prise20')?.texte).toBe('20A');
+    expect(motDansLeRond('prise20', 'LV')?.texte).toBe('LV');
+    // Hors des ronds : rien (le « RJ45 » d'une prise se lit à côté d'elle).
+    expect(motDansLeRond('rj45')).toBeNull();
+    expect(motDansLeRond('prise')).toBeNull();
+  });
+
+  it('dans la légende du dossier, le vidéophone porte « VP » et ne se mêle pas à la prise 20 A', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(4, 3, 'Entrée', { auNu: true });
+    st().addFixture('videophone', st().walls[0].id, 1);
+    st().addFixture('prise20', st().walls[1].id, 1);
+    const s = st();
+    const bytes = buildScanPdf(
+      { name: 'Legende', walls: s.walls, openings: s.openings, objects: [], rooms: s.rooms, fixtures: s.fixtures, photos: [] } as never,
+      false,
+      { metre: false } as never,
+    );
+    let src = '';
+    for (let i = 0; i < bytes.length; i++) src += String.fromCharCode(bytes[i]);
+    // Le plan l'écrit une fois, la légende une seconde.
+    expect(src.split('(VP) Tj').length - 1).toBeGreaterThanOrEqual(2);
   });
 });

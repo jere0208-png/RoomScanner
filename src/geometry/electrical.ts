@@ -1461,6 +1461,22 @@ export function libelleDuSymbole(
 }
 
 /**
+ * LE MOT ÉCRIT DANS LE ROND — « VP », « 20A », « LV »… Relevé du patron :
+ * « écris le VP dans la légende aussi, un rond peut être confondu ». Partout
+ * où le symbole se montre seul (légende du dossier, catalogue de pose,
+ * pastille d'attente, devis), le rond porte son mot. Dans le repère du
+ * symbole ; `taille` y est le corps du texte. `null` hors des ronds.
+ */
+export function motDansLeRond(
+  kind: FixtureKind,
+  usage?: string,
+): { texte: string; x: number; y: number; taille: number } | null {
+  const l = libelleDuSymbole(postsOf(kind), kind, usage);
+  if (!l || l.ou.x !== 0 || l.ou.y <= 0) return null;
+  return { texte: l.texte, x: l.ou.x, y: l.ou.y, taille: l.taille * 1.15 };
+}
+
+/**
  * Un point du repère d'un symbole, posé sur la feuille comme `symbolePose`
  * pose ses traits — c'est là que s'ancre son mot.
  */

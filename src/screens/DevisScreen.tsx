@@ -57,7 +57,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Text as SvgText } from 'react-native-svg';
 import { BackChevron } from '../components/BackChevron';
 import { PromptSheet, type PromptData } from '../components/Sheet';
 import { RoomScan } from 'react-native-room-scan';
@@ -86,7 +86,7 @@ import {
 } from '../geometry/devis';
 import { chiffrerLePlan } from '../geometry/devisplan';
 import { CEILINGS, CEILING_SYMBOL, type CeilingKind } from '../geometry/ceiling';
-import { FIXTURES, postsSymbol, type FixtureKind } from '../geometry/electrical';
+import { FIXTURES, motDansLeRond, postsSymbol, type FixtureKind } from '../geometry/electrical';
 import {
   ENSEIGNE_PUBLIQUE,
   GAMMES,
@@ -189,6 +189,21 @@ function SymboleDuPlan({ ligne }: { ligne: LigneLegende }) {
           fill={seg.fill ? spec.color : 'none'}
         />
       ))}
+      {(() => {
+        // Un rond seul se confond : il porte son mot (« VP », « 20A »).
+        const mot = motDansLeRond(kind);
+        return mot ? (
+          <SvgText
+            x={mot.x}
+            y={mot.y + mot.taille * 0.36}
+            fontSize={mot.taille}
+            fontWeight="800"
+            fill={spec.color}
+            textAnchor="middle">
+            {mot.texte}
+          </SvgText>
+        ) : null;
+      })()}
     </Svg>
   );
 }

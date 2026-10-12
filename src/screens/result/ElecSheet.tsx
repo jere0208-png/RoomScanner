@@ -17,7 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Text as SvgText } from 'react-native-svg';
 import { useTheme } from '../../theme';
 import { WallElevation } from '../../components/WallElevation';
 import { ActionSheet, type ActionData } from '../../components/Sheet';
@@ -25,6 +25,7 @@ import {
   FIXTURES,
   FIXTURE_FAMILIES,
   FIXTURE_SYMBOL,
+  motDansLeRond,
   type FixtureKind,
 } from '../../geometry/electrical';
 import { getStyles } from './styles';
@@ -162,6 +163,21 @@ export function ElecSheet({
                                       fill={s.fill ? spec.color : 'none'}
                                     />
                                   ))}
+                                  {(() => {
+                                    // Un rond seul se confond : il porte son mot.
+                                    const mot = motDansLeRond(kind);
+                                    return mot ? (
+                                      <SvgText
+                                        x={mot.x}
+                                        y={mot.y + mot.taille * 0.36}
+                                        fontSize={mot.taille}
+                                        fontWeight="800"
+                                        fill={spec.color}
+                                        textAnchor="middle">
+                                        {mot.texte}
+                                      </SvgText>
+                                    ) : null;
+                                  })()}
                                 </Svg>
                               </View>
                             </View>

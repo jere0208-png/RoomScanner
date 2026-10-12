@@ -15,11 +15,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Text as SvgText } from 'react-native-svg';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 import {
   FIXTURES,
   assemblySymbol,
+  motDansLeRond,
   type FixtureKind,
 } from '../geometry/electrical';
 import { CEILINGS, CEILING_SYMBOL, type CeilingKind } from '../geometry/ceiling';
@@ -153,6 +154,21 @@ export function EnAttente({
               fill={seg.fill ? spec.color : 'none'}
             />
           ))}
+          {(() => {
+            // Un rond seul se confond : il porte son mot (« VP », « 20A »).
+            const mot = !mur && !note && !plafond && kind ? motDansLeRond(kind) : null;
+            return mot ? (
+              <SvgText
+                x={mot.x}
+                y={mot.y + mot.taille * 0.36}
+                fontSize={mot.taille}
+                fontWeight="800"
+                fill={spec.color}
+                textAnchor="middle">
+                {mot.texte}
+              </SvgText>
+            ) : null;
+          })()}
         </Svg>
       </View>
       <View style={styles.attenteTextes}>
