@@ -26,6 +26,7 @@ export type IssueKind =
   | 'confiance'
   | 'contour'
   | 'murCourt'
+  | 'murIsole'
   | 'doublon'
   | 'hauteur'
   | 'linteau'
@@ -49,6 +50,8 @@ export interface PlanIssue {
 
 /** Mur plus court que ça : presque toujours un artefact de détection. */
 const MUR_COURT = 0.25;
+/** Un mur scanné plus court que ça et qui ne touche rien : un fantôme probable. */
+const MUR_ISOLE = 1.0;
 /** Deux murs plus proches que ça, et parallèles : un doublon. */
 const DOUBLON_DIST = 0.25;
 /** Écart de hauteur au-delà duquel un mur détonne dans son logement. */
@@ -161,6 +164,29 @@ export function checkPlan(
       wallId: w.id,
       message: `Un mur ne fait que ${(segLength(w) * 100).toFixed(0)} cm`,
       hint: 'C’est souvent un éclat de détection : supprimez-le.',
+    });
+  }
+
+  /*
+    LES MURS QUI NE TOUCHENT RIEN — revue « Camille » : un rideau de 45 cm
+    pris pour un mur, au milieu du séjour, ne se signalait jamais (il passait
+    le seuil des éclats). Un mur SCANNÉ dont aucun bout ne touche un autre
+    mur, et qui fait moins d'un mètre, est presque toujours un fantôme. Un
+    mur dessiné, lui, a été voulu : un muret, un retour.
+  */
+  const touche = (w: WallSeg, p: { x: number; z: number }) =>
+    walls.some((v) => v !== w && v.type === 'wall' && pointOnSeg(p, v.a, v.b).dist < 0.03);
+  for (const w of walls) {
+    if (w.type !== 'wall' || w.auNu) continue;
+    const L = segLength(w);
+    if (L < MUR_COURT || L >= MUR_ISOLE) continue;
+    if (touche(w, w.a) || touche(w, w.b)) continue;
+    issues.push({
+      kind: 'murIsole',
+      severity: L < 0.6 ? 'alerte' : 'info',
+      wallId: w.id,
+      message: `Un mur de ${(L * 100).toFixed(0)} cm ne touche aucun autre mur`,
+      hint: 'C’est souvent un rideau ou le flanc d’un meuble pris pour un mur : supprimez-le.',
     });
   }
 

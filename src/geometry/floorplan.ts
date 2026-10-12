@@ -2078,13 +2078,19 @@ export function wallsCentroid(walls: WallSeg[]): { x: number; z: number } {
  * Recale un meuble DEVANT les murs : tout coin de son empreinte qui pénètre
  * l'épaisseur d'un mur (ou passe derrière) pousse le meuble vers l'intérieur
  * de la pièce. Utilisé par le plan 2D, la vue 3D et le PDF.
+ *
+ * AU NU DE CHAQUE MUR, À DEUX MILLIMÈTRES — revue « Théo » : la marge de
+ * deux centimètres dessinait un jour derrière tout meuble « collé » (placé
+ * à 0 cm, montré à 2), et l'épaisseur de référence (14 cm) écartait de
+ * 5,5 cm un meuble plaqué contre une cloison de 7. Chaque mur pousse
+ * désormais depuis SA face, et la marge n'est plus qu'un souffle.
  */
 export function clampFootprint(
   f: ObjectFootprint,
   walls: WallSeg[],
   interior: { x: number; z: number },
   wallT = WALL_T,
-  margin = 0.02,
+  margin = 0.002,
 ): ObjectFootprint {
   let cx = f.cx;
   let cz = f.cz;
@@ -2135,7 +2141,9 @@ export function clampFootprint(
       const d = side * ((px - w.a.x) * nx + (pz - w.a.z) * nz);
       if (d < minCorner) minCorner = d;
     }
-    const need = wallT / 2 + margin - minCorner;
+    // Sa face à lui : l'épaisseur dite, sinon celle de référence.
+    const demi = (w.epaisseur !== undefined ? epaisseurDe(w) : wallT) / 2;
+    const need = demi + margin - minCorner;
     // On accepte de déplacer jusqu'à la profondeur du meuble : de quoi
     // dégager une télé ou une étagère entièrement enfoncée dans la cloison.
     // Au-delà, le meuble vit ailleurs — on ne le téléporte pas.
@@ -2146,11 +2154,12 @@ export function clampFootprint(
         nx: nx * side,
         nz: nz * side,
         base: (w.a.x * nx + w.a.z * nz) * side,
+        demi,
       });
     }
   }
   return faceIntoRoom(
-    raboter({ ...f, cx, cz }, pousses, wallT, margin),
+    raboter({ ...f, cx, cz }, pousses, margin),
     walls,
   );
 }
@@ -2159,7 +2168,7 @@ export function clampFootprint(
  * UN MUR QUI A DÛ POUSSER, et où passe son nu.
  *
  * On retient la NORMALE (vers l'intérieur) et `base`, la cote du plan du mur
- * le long de cette normale : le nu intérieur est alors à `base + wallT / 2`.
+ * le long de cette normale : le nu intérieur est alors à `base + demi`.
  *
  * On ne retient PAS ce que la poussée a déplacé. Les poussées s'enchaînent —
  * le deuxième mur mesure un meuble que le premier a déjà écarté — et les
@@ -2171,6 +2180,8 @@ interface Poussee {
   nx: number;
   nz: number;
   base: number;
+  /** La demi-épaisseur du mur : son nu est à `base + demi`. */
+  demi: number;
 }
 
 /**
@@ -2214,7 +2225,6 @@ const RABOT_MINI = 0.3;
 function raboter(
   f: ObjectFootprint,
   pousses: Poussee[],
-  wallT: number,
   margin: number,
 ): ObjectFootprint {
   if (pousses.length < 2) return f;
@@ -2254,7 +2264,7 @@ function raboter(
       distance de plan à plan vaut −(base₁ + base₂), et l'on retire une
       épaisseur de mur pour passer des axes aux nus.
     */
-    const dispo = -(bas.base + haut.base) - wallT - 2 * margin;
+    const dispo = -(bas.base + haut.base) - bas.demi - haut.demi - 2 * margin;
     /*
       UNE BOÎTE DE BIAIS TIENT PLUS DE PLACE QUE SES COTES.
 
@@ -2433,7 +2443,19 @@ export function linteauxRabotes(
   const HAUTEUR_DE_PORTE = 2.0;
   const aHauteurDePorte = (o: WallSeg) =>
     o.yCenter - o.height / 2 - sol < 0.1 && o.height >= HAUTEUR_DE_PORTE - 1e-9;
+  /*
+    UNE FENÊTRE HAUTE N'EST PAS UNE FENÊTRE RABOTÉE — revue « Camille » : une
+    fenêtre de 0,60 posée à 1,50 du sol (un WC, une salle d'eau) s'arrêtait
+    à 2,10 quand les autres montaient à 2,30, et le seul constat de deux
+    plans propres proposait de l'agrandir (de même une fenêtre de 0,90 à
+    1,20 du sol). Un volet qui pend rabote le haut d'une baie ordinaire ; il
+    ne remonte pas son allège. Au-delà de 1,10 m d'allège (celle d'une
+    fenêtre de séjour ou de chambre), la fenêtre est haute par dessin : elle
+    ne se compare pas.
+  */
+  const ALLEGE_HAUTE = 1.1;
   const baies = openings.filter((o) => {
+    if (o.type === 'window' && o.yCenter - o.height / 2 - sol > ALLEGE_HAUTE + 1e-9) return false;
     if (o.type === 'window') return enFacade(o) !== false && !aHauteurDePorte(o);
     if (o.type === 'door') return enFacade(o) === true && o.height < HAUTEUR_DE_PORTE - 1e-9;
     return false;
@@ -4685,25 +4707,70 @@ export function coupeParDefaut(
  * Dans les axes DU MEUBLE : un lit posé de biais se cote le long de ses
  * propres côtés, pas de ceux de l'écran. `null` quand aucun mur n'est en
  * face (le meuble regarde une baie, ou le vide d'un plan ouvert).
+ *
+ * LE MEUBLE D'À CÔTÉ COMPTE AUSSI — revue « Théo » : le chevet « à 0 cm à
+ * droite » se mesurait au mur, À TRAVERS le lit (238 cm), et finissait
+ * dans l'autre chevet. Un meuble voisin qui se dresse entre le bord et le
+ * mur d'en face devient la cote (`vers` le nomme). L'écart peut être
+ * négatif : le meuble mord déjà dans ce qu'il regarde.
  */
+export interface VoisinDeMeuble {
+  centre: Pt;
+  width: number;
+  depth: number;
+  yaw: number;
+  nom?: string;
+}
+
 export function ecartsAuxMurs(
   centre: Pt,
   box: { width: number; depth: number; yaw: number },
   walls: WallSeg[],
-): { dir: Pt; ecart: number | null }[] {
+  voisins: VoisinDeMeuble[] = [],
+): { dir: Pt; ecart: number | null; vers?: string }[] {
   const c = Math.cos(box.yaw);
   const sn = Math.sin(box.yaw);
   const ax = { x: c, z: sn };
   const az = { x: -sn, z: c };
   const pleins = walls.filter((w) => w.type === 'wall');
+  const coinsDe = (v: VoisinDeMeuble): Pt[] => {
+    const u = { x: Math.cos(v.yaw), z: Math.sin(v.yaw) };
+    const w = { x: -u.z, z: u.x };
+    return [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ].map(([a, b]) => ({
+      x: v.centre.x + (u.x * v.width * a + w.x * v.depth * b) / 2,
+      z: v.centre.z + (u.z * v.width * a + w.z * v.depth * b) / 2,
+    }));
+  };
+  const lesCoins = voisins.map((v) => ({ v, coins: coinsDe(v) }));
   return [
-    { dir: ax, demi: box.width / 2 },
-    { dir: { x: -ax.x, z: -ax.z }, demi: box.width / 2 },
-    { dir: az, demi: box.depth / 2 },
-    { dir: { x: -az.x, z: -az.z }, demi: box.depth / 2 },
-  ].map(({ dir, demi }) => {
+    { dir: ax, demi: box.width / 2, perp: az, demiPerp: box.depth / 2 },
+    { dir: { x: -ax.x, z: -ax.z }, demi: box.width / 2, perp: az, demiPerp: box.depth / 2 },
+    { dir: az, demi: box.depth / 2, perp: ax, demiPerp: box.width / 2 },
+    { dir: { x: -az.x, z: -az.z }, demi: box.depth / 2, perp: ax, demiPerp: box.width / 2 },
+  ].map(({ dir, demi, perp, demiPerp }) => {
     const d = castToWall(centre, dir, pleins);
-    return { dir, ecart: d === null ? null : d - demi };
+    let ecart = d === null ? null : d - demi;
+    let vers: string | undefined;
+    for (const { v, coins } of lesCoins) {
+      const le = coins.map((p) => (p.x - centre.x) * dir.x + (p.z - centre.z) * dir.z);
+      const tr = coins.map((p) => (p.x - centre.x) * perp.x + (p.z - centre.z) * perp.z);
+      // En face : il déborde sur la largeur du bord, à un centimètre près…
+      if (Math.max(...tr) <= -demiPerp + 0.01 || Math.min(...tr) >= demiPerp - 0.01) continue;
+      // …devant ce bord, sans être derrière le meuble ni l'englober.
+      const min = Math.min(...le);
+      if (Math.max(...le) <= demi + 1e-3 || min <= -demi + 1e-3) continue;
+      const g = min - demi;
+      if (ecart === null || g < ecart) {
+        ecart = g;
+        vers = v.nom ?? 'meuble';
+      }
+    }
+    return vers ? { dir, ecart, vers } : { dir, ecart };
   });
 }
 
@@ -4716,7 +4783,7 @@ export function centrePourEcart(
   e: { dir: Pt; ecart: number | null },
   voulu: number,
 ): Pt | null {
-  if (e.ecart === null || !(voulu >= 0) || !isFinite(voulu)) return null;
+  if (e.ecart === null || !(voulu >= 0) || !Number.isFinite(voulu)) return null;
   const d = e.ecart - voulu;
   return { x: centre.x + e.dir.x * d, z: centre.z + e.dir.z * d };
 }

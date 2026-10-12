@@ -14285,6 +14285,52 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Un plan d'équerre à l'ouverture, des noms sans doublon, des meubles au ras
+
+Suite de la troisième tournée, du plus gênant au moins gênant.
+
+**Le scan corrigé** (revue « Camille »)
+- Le plan s'ouvre d'équerre. ARKit oriente son repère selon l'endroit où l'on
+  a commencé : le plan s'ouvrait tourné de 23° ou de 52°, et l'image
+  exportée aussi. La vue part maintenant tournée de l'angle de la trame (au
+  plus un huitième de tour). Les murs, eux, ne bougent pas.
+- Plus de « Cuisine 2 2 ». Quand deux pièces portent le même nom, la
+  seconde prend le premier numéro libre de la même base (« Cuisine 3 »),
+  après une redétection comme après un second passage.
+- Un meuble loin de toute pièce ne la nomme plus. Le lit et le canapé d'un
+  séjour manqué au scan faisaient du dégagement voisin une « Cuisine 2 ».
+  Seul ce qui est dans la pièce, ou à moins de 50 cm de son contour, vote.
+- Plus de fausse « baie rabotée » sur une fenêtre haute. Une fenêtre posée
+  à plus de 1,10 m du sol (WC, salle d'eau, cuisine) ne se compare plus aux
+  autres, et le bouton ne propose plus de l'agrandir.
+- Un mur scanné de moins d'un mètre qui ne touche aucun autre mur se
+  signale (« Un mur de 45 cm ne touche aucun autre mur »). C'est presque
+  toujours un rideau ou le flanc d'un meuble. Un mur dessiné, voulu, ne se
+  signale pas.
+
+**Le T3 dessiné** (revue « Sophie »)
+- Une façade dont on a choisi l'épaisseur se dessine à cette épaisseur. La
+  surépaisseur de 10 cm reste la convention d'un mur dont on ignore
+  l'épaisseur ; une façade passée à 20 cm se dessinait à 30.
+- Poser une fenêtre puis taper ses cotes s'annule d'un seul appui. Des cotes
+  reprises plus tard restent un geste à part.
+- « Sur mesure » demande aussi le nom de la pièce (facultatif). Huit pièces
+  sortaient « Pièce sans nom », à renommer une à une.
+
+**L'aménagement** (revue « Théo »)
+- « Placer au centimètre » cote jusqu'au meuble d'en face, pas à travers
+  lui. Le chevet « à 0 cm à droite » se mesurait au mur, à 238 cm derrière
+  le lit, et finissait dans l'autre chevet. Le menu nomme le meuble visé,
+  et un écart négatif (le meuble mord déjà dans son voisin) s'affiche à 0.
+- Un meuble collé au mur se dessine au ras du mur. La marge d'affichage
+  passe de 2 cm à 2 mm, et chaque mur pousse depuis sa propre face : un
+  meuble plaqué contre une cloison de 7 cm ne s'en écarte plus de 5,5 cm.
+  Le PDF garde 2 cm de jour (0,4 mm au 1/50) pour que le trait du meuble
+  ne se fonde pas dans le mur.
+
+Bancs : `plansconstruits`, `floorplan`, `planauxcotes`. Planches de rendu
+de référence régénérées (meubles décalés de 1,8 cm vers leur mur).
+
 ## Les coins ratés se ferment ; le placard se compte ; « Redresser » garde les angles voulus
 
 Suite de la troisième tournée, toujours du plus gênant au moins gênant.

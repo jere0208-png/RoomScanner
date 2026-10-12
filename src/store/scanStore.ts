@@ -579,6 +579,45 @@ function nameRooms(kinds: (RoomKind | null)[]): string[] {
 }
 
 /**
+ * LE MEUBLE NE VOTE QUE CHEZ LUI — revue « Camille » : le séjour manqué au
+ * scan, son lit, son canapé et sa table se rattachaient à la pièce la plus
+ * proche — et le dégagement s'appelait « Cuisine 2 ». Le rattachement au
+ * plus proche reste (une télé plaquée au mur a son centre dehors), mais
+ * seul ce qui est dans la pièce, ou à moins d'un demi-mètre de son
+ * contour, dit ce qu'elle est.
+ */
+function voteDansLaPiece(o: { transform: number[] }, contour: Pt[]): boolean {
+  // Sans contour (rien ne se referme), tout ce qui est relevé parle encore.
+  if (contour.length < 3) return true;
+  const p = { x: o.transform[12], z: o.transform[14] };
+  if (pointInPolygon(p, contour)) return true;
+  for (let a = 0, b = contour.length - 1; a < contour.length; b = a++) {
+    if (pointOnSeg(p, contour[b], contour[a]).dist < 0.5) return true;
+  }
+  return false;
+}
+
+/**
+ * UN SEUL EXEMPLAIRE DE CHAQUE NOM — revue « Camille » : deux « Cuisine 2 »
+ * renumérotées donnaient « Cuisine 2 2 ». Le premier garde son nom ; le
+ * suivant prend le premier numéro libre de la même base (« Cuisine 3 »).
+ */
+function sansNomEnDouble(rooms: RoomEntry[]): void {
+  const pris = new Set<string>();
+  for (const r of rooms) {
+    if (!r.name || !pris.has(r.name)) {
+      if (r.name) pris.add(r.name);
+      continue;
+    }
+    const base = r.name.replace(/ \d+$/, '');
+    let k = 2;
+    while (pris.has(`${base} ${k}`)) k++;
+    r.name = `${base} ${k}`;
+    pris.add(r.name);
+  }
+}
+
+/**
  * Premier point où un rayon parti de `from` rencontre le contour d'une pièce.
  * Sert à poser une cloison qui touche pile les murs, des deux côtés.
  */
@@ -1417,6 +1456,14 @@ interface Snapshot {
 }
 const HISTORY_MAX = 40;
 const history: Snapshot[] = [];
+/**
+ * LA MENUISERIE QU'ON VIENT DE POSER, et le point de reprise de sa pose —
+ * revue « Sophie » : poser une fenêtre puis taper ses cotes demandait deux
+ * « Annuler » pour la retirer. Tant que rien d'autre n'est venu s'inscrire
+ * dans l'historique, ses cotes complètent la pose au lieu d'en être un
+ * geste de plus.
+ */
+let ouverturePosee: { id: string; reprise: Snapshot | undefined } | null = null;
 let lastKey = '';
 let lastAt = 0;
 
@@ -2957,10 +3004,10 @@ export const useScanStore = create<ScanState>((set, get) => {
       ...o,
       roomId: idPiece(roomIndexAt({ x: o.transform[12], z: o.transform[14] }, contours)),
     }));
-    const kinds = shapes.map((_, i) =>
+    const kinds = shapes.map((s, i) =>
       deduceRoomKind(
         objects
-          .filter((o) => o.roomId === idPiece(i))
+          .filter((o) => o.roomId === idPiece(i) && voteDansLaPiece(o, s.outline))
           .map((o) => o.category),
       ),
     );
@@ -2997,12 +3044,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       };
     });
     // Deux pièces peuvent hériter du même nom : on renumérote les doublons.
-    const seen = new Map<string, number>();
-    for (const r of rooms) {
-      const k = (seen.get(r.name) ?? 0) + 1;
-      seen.set(r.name, k);
-      if (k > 1) r.name = `${r.name} ${k}`;
-    }
+    sansNomEnDouble(rooms);
     /*
       LE PLAFOND SUIT LA RENUMÉROTATION. Les pièces reçoivent de
       nouveaux identifiants : un point lumineux qui garderait l'ancien
@@ -3164,7 +3206,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           )
           .map((x) => x.label),
         objects
-          .filter((o) => o.roomId === idPiece(i))
+          .filter((o) => o.roomId === idPiece(i) && voteDansLaPiece(o, sh.outline))
           .map((o) => o.category),
       ),
     );
@@ -6645,7 +6687,7 @@ export const useScanStore = create<ScanState>((set, get) => {
             .filter((x) => sh.outline.length >= 3 && pointInPolygon({ x: x.x + dx, z: x.z + dz }, sh.outline))
             .map((x) => x.label),
           objects
-            .filter((o) => o.roomId === idPiece(i))
+            .filter((o) => o.roomId === idPiece(i) && voteDansLaPiece(o, sh.outline))
             .map((o) => o.category),
         ),
       );
@@ -6674,6 +6716,8 @@ export const useScanStore = create<ScanState>((set, get) => {
           ...(releve ? { releve } : {}),
         };
       });
+      // Un nom gardé et un nom deviné peuvent se croiser : voir `sansNomEnDouble`.
+      sansNomEnDouble(kept);
       /*
         LE PLAFOND SUIT SA PIÈCE, par la position de son ancrage : les
         identifiants de pièce sont refaits à neuf.
@@ -7086,7 +7130,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           (r.sections ?? [])
             .filter((x) => sh.outline.length >= 3 && pointInPolygon({ x: x.x, z: x.z }, sh.outline))
             .map((x) => x.label),
-          objects.filter((o) => o.roomId === id).map((o) => o.category),
+          objects.filter((o) => o.roomId === id && voteDansLaPiece(o, sh.outline)).map((o) => o.category),
         );
       });
       /* Chaque mur, photographié et redressé pendant le scan. */
@@ -7995,6 +8039,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         yCenter: base + allege + h / 2,
       };
       set({ openings: [...st.openings, opening], dirty: true });
+      ouverturePosee = { id: opening.id, reprise: history[history.length - 1] };
       return opening.id;
     },
 
@@ -8007,7 +8052,13 @@ export const useScanStore = create<ScanState>((set, get) => {
       const cote = ouvertureCotee(o, st.walls.filter((w) => niveauDe(w) === niveauDe(o)), s);
       // La garde AVANT le point de reprise : voir `annulerunefois`.
       if (!cote) return;
-      pushHistory('coterOuverture');
+      // Ses cotes juste après la pose : le même geste (voir `ouverturePosee`).
+      const memePose =
+        ouverturePosee?.id === id &&
+        ouverturePosee.reprise !== undefined &&
+        history[history.length - 1] === ouverturePosee.reprise;
+      ouverturePosee = null;
+      if (!memePose) pushHistory('coterOuverture');
       set({
         openings: st.openings.map((x) => (x.id === id ? { ...x, ...cote } : x)),
         dirty: true,

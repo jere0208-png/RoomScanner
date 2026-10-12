@@ -356,6 +356,21 @@ export function pocheDesMurs(
     .map((p) => p.surface?.pts)
     .filter((p): p is Pt[] => !!p && p.length >= 3);
   const dansUnePiece = (p: Pt) => pieces.some((poly) => dansPoly(p, poly));
+  /*
+    L'ÉPAISSEUR CHOISIE EST L'ÉPAISSEUR DESSINÉE — revue « Sophie » : une
+    façade passée à 20 cm (« Épaisseur › Porteur ») se dessinait à 30. La
+    surépaisseur est la convention d'un mur dont on ignore l'épaisseur ;
+    celui dont on l'a dite se dessine tel quel. Le bord appartient au mur
+    dont la face passe par son milieu.
+  */
+  const epaisseurDite = (a: Pt, b: Pt) => {
+    const m = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+    return walls.some((w) => {
+      if (w.epaisseur === undefined) return false;
+      const { dist, t } = pointOnSeg(m, w.a, w.b);
+      return t >= -1e-6 && t <= 1 + 1e-6 && Math.abs(dist - epaisseurDe(w) / 2) < 0.005;
+    });
+  };
 
   // 1. La maçonnerie à l'épaisseur des murs.
   const brute = region(corps);
@@ -376,7 +391,7 @@ export function pocheDesMurs(
         const nr = { x: (b.z - a.z) / L, z: -(b.x - a.x) / L };
         normales.push(nr);
         const m = { x: (a.x + b.x) / 2 + nr.x * 0.3, z: (a.z + b.z) / 2 + nr.z * 0.3 };
-        const d = !dansUnePiece(m);
+        const d = !dansUnePiece(m) && !epaisseurDite(a, b);
         dehors.push(d);
         if (d) {
           bandes.push([a, b, { x: b.x + nr.x * facade, z: b.z + nr.z * facade }, { x: a.x + nr.x * facade, z: a.z + nr.z * facade }]);

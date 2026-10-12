@@ -913,6 +913,19 @@ describe('diagnostic du plan', () => {
     expect(kinds).toContain('hauteur');
   });
 
+  it('signale un mur scanné qui ne touche rien (revue « Camille »)', () => {
+    const fantome = [...carre, seg('rideau', { x: 1.5, z: 1.5 }, { x: 1.95, z: 1.5 })];
+    const i = checkPlan(fantome, rooms).find((x) => x.kind === 'murIsole');
+    expect(i?.wallId).toBe('rideau');
+    expect(i?.severity).toBe('alerte');
+    expect(i?.message).toContain('45 cm');
+    // Accroché à un mur, c'est un retour ; dessiné, c'est voulu.
+    const retour = [...carre, seg('retour', { x: 4, z: 1.5 }, { x: 3.55, z: 1.5 })];
+    expect(checkPlan(retour, rooms).some((x) => x.kind === 'murIsole')).toBe(false);
+    const muret = [...carre, { ...seg('muret', { x: 1.5, z: 1.5 }, { x: 1.95, z: 1.5 }), auNu: true }];
+    expect(checkPlan(muret, rooms).some((x) => x.kind === 'murIsole')).toBe(false);
+  });
+
   it('met les alertes en tête et propose un geste à chaque fois', () => {
     const sale = [
       ...carre.slice(0, 3),
@@ -2089,6 +2102,16 @@ describe('les linteaux rabotés', () => {
       baie('sdb', 2.15, 1.6),
     ];
     expect(linteauxRabotes(baies)).toHaveLength(0);
+  });
+
+  it('ni une petite fenêtre haute qui s’arrête plus bas (revue « Camille »)', () => {
+    // Une fenêtre de 0,60 posée à 1,50 du sol, linteau à 2,10 : ce n'est pas
+    // un volet qui pend, c'est une fenêtre haute — et la « remonter » à 2,30
+    // l'aurait agrandie.
+    const baies = [baie('a', 2.3, 0.95), baie('b', 2.3, 0.95), baie('haute', 2.1, 1.5), baie('cuisine', 2.1, 1.2)];
+    expect(linteauxRabotes(baies)).toHaveLength(0);
+    // Une fenêtre ordinaire au même linteau, elle, se signale toujours.
+    expect(linteauxRabotes([...baies, baie('c', 2.1, 0.95)]).map((r) => r.id)).toEqual(['c']);
   });
 
   /*

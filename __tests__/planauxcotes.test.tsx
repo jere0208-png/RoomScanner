@@ -179,17 +179,21 @@ describe('« Ajouter une pièce » sur mesure', () => {
   const textes = (t: TestRenderer.ReactTestRenderer) =>
     t.root.findAllByType(Text).map((n) => [].concat(n.props.children).join('')).join(' | ');
 
-  it('se tape dans la feuille même : deux champs, en mètres', () => {
+  it('se tape dans la feuille même : deux cotes en mètres, et un nom facultatif', () => {
     const choisi = jest.fn();
     const t = monter(choisi);
     act(() => bouton(t, 'Sur mesure').props.onPress());
     const champs = t.root.findAllByType(TextInput);
-    expect(champs).toHaveLength(2);
-    expect(champs.every((c) => c.props.keyboardType === 'decimal-pad')).toBe(true);
+    expect(champs).toHaveLength(3);
+    expect(champs.slice(0, 2).every((c) => c.props.keyboardType === 'decimal-pad')).toBe(true);
     act(() => champs[0].props.onChangeText('6,00'));
     act(() => champs[1].props.onChangeText('4'));
     act(() => bouton(t, 'Ajouter la pièce').props.onPress());
     expect(choisi).toHaveBeenCalledWith(6, 4, '');
+    // Le nom tapé avec les cotes (revue « Sophie »).
+    act(() => champs[2].props.onChangeText(' Chambre 2 '));
+    act(() => bouton(t, 'Ajouter la pièce').props.onPress());
+    expect(choisi).toHaveBeenLastCalledWith(6, 4, 'Chambre 2');
     act(() => t.unmount());
   });
 

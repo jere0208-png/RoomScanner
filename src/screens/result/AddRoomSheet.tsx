@@ -77,12 +77,19 @@ export function AddRoomSheet({
   const [surMesure, setSurMesure] = useState(false);
   const [largeur, setLargeur] = useState('');
   const [profondeur, setProfondeur] = useState('');
+  /*
+    LE NOM SE TAPE AVEC LES COTES — revue « Sophie » : huit pièces « Sur
+    mesure » sortaient « Pièce sans nom », à renommer une à une. Facultatif :
+    sans lui, la pièce reste sans nom, comme avant.
+  */
+  const [nom, setNom] = useState('');
   const [faute, setFaute] = useState<string | null>(null);
   // Chaque ouverture repart des gabarits.
   useEffect(() => {
     if (visible) return;
     setSurMesure(false);
     setFaute(null);
+    setNom('');
   }, [visible]);
 
   const ajouter = () => {
@@ -95,7 +102,7 @@ export function AddRoomSheet({
     onChoose(
       parseFloat(largeur.replace(',', '.')),
       parseFloat(profondeur.replace(',', '.')),
-      '',
+      nom.trim(),
     );
   };
 
@@ -155,6 +162,20 @@ export function AddRoomSheet({
             <View>
               {champ('Largeur', largeur, setLargeur)}
               {champ('Profondeur', profondeur, setProfondeur, ajouter)}
+              <View style={{ marginTop: 10 }}>
+                <Text style={styles.modalSubtitle}>Nom</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  accessibilityLabel="Nom de la pièce"
+                  value={nom}
+                  onChangeText={setNom}
+                  placeholder="Chambre, cuisine… (facultatif)"
+                  placeholderTextColor={c.inkFaint}
+                  autoCapitalize="sentences"
+                  returnKeyType="done"
+                  onSubmitEditing={ajouter}
+                />
+              </View>
               {faute && (
                 <Text style={{ color: c.danger, fontSize: 13, marginTop: 10 }} accessibilityLiveRegion="polite">
                   {faute}

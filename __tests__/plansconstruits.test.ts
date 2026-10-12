@@ -73,6 +73,9 @@ import {
   murNeufCote,
   massifsTechniques,
   type PoseDeMur,
+  ecartsAuxMurs,
+  centrePourEcart,
+  clampFootprint,
   type WallSeg,
 } from '../src/geometry/floorplan';
 import { poserLibre } from '../src/geometry/poser';
@@ -84,6 +87,7 @@ import { boardRows } from '../src/export/pdf';
 import { CATALOG_ITEMS, type CatalogItem } from '../src/geometry/catalogue';
 import { matchItem } from '../src/screens/result/FurnitureSheet';
 import { useAstuce } from '../src/ui/astuce';
+import { pocheDesMurs, SUREPAISSEUR_FACADE } from '../src/geometry/poche';
 
 const st = () => useScanStore.getState();
 const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
@@ -651,5 +655,127 @@ describe('le placard de Karim', () => {
     const [p] = roomParts(st().walls, st().rooms);
     expect(p.surface!.exact).toBe(true);
     expect(p.surface!.area).toBeCloseTo(10.2 - 0.06, 3);
+  });
+});
+
+describe('la façade de Sophie', () => {
+  it('un mur dont on a choisi l’épaisseur se dessine à cette épaisseur, sans surépaisseur', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(4.2, 5.1, 'Séjour', { auNu: true });
+    for (const w of [...st().walls]) st().setEpaisseurMur(w.id, 0.2);
+    const { contours } = pocheDesMurs(st().walls, st().openings, st().rooms);
+    const xs = contours.flat().map((p) => p.x);
+    const zs = contours.flat().map((p) => p.z);
+    // L'intérieur reste 4,20 × 5,10 ; la maçonnerie fait 20 cm de chaque côté, pas 30.
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(4.2 + 0.4, 6);
+    expect(Math.max(...zs) - Math.min(...zs)).toBeCloseTo(5.1 + 0.4, 6);
+  });
+
+  it('un mur à l’épaisseur par défaut garde la façade d’un vrai mur extérieur', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(4.2, 5.1, 'Séjour', { auNu: true });
+    const { contours } = pocheDesMurs(st().walls, st().openings, st().rooms);
+    const xs = contours.flat().map((p) => p.x);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(4.2 + 2 * (0.14 + SUREPAISSEUR_FACADE), 6);
+  });
+});
+
+describe('la fenêtre de Sophie', () => {
+  it('poser une ouverture et taper ses cotes s’annulent d’un seul appui', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(4.2, 5.1, 'Séjour', { auNu: true });
+    const m = st().walls[0];
+    const id = st().addOpening(m.id, 'window')!;
+    st().coterOuverture(id, { largeur: 1.0, hauteur: 1.25, allege: 0.95, depuis: 0.6 });
+    expect(segLength(st().openings[0])).toBeCloseTo(1.0, 6);
+    st().undo();
+    expect(st().openings).toHaveLength(0);
+  });
+
+  it('des cotes reprises plus tard restent un geste à part', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(4.2, 5.1, 'Séjour', { auNu: true });
+    const m = st().walls[0];
+    const id = st().addOpening(m.id, 'window')!;
+    st().coterOuverture(id, { largeur: 1.0, hauteur: 1.25, allege: 0.95, depuis: 0.6 });
+    st().coterOuverture(id, { largeur: 1.2, hauteur: 1.25, allege: 0.95, depuis: 0.6 });
+    st().undo();
+    expect(segLength(st().openings[0])).toBeCloseTo(1.0, 6);
+  });
+});
+
+describe('les noms de Camille', () => {
+  it('deux « Cuisine 2 » ne donnent plus « Cuisine 2 2 »', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(4, 3, 'Cuisine 2', { auNu: true });
+    st().addRoomLibre(3, 3, 'Cuisine 2', { auNu: true });
+    st().redetectRooms();
+    const noms = st().rooms.map((r) => r.name).sort();
+    expect(noms).toEqual(['Cuisine 2', 'Cuisine 3']);
+  });
+
+  it('un meuble loin de toute pièce ne la nomme pas', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(3, 1.2, '', { auNu: true });
+    // Un lit à trois mètres du dégagement : il n'en fait pas une chambre.
+    const [p] = roomParts(st().walls, st().rooms);
+    const xs = p.surface!.pts.map((q) => q.x);
+    const loin = Math.max(...xs) + 3;
+    useScanStore.setState({
+      objects: [
+        { id: 'lit', category: 'bed', width: 1.6, height: 0.5, depth: 2, transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, loin, 0.25, 0.6, 1] },
+      ],
+    });
+    st().redetectRooms();
+    expect(st().rooms[0].name).not.toMatch(/Chambre/);
+  });
+});
+
+describe('placer au centimètre, chez Théo', () => {
+  it('le chevet se cote jusqu’au lit, pas à travers lui', () => {
+    const murs = [
+      mur('n', 0, 0, 4, 0), mur('e', 4, 0, 4, 4), mur('s', 4, 4, 0, 4), mur('o', 0, 4, 0, 0),
+    ];
+    // Un chevet de 45 cm à gauche d'un lit de 1,60, collés l'un à l'autre.
+    const lit = { centre: { x: 2, z: 1.07 }, width: 1.6, depth: 2, yaw: 0, nom: 'lit' };
+    const e = ecartsAuxMurs({ x: 0.95, z: 0.3 }, { width: 0.45, depth: 0.4, yaw: 0 }, murs, [lit]);
+    const droite = e.find((x) => x.dir.x > 0.5)!;
+    expect(droite.vers).toBe('lit');
+    expect(droite.ecart).toBeCloseTo(1.2 - (0.95 + 0.225), 6);
+    // À gauche, rien entre lui et le mur : la cote reste au nu.
+    const gauche = e.find((x) => x.dir.x < -0.5)!;
+    expect(gauche.vers).toBeUndefined();
+    expect(gauche.ecart).toBeCloseTo(0.95 - 0.225 - 0.07, 6);
+    // « 0 cm » le colle au lit.
+    const p = centrePourEcart({ x: 0.95, z: 0.3 }, droite, 0)!;
+    expect(p.x + 0.225).toBeCloseTo(1.2, 6);
+  });
+
+  it('un meuble qui mord déjà dans son voisin donne un écart négatif, que « 0 » corrige', () => {
+    const murs = [mur('n', 0, 0, 4, 0), mur('e', 4, 0, 4, 4), mur('s', 4, 4, 0, 4), mur('o', 0, 4, 0, 0)];
+    const voisin = { centre: { x: 2, z: 2 }, width: 0.45, depth: 0.4, yaw: 0, nom: 'chevet' };
+    const e = ecartsAuxMurs({ x: 1.6, z: 2 }, { width: 0.45, depth: 0.4, yaw: 0 }, murs, [voisin]);
+    const droite = e.find((x) => x.dir.x > 0.5)!;
+    expect(droite.ecart).toBeLessThan(0);
+    const p = centrePourEcart({ x: 1.6, z: 2 }, droite, 0)!;
+    expect(p.x).toBeCloseTo(2 - 0.45, 6);
+  });
+});
+
+describe('le meuble collé de Théo', () => {
+  it('placé à 0 cm, il se dessine contre le mur, sans jour de 2 cm', () => {
+    const murs = [mur('n', 0, 0, 4, 0), mur('e', 4, 0, 4, 3), mur('s', 4, 3, 0, 3), mur('o', 0, 3, 0, 0)];
+    // Un canapé de 95 cm de profondeur, son dos au nu du mur du haut (0,07).
+    const f = clampFootprint({ id: 'canape', category: 'sofa', cx: 2, cz: 0.07 + 0.475, width: 2.28, depth: 0.95, height: 0.8, yCenter: 0.4, yaw: 0 }, murs, { x: 2, z: 1.5 });
+    expect(f.cz - 0.475 - 0.07).toBeLessThan(0.0025);
+  });
+
+  it('contre une cloison de 7 cm, il reste contre elle', () => {
+    const murs = [
+      mur('n', 0, 0, 4, 0), mur('e', 4, 0, 4, 3), mur('s', 4, 3, 0, 3),
+      { ...mur('o', 0, 3, 0, 0), epaisseur: 0.07 },
+    ];
+    const f = clampFootprint({ id: 'bahut', category: 'storage', cx: 0.035 + 0.3, cz: 1.5, width: 0.6, depth: 1.2, height: 0.8, yCenter: 0.4, yaw: 0 }, murs, { x: 2, z: 1.5 });
+    expect(f.cx - 0.3 - 0.035).toBeLessThan(0.0025);
   });
 });

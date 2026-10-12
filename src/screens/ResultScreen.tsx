@@ -38,7 +38,7 @@ import { surfacesHabitables } from '../geometry/habitable';
 import { accrocher, texteDeMesure } from '../geometry/regle';
 import { PEINTURES, hexDePeinture } from '../ui/peintures';
 import { TEINTES_MEUBLES, TEINTE_ORIGINE, cleDeTeinte, hexDeTeinte } from '../ui/habillage';
-import { DecorSheet } from '../components/DecorSheet';
+import { DecorSheet, nomDuMeuble } from '../components/DecorSheet';
 import { useReglagesTravaux } from '../store/reglagesTravaux';
 import { LaserSheet } from './result/LaserSheet';
 import { ExportSheet } from './result/ExportSheet';
@@ -657,12 +657,20 @@ export function ResultScreen() {
     plan. En état, chaque fin de déplacement ou de zoom redessinait l'écran
     entier une seconde fois, pour rien.
   */
-  const vuePlanRef = useRef<VuePlan>({
-    zoom: 1,
-    ox: 0,
-    oy: 0,
-    rot: 0,
+  /*
+    LE PLAN S'OUVRE D'ÉQUERRE — revue « Camille » : ARKit oriente son repère
+    selon l'endroit où l'on a commencé le relevé, et le plan s'ouvrait tourné
+    de 23° ou de 52°, l'image exportée avec. La vue part tournée de l'angle
+    de la trame (au plus un huitième de tour, dans un sens ou dans l'autre) :
+    les murs sont droits à l'écran, sans qu'on touche à leur géométrie.
+  */
+  const [vueDeDepart] = useState((): VuePlan => {
+    const st = useScanStore.getState();
+    const t = planFrameAngle(st.walls.filter((w) => niveauDe(w) === st.niveauCourant));
+    const rot = t <= Math.PI / 4 ? -t : Math.PI / 2 - t;
+    return { zoom: 1, ox: 0, oy: 0, rot: Math.abs(rot) < 1e-3 ? 0 : rot };
   });
+  const vuePlanRef = useRef<VuePlan>(vueDeDepart);
   const memoriserVuePlan = useCallback((v: VuePlan) => {
     vuePlanRef.current = v;
   }, []);
@@ -4982,22 +4990,36 @@ export function ResultScreen() {
                   ? sx > 0 ? 'À droite' : 'À gauche'
                   : sy > 0 ? 'En bas' : 'En haut';
               };
-              const ecarts = ecartsAuxMurs(centre, box, murs).filter((e) => e.ecart !== null);
+              // Les autres meubles du niveau : on cote jusqu'à eux, pas à travers (revue « Théo »).
+              const voisins = objects
+                .filter((o) => o.id !== obj.id)
+                .map((o) => ({
+                  centre: { x: o.transform[12], z: o.transform[14] },
+                  width: o.baseWidth ?? o.width,
+                  depth: o.baseDepth ?? o.depth,
+                  yaw: Math.atan2(o.transform[2], o.transform[0]),
+                  nom: nomDuMeuble(o).toLowerCase(),
+                }));
+              const ecarts = ecartsAuxMurs(centre, box, murs, voisins).filter((e) => e.ecart !== null);
               if (ecarts.length === 0) {
                 alerte('Aucun mur en face', 'Ce meuble ne regarde aucun mur : il se place au doigt ou aux flèches.');
                 return;
               }
+              // Un meuble qui mord déjà dans son voisin s'affiche à 0, pas à −28 cm.
+              const cm = (e: { ecart: number | null }) => Math.max(0, Math.round((e.ecart ?? 0) * 100));
               setMenu({
                 title: 'Placer le meuble',
-                subtitle: 'Choisissez un côté, puis tapez sa distance au mur, au nu.',
+                subtitle: 'Choisissez un côté, puis tapez sa distance au mur ou au meuble d’en face.',
                 actions: ecarts.map((e) => ({
-                  label: `${cote(e.dir)} · ${Math.round((e.ecart ?? 0) * 100)} cm du mur`,
+                  label: `${cote(e.dir)} · ${cm(e)} cm ${e.vers ? `(${e.vers})` : 'du mur'}`,
                   icon: 'regle' as const,
                   onPress: () =>
                     setPrompt({
-                      title: `${cote(e.dir)} : distance au mur`,
-                      subtitle: 'Du bord du meuble au nu du mur. Zéro : contre le mur.',
-                      value: String(Math.round((e.ecart ?? 0) * 100)),
+                      title: `${cote(e.dir)} : distance ${e.vers ? `au meuble (${e.vers})` : 'au mur'}`,
+                      subtitle: e.vers
+                        ? 'Du bord du meuble au meuble d’en face. Zéro : contre lui.'
+                        : 'Du bord du meuble au nu du mur. Zéro : contre le mur.',
+                      value: String(cm(e)),
                       unit: 'cm',
                       numeric: true,
                       okLabel: 'Placer',

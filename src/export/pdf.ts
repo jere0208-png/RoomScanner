@@ -2172,10 +2172,15 @@ function planPage(
     // Les meubles : leur contour et leurs traits d'architecte, recalés
     // devant les murs de LEUR pièce.
     const meublesDuPlan = objects.map((ob) => {
+      // Deux centimètres de jour sur le papier (0,4 mm au 1/50) : le trait
+      // du meuble ne se fond pas dans le poché du mur qu'il touche. L'écran,
+      // lui, le dessine au ras (voir `clampFootprint`).
       const o = clampFootprint(
         toFootprint(ob),
         partOf.get(roomOf(ob))?.walls ?? walls,
         centerOf(roomOf(ob)),
+        undefined,
+        0.02,
       );
       const cosY = Math.cos(o.yaw);
       const sinY = Math.sin(o.yaw);
