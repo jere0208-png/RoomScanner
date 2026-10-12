@@ -177,6 +177,12 @@ export interface WallSeg {
    * en 3D, dans le PDF et le DXF.
    */
   epaisseur?: number;
+  /**
+   * SES DEUX FACES ONT ÉTÉ RELEVÉES (`fusionnerMursDoubles`) : le trait est
+   * leur axe, et `epaisseur` leur écart mesuré. Sur un plan scanné, les
+   * pièces se comptent alors au nu de ce mur-là (revue « Sébastien »).
+   */
+  deuxFaces?: boolean;
 }
 
 /** Pièce d'un élément, valeur par défaut comprise. */
@@ -1619,7 +1625,12 @@ export function estDessine(walls: { auNu?: boolean }[]): boolean {
  * cotes se compte à l'intérieur des murs, cloisons déduites, pour que ses
  * m² se comparent au bail et que la peinture ne compte pas la maçonnerie.
  */
-export function contourAuNu(pts: Pt[], walls: WallSeg[]): Pt[] {
+export function contourAuNu(
+  pts: Pt[],
+  walls: WallSeg[],
+  /** Le demi-mur de chaque côté : par défaut, la moitié de son épaisseur. */
+  demi: (mur: WallSeg | undefined) => number = (mur) => (mur ? epaisseurDe(mur) : WALL_T) / 2,
+): Pt[] {
   const n = pts.length;
   if (n < 3) return pts;
   let double = 0;
@@ -1641,7 +1652,7 @@ export function contourAuNu(pts: Pt[], walls: WallSeg[]): Pt[] {
         pointOnSeg(p, w.a, w.b).dist < 0.02 &&
         pointOnSeg(q, w.a, w.b).dist < 0.02,
     );
-    const h = (mur ? epaisseurDe(mur) : WALL_T) / 2;
+    const h = demi(mur);
     return { o: { x: p.x + nrm.x * h, z: p.z + nrm.z * h }, d, nrm, h };
   });
   const out: Pt[] = [];
@@ -1738,6 +1749,14 @@ function makePart(roomId: string, items: WallSeg[]): RoomPart {
       area -= longueurDedans(w.a, w.b, nu) * epaisseurDe(w);
     }
     surface = { ...surface, nu, area: Math.max(area, 0) };
+  } else if (surface?.exact && items.some((w) => w.deuxFaces)) {
+    /*
+      UN PLAN SCANNÉ SE RELÈVE AUX FACES — sauf le mur vu des deux côtés,
+      que la fusion a posé sur son axe (revue « Sébastien ») : la pièce
+      reprend son demi-mur de ce côté-là, et ses 20,00 m² au laser.
+    */
+    const nu = contourAuNu(surface.pts, items, (mur) => (mur?.deuxFaces ? epaisseurDe(mur) / 2 : 0));
+    surface = { ...surface, nu, area: Math.max(loopAreaM2(nu), 0) };
   }
   const centroid = wallsCentroid(items);
   return {
@@ -1831,7 +1850,8 @@ export function solDesMurs(walls: readonly { yCenter: number; height: number; ty
 export function perimetreDesPieces(parts: RoomPart[]): number {
   let total = 0;
   for (const p of parts) {
-    const pts = p.surface?.pts;
+    // Le tour intérieur : au nu des murs quand la pièce l'a.
+    const pts = p.surface?.nu ?? p.surface?.pts;
     if (!pts || pts.length < 3) continue;
     for (let i = 0; i < pts.length; i++) {
       const a = pts[i];
@@ -2562,6 +2582,28 @@ export function fusionnerMursDoubles(
 ): WallSeg[] {
   const out: WallSeg[] = [];
   const absorbes = new Set<string>();
+  /*
+    UN MUR ÉPAIS VU DE SES DEUX CÔTÉS — revue « Sébastien ». Entre une
+    chambre et un garage, les deux faces d'un mur de 20 cm étaient réunies
+    sur la face du plus long : la chambre gardait ses murs arrêtés à
+    l'autre face, 20 cm plus loin, la soudure (15 cm) ne les rattrapait
+    plus, et la chambre disparaissait — sans trou, sans constat. Au-delà de
+    5 cm d'écart, ce sont deux faces : le mur se pose sur leur AXE, épais de
+    leur écart, et les murs qui s'arrêtaient sur l'une ou l'autre face
+    viennent le rejoindre.
+  */
+  const DEUX_FACES = 0.05;
+  const recales: {
+    origine: Pt;
+    u: Pt;
+    n: Pt;
+    /** Les deux faces, en décalage le long de `n` ; l'axe entre elles. */
+    faces: number[];
+    axe: number;
+    de: number;
+    a: number;
+    id: string;
+  }[] = [];
   // Le plus long d'abord : c'est lui qui garde son identité.
   const tries = [...walls].sort((a, b) => segLength(b) - segLength(a));
   for (const w of tries) {
@@ -2574,6 +2616,9 @@ export function fusionnerMursDoubles(
     const l = segLength(w) || 1;
     const u = { x: (B.x - A.x) / l, z: (B.z - A.z) / l };
     const n = { x: -u.z, z: u.x };
+    const origine = { ...w.a };
+    let autreFace: number | null = null;
+    let epaisseur = w.epaisseur;
     for (const o of tries) {
       if (o.id === w.id || absorbes.has(o.id) || o.type !== 'wall') continue;
       const lo = segLength(o) || 1;
@@ -2594,10 +2639,39 @@ export function fusionnerMursDoubles(
       const fin = Math.max(l, t1);
       A = { x: A.x + u.x * deb, z: A.z + u.z * deb };
       B = { x: A.x + u.x * (fin - deb), z: A.z + u.z * (fin - deb) };
+      const cote = (p: Pt) => (p.x - origine.x) * n.x + (p.z - origine.z) * n.z;
+      const d = (cote(o.a) + cote(o.b)) / 2;
+      if (autreFace === null && Math.abs(d) >= DEUX_FACES) {
+        autreFace = d;
+        epaisseur = Math.max(epaisseur ?? 0, Math.abs(d));
+      }
     }
-    out.push({ ...w, a: A, b: B });
+    if (autreFace !== null) {
+      const axe = autreFace / 2;
+      A = { x: A.x + n.x * axe, z: A.z + n.z * axe };
+      B = { x: B.x + n.x * axe, z: B.z + n.z * axe };
+      const t = (p: Pt) => (p.x - origine.x) * u.x + (p.z - origine.z) * u.z;
+      recales.push({ origine, u, n, faces: [0, autreFace], axe, de: t(A), a: t(B), id: w.id });
+      out.push({ ...w, a: A, b: B, epaisseur: epaisseur!, deuxFaces: true });
+    } else {
+      out.push({ ...w, a: A, b: B });
+    }
   }
-  return out;
+  if (recales.length === 0) return out;
+  // Les murs arrêtés sur une face rejoignent l'axe.
+  const recaler = (p: Pt): Pt => {
+    for (const r of recales) {
+      const t = (p.x - r.origine.x) * r.u.x + (p.z - r.origine.z) * r.u.z;
+      if (t < r.de - 0.05 || t > r.a + 0.05) continue;
+      const cote = (p.x - r.origine.x) * r.n.x + (p.z - r.origine.z) * r.n.z;
+      if (!r.faces.some((f) => Math.abs(cote - f) < 0.03)) continue;
+      const k = r.axe - cote;
+      return { x: p.x + r.n.x * k, z: p.z + r.n.z * k };
+    }
+    return p;
+  };
+  const fusionnes = new Set(recales.map((r) => r.id));
+  return out.map((w) => (fusionnes.has(w.id) || w.type !== 'wall' ? w : { ...w, a: recaler(w.a), b: recaler(w.b) }));
 }
 
 /**
@@ -3338,6 +3412,30 @@ export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
     points.push({ wall: w, end: 'a' }, { wall: w, end: 'b' });
   }
 
+  /*
+    DEUX COINS RELIÉS PAR UN MUR NE SE SOUDENT PAS — revue « Hugo ». Une
+    chambre accolée au couloir le dépasse d'une épaisseur de mur : un retour
+    de 14 cm, dessiné, entre deux coins. Sous la tolérance de 15 cm, la
+    soudure les fondait en un seul — le retour disparaissait, le mur voisin
+    partait en biais, et « Redétecter », « Scinder » ou « Couper » perdaient
+    la chambre (9 pièces devenaient 5). Un mur qui relie deux bouts dit
+    qu'ils sont deux : on ne soude que ce qu'aucun mur ne sépare. Même un
+    bout de 1 à 4 cm (revue « Inès » : une salle de bains qui dépasse le
+    séjour d'un rien) : soudé, il rouvrait le contour.
+  */
+  const RETOUR_MIN = ECLAT;
+  const memePoint = (p: Pt, q: Pt) => Math.hypot(p.x - q.x, p.z - q.z) < 1e-4;
+  const relies = (cluster: number[], j: number) => {
+    const pj = points[j].wall[points[j].end];
+    return out.some((w) => {
+      if (segLength(w) < RETOUR_MIN) return false;
+      const bouts = [w.a, w.b];
+      const ici = bouts.findIndex((q) => memePoint(q, pj));
+      if (ici < 0) return false;
+      const autre = bouts[1 - ici];
+      return cluster.some((k) => memePoint(points[k].wall[points[k].end], autre));
+    });
+  };
   const assigned = new Set<number>();
   const welded = new Set<number>();
   for (let i = 0; i < points.length; i++) {
@@ -3349,7 +3447,7 @@ export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
       if (assigned.has(j)) continue;
       if (roomOf(points[j].wall) !== room) continue;
       const pj = points[j].wall[points[j].end];
-      if (Math.hypot(pi.x - pj.x, pi.z - pj.z) < tol) cluster.push(j);
+      if (Math.hypot(pi.x - pj.x, pi.z - pj.z) < tol && !relies(cluster, j)) cluster.push(j);
     }
     if (cluster.length > 1) {
       const cx =
@@ -5198,10 +5296,15 @@ export function souderLesRecouvrements<W extends WallSeg, Rm extends { wallIds?:
         const idsE = morceauxE.map((_, i) => (i === 0 ? E.id : nomLibre(E.id)));
         const neufsE = morceauxE.map((m, i) => ({ ...E, id: idsE[i], a: at(m.de), b: at(m.a) }));
         const commun = idsE[morceauxE.findIndex((m) => m.de >= o0 - 1e-6 && m.a <= o1 + 1e-6)];
-        // Ce qui dépasse du mur neuf lui reste.
+        /*
+          Ce qui dépasse du mur neuf lui reste — DÈS QU'IL EXISTE. Revue
+          « Inès » : une salle de bains qui dépassait le séjour de 1 à 4 cm
+          perdait ce bout (il fallait 5 cm), son contour s'ouvrait, et elle
+          s'affichait à 4,37 m² « ≈ » au lieu de 3,80, « il manque un mur ».
+        */
         const restes: W[] = [];
-        if (o0 - s0 > 0.05) restes.push({ ...N, id: nomLibre(N.id), a: at(s0), b: at(o0) });
-        if (s1 - o1 > 0.05) restes.push({ ...N, id: nomLibre(N.id), a: at(o1), b: at(s1) });
+        if (o0 - s0 > ECLAT) restes.push({ ...N, id: nomLibre(N.id), a: at(s0), b: at(o0) });
+        if (s1 - o1 > ECLAT) restes.push({ ...N, id: nomLibre(N.id), a: at(o1), b: at(s1) });
         for (const x of restes) neufs.add(x.id);
         ws = [...ws.filter((w) => w !== N && w !== E), ...neufsE, ...restes];
         remplacer(E.id, idsE);

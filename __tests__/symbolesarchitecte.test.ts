@@ -52,6 +52,7 @@ import { placeDuDetecteur, roomParts, type Pt } from '../src/geometry/floorplan'
 import { planCircuits } from '../src/geometry/nfc15100';
 import { buildScanPdf } from '../src/export/pdf';
 import { buyingList } from '../src/geometry/conduits';
+import { chiffrer } from '../src/geometry/devis';
 
 const st = () => useScanStore.getState();
 beforeEach(() => {
@@ -212,7 +213,7 @@ describe('le ruban LED', () => {
     expect(st().ceiling.find((c) => c.id === id)!.trace![2].x).toBeCloseTo(avant.x + 1.2, 6);
   });
 
-  it('s’achète au mètre, avec son alimentation et son profilé', () => {
+  it('s’achète en rouleaux de 5 m, avec ses alimentations et son profilé', () => {
     st().commencerAuClavier();
     st().addRoomLibre(5, 4, 'Séjour', { auNu: true });
     const part = roomParts(st().walls, st().rooms)[0];
@@ -220,10 +221,20 @@ describe('le ruban LED', () => {
     st().addRuban(st().rooms[0].id, rubanPeripherique(contour, 0.6)!, true);
     st().addRuban(st().rooms[0].id, rubanLeLongDuMur(contour, { x: 2.5, z: 0 }, 0.05)!, false);
     const liste = buyingList([], [], st().ceiling);
-    const ruban = liste.find((l) => l.code === 'plafond-led')!;
-    expect(ruban.unit).toBe('m');
-    expect(ruban.quantity).toBeCloseTo(Math.ceil((13.2 + 5) * 2) / 2, 9);
-    expect(liste.find((l) => l.code === 'led-alimentation')?.quantity).toBe(2);
+    /*
+      Revues « Fatou » et « Mehdi » : sous un code inconnu du catalogue, le
+      ruban sortait du devis à 0 €. Le caisson de 13,20 m se coupe dans 3
+      rouleaux de 5 m, le ruban de 5 m dans 1 ; une alimentation de 60 W
+      par tranche de 5 m.
+    */
+    const ruban = liste.find((l) => l.code === 'ruban-led')!;
+    expect(ruban.unit).toBe('rouleau');
+    expect(ruban.quantity).toBe(4);
+    expect(ruban.note).toMatch(/18,5 m en 2 rubans/);
+    expect(liste.find((l) => l.code === 'transfo-led')?.quantity).toBe(4);
+    const devis = chiffrer(liste, [], [], 'dooxie');
+    expect(devis.lignes.find((l) => l.code === 'ruban-led')?.pu).toBeGreaterThan(0);
+    expect(devis.lignes.find((l) => l.code === 'transfo-led')?.pu).toBeGreaterThan(0);
     expect(CEILINGS.led.commandable).toBe(true);
   });
 });

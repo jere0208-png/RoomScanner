@@ -419,6 +419,9 @@ const METRES_PAR_DEPART = 12;
  * double, ce sont deux boîtes à 71 mm d'entraxe — et les plaques par
  * ensemble, ce qui n'est pas la même chose et se confond tout le temps.
  */
+/** La longueur d'un rouleau de ruban LED du commerce (m). */
+export const ROULEAU_LED = 5;
+
 export function buyingList(
   rows: PullRow[],
   fixtures: Fixture[],
@@ -782,33 +785,44 @@ export function buyingList(
 
   // ------------------------------------------------------------- plafond
   const parPlafond = new Map<string, number>();
-  // Le ruban LED se compte au MÈTRE, avec son alimentation et son profilé.
+  /*
+    LE RUBAN LED S'ACHÈTE EN ROULEAUX DE 5 M — revues « Fatou » et « Mehdi » :
+    compté au mètre sous un code que le catalogue ne connaissait pas, il
+    sortait du devis à 0 € (28,5 m de ruban, deux alimentations). Chaque
+    ruban se coupe dans ses rouleaux, et chaque tranche de 5 m (50 W, plus
+    20 % de marge) prend son alimentation de 60 W : les codes du catalogue
+    (`ruban-led`, `transfo-led`).
+  */
   let metresDeRuban = 0;
   let rubans = 0;
+  let rouleaux = 0;
   for (const cl of ceiling) {
     if (cl.kind === 'led' && cl.trace) {
-      metresDeRuban += longueurDuRuban(cl.trace, cl.ferme);
+      const L = longueurDuRuban(cl.trace, cl.ferme);
+      metresDeRuban += L;
       rubans += 1;
+      rouleaux += Math.max(1, Math.ceil(L / ROULEAU_LED - 1e-6));
       continue;
     }
     parPlafond.set(cl.kind, (parPlafond.get(cl.kind) ?? 0) + 1);
   }
   if (rubans > 0) {
+    const metres = (Math.ceil(metresDeRuban * 2) / 2).toFixed(1).replace('.', ',');
     out.push({
       family: 'Plafond',
-      code: 'plafond-led',
+      code: 'ruban-led',
       label: 'Ruban LED 24 V',
       spec: CEILINGS.led.note,
-      quantity: Math.ceil(metresDeRuban * 2) / 2,
-      unit: 'm',
-      note: `${rubans} ruban${rubans > 1 ? 's' : ''}, au demi-mètre supérieur`,
+      quantity: rouleaux,
+      unit: 'rouleau',
+      note: `${metres} m en ${rubans} ruban${rubans > 1 ? 's' : ''}, rouleaux de 5 m`,
     });
     out.push({
       family: 'Plafond',
-      code: 'led-alimentation',
+      code: 'transfo-led',
       label: 'Alimentation LED 24 V',
-      spec: 'Une par ruban, dimensionnée à 10 W/m plus 20 % de marge',
-      quantity: rubans,
+      spec: 'Une de 60 W par tranche de 5 m (10 W/m plus 20 % de marge)',
+      quantity: rouleaux,
       unit: 'u',
     });
     out.push({

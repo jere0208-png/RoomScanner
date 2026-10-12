@@ -69,13 +69,7 @@ import { panne as expliquer } from '../ui/panne';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { DevisAttention } from '../components/DevisAttention';
-import {
-  checkElectrical,
-  fixturePlacement,
-  roomInputsOf,
-  wallToRooms,
-} from '../geometry/nfc15100';
-import { roomParts } from '../geometry/floorplan';
+import { checkElectrical, wallToRooms } from '../geometry/nfc15100';
 import { TotalQuiMonte } from '../components/TotalQuiMonte';
 import {
   ageDuCatalogue,
@@ -84,7 +78,7 @@ import {
   type LigneDevis,
   type LigneLegende,
 } from '../geometry/devis';
-import { chiffrerLePlan } from '../geometry/devisplan';
+import { chiffrerLePlan, placerAuxNiveaux } from '../geometry/devisplan';
 import { CEILINGS, CEILING_SYMBOL, type CeilingKind } from '../geometry/ceiling';
 import { FIXTURES, motDansLeRond, postsSymbol, type FixtureKind } from '../geometry/electrical';
 import {
@@ -520,15 +514,13 @@ export function DevisScreen() {
   */
   const tableauAbsent = !fixtures.some((f) => f.kind === 'tableau');
   const manquesNfc = useMemo(() => {
-    const entrees = roomInputsOf(
-      rooms.map((r) => ({ ...r, name: r.name ?? '' })),
-      roomParts(walls, rooms),
-    );
+    // Niveau par niveau, comme le devis (revue « Mehdi »).
+    const { entrees, placement } = placerAuxNiveaux(walls, rooms, fixtures);
     return checkElectrical(
       entrees,
       fixtures,
       wallToRooms(entrees),
-      fixturePlacement(fixtures, walls, entrees),
+      placement,
       undefined,
       undefined,
       ceiling,

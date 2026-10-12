@@ -14285,6 +14285,51 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Tournée n°4 : plus de pièce perdue, un devis par niveau, la LED chiffrée
+
+**Deux coins reliés par un mur ne se soudent plus** (`weldCorners`). Le
+défaut de Hugo :
+- une chambre accolée au couloir le dépassait d'une épaisseur de mur ;
+- sous la tolérance de 15 cm, la soudure fondait les deux bouts de ce
+  retour de 14 cm ;
+- le mur voisin partait en biais, et « Redétecter », « Redresser »,
+  « Scinder » ou « Couper » perdaient la chambre : sa colocation passait de
+  9 pièces à 5.
+
+**Ce qui dépasse d'une pièce accolée lui reste, même 1 cm**
+(`souderLesRecouvrements`). La salle de bains d'Inès dépassait le séjour
+de 4 cm et ouvrait son contour : 4,37 m² « ≈ » au lieu de 3,80.
+
+**Un mur relevé sur ses deux faces se pose sur leur axe**
+(`fusionnerMursDoubles`). Le défaut de Sébastien :
+- derrière un mur de 15 à 30 cm entre une chambre et un garage, la chambre
+  disparaissait, sans trou ni constat ;
+- le mur prend maintenant l'écart des faces comme épaisseur (`deuxFaces`),
+  et les murs arrêtés sur l'une ou l'autre face le rejoignent ;
+- sur un plan scanné, les deux pièces se comptent au nu de ce mur-là :
+  20,00 et 18,00 m², les mesures du laser.
+
+**Le devis d'une maison à étage** (`placerAuxNiveaux`). Le défaut de Mehdi :
+- l'appareillage se plaçait sur les contours superposés des deux niveaux ;
+- 25 appareils de l'étage sur 67 étaient rangés au rez-de-chaussée, avec
+  11 alertes fausses au contrôle de la page ;
+- il se place désormais niveau par niveau, pour le devis comme pour son
+  contrôle ;
+- la pastille du plan chiffre la maison entière, comme la page : elle
+  affichait le seul niveau visible.
+
+**Le ruban LED s'achète en rouleaux de 5 m.** Il était compté au mètre sous
+un code inconnu du catalogue, donc à 0 € (Fatou, Mehdi).
+- Chaque ruban se coupe dans ses rouleaux (`ruban-led`).
+- Chaque tranche de 5 m prend son alimentation de 60 W (`transfo-led`).
+
+**Le métré au nu** (Fatou, Claire). Le périmètre et les murs nets du PDF,
+le tour du tableur et le « m périm. » de l'écran se prennent au nu des
+murs. La feuille annonçait le « tour intérieur » et mesurait l'axe : 30,2 m
+au lieu de 28,4.
+
+Banc : `tournee4plan`. `symbolesarchitecte` suit les rouleaux.
+
 ## Tournée n°4 : les cotes tapées, la coche par plan, le ruban retouchable
 
 Huit testeurs (quatre gratuits, quatre Pro). Ce lot répare ce qui faussait un

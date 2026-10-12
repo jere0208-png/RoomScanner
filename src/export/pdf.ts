@@ -4226,11 +4226,14 @@ function metrePage(
       (`mursNetsDe`), et le périmètre du contour, comme au tableur.
     */
     const h = roomHeight(part.walls);
-    const perim = part.surface
-      ? perimetreDe(part.surface.pts)
+    // Au nu des murs quand la pièce l'a — revues « Fatou » et « Claire » : la
+    // feuille annonçait le « tour intérieur » et mesurait l'axe (30,2 m pour 28,4).
+    const tourInterieur = part.surface ? part.surface.nu ?? part.surface.pts : null;
+    const perim = tourInterieur
+      ? perimetreDe(tourInterieur)
       : part.walls.reduce((s, x) => s + segLength(x), 0);
-    const nets = part.surface
-      ? mursNetsDe(part.surface.pts, h, baiesDeLaPiece(part, ctx.openings))
+    const nets = tourInterieur
+      ? mursNetsDe(tourInterieur, h, baiesDeLaPiece(part, ctx.openings))
       : wallAreaM2(part.walls, ctx.openings);
     totalArea2 += part.surface?.area ?? 0;
     totalWalls += nets;

@@ -1737,7 +1737,8 @@ export function ResultScreen() {
         // Le périmètre se prend sur le CONTOUR, pas sur la somme des murs :
         // un refend borde deux pièces, il ne compte qu'une fois de chaque
         // côté, et un mur qui dépasse ne rallonge pas la pièce.
-        const pts = p.surface?.pts ?? [];
+        // Au nu des murs quand la pièce l'a (revues « Fatou » et « Claire »).
+        const pts = p.surface?.nu ?? p.surface?.pts ?? [];
         let tour = 0;
         for (let i = 0; i < pts.length; i++) {
           const a = pts[i];
@@ -2327,18 +2328,28 @@ export function ResultScreen() {
    * qui n'a pas commencé.
    */
   const totalDevis = useMemo(() => {
-    if (fige.fixtures.length === 0 && fige.ceiling.length === 0) return null;
+    /*
+      LA MAISON ENTIÈRE, COMME LA PAGE DU DEVIS — revue « Mehdi » : sur un
+      R+1, la pastille ne chiffrait que le niveau affiché (2 050,47 € au
+      rez-de-chaussée, 1 156,57 € à l'étage) quand la page annonçait la
+      maison. Le calcul suit toujours le plan figé pendant un geste : on
+      relit le magasin quand le niveau affiché a fini de bouger.
+    */
+    const tout = useScanStore.getState();
+    if (tout.fixtures.length === 0 && tout.ceiling.length === 0) return null;
     return chiffrerLePlan(
-      fige.walls,
-      fige.rooms,
-      fige.fixtures,
-      fige.ceiling,
+      tout.walls,
+      tout.rooms,
+      tout.fixtures,
+      tout.ceiling,
       gammeDevis,
       new Set(devisEcartes),
-      fige.openings,
+      tout.openings,
       // Les mêmes corrections que la page du devis : quantités, caddie, prix.
       { quantites: devisQuantites, ajouts: devisAjouts, prix: devisPrix },
     ).total;
+    // Le plan figé du niveau sert de signal : le calcul lit la maison entière.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     fige.walls,
     fige.rooms,

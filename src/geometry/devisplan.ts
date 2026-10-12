@@ -14,7 +14,7 @@
 import { buyingList, pullSchedule } from './conduits';
 import { chiffrer, type AjustementsDevis, type Devis } from './devis';
 import { planRoutes } from './elecplan';
-import { roomParts, type WallSeg } from './floorplan';
+import { filtrerAuNiveau, niveauxPresents, roomParts, type RoomPart, type WallSeg } from './floorplan';
 import {
   fixturePlacement,
   materialList,
@@ -28,7 +28,51 @@ import type { GammeId } from './prix';
 import type { RoomShape } from './floorplan';
 
 /** Une pièce, telle que le store la garde. */
-type Piece = RoomShape & { name?: string };
+type Piece = RoomShape & { name?: string; niveau?: number };
+
+/**
+ * CHAQUE APPAREIL DANS SA PIÈCE, SUR SON NIVEAU — revue « Mehdi ». Le devis
+ * d'une maison R+1 posait l'appareillage sur les contours des deux niveaux
+ * superposés : 25 appareils de l'étage rangés dans les pièces du
+ * rez-de-chaussée, « Chambre 2 : 0 socle sur 3 », et un total de
+ * 2 861,10 € quand les deux niveaux, chacun chez lui, en faisaient
+ * 3 207,04. Les pièces se découpent et l'appareillage se place niveau par
+ * niveau, comme pour le tableau (`circuitsDuLogement`) ; le reste du calcul
+ * voit la maison entière.
+ */
+export function placerAuxNiveaux(
+  walls: WallSeg[],
+  rooms: Piece[],
+  fixtures: Fixture[],
+): { parts: RoomPart[]; entrees: RoomInput[]; placement: Map<string, string> } {
+  const niveaux = niveauxPresents(walls, rooms);
+  if (niveaux.length <= 1) {
+    const parts = roomParts(walls, rooms);
+    const entrees = roomInputsOf(
+      rooms.map((r) => ({ ...r, name: r.name ?? '' })),
+      parts,
+    );
+    return { parts, entrees, placement: fixturePlacement(fixtures, walls, entrees) };
+  }
+  const parts: RoomPart[] = [];
+  const entrees: RoomInput[] = [];
+  const placement = new Map<string, string>();
+  for (const n of niveaux) {
+    const x = filtrerAuNiveau(
+      { walls, openings: [] as WallSeg[], rooms, fixtures, photos: [], objects: [], ceiling: [] },
+      n,
+    );
+    const p = roomParts(x.walls, x.rooms);
+    const e = roomInputsOf(
+      x.rooms.map((r) => ({ ...r, name: r.name ?? '' })),
+      p,
+    );
+    parts.push(...p);
+    entrees.push(...e);
+    for (const [k, v] of fixturePlacement(x.fixtures, x.walls, e)) placement.set(k, v);
+  }
+  return { parts, entrees, placement };
+}
 
 export function chiffrerLePlan(
   walls: WallSeg[],
@@ -43,10 +87,8 @@ export function chiffrerLePlan(
   /** Ce que l'électricien corrige ou ajoute à la main : voir `chiffrer`. */
   ajustements?: AjustementsDevis,
 ): Devis {
-  const parts = roomParts(walls, rooms);
   const nommees = rooms.map((r) => ({ ...r, name: r.name ?? '' }));
-  const entrees: RoomInput[] = roomInputsOf(nommees, parts);
-  const placement = fixturePlacement(fixtures, walls, entrees);
+  const { parts, entrees, placement } = placerAuxNiveaux(walls, rooms, fixtures);
   // Sans tableau posé, `planRoutes` s'abstient — et le bordereau estime
   // alors au forfait, en le disant (voir `buyingList`).
   const chemins = planRoutes(
