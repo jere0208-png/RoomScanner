@@ -14285,6 +14285,33 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## « Normes auto » finit le travail ; la maison s'exporte empilée
+
+**« Normes auto » ne laisse plus ses propres alertes** (revue « Nicolas »).
+Après l'appui, le contrôle affichait encore « cuisine 0/4 au-dessus du
+plan », « aucun détecteur de fumée », « aucun tableau ».
+- Ce que le contrôle sait corriger d'un appui (une pose au mur, un appareil
+  au plafond), « Normes auto » le corrige aussi, constat après constat
+  (`completerAuxNormes`).
+- Une pose qui ne fait pas bouger son constat est reprise aussitôt, et le
+  constat est laissé à l'électricien : aucun appareil inutile n'est semé.
+- Le rapport le dit (« Contrôle : Poser PC 110 × 4, Poser le DAAF »).
+
+**La coupe 3D d'une pièce** (revue « Nicolas ») ne montre plus les appareils
+de l'autre face de ses cloisons. La coupe du séjour portait les prises de la
+cuisine, collées en l'air contre le mur coupé.
+
+**La maison à étages s'exporte empilée** (revue « Léa »). L'OBJ ne
+contenait que le niveau affiché, de y = 0 à sa hauteur ; deux fichiers
+importés se superposaient au lieu de s'empiler.
+- Avec plusieurs niveaux, l'OBJ porte toute la maison.
+- Chaque niveau est posé à son altitude : la hauteur sous plafond du niveau
+  du dessous plus une dalle de 20 cm (`altitudesDesNiveaux`, `DALLE`).
+- Chaque niveau a ses groupes (« RDC Sols », « R+1 Volumes ») pour pouvoir
+  masquer un étage dans le logiciel.
+
+Bancs : `plansconstruits`, `secondetournee`.
+
 ## Les meubles qui se chevauchent se voient ; la maison se totalise
 
 Suite de la troisième tournée, du plus gênant au moins gênant.

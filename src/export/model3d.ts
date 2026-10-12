@@ -14,7 +14,7 @@
  * en matière d'un clic dans le logiciel de destination.
  */
 import type { ObjectData } from 'react-native-room-scan';
-import type { RoomShape, WallSeg } from '../geometry/floorplan';
+import { abregerNiveau, type RoomShape, type WallSeg } from '../geometry/floorplan';
 import type { Fixture } from '../geometry/electrical';
 import { buildScene, type Face3D } from './../geometry/scene3d';
 import { MAQUETTE, matieresDesSols } from '../ui/maquette';
@@ -59,13 +59,41 @@ const n3 = (v: number) => (Math.round(v * 1000) / 1000).toString();
  * la matière.
  */
 export function buildObj(model: ModelForExport, name = 'EchoPlan'): string {
-  /*
-    EN COULEURS — correctif de l'audit : le fichier partait tout blanc, sans
-    le décor. La maquette de l'app, peintures, sols et murs d'accent
-    compris ; une couleur par sommet (« v x y z r g b »), que lisent
-    Blender, MeshLab et la plupart des visionneuses. Un seul fichier : pas
-    de .mtl à égarer en chemin.
-  */
+  return ecrireObj([{ prefixe: '', faces: facesDuModele(model), dy: 0 }], name);
+}
+
+/**
+ * LA MAISON ENTIÈRE, NIVEAUX EMPILÉS — revue « Léa » : chaque niveau sortait
+ * dans son fichier, de y = 0 à sa hauteur, et deux fichiers importés se
+ * superposaient. Un seul fichier : chaque niveau posé à son altitude
+ * (`altitudesDesNiveaux`), dans ses groupes à lui (« R+1 Sols », « R+1
+ * Volumes ») pour pouvoir masquer un étage dans le logiciel.
+ */
+export function buildObjMaison(
+  niveaux: { niveau: number; model: ModelForExport }[],
+  altitudes: Map<number, number>,
+  name = 'EchoPlan',
+): string {
+  return ecrireObj(
+    // La scène pose déjà le sol de chaque niveau à zéro (ARKit le met où il
+    // l'a trouvé, souvent 1,30 m plus bas) : il ne reste qu'à le monter.
+    niveaux.map(({ niveau, model }) => ({
+      prefixe: `${abregerNiveau(niveau)} `,
+      faces: facesDuModele(model),
+      dy: altitudes.get(niveau) ?? 0,
+    })),
+    name,
+  );
+}
+
+/**
+ * EN COULEURS — correctif de l'audit : le fichier partait tout blanc, sans
+ * le décor. La maquette de l'app, peintures, sols et murs d'accent
+ * compris ; une couleur par sommet (« v x y z r g b »), que lisent
+ * Blender, MeshLab et la plupart des visionneuses. Un seul fichier : pas
+ * de .mtl à égarer en chemin.
+ */
+function facesDuModele(model: ModelForExport): Face3D[] {
   const pieces = (model.rooms ?? []) as (RoomShape & { peinture?: string; sol?: string; accents?: Record<string, string> })[];
   const scene = buildScene(model.walls, model.openings, model.objects, {
     palette: MAQUETTE,
@@ -77,6 +105,13 @@ export function buildObj(model: ModelForExport, name = 'EchoPlan'): string {
     sols: solsDesPieces(pieces),
     accents: accentsDesPieces(pieces),
   });
+  return scene.faces;
+}
+
+function ecrireObj(
+  parties: { prefixe: string; faces: Face3D[]; dy: number }[],
+  name: string,
+): string {
   const lines: string[] = [
     `# ${name} — exporté par EchoPlan`,
     '# Unités : mètres. Y vers le haut. Couleur par sommet : v x y z r g b.',
@@ -85,7 +120,8 @@ export function buildObj(model: ModelForExport, name = 'EchoPlan'): string {
   const byGroup = new Map<string, string[]>();
   let base = 1;
 
-  for (const face of scene.faces) {
+  for (const face of parties.flatMap((x) => x.faces.map((f) => ({ ...f, prefixe: x.prefixe, dy: x.dy })))) {
+    const { prefixe, dy } = face;
     // Un contour n'est pas une surface ; une arête isolée non plus.
     if (face.fill === null || face.pts.length < 3) continue;
     const [rouge, vert, bleu] = rgbDe(face.fill);
@@ -97,10 +133,10 @@ export function buildObj(model: ModelForExport, name = 'EchoPlan'): string {
       l'autre sens pour garder leur endroit tourné du même côté qu'avant.
     */
     for (const p of face.pts) {
-      verts.push(`v ${n3(p.x)} ${n3(p.y)} ${n3(p.z)} ${n3(rouge)} ${n3(vert)} ${n3(bleu)}`);
+      verts.push(`v ${n3(p.x)} ${n3(p.y + dy)} ${n3(p.z)} ${n3(rouge)} ${n3(vert)} ${n3(bleu)}`);
     }
     const idx = face.pts.map((_, i) => base + i).reverse().join(' ');
-    const g = groupOf(face);
+    const g = `${prefixe}${groupOf(face)}`;
     const list = byGroup.get(g) ?? [];
     list.push(`f ${idx}`);
     byGroup.set(g, list);

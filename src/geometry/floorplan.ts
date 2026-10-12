@@ -5231,6 +5231,39 @@ export function niveauDeReference(niveaux: number[], n: number): number | null {
  * Elle est large comme « 2D » : « Rez-de-chaussee » n'y entre pas. Les
  * plans de batiment ecrivent R+1, R+2 — on ecrit comme eux.
  */
+/** L'épaisseur d'un plancher : du plafond d'un niveau au sol du suivant. */
+export const DALLE = 0.2;
+
+/**
+ * L'ALTITUDE DU SOL DE CHAQUE NIVEAU — revue « Léa » : les niveaux n'avaient
+ * pas d'altitude, et deux OBJ importés dans un logiciel se superposaient au
+ * lieu de s'empiler. Le rez-de-chaussée est à zéro ; un étage se pose sur la
+ * hauteur sous plafond du niveau du dessous plus une dalle, un sous-sol
+ * sous la sienne plus une dalle. Un niveau absent compte pour 2,50.
+ */
+export function altitudesDesNiveaux(walls: WallSeg[], dalle = DALLE): Map<number, number> {
+  const murs = walls.filter((w) => w.type === 'wall');
+  const presents = murs.map(niveauDe);
+  const haut = Math.max(NIVEAU_RDC, ...presents);
+  const bas = Math.min(NIVEAU_RDC, ...presents);
+  const hauteur = (n: number) => {
+    const hs = murs.filter((w) => niveauDe(w) === n).map((w) => w.height);
+    return hs.length > 0 ? Math.max(...hs) : 2.5;
+  };
+  const out = new Map<number, number>([[NIVEAU_RDC, 0]]);
+  let alt = 0;
+  for (let n = NIVEAU_RDC + 1; n <= haut; n++) {
+    alt += hauteur(n - 1) + dalle;
+    out.set(n, alt);
+  }
+  alt = 0;
+  for (let n = NIVEAU_RDC - 1; n >= bas; n--) {
+    alt -= hauteur(n) + dalle;
+    out.set(n, alt);
+  }
+  return out;
+}
+
 export function abregerNiveau(n: number): string {
   if (n === 0) return 'RDC';
   if (n === -1) return 'SS';

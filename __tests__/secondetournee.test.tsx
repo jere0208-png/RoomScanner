@@ -94,9 +94,12 @@ describe('les exports d’Inès', () => {
     expect(pdfFilename('Rez-de-chaussée')).toBe('Rez-de-chaussee.pdf');
   });
 
-  it('l’OBJ dit son niveau, comme le DXF', () => {
+  it('l’OBJ d’une maison à étages porte tous ses niveaux, chacun dans ses groupes', () => {
+    // Revue « Léa » : un fichier par niveau se superposait à l'autre une
+    // fois importé. La maison sort entière, empilée (« R+1 Sols »…).
     const ecran = lire('src/screens/ResultScreen.tsx');
-    expect(ecran).toMatch(/objFilename\(\s*niveaux\.length > 1/);
+    expect(ecran).toMatch(/if \(niveaux\.length > 1\) \{[\s\S]{0,200}altitudesDesNiveaux/);
+    expect(ecran).toContain('buildObjMaison(parNiveau, altitudes, scanName)');
   });
 
   it('l’OBJ n’est plus en miroir : le z du plan reste le z du fichier', () => {

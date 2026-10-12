@@ -67,7 +67,7 @@ import { SidePill } from '../components/SidePill';
 import { CeilingBar } from '../components/CeilingBar';
 import { ObjectBar } from '../components/ObjectBar';
 import { calerDansLaNiche } from '../geometry/niche';
-import { corrigerConstat, poserAuxNormes } from '../geometry/auto';
+import { completerAuxNormes, corrigerConstat, poserAuxNormes } from '../geometry/auto';
 import { ControlePastille } from '../components/ControlePastille';
 import { DevisPastille } from '../components/DevisPastille';
 import { ChoixScan } from '../components/ChoixScan';
@@ -107,6 +107,7 @@ import {
   type SaisieMurNeuf,
   planFrameAngle,
   filtrerAuNiveau,
+  altitudesDesNiveaux,
   nomDuNiveau,
   abregerNiveau,
   niveauDe,
@@ -148,7 +149,7 @@ import {
   passageDuMeuble,
 } from '../geometry/passage';
 import { type CatalogItem } from '../geometry/catalogue';
-import { buildObj, objFilename } from '../export/model3d';
+import { buildObj, buildObjMaison, objFilename } from '../export/model3d';
 import { checkPlan } from '../geometry/diagnostics';
 import {
   checkElectrical,
@@ -1614,19 +1615,41 @@ export function ResultScreen() {
        `exportOuvert`. */
     if (!exportOuvert()) return;
     try {
+      /*
+        PLUSIEURS NIVEAUX : LA MAISON ENTIÈRE, EMPILÉE (revue « Léa »), un
+        groupe par niveau. Un seul niveau : le fichier d'avant.
+      */
+      if (niveaux.length > 1) {
+        const st = useScanStore.getState();
+        const altitudes = altitudesDesNiveaux(st.walls);
+        const parNiveau = [...niveaux]
+          .sort((a, b) => a - b)
+          .map((n) => {
+            const j = filtrerAuNiveau(
+              {
+                walls: st.walls,
+                openings: st.openings,
+                rooms: st.rooms,
+                fixtures: st.fixtures,
+                photos: [],
+                objects: st.objects,
+                ceiling: [],
+              },
+              n,
+            );
+            return {
+              niveau: n,
+              model: { walls: j.walls, openings: j.openings, objects: j.objects, rooms: j.rooms, fixtures: j.fixtures },
+            };
+          });
+        await RoomScan.shareText(buildObjMaison(parNiveau, altitudes, scanName), objFilename(scanName));
+        return;
+      }
       const obj = buildObj(
         { walls, openings, objects, rooms, fixtures },
         scanName,
       );
-      // Le niveau dans le nom, comme le DXF (revue « Inès »).
-      await RoomScan.shareText(
-        obj,
-        objFilename(
-          niveaux.length > 1
-            ? `${scanName} ${abregerNiveau(niveauCourant)}`
-            : scanName,
-        ),
-      );
+      await RoomScan.shareText(obj, objFilename(scanName));
     } catch (e: any) {
       alerte(expliquer('export', e).titre, expliquer('export', e).message);
     }
@@ -3439,7 +3462,36 @@ export function ResultScreen() {
           .toString(36)
           .slice(2, 6)}`,
     });
-    if (pose.conforme) {
+    // Puis ce que le contrôle sait corriger d'un appui : voir `completerAuxNormes`.
+    const suite = completerAuxNormes(
+      {
+        rooms: roomInputs.map((r) => {
+          const part = parts.find((p) => p.roomId === r.id);
+          return { ...r, interieur: part?.labelAt ?? { x: 0, z: 0 } };
+        }),
+        walls,
+        openings,
+        objects: frais.objects,
+        fixtures: [...frais.fixtures, ...pose.fixtures],
+        ceiling: [...frais.ceiling, ...pose.ceiling],
+        id: (prefixe) =>
+          `${prefixe}-${Date.now().toString(36)}-${Math.random()
+            .toString(36)
+            .slice(2, 6)}`,
+      },
+      (fx, cl) =>
+        checkElectrical(
+          roomInputs,
+          fx,
+          wallRooms,
+          fixturePlacement(fx, walls, roomInputs),
+          undefined,
+          wallWorktops,
+          cl,
+          { walls, openings },
+        ),
+    );
+    if (pose.conforme && suite.poses.length === 0) {
       alerte(
         'Tout est aux normes',
         'Chaque pièce a son compte de socles, ses prises RJ45, sa commande ' +
@@ -3447,11 +3499,17 @@ export function ResultScreen() {
       );
       return;
     }
-    useScanStore.getState().poserDAuto(pose.fixtures, pose.ceiling);
-    const total = pose.fixtures.length + pose.ceiling.length;
+    const lesFixtures = [...pose.fixtures, ...suite.fixtures];
+    const leCeiling = [...pose.ceiling, ...suite.ceiling];
+    useScanStore.getState().poserDAuto(lesFixtures, leCeiling);
+    const total = lesFixtures.length + leCeiling.length;
+    // « Poser PC 110 » × 4 se dit une fois, avec son compte.
+    const comptes = new Map<string, number>();
+    for (const l of suite.poses) comptes.set(l, (comptes.get(l) ?? 0) + 1);
+    const controle = [...comptes].map(([l, n]) => (n > 1 ? `${l} × ${n}` : l));
     alerte(
       `${total} pose${total > 1 ? 's' : ''} ajoutée${total > 1 ? 's' : ''}`,
-      pose.rapport.join(SAUT) +
+      [...pose.rapport, ...(controle.length > 0 ? [`Contrôle : ${controle.join(', ')}`] : [])].join(SAUT) +
         SAUT +
         SAUT +
         'Tout est placé hors meubles et hors menuiseries. À vous de ' +

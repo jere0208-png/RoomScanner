@@ -77,6 +77,8 @@ import {
   centrePourEcart,
   clampFootprint,
   meublesQuiSeChevauchent,
+  altitudesDesNiveaux,
+  DALLE,
   toFootprint,
   type WallSeg,
 } from '../src/geometry/floorplan';
@@ -86,11 +88,12 @@ import { lireCm } from '../src/components/MurNeufSheet';
 import { planDifferentials, type Circuit } from '../src/geometry/nfc15100';
 import { tableauDepuisLePlan } from '../src/geometry/tableauFini';
 import { boardRows, pdfFilename } from '../src/export/pdf';
-import { objFilename } from '../src/export/model3d';
+import { buildObjMaison, objFilename } from '../src/export/model3d';
 import { dxfFilename } from '../src/export/dxf';
 import { CATALOG_ITEMS, type CatalogItem } from '../src/geometry/catalogue';
 import { matchItem } from '../src/screens/result/FurnitureSheet';
 import { useAstuce } from '../src/ui/astuce';
+import { completerAuxNormes } from '../src/geometry/auto';
 import { appartementExemple } from '../src/data/exemple';
 import { pocheDesMurs, SUREPAISSEUR_FACADE } from '../src/geometry/poche';
 
@@ -838,5 +841,92 @@ describe('les chevauchements de Théo', () => {
     const b = boite('b', 1.25, 0, 1, 1, 0, 0.8, Math.PI / 4);
     // Le losange de b déborde de 0,707 − 0,5 vers a : 0,25 − 0,207 de jour.
     expect(meublesQuiSeChevauchent([a, b])).toEqual([]);
+  });
+});
+
+describe('« Normes auto » chez Nicolas', () => {
+  const murs = [mur('n', 0, 0, 4, 0), mur('e', 4, 0, 4, 3), mur('s', 4, 3, 0, 3), mur('o', 0, 3, 0, 0)];
+  const ctx = {
+    rooms: [
+      { id: 'r1', name: 'Cuisine', area: 12, wallIds: ['n', 'e', 's', 'o'], interieur: { x: 2, z: 1.5 } },
+      // Le DAAF ne va pas en cuisine : il lui faut une autre pièce.
+      { id: 'r2', name: 'Séjour', area: 20, wallIds: [], interieur: { x: 6, z: 1.5 } },
+    ],
+    walls: murs,
+    openings: [],
+    objects: [],
+    fixtures: [],
+    ceiling: [],
+    id: (() => {
+      let k = 0;
+      return (p: string) => `${p}-${++k}`;
+    })(),
+  };
+
+  it('règle aussi ce que le contrôle sait corriger, constat après constat', () => {
+    const verifier = (fx: { height: number }[], cl: { kind: string }[]) => {
+      const hauts = fx.filter((f) => f.height >= 0.9).length;
+      return [
+        ...(hauts < 4
+          ? [{ message: `Cuisine : ${hauts} socles au-dessus du plan sur 4`, roomId: 'r1', fix: { type: 'poser' as const, kind: 'prise' as const, height: 1.1, label: 'Poser PC 110' } }]
+          : []),
+        ...(cl.some((c) => c.kind === 'daaf')
+          ? []
+          : [{ message: 'Aucun détecteur de fumée', fix: { type: 'plafond' as const, kind: 'daaf' as const, label: 'Poser le DAAF' } }]),
+      ];
+    };
+    const r = completerAuxNormes(ctx, verifier);
+    expect(r.fixtures.filter((f) => f.height === 1.1)).toHaveLength(4);
+    expect(r.ceiling.map((c) => c.kind)).toEqual(['daaf']);
+    expect(r.poses).toEqual(['Poser PC 110', 'Poser PC 110', 'Poser PC 110', 'Poser PC 110', 'Poser le DAAF']);
+  });
+
+  it('une pose qui ne règle rien est reprise, et le constat laissé', () => {
+    const verifier = () => [
+      { message: 'Cuisine : socle mal placé', roomId: 'r1', fix: { type: 'poser' as const, kind: 'prise' as const, label: 'Poser' } },
+    ];
+    const r = completerAuxNormes(ctx, verifier);
+    expect(r.fixtures).toHaveLength(0);
+    expect(r.poses).toHaveLength(0);
+  });
+});
+
+describe('la maison empilée de Léa', () => {
+  const etage = (n: number, h: number, sol = 0) =>
+    [mur('n', 0, 0, 6, 0), mur('e', 6, 0, 6, 7), mur('s', 6, 7, 0, 7), mur('o', 0, 7, 0, 0)].map((w) => ({
+      ...w,
+      id: `${w.id}${n}`,
+      height: h,
+      yCenter: sol + h / 2,
+      ...(n === 0 ? {} : { niveau: n }),
+    }));
+
+  it('chaque niveau a son altitude : hauteur du dessous plus une dalle', () => {
+    const alt = altitudesDesNiveaux([...etage(0, 2.5), ...etage(1, 2.4), ...etage(-1, 2.2)]);
+    expect(alt.get(0)).toBe(0);
+    expect(alt.get(1)).toBeCloseTo(2.5 + DALLE, 9);
+    expect(alt.get(-1)).toBeCloseTo(-(2.2 + DALLE), 9);
+  });
+
+  it('l’OBJ de la maison pose chaque niveau à sa hauteur, dans ses groupes', () => {
+    // L'étage relevé au scan a son sol à −1,30 (ARKit) : il se recale quand même.
+    const rdc = etage(0, 2.5);
+    const r1 = etage(1, 2.4, -1.3);
+    const alt = altitudesDesNiveaux([...rdc, ...r1]);
+    const obj = buildObjMaison(
+      [
+        { niveau: 0, model: { walls: rdc, openings: [], objects: [], rooms: [{ id: 'a', wallIds: rdc.map((w) => w.id) }] } },
+        { niveau: 1, model: { walls: r1, openings: [], objects: [], rooms: [{ id: 'b', wallIds: r1.map((w) => w.id) }] } },
+      ],
+      alt,
+    );
+    expect(obj).toContain('g RDC Sols');
+    expect(obj).toContain('g R+1 Volumes');
+    const ys = obj
+      .split('\n')
+      .filter((l) => l.startsWith('v '))
+      .map((l) => Number(l.split(' ')[2]));
+    expect(Math.min(...ys)).toBeCloseTo(0, 3);
+    expect(Math.max(...ys)).toBeCloseTo(2.5 + DALLE + 2.4, 3);
   });
 });

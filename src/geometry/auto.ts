@@ -384,3 +384,62 @@ export function corrigerConstat(
   }
   return null;
 }
+
+/**
+ * « NORMES AUTO » NE LAISSE PAS SES PROPRES ALERTES — revue « Nicolas » :
+ * après l'appui restaient « cuisine 0/4 au-dessus du plan », « aucun
+ * détecteur de fumée », « aucun tableau ». Ce que le contrôle sait corriger
+ * d'un appui (une pose au mur, un appareil au plafond), on le corrige ici
+ * aussi, constat après constat, jusqu'à ce que plus rien ne se règle.
+ *
+ * `verifier` rend les constats du plan tel qu'il serait : l'écran seul a de
+ * quoi les calculer. Une pose qui ne fait pas bouger son constat est
+ * reprise aussitôt, et le constat laissé à l'électricien : on ne sème pas
+ * d'appareils inutiles.
+ */
+export function completerAuxNormes(
+  ctx: ContexteCorrection & { ceiling: CeilingFixture[] },
+  verifier: (
+    fixtures: Fixture[],
+    ceiling: CeilingFixture[],
+  ) => { message: string; roomId?: string; fix?: ElecFix }[],
+  max = 30,
+): { fixtures: Fixture[]; ceiling: CeilingFixture[]; poses: string[] } {
+  let fixtures = ctx.fixtures;
+  let ceiling = ctx.ceiling;
+  const ajoutsF: Fixture[] = [];
+  const ajoutsC: CeilingFixture[] = [];
+  const poses: string[] = [];
+  const laisses = new Set<string>();
+  let dernier: { message: string; nf: number; nc: number } | null = null;
+  for (let k = 0; k < max; k++) {
+    const c = verifier(fixtures, ceiling).find(
+      (i) => i.fix && (i.fix.type === 'poser' || i.fix.type === 'plafond') && !laisses.has(i.message),
+    );
+    if (!c?.fix) break;
+    if (dernier && c.message === dernier.message) {
+      // La pose n'a rien changé : on la reprend, et l'on passe au suivant.
+      ajoutsF.splice(ajoutsF.length - dernier.nf, dernier.nf);
+      ajoutsC.splice(ajoutsC.length - dernier.nc, dernier.nc);
+      fixtures = fixtures.slice(0, fixtures.length - dernier.nf);
+      ceiling = ceiling.slice(0, ceiling.length - dernier.nc);
+      poses.pop();
+      laisses.add(c.message);
+      dernier = null;
+      continue;
+    }
+    const res = corrigerConstat(c.fix, c.roomId, { ...ctx, fixtures });
+    if (!res || res.fixtures.length + res.ceiling.length === 0) {
+      laisses.add(c.message);
+      dernier = null;
+      continue;
+    }
+    fixtures = [...fixtures, ...res.fixtures];
+    ceiling = [...ceiling, ...res.ceiling];
+    ajoutsF.push(...res.fixtures);
+    ajoutsC.push(...res.ceiling);
+    poses.push(c.fix.label);
+    dernier = { message: c.message, nf: res.fixtures.length, nc: res.ceiling.length };
+  }
+  return { fixtures: ajoutsF, ceiling: ajoutsC, poses };
+}

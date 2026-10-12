@@ -93,6 +93,7 @@ import {
   assemblyTag,
   faceX,
   facePoint,
+  pieceDuCote,
   postsOf,
   wallFace,
   type Fixture,
@@ -622,9 +623,20 @@ export function Iso3DView({
   const allFixtures = appareillageDuNiveau;
   const fixtures = useMemo(() => {
     if (!focusRoomId) return allFixtures;
-    const ids = new Set(keptWalls.map((w) => w.id));
-    return allFixtures.filter((f) => ids.has(f.wallId));
-  }, [allFixtures, keptWalls, focusRoomId]);
+    const parId = new Map(keptWalls.map((w) => [w.id, w]));
+    /*
+      ET SEULEMENT CELLES DE SA FACE — revue « Nicolas » : la coupe du séjour
+      embarquait les quatre prises que la cuisine porte de l'autre côté de
+      la cloison, collées en l'air contre le mur coupé.
+    */
+    return allFixtures.filter((f) => {
+      const w = parId.get(f.wallId);
+      if (!w) return false;
+      if (f.side === undefined) return true;
+      const piece = pieceDuCote(w, f.side, walls, allRooms);
+      return piece === null || piece === focusRoomId;
+    });
+  }, [allFixtures, keptWalls, focusRoomId, walls, allRooms]);
   const floors = useMemo(() => floorsOf(rooms), [rooms]);
   const roomNames = useMemo(
     () => new Map(rooms.map((r) => [r.id, r.name])),
@@ -1098,14 +1110,21 @@ export function Iso3DView({
             ws.some((w) => pointOnSeg(midOf(o), w.a, w.b).dist < 0.6),
           )
         : openings;
-      const murs = new Set(ws.map((w) => w.id));
+      const murs = new Map(ws.map((w) => [w.id, w]));
       return {
         rooms: rs,
         walls: ws,
         openings: os,
         objects: focus ? objects.filter((o) => roomOf(o) === focus) : objects,
+        // Les appareils de sa face seulement : voir `fixtures` plus haut.
         fixtures: focus
-          ? allFixtures.filter((f) => murs.has(f.wallId))
+          ? allFixtures.filter((f) => {
+              const w = murs.get(f.wallId);
+              if (!w) return false;
+              if (f.side === undefined) return true;
+              const piece = pieceDuCote(w, f.side, walls, allRooms);
+              return piece === null || piece === focus;
+            })
           : allFixtures,
       };
     },
