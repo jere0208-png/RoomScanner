@@ -24,6 +24,7 @@ import {
   HYPOTHESES,
   achats,
   baiesDeLaPiece,
+  cleHorsTravaux,
   nombre,
   piecesRetenues,
   travauxDesPieces,
@@ -312,7 +313,7 @@ describe('la feuille', () => {
     const sejour = () =>
       arbre!.root.findAll((x) => x.props?.accessibilityLabel === 'Séjour' && typeof x.props?.onPress === 'function')[0];
     act(() => sejour().props.onPress());
-    expect(useReglagesTravaux.getState().horsTravaux).toEqual(['Séjour']);
+    expect(useReglagesTravaux.getState().horsTravaux).toEqual([cleHorsTravaux(null, 'Séjour')]);
     // Refermée, rouverte : la chambre seule, toujours.
     act(() => arbre!.unmount());
     act(() => {
@@ -326,8 +327,41 @@ describe('la feuille', () => {
   });
 
   it('les pièces retenues : celles qui ne sont pas décochées', () => {
-    expect(piecesRetenues(pieces, ['Séjour']).map((p) => p.roomId)).toEqual(['Chambre']);
+    expect(piecesRetenues(pieces, [cleHorsTravaux(null, 'Séjour')]).map((p) => p.roomId)).toEqual(['Chambre']);
     expect(piecesRetenues(pieces, [])).toHaveLength(2);
+  });
+
+  /*
+    LA COCHE EST CELLE DU PLAN — revue « Fatou » : décocher la chambre de la
+    variante B la retirait aussi des achats de la variante A. Un numéro de
+    pièce (`room-1`) se retrouve dans tous les plans : la coche se range
+    avec le plan ouvert.
+  */
+  it('décocher une pièce dans un plan ne la retire pas des autres', () => {
+    const avant = useScanStore.getState().currentSaveId;
+    try {
+      useScanStore.setState({ currentSaveId: 'plan-B' });
+      act(() => {
+        arbre = TestRenderer.create(<TravauxSheet visible onClose={() => {}} pieces={pieces} />);
+      });
+      const sejour = arbre!.root.findAll(
+        (x) => x.props?.accessibilityLabel === 'Séjour' && typeof x.props?.onPress === 'function',
+      )[0];
+      act(() => sejour.props.onPress());
+      expect(textes(arbre!).join(' | ')).toContain('Pour 1 pièce sur 2.');
+      const hors = useReglagesTravaux.getState().horsTravaux;
+      // Dans B : la chambre seule. Dans A, la même pièce compte toujours.
+      expect(piecesRetenues(pieces, hors, 'plan-B').map((p) => p.roomId)).toEqual(['Chambre']);
+      expect(piecesRetenues(pieces, hors, 'plan-A')).toHaveLength(2);
+      act(() => arbre!.unmount());
+      useScanStore.setState({ currentSaveId: 'plan-A' });
+      act(() => {
+        arbre = TestRenderer.create(<TravauxSheet visible onClose={() => {}} pieces={pieces} />);
+      });
+      expect(textes(arbre!).join(' | ')).toContain('Pour tout le logement.');
+    } finally {
+      act(() => useScanStore.setState({ currentSaveId: avant }));
+    }
   });
 
   /*
@@ -351,7 +385,7 @@ describe('le dossier et le tableur suivent la coche', () => {
   it('le tableur ne chiffre que les pièces retenues', () => {
     const src = readFileSync(join(__dirname, '..', 'src', 'screens', 'ResultScreen.tsx'), 'utf8');
     const csv = src.slice(src.indexOf('const shareCsv = async'), src.indexOf('metreFilename(scanName)'));
-    expect(csv).toMatch(/piecesRetenues\(piecesTravaux, reglages\.horsTravaux\)/);
+    expect(csv).toMatch(/piecesRetenues\(piecesTravaux, reglages\.horsTravaux, useScanStore\.getState\(\)\.currentSaveId\)/);
   });
 });
 

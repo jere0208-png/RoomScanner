@@ -182,6 +182,7 @@ const cm = (m: number) => Math.round(m * 100);
 
 import type { ActionData } from './Sheet';
 import { alerte } from '../ui/alerte';
+import { lireCentimetres } from '../ui/saisieCote';
 
 interface Props {
   wallId: string;
@@ -1125,9 +1126,9 @@ export function WallElevation({
   };
   /** Applique une cote tapée au clavier (en cm). */
   const applyDraft = () => {
-    const v = parseFloat(draft.replace(',', '.'));
-    if (selected && editing && isFinite(v)) {
-      const m = v / 100;
+    // « 1m10 », « 110 », « 1,10 » : la lecture commune (revue « Bernard »).
+    const m = lireCentimetres(draft, { zero: true });
+    if (selected && editing && m !== null) {
       if (editing === 'g')
         moveFixture(selected.id, fromFaceX(face, m), selected.height);
       else if (editing === 'd')

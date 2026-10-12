@@ -37,6 +37,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { CloseCross } from './CloseCross';
 import { SOLAIRES } from '../ui/solaires';
+import { haptic } from '../ui/haptic';
+import type { FauteDeCote } from '../ui/saisieCote';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 
 /**
@@ -133,6 +135,14 @@ export interface PromptData {
    * relevée.
    */
   choix?: { label: string; value: string }[];
+  /**
+   * CE QUI NE VA PAS DANS LA VALEUR — revues « Bernard », « Inès », « Hugo ».
+   * Une cote illisible ou absurde (« 3m40 » lu 3 m, « 410 » lu 410 m) se
+   * posait sans un mot. Une faute garde la feuille ouverte, se dit sous le
+   * champ, et propose la lecture probable à un appui. Une faute
+   * `douteuse` (une cote hors du commun) passe à la seconde validation.
+   */
+  verifier?: (value: string) => FauteDeCote | null;
   onSubmit: (value: string) => void;
 }
 
@@ -487,8 +497,13 @@ export function PromptSheet({
   const styles = getStyles(c);
   const vu = useDernier(data);
   const [texte, setTexte] = useState('');
+  const [faute, setFaute] = useState<FauteDeCote | null>(null);
+  // La valeur dont on a déjà dit qu'elle sortait du commun : la revalider la garde.
+  const douteDit = useRef<string | null>(null);
   useEffect(() => {
     setTexte(data?.value ?? '');
+    setFaute(null);
+    douteDit.current = null;
   }, [data]);
   const attente = useRef<null | (() => void)>(null);
   /*
@@ -499,6 +514,14 @@ export function PromptSheet({
     et posé la cote précédente. La valeur voyage donc en argument.
   */
   const valider = (v: string = texte) => {
+    const f = data?.verifier?.(v) ?? null;
+    if (f && !(f.douteuse && douteDit.current === v)) {
+      setFaute(f);
+      douteDit.current = f.douteuse ? v : null;
+      haptic('alerte');
+      return;
+    }
+    setFaute(null);
     const suite = data?.onSubmit;
     attente.current = suite ? () => suite(v) : null;
     onClose();
@@ -522,7 +545,10 @@ export function PromptSheet({
             <TextInput
               style={styles.champ}
               value={texte}
-              onChangeText={setTexte}
+              onChangeText={(t) => {
+                setTexte(t);
+                setFaute(null);
+              }}
               autoFocus
               selectTextOnFocus
               keyboardType={vu.numeric ? 'decimal-pad' : 'default'}
@@ -532,6 +558,28 @@ export function PromptSheet({
             />
             {vu.unit ? <Text style={styles.unit}>{vu.unit}</Text> : null}
           </View>
+          {faute ? (
+            <View style={styles.faute}>
+              <Text style={styles.fauteTexte} accessibilityRole="alert">
+                {faute.message}
+              </Text>
+              {faute.proposition ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Utiliser ${faute.proposition}`}
+                  style={({ pressed }) => [styles.pastille, styles.pastilleCourante, pressed && styles.pastillePressee]}
+                  onPress={() => {
+                    const v = faute.proposition!;
+                    setTexte(v);
+                    valider(v);
+                  }}>
+                  <Text style={[styles.pastilleTexte, styles.pastilleTexteCourant]}>
+                    {`Utiliser ${faute.proposition}${vu.unit ? ` ${vu.unit}` : ''}`}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
           {/*
             UN APPUI SUFFIT : la pastille remplit le champ et valide. Un
             choix explicite n'a pas besoin d'être confirmé une seconde fois
@@ -593,6 +641,8 @@ export function PromptSheet({
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
     backdrop: { flex: 1, justifyContent: 'flex-end' },
+    faute: { marginTop: 8, gap: 8, alignItems: 'flex-start' },
+    fauteTexte: { color: c.danger, fontSize: 14, lineHeight: 19 },
     veil: { backgroundColor: 'rgba(11,13,18,0.42)' },
     avoider: { width: '100%' },
     sheet: {

@@ -15,6 +15,7 @@ import { create } from 'zustand';
 import {
   HYPOTHESES,
   PRIX_INDICATIFS,
+  cleHorsTravaux,
   type HypothesesTravaux,
   type PrixTravaux,
 } from '../geometry/travaux';
@@ -37,16 +38,17 @@ interface Etat {
   avecPrix: boolean;
   prix: PrixTravaux;
   /**
-   * LES PIÈCES DÉCOCHÉES — leurs identifiants. Correctif de l'audit : la
-   * coche ne vivait que dans la feuille, et le dossier PDF comme le tableur
-   * comptaient toutes les pièces. Un identifiant de pièce est unique : la
-   * liste vaut pour tous les plans sans qu'ils se gênent.
+   * LES PIÈCES DÉCOCHÉES, PLAN PAR PLAN — `cleHorsTravaux(plan, pièce)`.
+   * Correctif de l'audit : la coche ne vivait que dans la feuille, et le
+   * dossier PDF comme le tableur comptaient toutes les pièces. Puis revue
+   * « Fatou » : repérée au seul numéro de la pièce, elle valait pour tous
+   * les plans — `room-1` est dans chacun.
    */
   horsTravaux: string[];
-  /** Coche ou décoche une pièce. */
-  basculerPiece: (roomId: string) => void;
-  /** Recoche ces pièces (« Tout cocher »). */
-  cocherToutes: (roomIds: string[]) => void;
+  /** Coche ou décoche une pièce du plan ouvert. */
+  basculerPiece: (roomId: string, plan?: string | null) => void;
+  /** Recoche ces pièces du plan ouvert (« Tout cocher »). */
+  cocherToutes: (roomIds: string[], plan?: string | null) => void;
   charger: () => Promise<void>;
   regler: (h: Partial<HypothesesTravaux>) => void;
   reglerPrix: (p: Partial<PrixTravaux>) => void;
@@ -90,17 +92,18 @@ export const useReglagesTravaux = create<Etat>((set, get) => ({
   prix: PRIX_INDICATIFS,
   horsTravaux: [],
 
-  basculerPiece: (roomId) => {
+  basculerPiece: (roomId, plan) => {
+    const cle = cleHorsTravaux(plan, roomId);
     const avant = get().horsTravaux;
-    const horsTravaux = avant.includes(roomId)
-      ? avant.filter((id) => id !== roomId)
-      : [...avant, roomId].slice(-HORS_MAX);
+    const horsTravaux = avant.includes(cle)
+      ? avant.filter((id) => id !== cle)
+      : [...avant, cle].slice(-HORS_MAX);
     set({ horsTravaux });
     ecrire(get());
   },
 
-  cocherToutes: (roomIds) => {
-    const ids = new Set(roomIds);
+  cocherToutes: (roomIds, plan) => {
+    const ids = new Set(roomIds.map((id) => cleHorsTravaux(plan, id)));
     const horsTravaux = get().horsTravaux.filter((id) => !ids.has(id));
     if (horsTravaux.length === get().horsTravaux.length) return;
     set({ horsTravaux });

@@ -22,6 +22,7 @@ import type { VerdictDePassage } from '../geometry/passage';
 import type { Palette } from '../theme';
 
 import type { ObjectData } from 'react-native-room-scan';
+import { lireMetres } from '../ui/saisieCote';
 
 const fr2 = (v: number) => v.toFixed(2).replace('.', ',');
 
@@ -550,7 +551,8 @@ const local = StyleSheet.create({
  * de 12 à 1 200 est donc une cote en centimètres.
  */
 export function metresSaisis(t: string): number {
-  const v = parseFloat(t.replace(',', '.').trim());
+  // « 1m60 », « 160 cm » : la lecture commune (revue « Bernard »).
+  const v = lireMetres(t) ?? NaN;
   if (!Number.isFinite(v)) return NaN;
   return v >= 12 && v < 1200 ? v / 100 : v;
 }

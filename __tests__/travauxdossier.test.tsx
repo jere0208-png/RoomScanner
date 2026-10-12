@@ -18,6 +18,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { ExportScreen } from '../src/screens/ExportScreen';
 import { useScanStore } from '../src/store/scanStore';
 import { useReglagesTravaux } from '../src/store/reglagesTravaux';
+import { cleHorsTravaux } from '../src/geometry/travaux';
 import { useUsage } from '../src/store/usage';
 import { appartementExemple } from '../src/data/exemple';
 
@@ -131,7 +132,7 @@ describe('le dossier du particulier', () => {
     const toutes = piecesDuDossier();
     act(() => arbre?.unmount());
     arbre = null;
-    useReglagesTravaux.setState({ horsTravaux: [toutes[0]] });
+    useReglagesTravaux.setState({ horsTravaux: [cleHorsTravaux(useScanStore.getState().currentSaveId, toutes[0])] });
     const retenues = piecesDuDossier();
     expect(retenues).not.toContain(toutes[0]);
     expect(retenues).toHaveLength(toutes.length - 1);

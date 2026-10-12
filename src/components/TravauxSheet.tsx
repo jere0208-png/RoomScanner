@@ -29,6 +29,7 @@ import { haptic } from '../ui/haptic';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
 import {
   achats,
+  cleHorsTravaux,
   coutDesAchats,
   euros,
   nombre,
@@ -38,6 +39,7 @@ import {
   type PrixTravaux,
 } from '../geometry/travaux';
 import { useReglagesTravaux } from '../store/reglagesTravaux';
+import { useScanStore } from '../store/scanStore';
 import { PEINTURE_DEFAUT, hexDePeinture, nomDeTeinte } from '../ui/peintures';
 
 const COCHE = 'M6 12.5 l4 4 l8 -9';
@@ -108,7 +110,9 @@ export function TravauxSheet({
     LA COCHE NE SE REMET PLUS À ZÉRO À L'OUVERTURE : le dossier PDF et le
     tableur la lisent, et ce qu'on voit ici doit être ce qui part.
   */
-  const choisies = useMemo(() => piecesRetenues(pieces, horsTravaux), [pieces, horsTravaux]);
+  // La coche est celle du plan ouvert (revue « Fatou »).
+  const plan = useScanStore((st) => st.currentSaveId);
+  const choisies = useMemo(() => piecesRetenues(pieces, horsTravaux, plan), [pieces, horsTravaux, plan]);
   useEffect(() => {
     if (visible && !charge) charger();
   }, [visible, charge, charger]);
@@ -119,7 +123,7 @@ export function TravauxSheet({
 
   const basculer = (id: string) => {
     haptic('leger');
-    basculerPiece(id);
+    basculerPiece(id, plan);
   };
 
   const cartes: { cle: 'murs' | 'plafonds' | 'sol' | 'plinthes'; titre: string; gros: string; detail: string; teinte: string }[] = [
@@ -289,7 +293,7 @@ export function TravauxSheet({
             hitSlop={10}
             onPress={() => {
               haptic('leger');
-              cocherToutes(pieces.map((p) => p.roomId));
+              cocherToutes(pieces.map((p) => p.roomId), plan);
             }}>
             <Text style={s.toutCocher}>Tout cocher</Text>
           </Pressable>
@@ -297,7 +301,7 @@ export function TravauxSheet({
       </View>
       <View>
         {pieces.map((p) => {
-          const on = !horsTravaux.includes(p.roomId);
+          const on = !horsTravaux.includes(cleHorsTravaux(plan, p.roomId));
           return (
             <Pressable
               key={p.roomId}

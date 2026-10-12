@@ -194,7 +194,18 @@ import {
 } from '../geometry/ceiling';
 import { haptic } from '../ui/haptic';
 import { CeilingIcon } from '../components/CeilingIcon';
-import { rubanLeLongDuMur, rubanPeripherique } from '../geometry/ruban';
+import { rubanLeLongDuMur, rubanPeripherique, rubanSousLesMeubles } from '../geometry/ruban';
+import {
+  BORNES_ALLEGE,
+  BORNES_HAUTEUR,
+  BORNES_MENUISERIE,
+  BORNES_MUR,
+  BORNES_PIECE,
+  lireCentimetres,
+  lireMetres,
+  verifierCentimetres,
+  verifierMetres,
+} from '../ui/saisieCote';
 import { PAS_ROTATION, RecalageBar } from '../components/RecalageBar';
 import {
   CoupeSheet,
@@ -1748,7 +1759,7 @@ export function ResultScreen() {
       // Ce qu'il faut acheter suit le métré, aux réglages de « Travaux » —
       // et sur les seules pièces qu'on y a laissées cochées.
       const reglages = useReglagesTravaux.getState();
-      const retenues = piecesRetenues(piecesTravaux, reglages.horsTravaux);
+      const retenues = piecesRetenues(piecesTravaux, reglages.horsTravaux, useScanStore.getState().currentSaveId);
       const a = achatsDe(retenues, reglages.hypotheses);
       await RoomScan.shareText(
         // Sans le mode Électricité, le fichier s'arrête au métré des pièces.
@@ -2042,9 +2053,10 @@ export function ResultScreen() {
           : hauteursCourantes(o.type as 'door' | 'window' | 'opening'),
         'cm',
       ),
+      verifier: verifierMetres(quoi === 'largeur' ? 'Largeur' : 'Hauteur', BORNES_MENUISERIE),
       onSubmit: (t) => {
-        const v = parseFloat(t.replace(',', '.'));
-        if (!(v > 0)) return;
+        const v = lireMetres(t);
+        if (v === null || !(v > 0)) return;
         if (quoi === 'largeur') resizeOpening(id, v, undefined);
         else resizeOpening(id, undefined, v);
       },
@@ -2083,9 +2095,10 @@ export function ResultScreen() {
       /* Zéro pour une porte-fenêtre, 110 au-dessus d'un plan de travail :
          quatre appuis qui couvrent presque tout un logement. */
       choix: pastilles(ALLEGES_COURANTES, 'cm'),
+      verifier: verifierMetres('Bas de fenêtre', BORNES_ALLEGE),
       onSubmit: (t) => {
-        const v = parseFloat(t.replace(',', '.'));
-        if (isFinite(v)) setAllege(id, v);
+        const v = lireMetres(t, { zero: true });
+        if (v !== null) setAllege(id, v);
       },
     });
   };
@@ -2864,9 +2877,10 @@ export function ResultScreen() {
       unit: 'm',
       numeric: true,
       choix: pastilles(HAUTEURS_SOUS_PLAFOND, 'm'),
+      verifier: verifierMetres('Hauteur', BORNES_HAUTEUR),
       onSubmit: (t) => {
-        const v = parseFloat(t.replace(',', '.'));
-        if (!(v > 0)) return;
+        const v = lireMetres(t);
+        if (v === null || !(v > 0)) return;
         setRoomHeight(targetRoom.id, v);
         /*
           ET LE RESTE DU LOGEMENT ?
@@ -2946,7 +2960,12 @@ export function ResultScreen() {
     const roomId = targetRoom.id;
     // Une pièce dessinée se cote à l'intérieur, de mur à mur.
     const auNu = !!targetPart && estDessine(targetPart.walls);
-    const nb = (t: string) => parseFloat(t.replace(',', '.'));
+    /*
+      LA COTE SE LIT ET SE VÉRIFIE — revues « Inès » et « Hugo » : « 410 »
+      tapé ici faisait un mur de 410 m (une pièce de 311 m²), « 320 × 310 »
+      une chambre de 3 583 m². La feuille garde la cote et propose 4,10 m.
+    */
+    const nb = (t: string) => lireMetres(t) ?? NaN;
     /*
       GAUCHE-DROITE, PUIS HAUT-BAS — revue « Sophie » : la largeur proposée
       était le plus GRAND côté, appliquée à l'horizontale ; valider sans rien
@@ -2966,6 +2985,7 @@ export function ResultScreen() {
       unit: 'm',
       numeric: true,
       okLabel: 'Suivant',
+      verifier: verifierMetres('Largeur', BORNES_PIECE),
       onSubmit: (t) => {
         const L = nb(t);
         if (!(L > 0)) return;
@@ -2975,6 +2995,7 @@ export function ResultScreen() {
           value: enZ.toFixed(2).replace('.', ','),
           unit: 'm',
           numeric: true,
+          verifier: verifierMetres('Profondeur', BORNES_PIECE),
           onSubmit: (t2) => {
             const P = nb(t2);
             if (P > 0) resizeRoom(roomId, L, P, { auNu });
@@ -3151,9 +3172,10 @@ export function ResultScreen() {
       value: longueurCotee(walls, w, parts).toFixed(2).replace('.', ','),
       unit: 'm',
       numeric: true,
+      verifier: verifierMetres('Longueur', BORNES_MUR),
       onSubmit: (t) => {
-        const v = parseFloat(t.replace(',', '.'));
-        if (v > 0) setWallLength(wallId, v, { auNu });
+        const v = lireMetres(t);
+        if (v !== null && v > 0) setWallLength(wallId, v, { auNu });
       },
     });
   };
@@ -3178,9 +3200,10 @@ export function ResultScreen() {
       unit: 'm',
       numeric: true,
       choix: pastilles(HAUTEURS_SOUS_PLAFOND, 'm'),
+      verifier: verifierMetres('Hauteur', BORNES_HAUTEUR),
       onSubmit: (t) => {
-        const v = parseFloat(t.replace(',', '.'));
-        if (v > 0) setWallHeight(wallId, v);
+        const v = lireMetres(t);
+        if (v !== null && v > 0) setWallHeight(wallId, v);
       },
     });
   };
@@ -4388,12 +4411,12 @@ export function ResultScreen() {
                 const contour = surface.nu ?? surface.pts;
                 // Un contour à l'axe (relevé au scan) recule d'abord d'un demi-mur.
                 const bord = surface.nu ? 0 : WALL_T / 2;
-                const poserRuban = (trace: Pt[] | null, ferme: boolean) => {
+                const poserRuban = (trace: Pt[] | null, ferme: boolean, retrait?: number) => {
                   if (!trace) {
                     alerte('Pas la place', 'La pièce est trop petite pour ce retrait : essayez plus près des murs.');
                     return;
                   }
-                  const id = useScanStore.getState().addRuban(part.roomId, trace, ferme);
+                  const id = useScanStore.getState().addRuban(part.roomId, trace, ferme, retrait);
                   if (!id) return;
                   haptic('succes');
                   seuleSelection('plafond');
@@ -4407,13 +4430,41 @@ export function ResultScreen() {
                     unit: 'cm',
                     numeric: true,
                     okLabel: 'Poser',
+                    /*
+                      « 2,5 » ICI, CE SONT DES CENTIMÈTRES — revue « Bernard » :
+                      lu 2,50 m, il posait un ruban fermé de 7,60 m au milieu
+                      de la cuisine. Un retrait de ruban se compte en
+                      centimètres ; une virgule ne le fait passer en mètres
+                      que sous 1.
+                    */
+                    verifier: verifierCentimetres('Retrait', 0, 3, { zero: true, seuilMetres: 1 }),
                     onSubmit: (t) => {
-                      const v = lireCote(t);
+                      const v = lireCentimetres(t, { zero: true, seuilMetres: 1 });
                       if (v === null) return;
-                      poserRuban(rubanPeripherique(contour, bord + v), true);
+                      poserRuban(rubanPeripherique(contour, bord + v), true, v);
                     },
                   });
                 const icone = <CeilingIcon kind="led" size={22} />;
+                /*
+                  LES MEUBLES HAUTS DE LA PIÈCE — revues « Bernard » et
+                  « Mehdi » : le ruban « sous les meubles hauts » prenait le
+                  mur le plus proche du doigt, et tout ce mur. Un meuble haut :
+                  un modèle du catalogue, ou un rangement relevé dont le bas
+                  est à plus de 1,20 m du sol.
+                */
+                const sol = solDesMurs(part.walls);
+                const sousMeubles = rubanSousLesMeubles(
+                  contour,
+                  objects
+                    .map((o) => toFootprint(o))
+                    .filter(
+                      (f) =>
+                        (/^meubleHaut/.test(f.modele ?? '') ||
+                          (f.category === 'storage' && f.yCenter - f.height / 2 - sol > 1.2)) &&
+                        pointInPolygon({ x: f.cx, z: f.cz }, contour),
+                    ),
+                  at,
+                );
                 setMenu({
                   title: 'Ruban LED',
                   subtitle: 'Où court-il ?',
@@ -4430,9 +4481,19 @@ export function ResultScreen() {
                       node: icone,
                       onPress: () => enRetrait('Caisson de faux plafond', 60),
                     },
+                    ...(sousMeubles
+                      ? [
+                          {
+                            label: 'Sous les meubles hauts',
+                            hint: 'De leur premier bord au dernier',
+                            node: icone,
+                            onPress: () => poserRuban(sousMeubles, false),
+                          },
+                        ]
+                      : []),
                     {
-                      label: 'Le long du mur touché',
-                      hint: 'Sous les meubles hauts, boîte à rideaux, tête de lit',
+                      label: 'Le long du mur le plus proche',
+                      hint: 'Du point touché : boîte à rideaux, tête de lit',
                       node: icone,
                       onPress: () => poserRuban(rubanLeLongDuMur(contour, at, bord + 0.05), false),
                     },
@@ -5309,7 +5370,9 @@ export function ResultScreen() {
               /* Le point où le plan écrit le nom de la pièce : le pôle
                  intérieur de son contour. Le bouton « Centrer » y pose
                  l'appareil — même milieu pour le mot et pour la lampe. */
-              centre={part?.labelAt ?? null}
+              /* Un ruban court le long des murs : « Centrer » l'envoyait
+                 hors de la pièce (revue « Bernard »). */
+              centre={cl.trace ? null : part?.labelAt ?? null}
               styles={stylesBarres}
               palette={teinte}
               onMove={(at) => moveCeiling(cl.id, at)}
@@ -5336,8 +5399,26 @@ export function ResultScreen() {
                 qu'on voulait, et c'est aussi celui vers lequel la gaine
                 partira.
               */
+              onRetrait={
+                cl.trace && cl.ferme && cl.retrait !== undefined && part?.surface
+                  ? {
+                      actuel: cl.retrait,
+                      changer: (m) => {
+                        const surface = part.surface!;
+                        const contour = surface.nu ?? surface.pts;
+                        const trace = rubanPeripherique(contour, (surface.nu ? 0 : WALL_T / 2) + m);
+                        if (!trace) {
+                          alerte('Pas la place', 'La pièce est trop petite pour ce retrait : essayez plus près des murs.');
+                          return;
+                        }
+                        useScanStore.getState().retracerRuban(cl.id, trace, m);
+                        haptic('succes');
+                      },
+                    }
+                  : undefined
+              }
               onPonter={(() => {
-                if (!CEILINGS[cl.kind].commandable) return undefined;
+                if (!CEILINGS[cl.kind].commandable || cl.trace) return undefined;
                 const voisins = ceiling.filter(
                   (x) =>
                     x.id !== cl.id &&
@@ -6094,10 +6175,11 @@ export function ResultScreen() {
                       value: '',
                       unit: 'cm',
                       numeric: true,
+                      verifier: verifierCentimetres('Décalage', 0.001, 20),
                       onSubmit: (t) => {
-                        const v = parseFloat(t.replace(',', '.'));
-                        if (!(v > 0)) return;
-                        const d = (signe * v) / 100;
+                        const v = lireCentimetres(t);
+                        if (v === null || !(v > 0)) return;
+                        const d = signe * v;
                         useScanStore.getState().moveWall(id, sens.x * d, sens.z * d, false);
                         haptic('succes');
                       },

@@ -1953,7 +1953,9 @@ interface ScanState {
    * POSE UN RUBAN LED — un tracé ouvert ou fermé dans la pièce (voir
    * `ruban.ts`). Rend son identifiant, ou `undefined` sans tracé valable.
    */
-  addRuban: (roomId: string, trace: Pt[], ferme: boolean) => string | undefined;
+  addRuban: (roomId: string, trace: Pt[], ferme: boolean, retrait?: number) => string | undefined;
+  /** Retrace un ruban à un autre retrait, sous un seul « Annuler ». */
+  retracerRuban: (id: string, trace: Pt[], retrait?: number) => void;
   removeCeiling: (id: string) => void;
   /** Repose toute une ligne de spots : nouvelles places, nouvel axe. */
   setCeilingRow: (row: string, pts: Pt[], axe: SpotAxis) => void;
@@ -5990,18 +5992,52 @@ export const useScanStore = create<ScanState>((set, get) => {
       return id;
     },
 
-    addRuban: (roomId, trace, ferme) => {
+    addRuban: (roomId, trace, ferme, retrait) => {
       if (trace.length < 2 || trace.some((p) => !sontFinis(p.x, p.z))) return undefined;
       pushHistory('addCeiling');
       const id = `pl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       set({
         ceiling: [
           ...get().ceiling,
-          { id, kind: 'led', roomId, at: { ...trace[0] }, trace: trace.map((p) => ({ ...p })), ferme },
+          {
+            id,
+            kind: 'led',
+            roomId,
+            at: { ...trace[0] },
+            trace: trace.map((p) => ({ ...p })),
+            ferme,
+            ...(retrait !== undefined ? { retrait } : {}),
+          },
         ],
         dirty: true,
       });
       return id;
+    },
+
+    /*
+      LE RETRAIT D'UN RUBAN SE RETOUCHE — revue « Yasmine » : un caisson posé
+      à 50 cm ne se ramenait pas à 40. Le bandeau proposait la « distance au
+      mur de gauche » de son premier coin (230 cm) ; taper 40 faisait glisser
+      tout le tracé de 1,90 m, deux sommets hors de la pièce. On retrace.
+    */
+    retracerRuban: (id, trace, retrait) => {
+      const st = get();
+      const cl = st.ceiling.find((c) => c.id === id);
+      if (!cl || trace.length < 2 || trace.some((p) => !sontFinis(p.x, p.z))) return;
+      pushHistory(`retracerRuban:${id}`);
+      set({
+        ceiling: st.ceiling.map((c) =>
+          c.id === id
+            ? {
+                ...c,
+                at: { ...trace[0] },
+                trace: trace.map((p) => ({ ...p })),
+                ...(retrait !== undefined ? { retrait } : {}),
+              }
+            : c,
+        ),
+        dirty: true,
+      });
     },
 
     /**

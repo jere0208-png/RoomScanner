@@ -212,6 +212,11 @@ export interface CeilingFixture {
   trace?: Pt[];
   /** Le ruban fait le tour : il revient à son départ. */
   ferme?: boolean;
+  /**
+   * SON RETRAIT AU NU DES MURS (m), pour un ruban posé en corniche ou au
+   * bord d'un caisson : il se retouche (revue « Yasmine »).
+   */
+  retrait?: number;
 }
 
 /**

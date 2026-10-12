@@ -22,6 +22,7 @@ import { SOLAIRES } from '../ui/solaires';
 import { DEBORD_COTE, DEBORD_DOIGT } from '../ui/bandeau';
 import type { PromptData } from './Sheet';
 import type { Palette } from '../theme';
+import { lireCentimetres, verifierCentimetres } from '../ui/saisieCote';
 
 export function CeilingBar({
   fixture,
@@ -34,6 +35,7 @@ export function CeilingBar({
   onPrompt,
   onLink,
   onPonter,
+  onRetrait,
   onRemove,
   onDone,
 }: {
@@ -71,6 +73,13 @@ export function CeilingBar({
    * absent, et cette barre le dit déjà pour le bouton de commande.
    */
   onPonter?: { lie: boolean; faire: () => void };
+  /**
+   * UN RUBAN FERMÉ SE RÈGLE À SON RETRAIT, pas à ses distances aux murs —
+   * revue « Yasmine ». Absent : un ruban ouvert n'a pas de champ du tout ;
+   * déplacer son premier coin faisait glisser tout le tracé hors de la
+   * pièce.
+   */
+  onRetrait?: { actuel: number; changer: (metres: number) => void };
   onRemove: () => void;
   onDone: () => void;
 }) {
@@ -106,10 +115,10 @@ export function CeilingBar({
            * qu'on donne ».
            */
           const poser = (k: keyof typeof AXES, valeurCm: string) => {
-            const v = parseFloat(valeurCm.replace(',', '.'));
+            const v = lireCentimetres(valeurCm, { zero: true });
             const actuel = ecart(k);
-            if (!isFinite(v) || v < 0 || actuel === null) return;
-            const d = actuel - v / 100;
+            if (v === null || actuel === null) return;
+            const d = actuel - v;
             onMove({
               x: fixture.at.x + AXES[k].x * d,
               z: fixture.at.z + AXES[k].z * d,
@@ -200,21 +209,52 @@ export function CeilingBar({
                       champ prend maintenant le mur le plus proche sur son
                       axe — celui contre lequel on pose le mètre.
                     */}
-                    {(() => {
-                      const g = ecart('gauche');
-                      const d = ecart('droite');
-                      return d !== null && (g === null || d < g - 1e-6)
-                        ? champ('droite', 'Distance au mur de droite')
-                        : champ('gauche', 'Distance au mur de gauche');
-                    })()}
-                    {(() => {
-                      const h = ecart('haut');
-                      const b = ecart('bas');
-                      return b !== null && (h === null || b < h - 1e-6)
-                        ? champ('bas', 'Distance au mur du bas')
-                        : champ('haut', 'Distance au mur du haut');
-                    })()}
-                    <Text style={styles.unit}>cm</Text>
+                    {fixture.trace ? (
+                      onRetrait ? (
+                        <>
+                          <TouchableOpacity
+                            style={styles.clChamp}
+                            accessibilityLabel="Retrait du ruban"
+                            hitSlop={DEBORD_COTE}
+                            onPress={() =>
+                              onPrompt({
+                                title: 'Retrait du ruban',
+                                subtitle: 'Sa distance au nu des murs, en centimètres. Tout le tracé suit.',
+                                value: String(Math.round(onRetrait.actuel * 100)),
+                                unit: 'cm',
+                                numeric: true,
+                                okLabel: 'Retracer',
+                                verifier: verifierCentimetres('Retrait', 0, 3, { zero: true, seuilMetres: 1 }),
+                                onSubmit: (t) => {
+                                  const v = lireCentimetres(t, { zero: true, seuilMetres: 1 });
+                                  if (v !== null) onRetrait.changer(v);
+                                },
+                              })
+                            }>
+                            <Text style={styles.clValeur}>{`Retrait ${Math.round(onRetrait.actuel * 100)}`}</Text>
+                          </TouchableOpacity>
+                          <Text style={styles.unit}>cm</Text>
+                        </>
+                      ) : null
+                    ) : (
+                      <>
+                        {(() => {
+                          const g = ecart('gauche');
+                          const d = ecart('droite');
+                          return d !== null && (g === null || d < g - 1e-6)
+                            ? champ('droite', 'Distance au mur de droite')
+                            : champ('gauche', 'Distance au mur de gauche');
+                        })()}
+                        {(() => {
+                          const h = ecart('haut');
+                          const b = ecart('bas');
+                          return b !== null && (h === null || b < h - 1e-6)
+                            ? champ('bas', 'Distance au mur du bas')
+                            : champ('haut', 'Distance au mur du haut');
+                        })()}
+                        <Text style={styles.unit}>cm</Text>
+                      </>
+                    )}
                   </View>
               </View>
               </View>

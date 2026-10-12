@@ -14285,6 +14285,52 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Tournée n°4 : les cotes tapées, la coche par plan, le ruban retouchable
+
+Huit testeurs (quatre gratuits, quatre Pro). Ce lot répare ce qui faussait un
+plan sans un mot.
+
+**Une seule lecture des cotes** (`src/ui/saisieCote.ts`). Chaque champ
+lisait sa cote avec `parseFloat`, qui s'arrête à la première lettre :
+- « 3m40 » faisait 3,00 m, « 2m15 » une porte de 20 cm (Bernard) ;
+- « 410 » dans « Cotes » faisait un séjour de 311 m² (Inès, Hugo) ;
+- « 12abc » ou « 3..6 » passaient sans rien dire.
+
+Désormais :
+- « 3,40 », « 3m40 », « 3 m 40 » et « 340 cm » se lisent tous 3,40 m ;
+- ce qui ne se lit pas est refusé, avec un message.
+
+**La feuille de saisie vérifie avant de fermer** (`PromptData.verifier`).
+Cela vaut pour les cotes de pièce, la longueur et la hauteur d'un mur, les
+menuiseries, le bas de fenêtre, le décalage d'un mur et le retrait d'un
+ruban.
+- Une cote fausse garde la feuille ouverte et se dit sous le champ.
+- La lecture probable se pose en un appui : « Utiliser 4,10 ».
+- Une cote hors du commun (« 19 » pour une pièce) passe à la seconde
+  validation.
+
+**« Ajouter une pièce » sur mesure** suit les mêmes règles. La feuille
+repart à vide à chaque ouverture : elle gardait la profondeur de la pièce
+d'avant.
+
+**Les pièces décochées valent pour leur plan** (`cleHorsTravaux`). Décocher
+la chambre de la variante B la retirait aussi des achats de la variante A,
+car `room-1` existe dans tous les plans (Fatou).
+
+**Le ruban LED** (Bernard, Mehdi, Yasmine) :
+- « Sous les meubles hauts » court de leur premier bord au dernier, sous
+  leur face avant (`rubanSousLesMeubles`), même touché au milieu de la
+  pièce. « Le long du mur le plus proche » reste pour une tête de lit ou
+  une boîte à rideaux.
+- Une corniche qui mange la pièce ne se pose plus : retourné dans les deux
+  sens, le tracé gardait son aire. « 2,5 » y vaut 2,5 cm.
+- Un ruban fermé se règle à son **retrait**, qui retrace tout le tracé sous
+  un seul « Annuler » (`retracerRuban`).
+- « Centrer », les distances aux murs et « Seul » disparaissent du bandeau
+  d'un ruban : ils le faisaient sortir de la pièce.
+
+Banc : `saisiedescotes`. `travaux` vérifie aussi la coche par plan.
+
 ## Le mot dans le rond, partout
 
 Relevé du patron : « écris le VP dans la légende aussi… un rond peut être

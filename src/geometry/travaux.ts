@@ -247,10 +247,26 @@ export function travauxDesPieces(
  * La feuille, le dossier PDF et le tableur passent tous par ici (correctif
  * de l'audit : les pièces décochées comptaient quand même au dossier).
  */
-export function piecesRetenues<T extends { roomId: string }>(pieces: T[], horsTravaux: readonly string[]): T[] {
+export function piecesRetenues<T extends { roomId: string }>(
+  pieces: T[],
+  horsTravaux: readonly string[],
+  /** Le plan ouvert (`currentSaveId`) : la coche est la sienne. */
+  plan?: string | null,
+): T[] {
   if (horsTravaux.length === 0) return pieces;
   const hors = new Set(horsTravaux);
-  return pieces.filter((p) => !hors.has(p.roomId));
+  return pieces.filter((p) => !hors.has(cleHorsTravaux(plan, p.roomId)));
+}
+
+/**
+ * LA COCHE D'UNE PIÈCE, RANGÉE AVEC SON PLAN — revue « Fatou » : décocher la
+ * chambre de la variante B la retirait aussi des achats de la variante A
+ * (17 paquets de sol devenaient 11). La liste se repérait au seul numéro de
+ * la pièce, qu'une copie garde et que « Redétecter » refait : `room-1` est
+ * dans tous les plans. Elle se repère maintenant au plan ET à la pièce.
+ */
+export function cleHorsTravaux(plan: string | null | undefined, roomId: string): string {
+  return `${plan ?? 'neuf'}|${roomId}`;
 }
 
 export interface Achats {

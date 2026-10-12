@@ -450,7 +450,7 @@ const styles = getStyles(c);
     [multi, parNiveau, piecesTravaux],
   );
   const retenues = useMemo(
-    () => piecesRetenues(piecesDuDossier, reglages.horsTravaux),
+    () => piecesRetenues(piecesDuDossier, reglages.horsTravaux, useScanStore.getState().currentSaveId),
     [piecesDuDossier, reglages.horsTravaux],
   );
   const achatsDuDossier = (oui: boolean) =>

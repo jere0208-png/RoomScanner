@@ -74,6 +74,18 @@ export function rubanPeripherique(contour: Pt[], retrait: number): Pt[] | null {
   }
   // Le retrait a retourné le contour (pièce trop petite) : rien à poser.
   if (Math.sign(aireSignee(out)) !== Math.sign(aire) || Math.abs(aireSignee(out)) < 0.01) return null;
+  /*
+    RETOURNÉ DANS LES DEUX SENS, IL GARDE SON AIRE — revue « Bernard » : une
+    corniche à 2,50 m dans une cuisine de 3,40 × 2,80 se retournait en
+    largeur ET en profondeur ; l'aire gardait son signe, et un ruban fermé
+    de 7,60 m se posait au milieu de la pièce (23,60 m hors d'elle à
+    4,50 m). Chaque côté reculé doit garder le sens du sien.
+  */
+  for (let i = 0; i < n; i++) {
+    const a = out[i];
+    const b = out[(i + 1) % n];
+    if ((b.x - a.x) * cotes[i].u.x + (b.z - a.z) * cotes[i].u.z <= 1e-6) return null;
+  }
   return out;
 }
 
@@ -112,6 +124,107 @@ export function rubanLeLongDuMur(contour: Pt[], at: Pt, retrait: number): Pt[] |
     { x: a.x + dedans.x * retrait, z: a.z + dedans.z * retrait },
     { x: b.x + dedans.x * retrait, z: b.z + dedans.z * retrait },
   ];
+}
+
+/** Un meuble vu d'en haut : son centre, ses cotes, son orientation. */
+export interface MeubleVuDeHaut {
+  cx: number;
+  cz: number;
+  width: number;
+  depth: number;
+  yaw: number;
+}
+
+/**
+ * SOUS LES MEUBLES HAUTS — revues « Bernard » et « Mehdi ». « Le long du
+ * mur touché » prenait le mur le plus proche du doigt (celui de la fenêtre,
+ * pour un appui au milieu de la cuisine) et courait tout le mur : 3,40 m
+ * pour 2,00 m de meubles, 6,00 m pour 3,00 m, sans moyen de raccourcir.
+ *
+ * Ici le ruban court SOUS les meubles hauts : sur le mur qui les porte (le
+ * plus proche du doigt, s'ils sont sur plusieurs murs), de leur premier
+ * bord à leur dernier, sous leur face avant. Une rangée coupée par une
+ * fenêtre donne la partie la plus proche du doigt. `null` sans meuble haut
+ * contre un mur.
+ */
+export function rubanSousLesMeubles(
+  contour: Pt[],
+  meubles: readonly MeubleVuDeHaut[],
+  at: Pt,
+): Pt[] | null {
+  const pts = nettoye(contour);
+  const n = pts.length;
+  if (n < 3 || meubles.length === 0) return null;
+  const sens = aireSignee(pts) > 0 ? 1 : -1;
+  // Pour chaque côté, les meubles qui s'y adossent : leur étendue le long du mur.
+  type Rangee = { i: number; de: number; a: number; profondeur: number };
+  const rangees: Rangee[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % n];
+    const L = Math.hypot(b.x - a.x, b.z - a.z);
+    if (L < 0.2) continue;
+    const u = { x: (b.x - a.x) / L, z: (b.z - a.z) / L };
+    const dedans = { x: -u.z * sens, z: u.x * sens };
+    for (const m of meubles) {
+      const c = Math.cos(m.yaw);
+      const s = Math.sin(m.yaw);
+      const coins = [
+        [-1, -1],
+        [1, -1],
+        [1, 1],
+        [-1, 1],
+      ].map(([sx, sz]) => {
+        const lx = (sx * m.width) / 2;
+        const lz = (sz * m.depth) / 2;
+        return { x: m.cx + lx * c - lz * s, z: m.cz + lx * s + lz * c };
+      });
+      const le = coins.map((q) => (q.x - a.x) * u.x + (q.z - a.z) * u.z);
+      const loin = coins.map((q) => (q.x - a.x) * dedans.x + (q.z - a.z) * dedans.z);
+      const pres = Math.min(...loin);
+      // Adossé : son dos à moins de 15 cm du nu, et devant le mur, pas à côté.
+      if (pres > 0.15 || Math.max(...loin) <= 0) continue;
+      const de = Math.max(0, Math.min(...le));
+      const fin = Math.min(L, Math.max(...le));
+      if (fin - de < 0.1) continue;
+      rangees.push({ i, de, a: fin, profondeur: Math.max(...loin) });
+    }
+  }
+  if (rangees.length === 0) return null;
+  // Les meubles d'un même mur se suivent : une rangée tant que l'écart reste sous 30 cm.
+  const parMur = new Map<number, Rangee[]>();
+  for (const r of rangees) parMur.set(r.i, [...(parMur.get(r.i) ?? []), r]);
+  const suites: Rangee[] = [];
+  for (const [i, rs] of parMur) {
+    rs.sort((x, y) => x.de - y.de);
+    let cour: Rangee | null = null;
+    for (const r of rs) {
+      if (cour && r.de <= cour.a + 0.3) {
+        cour.a = Math.max(cour.a, r.a);
+        cour.profondeur = Math.max(cour.profondeur, r.profondeur);
+      } else {
+        cour = { i, de: r.de, a: r.a, profondeur: r.profondeur };
+        suites.push(cour);
+      }
+    }
+  }
+  // La rangée la plus proche du doigt.
+  const point = (r: Rangee, t: number, d: number) => {
+    const a = pts[r.i];
+    const b = pts[(r.i + 1) % n];
+    const L = Math.hypot(b.x - a.x, b.z - a.z);
+    const u = { x: (b.x - a.x) / L, z: (b.z - a.z) / L };
+    const dedans = { x: -u.z * sens, z: u.x * sens };
+    return { x: a.x + u.x * t + dedans.x * d, z: a.z + u.z * t + dedans.z * d };
+  };
+  const distance = (r: Rangee) => {
+    const p = point(r, (r.de + r.a) / 2, r.profondeur / 2);
+    return Math.hypot(p.x - at.x, p.z - at.z);
+  };
+  const choisie = suites.reduce((m, r) => (distance(r) < distance(m) ? r : m));
+  // Sous la face avant, en retrait de 5 cm : là où se pose le profilé.
+  const d = Math.max(0.05, choisie.profondeur - 0.05);
+  return [point(choisie, choisie.de, d), point(choisie, choisie.a, d)];
 }
 
 /** La longueur d'un ruban, en mètres — fermé, il revient à son départ. */

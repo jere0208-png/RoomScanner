@@ -41,6 +41,7 @@ import {
   largeursCourantes,
   type Nature,
 } from '../ui/cotesCourantes';
+import { lireCentimetres } from '../ui/saisieCote';
 
 /** « 83,5 » → 0.835 m ; rien de lisible → null. */
 /*
@@ -49,20 +50,15 @@ import {
   2 cm, sans un mot. Un nombre à virgule sous 5 n'est pas une cote en
   centimètres dans un logement : c'est une cote en mètres.
 */
-const enMetresDeTrop = (t: string, v: number) => v > 0 && v < 5 && /[.,]/.test(t);
-
-export const lireCm = (t: string): number | null => {
-  const v = parseFloat(t.replace(',', '.').replace(/\s/g, ''));
-  if (!isFinite(v) || v <= 0) return null;
-  return enMetresDeTrop(t, v) ? v : v / 100;
-};
+/*
+  « 2m15 », « 1m20 » — revue « Bernard » : la lecture s'arrêtait au « m »,
+  une porte de 2m15 montait à 20 cm. Une seule lecture, celle du chantier :
+  voir `src/ui/saisieCote`.
+*/
+export const lireCm = (t: string): number | null => lireCentimetres(t);
 
 /** Comme `lireCm`, mais zéro est une cote : « collé au mur ». */
-export const lireCote = (t: string): number | null => {
-  const v = parseFloat(t.replace(',', '.').replace(/\s/g, ''));
-  if (!isFinite(v) || v < 0) return null;
-  return enMetresDeTrop(t, v) ? v : v / 100;
-};
+export const lireCote = (t: string): number | null => lireCentimetres(t, { zero: true });
 
 /** 0.835 m → « 83,5 ». */
 export const ecrireCm = (m: number): string =>

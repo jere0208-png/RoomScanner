@@ -20,6 +20,7 @@ import { Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-nativ
 import { useTheme } from '../../theme';
 import { RoomChoice } from '../../components/RoomChoice';
 import { getStyles } from './styles';
+import { BORNES_PIECE, fauteDeMetres, lireMetres, type FauteDeCote } from '../../ui/saisieCote';
 
 /** Les gabarits proposés : des pièces qu'on rencontre, aux cotes usuelles. */
 const MODELES = [
@@ -33,28 +34,13 @@ const MODELES = [
   { nom: 'Buanderie', largeur: 2.2, profondeur: 1.8 },
 ];
 
-const enMetres = (v: number) => `${v.toFixed(2).replace('.', ',')} m`;
-
 /**
- * Ce qui ne va pas dans une cote tapée, dit en clair — ou rien.
- *
- * LES CENTIMÈTRES SE RECONNAISSENT : « 600 » pour une pièce, c'est six
- * mètres tapés en centimètres, pas une pièce de six cents mètres (la
- * saisie d'avant en faisait une de 3 600 m²). On propose la bonne lecture,
- * on ne la fait pas à la place de celui qui tape.
+ * Ce qui ne va pas dans une cote de pièce tapée, dit en clair — ou rien.
+ * Voir `fauteDeMetres` : « 600 » propose 6,00 m, « 19 » (une virgule
+ * oubliée) se fait confirmer, « 3m40 » se lit 3,40 m, « 12abc » se refuse.
  */
 export function fauteDeCote(texte: string, quoi: string): string | null {
-  const v = parseFloat(texte.replace(',', '.').trim());
-  if (!texte.trim() || !Number.isFinite(v) || v <= 0) {
-    return `${quoi} : tapez une cote en mètres, par exemple 3,60.`;
-  }
-  if (v >= 30) {
-    return v / 100 < 30
-      ? `${quoi} en centimètres ? Vouliez-vous dire ${enMetres(v / 100)} ? Les cotes se tapent en mètres.`
-      : `${quoi} : ${enMetres(v)}, c'est plus qu'un bâtiment.`;
-  }
-  if (v < 0.6) return `${quoi} : une pièce fait au moins 0,60 m de côté.`;
-  return null;
+  return fauteDeMetres(texte, quoi, BORNES_PIECE)?.message ?? null;
 }
 
 export function AddRoomSheet({
@@ -83,27 +69,36 @@ export function AddRoomSheet({
     sans lui, la pièce reste sans nom, comme avant.
   */
   const [nom, setNom] = useState('');
-  const [faute, setFaute] = useState<string | null>(null);
-  // Chaque ouverture repart des gabarits.
+  const [faute, setFaute] = useState<(FauteDeCote & { champ: 'l' | 'p' }) | null>(null);
+  // Ce qu'on a déjà signalé comme hors du commun : le revalider le garde.
+  const [douteDit, setDouteDit] = useState<string | null>(null);
+  /*
+    CHAQUE OUVERTURE REPART À VIDE — revue « Inès » : seul le nom se
+    vidait ; en ne tapant que la largeur de la pièce suivante, elle gardait
+    la profondeur de la précédente (2 × 5,20 au lieu de 2 × 1,90).
+  */
   useEffect(() => {
     if (visible) return;
     setSurMesure(false);
     setFaute(null);
+    setDouteDit(null);
     setNom('');
+    setLargeur('');
+    setProfondeur('');
   }, [visible]);
 
-  const ajouter = () => {
-    const f = fauteDeCote(largeur, 'Largeur') ?? fauteDeCote(profondeur, 'Profondeur');
-    if (f) {
+  const ajouter = (l: string = largeur, pr: string = profondeur) => {
+    const fl = fauteDeMetres(l, 'Largeur', BORNES_PIECE);
+    const fp = fauteDeMetres(pr, 'Profondeur', BORNES_PIECE);
+    const f = fl ? { ...fl, champ: 'l' as const } : fp ? { ...fp, champ: 'p' as const } : null;
+    const cle = `${l}×${pr}`;
+    if (f && !(f.douteuse && douteDit === cle)) {
       setFaute(f);
+      setDouteDit(f.douteuse ? cle : null);
       return;
     }
     setFaute(null);
-    onChoose(
-      parseFloat(largeur.replace(',', '.')),
-      parseFloat(profondeur.replace(',', '.')),
-      nom.trim(),
-    );
+    onChoose(lireMetres(l)!, lireMetres(pr)!, nom.trim());
   };
 
   const sousTitre = surMesure
@@ -161,7 +156,7 @@ export function AddRoomSheet({
           {surMesure ? (
             <View>
               {champ('Largeur', largeur, setLargeur)}
-              {champ('Profondeur', profondeur, setProfondeur, ajouter)}
+              {champ('Profondeur', profondeur, setProfondeur, () => ajouter())}
               <View style={{ marginTop: 10 }}>
                 <Text style={styles.modalSubtitle}>Nom</Text>
                 <TextInput
@@ -173,14 +168,28 @@ export function AddRoomSheet({
                   placeholderTextColor={c.inkFaint}
                   autoCapitalize="sentences"
                   returnKeyType="done"
-                  onSubmitEditing={ajouter}
+                  onSubmitEditing={() => ajouter()}
                 />
               </View>
               {faute && (
                 <Text style={{ color: c.danger, fontSize: 13, marginTop: 10 }} accessibilityLiveRegion="polite">
-                  {faute}
+                  {faute.message}
                 </Text>
               )}
+              {faute?.proposition ? (
+                <Pressable
+                  style={[styles.modalGhost, { marginTop: 8, alignSelf: 'flex-start' }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Utiliser ${faute.proposition} m`}
+                  onPress={() => {
+                    const v = faute.proposition!;
+                    if (faute.champ === 'l') setLargeur(v);
+                    else setProfondeur(v);
+                    ajouter(faute.champ === 'l' ? v : largeur, faute.champ === 'p' ? v : profondeur);
+                  }}>
+                  <Text style={styles.modalGhostText}>{`Utiliser ${faute.proposition} m`}</Text>
+                </Pressable>
+              ) : null}
               <View style={styles.modalActions}>
                 <Pressable
                   style={styles.modalGhost}
@@ -196,7 +205,7 @@ export function AddRoomSheet({
                   style={styles.modalPrimary}
                   accessibilityRole="button"
                   accessibilityLabel="Ajouter la pièce"
-                  onPress={ajouter}>
+                  onPress={() => ajouter()}>
                   <Text style={styles.modalPrimaryText}>Ajouter</Text>
                 </Pressable>
               </View>
