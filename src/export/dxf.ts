@@ -389,7 +389,8 @@ export function buildDxf(plan: PlanPourDxf): string {
   /* La cote de chaque mur, sur son calque : elle se relit, elle ne se calcule pas. */
   for (const w of plan.walls) {
     // La cote du plan : au nu pour un mur dessiné (revue « Léa »).
-    const L = longueurCotee(plan.walls, w);
+    // Avec ses pièces : la face d'un pan coupé (revue « Claire »).
+    const L = longueurCotee(plan.walls, w, decoupage);
     if (L < 0.2) continue;
     out += texte(
       CALQUE.cotes,

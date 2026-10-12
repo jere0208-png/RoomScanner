@@ -710,6 +710,36 @@ function hauteurDuNiveau(walls: WallSeg[], n: number): number {
 }
 
 /**
+ * COUPER UN NOM SANS CASSER UN CARACTÈRE — revue « Hugo » : la coupe à 40
+ * laissait la moitié d'un émoji (`\ud83d` orphelin).
+ */
+export function couperLeNom(nom: string, max: number): string {
+  const lettres = Array.from(nom);
+  return lettres.length <= max ? nom : lettres.slice(0, max).join('').trimEnd();
+}
+
+/**
+ * UN NOM DE PIÈCE QUE PERSONNE NE PORTE ENCORE — revues « Hugo » et
+ * « Inès ». On comptait les homonymes au lieu de chercher un rang libre
+ * (« Chambre, Bureau, Chambre 3, Chambre 3 », une « Chambre 4 » sans 2 ni
+ * 3), la coupe à 40 venait après le numéro (deux noms longs identiques),
+ * et deux gabarits « Salle de bains » le restaient. Le premier rang libre,
+ * et le numéro après la coupe.
+ */
+export function nomDePieceLibre(nom: string, pris: string[], max = 40): string {
+  const propre = couperLeNom(nom.trim(), max);
+  if (!propre) return '';
+  const deja = new Set(pris.map((x) => x.trim().toLowerCase()));
+  if (!deja.has(propre.toLowerCase())) return propre;
+  const base = propre.replace(/ \d+$/, '');
+  for (let k = 2; ; k++) {
+    const suffixe = ` ${k}`;
+    const essai = `${couperLeNom(base, max - suffixe.length)}${suffixe}`;
+    if (!deja.has(essai.toLowerCase())) return essai;
+  }
+}
+
+/**
  * Un nom de plan que personne ne porte encore : « Version A », sinon
  * « Version A — version 2 », « — version 3 »…
  */
@@ -3047,6 +3077,29 @@ export const useScanStore = create<ScanState>((set, get) => {
     const liens = shapes.map((s) =>
       olds.find((p) => pointInPolygon(p.labelAt, s.outline)),
     );
+    /*
+      LA DÉCO SURVIT AU RECALCUL — revue « Yasmine » : « Redétecter » et
+      « Redresser » ne reportaient que le nom et le type. Peinture Lin, sol
+      Chêne, mur d'accent terracotta : tout repartait au blanc, et seul un
+      « Annuler » remarqué à temps le rendait. Un mur d'accent se retrouve
+      par son identifiant, ou à défaut par sa place (le graphe recousu a pu
+      le renommer).
+    */
+    const accentsRepris = (accents: Record<string, string>, siens: string[]) => {
+      const out: Record<string, string> = {};
+      for (const [id, cle] of Object.entries(accents)) {
+        if (siens.includes(id)) {
+          out[id] = cle;
+          continue;
+        }
+        const vieux = jeu.walls.find((w) => w.id === id);
+        if (!vieux) continue;
+        const m = { x: (vieux.a.x + vieux.b.x) / 2, z: (vieux.a.z + vieux.b.z) / 2 };
+        const neuf = walls.find((w) => siens.includes(w.id) && pointOnSeg(m, w.a, w.b).dist < 0.05);
+        if (neuf) out[neuf.id] = cle;
+      }
+      return Object.keys(out).length > 0 ? out : undefined;
+    };
     const rooms: RoomEntry[] = shapes.map((s, i) => {
       const previous = liens[i];
       const kept = previous
@@ -3054,6 +3107,9 @@ export const useScanStore = create<ScanState>((set, get) => {
         : undefined;
       const declaree =
         kept?.declaree || declarees.some((p) => pointInPolygon(p, s.outline));
+      const accents = kept?.accents ? accentsRepris(kept.accents, s.wallIds) : undefined;
+      // Le relevé du plafond ne vaut que pour la même pièce, pas pour ses moitiés.
+      const seule = !!previous && liens.filter((x) => x === previous).length === 1;
       return {
         id: idPiece(i),
         name: kept?.name || auto[i],
@@ -3064,6 +3120,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         floor,
         ...(n === NIVEAU_RDC ? {} : { niveau: n }),
         ...(declaree ? { declaree: true } : {}),
+        ...(kept?.peinture ? { peinture: kept.peinture } : {}),
+        ...(kept?.sol ? { sol: kept.sol } : {}),
+        ...(accents ? { accents } : {}),
+        ...(seule && kept?.releve ? { releve: kept.releve } : {}),
       };
     });
     // Deux pièces peuvent hériter du même nom : on renumérote les doublons.
@@ -3861,7 +3921,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       set({
         rooms: get().rooms.map((r) =>
           r.id === roomId
-            ? { ...r, name: name.trim().slice(0, NOM_PIECE_MAX) }
+            ? { ...r, name: couperLeNom(name.trim(), NOM_PIECE_MAX) }
             : r,
         ),
         dirty: true,
@@ -5246,7 +5306,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           ...st.rooms,
           {
             id: roomId,
-            name: (nom ?? '').slice(0, NOM_PIECE_MAX),
+            name: nomDePieceLibre(nom ?? '', st.rooms.map((r) => r.name), NOM_PIECE_MAX),
             floor: null,
             niveau: st.niveauCourant,
             wallIds,
@@ -5259,7 +5319,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     addRoomBox: (largeur, profondeur, nom, contreWallId, opts) => {
       const st = get();
-      nom = nom?.slice(0, NOM_PIECE_MAX);
+      nom = nomDePieceLibre(nom ?? '', st.rooms.map((r) => r.name), NOM_PIECE_MAX);
       pushHistory('addRoom');
       const h = hauteurDuNiveau(st.walls, st.niveauCourant);
       const cle = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -5864,7 +5924,15 @@ export const useScanStore = create<ScanState>((set, get) => {
       const copie: SavedScan = {
         ...source,
         id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
-        name: `${source.name} (copie)`,
+        /*
+          UN NOM À ELLE — revues « Fatou » et « Hugo » : deux copies
+          s'appelaient « Plan (copie) », la copie d'une copie
+          « Plan (copie) (copie) ».
+        */
+        name: nomDeVersion(
+          `${source.name.replace(/ \(copie\)( — version \d+)?$/, '')} (copie)`,
+          st.saves.map((x) => x.name),
+        ),
         createdAt: now,
         updatedAt: now,
         // Copier, c'est vouloir garder : la copie est enregistrée, et
@@ -9735,7 +9803,11 @@ export const useScanStore = create<ScanState>((set, get) => {
         /* Un plan qui s'ouvre repose ses calques. */
         ...CALQUES_DE_BASE,
         screen: 'result',
-        scanName: `Plan du ${new Date().toLocaleDateString('fr-FR')}`,
+        // Deux plans du même jour ne portent pas le même nom (revue « Inès »).
+        scanName: nomDeVersion(
+          `Plan du ${new Date().toLocaleDateString('fr-FR')}`,
+          get().saves.map((x) => x.name),
+        ),
         resultOrigin: 'scan',
         niveauCourant: NIVEAU_RDC,
       });

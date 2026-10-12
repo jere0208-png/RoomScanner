@@ -22,7 +22,7 @@ import {
   planCircuits,
   planDifferentials,
   roomInputsOf,
-  roomUse,
+  priseDeCuisine,
   type Circuit,
   type Differential,
   circuitsDuDifferentiel,
@@ -231,7 +231,7 @@ export function circuitsDuLogement(
   return planCircuits(
     fixtures,
     (f) => pieceDe(f)?.name ?? '',
-    (f) => roomUse(pieceDe(f)?.name ?? '', pieceDe(f)?.kind) === 'cuisine',
+    (f) => priseDeCuisine(f, pieceDe(f)),
     (f) => pieceDe(f)?.id,
     ceiling,
   );

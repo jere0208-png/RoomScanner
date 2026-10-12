@@ -155,6 +155,8 @@ import { checkPlan } from '../geometry/diagnostics';
 import {
   checkElectrical,
   planCircuits,
+  estCuisine,
+  priseDeCuisine,
   roomUse,
   worktopsOnWall,
   type Worktop,
@@ -181,7 +183,7 @@ import {
   pieceDuCote,
 } from '../geometry/electrical';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { duReleve, nomDeVersion, useScanStore } from '../store/scanStore';
+import { duReleve, nomDePieceLibre, nomDeVersion, useScanStore } from '../store/scanStore';
 import { useAccountStore } from '../store/accountStore';
 import { demarrerComplement, demarrerEtage, lancerUnScan } from '../native/useRoomScan';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
@@ -360,6 +362,9 @@ export function ResultScreen() {
   const toutLAppareillage = useScanStore((s) => s.fixtures);
   const addFixture = useScanStore((s) => s.addFixture);
   const toutLePlafond = useScanStore((s) => s.ceiling);
+  // Ce qui vaut pour le LOGEMENT se cherche à tous les niveaux (revue « Mehdi »).
+  const tableauAuLogement = useScanStore((s) => s.fixtures.some((f) => f.kind === 'tableau'));
+  const daafAuLogement = useScanStore((s) => s.ceiling.some((c) => c.kind === 'daaf'));
   /*
     L'ÉCRAN NE MONTRE QU'UN ÉTAGE.
 
@@ -2270,7 +2275,7 @@ export function ResultScreen() {
     const m = new Map<string, { x: (f: Fixture) => number; plans: Worktop[] }>();
     for (const w of walls) {
       const piece = rooms.find((r) => r.id === roomOf(w));
-      const cuisine = roomUse(piece?.name ?? '', piece?.kind) === 'cuisine';
+      const cuisine = estCuisine(piece?.name ?? '', piece?.kind);
       for (const side of [1, -1] as const) {
         const face = wallFace(w, quads.get(w.id), side);
         const plans = worktopsOnWall(face, objects, cuisine, solDesMurs(walls));
@@ -2410,7 +2415,7 @@ export function ResultScreen() {
     return planCircuits(
       fige.fixtures,
       (f) => pieceDe(f)?.name ?? '',
-      (f) => roomUse(pieceDe(f)?.name ?? '', pieceDe(f)?.kind) === 'cuisine',
+      (f) => priseDeCuisine(f, pieceDe(f)),
       (f) => pieceDe(f)?.id,
       fige.ceiling,
     );
@@ -2481,6 +2486,8 @@ export function ResultScreen() {
             // La géométrie ouvre les constats de pose : face extérieure d'un
             // mur, appareil dans le vide d'une baie.
             { walls: fige.walls, openings: fige.openings },
+            // Le tableau, le détecteur de fumée : ceux du logement entier.
+            { tableau: tableauAuLogement, daaf: daafAuLogement },
           ),
     [
       modeElec,
@@ -2493,6 +2500,8 @@ export function ResultScreen() {
       fige.ceiling,
       fige.walls,
       fige.openings,
+      tableauAuLogement,
+      daafAuLogement,
     ],
   );
   /*
@@ -2867,12 +2876,12 @@ export function ResultScreen() {
     if (!targetRoom) return;
     const clean = name.trim();
     if (clean) {
-      const same = rooms.filter(
-        (r) =>
-          r.id !== targetRoom.id &&
-          (r.name === clean || r.name.startsWith(`${clean} `)),
-      ).length;
-      setRoomName(targetRoom.id, same === 0 ? clean : `${clean} ${same + 1}`);
+      // Le premier rang libre, à tous les niveaux (revue « Hugo »).
+      const autres = useScanStore
+        .getState()
+        .rooms.filter((r) => r.id !== targetRoom.id)
+        .map((r) => r.name);
+      setRoomName(targetRoom.id, nomDePieceLibre(clean, autres));
     } else {
       setRoomName(targetRoom.id, '');
     }
@@ -3526,6 +3535,7 @@ export function ResultScreen() {
           wallWorktops,
           cl,
           { walls, openings },
+          { tableau: tableauAuLogement, daaf: daafAuLogement },
         ),
     );
     if (pose.conforme && suite.poses.length === 0) {

@@ -256,8 +256,12 @@ const styles = getStyles(c);
   const plafondStocke = useScanStore((s) => s.ceiling);
   const toutLePlafond = modeElec ? plafondStocke : AUCUN_PLAFOND;
   const toutesLesNotes = useScanStore((s) => s.notes);
-  /** La feuille d'implantation du plafond, avec ses liens de commande. */
-  const [plafond, setPlafond] = useState(false);
+  /**
+   * La feuille d'implantation du plafond, avec ses liens de commande.
+   * Cochée d'office dès qu'un ruban LED est posé — revue « Claire » : le
+   * dossier sortait sans un mètre de la lumière qu'elle avait dessinée.
+   */
+  const [plafond, setPlafond] = useState(() => toutLePlafond.some((c) => c.kind === 'led'));
   const toutesLesPhotos = useScanStore((s) => s.photos);
   const toutesLesMesures = useScanStore((s) => s.mesures);
   /*
@@ -670,6 +674,7 @@ const styles = getStyles(c);
               return {
                 nom: nomDuNiveau(x.nv),
                 courant,
+                ...(plafond && x.ceiling.length > 0 ? { ceiling: x.ceiling } : {}),
                 scan: {
                   walls: x.walls,
                   openings: x.openings,

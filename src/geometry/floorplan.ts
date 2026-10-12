@@ -3257,7 +3257,7 @@ export interface SaisieMurNeuf {
  * Le trait du plan est l'axe ; la pièce, elle, commence au NU du mur
  * voisin. Une cote prise au mètre dans un angle part de ce nu.
  */
-function retraitDuCoin(walls: WallSeg[], hote: WallSeg, coin: Pt): number {
+export function retraitDuCoin(walls: WallSeg[], hote: WallSeg, coin: Pt): number {
   /*
     LE MUR QUI FAIT LE COIN, PAS LE PREMIER VENU — revue « Hugo » : sa
     fenêtre cotée « à 80 cm de la cloison » tombait à 83,5. Au bout du mur,

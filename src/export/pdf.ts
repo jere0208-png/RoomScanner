@@ -114,7 +114,16 @@ import {
 } from '../geometry/ceiling';
 import { planFrameAngle } from '../geometry/floorplan';
 import { assignOpenings } from '../geometry/scene3d';
-import { epaisseurDe, estDessine, etendueDeLaPiece, longueurCotee, placeDuDetecteur, pointOnSeg, wallRuns } from '../geometry/floorplan';
+import {
+  epaisseurDe,
+  estDessine,
+  etendueDeLaPiece,
+  longueurCotee,
+  placeDuDetecteur,
+  pointOnSeg,
+  retraitDuCoin,
+  wallRuns,
+} from '../geometry/floorplan';
 import {
   ajusterBlocs,
   masquesDeScene,
@@ -283,7 +292,13 @@ export interface PdfOptions {
    * et la page de garde valent pour tout le logement. À moins de deux
    * niveaux, le dossier est celui du `scan`, comme avant.
    */
-  niveaux?: { nom: string; scan: Omit<ScanForPdf, 'name'>; courant?: boolean }[];
+  niveaux?: {
+    nom: string;
+    scan: Omit<ScanForPdf, 'name'>;
+    courant?: boolean;
+    /** Le plafond de CE niveau (revue « Mehdi » : l'étage sortait sans le sien). */
+    ceiling?: CeilingFixture[];
+  }[];
   /**
    * Les perspectives à imprimer, une par page.
    *
@@ -2058,6 +2073,22 @@ function planPage(
       maxZ = Math.max(maxZ, p.z);
     }
   }
+  /*
+    UN MUR ÉPAIS PREND SA PLACE DANS LE CADRE — revue « Claire » : l'échelle
+    se choisissait sur les axes, et la marge de 50 points (faite pour les
+    chaînes de cotes) devait aussi loger le poché. Avec des murs anciens de
+    45 cm, à 1:30, les deux cotes de 3,00 m tombaient hors de la feuille. Ce
+    qu'un mur dépasse d'un mur ordinaire s'ajoute à l'emprise.
+  */
+  if (isFinite(minX)) {
+    const enPlus = Math.max(0, ...walls.map((w) => epaisseurDe(w) / 2)) - WALL_T / 2;
+    if (enPlus > 1e-6) {
+      minX -= enPlus;
+      maxX += enPlus;
+      minZ -= enPlus;
+      maxZ += enPlus;
+    }
+  }
   let scaleLabel: string | null = null;
   let echellePtParM: number | undefined;
   /** Le denominateur choisi : la regle graphique en depend. */
@@ -3211,14 +3242,29 @@ function planPage(
         const n = normalePage(w, sgn);
         const E = (epaisseurDe(w) / 2 + SUREPAISSEUR_FACADE) * scale;
         const angle = angleDe(a, b);
-        // Au nu pour un mur dessiné : la cote de l'écran (revue « Léa »).
-        const L = longueurCotee(walls, w);
+        // Au nu pour un mur dessiné : la cote de l'écran (revue « Léa »),
+        // avec ses pièces — un pan coupé n'a pas un demi-mur à chaque bout
+        // (revue « Claire » : 2,48 au lieu de 2,68).
+        const L = longueurCotee(walls, w, parts);
+        /*
+          LA CHAÎNE VA D'UN NU À L'AUTRE — revue « Claire » : ses attaches
+          partaient des axes (5,06 m mesurés au kutch sous « 4,80 »), et ses
+          pleins se comptaient au prorata de l'axe — 0,86 / 1,00 au lieu de
+          0,68 / 1,05, une chaîne de 4,93 sous un total de 4,80. Les bornes
+          sont les nus ; chaque plein se mesure en mètres réels.
+        */
+        const Lax = segLength(w) || 1;
+        const t0nu = w.auNu ? Math.min(0.5, retraitDuCoin(walls, w, w.a) / Lax) : 0;
+        const t1nu = w.auNu ? Math.max(0.5, 1 - retraitDuCoin(walls, w, w.b) / Lax) : 1;
+        const surMur = (tt: number) => ({ x: a.x + (b.x - a.x) * tt, y: a.y + (b.y - a.y) * tt });
+        const aNu = surMur(t0nu);
+        const bNu = surMur(t1nu);
 
         // La chaîne des murs : la longueur de chacun.
-        const A2 = plus(a, n, E + RANG_MURS);
-        const B2 = plus(b, n, E + RANG_MURS);
-        trace(plus(a, n, E + 2), plus(a, n, E + RANG_MURS + 3), 0.6, GREY);
-        trace(plus(b, n, E + 2), plus(b, n, E + RANG_MURS + 3), 0.6, GREY);
+        const A2 = plus(aNu, n, E + RANG_MURS);
+        const B2 = plus(bNu, n, E + RANG_MURS);
+        trace(plus(aNu, n, E + 2), plus(aNu, n, E + RANG_MURS + 3), 0.6, GREY);
+        trace(plus(bNu, n, E + 2), plus(bNu, n, E + RANG_MURS + 3), 0.6, GREY);
         trace(A2, B2, 0.8, INK);
         tiret(A2, u, n, 3.2, 1, INK);
         tiret(B2, u, n, 3.2, 1, INK);
@@ -3239,21 +3285,22 @@ function planPage(
           .map((o) => {
             const ta = pointOnSeg(o.a, w.a, w.b).t;
             const tb = pointOnSeg(o.b, w.a, w.b).t;
-            return { o, t0: Math.max(0, Math.min(ta, tb)), t1: Math.min(1, Math.max(ta, tb)) };
+            return { o, t0: Math.max(t0nu, Math.min(ta, tb)), t1: Math.min(t1nu, Math.max(ta, tb)) };
           })
           .sort((x, y) => x.t0 - y.t0);
         if (baies.length === 0) continue;
+        // Les positions restent celles du mur entier (0 à 1, d'axe à axe).
         const A1 = plus(a, n, E + RANG_BAIES);
         const B1 = plus(b, n, E + RANG_BAIES);
-        trace(A1, B1, 0.6, TRAIT_COTE);
+        trace(plus(aNu, n, E + RANG_BAIES), plus(bNu, n, E + RANG_BAIES), 0.6, TRAIT_COTE);
         const morceaux: { t0: number; t1: number; o?: WallSeg }[] = [];
-        let t = 0;
+        let t = t0nu;
         for (const bb of baies) {
           if (bb.t0 > t + 1e-4) morceaux.push({ t0: t, t1: bb.t0 });
           morceaux.push({ t0: bb.t0, t1: bb.t1, o: bb.o });
           t = Math.max(t, bb.t1);
         }
-        if (t < 1 - 1e-4) morceaux.push({ t0: t, t1: 1 });
+        if (t < t1nu - 1e-4) morceaux.push({ t0: t, t1: t1nu });
         const surLigne = (tt: number) => ({
           x: A1.x + (B1.x - A1.x) * tt,
           y: A1.y + (B1.y - A1.y) * tt,
@@ -3267,14 +3314,14 @@ function planPage(
           const P = surLigne(tt);
           tiret(P, u, n, 2.4, 0.8, TRAIT_COTE);
           // Les bords des baies se rappellent jusqu'à la façade.
-          if (tt > 1e-4 && tt < 1 - 1e-4) {
+          if (tt > t0nu + 1e-4 && tt < t1nu - 1e-4) {
             const F = { x: a.x + (b.x - a.x) * tt, y: a.y + (b.y - a.y) * tt };
             trace(plus(F, n, E + 2), plus(F, n, E + RANG_BAIES + 2.5), 0.5, GREY);
           }
         }
         const longPage = Math.hypot(b.x - a.x, b.y - a.y);
         for (const m of morceaux) {
-          const valeur = m.o ? segLength(m.o) : (m.t1 - m.t0) * L;
+          const valeur = m.o ? segLength(m.o) : (m.t1 - m.t0) * Lax;
           if (!m.o && valeur < 0.05) continue;
           const txt = frLen(valeur);
           const centre = surLigne((m.t0 + m.t1) / 2);
@@ -3376,7 +3423,7 @@ function planPage(
         const u = unitaire({ x: b.x - a.x, y: b.y - a.y });
         const angle = angleDe(a, b);
         const F = (epaisseurDe(w) / 2) * scale;
-        const txt = `${frLen(longueurCotee(walls, w))} m`;
+        const txt = `${frLen(longueurCotee(walls, w, parts))} m`;
         let mieux: { A: Pt; B: Pt; n: Pt; texte: Pt; cout: number; taille: number } | null = null;
         for (const sgn of [1, -1]) {
           const n = normalePage(w, sgn);
@@ -7506,7 +7553,7 @@ function planifierLeDossier(
           achats: null,
           existant: nv.courant ? opts.existant : undefined,
           schemas: nv.courant ? opts.schemas : null,
-          ceiling: nv.courant ? opts.ceiling : undefined,
+          ceiling: nv.courant ? opts.ceiling : nv.ceiling,
         },
         `N${k}`,
       );

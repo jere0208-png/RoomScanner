@@ -14285,6 +14285,57 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Tournée n°4 : la déco gardée, la cuisine ouverte, la façade juste, des noms uniques
+
+**La déco survit à « Redétecter » et « Redresser »** (Yasmine). La peinture,
+le sol et les murs d'accent passent de l'ancienne pièce à la nouvelle. Un
+mur d'accent se retrouve par son identifiant, ou par sa place si le graphe
+recousu l'a renommé. Le relevé du plafond suit la pièce quand elle reste
+entière.
+
+**La cuisine ouverte** (`estCuisine`, `priseDeCuisine`), revue de Mehdi :
+- « Séjour-cuisine » garde le compte de socles du séjour et y ajoute les
+  règles de la cuisine : six socles, dont quatre au-dessus du plan de
+  travail, le socle 32 A et les circuits spécialisés ;
+- pour les circuits, ses prises du plan de travail sont celles de la
+  cuisine, et ses prises basses restent au séjour.
+
+**Les prises d'appareil** (hotte, micro-ondes, réfrigérateur) :
+- elles se posent où est l'appareil, sans hauteur maximale ;
+- elles ne comptent ni parmi les socles exigés ni parmi ceux du plan de
+  travail.
+
+**Le logement entier pour ce qui le concerne.** À l'étage, plus de
+« Aucun tableau électrique » quand il est au rez-de-chaussée. Au
+rez-de-chaussée, plus de « Aucun détecteur de fumée » quand il est au
+palier.
+
+**Le PDF à étage garde le plafond de chaque niveau.** La feuille du
+plafond est cochée d'office dès qu'un ruban LED est posé.
+
+**La façade du PDF, d'un nu à l'autre** (Claire) :
+- la chaîne s'attache aux nus, et ses pleins se mesurent en mètres réels :
+  0,50 / 1,00 / 2,50 sous 4,00 m, au lieu de 0,65 / 1,00 / 2,45 ;
+- un mur plus épais que l'ordinaire élargit l'emprise du cadrage : avec des
+  murs de 45 cm, les cotes ne sortent plus de la feuille ;
+- la cote d'un pan coupé se lit sur sa pièce, dans le PDF comme dans le
+  DXF : 2,68 m au lieu de 2,48.
+
+**La bulle « Trop bas »** de la vue du mur vise la hauteur de la règle de
+l'endroit. Au-dessus d'un plan de travail, ce n'est plus 25 cm (Bernard).
+
+**Des noms uniques** (`nomDePieceLibre`, `couperLeNom`), revues de Hugo,
+Inès et Fatou :
+- une pièce prend le premier rang libre, numéro ajouté après la coupe à
+  40 caractères, sans casser un émoji ;
+- deux gabarits « Salle de bains » s'appellent « Salle de bains » et
+  « Salle de bains 2 » ;
+- deux copies d'un plan ne portent plus le même nom, et la copie d'une
+  copie n'empile plus les « (copie) » ;
+- deux plans dessinés le même jour ont chacun leur nom.
+
+Banc : `tournee4suite`.
+
 ## Tournée n°4 : plus de pièce perdue, un devis par niveau, la LED chiffrée
 
 **Deux coins reliés par un mur ne se soudent plus** (`weldCorners`). Le

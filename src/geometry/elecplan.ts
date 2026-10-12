@@ -21,7 +21,7 @@ import {
   type RoomPart,
   type WallSeg,
 } from './floorplan';
-import { planCircuits, roomUse, type Circuit } from './nfc15100';
+import { planCircuits, priseDeCuisine, type Circuit } from './nfc15100';
 import { COMMANDES, LUMIERES } from './schema';
 import type { RoomKind } from './furniture';
 import {
@@ -139,7 +139,7 @@ export function planRoutes(
   const circuits = planCircuits(
     fixtures,
     (f) => pieceDe(f)?.name ?? '',
-    (f) => roomUse(pieceDe(f)?.name ?? '', pieceDe(f)?.kind) === 'cuisine',
+    (f) => priseDeCuisine(f, pieceDe(f)),
     (f) => pieceDe(f)?.id,
     ceiling,
   );

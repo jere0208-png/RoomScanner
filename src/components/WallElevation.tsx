@@ -85,6 +85,7 @@ import {
   requirementFor,
   roomInputsOf,
   usageConnu,
+  estCuisine,
   roomUse,
   wallToRooms,
 } from '../geometry/nfc15100';
@@ -800,7 +801,7 @@ export function WallElevation({
     return worktopsOnWall(
       face,
       objects,
-      roomUse(piece?.name ?? '', piece?.kind) === 'cuisine',
+      estCuisine(piece?.name ?? '', piece?.kind),
       solDesMurs(walls),
     );
   }, [face, wall, rooms, objects, walls]);
@@ -942,11 +943,20 @@ export function WallElevation({
       plansDeTravail,
     );
     if (!r) return null;
+    /*
+      LA COTE PROPOSÉE EST CELLE DE LA RÈGLE D'ICI — revue « Bernard » :
+      au-dessus d'un plan de travail, « Trop bas · remettre à 25 cm »
+      remettait la prise à 25 cm, derrière le meuble bas. Comme le contrôle
+      (`checkElectrical`), on vise la hauteur courante ramenée dans la règle.
+    */
+    const std = SPECS[selected.kind].std;
+    const cible = Math.min(r.max ?? std, Math.max(r.min ?? std, std));
     if (r.min !== undefined && selected.height < r.min - 1e-6) {
-      return { sens: 'trop bas', regle: r.regle };
+      return { sens: 'trop bas', regle: r.regle, cible };
     }
-    if (r.max !== undefined && selected.height > r.max + 1e-6) {
-      return { sens: 'trop haut', regle: r.regle };
+    // Une prise d'appareil (hotte, micro-ondes) se pose où est l'appareil.
+    if (r.max !== undefined && selected.height > r.max + 1e-6 && !selected.usage) {
+      return { sens: 'trop haut', regle: r.regle, cible };
     }
     return null;
   })();
@@ -2266,14 +2276,14 @@ export function WallElevation({
                     moveFixture(
                       selected.id,
                       selected.along,
-                      SPECS[selected.kind].std,
+                      hauteurKO.cible,
                     )
                   }
                 >
                   <Text style={styles.alerteTexte} numberOfLines={1}>
                     {`Trop ${hauteurKO.sens === 'trop bas' ? 'bas' : 'haut'}`}
                     <Text style={styles.alerteFixe}>
-                      {`  ·  remettre à ${cm(SPECS[selected.kind].std)} cm`}
+                      {`  ·  remettre à ${cm(hauteurKO.cible)} cm`}
                     </Text>
                   </Text>
                 </TouchableOpacity>

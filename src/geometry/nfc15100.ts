@@ -100,6 +100,32 @@ export function roomUse(name: string, kind?: RoomKind | null): RoomUse {
 }
 
 /**
+ * UNE CUISINE, MÊME OUVERTE — revue « Mehdi ». « Séjour-cuisine » se lisait
+ * séjour (le mot vient en premier) : fausse alerte « socle 32 A hors
+ * cuisine », aucun contrôle des circuits spécialisés ni des prises sur plan
+ * de travail, et les prises du plan de travail sur le circuit d'une chambre.
+ * Le séjour garde son compte de socles ; la cuisine y ajoute ses règles.
+ */
+export function estCuisine(name: string, kind?: RoomKind | null): boolean {
+  return roomUse(name, kind) === 'cuisine' || /cuisine|kitchenette/.test(sansAccent(name));
+}
+
+/**
+ * UNE PRISE DE LA CUISINE, pour les circuits : toutes celles d'une cuisine ;
+ * dans une cuisine ouverte, celles du plan de travail (le reste est au
+ * séjour).
+ */
+export function priseDeCuisine(
+  f: { height: number },
+  piece: { name?: string; kind?: RoomKind | null } | undefined,
+): boolean {
+  if (!piece) return false;
+  const nom = piece.name ?? '';
+  if (roomUse(nom, piece.kind) === 'cuisine') return true;
+  return estCuisine(nom, piece.kind) && f.height >= PLAN_TRAVAIL - 1e-6;
+}
+
+/**
  * L'USAGE DE CETTE PIÈCE EST-IL CONNU, ou déduit faute de mieux ?
  *
  * `roomUse` rend toujours une réponse — « autre » quand rien ne dit ce
@@ -502,6 +528,10 @@ export const HEIGHT_RULES: Partial<
 /** Un socle est réputé « au-dessus du plan de travail » à partir de 90 cm. */
 const PLAN_TRAVAIL = 0.9;
 
+/** Une prise posée pour UN appareil (sigle FRI, MI, H…) : pas un socle d'usage. */
+const priseDAppareil = (f: { kind: FixtureKind; usage?: string }) =>
+  !!f.usage && (f.kind === 'prise' || f.kind === 'prise2' || f.kind === 'prise3');
+
 /** Un appareil porte-t-il au moins un socle 16 A ? */
 const porteSocle = (k: FixtureKind) => socketsOf(k) > 0;
 
@@ -686,6 +716,14 @@ export function checkElectrical(
    * contrôles se taisent — ils ne peuvent pas deviner les murs.
    */
   geometrie?: { walls: WallSeg[]; openings: WallSeg[] },
+  /**
+   * TOUT LE LOGEMENT, quand l'écran n'en montre qu'un niveau — revue
+   * « Mehdi » : à l'étage, « Aucun tableau électrique » (il est au
+   * rez-de-chaussée) ; au rez-de-chaussée, « Aucun détecteur de fumée dans
+   * le logement » (il est au palier). Ce qui vaut pour le LOGEMENT se
+   * cherche dans le logement entier.
+   */
+  logement?: { tableau: boolean; daaf: boolean },
 ): ElecIssue[] {
   const out: ElecIssue[] = [];
   if (geometrie) {
@@ -728,7 +766,9 @@ export function checkElectrical(
         regle: rule.regle,
         fix: remise,
       });
-    } else if (rule.max !== undefined && f.height > rule.max + 1e-6) {
+    } else if (rule.max !== undefined && f.height > rule.max + 1e-6 && !priseDAppareil(f)) {
+      // Une prise d'appareil (hotte à 2 m, micro-ondes en hauteur) se pose
+      // où est l'appareil : pas de hauteur maximale (revue « Mehdi »).
       out.push({
         roomId: roomOfFixture(f),
         fixtureId: f.id,
@@ -744,12 +784,25 @@ export function checkElectrical(
   // ------------------------------------------------ équipement par pièce
   for (const room of rooms) {
     const use = roomUse(room.name, room.kind);
-    const req = requirementFor(use, room.area);
+    const cuisineOuverte = use !== 'cuisine' && estCuisine(room.name, room.kind);
+    const base = requirementFor(use, room.area);
+    const req =
+      cuisineOuverte && room.area >= 4
+        ? {
+            ...base,
+            socles: Math.max(base.socles, 6),
+            surPlan: 4,
+            regle:
+              base.regle +
+              ' Cuisine ouverte : six socles au moins, dont quatre au-dessus du plan de travail.',
+          }
+        : base;
     // Un appareil ne compte QUE pour la pièce où il donne.
     const mine = fixtures.filter((f) => roomOfFixture(f) === room.id);
     // Des SOCLES, pas des plaques : un ensemble double en porte un, un
-    // triple en porte deux.
-    const socles = mine.reduce((somme, f) => somme + socketsOf(f.kind), 0);
+    // triple en porte deux. La prise d'un appareil (hotte, micro-ondes,
+    // réfrigérateur) ne compte pas parmi les socles exigés.
+    const socles = mine.reduce((somme, f) => somme + (priseDAppareil(f) ? 0 : socketsOf(f.kind)), 0);
     const rj45 = mine.reduce((somme, f) => somme + rjOf(f.kind), 0);
     const label = room.name || USE_LABEL[use];
 
@@ -786,7 +839,7 @@ export function checkElectrical(
     }
     if (req.surPlan > 0) {
       const hauts = mine.reduce(
-        (somme, f) => somme + (f.height >= PLAN_TRAVAIL ? socketsOf(f.kind) : 0),
+        (somme, f) => somme + (f.height >= PLAN_TRAVAIL && !priseDAppareil(f) ? socketsOf(f.kind) : 0),
         0,
       );
       if (hauts < req.surPlan) {
@@ -830,7 +883,7 @@ export function checkElectrical(
 
     // Une prise de cuisson ailleurs qu'en cuisine mérite une question.
     const cuisson = mine.filter((f) => f.kind === 'prise32').length;
-    if (cuisson > 0 && use !== 'cuisine') {
+    if (cuisson > 0 && !estCuisine(room.name, room.kind)) {
       out.push({
         roomId: room.id,
         severity: 'alerte',
@@ -869,7 +922,7 @@ export function checkElectrical(
    * cuisine. Et elle ne dit rien tant qu'aucune cuisine n'est nommée :
    * sans cuisine, il n'y a pas de logement à recevoir.
    */
-  const cuisines = rooms.filter((r) => roomUse(r.name, r.kind) === 'cuisine');
+  const cuisines = rooms.filter((r) => estCuisine(r.name, r.kind));
   if (cuisines.length > 0) {
     const dedies = fixtures.filter(
       (f) => f.kind === 'prise20' || f.kind === 'sortieCable',
@@ -980,7 +1033,8 @@ export function checkElectrical(
    * circuit, et il propose de le poser.
    */
   const tableaux = fixtures.filter((f) => f.kind === 'tableau');
-  if (fixtures.length > 0 && tableaux.length === 0) {
+  const unTableau = tableaux.length > 0 || !!logement?.tableau;
+  if (fixtures.length > 0 && !unTableau) {
     out.push({
       code: 'tableau',
       severity: 'alerte',
@@ -1143,7 +1197,8 @@ export function checkElectrical(
    * qu'il hurle en faisant cuire des pâtes ne protège plus personne.
    */
   const daaf = ceiling.filter((cl) => cl.kind === 'daaf');
-  if (ceiling.length > 0 && daaf.length === 0) {
+  const unDaaf = daaf.length > 0 || !!logement?.daaf;
+  if (ceiling.length > 0 && !unDaaf) {
     out.push({
       code: 'daaf',
       severity: 'alerte',
@@ -1782,10 +1837,7 @@ export function materialList(
     return ids.map((id) => roomById.get(id)).find((r) => !!r);
   };
   const nameOf = (f: Fixture) => firstRoom(f)?.name || 'Hors pièce';
-  const isKitchen = (f: Fixture) => {
-    const r = firstRoom(f);
-    return !!r && roomUse(r.name, r.kind) === 'cuisine';
-  };
+  const isKitchen = (f: Fixture) => priseDeCuisine(f, firstRoom(f));
 
   const byRoom: RoomMaterial[] = rooms.map((r) => {
     const mine = fixtures.filter((f) => firstRoom(f)?.id === r.id);
