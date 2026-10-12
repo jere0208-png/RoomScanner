@@ -14285,6 +14285,24 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le refus « 400 » de la lecture : le texte de l'API, et un second essai
+
+Le patron a renvoyé la lecture avec le nouveau serveur. Message affiché :
+« code 400, invalid_request_error ». Ce n'est ni le crédit, ni la clé, ni
+l'image : l'API refuse la forme de la requête.
+
+- **Le texte de l'API se lit maintenant dans l'app**, en 220 signes au plus.
+  C'est lui qui nomme la cause, et il ne contient ni la clé ni la photo.
+- **L'outil imposé** (`tool_choice` de type « tool ») est refusé par un
+  modèle qui réfléchit de lui-même. Si le refus le dit (« tool_choice » ou
+  « thinking »), le serveur redemande une fois en le laissant choisir
+  (`auto`). La consigne dit déjà de rendre la lecture par `plan_lu`.
+- **La clé est nettoyée** (`trim`) : un retour à la ligne collé en même
+  temps qu'elle ne la casse plus.
+- **Le corps de la requête est encodé sans échec possible**
+  (`JSON_INVALID_UTF8_SUBSTITUTE`). Sinon, la requête partirait vide, sans
+  que rien ne le dise.
+
 ## Une lecture de plan refusée dit pourquoi
 
 Relevé du patron, photo d'un plan d'électricien à l'appui : « la lecture

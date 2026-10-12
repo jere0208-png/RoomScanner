@@ -412,7 +412,12 @@ describe('ce qui la porte', () => {
     expect(api).toContain('LECTURES_PAR_JOUR');
     const lecteur = lire('server', 'lecture-plan.php');
     expect(lecteur).toContain("'tool_choice' => ['type' => 'tool', 'name' => 'plan_lu']");
-    expect(lecteur).toContain("'x-api-key: ' . ANTHROPIC_CLE");
+    // La clé, débarrassée d'un espace ou d'un retour à la ligne collé avec.
+    expect(lecteur).toContain("'x-api-key: ' . trim(ANTHROPIC_CLE)");
+    // L'outil imposé refusé (code 400) : un second essai, le modèle choisit.
+    expect(lecteur).toContain("$corps['tool_choice'] = ['type' => 'auto'];");
+    // Et le texte de l'API se lit dans l'app, pour corriger à coup sûr.
+    expect(lecteur).toContain("mb_substr($message, 0, 220)");
     expect(lecteur).not.toMatch(/sk-ant-/);
     // Un refus de l'API dit SA cause : crédit, clé, modèle, image (relevé du
     // patron : « il la refuse directement », sans dire pourquoi).

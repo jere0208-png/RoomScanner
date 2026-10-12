@@ -159,7 +159,31 @@ function raisonDuRefus(int $code, $reponse, string $modele): string {
   if (stripos($message, 'image') !== false) {
     return 'Le lecteur n’a pas pu ouvrir la photo : reprenez-la, ou importez-la en JPEG.';
   }
-  return 'Le lecteur de plans a refusé la demande (code ' . $code . ($type !== '' ? ', ' . $type : '') . ') : réessayez dans un instant.';
+  // Le texte de l'API, tel quel : il dit la cause (il ne contient ni la clé
+  // ni la photo), et c'est lui qu'il faut lire pour corriger.
+  return 'Le lecteur de plans a refusé la demande (code ' . $code . ($type !== '' ? ', ' . $type : '') . ')'
+    . ($message !== '' ? ' : « ' . mb_substr($message, 0, 220) . ' »' : ' : réessayez dans un instant.');
+}
+
+/** Un appel à l'API des messages : [code HTTP, corps brut ou false]. */
+function appelerLeLecteur(string $envoi): array {
+  $curl = curl_init('https://api.anthropic.com/v1/messages');
+  curl_setopt_array($curl, [
+    CURLOPT_POST => true,
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_HTTPHEADER => [
+      'content-type: application/json',
+      'x-api-key: ' . trim(ANTHROPIC_CLE),
+      'anthropic-version: 2023-06-01',
+    ],
+    CURLOPT_POSTFIELDS => $envoi,
+    CURLOPT_CONNECTTIMEOUT => 10,
+    CURLOPT_TIMEOUT => 170,
+  ]);
+  $brut = curl_exec($curl);
+  $code = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+  curl_close($curl);
+  return [$code, $brut];
 }
 
 /**
@@ -208,26 +232,34 @@ function lirePlanPapier(string $image, string $media, array $textes): array {
       ],
     ],
   ];
-  $curl = curl_init('https://api.anthropic.com/v1/messages');
-  curl_setopt_array($curl, [
-    CURLOPT_POST => true,
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HTTPHEADER => [
-      'content-type: application/json',
-      'x-api-key: ' . ANTHROPIC_CLE,
-      'anthropic-version: 2023-06-01',
-    ],
-    CURLOPT_POSTFIELDS => json_encode($corps, JSON_UNESCAPED_UNICODE),
-    CURLOPT_CONNECTTIMEOUT => 10,
-    CURLOPT_TIMEOUT => 170,
-  ]);
-  $brut = curl_exec($curl);
-  $code = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
-  curl_close($curl);
+  $envoi = json_encode($corps, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+  if ($envoi === false) {
+    error_log('EchoPlan lecture-plan : json_encode — ' . json_last_error_msg());
+    return ['ok' => false, 'raison' => 'La photo n’a pas pu être préparée pour la lecture : recommencez.'];
+  }
+  [$code, $brut] = appelerLeLecteur($envoi);
   if ($brut === false || $code === 0) {
     return ['ok' => false, 'raison' => 'Le lecteur de plans ne répond pas : réessayez dans un instant.'];
   }
   $reponse = json_decode((string) $brut, true);
+  /*
+    L'OUTIL IMPOSÉ, REFUSÉ PAR CERTAINS MODÈLES — relevé du patron : « code
+    400, invalid_request_error ». Un modèle qui réfléchit de lui-même refuse
+    qu'on lui impose un outil (`tool_choice` de type « tool »). On redemande
+    alors une fois en le laissant choisir : la consigne dit déjà de rendre la
+    lecture par `plan_lu`, et c'est ce qu'il fait.
+  */
+  $motif400 = $code === 400 && is_array($reponse) ? (string) ($reponse['error']['message'] ?? '') : '';
+  if ($motif400 !== '' && (stripos($motif400, 'tool_choice') !== false || stripos($motif400, 'thinking') !== false)) {
+    error_log('EchoPlan lecture-plan : outil imposé refusé, nouvel essai en « auto » — ' . mb_substr($motif400, 0, 200));
+    $corps['tool_choice'] = ['type' => 'auto'];
+    $envoi = json_encode($corps, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    [$code, $brut] = appelerLeLecteur((string) $envoi);
+    if ($brut === false || $code === 0) {
+      return ['ok' => false, 'raison' => 'Le lecteur de plans ne répond pas : réessayez dans un instant.'];
+    }
+    $reponse = json_decode((string) $brut, true);
+  }
   if ($code === 429 || $code === 529) {
     return ['ok' => false, 'raison' => 'Le lecteur de plans est très demandé : réessayez dans une minute.'];
   }
