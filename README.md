@@ -14285,6 +14285,44 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les prix qui manquaient, et la rangée du devis qui tient dans sa carte
+
+**Les articles à 0 € ont un prix.** Choix du patron : « les plus utilisés,
+moyen de gamme, de Castorama ». Les trois prix suivants ont été vus le 12
+octobre 2026, sur des articles vendus et expédiés par Castorama. Ils entrent
+dans le relevé du matin (`server/sources-prix.json`).
+- Profilé LED : Paulmann Base 2 m, aluminium anodisé et diffuseur satiné,
+  19,95 €.
+- Visiophone 2 fils : Avidsen Elia, écran 7", 149,90 €. Il est compté en
+  kit (moniteur et platine de rue), sans boîte Ø 67 ni plaque, comme le
+  tableau.
+- Détecteur d'ouverture : Somfy IntelliTAG, 49,90 €. C'est le milieu de
+  gamme, entre les contacts à 20-30 € et le Diagral à 89,90 €.
+
+Deux articles prennent un prix déjà au catalogue :
+- **l'interrupteur général** prend le prix de l'interrupteur de la gamme ;
+  le contacteur qu'il commande se chiffre au tableau ;
+- **le spot au sol** est un luminaire, annoncé comme tel, comme les autres.
+
+**Le ruban LED ne paie plus son alimentation deux fois.** Le rouleau du
+catalogue est un kit Paulmann de 5 m vendu avec son alimentation
+230/24 V. Le bordereau ne compte plus d'alimentation à part, et le dit
+(« kits de 5 m avec leur alimentation »).
+
+**La rangée du haut tient dans sa carte.** Relevé du patron, capture à
+l'appui : « le prix du devis sort encore de son bloc ». La rangée se
+resserrait sur une estimation de ses largeurs ; déjà serrée, elle
+dépassait encore de onze points. Elle se mesure maintenant, et se resserre
+d'un cran tant qu'elle déborde :
+1. « Travaux » en icône ;
+2. « Explorer » devient « Visite » ;
+3. « RA » en icône, et la bascule 2D/3D sans ses chevrons ;
+4. « Visite » en icône.
+
+Le prix, lui, se lit toujours en entier.
+
+Bancs : `rangeeduhaut`, `symbolesarchitecte`.
+
 ## Tournée n°4 : la corbeille, des versions intactes, le bordereau au tableur
 
 **La corbeille** (Fatou, Hugo). Supprimer un plan l'effaçait pour de bon,

@@ -730,11 +730,17 @@ export function buyingList(
     }
   }
 
-  // Boîtes et plaques : ce que porte le mur, poste par poste.
+  /*
+    Boîtes et plaques : ce que porte le mur, poste par poste. Pas pour le
+    tableau ni le visiophone, qui se posent sur leur propre support — revue
+    « Mehdi » : ils recevaient une boîte Ø 67 et une plaque 1 poste.
+  */
+  const SANS_BOITE = new Set<string>(['tableau', 'videophone']);
   const parEnsemble = new Map<string, number>();
   for (const f of fixtures) {
     const cle = f.group ?? f.id;
-    parEnsemble.set(cle, (parEnsemble.get(cle) ?? 0) + postsOf(f.kind).length);
+    const n = postsOf(f.kind).filter((k) => !SANS_BOITE.has(k)).length;
+    if (n > 0) parEnsemble.set(cle, (parEnsemble.get(cle) ?? 0) + n);
   }
   const postes = [...parEnsemble.values()].reduce((t, n) => t + n, 0);
   if (postes > 0) {
@@ -773,6 +779,18 @@ export function buyingList(
     }
   }
   for (const [k, q] of parType) {
+    // Le visiophone s'achète en kit, moniteur et platine de rue (revue « Mehdi »).
+    if (k === 'videophone') {
+      out.push({
+        family: 'Appareillage',
+        code: 'visiophone',
+        label: 'Visiophone 2 fils',
+        spec: 'Kit : moniteur intérieur et platine de rue',
+        quantity: q,
+        unit: 'u',
+      });
+      continue;
+    }
     out.push({
       family: 'Appareillage',
       code: `meca-${k}`,
@@ -789,9 +807,9 @@ export function buyingList(
     LE RUBAN LED S'ACHÈTE EN ROULEAUX DE 5 M — revues « Fatou » et « Mehdi » :
     compté au mètre sous un code que le catalogue ne connaissait pas, il
     sortait du devis à 0 € (28,5 m de ruban, deux alimentations). Chaque
-    ruban se coupe dans ses rouleaux, et chaque tranche de 5 m (50 W, plus
-    20 % de marge) prend son alimentation de 60 W : les codes du catalogue
-    (`ruban-led`, `transfo-led`).
+    ruban se coupe dans ses rouleaux (`ruban-led`). Le rouleau du catalogue
+    est un KIT de 5 m vendu avec son alimentation 230/24 V : compter une
+    alimentation à part la paierait deux fois.
   */
   let metresDeRuban = 0;
   let rubans = 0;
@@ -815,15 +833,7 @@ export function buyingList(
       spec: CEILINGS.led.note,
       quantity: rouleaux,
       unit: 'rouleau',
-      note: `${metres} m en ${rubans} ruban${rubans > 1 ? 's' : ''}, rouleaux de 5 m`,
-    });
-    out.push({
-      family: 'Plafond',
-      code: 'transfo-led',
-      label: 'Alimentation LED 24 V',
-      spec: 'Une de 60 W par tranche de 5 m (10 W/m plus 20 % de marge)',
-      quantity: rouleaux,
-      unit: 'u',
+      note: `${metres} m en ${rubans} ruban${rubans > 1 ? 's' : ''}, kits de 5 m avec leur alimentation`,
     });
     out.push({
       family: 'Plafond',

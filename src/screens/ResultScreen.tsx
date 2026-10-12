@@ -69,7 +69,7 @@ import { ObjectBar } from '../components/ObjectBar';
 import { calerDansLaNiche } from '../geometry/niche';
 import { completerAuxNormes, corrigerConstat, poserAuxNormes } from '../geometry/auto';
 import { ControlePastille } from '../components/ControlePastille';
-import { DevisPastille } from '../components/DevisPastille';
+import { DevisPastille, prixCourt } from '../components/DevisPastille';
 import { ChoixScan } from '../components/ChoixScan';
 import { RoomBar } from '../components/RoomBar';
 import { StripBar } from '../components/StripBar';
@@ -303,6 +303,8 @@ export function ResultScreen() {
   const [hActions, setHActions] = useState(0);
   /** Ce que la colonne d'actions occupe VRAIMENT en largeur. */
   const [wActions, setWActions] = useState(0);
+  /** Le cran de resserrement mesuré de la rangée du haut — voir `cranRangee`. */
+  const [mesureRangee, setMesureRangee] = useState({ cle: '', cran: 0 });
   /**
    * TROIS ÉTAGES AU BAS DE LA CARTE, ET RIEN QUI DÉBORDE.
    *
@@ -3387,7 +3389,7 @@ export function ResultScreen() {
     déborde, « Explorer » et « Travaux » gardent leur icône et perdent leur
     mot — ils se reconnaissent, le prix, lui, doit se lire.
   */
-  const rangeeSerree = (() => {
+  const estimeSerree = (() => {
     const largeurs = [
       !modeElec && piecesTravaux.length > 0 ? 104 : 0,
       modeElec && totalDevis !== null && totalDevis > 0 ? 96 : 0,
@@ -3409,8 +3411,8 @@ export function ResultScreen() {
     sur fond bleu. « Travaux » perd le sien d'abord ; s'il manque encore de
     la place, « Explorer » se dit « Visite », plus court.
   */
-  const explorerCourt =
-    rangeeSerree &&
+  const estimeCourt =
+    estimeSerree &&
     (() => {
       const largeurs = [
         !modeElec && piecesTravaux.length > 0 ? 34 : 0,
@@ -3426,6 +3428,35 @@ export function ResultScreen() {
       const total = largeurs.reduce((t, l) => t + l, 0) + 8 * (largeurs.length - 1);
       return total > winLargeur - 2 * 16 - 20;
     })();
+  /*
+    ET ON MESURE, CAR L'ESTIMATION NE SUFFIT PAS — relevé du patron, capture
+    à l'appui : « le prix du devis sort encore de son bloc ». Les largeurs
+    écrites plus haut sont des paris (une police, un prix plus long, un
+    téléphone plus étroit) ; sur sa capture, la rangée déjà serrée débordait
+    encore de onze points. La rangée se mesure (une vue ordinaire : rien
+    d'animé ne se mesure ici), et tant qu'elle dépasse la carte elle se
+    resserre d'un cran : 1, « Travaux » en icône ; 2, « Explorer » se dit
+    « Visite » ; 3, « RA » en icône et la bascule 2D/3D sans chevrons ;
+    4, « Visite » en icône. Le prix, lui, se lit toujours en entier.
+  */
+  const cleRangee = [
+    modeElec,
+    piecesTravaux.length > 0,
+    totalDevis !== null && totalDevis > 0 ? prixCourt(totalDevis) : '',
+    alertesDePlan > 0,
+    walls.length > 0,
+    tab,
+    niveaux.length,
+    winLargeur,
+  ].join('|');
+  const cranRangee = Math.max(
+    estimeCourt ? 2 : estimeSerree ? 1 : 0,
+    mesureRangee.cle === cleRangee ? mesureRangee.cran : 0,
+  );
+  const rangeeSerree = cranRangee >= 1;
+  const explorerCourt = cranRangee >= 2;
+  const rangeeEnIcones = cranRangee >= 3;
+  const explorerIcone = cranRangee >= 4;
 
   const metrics = [
     ...(rooms.length > 1
@@ -4905,7 +4936,14 @@ export function ResultScreen() {
           portée de pouce.
         */}
         {!capturing && (
-          <View style={styles.vueRangee}>
+          <View
+            style={styles.vueRangee}
+            onLayout={(e) => {
+              // Elle dépasse la carte (dix points de bord de chaque côté) : un cran de plus.
+              if (e.nativeEvent.layout.width > carteW - 20 + 0.5 && cranRangee < 4) {
+                setMesureRangee({ cle: cleRangee, cran: cranRangee + 1 });
+              }
+            }}>
             {/*
               LE CONTRÔLE VIT ICI, contre le sélecteur de vue — relevé du
               patron. C'est un verdict, pas un outil : il se consulte d'un
@@ -5055,7 +5093,7 @@ export function ResultScreen() {
             )}
             {walls.length > 0 && (
               <TouchableOpacity
-                style={[styles.vuePastille, styles.explorerPastille]}
+                style={[styles.vuePastille, styles.explorerPastille, explorerIcone && styles.pastilleIcone]}
                 accessibilityLabel="Explorer"
                 accessibilityHint="Entrer dans la pièce et s’y promener"
                 onPress={() => {
@@ -5065,7 +5103,9 @@ export function ResultScreen() {
                 <Svg width={16} height={16} viewBox="0 0 24 24">
                   <Trace d={SOLAIRES.marcher} fill="#FFFFFF" fillRule="evenodd" />
                 </Svg>
-                <Text style={styles.explorerPastilleTexte}>{explorerCourt ? 'Visite' : 'Explorer'}</Text>
+                {!explorerIcone && (
+                  <Text style={styles.explorerPastilleTexte}>{explorerCourt ? 'Visite' : 'Explorer'}</Text>
+                )}
               </TouchableOpacity>
             )}
             {/*
@@ -5075,14 +5115,14 @@ export function ResultScreen() {
             */}
             {walls.length > 0 && tab === '3d' && (
               <TouchableOpacity
-                style={styles.vuePastille}
+                style={[styles.vuePastille, rangeeEnIcones && styles.pastilleIcone]}
                 accessibilityLabel="Réalité augmentée"
                 accessibilityHint="Poser la maquette chez soi, à travers la caméra"
                 onPress={() => voirChezSoi()}>
                 <Svg width={16} height={16} viewBox="0 0 24 24">
                   <Trace d={SOLAIRES.model} fill={teinte.blue} fillRule="evenodd" />
                 </Svg>
-                <Text style={styles.vuePastilleTexte}>RA</Text>
+                {!rangeeEnIcones && <Text style={styles.vuePastilleTexte}>RA</Text>}
               </TouchableOpacity>
             )}
             {niveaux.length > 1 && (
@@ -5107,7 +5147,7 @@ export function ResultScreen() {
               <Text style={styles.vuePastilleTexte}>
                 {vue === '2d' ? '2D' : '3D'}
               </Text>
-              <ChevronsUpDown size={15} color={teinte.inkFaint} strokeWidth={2.4} />
+              {!rangeeEnIcones && <ChevronsUpDown size={15} color={teinte.inkFaint} strokeWidth={2.4} />}
             </TouchableOpacity>
           </View>
         )}

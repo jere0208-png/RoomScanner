@@ -689,6 +689,20 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   // ------------------------------------------------------ plafond et divers
   'transfo-led': v([['Castorama', 51.9]]),
   'ruban-led': v([['Castorama', 52.99]]),
+  /*
+    LES PRIX QUI MANQUAIENT — revues « Fatou » et « Mehdi », choix du
+    patron : « prends les plus utilisés, moyen de gamme, de Castorama ».
+    Vus le 12 octobre 2026, vendus et expédiés par Castorama :
+    - le profilé Paulmann Base 2 m, aluminium anodisé et diffuseur satiné ;
+    - le visiophone 2 fils Avidsen Elia, écran 7", entre le Thomson à 99 €
+      et le Somfy V350 à 234,90 € ;
+    - le détecteur d'ouverture Somfy IntelliTAG, entre les contacts à
+      20-30 € et le Diagral à 89,90 €.
+    Le relevé du matin les reprend (`server/sources-prix.json`).
+  */
+  'led-profile': v([['Castorama', 19.95]]),
+  visiophone: v([['Castorama', 149.9]]),
+  'alarme-contact': v([['Castorama', 49.9]]),
   'gaine-vmc-125': v([['Castorama', 14.95]]),
   'bouche-vmc': v([['Castorama', 69.9]]),
 };
@@ -707,6 +721,8 @@ export const LUMINAIRES: CeilingKind[] = [
   'spot',
   'applique',
   'ventilateur',
+  // Le spot encastré au sol est un luminaire comme les autres (revue « Mehdi »).
+  'spotSol',
 ];
 
 // ------------------------------------------------ le catalogue qui arrive

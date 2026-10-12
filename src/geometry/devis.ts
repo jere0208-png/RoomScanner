@@ -284,7 +284,17 @@ function tarifDe(code: string, gamme: GammeId): Tarif | null {
   if (recu) return recu;
   if (code.startsWith('meca-')) {
     const kind = code.slice(5) as FixtureKind;
-    return TARIFS_MECANISME[gamme][kind] ?? null;
+    /*
+      L'INTERRUPTEUR GÉNÉRAL EST UN INTERRUPTEUR DE LA GAMME — revue
+      « Mehdi » : sans prix, il sortait à 0 €. Son mécanisme est celui de
+      l'interrupteur ; ce qu'il commande (un contacteur) se chiffre au
+      tableau.
+    */
+    return (
+      TARIFS_MECANISME[gamme][kind] ??
+      (kind === 'interGeneral' ? TARIFS_MECANISME[gamme].inter : undefined) ??
+      null
+    );
   }
   if (code.startsWith('plaque-')) {
     return tarifPlaque(gamme, Number(code.slice(7)) || 1);

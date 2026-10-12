@@ -28,6 +28,14 @@
     }
    ]
   },
+  "alarme-contact": {
+   "url": "https://www.castorama.fr/detecteur-d-ouverture-de-porte-et-fenetre-interieur-somfy/3660849508517_CAFR.prd",
+   "ean": "3660849508517",
+   "facteur": 1,
+   "intitule": "Détecteur d'ouverture IntelliTAG - Somfy",
+   "confiance": "proche",
+   "note": "Radio, pour centrale Somfy Home Alarm. Milieu de gamme : entre les contacts à 20-30 € et le Diagral 30APK à 89,90 €. Le bon contact dépend de la centrale."
+  },
   "barrette-equipotentielle": {
    "url": "https://www.castorama.fr/barrette-de-terre-basse-zenitech-cables-10-a-35-mm-/3545411230211_CAFR.prd",
    "ean": "3545411230211",
@@ -849,6 +857,14 @@
      "url": "https://www.bricodepot.fr/p/3414971087095/interrupteur-volet-roulant-dooxie-blanc"
     }
    ]
+  },
+  "led-profile": {
+   "url": "https://www.castorama.fr/profile-de-strip-led-base-ip20-aluminium-anodise-satine-paulmann-l-200-x-h-9-x-p-17cm/4000870705186_CAFR.prd",
+   "ean": "4000870705186",
+   "facteur": 1,
+   "intitule": "Profilé de strip LED Base IP20 aluminium anodisé, satiné Paulmann L.200 x H.9 x P.17cm",
+   "confiance": "exact",
+   "note": "Barre de 2 m avec diffuseur satiné, de la même gamme que le kit ruban (Paulmann). Milieu de gamme : les Silamp de la marketplace sont moins chers, les Square plus chers."
   },
   "meca-celiane-inter": {
    "url": "https://www.castorama.fr/interrupteur-va-et-vient-legrand-celiane-10a-blanc-sans-plaque/3414972441544_CAFR.prd",
@@ -2005,6 +2021,14 @@
    "intitule": "Vis pour plaque de plâtre (universelle), noir mat, 3,5x25 mm - 200 pièces",
    "confiance": "exact",
    "note": "3,5 × 25, boîte de 200 : correspondance exacte (vis universelle pointe fine)."
+  },
+  "visiophone": {
+   "url": "https://www.castorama.fr/visiophone-filaire-avidsen-elia-ecran-7-/3345111122904_CAFR.prd",
+   "ean": "3345111122904",
+   "facteur": 1,
+   "intitule": "Visiophone filaire Avidsen Elia écran 7\"",
+   "confiance": "proche",
+   "note": "Kit 2 fils, moniteur 7\" et platine de rue. Milieu de gamme chez Castorama, entre le Thomson à 99 € et le Somfy V350 à 234,90 €."
   },
   "wago-2": {
    "url": "https://www.castorama.fr/85-bornes-automatiques-diall-serie-273-wago-1-2-5-mm-/3663602793489_CAFR.prd",

@@ -53,6 +53,7 @@ import { planCircuits } from '../src/geometry/nfc15100';
 import { buildScanPdf } from '../src/export/pdf';
 import { buyingList } from '../src/geometry/conduits';
 import { chiffrer } from '../src/geometry/devis';
+import { TARIFS_MECANISME } from '../src/geometry/prix';
 
 const st = () => useScanStore.getState();
 beforeEach(() => {
@@ -224,17 +225,18 @@ describe('le ruban LED', () => {
     /*
       Revues « Fatou » et « Mehdi » : sous un code inconnu du catalogue, le
       ruban sortait du devis à 0 €. Le caisson de 13,20 m se coupe dans 3
-      rouleaux de 5 m, le ruban de 5 m dans 1 ; une alimentation de 60 W
-      par tranche de 5 m.
+      rouleaux de 5 m, le ruban de 5 m dans 1. Le rouleau du catalogue est
+      un kit AVEC son alimentation : pas d'alimentation comptée deux fois.
     */
     const ruban = liste.find((l) => l.code === 'ruban-led')!;
     expect(ruban.unit).toBe('rouleau');
     expect(ruban.quantity).toBe(4);
-    expect(ruban.note).toMatch(/18,5 m en 2 rubans/);
-    expect(liste.find((l) => l.code === 'transfo-led')?.quantity).toBe(4);
+    expect(ruban.note).toMatch(/18,5 m en 2 rubans, kits de 5 m avec leur alimentation/);
+    expect(liste.find((l) => l.code === 'transfo-led')).toBeUndefined();
     const devis = chiffrer(liste, [], [], 'dooxie');
     expect(devis.lignes.find((l) => l.code === 'ruban-led')?.pu).toBeGreaterThan(0);
-    expect(devis.lignes.find((l) => l.code === 'transfo-led')?.pu).toBeGreaterThan(0);
+    // Le profilé a son prix, lui aussi (relevé Castorama, Paulmann 2 m).
+    expect(devis.lignes.find((l) => l.code === 'led-profile')?.pu).toBe(19.95);
     expect(CEILINGS.led.commandable).toBe(true);
   });
 });
@@ -306,3 +308,30 @@ describe('le mot dans le rond, partout où le symbole est seul', () => {
     expect(src.split('(VP) Tj').length - 1).toBeGreaterThanOrEqual(2);
   });
 });
+
+/*
+  LES PRIX QUI MANQUAIENT — revues « Fatou » et « Mehdi », choix du patron :
+  « les plus utilisés, moyen de gamme, de Castorama ». Le visiophone en kit
+  (sans boîte ni plaque), l'interrupteur général au prix de l'interrupteur
+  de la gamme, le détecteur d'ouverture, le spot au sol compté comme
+  luminaire.
+*/
+describe('le devis chiffre ce qui sortait à 0 €', () => {
+  const f = (id: string, kind: string) =>
+    ({ id, kind, wallId: 'w', along: 1, height: 1.1, side: 1 }) as never;
+  it('visiophone, interrupteur général, détecteur d’ouverture', () => {
+    const fixtures = [f('v', 'videophone'), f('g', 'interGeneral')];
+    const ouvertures = [{ id: 'o', type: 'window', a: { x: 0, z: 0 }, b: { x: 1, z: 0 }, height: 1, yCenter: 1, detecteur: true }] as never;
+    const liste = buyingList([], fixtures, [], ouvertures);
+    const visio = liste.find((l) => l.code === 'visiophone')!;
+    expect(visio.label).toBe('Visiophone 2 fils');
+    // Pas de boîte Ø 67 ni de plaque pour lui : seul l'interrupteur général en a.
+    expect(liste.find((l) => l.code === 'boite-encastrement')?.quantity).toBe(1);
+    const devis = chiffrer(liste, [], [], 'dooxie');
+    const pu = (code: string) => devis.lignes.find((l) => l.code === code)?.pu;
+    expect(pu('visiophone')).toBe(149.9);
+    expect(pu('alarme-contact')).toBe(49.9);
+    expect(pu('meca-interGeneral')).toBe(TARIFS_MECANISME.dooxie.inter!.pu);
+  });
+});
+
