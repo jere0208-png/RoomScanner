@@ -149,9 +149,10 @@ export function wiresOf(circuit: Circuit, fixtures?: Fixture[]): Wire[] {
   const lumieres =
     (poses ? poses.filter((f) => LUMIERES.includes(f.kind)).length : 1) +
     auPlafond;
-  const vaEtVient = poses
-    ? commandes >= 2 || poses.some((f) => f.kind === 'va')
-    : false;
+  // Les liens tracés décident quand on les a (voir `Circuit.vaEtVient`).
+  const vaEtVient =
+    circuit.vaEtVient ??
+    (poses ? commandes >= 2 || poses.some((f) => f.kind === 'va') : false);
 
   const out = [...base];
   if (commandes >= 1 && lumieres >= 1) {
@@ -219,6 +220,7 @@ export function wiresOfRun(
 
 /** Ce circuit se câble-t-il en va-et-vient ? Deux commandes, ou un « va ». */
 export function estVaEtVient(circuit: Circuit, fixtures?: Fixture[]): boolean {
+  if (circuit.vaEtVient !== undefined) return circuit.vaEtVient;
   if (!fixtures) return false;
   const poses = circuit.fixtureIds
     .map((id) => fixtures.find((f) => f.id === id))

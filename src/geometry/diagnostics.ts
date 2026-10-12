@@ -21,6 +21,7 @@ import {
   type RoomShape,
   type WallSeg,
 } from './floorplan';
+import { pointInPolygon } from './appearance';
 
 export type IssueKind =
   | 'confiance'
@@ -30,7 +31,8 @@ export type IssueKind =
   | 'doublon'
   | 'hauteur'
   | 'linteau'
-  | 'pieceMinuscule';
+  | 'pieceMinuscule'
+  | 'superposition';
 
 export interface PlanIssue {
   kind: IssueKind;
@@ -230,9 +232,58 @@ export function checkPlan(
     });
   }
 
+  /*
+    --- DEUX PIÈCES L'UNE SUR L'AUTRE — revue « Hugo » : une chambre glissée
+    sur le séjour, ou accolée à une cloison déjà mitoyenne, se posait DANS sa
+    voisine. Les m² se comptaient deux fois, sans un mot. On mesure ce que
+    les deux contours ont en commun (au nu quand on l'a), sur une grille de
+    dix centimètres.
+  */
+  {
+    const contours = parts
+      .filter((p) => p.surface && p.surface.area > 0)
+      .map((p) => ({ id: p.roomId, pts: p.surface!.nu ?? p.surface!.pts }));
+    const PAS = 0.1;
+    for (let i = 0; i < contours.length; i++) {
+      for (let j = i + 1; j < contours.length; j++) {
+        const a = contours[i];
+        const b = contours[j];
+        const x0 = Math.max(Math.min(...a.pts.map((q) => q.x)), Math.min(...b.pts.map((q) => q.x)));
+        const x1 = Math.min(Math.max(...a.pts.map((q) => q.x)), Math.max(...b.pts.map((q) => q.x)));
+        const z0 = Math.max(Math.min(...a.pts.map((q) => q.z)), Math.min(...b.pts.map((q) => q.z)));
+        const z1 = Math.min(Math.max(...a.pts.map((q) => q.z)), Math.max(...b.pts.map((q) => q.z)));
+        if (x1 - x0 < PAS || z1 - z0 < PAS) continue;
+        let n = 0;
+        for (let x = x0 + PAS / 2; x < x1; x += PAS) {
+          for (let z = z0 + PAS / 2; z < z1; z += PAS) {
+            if (pointInPolygon({ x, z }, a.pts) && pointInPolygon({ x, z }, b.pts)) n++;
+          }
+        }
+        const commun = n * PAS * PAS;
+        if (commun < 0.25) continue;
+        issues.push({
+          kind: 'superposition',
+          severity: 'alerte',
+          roomId: b.id,
+          message: `${nameOf(rooms, a.id)} et ${nameOf(rooms, b.id)} se superposent sur ${commun
+            .toFixed(1)
+            .replace('.', ',')} m²`,
+          hint: 'Ces m² comptent deux fois : déplacez une des pièces, ou retirez celle qui est en trop.',
+        });
+      }
+    }
+  }
+
   // --- pièces improbables
   for (const part of parts) {
     if (!part.surface || part.surface.area >= PIECE_MINUSCULE) continue;
+    /*
+      UNE PIÈCE QU'ON A NOMMÉE N'EST PAS UNE ERREUR — revue « Inès » : son WC
+      de 1,26 m² se faisait conseiller « fusionnez-la ou retirez-la ». Un
+      WC, une salle d'eau, un placard nommés sont ce qu'ils disent.
+    */
+    const nom = (rooms.find((r) => r.id === part.roomId)?.name ?? '').trim();
+    if (nom && !/^pi[eè]ce( \d+)?$/i.test(nom)) continue;
     issues.push({
       kind: 'pieceMinuscule',
       severity: 'info',

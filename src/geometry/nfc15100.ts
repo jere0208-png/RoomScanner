@@ -1460,6 +1460,13 @@ export interface Circuit {
    * feuille à l'autre.
    */
   ceilingIds?: string[];
+  /**
+   * UN VA-ET-VIENT, D'APRÈS LES LIENS TRACÉS — un point lumineux commandé par
+   * deux interrupteurs au moins (l'interrupteur général ne compte pas : il
+   * coupe, il ne commande pas). Absent quand aucun lien n'est tracé : on s'en
+   * tient alors au nombre de commandes du circuit. Voir `estVaEtVient`.
+   */
+  vaEtVient?: boolean;
   note?: string;
   /**
    * Métré de câble (m), quand la géométrie est connue : c'est la seule
@@ -1673,9 +1680,32 @@ export function planCircuits(
         const nom = suffixe.get(h.roomId);
         if (nom && !pieces.includes(nom)) pieces.push(nom);
       }
+      /*
+        LE VA-ET-VIENT SE LIT SUR LES LIENS — revue « Mehdi » : dès qu'un
+        circuit d'éclairage portait deux commandes, il passait en va-et-vient
+        (193 m de navette pour 4 va-et-vient réels sur 17 commandes), et
+        l'interrupteur général en ajoutait une à chaque point.
+      */
+      const commandeurs = (p: { id: string; commands?: string[] }) =>
+        new Set(
+          (p.commands ?? []).filter((cid) => {
+            if (cid === p.id) return false;
+            const k = fixtures.find((x) => x.id === cid)?.kind;
+            return !!k && COMMANDES_MURALES.includes(k) && k !== 'interGeneral';
+          }),
+        ).size;
+      const pointsIci: { id: string; commands?: string[] }[] = [
+        ...lot.filter((f) => f.kind === 'applique'),
+        ...hauts,
+      ];
+      const lies = pointsIci.some((p) => (p.commands ?? []).length > 0);
+      const vaDeclare = lot.some((f) => f.kind === 'va');
+      const vaEtVient =
+        lies || vaDeclare ? vaDeclare || pointsIci.some((p) => commandeurs(p) >= 2) : undefined;
       add({
         label: `Éclairage ${i + 1}`,
         nature: 'eclairage',
+        ...(vaEtVient !== undefined ? { vaEtVient } : {}),
         points,
         section: 1.5,
         breaker: 16,

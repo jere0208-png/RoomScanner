@@ -2795,7 +2795,19 @@ export const useScanStore = create<ScanState>((set, get) => {
       notes: st.notes,
       mesures: st.mesures,
     });
-    if (history.length > HISTORY_MAX) history.shift();
+    if (history.length > HISTORY_MAX) {
+      history.shift();
+      /*
+        LA MARQUE D'ENREGISTREMENT GLISSE AVEC L'HISTORIQUE — revue « Hugo » :
+        après cinquante gestes et quarante « Annuler », l'app disait « rien à
+        enregistrer » sur un plan qui n'était PAS celui enregistré (la
+        hauteur à 2,60 au lieu de la sienne), et « Revenir à la version
+        enregistrée » disparaissait. L'état enregistré recule d'un cran avec
+        le plus ancien point ; sorti de l'historique, il n'est plus jamais
+        « retrouvé » par un « Annuler ».
+      */
+      savedDepth = savedDepth > 0 ? savedDepth - 1 : -1;
+    }
     if (!st.canUndo) set({ canUndo: true });
   };
 
@@ -4318,7 +4330,6 @@ export const useScanStore = create<ScanState>((set, get) => {
         C'est l'un des rares défauts qu'on ne signale jamais, parce qu'on
         croit avoir mal appuyé. Voir `annulerunefois`.
       */
-      pushHistory('mergeRooms');
       // La cloison commune cesse de border : elle devient intérieure à la
       // pièce réunie, et le contour se referme sur l'enveloppe des deux.
       const inA = new Set(a.wallIds ?? []);
@@ -4333,6 +4344,9 @@ export const useScanStore = create<ScanState>((set, get) => {
       */
       const mitoyen = [...inA].some((id) => inB.has(id));
       if (!mitoyen) return;
+      // Après la garde (revue « Hugo » : une fusion refusée laissait un
+      // « Annuler » qui ne faisait rien).
+      pushHistory('mergeRooms');
       const wallIds = [...new Set([...inA, ...inB])].filter(
         (id) => !(inA.has(id) && inB.has(id)),
       );

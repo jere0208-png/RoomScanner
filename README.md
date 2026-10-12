@@ -14285,6 +14285,42 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Va-et-vient d'après les liens, pièces superposées, historique juste
+
+**Le va-et-vient se lit sur les liens tracés** (`Circuit.vaEtVient`), revue
+de Mehdi.
+- Avant, dès qu'un circuit d'éclairage portait deux commandes, il passait en
+  va-et-vient : 193 m de navette pour 4 va-et-vient réels sur 17
+  commandes.
+- Maintenant, un point lumineux commandé par au moins deux interrupteurs
+  fait un va-et-vient. L'interrupteur général n'y compte pas : il coupe,
+  il ne commande pas.
+- Sans aucun lien tracé, l'ancienne règle s'applique toujours.
+
+**Deux pièces superposées se signalent** (`superposition`), revue de Hugo.
+Une chambre glissée sur le séjour comptait ses m² deux fois, sans un mot.
+Le contrôle du plan mesure maintenant ce que les contours ont en commun,
+sur une grille de 10 cm, et le dit au-delà d'un quart de m².
+
+**L'historique reste juste après quarante gestes** (Hugo). Quand le plus
+ancien point d'annulation sort, la marque d'enregistrement recule avec
+lui. Après cinquante gestes et quarante « Annuler », l'app disait « rien à
+enregistrer » sur un plan qui ne l'était pas.
+
+**Une fusion refusée** ne laisse plus d'« Annuler » qui ne fait rien : le
+point de reprise se pose après la garde.
+
+**Un WC, une salle d'eau ou un placard nommés** ne se font plus conseiller
+« fusionnez-la ou retirez-la » (Inès). Seule une petite pièce sans nom le
+reçoit.
+
+**L'export, sans Pro** (Bernard) : l'image du plan vient en tête, et dit
+qu'elle s'envoie ou s'imprime gratuitement.
+
+**La règle graphique** du PDF écrit « 1,5 m » à la française (Claire).
+
+Banc : `tournee4fin`.
+
 ## Le faux plafond reste dans sa pièce, le nom s'abrège avant la surface
 
 **La hauteur sous plafond est une donnée de la pièce** (Claire). Un faux

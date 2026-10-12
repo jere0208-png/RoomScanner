@@ -126,13 +126,19 @@ export function ExportSheet({
       'Image du plan',
       // Revues « Nadia », « Marie », « Sophie » : la seule sortie gratuite
       // ne disait pas qu'elle l'était.
-      'La vue affichée, avec ses cotes. Gratuite, avec le logo EchoPlan.',
+      // Revue « Bernard » : il cherchait comment IMPRIMER son plan.
+      'La vue affichée, avec ses cotes : à envoyer ou à imprimer. Gratuite, avec le logo EchoPlan.',
       onImage,
     ],
   ];
+  /*
+    SANS PRO, L'IMAGE GRATUITE EN TÊTE — revue « Bernard » : cinq sorties
+    « PRO » avant la seule qu'il pouvait prendre, en dernier.
+  */
+  const enOrdre = pro ? sorties : [...sorties.filter(([art]) => art === 'image'), ...sorties.filter(([art]) => art !== 'image')];
   const visibles = modeElec
-    ? sorties
-    : sorties.filter(([art]) => art !== 'materiel');
+    ? enOrdre
+    : enOrdre.filter(([art]) => art !== 'materiel');
   /*
     LA LARGEUR DES CARTES. L'image se dessine à la taille de la carte : elle
     est déduite de l'écran dès la première image (la feuille garde 28 points

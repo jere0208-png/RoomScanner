@@ -121,7 +121,8 @@ describe('les sorties offertes', () => {
       );
     });
     const fonds = t.root.findAllByType(ExportFond);
-    expect(fonds.map((f) => f.props.kind)).toEqual(['pdf', 'obj', 'materiel', 'csv', 'dxf', 'image']);
+    // Sans Pro, l'image gratuite vient en tête (revue « Bernard »).
+    expect(fonds.map((f) => f.props.kind)).toEqual(['image', 'pdf', 'obj', 'materiel', 'csv', 'dxf']);
     for (const f of fonds) {
       expect(f.props.hauteur).toBe(HAUTEUR_CARTE);
       expect(f.props.largeur).toBeGreaterThan(150);

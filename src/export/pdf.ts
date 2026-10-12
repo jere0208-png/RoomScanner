@@ -1249,7 +1249,8 @@ function drawSheetChrome(
     d.rect(bx, by, wl / 2, 3, INK, INK, 0.4);
     d.rect(bx + wl / 2, by, wl / 2, 3, '#FFFFFF', INK, 0.4);
     d.text(
-      r.total < 1 ? `${Math.round(r.total * 100)} cm` : `${r.total} m`,
+      // « 1,5 m », à la française (revue « Claire » : « 1.5 m »).
+      r.total < 1 ? `${Math.round(r.total * 100)} cm` : `${String(r.total).replace('.', ',')} m`,
       bx + wl + 3,
       by,
       5,
