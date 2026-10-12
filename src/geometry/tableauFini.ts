@@ -25,6 +25,7 @@ import {
   roomUse,
   type Circuit,
   type Differential,
+  circuitsDuDifferentiel,
 } from './nfc15100';
 import type { RoomKind } from './furniture';
 
@@ -146,7 +147,6 @@ function usageDuCircuit(c: Circuit): string | undefined {
  * déborde). Les courants faibles, sans disjoncteur, n'y sont pas.
  */
 export function tableauDepuisLePlan(circuits: Circuit[], differentiels: Differential[]): TableauExistant {
-  const parLabel = new Map(circuits.map((c) => [c.label, c]));
   const departs: DepartExistant[] = [{ id: 'plan-ig', organe: 'interrupteur', calibre: 63, rangee: 0 }];
   const poses = new Set<string>();
   let rangee = 1;
@@ -162,9 +162,8 @@ export function tableauDepuisLePlan(circuits: Circuit[], differentiels: Differen
     };
   };
   differentiels.forEach((d, i) => {
-    const siens = d.circuits
-      .map((l) => parLabel.get(l))
-      .filter((c): c is Circuit => !!c && c.breaker !== null);
+    // Par identifiant : deux circuits du même libellé restent deux (revue « Nicolas »).
+    const siens = circuitsDuDifferentiel(d, circuits).filter((c) => c.breaker !== null);
     let r = rangee;
     let rempli = 2;
     departs.push({

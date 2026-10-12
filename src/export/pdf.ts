@@ -84,9 +84,9 @@ import {
 import {
   USE_LABEL,
   wallFurniture,
-  type Circuit,
   type Differential,
   type MaterialList,
+  circuitsDuDifferentiel,
 } from '../geometry/nfc15100';
 import {
   circuitColor,
@@ -6108,13 +6108,11 @@ export interface BoardRow {
  * Exportée : c'est un calcul, pas un dessin, et c'est lui qu'on vérifie.
  */
 export function boardRows(list: MaterialList): BoardRow[] {
-  const parLabel = new Map(list.circuits.map((c) => [c.label, c]));
   const rows: BoardRow[] = [];
   let numero = 0;
   for (const diff of list.differentials) {
-    const proteges = diff.circuits
-      .map((l) => parLabel.get(l))
-      .filter((c): c is Circuit => !!c);
+    // Par identifiant : deux circuits du même libellé restent deux (revue « Nicolas »).
+    const proteges = circuitsDuDifferentiel(diff, list.circuits);
     // Le différentiel en tête, puis ses disjoncteurs, treize par treize.
     let reste = proteges;
     let premiere = true;

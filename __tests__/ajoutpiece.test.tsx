@@ -438,9 +438,11 @@ describe('la soudure au contact', () => {
   it('mais ne soude rien quand les murs ne se recouvrent pas', () => {
     const id = useScanStore.getState().addRoomBox(2, 2, 'WC', null);
     useScanStore.getState().moveRoom(id, 0.5, 0);
-    const avant = useScanStore.getState().walls.length;
-    // On l'éloigne : aucun mur ne tombe sur un autre.
+    // On l'éloigne : aucun mur ne tombe sur un autre, rien ne reste partagé.
     useScanStore.getState().moveRoom(id, 3, 3);
-    expect(useScanStore.getState().walls).toHaveLength(avant);
+    const st = useScanStore.getState();
+    const wc = st.rooms.find((r) => r.id === id)!;
+    const autres = st.rooms.filter((r) => r.id !== id).flatMap((r) => r.wallIds ?? []);
+    expect((wc.wallIds ?? []).filter((x) => autres.includes(x))).toEqual([]);
   });
 });

@@ -1511,6 +1511,12 @@ export interface WallHole {
   t1: number;
   y0: number;
   y1: number;
+  /**
+   * Percé dans un mur CONFONDU avec celui de l'ouverture : le trou s'y fait,
+   * mais le seuil, le dormant et le vantail ne se posent qu'une fois, sur le
+   * mur principal.
+   */
+  secondaire?: boolean;
 }
 
 /**
@@ -1569,24 +1575,42 @@ export function assignOpenings(
     }
     if (!best) continue;
 
-    const w = best.wall;
-    const wd = { x: w.b.x - w.a.x, z: w.b.z - w.a.z };
-    const wl2 = wd.x * wd.x + wd.z * wd.z || 1;
-    const along = (p: Pt) =>
-      ((p.x - w.a.x) * wd.x + (p.z - w.a.z) * wd.z) / wl2;
-    const ta = along(o.a);
-    const tb = along(o.b);
-    const t0 = Math.max(0, Math.min(ta, tb));
-    const t1 = Math.min(1, Math.max(ta, tb));
-    if (t1 - t0 < 1e-3) continue;
-    const y0 = Math.max(0, o.yCenter - o.height / 2 - floorY);
-    const y1 = Math.min(w.height, y0 + o.height);
-    if (y1 - y0 < 1e-3) continue;
+    /*
+      ET TOUS LES MURS CONFONDUS AVEC LUI — revues « Sophie » et « Théo » :
+      deux murs posés l'un sur l'autre (deux pièces glissées l'une contre
+      l'autre, un plan d'avant la soudure) ; un seul se perçait, et la porte
+      restait murée en 3D pendant que la visite la traversait.
+    */
+    const b0 = best.wall;
+    const lb = Math.hypot(b0.b.x - b0.a.x, b0.b.z - b0.a.z) || 1;
+    const ub = { x: (b0.b.x - b0.a.x) / lb, z: (b0.b.z - b0.a.z) / lb };
+    const surSaLigne = (q: Pt) => Math.abs((q.x - b0.a.x) * ub.z - (q.z - b0.a.z) * ub.x) < 0.03;
+    const cibles = walls.filter(
+      (x) =>
+        x === b0 ||
+        (x.type === 'wall' && surSaLigne(x.a) && surSaLigne(x.b) && pointOnSeg(mid, x.a, x.b).dist < 0.6),
+    );
+    let pose = false;
+    for (const w of cibles) {
+      const wd = { x: w.b.x - w.a.x, z: w.b.z - w.a.z };
+      const wl2 = wd.x * wd.x + wd.z * wd.z || 1;
+      const along = (p: Pt) =>
+        ((p.x - w.a.x) * wd.x + (p.z - w.a.z) * wd.z) / wl2;
+      const ta = along(o.a);
+      const tb = along(o.b);
+      const t0 = Math.max(0, Math.min(ta, tb));
+      const t1 = Math.min(1, Math.max(ta, tb));
+      if (t1 - t0 < 1e-3) continue;
+      const y0 = Math.max(0, o.yCenter - o.height / 2 - floorY);
+      const y1 = Math.min(w.height, y0 + o.height);
+      if (y1 - y0 < 1e-3) continue;
 
-    const list = out.get(w.id) ?? [];
-    list.push({ seg: o, t0, t1, y0, y1 });
-    out.set(w.id, list);
-    out.set(`used:${o.id}`, []);
+      const list = out.get(w.id) ?? [];
+      list.push({ seg: o, t0, t1, y0, y1, ...(w !== b0 ? { secondaire: true } : {}) });
+      out.set(w.id, list);
+      pose = true;
+    }
+    if (pose) out.set(`used:${o.id}`, []);
   }
   return out;
 }
@@ -2613,6 +2637,8 @@ export function buildScene(
 
     // ---------------------------------------- portes / fenêtres du mur
     for (const hole of mine) {
+      // Le trou d'un mur confondu : percé, mais rien ne s'y pose deux fois.
+      if (hole.secondaire) continue;
       /*
         UNE PORTE EST UN TROU, PAS UN PANNEAU DE PLUS.
 

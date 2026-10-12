@@ -70,6 +70,9 @@ import {
 import { poserLibre } from '../src/geometry/poser';
 import { masonryRuns, wallFace } from '../src/geometry/electrical';
 import { lireCm } from '../src/components/MurNeufSheet';
+import { planDifferentials, type Circuit } from '../src/geometry/nfc15100';
+import { tableauDepuisLePlan } from '../src/geometry/tableauFini';
+import { boardRows } from '../src/export/pdf';
 import { CATALOG_ITEMS, type CatalogItem } from '../src/geometry/catalogue';
 import { matchItem } from '../src/screens/result/FurnitureSheet';
 
@@ -426,6 +429,45 @@ describe('les retouches de Camille', () => {
     for (const p of parts) {
       const e = etendueDeLaPiece(p.surface!);
       expect(Math.max(e.width, e.depth)).toBeLessThan(3);
+    }
+  });
+});
+
+describe('le tableau projeté de Nicolas', () => {
+  const circuit = (id: string, label: string, nature: Circuit['nature'], breaker: number, piece: string): Circuit => ({
+    id, label, nature, points: 1, section: 2.5, breaker, rooms: [piece], fixtureIds: [],
+  });
+  const circuits = [
+    circuit('c1', 'Prises séjour', 'prises', 16, 'Séjour'),
+    circuit('c2', 'Spécialisé 20 A — Cuisine', 'specialise', 20, 'Four'),
+    circuit('c3', 'Spécialisé 20 A — Cuisine', 'specialise', 20, 'Lave-linge'),
+    circuit('c4', 'Spécialisé 20 A — Cuisine', 'specialise', 20, 'Lave-vaisselle'),
+  ];
+  it('trois circuits du même libellé font trois disjoncteurs, chacun sous son différentiel', () => {
+    const diffs = planDifferentials(circuits);
+    const t = tableauDepuisLePlan(circuits, diffs);
+    const dj = t.departs.filter((d) => d.organe === 'disjoncteur').map((d) => d.id);
+    expect(dj.sort()).toEqual(['plan-c1', 'plan-c2', 'plan-c3', 'plan-c4']);
+  });
+  it('et le tableau du PDF aussi', () => {
+    const rows = boardRows({ circuits, differentials: planDifferentials(circuits) } as never);
+    const legendes = rows.flatMap((r) => r.modules.filter((m) => !m.differentiel).map((m) => m.legende));
+    expect(legendes.filter((l) => /Four|Lave-linge|Lave-vaisselle/.test(l)).sort()).toHaveLength(3);
+    expect(new Set(legendes).size).toBe(legendes.length);
+  });
+});
+
+describe('la face où l’on pose', () => {
+  it('l’appareil va sur la face qu’on regarde, même sur une cloison', () => {
+    st().commencerAuClavier();
+    st().addRoomLibre(6, 4, 'Séjour', { auNu: true });
+    const zs = st().walls.flatMap((w) => [w.a.z, w.b.z]);
+    const x = Math.min(...st().walls.flatMap((w) => [w.a.x, w.b.x])) + 3;
+    st().addWallBetween({ x, z: Math.min(...zs) }, { x, z: Math.max(...zs) }, { epaisseur: 0.07 });
+    const cloison = st().walls.find((w) => Math.abs(w.a.x - x) < 1e-6 && Math.abs(w.b.x - x) < 1e-6)!;
+    for (const cote of [1, -1] as const) {
+      const id = st().addFixture('prise', cloison.id, 1, cote)!;
+      expect(st().fixtures.find((f) => f.id === id)!.side).toBe(cote);
     }
   });
 });

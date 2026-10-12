@@ -423,7 +423,8 @@ interface Props {
    * à l'arrivée. Les déplacements arrivent en mètres, dans le repère du
    * monde : la vue peut être tournée, le plan ne s'en occupe pas.
    */
-  onMoveRoom?: (dx: number, dz: number) => void;
+  /** `aimant` : faux pendant le glisser, vrai au lâcher (voir `moveRoom`). */
+  onMoveRoom?: (dx: number, dz: number, aimant?: boolean) => void;
   /** Appui sur le cartouche d'une pièce (mode édition) : la renomme. */
   onEditRoomName?: (id: string) => void;
   /**
@@ -962,8 +963,12 @@ export function FloorplanEditor({
         // Écran → monde : la conversion est déjà écrite, rotation et zoom
         // compris. La réécrire ici, c'est se tromper d'un signe un jour.
         const d = m.deltaToMeters(dx, dy);
-        onMoveRoom?.(d.x, d.z);
+        // Pendant le geste, sans aimant : il ramenait la pièce à chaque pas.
+        onMoveRoom?.(d.x, d.z, false);
       },
+      // Au lâcher : l'aimant et la soudure des murs qui se recouvrent.
+      onPanResponderRelease: () => onMoveRoom?.(0, 0, true),
+      onPanResponderTerminate: () => onMoveRoom?.(0, 0, true),
     }),
   ).current;
   const pieceDep = useRef({ x: 0, y: 0 });

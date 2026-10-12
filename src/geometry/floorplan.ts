@@ -4863,6 +4863,92 @@ export function partRecouverte(existants: WallSeg[], venus: WallSeg[]): number {
 }
 
 /**
+ * DEUX MURS L'UN SUR L'AUTRE N'EN FONT QU'UN — revues « Sophie » et « Théo ».
+ *
+ * Une pièce accolée ou glissée contre une autre posait son mur PAR-DESSUS
+ * celui du voisin : deux maçonneries au même endroit. En 3D, un seul des
+ * deux se perçait et la porte restait murée ; la cote « depuis le coin » se
+ * prenait sur le mauvais mur, et la porte de la salle de bains tombait sur
+ * celle du WC ; le contrôle conseillait d'en supprimer un, et la moitié des
+ * pièces s'ouvraient.
+ *
+ * Les murs qu'on vient de poser ou de déplacer (`nouveaux`) cèdent la place
+ * à ceux qui étaient déjà là : la part commune devient UN mur, que les deux
+ * pièces partagent ; ce qui dépasse reste à la nouvelle pièce. Les contours
+ * des pièces sont réécrits au passage. Même niveau, même ligne (à 3 cm),
+ * recouvrement d'au moins 5 cm.
+ */
+export function souderLesRecouvrements<W extends WallSeg, Rm extends { wallIds?: string[] }>(
+  walls: W[],
+  rooms: Rm[],
+  nouveaux: Set<string>,
+  tol = 0.03,
+): { walls: W[]; rooms: Rm[] } {
+  let ws = [...walls];
+  let rs = rooms;
+  const neufs = new Set(nouveaux);
+  const pris = new Set(ws.map((w) => w.id));
+  const nomLibre = (base: string) => {
+    let k = 1;
+    while (pris.has(`${base}#${k}`)) k++;
+    const id = `${base}#${k}`;
+    pris.add(id);
+    return id;
+  };
+  const remplacer = (id: string, par: string[]) => {
+    rs = rs.map((r) =>
+      r.wallIds?.includes(id)
+        ? { ...r, wallIds: [...new Set(r.wallIds.flatMap((x) => (x === id ? par : [x])))] }
+        : r,
+    );
+  };
+  for (let garde = 0; garde < 50; garde++) {
+    let fait = false;
+    for (const N of ws) {
+      if (!neufs.has(N.id) || N.type !== 'wall') continue;
+      const LN = segLength(N);
+      if (LN < 1e-6) continue;
+      const uN = { x: (N.b.x - N.a.x) / LN, z: (N.b.z - N.a.z) / LN };
+      for (const E of ws) {
+        if (E === N || neufs.has(E.id) || E.type !== 'wall' || niveauDe(E) !== niveauDe(N)) continue;
+        const L = segLength(E);
+        if (L < 1e-6) continue;
+        const u = { x: (E.b.x - E.a.x) / L, z: (E.b.z - E.a.z) / L };
+        if (Math.abs(u.x * uN.z - u.z * uN.x) > 0.02) continue;
+        const ecart = (q: Pt) => Math.abs((q.x - E.a.x) * u.z - (q.z - E.a.z) * u.x);
+        if (ecart(N.a) > tol || ecart(N.b) > tol) continue;
+        const t = (q: Pt) => (q.x - E.a.x) * u.x + (q.z - E.a.z) * u.z;
+        const s0 = Math.min(t(N.a), t(N.b));
+        const s1 = Math.max(t(N.a), t(N.b));
+        const o0 = Math.max(0, s0);
+        const o1 = Math.min(L, s1);
+        if (o1 - o0 < 0.05) continue;
+        const at = (s: number): Pt => ({ x: E.a.x + u.x * s, z: E.a.z + u.z * s });
+        // Le mur déjà là, coupé aux bouts de la part commune.
+        const coupes = [0, ...[o0, o1].filter((s) => s > 1e-6 && s < L - 1e-6), L].sort((a, b) => a - b);
+        const morceauxE = coupes.slice(1).map((fin, i) => ({ de: coupes[i], a: fin }));
+        const idsE = morceauxE.map((_, i) => (i === 0 ? E.id : nomLibre(E.id)));
+        const neufsE = morceauxE.map((m, i) => ({ ...E, id: idsE[i], a: at(m.de), b: at(m.a) }));
+        const commun = idsE[morceauxE.findIndex((m) => m.de >= o0 - 1e-6 && m.a <= o1 + 1e-6)];
+        // Ce qui dépasse du mur neuf lui reste.
+        const restes: W[] = [];
+        if (o0 - s0 > 0.05) restes.push({ ...N, id: nomLibre(N.id), a: at(s0), b: at(o0) });
+        if (s1 - o1 > 0.05) restes.push({ ...N, id: nomLibre(N.id), a: at(o1), b: at(s1) });
+        for (const x of restes) neufs.add(x.id);
+        ws = [...ws.filter((w) => w !== N && w !== E), ...neufsE, ...restes];
+        remplacer(E.id, idsE);
+        remplacer(N.id, [restes[0]?.id, commun, restes[1]?.id].filter((x): x is string => !!x));
+        fait = true;
+        break;
+      }
+      if (fait) break;
+    }
+    if (!fait) break;
+  }
+  return { walls: ws, rooms: rs };
+}
+
+/**
  * LE NIVEAU SUR LEQUEL ON CALE CELUI QU'ON REGARDE — celui du dessous, ou à
  * défaut celui du dessus.
  *

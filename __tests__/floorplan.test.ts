@@ -1236,16 +1236,20 @@ describe('portes et fenêtres en volumes', () => {
     expect(holes.get('n')).toHaveLength(1);
   });
 
-  it('préfère malgré tout le mur de SA pièce', () => {
-    // Deux murs superposés, un par pièce : c'est le sien qui gagne, sinon
-    // une porte de palier percerait la cloison du voisin.
+  it('préfère malgré tout le mur de SA pièce — et perce aussi le mur confondu', () => {
+    // Deux murs superposés, un par pièce : c'est le sien qui porte la porte.
+    // Le mur confondu se perce aussi — revues « Sophie » et « Théo » : sinon
+    // la porte entre deux pièces restait murée en 3D — mais sans rien y poser
+    // une seconde fois (`secondaire`).
     const doublon: WallSeg[] = [
       { ...rect[0], id: 'n-r1', roomId: 'r1' },
       { ...rect[0], id: 'n-r2', roomId: 'r2', a: { x: 0, z: 0.02 }, b: { x: 4, z: 0.02 } },
     ];
     const holes = assignOpenings(doublon, [{ ...porte, roomId: 'r2' }], 0);
     expect(holes.get('n-r2')).toHaveLength(1);
-    expect(holes.get('n-r1')).toBeUndefined();
+    expect(holes.get('n-r2')![0].secondaire).toBeUndefined();
+    expect(holes.get('n-r1')).toHaveLength(1);
+    expect(holes.get('n-r1')![0].secondaire).toBe(true);
   });
 
   it('n’attrape pas une ouverture d’un mur perpendiculaire ou lointain', () => {

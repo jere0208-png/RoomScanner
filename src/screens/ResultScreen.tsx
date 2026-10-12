@@ -174,6 +174,7 @@ import {
   wallFace,
   type Fixture,
   type FixtureKind,
+  pieceDuCote,
 } from '../geometry/electrical';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { nomDeVersion, useScanStore } from '../store/scanStore';
@@ -2907,7 +2908,17 @@ export function ResultScreen() {
 
   /** Pose l'appareil sur ce mur et ouvre aussitot le mur vu de face. */
   const placeFixture = (kind: FixtureKind, wallId: string, height?: number) => {
-    const id = addFixture(kind, wallId, cibleDuRetour(wallId));
+    // Du côté de la pièce choisie, s'il y en a une (revue « Nicolas »).
+    const mur = walls.find((w) => w.id === wallId);
+    const cote: 1 | -1 | undefined =
+      mur && selectedRoomId
+        ? pieceDuCote(mur, 1, walls, rooms) === selectedRoomId
+          ? 1
+          : pieceDuCote(mur, -1, walls, rooms) === selectedRoomId
+            ? -1
+            : undefined
+        : undefined;
+    const id = addFixture(kind, wallId, cibleDuRetour(wallId), cote);
     setPendingKind(null);
     if (!id) return;
     // Rangé à côté d'un autre, sous une plaque commune : la main le sent,
@@ -4099,8 +4110,8 @@ export function ResultScreen() {
             selectedRoomId={selectedRoomId}
             /* Glisser dans la pièce choisie la déplace, avec ses meubles et
                son appareillage — et elle s'aimante aux murs voisins. */
-            onMoveRoom={(dx, dz) =>
-              selectedRoomId && moveRoom(selectedRoomId, dx, dz)
+            onMoveRoom={(dx, dz, aimant) =>
+              selectedRoomId && moveRoom(selectedRoomId, dx, dz, aimant)
             }
             ceiling={ceiling}
             showCeiling={showCeiling}

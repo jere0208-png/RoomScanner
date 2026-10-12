@@ -14285,6 +14285,57 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Un seul mur entre deux pièces ; décaler sans tordre ; le tableau projeté juste
+
+La suite de la troisième tournée, du plus gênant au moins gênant.
+
+**Un seul mur entre deux pièces, toujours** (revues « Sophie » et « Théo »).
+Une pièce accolée ou glissée contre une autre posait son mur par-dessus celui
+du voisin : quatre doublons en accolé, treize en glissé. Les conséquences :
+- en 3D, un seul des deux se perçait et la porte restait murée ;
+- la cote « depuis le coin » se prenait sur le mauvais mur ;
+- suivre le conseil du contrôle (« supprimez l'autre ») ouvrait sept pièces
+  sur huit.
+
+Ce qui change :
+- les murs qu'on vient de poser ou de déplacer cèdent la place à ceux qui
+  étaient là (`souderLesRecouvrements`). La part commune devient un mur que
+  les deux pièces partagent, et ce qui dépasse reste à la nouvelle pièce.
+  Cela vaut pour la pièce accolée, la pièce posée à côté et la pièce
+  glissée ;
+- une pièce accolée plus large que le mur choisi le prolonge, au lieu d'en
+  prendre la longueur sans rien dire ;
+- glisser une pièce n'aimante plus à chaque image. Un glissement lent d'un
+  mètre ne la bougeait pas. L'aimant et la soudure s'appliquent au lâcher, et
+  l'aimant rattrape les deux axes ;
+- retirer l'un de deux murs confondus laisse les pièces fermées : l'autre
+  prend sa place dans leur contour ;
+- en 3D, une porte perce tous les murs confondus. Le seuil et le vantail ne
+  se posent qu'une fois (`secondaire`).
+
+**Décaler sans tordre** (revues « Karim » et « Sophie »)
+- Le mur voisin d'un mur qu'on décale glisse le long de sa propre ligne. Un
+  pan coupé ou un mur à 80° ne tordent plus leurs voisins. « Longueur du
+  mur », qui décale le mur d'en bout, en profite aussi.
+- Un mur d'une autre pièce qui touche seulement le coin ne suit plus. Le mur
+  que partagent les deux pièces se coupe là où arrive le mur décalé, ou se
+  prolonge pour lui seul. Décaler le fond d'une cuisine accolée ne fait plus
+  du séjour un trapèze.
+
+**Le tableau projeté** (revue « Nicolas »). Trois circuits « Spécialisé 20 A
+— Cuisine » portaient le même libellé : le premier était posé trois fois sous
+le type A, et les deux autres finissaient hors de tout différentiel. Les
+différentiels désignent maintenant leurs circuits par identifiant
+(`circuitIds`, `circuitsDuDifferentiel`), dans le tableau projeté comme dans
+celui du PDF.
+
+**La face où l'on pose** (revue « Nicolas »). Sur une cloison, l'appareil
+allait sur la face de la première pièce trouvée : neuf poses sur trente-huit
+partaient chez le voisin, et la vue de l'établi basculait. L'établi pose sur
+la face affichée, et le plan sur celle de la pièce choisie.
+
+Bancs : `unseulmur`, `plansconstruits`.
+
 ## Troisième tournée : des plans construits de bout en bout, en 2D et en 3D
 
 Six profils ont construit eux-mêmes des plans, puis les ont regardés en 3D :

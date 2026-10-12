@@ -1657,6 +1657,30 @@ export interface Differential {
   type: 'A' | 'AC';
   rating: number;
   circuits: string[];
+  /**
+   * LES CIRCUITS PAR LEUR IDENTIFIANT — revue « Nicolas » : trois
+   * « Spécialisé 20 A — Cuisine » portent le même libellé, et le tableau
+   * projeté posait trois fois le premier, et les deux autres hors de tout
+   * différentiel. Absents des listes d'avant : on retombe sur les libellés.
+   */
+  circuitIds?: string[];
+}
+
+/** Les circuits d'un différentiel, chacun une seule fois (voir `circuitIds`). */
+export function circuitsDuDifferentiel(d: Differential, circuits: Circuit[]): Circuit[] {
+  if (d.circuitIds) {
+    const parId = new Map(circuits.map((c) => [c.id, c]));
+    return d.circuitIds.map((id) => parId.get(id)).filter((c): c is Circuit => !!c);
+  }
+  const pris = new Set<string>();
+  const out: Circuit[] = [];
+  for (const l of d.circuits) {
+    const c = circuits.find((x) => x.label === l && !pris.has(x.id));
+    if (!c) continue;
+    pris.add(c.id);
+    out.push(c);
+  }
+  return out;
 }
 
 /**
@@ -1681,6 +1705,7 @@ export function planDifferentials(circuits: Circuit[]): Differential[] {
       type: 'A',
       rating: 40,
       circuits: lot.map((c) => c.label),
+      circuitIds: lot.map((c) => c.id),
     }),
   );
   chunk(reste, MAX_PAR_DIFF).forEach((lot, i) =>
@@ -1689,6 +1714,7 @@ export function planDifferentials(circuits: Circuit[]): Differential[] {
       type: 'AC',
       rating: 40,
       circuits: lot.map((c) => c.label),
+      circuitIds: lot.map((c) => c.id),
     }),
   );
   // Un logement sans circuit spécialisé n'aurait aucun type A : la norme en
@@ -1699,6 +1725,7 @@ export function planDifferentials(circuits: Circuit[]): Differential[] {
       type: 'A',
       rating: 40,
       circuits: [],
+      circuitIds: [],
     });
   }
   return out;

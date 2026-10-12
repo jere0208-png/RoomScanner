@@ -951,7 +951,8 @@ export function WallElevation({
    * déjà qu'elle manque serait un détour.
    */
   const poser = (kind: FixtureKind, height?: number) => {
-    const id = addFixture(kind, wallId);
+    // Sur la face qu'on regarde, pas sur celle de la pièce d'à côté (revue « Nicolas »).
+    const id = addFixture(kind, wallId, undefined, side);
     if (!id) return;
     if (height !== undefined) {
       const pose = useScanStore.getState().fixtures.find(f => f.id === id);
@@ -1191,7 +1192,7 @@ export function WallElevation({
         break;
       }
     }
-    const id = addFixture(kind, wallId, x);
+    const id = addFixture(kind, wallId, x, side);
     if (!id) return;
     onSelect(id);
     haptic('succes');
