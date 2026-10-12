@@ -138,12 +138,12 @@ describe('le lien sur le papier', () => {
     for (let i = 0; i < bytes.length; i++) src += String.fromCharCode(bytes[i]);
     // Le tireté du plan électrique : celui de l'architecte (voir `ui/encreElec`).
     const lien = src.indexOf('[3 2.2]');
-    // Le témoin du bloc des symboles : le filet qui relie chacun à son mur,
-    // un trait plein de l'encre électrique. (Le sigle « RJ » qui servait de
-    // témoin a quitté le plan : la légende nomme la prise.)
+    // Le témoin du bloc des symboles : leur trait, plein, de l'encre
+    // électrique. (Le filet qui servait de témoin a quitté le plan : posé
+    // contre son mur comme chez l'architecte, le symbole n'en a plus.)
     const n2 = (v: number) => (Math.round(v * 100) / 100).toString();
     const rgb = [1, 3, 5].map((i) => n2(parseInt('#D7263D'.slice(i, i + 2), 16) / 255)).join(' ');
-    const filet = src.indexOf(`${rgb} RG 0.6 w [] 0 d`);
+    const filet = src.indexOf(`${rgb} RG 0.9 w`);
     expect(lien).toBeGreaterThanOrEqual(0);
     expect(filet).toBeGreaterThanOrEqual(0);
     expect(lien).toBeLessThan(filet);

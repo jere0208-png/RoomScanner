@@ -108,6 +108,47 @@ export interface Fixture {
    * jamais valoir « fais l'inhabituel ».
    */
   sansPontage?: boolean;
+  /**
+   * L'APPAREIL QU'ELLE DESSERT, en sigle de plan d'architecte — « LV »
+   * (lave-vaisselle), « PL » (plaque), « FO » (four)… Voir `USAGES`. Il
+   * s'écrit dans le rond d'une alimentation dédiée (`libelleDuSymbole`).
+   */
+  usage?: string;
+}
+
+/**
+ * LES APPAREILS QU'UNE ALIMENTATION DÉDIÉE DESSERT — les sigles de la
+ * légende d'un plan d'architecte (DCE « Romeo » : « Alim Lave vaisselle »,
+ * « Alim Plaque »…), écrits dans le rond du symbole.
+ */
+export const USAGES: { sigle: string; label: string }[] = [
+  { sigle: 'LV', label: 'Lave-vaisselle' },
+  { sigle: 'LL', label: 'Lave-linge' },
+  { sigle: 'SL', label: 'Sèche-linge' },
+  { sigle: 'FO', label: 'Four' },
+  { sigle: 'PL', label: 'Plaque de cuisson' },
+  { sigle: 'MI', label: 'Micro-ondes' },
+  { sigle: 'FRI', label: 'Réfrigérateur' },
+  { sigle: 'CG', label: 'Congélateur' },
+  { sigle: 'H', label: 'Hotte' },
+  { sigle: 'SS', label: 'Sèche-serviettes' },
+  { sigle: 'CU', label: 'Chauffe-eau' },
+  { sigle: 'CL', label: 'Climatisation' },
+  { sigle: 'VE', label: 'Borne de recharge' },
+];
+
+/**
+ * LES APPAREILS QU'ON PROPOSE POUR UN TYPE DE SORTIE — ceux qu'elle
+ * alimente d'ordinaire. Une prise 20 A dessert un lave-linge, pas une
+ * plaque ; une sortie de câble, une plaque ou un chauffe-eau.
+ */
+export function usagesPour(kind: FixtureKind): { sigle: string; label: string }[] {
+  const pris = (sigles: string[]) => USAGES.filter((u) => sigles.includes(u.sigle));
+  if (kind === 'prise20') return pris(['LV', 'LL', 'SL', 'FO', 'CG']);
+  if (kind === 'prise32') return pris(['PL', 'FO']);
+  if (kind === 'sortieCable') return pris(['PL', 'CU', 'CL', 'SS', 'VE']);
+  if (kind === 'prise') return pris(['FRI', 'MI', 'H', 'SS']);
+  return [];
 }
 
 /**
@@ -1012,29 +1053,30 @@ export interface SymbolStroke {
 }
 
 /**
- * LE SOCLE DE PRISE — le demi-cercle sur sa tige.
+ * LE SOCLE DE PRISE — l'arc posé sur le mur, sa tige vers la pièce.
  *
- * C'est le symbole de la prise de courant sur un plan français : un
- * demi-disque appuyé sur son diamètre, prolongé d'une tige qui rejoint le
- * mur. Tout le reste du jeu s'en déduit par ajout d'un signe distinctif, et
- * jamais par changement de forme — c'est ce qui permet de lire un plan sans
- * revenir à la légende à chaque symbole.
+ * Relevé du patron, plan d'architecte à l'appui (DCE « Romeo ») : « je
+ * trouve ces plans plus intuitifs ». La prise y est un demi-cercle OUVERT
+ * sur le mur, ses deux pointes contre la maçonnerie, et une courte tige qui
+ * part vers la pièce ; « 2 » au bout de la tige pour une double, « RJ45 » à
+ * côté pour la communication. Le demi-disque sur son diamètre, tige vers le
+ * mur, se lisait à l'envers de ce que dessinent les architectes.
+ *
+ * Repère : +y vers le mur ; les pointes de l'arc touchent le mur (y = 10).
  */
 const SOCLE: SymbolStroke[] = [
-  { d: 'M-8 2 H8' },
-  { d: 'M-8 2 A8 8 0 0 1 8 2' },
-  { d: 'M0 2 V10' },
+  { d: 'M-7 10 A7 7 0 0 1 7 10' },
+  { d: 'M0 3 V-3' },
 ];
 
 /**
- * La barre du socle SPÉCIALISÉ : un trait en travers du diamètre.
- *
- * Une prise 20 A de lave-linge et une prise 16 A de séjour se dessinaient
- * exactement pareil — seul le sigle écrit à côté les distinguait, et il
- * disparaît dès qu'on dézoome. La convention marque le circuit spécialisé
- * d'un trait : on le voit sans lire.
+ * L'ALIMENTATION DÉDIÉE — le rond de la légende (« Alim Lave vaisselle »,
+ * « Alim Plaque »…), où s'écrit le sigle de l'appareil (`usage`) ou, à
+ * défaut, le calibre.
  */
-const BARRE_SPECIALISE: SymbolStroke = { d: 'M-4.5 -2.5 H4.5' };
+const ROND_ALIM: SymbolStroke[] = [
+  { d: 'M-6.5 3 a6.5 6.5 0 1 0 13 0 a6.5 6.5 0 1 0 -13 0' },
+];
 
 /**
  * La prise de COMMUNICATION : le socle, barré d'un trait vertical.
@@ -1043,17 +1085,20 @@ const BARRE_SPECIALISE: SymbolStroke = { d: 'M-4.5 -2.5 H4.5' };
  * voisinent — c'est le cas de tous les séjours — rien ne les distinguait
  * que la couleur, qui disparaît à l'impression en noir et blanc.
  */
-const TRAIT_VDI: SymbolStroke = { d: 'M0 2 V-5' };
+const TRAIT_VDI: SymbolStroke = { d: 'M0 9.5 V5.5' };
 
+/**
+ * L'INTERRUPTEUR : un petit rond contre le mur, sa manette et son drapeau —
+ * le rond est creux, comme dans la légende de l'architecte.
+ */
 const POINT_MUR: SymbolStroke = {
-  d: 'M0 8 m-2.4 0 a2.4 2.4 0 1 0 4.8 0 a2.4 2.4 0 1 0 -4.8 0',
-  fill: true,
+  d: 'M0 7.6 m-2.4 0 a2.4 2.4 0 1 0 4.8 0 a2.4 2.4 0 1 0 -4.8 0',
 };
 
 const MANETTE: SymbolStroke[] = [
   POINT_MUR,
-  { d: 'M0 8 L6 -4' },
-  { d: 'M2.6 -5.6 L9.6 -2.2' },
+  { d: 'M1.2 5.5 L6 -4' },
+  { d: 'M6 -4 L9.8 -2.3' },
 ];
 
 /**
@@ -1168,49 +1213,43 @@ function shiftPath(d: string, dx: number): string {
 export const FIXTURE_SYMBOL: Record<FixtureKind, SymbolStroke[]> = {
   prise: SOCLE,
   /**
-   * La prise DOUBLE : deux demi-disques sur une même tige.
-   *
-   * Elle était dessinée comme un arc de plus à l'intérieur du premier, ce
-   * qui n'est la convention de personne — ça se lisait comme une prise
-   * simple mal imprimée. Deux socles côte à côte, c'est ce que l'œil
-   * attend.
+   * La prise DOUBLE, quand on la dessine seule (la légende, le devis) : deux
+   * arcs côte à côte contre le mur. Sur le plan, l'ensemble se dessine d'un
+   * arc et de son « 2 » (`symboleCompact`, `libelleDuSymbole`).
    */
   prise2: [
-    { d: 'M-9 2 H9' },
-    { d: 'M-9 2 A4.5 4.5 0 0 1 0 2' },
-    { d: 'M0 2 A4.5 4.5 0 0 1 9 2' },
-    { d: 'M0 2 V10' },
+    { d: 'M-9 10 A4.5 4.5 0 0 1 0 10' },
+    { d: 'M0 10 A4.5 4.5 0 0 1 9 10' },
+    { d: 'M0 5.5 V-1' },
   ],
-  prise20: [...SOCLE, BARRE_SPECIALISE],
-  // La 32 A porte DEUX barres : c'est le plus gros calibre du logement, et
-  // la confondre avec un 20 A se paie en section de câble.
-  prise32: [
-    ...SOCLE,
-    BARRE_SPECIALISE,
-    { d: 'M-4.5 -5 H4.5' },
-  ],
+  // Les alimentations dédiées : le rond de la légende. Le calibre ou le
+  // sigle de l'appareil s'y écrit (`libelleDuSymbole`) ; la 32 A porte en
+  // plus son trait de spécialisé, pour se distinguer sans lire.
+  prise20: ROND_ALIM,
+  prise32: [...ROND_ALIM, { d: 'M-6.5 10 H6.5' }],
   inter: MANETTE,
-  va: [...MANETTE, { d: 'M1.2 -8.4 L8.2 -5' }],
-  poussoir: [POINT_MUR, { d: 'M0 8 V-4' }, { d: 'M-5 -4 H5' }],
+  va: [...MANETTE, { d: 'M4.6 -1.1 L8.4 0.6' }],
+  poussoir: [POINT_MUR, { d: 'M0 5.2 V-4' }, { d: 'M-5 -4 H5' }],
   variateur: [
     ...MANETTE,
     { d: 'M-9 -1 L-2.5 -6.5' },
     { d: 'M-9 -1 l3.4 0.5' },
     { d: 'M-9 -1 l0.5 -3.4' },
   ],
+  // La communication : le socle, et son mot écrit à côté (« RJ45 », « TV »).
+  // Le petit trait dans l'arc la distingue encore sans lire.
   rj45: [...SOCLE, TRAIT_VDI],
-  // La TV : le socle de communication, avec l'antenne au-dessus.
-  tv: [
-    ...SOCLE,
-    TRAIT_VDI,
-    { d: 'M-3.5 -5 L0 -8 L3.5 -5' },
-  ],
+  tv: [...SOCLE, TRAIT_VDI, { d: 'M-2.5 6.5 H2.5' }],
+  /*
+    L'APPLIQUE : le demi-disque contre le mur, barré de sa croix — le point
+    lumineux coupé en deux par la maçonnerie, comme sur le plan
+    d'architecte.
+  */
   applique: [
-    { d: 'M-6 -2 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0' },
-    { d: 'M-4.2 -6.2 L4.2 2.2' },
-    { d: 'M4.2 -6.2 L-4.2 2.2' },
-    { d: 'M0 4 V9' },
-    { d: 'M-7 9.5 H7' },
+    { d: 'M-7 10 H7' },
+    { d: 'M-7 10 A7 7 0 0 1 7 10' },
+    { d: 'M-7 10 L4.95 5.05' },
+    { d: 'M7 10 L-4.95 5.05' },
   ],
   tableau: [
     { d: 'M-9 -7 H9 V7 H-9 Z' },
@@ -1226,10 +1265,14 @@ export const FIXTURE_SYMBOL: Record<FixtureKind, SymbolStroke[]> = {
     { d: 'M-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0' },
     { d: 'M-4 0 H4' },
   ],
+  /*
+    LA SORTIE DE CÂBLE : « Alim. diverse » de la légende — le cadre et sa
+    flèche brisée (clim, volet, portail, plaque câblée en direct).
+  */
   sortieCable: [
-    { d: 'M0 4 m-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0', fill: true },
-    { d: 'M0 1 V-8' },
-    { d: 'M-4 -8 H4' },
+    { d: 'M-9 -2 H9 V10 H-9 Z' },
+    { d: 'M-6 6.5 H-1.5 L1.5 1.5 H6' },
+    { d: 'M3.6 -0.2 L6 1.5 L3.6 3.2' },
   ],
   boite: [
     { d: 'M-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0' },
@@ -1335,6 +1378,57 @@ export function symbolPolylines(
 
 /** Demi-largeur du repère des symboles : ils tiennent tous dans ±11. */
 export const SYMBOL_SPAN = 22;
+
+/**
+ * LE MOT DU SYMBOLE, comme sur un plan d'architecte : « 2 » au bout de la
+ * tige d'une prise double, « RJ45 » ou « TV » à côté de son socle, le sigle
+ * de l'appareil (« LV », « PL »…) ou le calibre dans le rond d'une
+ * alimentation dédiée. Il se lit DROIT, quel que soit le mur : seul son
+ * point d'ancrage (`ou`, dans le repère du symbole) tourne avec lui.
+ *
+ * `compte` : le mot dit le nombre de postes — le « ×2 » n'a plus à le dire.
+ * `taille` : le corps du texte, en unités du repère.
+ */
+export function libelleDuSymbole(
+  posts: FixtureKind[],
+  kind: FixtureKind,
+  usage?: string,
+): { texte: string; ou: { x: number; y: number }; taille: number; compte: boolean } | null {
+  const ps = posts.length > 0 ? posts : [kind];
+  const tige = { x: 0, y: -9 };
+  if (ps.length === 1 && (ps[0] === 'prise20' || ps[0] === 'prise32')) {
+    const texte = usage || (ps[0] === 'prise20' ? '20A' : '32A');
+    return { texte, ou: { x: 0, y: 3 }, taille: texte.length > 2 ? 4.6 : 5.6, compte: false };
+  }
+  if (ps.length === 1 && ps[0] === 'sortieCable') {
+    return usage ? { texte: usage, ou: { x: 0, y: -8 }, taille: 6, compte: false } : null;
+  }
+  const rj = ps.filter((p) => p === 'rj45').length;
+  const tv = ps.filter((p) => p === 'tv').length;
+  if (rj > 0) return { texte: rj > 1 ? `RJ45×${rj}` : 'RJ45', ou: tige, taille: 5.4, compte: rj > 1 };
+  if (tv > 0) return { texte: 'TV', ou: tige, taille: 6, compte: false };
+  if (ps.every((p) => p === 'prise')) {
+    if (usage) return { texte: usage, ou: tige, taille: 6, compte: false };
+    return ps.length > 1 ? { texte: String(ps.length), ou: tige, taille: 6.5, compte: true } : null;
+  }
+  return null;
+}
+
+/**
+ * Un point du repère d'un symbole, posé sur la feuille comme `symbolePose`
+ * pose ses traits — c'est là que s'ancre son mot.
+ */
+export function pointDuSymbole(
+  p: { x: number; y: number },
+  cx: number,
+  cy: number,
+  k: number,
+  versLeMur: { x: number; y: number } = { x: 0, y: -1 },
+): { x: number; y: number } {
+  const w = versLeMur;
+  const e = { x: -w.y, y: w.x };
+  return { x: cx + (p.x * e.x + p.y * w.x) * k, y: cy + (p.x * e.y + p.y * w.y) * k };
+}
 
 /**
  * JUSQU'OÙ UN SYMBOLE DESCEND VERS SON MUR, dans son repère.

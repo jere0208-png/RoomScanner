@@ -31,7 +31,7 @@ import LampWallUp from 'lucide-react-native/icons/lamp-wall-up';
 import ScanEye from 'lucide-react-native/icons/scan-eye';
 import { useTheme } from '../theme';
 import { SOLAIRES } from '../ui/solaires';
-import { CEILINGS, type CeilingKind } from '../geometry/ceiling';
+import { CEILINGS, CEILING_SYMBOL, type CeilingKind } from '../geometry/ceiling';
 
 /** « spots » = la ligne de spots, qui n'est pas un appareil mais un geste. */
 export type CeilingIconKind = CeilingKind | 'spots';
@@ -80,6 +80,27 @@ export function CeilingIcon({
           fill={teinteFamille || c.ink}
           fillRule="evenodd"
         />
+      </Svg>
+    );
+  }
+  /*
+    LE RUBAN LED ET LE SPOT AU SOL n'ont pas d'icône au trait dans ce jeu :
+    ils se dessinent comme sur le plan, d'après la légende de l'architecte.
+  */
+  if (kind === 'led' || kind === 'spotSol') {
+    return (
+      <Svg width={size} height={size} viewBox="-12 -12 24 24">
+        {CEILING_SYMBOL[kind].map((seg, i) => (
+          <Path
+            key={i}
+            d={seg.d}
+            stroke={teinteFamille || c.ink}
+            strokeWidth={1.9}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
+          />
+        ))}
       </Svg>
     );
   }

@@ -19,15 +19,19 @@ import {
   faceX,
   facePoint,
   filetJusquAuSymbole,
+  libelleDuSymbole,
+  porteeVersLeMur,
   postsOf,
   symboleCompact,
   stackRanks,
   wallFace,
   type Fixture,
+  type SymbolStroke,
 } from '../geometry/electrical';
 import { linkCurve } from '../geometry/ceiling';
 import type { Pt, WallSeg } from '../geometry/floorplan';
 import { markColor } from '../geometry/schema';
+import { SUREPAISSEUR_FACADE } from '../geometry/poche';
 import {
   LienQuiSeTisse,
   OndeePose,
@@ -50,6 +54,41 @@ export function rayonDAppareil(echelle: number): number {
   return Math.max(2.5, (5.5 * echelle) / 60);
 }
 
+/**
+ * LE SYMBOLE SE POSE CONTRE SON MUR — comme sur le plan d'architecte : les
+ * pointes de l'arc d'une prise touchent la maçonnerie, le rond d'un
+ * interrupteur aussi. Rend la distance (m) du nu au centre du symbole :
+ * deux centimètres d'air, plus ce que le symbole descend vers son mur.
+ */
+export function sortieDuSymbole(symbole: SymbolStroke[], echelle: number, bande = 0): number {
+  return 0.02 + bande + (porteeVersLeMur(symbole) * rayonDAppareil(echelle)) / 11 / Math.max(echelle, 1e-6);
+}
+
+/**
+ * La surépaisseur à franchir : posé sur la face EXTÉRIEURE d'une façade
+ * (`dehors` : le côté du dehors de chaque mur), le symbole passe d'abord la
+ * bande de façade du poché.
+ */
+export function bandeDeFacade(
+  f: Fixture,
+  walls: WallSeg[],
+  dehors?: Map<string, 1 | -1>,
+): number {
+  if (!dehors || dehors.get(f.wallId) !== f.side) return 0;
+  const w = walls.find((x) => x.id === f.wallId);
+  return w && w.epaisseur === undefined ? SUREPAISSEUR_FACADE : 0;
+}
+
+/** La même, pour un appareil seul (les liens de commande partent de lui). */
+export function sortieDeLAppareil(
+  f: Fixture,
+  echelle: number,
+  walls: WallSeg[] = [],
+  dehors?: Map<string, 1 | -1>,
+): number {
+  return sortieDuSymbole(symboleCompact(postsOf(f.kind), f.kind).symbole, echelle, bandeDeFacade(f, walls, dehors));
+}
+
 export function FixtureLayer({
   fixtures,
   circuitMarks,
@@ -61,8 +100,11 @@ export function FixtureLayer({
   navigating,
   onSelectFixture,
   encre,
+  dehors,
   c,
 }: {
+  /** Le côté du dehors de chaque façade : un appareil posé dehors la franchit. */
+  dehors?: Map<string, 1 | -1>;
   /**
    * L'ENCRE DU PLAN ÉLECTRIQUE (voir `ui/encreElec`) : toute l'électricité
    * d'un seul rouge, comme sur un plan d'architecte. Absente, chaque
@@ -109,7 +151,7 @@ export function FixtureLayer({
     const w = walls.find((x) => x.id === f.wallId);
     if (!w) return null;
     const fa = wallFace(w, quads.get(w.id), f.side);
-    const pt = facePoint(fa, faceX(fa, f.along), 0.16);
+    const pt = facePoint(fa, faceX(fa, f.along), sortieDeLAppareil(f, mapping.scale, walls, dehors));
     return mapping.toPx({ x: pt.x, z: pt.z });
   };
   const view = { rot: viewRot };
@@ -129,8 +171,8 @@ export function FixtureLayer({
           if (!wf || !wc) return null;
           const fa = wallFace(wf, quads.get(wf.id), f.side);
           const fc = wallFace(wc, quads.get(wc.id), cmd.side);
-          const de = facePoint(fa, faceX(fa, f.along), 0.16);
-          const vers = facePoint(fc, faceX(fc, cmd.along), 0.16);
+          const de = facePoint(fa, faceX(fa, f.along), sortieDeLAppareil(f, mapping.scale, walls, dehors));
+          const vers = facePoint(fc, faceX(fc, cmd.along), sortieDeLAppareil(cmd, mapping.scale, walls, dehors));
           const courbe = linkCurve(
             { x: de.x, z: de.z },
             { x: vers.x, z: vers.z },
@@ -303,11 +345,16 @@ export function FixtureLayer({
         return unites.map(({ f, face, x, postes }) => {
           const spec = FIXTURES[f.kind];
           const { symbole: symbol, fois } = symboleCompact(postes, f.kind);
-          const tag = assemblyTag(postes);
+          // Le mot de l'architecte (« 2 », « RJ45 », « LV »…) remplace le
+          // sigle d'appoint, et le « ×2 » quand il dit déjà le nombre.
+          const libelle = libelleDuSymbole(postes, f.kind, f.usage);
+          const tag = libelle ? null : assemblyTag(postes);
           // Échelonnement : le deuxième appareil du même point se pose
-          // plus loin du mur, sur le même filet.
+          // plus loin du mur, sur le même filet. Le premier TOUCHE son mur.
           const lod = navigating ? 0 : elecLod;
-          const out = 0.14 + (ranks.get(f.id) ?? 0) * (0.1 + 0.14 * lod);
+          const out =
+            sortieDuSymbole(symbol, mapping.scale, bandeDeFacade(f, walls, dehors)) +
+            (ranks.get(f.id) ?? 0) * (0.1 + 0.14 * lod);
           const anchor = mapping.toPx(facePoint(face, x, 0.02));
           const p = mapping.toPx(facePoint(face, x, out));
           // Le symbole regarde SA face : sa tige rejoint le mur. Le
@@ -436,8 +483,43 @@ export function FixtureLayer({
                       />
                     ))}
                   </G>
+                  {libelle &&
+                    (() => {
+                      /*
+                        LE MOT SE LIT DROIT. Son ancre tourne avec le
+                        symbole ; lui non. Hors du rond, il s'écarte de
+                        la moitié de son encombrement dans la direction
+                        de son ancre : « RJ45 » ne mord pas sur l'arc.
+                      */
+                      const k = rayon / 11;
+                      const a = (dir * Math.PI) / 180;
+                      const ox = libelle.ou.x * Math.cos(a) - libelle.ou.y * Math.sin(a);
+                      const oy = libelle.ou.x * Math.sin(a) + libelle.ou.y * Math.cos(a);
+                      // Il dézoome avec son symbole (relevé du patron).
+                      const fs = libelle.taille * k * 1.15;
+                      const dedans = libelle.ou.x === 0 && libelle.ou.y > 0;
+                      const L = Math.hypot(ox, oy) || 1;
+                      const larg = libelle.texte.length * fs * 0.6;
+                      const haut = fs * 0.8;
+                      const demi = dedans
+                        ? 0
+                        : (Math.abs(ox / L) * larg + Math.abs(oy / L) * haut) / 2;
+                      const lx = p.x + (ox / L) * (L * k + demi);
+                      const ly = p.y + (oy / L) * (L * k + demi);
+                      return (
+                        <SvgText
+                          x={lx}
+                          y={ly + fs * 0.36}
+                          fill={encre ?? spec.color}
+                          fontSize={fs}
+                          fontWeight="700"
+                          textAnchor="middle">
+                          {libelle.texte}
+                        </SvgText>
+                      );
+                    })()}
                   {/* « ×3 » : le nombre de postes, en petit, contre le symbole. */}
-                  {fois ? (
+                  {fois && !libelle?.compte ? (
                     <G>
                       {/* À la taille de SON symbole : il dézoome avec lui. */}
                       <Rect

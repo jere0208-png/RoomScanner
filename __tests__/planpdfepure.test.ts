@@ -117,7 +117,10 @@ describe('le plan de l’exemple, épuré', () => {
 
   it('la légende dessine le logo RJ une fois, avec ou sans prises', () => {
     const ecrits = mots(plan).map((m) => m.texte);
-    expect(ecrits.filter((t) => t.startsWith('RJ45'))).toEqual(['RJ45, seule ou avec prises']);
+    expect(ecrits.filter((t) => t.startsWith('RJ45') && t !== 'RJ45')).toEqual(['RJ45, seule ou avec prises']);
+    // Et sur le plan, chaque prise de communication porte son mot, comme
+    // chez l'architecte (DCE « Romeo »).
+    expect(ecrits.filter((t) => t === 'RJ45').length).toBeGreaterThan(0);
     expect(ecrits).toContain('APPAREILLAGE');
     expect(ecrits).toContain('Lien de commande');
   });

@@ -15,6 +15,7 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { castToWall, type Pt, type WallSeg } from '../geometry/floorplan';
 import { CEILINGS, type CeilingFixture } from '../geometry/ceiling';
+import { longueurDuRuban } from '../geometry/ruban';
 import { CarteDuMenu, IconeBandeau } from './StripBar';
 import { haptic } from '../ui/haptic';
 import { SOLAIRES } from '../ui/solaires';
@@ -184,6 +185,10 @@ export function CeilingBar({
                 <View style={styles.bandeauTexte}>
                   <Text style={styles.bandeauTitre} numberOfLines={1}>
                     {CEILINGS[fixture.kind].label}
+                    {/* Un ruban se dit à sa longueur : c'est ce qu'on achète. */}
+                    {fixture.trace
+                      ? ` · ${longueurDuRuban(fixture.trace, fixture.ferme).toFixed(2).replace('.', ',')} m`
+                      : ''}
                   </Text>
                   <View style={styles.editRow}>
                     {/*

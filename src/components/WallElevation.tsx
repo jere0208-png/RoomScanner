@@ -72,6 +72,7 @@ import {
   COMMANDES_MURALES,
   FIXTURE_FAMILIES,
   seCommande,
+  usagesPour,
   type FixtureKind,
 } from '../geometry/electrical';
 import {
@@ -235,6 +236,7 @@ export function WallElevation({
   const moveFixture = useScanStore(s => s.moveFixture);
   const addFixture = useScanStore(s => s.addFixture);
   const flipFixture = useScanStore(s => s.flipFixture);
+  const setFixtureUsage = useScanStore(s => s.setFixtureUsage);
   const basculerPontage = useScanStore(s => s.basculerPontage);
   const removeFixture = useScanStore(s => s.removeFixture);
   const repeterFixture = useScanStore(s => s.repeterFixture);
@@ -2618,6 +2620,33 @@ export function WallElevation({
                         'M9 12 h6',
                       ],
                       press: () => basculerPontage(selected.id),
+                    },
+                    /*
+                      L'APPAREIL DESSERVI — le sigle de la légende de
+                      l'architecte (« LV », « PL »…), écrit dans le symbole
+                      du plan. Seulement pour une sortie qui en dessert un.
+                    */
+                    {
+                      key: 'usage',
+                      label: selected.usage ?? 'Appareil',
+                      on: usagesPour(selected.kind).length > 0,
+                      tint: c.blue,
+                      plein: null,
+                      paths: ['M12 12 m-8 0 a8 8 0 1 0 16 0 a8 8 0 1 0 -16 0', 'M8.5 12 h7'],
+                      press: () =>
+                        alerte(
+                          'Ce qu’elle alimente',
+                          'Son sigle s’écrit dans le symbole du plan, comme sur un plan d’architecte.',
+                          [
+                            ...usagesPour(selected.kind).map(u => ({
+                              label: `${u.label} (${u.sigle})`,
+                              onPress: () => setFixtureUsage(selected.id, u.sigle),
+                            })),
+                            ...(selected.usage
+                              ? [{ label: 'Aucun', onPress: () => setFixtureUsage(selected.id, undefined) }]
+                              : [{ label: 'Annuler' }]),
+                          ],
+                        ),
                     },
                     {
                       key: 'flip',

@@ -722,6 +722,15 @@ export function nomDeVersion(nom: string, pris: string[]): string {
   return `${base} — version ${k}`;
 }
 
+/**
+ * UN APPAREIL DE PLAFOND BOUGE AVEC SON TRACÉ — le ruban LED n'est pas un
+ * point : quand la pièce glisse, se recadre ou tourne, chaque point de son
+ * tracé suit le même chemin que son ancre.
+ */
+function avecSaTrace(cl: CeilingFixture, f: (p: Pt) => Pt): CeilingFixture {
+  return cl.trace ? { ...cl, at: f(cl.at), trace: cl.trace.map(f) } : { ...cl, at: f(cl.at) };
+}
+
 /** Une clé de relevé : unique, courte, sans signification. */
 function nouvelleCle(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -1878,6 +1887,11 @@ interface ScanState {
   /** Bascule l'appareil sur l'autre face du mur, sans le déplacer. */
   flipFixture: (id: string) => void;
   /**
+   * L'APPAREIL QU'ELLE DESSERT (« LV », « PL »…, voir `USAGES`) — il
+   * s'écrit dans son symbole. `undefined` le retire.
+   */
+  setFixtureUsage: (id: string, usage: string | undefined) => void;
+  /**
    * Repose les DEUX appareils d'un ensemble d'un coup.
    *
    * Choisir « ensemble centré » déplace aussi le premier : il faut donc
@@ -1935,6 +1949,11 @@ interface ScanState {
     ligne?: { row: string; axe: SpotAxis },
   ) => string;
   moveCeiling: (id: string, at: Pt) => void;
+  /**
+   * POSE UN RUBAN LED — un tracé ouvert ou fermé dans la pièce (voir
+   * `ruban.ts`). Rend son identifiant, ou `undefined` sans tracé valable.
+   */
+  addRuban: (roomId: string, trace: Pt[], ferme: boolean) => string | undefined;
   removeCeiling: (id: string) => void;
   /** Repose toute une ligne de spots : nouvelles places, nouvel axe. */
   setCeilingRow: (row: string, pts: Pt[], axe: SpotAxis) => void;
@@ -3068,7 +3087,11 @@ export const useScanStore = create<ScanState>((set, get) => {
         vieille?.surface && j >= 0
           ? recadrerAuCadre(cl.at, vieille.surface.pts, shapes[j].outline)
           : cl.at;
-      return { ...cl, at, roomId: idPiece(roomIndexAt(at, contours)) };
+      // Le tracé d'un ruban suit le même recadrage que son ancre.
+      const deplace = vieille?.surface && j >= 0
+        ? avecSaTrace(cl, (p) => recadrerAuCadre(p, vieille!.surface!.pts, shapes[j].outline))
+        : cl;
+      return { ...deplace, at, roomId: idPiece(roomIndexAt(at, contours)) };
     });
     set({
       walls: remplacer(st.walls, jeu.walls, walls),
@@ -3589,7 +3612,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         openings: st.openings.map(emporter),
         ceiling: st.ceiling.map((cl) =>
           cl.roomId === roomId
-            ? { ...cl, at: recadrerAuCadre(cl.at, bAvant, bApres) }
+            ? avecSaTrace(cl, (p) => recadrerAuCadre(p, bAvant, bApres))
             : cl,
         ),
         fixtures: st.fixtures.map((f) =>
@@ -4130,7 +4153,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         ),
         ceiling: st.ceiling.map((cl) =>
           cl.roomId === roomId
-            ? { ...cl, at: { x: cl.at.x + ddx, z: cl.at.z + ddz } }
+            ? avecSaTrace(cl, (p) => ({ x: p.x + ddx, z: p.z + ddz }))
             : cl,
         ),
         dirty: true,
@@ -4389,7 +4412,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           jeu.ceiling.map((cl) => {
             const v = cadreDe(avantParts, cl.roomId);
             const nv = cadreDe(apresParts, cl.roomId);
-            return v && nv ? { ...cl, at: recadrerAuCadre(cl.at, v, nv) } : cl;
+            return v && nv ? avecSaTrace(cl, (p) => recadrerAuCadre(p, v, nv)) : cl;
           }),
         ),
         dirty: true,
@@ -5965,6 +5988,20 @@ export const useScanStore = create<ScanState>((set, get) => {
       return id;
     },
 
+    addRuban: (roomId, trace, ferme) => {
+      if (trace.length < 2 || trace.some((p) => !sontFinis(p.x, p.z))) return undefined;
+      pushHistory('addCeiling');
+      const id = `pl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      set({
+        ceiling: [
+          ...get().ceiling,
+          { id, kind: 'led', roomId, at: { ...trace[0] }, trace: trace.map((p) => ({ ...p })), ferme },
+        ],
+        dirty: true,
+      });
+      return id;
+    },
+
     /**
      * REPOSER UNE LIGNE, d'un seul geste et d'un seul repentir.
      *
@@ -6021,8 +6058,13 @@ export const useScanStore = create<ScanState>((set, get) => {
           ? insetOnRing(ring, at, WALL_T / 2 + 0.03)
           : at;
       pushHistory(`ceiling:${id}`);
+      // Un ruban glisse en entier : son tracé suit son ancre.
+      const dx = pose.x - cl.at.x;
+      const dz = pose.z - cl.at.z;
       set({
-        ceiling: st.ceiling.map((c) => (c.id === id ? { ...c, at: pose } : c)),
+        ceiling: st.ceiling.map((c) =>
+          c.id === id ? avecSaTrace(c, (p) => ({ x: p.x + dx, z: p.z + dz })) : c,
+        ),
         dirty: true,
       });
     },
@@ -6215,6 +6257,22 @@ export const useScanStore = create<ScanState>((set, get) => {
         fixtures: get().fixtures.map((f) =>
           f.id === id ? { ...f, along, group: undefined } : f,
         ),
+        dirty: true,
+      });
+    },
+
+    setFixtureUsage: (id, usage) => {
+      const f = get().fixtures.find((x) => x.id === id);
+      if (!f || (f.usage ?? undefined) === usage) return;
+      pushHistory('setFixtureUsage');
+      set({
+        fixtures: get().fixtures.map((x) => {
+          if (x.id !== id) return x;
+          const neuf = { ...x };
+          if (usage) neuf.usage = usage;
+          else delete neuf.usage;
+          return neuf;
+        }),
         dirty: true,
       });
     },
@@ -6923,7 +6981,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         ceiling: st.ceiling.map((cl) => {
           const piece = st.rooms.find((r) => r.id === cl.roomId);
           return piece && niveauDe(piece) === n
-            ? { ...cl, at: bouge(cl.at) }
+            ? avecSaTrace(cl, bouge)
             : cl;
         }),
         /*
@@ -6973,7 +7031,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           return { ...o, transform: t };
         }),
         ceiling: st.ceiling.map((cl) =>
-          dansLeNiveau(cl.roomId) ? { ...cl, at: tourne(cl.at) } : cl,
+          dansLeNiveau(cl.roomId) ? avecSaTrace(cl, tourne) : cl,
         ),
         notes: st.notes.map((x) => (niveauDe(x) === n ? { ...x, at: tourne(x.at) } : x)),
         mesures: st.mesures.map((x) => (niveauDe(x) === n ? { ...x, a: tourne(x.a), b: tourne(x.b) } : x)),

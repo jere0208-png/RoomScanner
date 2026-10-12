@@ -37,8 +37,8 @@ describe('la portée d’un symbole vers son mur', () => {
   it('est le bout de sa tige, dans son repère', () => {
     // Le socle : sa tige descend jusqu'à y = 10.
     expect(porteeVersLeMur(FIXTURE_SYMBOL.prise)).toBeCloseTo(10);
-    // L'interrupteur : le point du mur, centré à 8, de rayon 2,4.
-    expect(porteeVersLeMur(FIXTURE_SYMBOL.inter)).toBeCloseTo(10.4);
+    // L'interrupteur : son rond creux, centré à 7,6, de rayon 2,4.
+    expect(porteeVersLeMur(FIXTURE_SYMBOL.inter)).toBeCloseTo(10);
   });
 });
 
@@ -65,32 +65,32 @@ describe('le filet s’arrête avant le symbole', () => {
 });
 
 describe('dans le dossier, le symbole tourne vers son mur', () => {
-  // Le bout de la tige d'un socle, posé en (100, 100) à l'échelle 0,5.
-  const boutDeTige = (versLeMur: { x: number; y: number }) => {
-    const traits = symbolePose(FIXTURE_SYMBOL.prise, 100, 100, 0.5, versLeMur);
-    // La tige : le trait « M0 2 V10 », le troisième du socle.
-    return traits[2].pts[1];
+  // Les pointes de l'arc d'un socle — contre le mur — et le bout de sa tige
+  // — vers la pièce —, posé en (100, 100) à l'échelle 0,5.
+  const pose = (versLeMur: { x: number; y: number }) => {
+    const [arc, tige] = symbolePose(FIXTURE_SYMBOL.prise, 100, 100, 0.5, versLeMur);
+    return { pointes: [arc.pts[0], arc.pts[arc.pts.length - 1]], bout: tige.pts[1] };
   };
 
-  it('droit par défaut : la tige vers le bas de la feuille (y du PDF vers le haut)', () => {
-    const p = boutDeTige({ x: 0, y: -1 });
-    expect(p.x).toBeCloseTo(100);
-    expect(p.y).toBeCloseTo(95);
+  it('droit par défaut : l’arc vers le bas de la feuille (y du PDF vers le haut), la tige vers la pièce', () => {
+    const { pointes, bout } = pose({ x: 0, y: -1 });
+    for (const p of pointes) expect(p.y).toBeCloseTo(95);
+    expect(bout.x).toBeCloseTo(100);
+    expect(bout.y).toBeCloseTo(101.5);
   });
 
-  it('mur du haut : la tige monte', () => {
-    const p = boutDeTige({ x: 0, y: 1 });
-    expect(p.x).toBeCloseTo(100);
-    expect(p.y).toBeCloseTo(105);
+  it('mur du haut : l’arc monte', () => {
+    const { pointes, bout } = pose({ x: 0, y: 1 });
+    for (const p of pointes) expect(p.y).toBeCloseTo(105);
+    expect(bout.y).toBeCloseTo(98.5);
   });
 
-  it('mur de droite : la tige part à droite — le symbole a tourné d’un quart de tour', () => {
-    const p = boutDeTige({ x: 1, y: 0 });
-    expect(p.x).toBeCloseTo(105);
-    expect(p.y).toBeCloseTo(100);
-    // Et le diamètre du socle, horizontal quand il est droit, est vertical.
-    const diametre = symbolePose(FIXTURE_SYMBOL.prise, 100, 100, 0.5, { x: 1, y: 0 })[0].pts;
-    expect(diametre[0].x).toBeCloseTo(diametre[1].x);
+  it('mur de droite : l’arc part à droite — le symbole a tourné d’un quart de tour', () => {
+    const { pointes, bout } = pose({ x: 1, y: 0 });
+    // Les deux pointes contre le mur : à la même abscisse.
+    for (const p of pointes) expect(p.x).toBeCloseTo(105);
+    expect(bout.x).toBeCloseTo(98.5);
+    expect(bout.y).toBeCloseTo(100);
   });
 
   it('et le plan du dossier s’en sert, filet compris', () => {
@@ -107,21 +107,18 @@ describe('à l’écran, le filet ne barre plus le symbole', () => {
     arbre = null;
   });
 
-  it('il s’arrête avant la tige, sur la ligne qui mène au centre', () => {
+  it('le premier appareil touche son mur : plus de filet ; le suivant garde le sien, arrêté avant lui', () => {
     act(() => {
       useScanStore.getState().reset();
       useScanStore.getState().commencerAuClavier();
       useScanStore.getState().addRoomRect({ x: 0, z: 0 }, { x: 4, z: 3 }, 'Chambre');
       const wallIds = useScanStore.getState().rooms[0].wallIds ?? [];
       useScanStore.setState({
-        fixtures: wallIds.map((w, i) => ({
-          id: `p${i}`,
-          kind: 'prise' as const,
-          wallId: w,
-          along: 1.2,
-          height: 0.25,
-          side: 1 as const,
-        })),
+        // Sur chaque mur, deux appareils au même point : le second s'échelonne.
+        fixtures: wallIds.flatMap((w, i) => [
+          { id: `p${i}`, kind: 'prise' as const, wallId: w, along: 1.2, height: 0.25, side: 1 as const },
+          { id: `q${i}`, kind: 'prise' as const, wallId: w, along: 1.2, height: 1.1, side: 1 as const },
+        ]),
       });
     });
     let t!: TestRenderer.ReactTestRenderer;
@@ -139,8 +136,10 @@ describe('à l’écran, le filet ne barre plus le symbole', () => {
       (n) => n.type === G && typeof n.props.accessibilityLabel === 'string'
         && n.findAll((m) => m.type === G && /rotate\(/.test(String(m.props.transform ?? ''))).length === 1,
     );
-    expect(appareils.length).toBe(4);
-    for (const a of appareils) {
+    expect(appareils.length).toBe(8);
+    // Contre le mur, comme sur un plan d'architecte : rien entre lui et le nu.
+    expect(appareils.filter((a) => a.findAllByType(Line).length === 0)).toHaveLength(4);
+    for (const a of appareils.filter((x) => x.findAllByType(Line).length > 0)) {
       const tour = a.findAll((m) => m.type === G && /rotate\(/.test(String(m.props.transform ?? '')))[0];
       const [, cx, cy, , sc] = String(tour.props.transform).match(
         /translate\(([-\d.e]+), ([-\d.e]+)\) rotate\(([-\d.e]+)\) scale\(([-\d.e]+)\)/,

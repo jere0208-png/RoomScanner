@@ -108,6 +108,7 @@ import {
   planFrameAngle,
   filtrerAuNiveau,
   altitudesDesNiveaux,
+  WALL_T,
   nomDuNiveau,
   abregerNiveau,
   niveauDe,
@@ -192,6 +193,8 @@ import {
   type SpotAxis,
 } from '../geometry/ceiling';
 import { haptic } from '../ui/haptic';
+import { CeilingIcon } from '../components/CeilingIcon';
+import { rubanLeLongDuMur, rubanPeripherique } from '../geometry/ruban';
 import { PAS_ROTATION, RecalageBar } from '../components/RecalageBar';
 import {
   CoupeSheet,
@@ -4369,6 +4372,72 @@ export function ResultScreen() {
                 seuleSelection('plafond');
                 setSelCeiling(null);
                 setSelRow(row);
+                return;
+              }
+              /*
+                LE RUBAN LED SE POSE EN TRACÉ — relevé du patron, plan
+                d'architecte à l'appui : « rajoute la possibilité de placer
+                de la LED comme sur ces plans ». On a touché la pièce ; reste
+                à dire où court le ruban : en corniche le long des murs, au
+                bord d'un caisson, ou le long du mur touché (sous les meubles
+                hauts, dans une boîte à rideaux).
+              */
+              if (pendingCeiling === 'led') {
+                setPendingCeiling(null);
+                const surface = part.surface!;
+                const contour = surface.nu ?? surface.pts;
+                // Un contour à l'axe (relevé au scan) recule d'abord d'un demi-mur.
+                const bord = surface.nu ? 0 : WALL_T / 2;
+                const poserRuban = (trace: Pt[] | null, ferme: boolean) => {
+                  if (!trace) {
+                    alerte('Pas la place', 'La pièce est trop petite pour ce retrait : essayez plus près des murs.');
+                    return;
+                  }
+                  const id = useScanStore.getState().addRuban(part.roomId, trace, ferme);
+                  if (!id) return;
+                  haptic('succes');
+                  seuleSelection('plafond');
+                  setSelCeiling(id);
+                };
+                const enRetrait = (titre: string, defaut: number) =>
+                  setPrompt({
+                    title: titre,
+                    subtitle: 'La distance du ruban au nu des murs.',
+                    value: String(defaut),
+                    unit: 'cm',
+                    numeric: true,
+                    okLabel: 'Poser',
+                    onSubmit: (t) => {
+                      const v = lireCote(t);
+                      if (v === null) return;
+                      poserRuban(rubanPeripherique(contour, bord + v), true);
+                    },
+                  });
+                const icone = <CeilingIcon kind="led" size={22} />;
+                setMenu({
+                  title: 'Ruban LED',
+                  subtitle: 'Où court-il ?',
+                  actions: [
+                    {
+                      label: 'Tour de la pièce, en corniche',
+                      hint: 'Le long des murs, à 10 cm',
+                      node: icone,
+                      onPress: () => enRetrait('Corniche lumineuse', 10),
+                    },
+                    {
+                      label: 'Bord d’un caisson de faux plafond',
+                      hint: 'À 60 cm des murs, ou à la cote tapée',
+                      node: icone,
+                      onPress: () => enRetrait('Caisson de faux plafond', 60),
+                    },
+                    {
+                      label: 'Le long du mur touché',
+                      hint: 'Sous les meubles hauts, boîte à rideaux, tête de lit',
+                      node: icone,
+                      onPress: () => poserRuban(rubanLeLongDuMur(contour, at, bord + 0.05), false),
+                    },
+                  ],
+                });
                 return;
               }
               addCeiling(pendingCeiling!, part.roomId, at);

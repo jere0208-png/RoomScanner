@@ -8,6 +8,7 @@
  */
 import { BLEU_FENETRE, ENCRE_ELEC } from '../ui/encreElec';
 import { pocheDesMurs, SUREPAISSEUR_FACADE } from '../geometry/poche';
+import { cotesExterieurs } from '../geometry/cibleMur';
 import { CarteDEncre, boiteDuMot } from './encre';
 import type { FloorData, ObjectData } from 'react-native-room-scan';
 import {
@@ -60,6 +61,9 @@ import { wallLabel, type DeviceName } from '../geometry/naming';
 import {
   FIXTURES,
   FIXTURE_TAG,
+  libelleDuSymbole,
+  pointDuSymbole,
+  porteeVersLeMur,
   assemblySymbol,
   faceX,
   faceXofT,
@@ -96,10 +100,12 @@ import {
 } from '../geometry/schema';
 import { conduitPour, type BuyRow, type PullRow } from '../geometry/conduits';
 import { plaqueDeCote } from '../geometry/cotes';
+import { pointDAccroche, zigzag } from '../geometry/ruban';
 import {
   CEILINGS,
   ceilingChain,
   CEILING_SYMBOL,
+  C_LED,
   lightingLoad,
   linkAnchor,
   linkCurve,
@@ -1915,7 +1921,8 @@ function planPage(
         teinte: ENCRE_ELEC,
         lignes: plafondLegende.map((k) => ({
           texte: CEILINGS[k].label,
-          symbole: { paths: CEILING_SYMBOL[k], color: ENCRE_ELEC },
+          // Le ruban LED garde son bleu, comme sur le plan.
+          symbole: { paths: CEILING_SYMBOL[k], color: k === 'led' ? C_LED : ENCRE_ELEC },
         })),
       });
     }
@@ -2380,8 +2387,31 @@ function planPage(
         x: v.along,
       })),
     );
-    /** Où sort le symbole du mur : le rang l'échelonne le long de son filet. */
-    const sortieDuMur = (id: string) => 0.2 + (ranks.get(id) ?? 0) * 0.24;
+    const ECHELLE_SYMBOLE = 0.5;
+    /*
+      OÙ SORT LE SYMBOLE DU MUR — contre lui, comme sur le plan
+      d'architecte : deux centimètres d'air plus ce que le symbole descend
+      vers son mur ; le rang échelonne les suivants le long de leur filet.
+      Posé sur la face EXTÉRIEURE d'une façade, il franchit d'abord sa
+      surépaisseur (`pocheDesMurs`) : sinon il tombait dans le dessin des
+      baies.
+    */
+    const dehorsDesMurs = cotesExterieurs(walls, parts);
+    const murDeLAppareil = new Map(walls.map((w) => [w.id, w]));
+    const bandeDehors = (g: Fixture) => {
+      const w = murDeLAppareil.get(g.wallId);
+      return w && w.epaisseur === undefined && dehorsDesMurs.get(g.wallId) === g.side ? SUREPAISSEUR_FACADE : 0;
+    };
+    const porteeDe = new Map(
+      unites.map((v) => [
+        v.f.id,
+        { portee: porteeVersLeMur(symboleCompact(v.postes, v.f.kind).symbole), bande: bandeDehors(v.f) },
+      ]),
+    );
+    const sortieDuMur = (id: string) => {
+      const p0 = porteeDe.get(id);
+      return 0.02 + (p0?.bande ?? 0) + ((p0?.portee ?? 10) * ECHELLE_SYMBOLE) / scale + (ranks.get(id) ?? 0) * 0.24;
+    };
     /**
      * L'EMPAN DU SYMBOLE COMPOSÉ — ce qui l'entoure se pose dessus.
      *
@@ -2390,7 +2420,6 @@ function planPage(
      * pas d'entraxe que `postsSymbol`, demi-symbole aux extrémités, le tout
      * à l'échelle du dessin.
      */
-    const ECHELLE_SYMBOLE = 0.5;
     const rayonDuSymbole = (n: number) =>
       6.5 +
       ((Math.max(1, n) - 1) *
@@ -2399,6 +2428,8 @@ function planPage(
         2;
     /** La taille des mots qui accompagnent un symbole. */
     const TAILLE_SIGLE = 5.5;
+    /** Le mot de chaque symbole (« 2 », « RJ45 »…), à la place retenue. */
+    const motsDesSymboles = new Map<string, { texte: string; base: { x: number; y: number }; taille: number }>();
     /** Un mot retenu ici, dessiné plus bas, à la place qu'il a trouvée. */
     const motsAppareil: {
       texte: string;
@@ -2416,6 +2447,42 @@ function planPage(
       const x = Math.max(0, Math.min(face.len, along));
       const q = px(facePoint(face, x, sortieDuMur(f.id)));
       if (!dansLeCadre(q)) continue;
+      /*
+        LE MOT DE L'ARCHITECTE SE POSE ICI, AVANT SON DISQUE — « 2 »,
+        « RJ45 », « LV » (voir `libelleDuSymbole`). Sa place d'abord (dans le
+        rond, au bout de la tige), puis sur les côtés, puis plus loin : la
+        première qui ne tombe ni sur un trait ni sur un mot. Il est encré et
+        retenu aussitôt — les cotes et les cartouches l'évitent ensuite.
+      */
+      const lib = libelleDuSymbole(postes, f.kind, f.usage);
+      if (lib) {
+        const a0 = px(facePoint(face, x, 0.02));
+        const Lw = Math.hypot(a0.x - q.x, a0.y - q.y) || 1;
+        const versLeMur = { x: (a0.x - q.x) / Lw, y: (a0.y - q.y) / Lw };
+        const t = lib.taille * ECHELLE_SYMBOLE * 1.15;
+        const dedans = lib.ou.x === 0 && lib.ou.y > 0;
+        const essais = [lib.ou, ...(dedans ? [{ x: 0, y: -9 }] : []), { x: 13, y: 0 }, { x: -13, y: 0 }, { x: 0, y: -16 }];
+        let choisi: ReturnType<typeof boiteDuMot> | null = null;
+        for (const ou of essais) {
+          const anc = pointDuSymbole(ou, 0, 0, ECHELLE_SYMBOLE, versLeMur);
+          const L = Math.hypot(anc.x, anc.y) || 1;
+          const auCentre = ou === lib.ou && dedans;
+          const larg = lib.texte.length * t * 0.5;
+          const haut = t * 0.72;
+          const demi = auCentre ? 0 : (Math.abs(anc.x / L) * larg + Math.abs(anc.y / L) * haut) / 2;
+          const mot = boiteDuMot(lib.texte, q.x + (anc.x / L) * (L + demi), q.y + (anc.y / L) * (L + demi), t);
+          if (!choisi) choisi = mot;
+          if (dansLeCadre(mot.base) && encre.sous(mot.boite) === 0 && libre(mot.boite)) {
+            choisi = mot;
+            break;
+          }
+        }
+        if (choisi) {
+          encre.boite(choisi.boite);
+          posees.push(choisi.boite);
+          motsDesSymboles.set(f.id, { texte: lib.texte, base: choisi.base, taille: t });
+        }
+      }
       encre.disque(q, rayonDuSymbole(postes.length));
       encre.segment(px(facePoint(face, x, 0.02)), q, 0.8);
       for (const cid of membres.flatMap((m) => m.f.commands ?? [])) {
@@ -2438,7 +2505,9 @@ function planPage(
         const face = wallFace(w, murQuads.get(w.id), f.side);
         // Depuis le symbole de l'interrupteur, là où le lien se dessine.
         const depart = facePoint(face, faceX(face, f.along), sortieDuMur(f.id));
-        const arrivee = linkAnchor({ x: depart.x, z: depart.z }, cl.at, CEILINGS[cl.kind].d * 0.7);
+        const arrivee = cl.trace
+          ? pointDAccroche(cl, { x: depart.x, z: depart.z })
+          : linkAnchor({ x: depart.x, z: depart.z }, cl.at, CEILINGS[cl.kind].d * 0.7);
         encre.trait(linkCurve({ x: depart.x, z: depart.z }, arrivee).map(px), 0.8);
       }
     }
@@ -2499,6 +2568,11 @@ function planPage(
      */
     const pastillesPlafond: Boite[] = [];
     for (const cl of plafondPose) {
+      // Un ruban LED retient son tracé, pas un disque.
+      if (cl.trace && cl.trace.length >= 2) {
+        encre.trait((cl.ferme ? [...cl.trace, cl.trace[0]] : cl.trace).map(px), 2.2);
+        continue;
+      }
       const q = px(cl.at);
       if (!dansLeCadre(q)) continue;
       const r =
@@ -2590,7 +2664,8 @@ function planPage(
     const cotesDePlafond: { a: Pt; b: Pt; dist: number }[] = [];
     {
       const dejaEnTravers = new Map<string, number[]>();
-      for (const cl of extra?.hideCotesPose ? [] : plafondPose) {
+      // Un ruban LED ne se cote pas depuis son premier point : son tracé le dit.
+      for (const cl of extra?.hideCotesPose ? [] : plafondPose.filter((c) => !c.trace)) {
         const q0 = px(cl.at);
         if (!dansLeCadre(q0)) continue;
         const r = rayonPlafond(cl);
@@ -3361,6 +3436,12 @@ function planPage(
       const q = px(cl.at);
       disquesElec.push({ x: q.x, y: q.y, r: rayonPlafond(cl) + MARGE_LIEN });
     }
+    // Le mot d'un symbole aussi : un lien ne barre pas « RJ45 ».
+    for (const mot of motsDesSymboles.values()) {
+      const l = mot.texte.length * mot.taille * 0.5;
+      const h = mot.taille * 0.72;
+      disquesElec.push({ x: mot.base.x, y: mot.base.y + h / 2, r: Math.hypot(l, h) / 2 + MARGE_LIEN });
+    }
     const tracerLien = (pts: Pt[]) => {
       for (const morceau of horsDesDisques(pts, disquesElec)) {
         d.dashedPath(morceau, LIEN_LARGEUR, ENCRE_ELEC, [3, 2.2], LIEN_ALPHA);
@@ -3435,7 +3516,14 @@ function planPage(
           bloc de 3, mettre l'icône prise avec un "x3" en petit à côté ».
         */
         drawSymbol(d, symbole, q.x, q.y, ECHELLE_SYMBOLE, ENCRE_ELEC, 0.9, versLeMur);
-        if (fois) {
+        /*
+          LE MOT DE L'ARCHITECTE — « 2 », « RJ45 », « LV »… — écrit droit, à
+          la place retenue avant les cotes (voir plus haut).
+        */
+        const libelle = libelleDuSymbole(postes, f.kind, f.usage);
+        const mot = motsDesSymboles.get(f.id);
+        if (mot) d.text(mot.texte, mot.base.x, mot.base.y, mot.taille, ENCRE_ELEC, { bold: true });
+        if (fois && !libelle?.compte) {
           d.text(`×${fois}`, q.x + SYMBOL_SPAN * ECHELLE_SYMBOLE * 0.45, q.y + SYMBOL_SPAN * ECHELLE_SYMBOLE * 0.3, 5.5, ENCRE_ELEC, {
             align: 'left',
             bold: true,
@@ -3500,11 +3588,9 @@ function planPage(
             const face = wallFace(w, quadsMur.get(w.id), f.side);
             // Depuis le symbole de l'interrupteur — le disque le dégage.
             const depart = facePoint(face, faceX(face, f.along), sortieDuMur(f.id));
-            const arrivee = linkAnchor(
-              { x: depart.x, z: depart.z },
-              cl.at,
-              CEILINGS[cl.kind].d * 0.7,
-            );
+            const arrivee = cl.trace
+              ? pointDAccroche(cl, { x: depart.x, z: depart.z })
+              : linkAnchor({ x: depart.x, z: depart.z }, cl.at, CEILINGS[cl.kind].d * 0.7);
             tracerLien(linkCurve({ x: depart.x, z: depart.z }, arrivee).map(px));
           }
         }
@@ -3561,16 +3647,29 @@ function planPage(
           cote du spot voisin. Les plaques se posent quand plus aucun trait ne
           viendra.
         */
+        // Les mots des symboles (« RJ45 », « 2 ») : la cote s'interrompt
+        // devant eux plutôt que de les barrer.
+        const disquesDesMots = [...motsDesSymboles.values()].map((mot) => {
+          const l = mot.texte.length * mot.taille * 0.5;
+          const h = mot.taille * 0.72;
+          return { x: mot.base.x, y: mot.base.y + h / 2, r: Math.hypot(l, h) / 2 + 0.8 };
+        });
         for (const c of cotesDePlafond) {
           cotesPosees.add(cleCote(c.a, c.b));
-          d.dashedPath([c.a, c.b], 0.6, SKY, [2, 3]);
+          for (const morceau of horsDesDisques([c.a, c.b], disquesDesMots)) {
+            d.dashedPath(morceau, 0.6, SKY, [2, 3]);
+          }
           const l = Math.hypot(c.b.x - c.a.x, c.b.y - c.a.y) || 1;
           const nx = (c.b.y - c.a.y) / l;
           const ny = -(c.b.x - c.a.x) / l;
           d.line(c.b.x - nx * 3, c.b.y - ny * 3, c.b.x + nx * 3, c.b.y + ny * 3, 0.8, SKY);
         }
         const chainesTracees = chainesPlafond.filter((c) => !cotesPosees.has(cleCote(c.a, c.b)));
-        for (const c of chainesTracees) d.dashedPath([c.a, c.b], 0.6, GREY, [2, 2]);
+        for (const c of chainesTracees) {
+          for (const morceau of horsDesDisques([c.a, c.b], disquesDesMots)) {
+            d.dashedPath(morceau, 0.6, GREY, [2, 2]);
+          }
+        }
         /*
           L'ÉTIQUETTE GLISSE LE LONG DE SA COTE, sans jamais la quitter — de
           part et d'autre du milieu, puis de part et d'autre du trait ; et si
@@ -3648,6 +3747,11 @@ function planPage(
             aucune étiquette ne vient s'y écrire, et le symbole se lit sans
             avoir besoin de creuser un trou.
           */
+          // Le ruban LED suit son tracé, en zigzag bleu (plan d'architecte).
+          if (cl.trace && cl.trace.length >= 2) {
+            d.path(zigzag(cl.trace.map(px), 3, 1, cl.ferme), 0.7, C_LED);
+            continue;
+          }
           drawSymbol(d, CEILING_SYMBOL[cl.kind], q.x, q.y, r / 9, ENCRE_ELEC, 1.1);
         }
       }

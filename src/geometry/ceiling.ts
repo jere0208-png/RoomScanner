@@ -16,10 +16,15 @@
  */
 import { castToWall, interiorPole, type Pt, type WallSeg } from './floorplan';
 import { pointInPolygon } from './appearance';
+import { longueurDuRuban } from './ruban';
 
 export type CeilingKind =
   | 'dcl'
   | 'spot'
+  /** Encastré de sol ou de marche — la « croix de visée » du plan d'architecte. */
+  | 'spotSol'
+  /** Ruban LED : un TRACÉ (`CeilingFixture.trace`), pas un point. */
+  | 'led'
   | 'applique'
   | 'ventilateur'
   | 'daaf'
@@ -43,6 +48,8 @@ export interface CeilingSpec {
 }
 
 const C_LUM = '#E0A33A';
+/** Le bleu du ruban LED, celui du plan d'architecte. */
+export const C_LED = '#1E88E5';
 const C_SECU = '#EB5757';
 const C_VENT = '#3EB8E5';
 
@@ -55,6 +62,9 @@ export const CEILING_KINDS: CeilingKind[] = [
   'camera',
   'vmc',
   'detecteur',
+  // Les deux venus du plan d'architecte (DCE « Romeo »).
+  'led',
+  'spotSol',
 ];
 
 export const CEILINGS: Record<CeilingKind, CeilingSpec> = {
@@ -79,6 +89,29 @@ export const CEILINGS: Record<CeilingKind, CeilingSpec> = {
     watts: 8,
     commandable: true,
     note: 'Encastré, Ø 75 mm percé. Se compte par ligne de spots.',
+  },
+  led: {
+    label: 'Ruban LED',
+    short: 'LED',
+    family: 'Éclairage',
+    d: 0.1,
+    color: C_LED,
+    // Par mètre de ruban : voir `puissanceDuPlafonnier`.
+    watts: 10,
+    commandable: true,
+    note:
+      'Ruban 24 V en profilé : corniche, caisson de faux plafond, dessous ' +
+      'de meubles hauts, boîte à rideaux. Son alimentation reste accessible.',
+  },
+  spotSol: {
+    label: 'Spot au sol',
+    short: 'SPS',
+    family: 'Éclairage',
+    d: 0.1,
+    color: C_LUM,
+    watts: 3,
+    commandable: true,
+    note: 'Encastré de sol ou de marche : IP67 dehors, classe III en pièce d’eau.',
   },
   applique: {
     label: 'Applique plafond',
@@ -172,6 +205,23 @@ export interface CeilingFixture {
   row?: string;
   /** L'axe sur lequel la ligne a été tendue : longueur ou largeur. */
   axe?: SpotAxis;
+  /**
+   * LE TRACÉ D'UN RUBAN LED, dans le repère du plan (`led` seulement) —
+   * `at` en est le premier point. Voir `ruban.ts`.
+   */
+  trace?: Pt[];
+  /** Le ruban fait le tour : il revient à son départ. */
+  ferme?: boolean;
+}
+
+/**
+ * LA PUISSANCE D'UN APPAREIL DE PLAFOND — celle de sa fiche, et pour un
+ * ruban LED, celle de son mètre multipliée par sa longueur.
+ */
+export function puissanceDuPlafonnier(c: CeilingFixture): number {
+  const w = CEILINGS[c.kind].watts;
+  if (c.kind !== 'led' || !c.trace) return w;
+  return Math.round(w * longueurDuRuban(c.trace, c.ferme));
 }
 
 /** Le sens d'une ligne de spots, par rapport à la pièce. */
@@ -195,13 +245,22 @@ export const CEILING_SYMBOL: Record<CeilingKind, { d: string; fill?: boolean }[]
     { d: 'M-5.66 -5.66 L5.66 5.66' },
     { d: 'M5.66 -5.66 L-5.66 5.66' },
   ],
+  // Le spot : deux ronds l'un dans l'autre, comme dans la légende de
+  // l'architecte (DCE « Romeo »).
   spot: [
-    { d: 'M-5 0 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0' },
-    { d: 'M0 -8 v3', },
-    { d: 'M0 5 v3' },
-    { d: 'M-8 0 h3' },
-    { d: 'M5 0 h3' },
+    { d: 'M-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0' },
+    { d: 'M-3.6 0 a3.6 3.6 0 1 0 7.2 0 a3.6 3.6 0 1 0 -7.2 0' },
   ],
+  // Le spot au sol : le spot, dans sa croix de visée.
+  spotSol: [
+    { d: 'M-5.5 0 a5.5 5.5 0 1 0 11 0 a5.5 5.5 0 1 0 -11 0' },
+    { d: 'M-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0' },
+    { d: 'M-9 0 H9' },
+    { d: 'M0 -9 V9' },
+  ],
+  // Le ruban LED, pour une légende ou un bouton : sa ligne brisée. Sur le
+  // plan, il suit son tracé (`trace`).
+  led: [{ d: 'M-9 1.5 L-6 -1.5 L-3 1.5 L0 -1.5 L3 1.5 L6 -1.5 L9 1.5' }],
   applique: [
     { d: 'M-7 4 h14' },
     { d: 'M-4 4 a4 4 0 0 1 8 0' },
@@ -213,17 +272,23 @@ export const CEILING_SYMBOL: Record<CeilingKind, { d: string; fill?: boolean }[]
     { d: 'M2 0 C 9 -3 7 -8 3 -8 C 3 -5 2 -2 2 0' },
     { d: 'M-1 2 C -8 5 -6 9 -2 9 C -2 6 -1 4 -1 2' },
   ],
+  // Le détecteur de fumée : le détecteur de l'architecte, cœur plein.
   daaf: [
-    { d: 'M-8 0 a8 8 0 1 0 16 0 a8 8 0 1 0 -16 0' },
-    { d: 'M-3.5 0 a3.5 3.5 0 1 0 7 0 a3.5 3.5 0 1 0 -7 0', fill: true },
+    { d: 'M-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0' },
+    { d: 'M-3 0 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0', fill: true },
+    { d: 'M0 0 V-9' },
+    { d: 'M0 0 H9' },
   ],
   camera: [
     { d: 'M-8 -4 h11 v8 h-11 z' },
     { d: 'M3 -2 L8 -5 v10 L3 2 z', fill: true },
   ],
+  // Le détecteur : deux ronds et son quart de visée (légende « Détecteur »).
   detecteur: [
-    { d: 'M-8 0 a8 8 0 1 0 16 0 a8 8 0 1 0 -16 0' },
-    { d: 'M-4 3 L0 -4 L4 3' },
+    { d: 'M-6 0 a6 6 0 1 0 12 0 a6 6 0 1 0 -12 0' },
+    { d: 'M-3.4 0 a3.4 3.4 0 1 0 6.8 0 a3.4 3.4 0 1 0 -6.8 0' },
+    { d: 'M0 0 V-9' },
+    { d: 'M0 0 H9' },
   ],
   vmc: [
     { d: 'M-8 0 a8 8 0 1 0 16 0 a8 8 0 1 0 -16 0' },
@@ -287,7 +352,7 @@ export function lightingLoad(
     const spec = CEILINGS[c.kind];
     const cur = out.get(c.roomId) ?? { points: 0, watts: 0 };
     if (spec.watts > 0) cur.points += 1;
-    cur.watts += spec.watts;
+    cur.watts += puissanceDuPlafonnier(c);
     out.set(c.roomId, cur);
   }
   return out;

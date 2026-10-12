@@ -160,7 +160,9 @@ describe('ce qui fait l’objet est là', () => {
 
 describe('au plafond', () => {
   const HAUT = 2.5;
-  it.each(CEILING_KINDS.map((k) => [k]))('%s pend sous le plafond, à sa place', (kind) => {
+  // Le ruban LED est un tracé et le spot au sol est au sol : voir plus bas.
+  const SUSPENDUS = CEILING_KINDS.filter((k) => k !== 'led' && k !== 'spotSol');
+  it.each(SUSPENDUS.map((k) => [k]))('%s pend sous le plafond, à sa place', (kind) => {
     const cl: CeilingFixture = { id: `c-${kind}`, kind, roomId: 'room-1', at: { x: 2, z: 1.5 } };
     const poses = (scene([], [cl]).appareils ?? []).filter((p) => p.genre === 'plafond');
     expect(poses).toHaveLength(1);
@@ -172,6 +174,26 @@ describe('au plafond', () => {
     const corps = pts.filter((q) => q.mat === 'laque');
     const cx = (Math.min(...corps.map((q) => q.x)) + Math.max(...corps.map((q) => q.x))) / 2;
     expect(Math.abs(cx - 2)).toBeLessThan(0.01);
+  });
+
+  it('le ruban LED court sous le plafond, le long de son tracé ; le spot au sol, au sol', () => {
+    const ruban: CeilingFixture = {
+      id: 'r', kind: 'led', roomId: 'room-1', at: { x: 0.5, z: 0.5 },
+      trace: [{ x: 0.5, z: 0.5 }, { x: 3.5, z: 0.5 }], ferme: false,
+    };
+    const sol: CeilingFixture = { id: 's', kind: 'spotSol', roomId: 'room-1', at: { x: 2, z: 1.5 } };
+    const sc = scene([], [ruban, sol]);
+    // Ni l'un ni l'autre ne pend : pas de modèle de plafonnier.
+    expect((sc.appareils ?? []).filter((p) => p.genre === 'plafond')).toHaveLength(0);
+    const bande = sc.faces.filter((f) => f.ownerId === 'cl-r');
+    expect(bande.length).toBeGreaterThan(0);
+    const xs = bande.flatMap((f) => f.pts.map((q) => q.x));
+    expect(Math.min(...xs)).toBeCloseTo(0.5, 2);
+    expect(Math.max(...xs)).toBeCloseTo(3.5, 2);
+    for (const f of bande) for (const q of f.pts) expect(q.y).toBeGreaterThan(HAUT - 0.1);
+    const pastille = sc.faces.filter((f) => f.ownerId === 'cl-s');
+    expect(pastille.length).toBeGreaterThan(0);
+    for (const f of pastille) for (const q of f.pts) expect(q.y).toBeLessThan(0.05);
   });
 
   it('un ventilateur se voit à son envergure : 1,10 m de pales', () => {

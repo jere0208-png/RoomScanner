@@ -14285,6 +14285,76 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les symboles du plan d'architecte, et le ruban LED
+
+Relevé du patron, DCE d'architecte à l'appui (projet « Romeo », plans Elec
+du R-1 au R+1) : « reprends les icônes des légendes et du plan pour changer
+les nôtres — appliques, luminaires, détecteurs, spots, prises… Je trouve ces
+plans plus intuitifs », puis « rajoute la possibilité de placer de la LED
+comme sur ces plans ».
+
+**Les symboles, d'après la légende de l'architecte.** Ils changent partout à
+la fois : le plan, le dossier PDF, le devis et la pastille de pose, qui
+lisent tous `FIXTURE_SYMBOL` et `CEILING_SYMBOL`.
+- **Prise** : un demi-cercle ouvert sur le mur, ses deux pointes contre la
+  maçonnerie, et une courte tige vers la pièce. Avant, c'était un demi-disque
+  sur son diamètre, tige vers le mur, à l'envers de ce que dessinent les
+  architectes.
+- **Prise double** : « 2 » écrit au bout de la tige, à la place du « ×2 ».
+- **RJ45, TV** : le mot écrit à côté du socle (« RJ45 », « TV »).
+- **Alimentation dédiée** (20 A, 32 A) : le rond de la légende, avec le
+  sigle de l'appareil dedans (« LV », « LL », « SL », « FO », « PL »,
+  « MI »…). Faute de sigle, le calibre s'y écrit (« 20A »). Le sigle se
+  choisit dans l'établi (bouton « Appareil », `USAGES`, `usagesPour`).
+- **Sortie de câble** : « Alim. diverse », le cadre et sa flèche brisée, avec
+  son sigle à côté (« CL » pour une clim).
+- **Interrupteur** : un petit rond creux contre le mur, sa manette et son
+  drapeau.
+- **Applique** : le demi-disque contre le mur, barré de sa croix.
+- **Au plafond** :
+  - le point lumineux garde son cercle croisé ;
+  - le spot a deux ronds l'un dans l'autre ;
+  - le détecteur a deux ronds et son quart de visée ;
+  - le détecteur de fumée a le même dessin, cœur plein.
+
+**Contre le mur, comme chez l'architecte.** Le premier symbole d'un point de
+mur se pose contre son mur, sans filet ; les suivants s'échelonnent avec le
+leur. Sur la face extérieure d'une façade, le symbole franchit d'abord la
+surépaisseur du poché.
+
+Sur le dossier, les mots (« 2 », « RJ45 », « LV ») se placent avant les
+cotes. Leur place d'abord, puis sur les côtés, puis plus loin : la première
+qui ne tombe ni sur un trait ni sur un mot. Les liens de commande et les cotes
+du plafond s'interrompent devant eux.
+
+**Le spot au sol** (`spotSol`) : le spot dans sa croix de visée. Il se pose
+comme un point du plafond, mais en 3D sa pastille est au ras du sol (marches,
+terrasse).
+
+**Le ruban LED** (`led`, `ruban.ts`) : un tracé en zigzag bleu, pas un
+point.
+- Choisir « Ruban LED » dans les poses au plafond, toucher la pièce, puis
+  dire où il court :
+  - tout le tour, en corniche (10 cm des murs par défaut) ;
+  - au bord d'un caisson de faux plafond (60 cm par défaut, ou la cote
+    tapée) ;
+  - le long du mur touché : sous les meubles hauts, dans une boîte à rideaux,
+    au-dessus d'une tête de lit.
+- Il se relie à son interrupteur ; le lien s'accroche au point du ruban le
+  plus proche.
+- Il glisse, se recadre et tourne avec sa pièce (`avecSaTrace`).
+- Sa puissance suit sa longueur (10 W/m, `puissanceDuPlafonnier`) ; le
+  bandeau dit sa longueur.
+- Il s'achète au mètre (au demi-mètre supérieur), avec une alimentation 24 V
+  par ruban et des barres de profilé. Il n'a pas de prix relevé.
+- En 3D, c'est une bande bleue sous le plafond. Dans le dossier, il se
+  dessine sur le plan, sans cote depuis son premier point, et il a sa ligne
+  bleue dans la légende.
+
+Bancs : `symbolesarchitecte` ; `symboletourne`, `electrical`,
+`appareilsreels`, `liermur`, `dezoomdesnoms`, `planpdfepure` et `bandeaux`
+suivent les nouveaux dessins. Planches du plan 2D régénérées.
+
 ## « Normes auto » finit le travail ; la maison s'exporte empilée
 
 **« Normes auto » ne laisse plus ses propres alertes** (revue « Nicolas »).

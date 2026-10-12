@@ -310,11 +310,10 @@ describe('symboles de plan', () => {
      */
     expect(trace('prise20')).not.toBe(trace('prise'));
     expect(trace('prise32')).not.toBe(trace('prise20'));
-    // Mais tous gardent le socle : on reconnaît une prise au premier coup
-    // d'œil, et son calibre au second.
-    for (const k of ['prise20', 'prise32'] as const) {
-      expect(trace(k).startsWith(trace('prise'))).toBe(true);
-    }
+    // Plan d'architecte (DCE « Romeo ») : l'alimentation dédiée est le ROND
+    // de la légende, où s'écrit l'appareil ou le calibre ; la 32 A garde le
+    // rond, et son trait de plus.
+    expect(trace('prise32').startsWith(trace('prise20'))).toBe(true);
     expect(FIXTURE_TAG.prise20).toBeTruthy();
     expect(FIXTURE_TAG.prise32).toBeTruthy();
 

@@ -76,6 +76,9 @@ export const TEMPS_MUR: Record<FixtureKind, number> = {
 export const TEMPS_PLAFOND: Record<CeilingKind, number> = {
   dcl: 1.0,
   spot: 0.6,
+  // Un ruban : sa pose en profilé et son alimentation.
+  led: 1.5,
+  spotSol: 0.8,
   applique: 1.0,
   ventilateur: 2.0,
   daaf: 0.4,

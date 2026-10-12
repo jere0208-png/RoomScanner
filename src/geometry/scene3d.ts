@@ -3242,6 +3242,70 @@ export function buildScene(
       0,
     );
     if (!(haut > 0.5)) continue;
+    /*
+      LE RUBAN LED : une bande bleue juste sous le plafond, le long de son
+      tracé — dessus et dessous, pour qu'on la voie d'en haut comme d'en
+      bas. Pas de modèle à poser : c'est une ligne de lumière.
+    */
+    if (cl.kind === 'led') {
+      const tr = cl.trace ?? [];
+      const chemin = cl.ferme && tr.length > 2 ? [...tr, tr[0]] : tr;
+      const yb = haut - 0.03;
+      for (let i = 0; i + 1 < chemin.length; i++) {
+        const p = chemin[i];
+        const q = chemin[i + 1];
+        const L = Math.hypot(q.x - p.x, q.z - p.z);
+        if (L < 1e-6) continue;
+        const nx = (-(q.z - p.z) / L) * 0.012;
+        const nz = ((q.x - p.x) / L) * 0.012;
+        const bande = [
+          { x: p.x + nx, y: yb, z: p.z + nz },
+          { x: q.x + nx, y: yb, z: q.z + nz },
+          { x: q.x - nx, y: yb, z: q.z - nz },
+          { x: p.x - nx, y: yb, z: p.z - nz },
+        ];
+        const milieu: P3 = { x: (p.x + q.x) / 2, y: yb, z: (p.z + q.z) / 2 };
+        for (const sens of [1, -1]) {
+          faces.push({
+            pts: sens > 0 ? bande : [...bande].reverse(),
+            fill: spec.color,
+            stroke: null,
+            shade: false,
+            normal: { x: 0, y: sens, z: 0 },
+            ownerId: `cl-${cl.id}`,
+            roomId: cl.roomId,
+            depthAt: milieu,
+            appareil: true,
+          });
+        }
+      }
+      continue;
+    }
+    /*
+      LE SPOT AU SOL : sa pastille, au ras du sol — il éclaire vers le haut,
+      il ne pend pas sous le plafond.
+    */
+    if (cl.kind === 'spotSol') {
+      const rs = Math.max(0.04, spec.d / 2);
+      const ys = floorY + 0.006;
+      const disque = Array.from({ length: 10 }, (_, i) => ({
+        x: cl.at.x + rs * Math.cos((i / 10) * Math.PI * 2),
+        y: ys,
+        z: cl.at.z + rs * Math.sin((i / 10) * Math.PI * 2),
+      }));
+      faces.push({
+        pts: disque,
+        fill: mixHex(spec.color, '#FFFFFF', 0.25),
+        stroke: null,
+        shade: false,
+        normal: { x: 0, y: 1, z: 0 },
+        ownerId: `cl-${cl.id}`,
+        roomId: cl.roomId,
+        depthAt: { x: cl.at.x, y: ys, z: cl.at.z },
+        appareil: true,
+      });
+      continue;
+    }
     const r = Math.max(0.05, spec.d / 2);
     const y1 = haut - 0.01;
     const y0 = y1 - 0.06;

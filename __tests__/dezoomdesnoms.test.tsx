@@ -101,10 +101,11 @@ describe('sur le plan', () => {
     expect(demi).toBeCloseTo(10.5 * 0.5);
   });
 
-  it('et le « ×2 » avec son symbole, sans plancher qui le garderait grand', () => {
-    const plein = taille(monter(1), '×2');
+  it('et le « 2 » de la prise double avec son symbole, sans plancher qui le garderait grand', () => {
+    // Plan d'architecte : le nombre s'écrit au bout de la tige, sans « × ».
+    const plein = taille(monter(1), '2');
     act(() => arbre?.unmount());
-    const reduit = taille(monter(0.4), '×2');
+    const reduit = taille(monter(0.4), '2');
     expect(reduit).toBeLessThan(plein * 0.75);
   });
 });

@@ -45,7 +45,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { ResultScreen } from '../src/screens/ResultScreen';
 import { FloorplanEditor } from '../src/components/FloorplanEditor';
 import { FIXTURE_FAMILIES, FIXTURE_SYMBOL } from '../src/geometry/electrical';
-import { CEILINGS, CEILING_KINDS } from '../src/geometry/ceiling';
+import { CEILINGS, CEILING_KINDS, CEILING_SYMBOL } from '../src/geometry/ceiling';
 import { useScanStore } from '../src/store/scanStore';
 import {
   SNAPSHOT_FIXTURES,
@@ -378,7 +378,8 @@ describe('l’écran des résultats', () => {
     // Un SPOT, reconnu à son symbole : le disque cerné de quatre rayons.
     // Chercher « un groupe touchable » ne suffit pas — l'appareillage mural
     // en pose aussi, et le banc attrapait une prise TV.
-    const RAYON = 'M-5 0 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0';
+    // Le spot de la légende d'architecte : deux ronds l'un dans l'autre.
+    const RAYON = CEILING_SYMBOL.spot[0].d;
     const spots = () =>
       tree.root
         .findAll((n) => typeof n.props?.onPress === 'function')
@@ -444,7 +445,8 @@ describe('l’écran des résultats', () => {
    */
   it('la ligne de spots se relie à une commande d’un geste', () => {
     const tree = monter();
-    const RAYON = 'M-5 0 a5 5 0 1 0 10 0 a5 5 0 1 0 -10 0';
+    // Le spot de la légende d'architecte : deux ronds l'un dans l'autre.
+    const RAYON = CEILING_SYMBOL.spot[0].d;
     const spot = tree.root
       .findAll((n) => typeof n.props?.onPress === 'function')
       .filter((n) => n.findAllByType(Path).some((p) => p.props.d === RAYON))[0];

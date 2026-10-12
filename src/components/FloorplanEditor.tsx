@@ -3267,6 +3267,7 @@ export function FloorplanEditor({
               navigating={false}
               onSelectFixture={onSelectFixture}
               encre={encre}
+              dehors={dehorsDesMurs}
               c={c}
             />
 

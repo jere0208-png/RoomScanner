@@ -22,6 +22,7 @@
  * rarement une seule paire, et une gaine trop juste se paie au tirage.
  */
 import { CEILINGS, type CeilingFixture } from './ceiling';
+import { longueurDuRuban } from './ruban';
 import { FIXTURES, postsOf, type Fixture } from './electrical';
 import type { Circuit } from './nfc15100';
 import type { TronconMetre } from './elecplan';
@@ -766,8 +767,43 @@ export function buyingList(
 
   // ------------------------------------------------------------- plafond
   const parPlafond = new Map<string, number>();
+  // Le ruban LED se compte au MÈTRE, avec son alimentation et son profilé.
+  let metresDeRuban = 0;
+  let rubans = 0;
   for (const cl of ceiling) {
+    if (cl.kind === 'led' && cl.trace) {
+      metresDeRuban += longueurDuRuban(cl.trace, cl.ferme);
+      rubans += 1;
+      continue;
+    }
     parPlafond.set(cl.kind, (parPlafond.get(cl.kind) ?? 0) + 1);
+  }
+  if (rubans > 0) {
+    out.push({
+      family: 'Plafond',
+      code: 'plafond-led',
+      label: 'Ruban LED 24 V',
+      spec: CEILINGS.led.note,
+      quantity: Math.ceil(metresDeRuban * 2) / 2,
+      unit: 'm',
+      note: `${rubans} ruban${rubans > 1 ? 's' : ''}, au demi-mètre supérieur`,
+    });
+    out.push({
+      family: 'Plafond',
+      code: 'led-alimentation',
+      label: 'Alimentation LED 24 V',
+      spec: 'Une par ruban, dimensionnée à 10 W/m plus 20 % de marge',
+      quantity: rubans,
+      unit: 'u',
+    });
+    out.push({
+      family: 'Plafond',
+      code: 'led-profile',
+      label: 'Profilé aluminium et diffuseur',
+      spec: 'Pour ruban de 10 mm, en barres de 2 m',
+      quantity: Math.ceil(metresDeRuban / 2),
+      unit: 'barre 2 m',
+    });
   }
   for (const [k, q] of parPlafond) {
     const spec = CEILINGS[k as keyof typeof CEILINGS];

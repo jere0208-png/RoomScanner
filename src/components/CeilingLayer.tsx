@@ -27,6 +27,7 @@ import {
   type Fixture,
 } from '../geometry/electrical';
 import { castToWall, type Pt, type RoomPart, type WallSeg } from '../geometry/floorplan';
+import { sortieDeLAppareil } from './FixtureLayer';
 import {
   TAILLE_ECART,
   etiquettesDesEcarts,
@@ -35,10 +36,12 @@ import {
 import {
   CEILINGS,
   CEILING_SYMBOL,
+  C_LED,
   linkAnchor,
   linkCurve,
   type CeilingFixture,
 } from '../geometry/ceiling';
+import { pointDAccroche, zigzag } from '../geometry/ruban';
 
 /**
  * LA TAILLE D'UN POINT LUMINEUX SUR LE PLAN — relevé du patron : « les
@@ -155,6 +158,46 @@ export function CeilingLayer({
           const choisi =
             cl.id === selectedCeilingId ||
             (!!selectedCeilingRow && cl.row === selectedCeilingRow);
+          /*
+            LE RUBAN LED SUIT SON TRACÉ, en zigzag bleu — le dessin du plan
+            d'architecte. Il se touche sur toute sa longueur.
+          */
+          if (cl.trace && cl.trace.length >= 2) {
+            const ecran = cl.trace.map((pt) => mapping.toPx(pt));
+            const pas = Math.max(5, Math.min(12, mapping.scale * 0.12));
+            const dents = zigzag(ecran, pas, pas * 0.32, cl.ferme)
+              .map((g) => `${g.x},${g.y}`)
+              .join(' ');
+            const ligne = (cl.ferme ? [...ecran, ecran[0]] : ecran)
+              .map((g) => `${g.x},${g.y}`)
+              .join(' ');
+            return (
+              <G
+                key={`cl-${cl.id}`}
+                accessibilityLabel={spec.label}
+                onPress={onSelectCeiling ? () => onSelectCeiling(cl.id) : undefined}>
+                <Polyline points={ligne} fill="none" stroke="transparent" strokeWidth={18} />
+                {choisi && (
+                  <Polyline
+                    points={ligne}
+                    fill="none"
+                    stroke={c.blueSoft}
+                    strokeWidth={pas * 1.6}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                )}
+                <Polyline
+                  points={dents}
+                  fill="none"
+                  stroke={C_LED}
+                  strokeWidth={choisi ? 1.9 : 1.4}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </G>
+            );
+          }
           return (
             <G
               key={`cl-${cl.id}`}
@@ -197,13 +240,12 @@ export function CeilingLayer({
             const w = walls.find((x) => x.id === f.wallId);
             if (!w) return null;
             const fa = wallFace(w, quads.get(w.id), f.side);
-            const depart = facePoint(fa, faceX(fa, f.along), 0.16);
+            const depart = facePoint(fa, faceX(fa, f.along), sortieDeLAppareil(f, mapping.scale));
             const rayon = Math.max(0.1, CEILINGS[cl.kind].d * 0.7);
-            const arrivee = linkAnchor(
-              { x: depart.x, z: depart.z },
-              cl.at,
-              rayon,
-            );
+            // Un ruban s'accroche au point de son tracé le plus proche.
+            const arrivee = cl.trace
+              ? pointDAccroche(cl, { x: depart.x, z: depart.z })
+              : linkAnchor({ x: depart.x, z: depart.z }, cl.at, rayon);
             const courbe = linkCurve(
               { x: depart.x, z: depart.z },
               arrivee,
