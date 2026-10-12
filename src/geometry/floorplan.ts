@@ -56,6 +56,14 @@ export interface WallSeg {
   /** Pièce à laquelle ce mur appartient (scan multi-pièces). */
   roomId?: string;
   /**
+   * TRACÉ AUX COTES INTÉRIEURES — un mur dessiné à la main ou lu sur un plan
+   * papier. Ses cotes se lisent et se tapent de nu à nu, et la pièce qu'il
+   * ferme (avec d'autres comme lui) se compte au nu : voir `contourAuNu`.
+   * Absent d'un mur scanné, compté à l'axe tant que la mesure au mètre
+   * ruban n'a pas tranché.
+   */
+  auNu?: boolean;
+  /**
    * Ouverture qu'on TRAVERSE : baie sans porte, ou porte détectée ouverte.
    * Elle ne se dessine pas comme un panneau mais comme un vide.
    */
@@ -1464,7 +1472,14 @@ export function quadPoints(q: WallQuad): Pt[] {
 export interface RoomSurface {
   /** Contour de la pièce (polygone fermé, sens quelconque). */
   pts: Pt[];
-  /** Aire en m². */
+  /**
+   * LE CONTOUR AU NU, pour une pièce DESSINÉE : ses côtés rentrés d'une
+   * demi-épaisseur de leur mur. C'est lui que mesure l'aire (voir
+   * `makePart`). Absent d'une pièce scannée, comptée à l'axe tant que la
+   * mesure au mètre ruban n'a pas tranché.
+   */
+  nu?: Pt[];
+  /** Aire en m² — au nu pour une pièce dessinée, à l'axe sinon. */
   area: number;
   /** false = la boucle de murs n'était pas fermée, le contour est reconstitué. */
   exact: boolean;
@@ -1494,9 +1509,85 @@ export interface RoomPart {
   labelAt: Pt;
 }
 
+/** Une pièce DESSINÉE : tous ses murs ont été tracés aux cotes intérieures (`auNu`). */
+export function estDessine(walls: { auNu?: boolean }[]): boolean {
+  return walls.length > 0 && walls.every((w) => w.auNu === true);
+}
+
+/**
+ * LE CONTOUR AU NU — chaque côté du contour à l'axe, rentré d'une
+ * demi-épaisseur de SON mur, et les coins recoupés.
+ *
+ * Décision du patron, revues « Hugo » et « Lucas » : un plan dessiné aux
+ * cotes se compte à l'intérieur des murs, cloisons déduites, pour que ses
+ * m² se comparent au bail et que la peinture ne compte pas la maçonnerie.
+ */
+export function contourAuNu(pts: Pt[], walls: WallSeg[]): Pt[] {
+  const n = pts.length;
+  if (n < 3) return pts;
+  let double = 0;
+  for (let i = 0; i < n; i++) {
+    const p = pts[i];
+    const q = pts[(i + 1) % n];
+    double += p.x * q.z - q.x * p.z;
+  }
+  const sens = double > 0 ? 1 : -1;
+  const cotes = pts.map((p, i) => {
+    const q = pts[(i + 1) % n];
+    const L = Math.hypot(q.x - p.x, q.z - p.z) || 1;
+    const d = { x: (q.x - p.x) / L, z: (q.z - p.z) / L };
+    // Vers l'intérieur : la gauche d'un contour tourné dans le sens direct.
+    const nrm = { x: -d.z * sens, z: d.x * sens };
+    const mur = walls.find(
+      (w) =>
+        w.type === 'wall' &&
+        pointOnSeg(p, w.a, w.b).dist < 0.02 &&
+        pointOnSeg(q, w.a, w.b).dist < 0.02,
+    );
+    const h = (mur ? epaisseurDe(mur) : WALL_T) / 2;
+    return { o: { x: p.x + nrm.x * h, z: p.z + nrm.z * h }, d, nrm, h };
+  });
+  const out: Pt[] = [];
+  for (let j = 0; j < n; j++) {
+    const a = cotes[(j - 1 + n) % n];
+    const b = cotes[j];
+    const den = a.d.x * b.d.z - a.d.z * b.d.x;
+    if (Math.abs(den) < 1e-9) {
+      // Deux côtés dans l'alignement : un ressaut si les épaisseurs diffèrent.
+      const p = pts[j];
+      if (Math.abs(a.h - b.h) > 1e-6) out.push({ x: p.x + a.nrm.x * a.h, z: p.z + a.nrm.z * a.h });
+      out.push({ x: p.x + b.nrm.x * b.h, z: p.z + b.nrm.z * b.h });
+      continue;
+    }
+    const t = ((b.o.x - a.o.x) * b.d.z - (b.o.z - a.o.z) * b.d.x) / den;
+    out.push({ x: a.o.x + a.d.x * t, z: a.o.z + a.d.z * t });
+  }
+  return out;
+}
+
+/** Largeur et profondeur d'une pièce : au nu si elle est dessinée, à l'axe sinon. */
+export function etendueDeLaPiece(surface: RoomSurface): ReturnType<typeof roomExtent> {
+  return roomExtent(surface.nu ?? surface.pts);
+}
+
+/** La longueur d'un mur de nu à nu : l'axe, moins le demi-mur qui le ferme à chaque bout. */
+export function longueurAuNu(walls: WallSeg[], w: WallSeg): number {
+  return Math.max(0, segLength(w) - retraitDuCoin(walls, w, w.a) - retraitDuCoin(walls, w, w.b));
+}
+
+/** La cote d'un mur telle qu'on la lit sur le plan : au nu s'il est dessiné. */
+export function longueurCotee(walls: WallSeg[], w: WallSeg): number {
+  return w.auNu ? longueurAuNu(walls, w) : segLength(w);
+}
+
 /** Complète une pièce : contour, centre, et point de pose du cartouche. */
 function makePart(roomId: string, items: WallSeg[]): RoomPart {
-  const surface = roomSurface(items);
+  let surface = roomSurface(items);
+  // Une pièce dessinée se compte au nu : voir `contourAuNu`.
+  if (surface?.exact && estDessine(items)) {
+    const nu = contourAuNu(surface.pts, items);
+    surface = { ...surface, nu, area: loopAreaM2(nu) };
+  }
   const centroid = wallsCentroid(items);
   return {
     roomId,

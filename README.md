@@ -14285,6 +14285,48 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Un plan dessiné se compte à l'intérieur ; le tableau existant se relève tel qu'il est
+
+Décisions du patron, après la deuxième tournée d'utilisateurs.
+
+**Un plan dessiné aux cotes se compte à l'intérieur des murs** (revues
+« Hugo » et « Lucas »). Avant, « 6,00 × 4,00 » dessinait un intérieur de
+5,86 × 3,86 et annonçait 24,0 m², et la salle d'eau de 3,20 m² en affichait
+3,5.
+- Chaque mur tracé à la main ou lu sur un plan papier porte le marqueur
+  `auNu`. Une pièce dont tous les murs le portent se compte au nu
+  (`contourAuNu`) : chaque côté rentre d'une demi-épaisseur de son mur, et
+  les cloisons se déduisent des m².
+- Les cotes qu'on tape sont intérieures, de mur à mur : « Ajouter une
+  pièce » (gabarits et « Sur mesure »), une pièce accolée (sa profondeur va
+  du nu du mur mitoyen au nu du mur du fond), « Cotes » de la pièce et
+  « Longueur du mur ». Le plan dessine toujours les axes, une demi-épaisseur
+  plus loin.
+- Le plan, le bandeau de la pièce et le PDF écrivent ces cotes-là
+  (`longueurCotee`, `etendueDeLaPiece`).
+- Un plan scanné ne change pas : il reste compté au trait tant que la
+  mesure au mètre ruban n'a pas dit si ce trait est l'axe ou la face.
+
+**Le tableau existant se relève tel qu'il est** (revue « Marc ») :
+- « Relever le tableau existant » ouvre un coffret vide. Seul le tableau
+  dessiné sur le plan se pré-remplit du tableau projeté, et la feuille
+  l'annonce : « Tableau projeté, pas relevé », avec « Partir d'un coffret
+  vide » et « C'est bien le tableau en place ». La feuille PDF d'un tableau
+  projeté s'intitule « Tableau projeté (non relevé) » ;
+- le neuvième circuit sous un même différentiel se clipse, et la feuille dit
+  l'écart, que le contrôle compte. Un relevé note le défaut au lieu de
+  l'interdire ;
+- la section du fil se note sous chaque disjoncteur, et le calibre se
+  contrôle contre elle : 1,5 mm² → 16 A, 2,5 mm² → 20 A, 4 mm² → 25 A,
+  6 mm² → 32 A. Au-delà, c'est un danger. Les disjoncteurs seuls entrent
+  dans ce contrôle : un porte-fusible n'est plus aux normes, et il est déjà
+  signalé à remplacer ;
+- le four et le chauffe-eau se protègent à 20 A (la plaque reste à 32 A) ;
+- les calibres 25 A et 40 A s'ajoutent à la palette.
+
+Bancs : `surfacesaunu`, `relevetableau`. `tableauvivant` et `ajoutpiece` sont
+mis à jour pour ces décisions.
+
 ## Deuxième tournée, suite : exports justes, versions, Décorer avec des noms
 
 La suite de la deuxième tournée d'utilisateurs, une fois les pertes de

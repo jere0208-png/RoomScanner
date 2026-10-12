@@ -82,6 +82,12 @@ export interface DepartExistant {
    * après rangée, comme on les avait notés.
    */
   rangee?: number;
+  /**
+   * LA SECTION DU FIL qu'il protège, en mm², quand on l'a lue — revue
+   * « Marc » : sans elle, des prises en 1,5 mm² sous un 20 A passaient le
+   * contrôle. Voir `calibreMaxSection`.
+   */
+  section?: number;
 }
 
 export type Organe = DepartExistant['organe'];
@@ -96,6 +102,13 @@ export type Organe = DepartExistant['organe'];
  */
 export interface TableauExistant {
   departs: DepartExistant[];
+  /**
+   * DÉDUIT DU PLAN, PAS RELEVÉ — revue « Marc » : la feuille s'ouvrait
+   * remplie du tableau que l'app projetait, souvent « conforme », et rien
+   * ne le disait. Un tableau constitué depuis le projet le porte jusqu'à
+   * ce qu'on confirme l'avoir vérifié, ou qu'on le vide.
+   */
+  projete?: boolean;
   /** Rangées du tableau, quand elles ont été relevées. */
   rangees?: number;
   /** Modules par rangée (13, 18…). */
@@ -424,7 +437,11 @@ export function dimensionsDuCoffret(rail: { rangees: number; parRangee: number }
 const CALIBRE_MAX: { motif: RegExp; max: number; quoi: string }[] = [
   { motif: /éclairage|eclairage|lumi|spot|dcl/i, max: 16, quoi: 'éclairage' },
   { motif: /volet/i, max: 16, quoi: 'volets roulants' },
-  { motif: /cuisson|plaque|four/i, max: 32, quoi: 'cuisson' },
+  // Le four et le chauffe-eau : 20 A sur du 2,5 mm² (revue « Marc ») ; la
+  // plaque, elle, va jusqu'à 32 A sur du 6 mm².
+  { motif: /\bfour\b/i, max: 20, quoi: 'four' },
+  { motif: /chauffe|cumulus|ballon/i, max: 20, quoi: 'chauffe-eau' },
+  { motif: /cuisson|plaque/i, max: 32, quoi: 'cuisson' },
   { motif: /lave|sèche|seche|lv|ll/i, max: 20, quoi: 'appareil spécialisé' },
   { motif: /prise/i, max: 20, quoi: 'prises' },
 ];
@@ -435,6 +452,22 @@ export function calibreMaxDe(usage: string | undefined): number | null {
   return regle ? regle.max : null;
 }
 
+/**
+ * LE CALIBRE QU'ADMET UNE SECTION — revue « Marc », tableau validé par le
+ * patron. Les disjoncteurs seuls : un porte-fusible n'est plus aux normes,
+ * il est à remplacer quoi qu'il protège (constat `fusibles`).
+ */
+export const SECTIONS_MM2 = [1.5, 2.5, 4, 6];
+const CALIBRE_PAR_SECTION: Record<string, number> = { '1.5': 16, '2.5': 20, '4': 25, '6': 32 };
+
+/** Le disjoncteur le plus fort qu'admet cette section — `null` si elle n'est pas notée. */
+export function calibreMaxSection(section: number | undefined): number | null {
+  return section ? CALIBRE_PAR_SECTION[String(section)] ?? null : null;
+}
+
+/** « 2,5 » : une section à la française. */
+const enMm2 = (s: number) => String(s).replace('.', ',');
+
 /** Au-delà, le différentiel ne protège plus rien correctement. */
 export const MAX_CIRCUITS_PAR_DIFF = 8;
 
@@ -442,8 +475,9 @@ export const MAX_CIRCUITS_PAR_DIFF = 8;
  * LE DIFFÉRENTIEL QUI RECEVRAIT CET ORGANE, ET CE QU'IL PORTERAIT ALORS.
  *
  * Relevé du patron : « on n'empêche pas de mettre plus de huit disjoncteurs
- * si on essaye ». Le diagnostic le disait APRÈS coup ; le geste se refuse
- * maintenant AVANT : on pose l'organe pour de faux, au bout de sa rangée,
+ * si on essaye ». Puis, revue « Marc », décision du patron : un relevé NOTE
+ * le défaut, il ne l'interdit pas — le neuvième se pose, et la feuille dit
+ * l'écart en le posant : on pose l'organe pour de faux, au bout de sa rangée,
  * on le rattache comme le tableau le montrera, et l'on compte ce que son
  * différentiel 30 mA porterait — exactement comme le diagnostic compte.
  * `null` : l'organe ne se range sous aucun 30 mA.
@@ -666,6 +700,28 @@ export function diagnosticExistant(
     }
   }
 
+  /*
+    LE CALIBRE CONTRE LA SECTION DU FIL — revue « Marc » : le classique
+    « 25 A sur du 2,5 mm² » passait, faute de section notée. Un fil trop
+    faible pour son disjoncteur chauffe sans que rien ne coupe : danger.
+  */
+  for (const d of departs) {
+    if (d.organe !== 'disjoncteur' || !d.calibre || !d.section) continue;
+    const max = calibreMaxSection(d.section);
+    if (max && d.calibre > max) {
+      dire({
+        id: `section-${d.id}`,
+        gravite: 'danger',
+        titre: `Disjoncteur ${d.calibre} A sur du ${enMm2(d.section)} mm²`,
+        detail:
+          `Le ${enMm2(d.section)} mm² se protège à ${max} A au plus : au-delà, ` +
+          'le fil chauffe avant que le disjoncteur ne coupe.',
+        remede: `Ramener le disjoncteur à ${max} A, ou tirer une ligne de section supérieure.`,
+        cibles: [d.id],
+      });
+    }
+  }
+
   if (tableau) {
     if (tableau.rangees < RANGEES_MIN) {
       dire({
@@ -754,7 +810,7 @@ export function grilleDuTableau(
     },
     { id: 'proteges', titre: 'Chaque circuit sous un 30 mA', ok: juger(a('sans-30ma') || a('hors-30ma')) },
     { id: 'huit', titre: 'Huit circuits au plus par différentiel', ok: juger(a('charge')) },
-    { id: 'calibres', titre: 'Des calibres faits pour leurs fils', ok: juger(a('calibre')) },
+    { id: 'calibres', titre: 'Des calibres faits pour leurs fils', ok: juger(a('calibre') || a('section')) },
     { id: 'fusibles', titre: 'Aucun porte-fusible', ok: juger(a('fusibles')) },
     { id: 'rangees', titre: 'Deux rangées au minimum', ok: decrit ? !a('une-rangee') : null },
     { id: 'reserve', titre: 'Un cinquième de réserve', ok: decrit && !vide ? !a('reserve') : null },

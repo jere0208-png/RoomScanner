@@ -31,7 +31,6 @@ import {
   clampFootprint,
   makeMapping,
   quadPoints,
-  roomExtent,
   roomOf,
   angleAimante,
   anglesRemarquables,
@@ -58,6 +57,8 @@ import {
   type WallSeg,
   pointOnSeg,
   epaisseurDe,
+  etendueDeLaPiece,
+  longueurCotee,
 } from '../geometry/floorplan';
 import type { ObjectData } from 'react-native-room-scan';
 import {
@@ -1770,7 +1771,7 @@ export function FloorplanEditor({
       const extText =
         showMeasures && part.surface
           ? (() => {
-              const e = roomExtent(part.surface.pts);
+              const e = etendueDeLaPiece(part.surface);
               return `${e.width.toFixed(2).replace('.', ',')} × ${e.depth
                 .toFixed(2)
                 .replace('.', ',')} m`;
@@ -2635,6 +2636,7 @@ export function FloorplanEditor({
                 }
                 measureAt={cotesArbitrees.poses.get(`w:${w.id}`)}
                 measureOpacity={1 - detail}
+                longueur={longueurCotee(walls, w)}
                 selected={editable && w.id === selectedWallId}
                 onPress={
                   editable
@@ -4101,6 +4103,7 @@ function WallBody({
   showMeasure,
   measureAt,
   measureOpacity = 1,
+  longueur,
   selected,
   neuve,
   sansCorps,
@@ -4127,6 +4130,8 @@ function WallBody({
   measureAt?: { x: number; y: number };
   /** Les cotes globales s'effacent quand les cotes de détail arrivent. */
   measureOpacity?: number;
+  /** La cote à écrire : au nu pour un mur dessiné (voir `longueurCotee`). */
+  longueur?: number;
   selected: boolean;
   /**
    * LE MUR D'UNE PIECE PAS ENCORE ARRETEE — il se dessine en pointillés.
@@ -4196,7 +4201,7 @@ function WallBody({
     x: (a.x + b.x) / 2 + n.x * (bodyPx / 2 + 9),
     y: (a.y + b.y) / 2 + n.y * (bodyPx / 2 + 9),
   };
-  const label = `${segLength(wall).toFixed(2).replace('.', ',')} m`;
+  const label = `${(longueur ?? segLength(wall)).toFixed(2).replace('.', ',')} m`;
   /*
     LA COUPE DU MUR EST NOIRE. TOUJOURS.
 

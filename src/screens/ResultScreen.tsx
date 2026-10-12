@@ -123,6 +123,9 @@ import {
   solDesMurs,
   perimetreDesPieces,
   niveauDeReference,
+  etendueDeLaPiece,
+  estDessine,
+  longueurCotee,
 } from '../geometry/floorplan';
 import { hasCapturedColors, pointInPolygon } from '../geometry/appearance';
 import { planRoutes } from '../geometry/elecplan';
@@ -592,9 +595,16 @@ export function ResultScreen() {
   const reference = useTableauDeReference();
   const referenceRef = useRef(reference);
   referenceRef.current = reference;
-  const ouvrirLeTableau = useCallback(() => {
+  /*
+    UN RELEVÉ PART D'UN COFFRET VIDE — revue « Marc », décision du patron.
+    « Relever le tableau existant » s'ouvrait rempli du tableau que l'app
+    projetait, souvent au vert « conforme » : on pouvait remettre au client
+    un tableau fictif. Seul le tableau DESSINÉ sur le plan (et « Modifier »
+    de son rendu) se pré-remplit, et la feuille le dit.
+  */
+  const ouvrirLeTableau = useCallback((depuisLeProjet = false) => {
     const r = referenceRef.current;
-    if (r.projete && r.tableau) useScanStore.getState().constituerLeTableau(r.tableau);
+    if (depuisLeProjet && r.projete && r.tableau) useScanStore.getState().constituerLeTableau(r.tableau);
     setExistantOuvert(true);
   }, []);
   /** La feuille « Ce qu'il faut acheter » (voir `geometry/travaux`). */
@@ -1114,7 +1124,7 @@ export function ResultScreen() {
                     ? 'Pré-rempli du tableau dessiné ici : ajustez-le organe par organe.'
                     : 'Reconstruisez-le organe par organe : il se dessinera tel quel.',
                 icon: 'tableau' as const,
-                onPress: () => ouvrirLeTableau(),
+                onPress: () => ouvrirLeTableau(true),
               },
               {
                 label: 'Voir le tableau fini',
@@ -2152,8 +2162,9 @@ export function ResultScreen() {
     };
   }, [ficheOuverte, targetRoom, parts, walls, openings, objects, fixtures, nordReleve, habitable]);
   const targetPart = parts.find((p) => p.roomId === targetRoomId) ?? null;
+  // Au nu pour une pièce dessinée : ce que donne le mètre (voir `contourAuNu`).
   const targetExtent = targetPart?.surface
-    ? roomExtent(targetPart.surface.pts)
+    ? etendueDeLaPiece(targetPart.surface)
     : { width: 0, depth: 0, angle: 0 };
   // Deux familles de constats, une seule liste : celui qui regarde son plan
   // se moque de savoir si le défaut est géométrique ou électrique.
@@ -2810,10 +2821,14 @@ export function ResultScreen() {
   const promptRoomCotes = () => {
     if (!targetRoom || !targetExtent) return;
     const roomId = targetRoom.id;
+    // Une pièce dessinée se cote à l'intérieur, de mur à mur.
+    const auNu = !!targetPart && estDessine(targetPart.walls);
     const nb = (t: string) => parseFloat(t.replace(',', '.'));
     setPrompt({
-      title: 'Largeur de la pièce',
-      subtitle: 'Le coin haut-gauche ne bouge pas : la pièce s’étend vers la droite et vers le bas.',
+      title: auNu ? 'Largeur intérieure' : 'Largeur de la pièce',
+      subtitle: auNu
+        ? 'De mur à mur, au mètre. Le coin haut-gauche ne bouge pas : la pièce s’étend vers la droite et vers le bas.'
+        : 'Le coin haut-gauche ne bouge pas : la pièce s’étend vers la droite et vers le bas.',
       value: targetExtent.width.toFixed(2).replace('.', ','),
       unit: 'm',
       numeric: true,
@@ -2822,14 +2837,14 @@ export function ResultScreen() {
         const L = nb(t);
         if (!(L > 0)) return;
         setPrompt({
-          title: 'Profondeur de la pièce',
+          title: auNu ? 'Profondeur intérieure' : 'Profondeur de la pièce',
           subtitle: `Largeur retenue : ${L.toFixed(2).replace('.', ',')} m.`,
           value: targetExtent.depth.toFixed(2).replace('.', ','),
           unit: 'm',
           numeric: true,
           onSubmit: (t2) => {
             const P = nb(t2);
-            if (P > 0) resizeRoom(roomId, L, P);
+            if (P > 0) resizeRoom(roomId, L, P, { auNu });
           },
         });
       },
@@ -2983,15 +2998,19 @@ export function ResultScreen() {
   const promptLength = (wallId: string) => {
     const w = walls.find((x) => x.id === wallId);
     if (!w) return;
+    // Un mur dessiné se cote de nu à nu, comme au mètre.
+    const auNu = !!w.auNu;
     setPrompt({
       title: 'Longueur du mur',
-      subtitle: 'L’extrémité opposée se déplace, les murs soudés suivent.',
-      value: segLength(w).toFixed(2).replace('.', ','),
+      subtitle: auNu
+        ? 'De nu à nu. Le bout de gauche (ou du haut) reste ; le mur d’en bout se décale, d’équerre.'
+        : 'Le bout de gauche (ou du haut) reste ; le mur d’en bout se décale, d’équerre.',
+      value: longueurCotee(walls, w).toFixed(2).replace('.', ','),
       unit: 'm',
       numeric: true,
       onSubmit: (t) => {
         const v = parseFloat(t.replace(',', '.'));
-        if (v > 0) setWallLength(wallId, v);
+        if (v > 0) setWallLength(wallId, v, { auNu });
       },
     });
   };
@@ -3152,7 +3171,8 @@ export function ResultScreen() {
           onChoose={(largeur, profondeur, nom) => {
             // Rien au plan : elle se pose à l'origine, et elle est CHOISIE
             // — sans quoi ni ses poignées ni son glissement n'existeraient.
-            setSelectedRoomId(addRoomLibre(largeur, profondeur, nom));
+            // Des cotes intérieures : voir `AddRoomSheet`.
+            setSelectedRoomId(addRoomLibre(largeur, profondeur, nom, { auNu: true }));
             setAjoutPiece(false);
             setEditMode(true);
             haptic('succes');
@@ -3659,7 +3679,7 @@ export function ResultScreen() {
                         icon: 'tableau' as const,
                         hint: existant?.departs.length
                           ? `${existant.departs.length} organe(s) relevé(s) — le même tableau qu’au mur.`
-                          : 'Rénovation : reconstruisez-le organe par organe, l’app dit ce qui bloque.',
+                          : 'Rénovation : un coffret vide, que vous remplissez organe par organe ; l’app dit ce qui bloque.',
                         onPress: () => ouvrirLeTableau(),
                       },
                       {
@@ -5678,7 +5698,7 @@ export function ResultScreen() {
                     nom: 'ce mur',
                     actuelle: segLength(selectedWall),
                     appliquer: (m: number) =>
-                      setWallLength(selectedWall.id, m),
+                      setWallLength(selectedWall.id, m, { auNu: !!selectedWall.auNu }),
                   }),
               },
               /*
@@ -6142,9 +6162,10 @@ export function ResultScreen() {
         onChoose={(largeur, profondeur, nom) => {
           // Accolée au mur choisi, s'il y en a un : c'est ainsi qu'on bâtit
           // un appartement de proche en proche.
+          // Des cotes intérieures : voir `AddRoomSheet`.
           const id = selectedWallId
-            ? addRoomBox(largeur, profondeur, nom, selectedWallId)
-            : addRoomLibre(largeur, profondeur, nom);
+            ? addRoomBox(largeur, profondeur, nom, selectedWallId, { auNu: true })
+            : addRoomLibre(largeur, profondeur, nom, { auNu: true });
           setAjoutPiece(false);
           seuleSelection('piece');
           // Une SEULE pièce en pointillés à la fois : celle qu'on vient de
@@ -6235,6 +6256,7 @@ export function ResultScreen() {
         onRetirer={(id) => useScanStore.getState().retirerDepart(id)}
         onDecrire={(t) => useScanStore.getState().decrireTableau(t)}
         onVider={() => useScanStore.getState().viderLeTableau()}
+        onConfirmerReleve={() => useScanStore.getState().confirmerLeReleve()}
         onRetirerRangee={(k) => useScanStore.getState().retirerLaRangee(k)}
         onDeplacer={(id, vers) => useScanStore.getState().deplacerDepart(id, vers)}
         surLePlan={
@@ -6259,7 +6281,7 @@ export function ResultScreen() {
         onClose={() => setTableauFini(false)}
         onModifier={() => {
           setTableauFini(false);
-          ouvrirApres(ouvrirLeTableau);
+          ouvrirApres(() => ouvrirLeTableau(true));
         }}
       />
 

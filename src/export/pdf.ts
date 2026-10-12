@@ -13,7 +13,6 @@ import type { FloorData, ObjectData } from 'react-native-room-scan';
 import {
   castToWall,
   clampFootprint,
-  roomExtent,
   roomHeight,
   roomOf,
   roomParts,
@@ -108,7 +107,7 @@ import {
 } from '../geometry/ceiling';
 import { planFrameAngle } from '../geometry/floorplan';
 import { assignOpenings } from '../geometry/scene3d';
-import { epaisseurDe, pointOnSeg, wallRuns } from '../geometry/floorplan';
+import { epaisseurDe, etendueDeLaPiece, pointOnSeg, wallRuns } from '../geometry/floorplan';
 import {
   ajusterBlocs,
   masquesDeScene,
@@ -4051,7 +4050,7 @@ function metrePage(
     const name =
       ctx.roomNames[part.roomId] || `Pièce ${parts.indexOf(part) + 1}`;
     const ext = part.surface
-      ? roomExtent(part.surface.pts)
+      ? etendueDeLaPiece(part.surface)
       : { width: 0, depth: 0 };
     /*
       UNE SEULE SURFACE DE MURS — relevé du patron, point 5 de la réflexion
@@ -7186,7 +7185,12 @@ function planifierUnNiveau(
     dans cet ordre-là, et c'est dans cet ordre qu'on lui en parle.
   */
   if (existant) {
-    feuilles.push({ genre: 'existant', titre: 'Tableau existant', fabriquer: (n) => existantPage(ctx, n, existant) });
+    feuilles.push({
+      genre: 'existant',
+      // Déduit du plan, il ne se présente pas comme un relevé (revue « Marc »).
+      titre: existant.projete ? 'Tableau projeté (non relevé)' : 'Tableau existant',
+      fabriquer: (n) => existantPage(ctx, n, existant),
+    });
   }
   /*
     LE CHEMINEMENT, JUSTE APRES LE METRE.

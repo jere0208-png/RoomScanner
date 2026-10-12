@@ -43,6 +43,8 @@ import { radius, shadowCard, useTheme, type Palette } from '../../theme';
 import {
   bilanExistant,
   calibreMaxDe,
+  calibreMaxSection,
+  SECTIONS_MM2,
   chargeEnPosant,
   MAX_CIRCUITS_PAR_DIFF,
   diagnosticExistant,
@@ -66,8 +68,12 @@ import {
   type FauteDuModule,
 } from '../../components/TableauVivant';
 
-/** Les calibres qu'on rencontre vraiment sur un rail, dans cet ordre. */
-const CALIBRES = [2, 10, 16, 20, 32];
+/**
+ * Les calibres qu'on rencontre vraiment sur un rail, dans cet ordre — 25 A
+ * et 40 A compris (revue « Marc » : sans eux, impossible de noter le
+ * classique 25 A sur du 2,5 mm²).
+ */
+const CALIBRES = [2, 10, 16, 20, 25, 32, 40];
 
 const TEINTE: Record<GraviteConstat, keyof Palette> = {
   danger: 'danger',
@@ -142,6 +148,7 @@ export function ExistantSheet({
   pieces,
   onVoirFini,
   onVider,
+  onConfirmerReleve,
   onRetirerRangee,
 }: {
   visible: boolean;
@@ -162,6 +169,8 @@ export function ExistantSheet({
   onVoirFini?: () => void;
   /** Retire tous les organes : on repart d'un coffret vide. */
   onVider?: () => void;
+  /** Le tableau déduit du plan a été vérifié : il devient un relevé. */
+  onConfirmerReleve?: () => void;
   /** Retire la rangée `k`, vide, où qu'elle soit : celles du dessous remontent. */
   onRetirerRangee?: (k: number) => void;
 }) {
@@ -251,20 +260,20 @@ export function ExistantSheet({
       return;
     }
     /*
-      HUIT CIRCUITS AU PLUS SOUS UN DIFFÉRENTIEL — et c'est un geste refusé,
-      pas un constat lu après coup (voir `chargeEnPosant`).
+      HUIT CIRCUITS AU PLUS SOUS UN DIFFÉRENTIEL — un relevé NOTE le défaut,
+      il ne l'interdit pas (revue « Marc », décision du patron). Le neuvième
+      se clipse, et la feuille dit l'écart en le posant ; le contrôle le
+      compte (voir `chargeEnPosant`).
     */
     const charge = chargeEnPosant(departsBruts, { rangees: impl.rangees, parRangee: impl.parRangee }, { ...modele, rangee: r });
-    if (charge && charge.circuits > MAX_CIRCUITS_PAR_DIFF) {
-      refuser(
-        `Le différentiel ${numeroDuDiff(impl, charge.differentiel)} protège déjà ${MAX_CIRCUITS_PAR_DIFF} circuits, ` +
-          'le maximum : clipsez un nouveau différentiel 30 mA pour les suivants.',
-      );
-      return;
-    }
+    const ecart =
+      charge && charge.circuits > MAX_CIRCUITS_PAR_DIFF
+        ? `Le différentiel ${numeroDuDiff(impl, charge.differentiel)} protège maintenant ${charge.circuits} circuits, ` +
+          `au-delà des ${MAX_CIRCUITS_PAR_DIFF} admis : l’écart est noté dans le contrôle.`
+        : null;
     onAjouter({ ...modele, rangee: r });
-    setRefus(null);
-    haptic('accroche');
+    setRefus(ecart);
+    haptic(ecart ? 'alerte' : 'accroche');
     // Une rangée pleine passe la main à la suivante, comme l'œil qui lit.
     const reste = impl.libres[r] - largeurDe(modele);
     if (reste <= 0) {
@@ -380,6 +389,43 @@ export function ExistantSheet({
               }}>
               <Text style={styles.lienBoutonTexte}>Voir le tableau fini</Text>
             </TouchableOpacity>
+          ) : null}
+          {/*
+            DÉDUIT DU PLAN, PAS RELEVÉ — revue « Marc » : on pouvait remettre
+            au client un tableau fictif déclaré conforme. Le bandeau le dit
+            tant qu'on n'a pas confirmé l'avoir vérifié.
+          */}
+          {existant?.projete ? (
+            <View style={styles.projete} testID="tableau-projete">
+              <Text style={styles.projeteTitre}>Tableau projeté, pas relevé</Text>
+              <Text style={styles.projeteTexte}>
+                L’app l’a déduit du plan. Ajustez-le organe par organe, ou repartez d’un coffret vide.
+              </Text>
+              <View style={styles.projeteBoutons}>
+                {onVider ? (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="Partir d’un coffret vide"
+                    onPress={() => {
+                      haptic('leger');
+                      onVider();
+                    }}>
+                    <Text style={styles.projeteLien}>Partir d’un coffret vide</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {onConfirmerReleve ? (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="C’est bien le tableau en place"
+                    onPress={() => {
+                      haptic('succes');
+                      onConfirmerReleve();
+                    }}>
+                    <Text style={styles.projeteLien}>C’est bien le tableau en place</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
           ) : null}
           {/*
             REPARTIR DE ZÉRO — ouvert sur un tableau jamais constitué, la
@@ -639,9 +685,33 @@ export function ExistantSheet({
                           mot={(a) => `${a} A`}
                           alerte={(a) => {
                             const max = calibreMaxDe(choix.usage);
-                            return choix.organe === 'disjoncteur' && !!max && a > max;
+                            const parFil = calibreMaxSection(choix.section);
+                            return (
+                              choix.organe === 'disjoncteur' &&
+                              ((!!max && a > max) || (!!parFil && a > parFil))
+                            );
                           }}
                           onChoix={(a) => onModifier(choix.id, { calibre: a })}
+                        />
+                      </>
+                    )}
+                    {/*
+                      LA SECTION DU FIL — revue « Marc ». Le disjoncteur
+                      protège le fil : sans sa section, le contrôle ne peut
+                      pas dire qu'un 25 A sur du 2,5 mm² le laisse chauffer.
+                    */}
+                    {choix.organe === 'disjoncteur' && (
+                      <>
+                        <Text style={styles.aide}>Section du fil</Text>
+                        <Puces
+                          valeurs={SECTIONS_MM2}
+                          actuelle={choix.section}
+                          mot={(s) => `${String(s).replace('.', ',')} mm²`}
+                          alerte={(s) => {
+                            const max = calibreMaxSection(s);
+                            return !!max && !!choix.calibre && choix.calibre > max;
+                          }}
+                          onChoix={(s) => onModifier(choix.id, { section: s })}
                         />
                       </>
                     )}
@@ -1036,5 +1106,17 @@ const getStyles = (c: Palette) =>
     lienBoutonTexte: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '700' },
     voirFini: { marginTop: 10, marginBottom: 4 },
     viderLigne: { flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 8 },
+    projete: {
+      marginTop: 10,
+      padding: 12,
+      borderRadius: 12,
+      backgroundColor: c.surfaceSunken,
+      borderWidth: 1,
+      borderColor: c.amber,
+    },
+    projeteTitre: { color: c.ink, fontSize: 14, fontWeight: '800' },
+    projeteTexte: { color: c.inkSoft, fontSize: 12.5, lineHeight: 17, marginTop: 3 },
+    projeteBoutons: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 8 },
+    projeteLien: { color: c.blue, fontSize: 13.5, fontWeight: '700' },
     viderTexte: { fontSize: 13, fontWeight: '600', color: c.inkSoft },
   });

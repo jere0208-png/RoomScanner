@@ -70,6 +70,9 @@ import {
   wallRuns,
   weldCorners,
   fusionnerMursDoubles,
+  estDessine,
+  longueurAuNu,
+  epaisseurDe,
   NIVEAU_RDC,
   niveauDe,
   niveauxPresents,
@@ -1498,6 +1501,8 @@ interface ScanState {
   constituerLeTableau: (t: TableauExistant) => void;
   /** Repart d'un tableau vide (qui reste constitué : vide, il se dessine vide). */
   viderLeTableau: () => void;
+  /** Le tableau déduit du plan a été vérifié sur place : il devient un relevé. */
+  confirmerLeReleve: () => void;
   /**
    * Retire la rangée `k`, VIDE, où qu'elle soit : celles du dessous
    * remontent (voir `sansLaRangee`). Une rangée garnie ne bouge pas.
@@ -1645,7 +1650,11 @@ interface ScanState {
    * Un contour libre n'a pas de « largeur × profondeur » unique : le geste
    * ne s'applique qu'aux rectangles, et les autres gardent leurs murs.
    */
-  resizeRoom: (roomId: string, largeur: number, profondeur: number) => void;
+  /**
+   * Repose une pièce rectangulaire à ses cotes. `auNu` : ce sont des cotes
+   * INTÉRIEURES, de mur à mur (une pièce dessinée, voir `contourAuNu`).
+   */
+  resizeRoom: (roomId: string, largeur: number, profondeur: number, opts?: { auNu?: boolean }) => void;
   /**
    * Etire une piece RECTANGULAIRE par un de ses bords, le bord oppose fixe.
    *
@@ -1708,7 +1717,7 @@ interface ScanState {
    * Pose une piece rectangulaire AU MILIEU de ce qui existe, prete a etre
    * poussee et etiree. Rend son identifiant.
    */
-  addRoomLibre: (largeur: number, profondeur: number, nom?: string) => string | null;
+  addRoomLibre: (largeur: number, profondeur: number, nom?: string, opts?: { auNu?: boolean }) => string | null;
   /** La piece cesse d'etre neuve : son trait se ferme. */
   arreterPiece: (roomId: string) => void;
   addRoomRect: (
@@ -1730,6 +1739,8 @@ interface ScanState {
      * logement, et la cloison ne se dessine qu'une fois.
      */
     contreWallId?: string | null,
+    /** `auNu` : largeur et profondeur sont intérieures (voir `resizeRoom`). */
+    opts?: { auNu?: boolean },
   ) => string;
   /** Appareillage électrique posé sur les murs (prises, commandes, RJ45…). */
   fixtures: Fixture[];
@@ -2209,7 +2220,8 @@ interface ScanState {
    * l'accroche, une seule fois, sur l'angle voulu.
    */
   setWallAngle: (id: string, deg: number) => void;
-  setWallLength: (id: string, length: number) => void;
+  /** `auNu` : la longueur tapée est de nu à nu (un mur dessiné). */
+  setWallLength: (id: string, length: number, opts?: { auNu?: boolean }) => void;
   renameCurrent: (name: string) => void;
   saveAsCopy: (name: string) => void;
   /** Enregistre les modifications du plan dans la bibliothèque. */
@@ -3179,6 +3191,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     profondeur: number,
     origine: Pt | null,
     cle: string,
+    auNu = false,
   ) => {
       const st = get();
       const murs = mursDeLaPiece(roomId);
@@ -3186,8 +3199,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       // Une cote nulle ou négative n'est pas une intention, c'est une
       // saisie ratée : on ne la borne pas, on l'ignore.
       if (!(largeur > 0) || !(profondeur > 0)) return;
-      const L = Math.min(MUR_MAX_M, Math.max(0.6, largeur));
-      const P = Math.min(MUR_MAX_M, Math.max(0.6, profondeur));
+      let L = Math.min(MUR_MAX_M, Math.max(0.6, largeur));
+      let P = Math.min(MUR_MAX_M, Math.max(0.6, profondeur));
       const xs = murs.flatMap((w) => [w.a.x, w.b.x]);
       const zs = murs.flatMap((w) => [w.a.z, w.b.z]);
       const x0 = Math.min(...xs);
@@ -3200,6 +3213,21 @@ export const useScanStore = create<ScanState>((set, get) => {
         (w) => Math.abs(w.a.x - w.b.x) < 1e-3 || Math.abs(w.a.z - w.b.z) < 1e-3,
       );
       if (!droit || x1 - x0 < 1e-3 || z1 - z0 < 1e-3) return;
+      /*
+        DES COTES INTÉRIEURES — décision du patron pour les plans dessinés :
+        on tape ce que donne le mètre, de mur à mur. Le plan dessine les
+        axes : chaque côté recule d'une demi-épaisseur de SON mur.
+      */
+      if (auNu && estDessine(murs)) {
+        const demi = (garde: (w: WallSeg) => boolean) => {
+          const w = murs.find(garde);
+          return (w ? epaisseurDe(w) : WALL_T) / 2;
+        };
+        const enX = (x: number) => (w: WallSeg) => Math.abs(w.a.x - x) < 1e-3 && Math.abs(w.b.x - x) < 1e-3;
+        const enZ = (z: number) => (w: WallSeg) => Math.abs(w.a.z - z) < 1e-3 && Math.abs(w.b.z - z) < 1e-3;
+        L = Math.min(MUR_MAX_M, L + demi(enX(x0)) + demi(enX(x1)));
+        P = Math.min(MUR_MAX_M, P + demi(enZ(z0)) + demi(enZ(z1)));
+      }
 
       pushHistory(cle);
       /*
@@ -4031,6 +4059,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         niveau: part.walls[0]?.niveau,
         // Le groupe de ses murs : voir `splitRoom`.
         ...groupeDesMurs(part.walls),
+        ...(estDessine(part.walls) ? { auNu: true } : {}),
         ...(Math.abs(e - WALL_T) > 1e-6
           ? { epaisseur: Math.min(Math.max(e, 0.03), 0.6) }
           : {}),
@@ -4090,6 +4119,8 @@ export const useScanStore = create<ScanState>((set, get) => {
           groupe, le faisaient.
         */
         ...groupeDesMurs(part.walls),
+        // Dans une pièce dessinée, elle se cote au nu comme les autres.
+        ...(estDessine(part.walls) ? { auNu: true } : {}),
       };
       set({ walls: [...st.walls, wall], dirty: true });
       get().redetectRooms(niveauDe(wall));
@@ -4178,8 +4209,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       vers le bas, donc ce qu'on regarde ne saute pas et les pièces voisines
       restent où elles sont.
     */
-    resizeRoom: (roomId, largeur, profondeur) =>
-      reposerPiece(roomId, largeur, profondeur, null, 'resizeRoom'),
+    resizeRoom: (roomId, largeur, profondeur, opts) =>
+      reposerPiece(roomId, largeur, profondeur, null, 'resizeRoom', !!opts?.auNu),
 
     /*
       ET LE MEME RECTANGLE SE TIRE PAR UN BORD.
@@ -4427,6 +4458,8 @@ export const useScanStore = create<ScanState>((set, get) => {
             // Il naît à l'étage où l'on travaille : voir `addRoomBox`.
             niveau: depart?.niveau ?? st.niveauCourant,
             ...groupe,
+            // Tracé à la main : voir `WallSeg.auNu`.
+            auNu: true,
             ...(e && e > 0 && Math.abs(e - WALL_T) > 1e-6
               ? { epaisseur: Math.min(Math.max(e, 0.03), 0.6) }
               : {}),
@@ -4578,10 +4611,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       AU MILIEU DE CE QUI EXISTE, parce que c'est la que l'oeil est deja
       pose. Sur un plan vierge, a l'origine — il n'y a pas d'ailleurs.
     */
-    addRoomLibre: (largeur, profondeur, nom) => {
+    addRoomLibre: (largeur, profondeur, nom, opts) => {
       const st = get();
-      const l = Math.min(MUR_MAX_M, Math.max(0.6, largeur));
-      const p = Math.min(MUR_MAX_M, Math.max(0.6, profondeur));
+      // Des cotes intérieures : les axes passent une demi-épaisseur plus loin, de chaque côté.
+      const t = opts?.auNu ? WALL_T : 0;
+      const l = Math.min(MUR_MAX_M, Math.max(0.6, largeur) + t);
+      const p = Math.min(MUR_MAX_M, Math.max(0.6, profondeur) + t);
       const auNiveau = st.walls.filter((w) => niveauDe(w) === st.niveauCourant);
       const xs = auNiveau.flatMap((w) => [w.a.x, w.b.x]);
       const zs = auNiveau.flatMap((w) => [w.a.z, w.b.z]);
@@ -4724,6 +4759,8 @@ export const useScanStore = create<ScanState>((set, get) => {
           roomId,
           // A l'etage ou l'on travaille : voir `addRoomBox`.
           niveau: st.niveauCourant,
+          // Trace a la main : ses cotes sont interieures (voir `WallSeg.auNu`).
+          auNu: true,
         };
         neufs.push(mur);
         wallIds.push(mur.id);
@@ -4746,7 +4783,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       return roomId;
     },
 
-    addRoomBox: (largeur, profondeur, nom, contreWallId) => {
+    addRoomBox: (largeur, profondeur, nom, contreWallId, opts) => {
       const st = get();
       nom = nom?.slice(0, NOM_PIECE_MAX);
       pushHistory('addRoom');
@@ -4821,7 +4858,8 @@ export const useScanStore = create<ScanState>((set, get) => {
           // `perpOf(u)` = (−uz, ux). La nouvelle pièce va à l'OPPOSé.
           const dedans = interiorSide(contre, st.walls, st.rooms);
           const n = { x: u.z * dedans, z: -u.x * dedans };
-          const p = Math.max(0.6, profondeur);
+          // Une profondeur intérieure : du nu du mur mitoyen au nu du mur du fond.
+          const p = Math.max(0.6, profondeur) + (opts?.auNu ? (epaisseurDe(contre) + WALL_T) / 2 : 0);
           const c1 = { x: contre.b.x + n.x * p, z: contre.b.z + n.z * p };
           const c2 = { x: contre.a.x + n.x * p, z: contre.a.z + n.z * p };
           const murs = [
@@ -4845,6 +4883,8 @@ export const useScanStore = create<ScanState>((set, get) => {
             // séjour : deux pièces au même endroit, un métré faux, et une
             // surface au sol qui double sans raison.
             niveau: st.niveauCourant,
+            // Tracé à la main : voir `WallSeg.auNu`.
+            auNu: true,
           }));
           set({
             walls: [...st.walls, ...murs],
@@ -4900,8 +4940,8 @@ export const useScanStore = create<ScanState>((set, get) => {
           ? Math.max(...xs) + 0.5
           : Math.min(...xs);
       const z0 = zs.length > 0 ? Math.min(...zs) : 0;
-      const x1 = x0 + Math.max(0.6, largeur);
-      const z1 = z0 + Math.max(0.6, profondeur);
+      const x1 = x0 + Math.max(0.6, largeur) + (opts?.auNu ? WALL_T : 0);
+      const z1 = z0 + Math.max(0.6, profondeur) + (opts?.auNu ? WALL_T : 0);
       const coins: Pt[] = [
         { x: x0, z: z0 },
         { x: x1, z: z0 },
@@ -4918,6 +4958,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         roomId,
         // À l'étage où l'on travaille : voir le bloc accolé, plus haut.
         niveau: st.niveauCourant,
+        // Tracé à la main : voir `WallSeg.auNu`.
+        auNu: true,
       }));
       set({
         walls: [...st.walls, ...murs],
@@ -6260,15 +6302,28 @@ export const useScanStore = create<ScanState>((set, get) => {
       pushHistory('constituerLeTableau');
       const graine = Date.now().toString(36);
       set({
-        existant: rangerLeTableau({
-          ...t,
-          departs: t.departs.map((d, i) => ({
-            ...d,
-            id: `dep-${graine}-${i.toString(36)}${Math.random().toString(36).slice(2, 4)}`,
-          })),
-        }),
+        existant: {
+          ...rangerLeTableau({
+            ...t,
+            departs: t.departs.map((d, i) => ({
+              ...d,
+              id: `dep-${graine}-${i.toString(36)}${Math.random().toString(36).slice(2, 4)}`,
+            })),
+          }),
+          // Déduit du plan : la feuille le dit (voir `TableauExistant.projete`).
+          projete: true,
+        },
         dirty: true,
       });
+    },
+
+    confirmerLeReleve: () => {
+      const ex = get().existant;
+      if (!ex?.projete) return;
+      pushHistory('confirmerLeReleve');
+      const releve = { ...ex };
+      delete releve.projete;
+      set({ existant: releve, dirty: true });
     },
 
     retirerLaRangee: (k) => {
@@ -6978,11 +7033,16 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     /** Donne au mur la longueur tapée : voir plus bas. */
-    setWallLength: (id, length) => {
+    setWallLength: (id, length, opts) => {
       if (!sontFinis(length)) return;
       const st = get();
       const wall = st.walls.find((w) => w.id === id);
       if (!wall || length <= 0) return;
+      // De nu à nu, sur un mur dessiné : l'axe a en plus le demi-mur qui le ferme à chaque bout.
+      if (opts?.auNu && wall.auNu) {
+        const memes = st.walls.filter((w) => niveauDe(w) === niveauDe(wall));
+        length += segLength(wall) - longueurAuNu(memes, wall);
+      }
       /*
         NEUF CENT QUATRE-VINGT-DIX-NEUF MÈTRES.
 
@@ -8901,7 +8961,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         scanName: nom,
         resultOrigin: 'scan',
         niveauCourant: NIVEAU_RDC,
-        walls: plan.walls,
+        // Lu sur un plan papier : ses cotes sont celles du plan, intérieures.
+        walls: plan.walls.map((w) => ({ ...w, auNu: true })),
         openings: plan.openings,
         rooms: plan.rooms.map((r) => ({ ...r, floor: null })),
         objects: [],

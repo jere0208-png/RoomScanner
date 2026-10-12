@@ -101,8 +101,8 @@ export function AddRoomSheet({
 
   const sousTitre = surMesure
     ? accolee
-      ? 'La largeur se prend le long du mur choisi, la profondeur s’en éloigne.'
-      : 'Largeur et profondeur, en mètres.'
+      ? 'Cotes intérieures : la profondeur se prend du nu du mur choisi au nu du mur du fond.'
+      : 'Cotes intérieures, de mur à mur, en mètres — celles du mètre ruban.'
     : accolee
       ? 'Elle s’accole au mur choisi et le partage avec lui : ' +
         'elle en prend la longueur, et vous donnez la profondeur.'

@@ -415,7 +415,8 @@ describe('le tableau existant, revu — huit circuits, le type AC, le défilemen
     expect(chargeEnPosant(huit, { rangees: 2, parRangee: 13 }, { organe: 'parafoudre', calibre: null, rangee: 0 })).toBeNull();
   });
 
-  it('dans la feuille : le neuvième disjoncteur est refusé, et l’on dit pourquoi', () => {
+  // Un relevé NOTE le défaut, il ne l'interdit pas (revue « Marc », décision du patron).
+  it('dans la feuille : le neuvième disjoncteur se clipse, et l’on dit l’écart', () => {
     useScanStore.setState({ existant: null });
     let t!: TestRenderer.ReactTestRenderer;
     act(() => {
@@ -454,10 +455,10 @@ describe('le tableau existant, revu — huit circuits, le type AC, le défilemen
     appuie('Clipser : Différentiel 30 mA type AC');
     for (let i = 0; i < 9; i++) appuie('Disjoncteur 16 ampères');
     const departs = useScanStore.getState().existant!.departs;
-    expect(departs.filter((d) => d.organe === 'disjoncteur')).toHaveLength(8);
+    expect(departs.filter((d) => d.organe === 'disjoncteur')).toHaveLength(9);
     expect(departs.find((d) => d.organe === 'differentiel')!.typeDiff).toBe('AC');
     const mots = t.root.findAllByType(Text).map((n) => [].concat(n.props.children).join('')).join(' ');
-    expect(mots).toMatch(/protège déjà 8 circuits/);
+    expect(mots).toMatch(/protège maintenant 9 circuits/);
     act(() => t.unmount());
   });
 

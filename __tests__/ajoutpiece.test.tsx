@@ -63,7 +63,8 @@ describe('ajouter une pièce au plan', () => {
   });
 
   it('et le plan la reconnaît comme une pièce à part entière', () => {
-    const id = useScanStore.getState().addRoomBox(3.4, 3, 'Chambre');
+    // Des cotes intérieures, comme l'écran les passe : la surface est celle du mètre.
+    const id = useScanStore.getState().addRoomBox(3.4, 3, 'Chambre', undefined, { auNu: true });
     const st = useScanStore.getState();
     const parts = roomParts(st.walls, st.rooms);
     const part = parts.find((p) => p.roomId === id);
