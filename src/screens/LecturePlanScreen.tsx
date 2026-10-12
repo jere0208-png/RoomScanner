@@ -35,6 +35,7 @@ import {
   Image,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -45,7 +46,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { roomParts, segLength } from '../geometry/floorplan';
-import { reconstruirePlan, type PlanLu } from '../geometry/lecturePlan';
+import { reconstruirePlan, type LectureBrute, type PlanLu } from '../geometry/lecturePlan';
 import { importerUnPlan, ouvrirUnFichier, pageDuPdf, scannerUnPlan, type PageDePlan } from '../native/lecturePlan';
 import { envoyerLePlan, type ReponseDeLecture } from '../net/lecturePlan';
 import { useAccountStore } from '../store/accountStore';
@@ -70,7 +71,7 @@ type Etat =
   | { phase: 'invitation' }
   | { phase: 'apercu'; page: PageDePlan; charge?: boolean }
   | { phase: 'lecture'; page: PageDePlan; etape: number }
-  | { phase: 'lu'; page: PageDePlan; plan: PlanLu; essai: boolean }
+  | { phase: 'lu'; page: PageDePlan; plan: PlanLu; essai: boolean; brut: LectureBrute }
   | {
       phase: 'echec';
       page?: PageDePlan;
@@ -152,7 +153,7 @@ export function LecturePlanScreen() {
       return;
     }
     haptic('succes');
-    setEtat({ phase: 'lu', page, plan: plan.plan, essai: r.essai });
+    setEtat({ phase: 'lu', page, plan: plan.plan, essai: r.essai, brut: r.lecture });
   };
 
   const prendre = async (source: 'scanner' | 'photo' | 'fichier') => {
@@ -256,6 +257,7 @@ export function LecturePlanScreen() {
             c={c}
             plan={etat.plan}
             essai={etat.essai}
+            brut={etat.brut}
             onCreer={() => creer(etat.plan)}
             onReprendre={() => setEtat({ phase: 'invitation' })}
           />
@@ -497,6 +499,7 @@ function Lu({
   c,
   plan,
   essai,
+  brut,
   onCreer,
   onReprendre,
 }: {
@@ -504,6 +507,8 @@ function Lu({
   c: Palette;
   plan: PlanLu;
   essai: boolean;
+  /** Ce que l'IA a rendu, tel quel : pour le diagnostic. */
+  brut?: LectureBrute;
   onCreer: () => void;
   onReprendre: () => void;
 }) {
@@ -522,10 +527,25 @@ function Lu({
   return (
     <View testID="lecture-lue">
       <View style={s.carte}>
-        <View style={s.confiance}>
+        {/*
+          LE DIAGNOSTIC, D'UN APPUI LONG — relevé du patron : « il a scanné
+          cela, rien à voir ». Pour savoir si la faute est à la lecture de
+          l'IA ou à la reconstruction, il faut ce qu'elle a rendu, tel quel :
+          un appui long sur la confiance le partage (rien ne part sans ce
+          geste, et rien n'est gardé).
+        */}
+        <Pressable
+          testID="confiance-de-lecture"
+          style={s.confiance}
+          delayLongPress={700}
+          onLongPress={() => {
+            if (!brut) return;
+            haptic('leger');
+            Share.share({ message: JSON.stringify(brut) }).catch(() => {});
+          }}>
           <View style={[s.pastille, { backgroundColor: teinte }]} />
           <Text style={[s.confianceMot, { color: teinte }]}>{mot}</Text>
-        </View>
+        </Pressable>
         <ApercuDuPlanLu plan={plan} c={c} />
         <Text style={s.bilan}>
           {plan.rooms.length} pièce{plan.rooms.length > 1 ? 's' : ''} · {plan.walls.length} murs ·{' '}

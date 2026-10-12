@@ -89,7 +89,19 @@ export interface LectureBrute {
     b: PointLu;
     reference?: ReferenceDeCote;
   }[];
-  pieces?: { nom: string; point: PointLu; surface?: string }[];
+  pieces?: {
+    nom: string;
+    point: PointLu;
+    surface?: string;
+    /**
+     * Les coins INTÉRIEURS de la pièce, dans l'ordre du tour (le nu des
+     * murs). Chaque côté longe un mur : là où aucun mur lu ne le borde, il
+     * en devient un — voir `reconstruirePlan`, étape 3.
+     */
+    contour?: PointLu[];
+  }[];
+  /** Le rectangle du plan principal, [x1, y1, x2, y2] : le reste est écarté. */
+  cadre?: number[];
   symboles?: {
     /** Ce que le symbole représente, en mots : « prise 16 A », « point lumineux ». */
     libelle: string;
@@ -446,21 +458,31 @@ const TOL_BOUT = 0.35;
  * RECONSTRUIT LE PLAN À PARTIR DE SA LECTURE. Voir l'en-tête du module pour
  * la marche ; chaque étape est commentée là où elle se fait.
  */
-export function reconstruirePlan(brut: LectureBrute, image: ImageLue): ResultatDeLecture {
-  if (!brut || !brut.est_un_plan) {
-    return { ok: false, raison: brut?.raison || 'Ce n’est pas un plan, ou il est illisible.' };
+export function reconstruirePlan(lu: LectureBrute, image: ImageLue): ResultatDeLecture {
+  if (!lu || !lu.est_un_plan) {
+    return { ok: false, raison: lu?.raison || 'Ce n’est pas un plan, ou il est illisible.' };
   }
+  // 0. LE PLAN PRINCIPAL SEUL — voir `garderLePlanPrincipal`.
+  const brut = garderLePlanPrincipal(lu);
   const W = Math.max(1, image.largeur);
   const H = Math.max(1, image.hauteur);
   /** Millièmes → pixels. */
   const px = (p: PointLu | number[]): { x: number; y: number } => ({ x: (p[0] / 1000) * W, y: (p[1] / 1000) * H });
   const mursBruts = (brut.murs ?? []).filter((m) => Array.isArray(m) && m.length >= 4 && m.slice(0, 4).every(Number.isFinite));
-  if (mursBruts.length < 3) return { ok: false, raison: 'Trop peu de murs lus : le plan est-il entier sur la photo ?' };
+  const contours = contoursLus(brut);
+  if (mursBruts.length < 3 && contours.length === 0) {
+    return { ok: false, raison: 'Trop peu de murs lus : le plan est-il entier sur la photo ?' };
+  }
 
   // 1. L'ORIENTATION — la direction dominante des murs, modulo l'équerre.
   let C = 0;
   let S = 0;
-  for (const m of mursBruts) {
+  // Les murs lus, et les côtés des pièces : tous disent l'équerre du plan.
+  const traits = [
+    ...mursBruts.map((m) => [m[0], m[1], m[2], m[3]]),
+    ...contours.flatMap((c) => c.map((q, k) => [q[0], q[1], c[(k + 1) % c.length][0], c[(k + 1) % c.length][1]])),
+  ];
+  for (const m of traits) {
     const a = px([m[0], m[1]]);
     const b = px([m[2], m[3]]);
     const L = Math.hypot(b.x - a.x, b.y - a.y);
@@ -587,7 +609,21 @@ export function reconstruirePlan(brut: LectureBrute, image: ImageLue): ResultatD
     if (dx <= dz * Math.tan((10 * Math.PI) / 180)) return 'v';
     return 'o';
   };
-  for (const s of segs) {
+  /*
+    LES CONTOURS DES PIÈCES TIENNENT LES MURS — relevé du patron : « il a
+    scanné cela, rien à voir, manque beaucoup de murs ». L'IA trace mieux une
+    pièce, ancrée à son nom, qu'une liste de soixante segments. Chaque côté
+    d'un contour longe un mur, sur son nu : là où aucun mur lu ne le borde
+    (parallèle, à moins de 30 cm, sur la moitié de sa longueur), il en
+    devient un. Les côtés de deux pièces voisines, à l'épaisseur d'une
+    cloison l'un de l'autre, se fondent ensuite en UNE cloison, au milieu
+    (`fusionnerLesNus`).
+  */
+  const faces: Seg[] = contours.flatMap((c) =>
+    c.map((q, k) => ({ a: enM(q), b: enM(c[(k + 1) % c.length]), ep: null as number | null })),
+  ).filter((s) => Math.hypot(s.b.x - s.a.x, s.b.z - s.a.z) > 0.15);
+  // Lus ou déduits, tous se mettent d'équerre de la même façon.
+  for (const s of [...segs, ...faces]) {
     if (sens(s) === 'h') {
       const z = (s.a.z + s.b.z) / 2;
       const x0 = Math.min(s.a.x, s.b.x);
@@ -601,6 +637,24 @@ export function reconstruirePlan(brut: LectureBrute, image: ImageLue): ResultatD
       s.a = { x, z: z0 };
       s.b = { x, z: z1 };
     }
+  }
+  const lus = [...segs];
+  for (const f of faces) {
+    const s = sens(f);
+    if (s === 'o') {
+      segs.push(f);
+      continue;
+    }
+    const pos = (v: Seg) => (s === 'h' ? v.a.z : v.a.x);
+    const lo = (v: Seg) => (s === 'h' ? v.a.x : v.a.z);
+    const hi = (v: Seg) => (s === 'h' ? v.b.x : v.b.z);
+    const borde = lus.some(
+      (m) =>
+        sens(m) === s &&
+        Math.abs(pos(m) - pos(f)) <= 0.3 &&
+        Math.min(hi(m), hi(f)) - Math.max(lo(m), lo(f)) >= (hi(f) - lo(f)) * 0.5,
+    );
+    if (!borde) segs.push(f);
   }
   segs = fusionnerLesNus(segs, sens);
 
@@ -1152,6 +1206,59 @@ function fusionnerLesNus(segs: Seg[], sens: (s: Seg) => 'h' | 'v' | 'o'): Seg[] 
   return out;
 }
 
+/** Les contours de pièces exploitables : trois coins au moins, tous chiffrés. */
+function contoursLus(brut: LectureBrute): PointLu[][] {
+  return (brut.pieces ?? [])
+    .map((p) => p?.contour)
+    .filter(
+      (c): c is PointLu[] =>
+        Array.isArray(c) &&
+        c.length >= 3 &&
+        c.every((q) => Array.isArray(q) && q.length >= 2 && Number.isFinite(q[0]) && Number.isFinite(q[1])),
+    );
+}
+
+/**
+ * LE PLAN PRINCIPAL, ET LUI SEUL — relevé du patron : la photo montrait
+ * aussi le bas d'une autre feuille, avec ses cotes. Ce qui est lu hors du
+ * cadre que l'IA a reconnu au plan principal est écarté : murs, pièces,
+ * ouvertures, symboles (à 3 % près), et les cotes (à 6 % près : les chaînes
+ * extérieures courent au-delà des murs). Les liens se renumérotent sur les
+ * symboles gardés. Sans cadre lisible, rien ne change.
+ */
+function garderLePlanPrincipal(brut: LectureBrute): LectureBrute {
+  const c = brut.cadre;
+  if (!Array.isArray(c) || c.length < 4 || !c.slice(0, 4).every(Number.isFinite)) return brut;
+  const boite = (marge: number) => ({
+    x0: Math.min(c[0], c[2]) - marge,
+    x1: Math.max(c[0], c[2]) + marge,
+    y0: Math.min(c[1], c[3]) - marge,
+    y1: Math.max(c[1], c[3]) + marge,
+  });
+  const serre = boite(30);
+  if (serre.x1 - serre.x0 < 150 || serre.y1 - serre.y0 < 150) return brut;
+  const large = boite(60);
+  const dans = (b: typeof serre, p?: number[] | null) =>
+    !!p && p[0] >= b.x0 && p[0] <= b.x1 && p[1] >= b.y0 && p[1] <= b.y1;
+  const milieu = (a: number[], b: number[]) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  const symboles = brut.symboles ?? [];
+  const nouvelIndice = new Map<number, number>();
+  symboles.forEach((s, i) => {
+    if (dans(serre, s?.point)) nouvelIndice.set(i, nouvelIndice.size);
+  });
+  return {
+    ...brut,
+    murs: (brut.murs ?? []).filter((m) => Array.isArray(m) && m.length >= 4 && dans(serre, milieu([m[0], m[1]], [m[2], m[3]]))),
+    ouvertures: (brut.ouvertures ?? []).filter((o) => o?.a && o.b && dans(serre, milieu(o.a, o.b))),
+    cotes: (brut.cotes ?? []).filter((x) => x?.a && x.b && dans(large, milieu(x.a, x.b))),
+    pieces: (brut.pieces ?? []).filter((p) => dans(serre, p?.point)),
+    symboles: symboles.filter((_, i) => nouvelIndice.has(i)),
+    liens: (brut.liens ?? [])
+      .filter((l) => Array.isArray(l) && nouvelIndice.has(l[0]) && nouvelIndice.has(l[1]))
+      .map((l) => [nouvelIndice.get(l[0])!, nouvelIndice.get(l[1])!]),
+  };
+}
+
 /**
  * L'ÉCHELLE PAR LES SURFACES ÉCRITES — quand aucune cote n'est lisible.
  * L'aire d'une pièce, en pixels carrés sur la photo, contre ses mètres
@@ -1165,6 +1272,30 @@ function echelleDesSurfaces(
 ): number {
   const etiquettes = (brut.pieces ?? []).filter((p) => p?.surface && p.point);
   if (etiquettes.length === 0) return NaN;
+  /*
+    LES CONTOURS D'ABORD — l'aire d'une pièce lue directement, sans dépendre
+    des murs qui la referment : sur un plan dont la moitié des cloisons
+    manquaient à la lecture, aucune pièce ne se refermait, et l'échelle se
+    prenait sur la seule qui restait (relevé du patron : « WC : 2,48 m²
+    écrits, 4,7 m² dessinés »).
+  */
+  const parContour: number[] = [];
+  for (const e of etiquettes) {
+    const c = e.contour;
+    if (!Array.isArray(c) || c.length < 3) continue;
+    const lue = lireCote((e.surface ?? '').replace(/m(²|2)/i, '').trim());
+    if (!lue || !(lue.valeur > 0)) continue;
+    const pts = c.map((q) => ptR(q));
+    let aire = 0;
+    for (let k = 0; k < pts.length; k++) {
+      const p = pts[k];
+      const q = pts[(k + 1) % pts.length];
+      aire += p.x * q.y - q.x * p.y;
+    }
+    aire = Math.abs(aire) / 2;
+    if (aire > 1) parContour.push(Math.sqrt(lue.valeur / aire));
+  }
+  if (parContour.length > 0) return mediane(parContour);
   const murs: WallSeg[] = mursBruts.map((m, i) => {
     const a = ptR([m[0], m[1]]);
     const b = ptR([m[2], m[3]]);

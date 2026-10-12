@@ -14285,6 +14285,64 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le plan d'électricien sans cotes : deux lectures, et les pièces qui tiennent les murs
+
+Relevé du patron, photo à l'appui d'un plan d'électricien très chargé, sans
+cote : « il a scanné cela, rien à voir, manque beaucoup de murs. Certes il
+n'y a pas de cotes mais il devrait au moins prendre les murs correctement.
+Compare les deux et corrige pour une lecture beaucoup plus améliorée. »
+
+**Ce qui était rendu.** 19 murs morcelés, une seule pièce, aucune cloison,
+aucune ouverture, aucun symbole. La feuille porte pourtant onze pièces
+nommées avec leur surface, des dizaines de cloisons et une centaine de
+symboles. Le bilan n'avait pas même de carte « symboles » : l'IA n'en avait
+rendu aucun. La faute était à la lecture, pas à la reconstruction.
+
+**Pourquoi.**
+- Une seule demande pour tout lire, sur un plan aussi dense : l'IA rendait
+  une version résumée.
+- La consigne « mieux vaut un mur de moins qu'un mur faux » la poussait à
+  omettre les cloisons fines.
+- La photo montrait aussi le bas d'une autre feuille, avec ses cotes.
+
+**Le serveur — deux lectures ciblées, en parallèle** (`lecture-plan.php`) :
+- **Le bâti** (`plan_lu`) : le cadre du plan principal, puis chaque pièce
+  avec son contour (ses coins intérieurs), tous les murs et cloisons, les
+  ouvertures, les cotes, la hauteur sous plafond.
+- **L'électricité** (`electricite_lue`) : chaque symbole, pièce par pièce
+  et mur par mur, avec les sigles des appareils spécialisés (LL, SL, LV,
+  FO, PL, FRI…), puis les liens de commande.
+- **Les deux partent ensemble** (`appelerEnParallele`) : l'attente reste
+  celle d'une seule lecture. Sans électricité lue, le bâti reste ; sans
+  bâti, pas de plan.
+- **Deux consignes communes** : « un seul plan », pour ignorer l'autre
+  feuille ; « sois exhaustif », pour 40 à 120 murs et 50 à 200 symboles.
+
+**L'app — les pièces tiennent les murs** (`reconstruirePlan`) :
+- **Le cadre** (`garderLePlanPrincipal`) écarte ce qui est lu hors du plan
+  principal. Les cotes gardent une marge plus large : les chaînes
+  extérieures courent au-delà des murs.
+- **Chaque côté d'un contour de pièce devient un mur** là où aucun mur lu
+  ne le borde (parallèle, à moins de 30 cm, sur la moitié de sa longueur).
+  Les côtés de deux pièces voisines se fondent en une cloison, au milieu
+  de leur écart, de l'épaisseur qui les sépare.
+- **Sans cote, l'échelle vient des surfaces écrites mesurées sur les
+  contours**, et non plus sur les pièces que les murs lus refermaient.
+- **Le diagnostic** : un appui long sur la confiance (« Lecture fragile »)
+  partage la lecture brute de l'IA. On sait ainsi si la faute est à la
+  lecture ou à la reconstruction. Rien ne part sans ce geste, rien n'est
+  gardé.
+
+**Bancs.**
+- `lectureplancontours` :
+  - deux pièces lues sans aucun mur donnent deux pièces nommées, à leur
+    surface ;
+  - une seule cloison de 20 cm entre elles ;
+  - pas de doublon avec un mur déjà lu ;
+  - l'autre feuille est écartée, et sa cote ne donne pas l'échelle.
+- `lectureplanecran` : le diagnostic et le serveur.
+- Le banc des 600 plans reste vert.
+
 ## Le refus « 400 » de la lecture : le texte de l'API, et un second essai
 
 Le patron a renvoyé la lecture avec le nouveau serveur. Message affiché :

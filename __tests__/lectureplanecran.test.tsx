@@ -207,6 +207,21 @@ describe('la page', () => {
     act(() => t.unmount());
   });
 
+  it('un appui long sur la confiance partage la lecture brute de l’IA — le diagnostic', async () => {
+    const { Share } = jest.requireActual('react-native') as typeof import('react-native');
+    const partage = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' } as never);
+    mockScanner.mockResolvedValue(PAGE);
+    mockEnvoyer.mockResolvedValue({ ok: true, lecture: LECTURE, essai: false });
+    const t = await monter();
+    await act(async () => bouton(t, 'Scanner le plan').props.onPress());
+    const confiance = t.root.findAll((n) => n.props?.testID === 'confiance-de-lecture' && typeof n.props?.onLongPress === 'function')[0];
+    act(() => confiance.props.onLongPress());
+    expect(partage).toHaveBeenCalledTimes(1);
+    expect(String(partage.mock.calls[0][0].message)).toContain('"est_un_plan":true');
+    partage.mockRestore();
+    act(() => t.unmount());
+  });
+
   it('l’essai utilisé : la porte du Pro', async () => {
     mockScanner.mockResolvedValue(PAGE);
     mockEnvoyer.mockResolvedValue({ ok: false, motif: 'pro', message: 'Votre lecture d’essai est utilisée.' });
@@ -411,11 +426,21 @@ describe('ce qui la porte', () => {
     expect(api).toContain("'raison' => 'pro'");
     expect(api).toContain('LECTURES_PAR_JOUR');
     const lecteur = lire('server', 'lecture-plan.php');
-    expect(lecteur).toContain("'tool_choice' => ['type' => 'tool', 'name' => 'plan_lu']");
+    // Deux lectures ciblées, en parallèle : le bâti, puis l'électricité
+    // (relevé du patron : « manque beaucoup de murs » sur un plan chargé).
+    expect(lecteur).toContain("'name' => 'plan_lu'");
+    expect(lecteur).toContain("'name' => 'electricite_lue'");
+    expect(lecteur).toContain('function appelerEnParallele(');
+    expect(lecteur).toContain("'tool_choice' => $impose ? ['type' => 'tool', 'name' => $l['outil']['name']] : ['type' => 'auto']");
+    // Le contour de chaque pièce, et le cadre du plan principal.
+    expect(lecteur).toContain("'contour' => ['type' => 'array', 'items' => $point, 'minItems' => 3]");
+    expect(lecteur).toContain("'cadre' =>");
+    expect(lecteur).toContain('UN SEUL PLAN.');
+    expect(lecteur).toContain('SOIS EXHAUSTIF.');
     // La clé, débarrassée d'un espace ou d'un retour à la ligne collé avec.
     expect(lecteur).toContain("'x-api-key: ' . trim(ANTHROPIC_CLE)");
     // L'outil imposé refusé (code 400) : un second essai, le modèle choisit.
-    expect(lecteur).toContain("$corps['tool_choice'] = ['type' => 'auto'];");
+    expect(lecteur).toContain('function refusDeLOutilImpose(');
     // Et le texte de l'API se lit dans l'app, pour corriger à coup sûr.
     expect(lecteur).toContain("mb_substr($message, 0, 220)");
     expect(lecteur).not.toMatch(/sk-ant-/);
