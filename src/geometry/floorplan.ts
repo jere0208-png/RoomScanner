@@ -2802,6 +2802,8 @@ export function fusionnerMursDoubles(
  * on les cherche dans le graphe des murs.
  */
 export const LARGEUR_DE_BAIE = 1.6;
+/** À partir de cette largeur, une « porte » est une baie, où qu'elle soit (m). */
+const BAIE_SANS_DOUTE = 2;
 
 export function baiesVitrees<O extends WallSeg>(openings: O[], walls: WallSeg[], contours?: Pt[][]): O[] {
   if (!openings.some((o) => o.type === 'door' && segLength(o) >= LARGEUR_DE_BAIE)) return openings;
@@ -2813,7 +2815,16 @@ export function baiesVitrees<O extends WallSeg>(openings: O[], walls: WallSeg[],
     const l = segLength(o);
     if (o.type !== 'door' || l < LARGEUR_DE_BAIE) return o;
     let facade: boolean;
-    if (lesContours.length === 0) {
+    if (l >= BAIE_SANS_DOUTE) {
+      /*
+        DEUX MÈTRES ET PLUS, C'EST UNE BAIE, MÊME ENTRE DEUX PIÈCES — revues
+        « Gérard » et « Bérénice » : la baie coulissante de 2,40 m entre le
+        séjour et la loggia (ou la véranda) gardait un battant de 2,40 m qui
+        balayait le séjour, et le contrôle croyait que la table gênait son
+        ouverture. Une porte battante ne fait pas deux mètres.
+      */
+      facade = true;
+    } else if (lesContours.length === 0) {
       facade = l >= 1.8;
     } else {
       const n = { x: -(o.b.z - o.a.z) / l, z: (o.b.x - o.a.x) / l };

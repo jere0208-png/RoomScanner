@@ -35,8 +35,9 @@
  *    une porte part du sol. Au-delà, l'écart est réel — un mur de jambette,
  *    un pan coupé, une imposte — et il reste.
  */
+import type { ObjectData } from 'react-native-room-scan';
 import { coffreDuProfil, type ProfilDessus } from './coffreLidar';
-import { reprojectOpenings, segLength, straightenWalls, type WallSeg } from './floorplan';
+import { reprojectOpenings, segLength, straightenWalls, type Pt, type WallSeg } from './floorplan';
 
 /** Les écarts que le scan fait, et en deçà desquels on aligne (m, °). */
 export const TOLERANCES_DU_RELEVE = {
@@ -261,6 +262,131 @@ function baiesLogiques(openings: WallSeg[], sol: number): WallSeg[] {
   });
 }
 
+// ------------------------------------------------------ 3. une chose, une fois
+
+/**
+ * UNE BAIE VUE DES DEUX CÔTÉS DE SON MUR RESTE UNE BAIE — revues « Thomas »
+ * et « Bérénice » : la porte d'une cloison, vue depuis chacune de ses deux
+ * pièces, sortait deux fois — 18 portes pour 9, deux battants et deux cotes
+ * « 0,83 0,83 » au PDF, et le métré déduisait deux fois chaque porte des
+ * murs à peindre. Deux baies parallèles, à moins de 45 cm l'une de l'autre
+ * (l'épaisseur d'un mur), qui se recouvrent pour moitié au moins, n'en font
+ * qu'une : au milieu des deux faces, à leur largeur moyenne. La plus haute
+ * donne sa nature (une porte-fenêtre vue de dehors comme une porte).
+ */
+export function sansBaiesEnDouble(openings: WallSeg[]): WallSeg[] {
+  const absorbees = new Set<string>();
+  const out: WallSeg[] = [];
+  for (let i = 0; i < openings.length; i++) {
+    const o = openings[i];
+    if (absorbees.has(o.id)) continue;
+    const L = segLength(o);
+    if (L < 1e-6) {
+      out.push(o);
+      continue;
+    }
+    const u = { x: (o.b.x - o.a.x) / L, z: (o.b.z - o.a.z) / L };
+    const n = { x: -u.z, z: u.x };
+    const t = (p: Pt) => (p.x - o.a.x) * u.x + (p.z - o.a.z) * u.z;
+    const lat = (p: Pt) => (p.x - o.a.x) * n.x + (p.z - o.a.z) * n.z;
+    let garde = o;
+    for (let j = i + 1; j < openings.length; j++) {
+      const q = openings[j];
+      if (absorbees.has(q.id)) continue;
+      const Lq = segLength(q);
+      if (Lq < 1e-6) continue;
+      const uq = { x: (q.b.x - q.a.x) / Lq, z: (q.b.z - q.a.z) / Lq };
+      if (Math.abs(u.x * uq.x + u.z * uq.z) < 0.95) continue;
+      const d = (lat(q.a) + lat(q.b)) / 2;
+      if (Math.abs(d) > 0.45) continue;
+      const t0 = Math.min(t(q.a), t(q.b));
+      const t1 = Math.max(t(q.a), t(q.b));
+      const commun = Math.min(t1, L) - Math.max(t0, 0);
+      if (commun < 0.5 * Math.min(L, Lq)) continue;
+      absorbees.add(q.id);
+      // Au milieu des deux faces, à la largeur moyenne, autour du milieu commun.
+      const mil = (L + t0 + t1) / 4;
+      const largeur = (L + Lq) / 2;
+      const centre = { x: o.a.x + u.x * mil + n.x * (d / 2), z: o.a.z + u.z * mil + n.z * (d / 2) };
+      const haute = q.height > garde.height + 1e-9 ? q : garde;
+      garde = {
+        ...haute,
+        id: o.id,
+        a: { x: centre.x - (u.x * largeur) / 2, z: centre.z - (u.z * largeur) / 2 },
+        b: { x: centre.x + (u.x * largeur) / 2, z: centre.z + (u.z * largeur) / 2 },
+        height: (o.height + q.height) / 2,
+        yCenter: (o.yCenter + q.yCenter) / 2,
+      };
+    }
+    out.push(garde);
+  }
+  return absorbees.size > 0 ? out : openings;
+}
+
+/**
+ * UN MEUBLE, UNE FOIS — revues « Thomas » et « Bérénice ».
+ * - Le séjour repris à un passage de plus gardait deux canapés : l'ancien,
+ *   poussé par le nouveau, partait de 87 cm dans le refend. Deux meubles de
+ *   même nature, de même taille à un quart près, dont les centres tombent à
+ *   moins de la moitié de la plus petite largeur, sont le même meuble vu
+ *   deux fois : on garde le plus grand.
+ * - La table de 2,40 m que RoomPlan coupe en deux ressortait en deux
+ *   moitiés, dessinées en rouge. Deux tables de même profondeur et de même
+ *   cap, alignées, bout à bout à 6 cm près, en font une.
+ */
+export function sansMeublesEnDouble<O extends ObjectData>(objets: O[]): O[] {
+  const cap = (o: O) => Math.atan2(o.transform[2], o.transform[0]);
+  const memeCap = (a: O, b: O, tol: number) => {
+    let d = Math.abs(cap(a) - cap(b)) % Math.PI;
+    if (d > Math.PI / 2) d = Math.PI - d;
+    return d <= tol;
+  };
+  const jetes = new Set<string>();
+  const suite = objets.map((o) => o);
+  for (let i = 0; i < suite.length; i++) {
+    const a = suite[i];
+    if (jetes.has(a.id)) continue;
+    for (let j = i + 1; j < suite.length; j++) {
+      const b = suite[j];
+      if (jetes.has(b.id) || a.category !== b.category) continue;
+      if (!memeCap(a, b, (15 * Math.PI) / 180)) continue;
+      const d = Math.hypot(a.transform[12] - b.transform[12], a.transform[14] - b.transform[14]);
+      const semblables =
+        Math.abs(a.width - b.width) <= 0.25 * Math.max(a.width, b.width) &&
+        Math.abs(a.depth - b.depth) <= 0.25 * Math.max(a.depth, b.depth);
+      if (semblables && d <= 0.5 * Math.min(a.width, b.width)) {
+        // Le même meuble vu deux fois : le plus grand reste.
+        const petit = a.width * a.depth >= b.width * b.depth ? b : a;
+        jetes.add(petit.id);
+        if (petit === a) break;
+        continue;
+      }
+      // La table coupée en deux.
+      if (!/table/i.test(a.category) || !memeCap(a, b, (5 * Math.PI) / 180) || Math.abs(a.depth - b.depth) > 0.05) continue;
+      const ca = cap(a);
+      const u = { x: Math.cos(ca), z: Math.sin(ca) };
+      const dx = b.transform[12] - a.transform[12];
+      const dz = b.transform[14] - a.transform[14];
+      const le = dx * u.x + dz * u.z;
+      const travers = Math.abs(-dx * u.z + dz * u.x);
+      const jeu = Math.abs(le) - (a.width + b.width) / 2;
+      if (travers > 0.05 || jeu > 0.06 || jeu < -0.05) continue;
+      const debut = Math.min(-a.width / 2, le - b.width / 2);
+      const fin = Math.max(a.width / 2, le + b.width / 2);
+      const milieu = (debut + fin) / 2;
+      const t = [...a.transform];
+      t[12] = a.transform[12] + u.x * milieu;
+      t[14] = a.transform[14] + u.z * milieu;
+      suite[i] = { ...a, width: fin - debut, transform: t };
+      jetes.add(b.id);
+      // On revoit la table agrandie : une troisième part peut suivre.
+      i--;
+      break;
+    }
+  }
+  return jetes.size > 0 ? suite.filter((o) => !jetes.has(o.id)) : objets;
+}
+
 /**
  * LE RELEVÉ RAMENÉ À LA LOGIQUE DE CONSTRUCTION — les murs d'équerre et à
  * la même hauteur, les baies suivant leurs murs, puis sur leurs niveaux
@@ -269,7 +395,7 @@ function baiesLogiques(openings: WallSeg[], sol: number): WallSeg[] {
  */
 export function releveLogique(walls: WallSeg[], openings: WallSeg[]): { walls: WallSeg[]; openings: WallSeg[] } {
   const murs = mursLogiques(walls);
-  const suivies = reprojectOpenings(walls, murs, openings);
+  const suivies = reprojectOpenings(walls, murs, sansBaiesEnDouble(openings));
   const pieds = murs.filter((w) => w.type === 'wall').map((w) => w.yCenter - w.height / 2);
   const sol = pieds.length > 0 ? Math.min(...pieds) : 0;
   return { walls: murs, openings: baiesLogiques(suivies, sol) };

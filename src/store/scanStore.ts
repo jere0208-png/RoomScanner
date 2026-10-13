@@ -98,7 +98,7 @@ import {
   type WallSeg,
 } from '../geometry/floorplan';
 import { avecCoffresDuLidar } from '../geometry/coffreLidar';
-import { avecLesBordsDuLidar, releveLogique } from '../geometry/logique';
+import { avecLesBordsDuLidar, releveLogique, sansMeublesEnDouble } from '../geometry/logique';
 import type { MurDouteux } from '../geometry/murDouteux';
 import { reunirLesCanapesDAngle } from '../geometry/canapeAngle';
 import { calerDansLaNiche, calerLesMeubles } from '../geometry/niche';
@@ -1684,6 +1684,14 @@ interface ScanState {
    * combien ils ont été décalés en entrant dans le plan (le pré-calage d'un
    * étage). Non persisté : un redémarrage les efface, côté iPhone aussi.
    */
+  /**
+   * LES PIÈCES RETIRÉES D'UN PLAN SCANNÉ — revue « Thomas » : la pièce du
+   * voisin, scannée par erreur puis retirée, revenait à chaque passage, car
+   * l'iPhone relivre tous les passages faits. On garde son contour ; ce que
+   * le passage suivant y relivre ne revient pas. Comme les passages, non
+   * enregistré : un redémarrage les efface, côté iPhone aussi.
+   */
+  piecesEcartees: { cle: string; niveau: number; contour: Pt[] }[];
   passagesNatifs: {
     cle: string;
     niveau: number;
@@ -3397,7 +3405,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     const objects: ObjectData[] = calerLesMeubles(orienterLesSieges(
       separerLeMobilier(
         // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
-        reunirLesCanapesDAngle(entrants).map((o) => {
+        reunirLesCanapesDAngle(sansMeublesEnDouble(entrants)).map((o) => {
           const t = [...o.transform];
           t[12] += dx;
           t[14] += dz;
@@ -3856,6 +3864,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     complementEnCours: false,
     cleDuReleve: null,
     passagesNatifs: null,
+    piecesEcartees: [],
     passagesDuPlanOuvert: () => {
       const st = get();
       const p = st.passagesNatifs;
@@ -4378,6 +4387,16 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (st.rooms.length <= 1) return;
       pushHistory('removeRoom');
       const gone = st.rooms.find((r) => r.id === roomId);
+      // Une pièce retirée d'un plan scanné ne revient pas au passage suivant.
+      const contour = st.cleDuReleve ? roomParts(st.walls, st.rooms).find((p) => p.roomId === roomId)?.surface?.pts : null;
+      if (st.cleDuReleve && contour && contour.length >= 3) {
+        set({
+          piecesEcartees: [
+            ...st.piecesEcartees,
+            { cle: st.cleDuReleve, niveau: niveauDe(gone), contour: contour.map((q) => ({ ...q })) },
+          ],
+        });
+      }
       const rooms = st.rooms.filter((r) => r.id !== roomId);
       // Un refend borde deux pièces : il ne part que si plus aucune autre
       // pièce ne s'appuie dessus.
@@ -6958,11 +6977,35 @@ export const useScanStore = create<ScanState>((set, get) => {
       const decaler = <T extends WallSeg>(w: T): T =>
         dx === 0 && dz === 0 && angle === 0 ? w : { ...w, a: placer(w.a), b: placer(w.b) };
       // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR.
-      const segments = avecLesBordsDuLidar(
+      const relivres = avecLesBordsDuLidar(
         avecCoffresDuLidar(surfaces.map((x) => toSegment(x)), r.dessus),
         r.dessus,
         r.tableaux,
       ).map(decaler);
+      /*
+        CE QUI A ÉTÉ RETIRÉ NE REVIENT PAS — revue « Thomas » : la pièce du
+        voisin, retirée, revenait à chaque passage. Ce que le passage relivre
+        dans son contour s'écarte, sauf le mur qu'une pièce gardée borde
+        aussi.
+      */
+      const ecartees = st.piecesEcartees
+        .filter((p) => p.cle === st.cleDuReleve && p.niveau === n)
+        .map((p) => p.contour);
+      const gardees =
+        ecartees.length > 0
+          ? roomParts(jeuDuNiveau(st, n).walls, jeuDuNiveau(st, n).rooms)
+              .map((p) => p.surface?.pts ?? [])
+              .filter((c) => c.length >= 3)
+          : [];
+      const pres = (p: Pt, c: Pt[]) =>
+        pointInPolygon(p, c) || c.some((q, i) => pointOnSeg(p, q, c[(i + 1) % c.length]).dist <= 0.15);
+      const ecarte = (p: Pt) => ecartees.some((c) => pres(p, c)) && !gardees.some((c) => pres(p, c));
+      const milieuDe = (w: WallSeg) => ({ x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 });
+      const segments = ecartees.length > 0 ? relivres.filter((w) => !ecarte(milieuDe(w))) : relivres;
+      const meublesDuPassage =
+        ecartees.length > 0
+          ? entrants.filter((o) => !ecarte(placer({ x: o.transform[12], z: o.transform[14] })))
+          : entrants;
       /*
         LA CLOISON MITOYENNE EST VUE DEUX FOIS — une fois depuis chaque
         pièce. Sans les réunir, chaque arête doublée fausse le parcours des
@@ -7063,7 +7106,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const meublesVenus: ObjectData[] = calerLesMeubles(orienterLesSieges(
         separerLeMobilier(
           // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
-          reunirLesCanapesDAngle(entrants).map((o) => {
+          reunirLesCanapesDAngle(sansMeublesEnDouble(meublesDuPassage)).map((o) => {
             const t = [...o.transform];
             if (angle) {
               const cs = Math.cos(angle);
@@ -7549,7 +7592,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const objects: ObjectData[] = calerLesMeubles(orienterLesSieges(
         separerLeMobilier(
           // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
-          reunirLesCanapesDAngle(incomingObjects).map((o) => ({
+          reunirLesCanapesDAngle(sansMeublesEnDouble(incomingObjects)).map((o) => ({
             ...o,
             roomId: `room-${roomIndexAt(
               { x: o.transform[12], z: o.transform[14] },
@@ -7679,6 +7722,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Les passages que garde l'iPhone sont ceux de CE relevé, au rez-de-chaussée.
         cleDuReleve: cle,
         passagesNatifs: { cle, niveau: NIVEAU_RDC, dx: 0, dz: 0 },
+        piecesEcartees: [],
         processing: false,
         scanning: false,
         /* Un plan qui s'ouvre repose ses calques. */

@@ -14285,6 +14285,35 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Une chose, une fois, passage après passage
+
+**Une baie vue des deux côtés de son mur reste une baie** (Thomas,
+Bérénice). La porte d'une cloison, vue depuis chacune de ses deux pièces,
+sortait deux fois : 18 portes pour 9, deux battants et deux cotes au PDF.
+Le métré déduisait aussi deux fois chaque porte des murs à peindre. Deux
+baies parallèles, à moins de 45 cm l'une de l'autre et qui se recouvrent
+pour moitié au moins, n'en font plus qu'une. Elle se place au milieu des
+deux faces, à leur largeur moyenne.
+
+**Un meuble vu deux fois reste un meuble** (Thomas, Bérénice).
+- Deux meubles de même nature et de même taille, aux centres proches,
+  sont le même meuble : le plus grand reste. Le séjour repris au cinquième
+  passage gardait deux canapés, l'ancien poussé de 87 cm dans le refend.
+- Deux tables de même profondeur, alignées et bout à bout, en font une :
+  la table de 2,40 m que RoomPlan coupe en deux.
+
+**La pièce retirée ne revient pas** (Thomas). La pièce du voisin, scannée
+par erreur puis retirée, revenait à chaque passage, car l'iPhone relivre
+tous les passages faits. Son contour est gardé, et ce que le passage
+suivant y relivre ne revient plus. Le mur qu'une pièce gardée borde aussi
+reste.
+
+**Deux mètres et plus, c'est une baie** (Gérard, Bérénice). La baie
+coulissante de 2,40 m entre le séjour et la loggia, ou la véranda, gardait
+un battant de 2,40 m. Une porte battante ne fait pas deux mètres.
+
+Banc : `tournee5passages`.
+
 ## L'électricité sur un vrai scan : derrière les meubles, hors des volumes, la cuisson
 
 **« Normes auto » sur un vrai relevé** (Gérard, Thomas).
