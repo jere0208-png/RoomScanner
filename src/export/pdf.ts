@@ -7,7 +7,7 @@
  * PDF 1.4 non compressé, A4, polices Helvetica (WinAnsi).
  */
 import { BLEU_FENETRE, ENCRE_ELEC } from '../ui/encreElec';
-import { pocheDesMurs, SUREPAISSEUR_FACADE } from '../geometry/poche';
+import { dansLeBati, pocheDesMurs, SUREPAISSEUR_FACADE } from '../geometry/poche';
 import { cotesExterieurs } from '../geometry/cibleMur';
 import { CarteDEncre, boiteDuMot } from './encre';
 import type { FloorData, ObjectData } from 'react-native-room-scan';
@@ -3248,10 +3248,18 @@ function planPage(
         const L = Math.hypot(dx, dz) || 1;
         const n = { x: -dz / L, z: dx / L };
         const h = epaisseurDe(w) / 2 + 0.3;
+        /*
+          LE DEHORS, PAS SEULEMENT « PAS UNE PIÈCE » — revue « Claire » :
+          derrière les retours d'un coffre de cheminée ou les murs d'un
+          placard, il n'y a pas de pièce, mais ce n'est pas la rue. Ces murs
+          prenaient une chaîne de façade, tirée dans le poché. Ils se cotent
+          maintenant comme des cloisons, du côté de la pièce.
+        */
         const dehors = (sgn: number) =>
           [0.25, 0.5, 0.75].every((t) => {
             const m = { x: w.a.x + dx * t, z: w.a.z + dz * t };
-            return !dansUnePiece({ x: m.x + n.x * sgn * h, z: m.z + n.z * sgn * h });
+            const q = { x: m.x + n.x * sgn * h, z: m.z + n.z * sgn * h };
+            return !dansUnePiece(q) && !dansLeBati(walls, q);
           });
         const p = dehors(1);
         const m = dehors(-1);
@@ -3451,8 +3459,26 @@ function planPage(
       }
 
       // ------------------------------------------- les cloisons, collées
-      for (const w of parLongueur) {
-        if (coteDehors(w) !== 0) continue;
+      /*
+        LES COTES À L'ÉTROIT D'ABORD — revue « Claire » : la profondeur d'un
+        placard, plus courte que son chiffre, n'a que quelques places autour
+        de ses bouts ; posée après les grandes, elle les trouvait prises et
+        allait se loger dans la pièce voisine. Une grande cote glisse le long
+        de tout son mur : elle cède la place.
+      */
+      const etroite = (w: WallSeg) =>
+        `${frLen(longueurCotee(walls, w, parts))} m`.length * 7.5 * 0.5 > Math.hypot(px(w.b).x - px(w.a).x, px(w.b).y - px(w.a).y) - 4;
+      const cloisons = parLongueur.filter((w) => coteDehors(w) === 0);
+      const parPlace = [...cloisons.filter(etroite).reverse(), ...cloisons.filter((w) => !etroite(w))];
+      // Les pièces sur la feuille : une cote reste dans la pièce de son mur.
+      const piecesPage = surfacesPieces.map((poly) =>
+        poly.map((p) => {
+          const q = px(p);
+          return { x: q.x, z: q.y };
+        }),
+      );
+      const pieceDuPoint = (P: Pt) => piecesPage.findIndex((poly) => dansLePoche({ x: P.x, z: P.y }, [poly]));
+      for (const w of parPlace) {
         const a = px(w.a);
         const b = px(w.b);
         const longPage = Math.hypot(b.x - a.x, b.y - a.y);
@@ -3461,10 +3487,58 @@ function planPage(
         const angle = angleDe(a, b);
         const F = (epaisseurDe(w) / 2) * scale;
         const txt = `${frLen(longueurCotee(walls, w, parts))} m`;
-        let mieux: { A: Pt; B: Pt; n: Pt; texte: Pt; cout: number; taille: number } | null = null;
+        /*
+          LES LIGNES D'ATTACHE D'UNE COTE ÉCARTÉE — revue « Claire » : la
+          profondeur d'un placard, cotée à un centimètre de papier de son mur,
+          flottait seule dans la pièce voisine, sans rien qui dise ce qu'elle
+          mesure. Un bout de trait qu'aucun mur de travers ne rejoint reçoit
+          sa ligne d'attache, du mur au trait. Elle peut croiser un trait,
+          comme à la main ; barrer un mot lui coûte, et sa longueur aussi.
+        */
+        const tolerance = 0.06 * scale;
+        /** Jusqu'où, du côté n, un mur de travers prolonge le bout P du mur. */
+        const porteeAuBout = (P: Pt, n: Pt) => {
+          let m = 0;
+          for (const o of walls) {
+            if (o.id === w.id || (o.type !== undefined && o.type !== 'wall')) continue;
+            const oa = px(o.a);
+            const ob = px(o.b);
+            const lo = Math.hypot(ob.x - oa.x, ob.y - oa.y);
+            if (lo < 1e-6) continue;
+            const uo = { x: (ob.x - oa.x) / lo, y: (ob.y - oa.y) / lo };
+            if (Math.abs(u.x * uo.y - u.y * uo.x) < 0.5) continue;
+            const t = (P.x - oa.x) * uo.x + (P.y - oa.y) * uo.y;
+            if (t < -tolerance || t > lo + tolerance) continue;
+            if (Math.abs((P.x - oa.x) * uo.y - (P.y - oa.y) * uo.x) > tolerance) continue;
+            m = Math.max(m, (oa.x - P.x) * n.x + (oa.y - P.y) * n.y, (ob.x - P.x) * n.x + (ob.y - P.y) * n.y);
+          }
+          return m;
+        };
+        /*
+          UNE COTE PLUS COURTE QUE SON CHIFFRE l'écrit au-delà d'un bout de
+          son trait, dans son prolongement : c'est ainsi qu'on cote à la main
+          la profondeur d'un placard, plutôt que de l'envoyer flotter dans la
+          pièce voisine (revue « Claire »).
+        */
+        const longueurMot = txt.length * 7.5 * 0.5;
+        const courte = longueurMot > longPage - 4;
+        const audela = courte ? [-(longueurMot / 2 + 3) / longPage, 1 + (longueurMot / 2 + 3) / longPage] : [];
+        // Et elle reste près de son mur : loin, rien ne dit plus ce qu'elle mesure.
+        const ecarts = [6, 11, 16, 22, 28, 34].filter((o) => !courte || o <= Math.max(11, longPage));
+        let mieux: {
+          A: Pt;
+          B: Pt;
+          n: Pt;
+          texte: Pt;
+          cout: number;
+          taille: number;
+          attaches: (readonly [Pt, Pt])[];
+        } | null = null;
         for (const sgn of [1, -1]) {
           const n = normalePage(w, sgn);
-          for (const off of [6, 11, 16, 22, 28, 34]) {
+          const portees = [porteeAuBout(a, n), porteeAuBout(b, n)];
+          const pieceDuBord = pieceDuPoint(plus({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, n, F + 1.5));
+          for (const off of ecarts) {
             const A = plus(a, n, F + off);
             const B = plus(b, n, F + off);
             // Les bouts du trait passent dans les murs qu'il rejoint : on ne
@@ -3472,7 +3546,20 @@ function planPage(
             const rogne = Math.min(longPage / 3, F + 4);
             const encreTrait = encre.leLong(plus(A, u, rogne), plus(B, u, -rogne));
             const barre = barreUnMot(A, B);
-            for (const [t, cote, taille] of [0.5, 0.38, 0.62, 0.26, 0.74, 0.16, 0.84, 0.08, 0.92, -0.14, 1.14].flatMap((tt) =>
+            const attaches = (
+              [
+                [a, A, portees[0]],
+                [b, B, portees[1]],
+              ] as const
+            )
+              .filter(([, , portee]) => portee < F + off - 1)
+              .map(([P, Q]) => [plus(P, n, F + 1), plus(Q, n, 1.5)] as const);
+            const coutAttaches = attaches.reduce(
+              (s, [P, Q]) =>
+                s + encre.leLong(plus(P, n, 0.5), plus(Q, n, -2.5)) * 0.3 + barreUnMot(P, Q, 0) * 150 + off * 0.4,
+              0,
+            );
+            for (const [t, cote, taille] of [0.5, 0.38, 0.62, 0.26, 0.74, 0.16, 0.84, 0.08, 0.92, -0.14, 1.14, ...audela].flatMap((tt) =>
               // Le mot se pose au-delà du trait — ou, quand le trait est assez
               // loin du mur, entre les deux ; et un cran plus petit s'il le faut.
               [7.5, 6.5].flatMap((z) => (off >= 14 ? [[tt, 1, z], [tt, -1, z]] : [[tt, 1, z]])),
@@ -3486,15 +3573,18 @@ function planPage(
                 encre.sous(q.boite) * 20 +
                 encreTrait * 2.5 +
                 barre * 400 +
+                coutAttaches +
+                (pieceDuBord >= 0 && pieceDuPoint(c) !== pieceDuBord ? 3000 : 0) +
                 off * 0.5 +
                 Math.abs(t - 0.5) * 14 +
                 (taille < 7.5 ? 25 : 0);
-              if (!mieux || cout < mieux.cout) mieux = { A, B, n, texte: c, cout, taille };
+              if (!mieux || cout < mieux.cout) mieux = { A, B, n, texte: c, cout, taille, attaches };
             }
           }
         }
         if (!mieux) continue;
         const { A, B, n } = mieux;
+        for (const [P, Q] of mieux.attaches) trace(P, Q, 0.4, TRAIT_COTE);
         trace(A, B, 0.6, TRAIT_COTE);
         tiret(A, u, n, 2.6, 0.8, TRAIT_COTE);
         tiret(B, u, n, 2.6, 0.8, TRAIT_COTE);

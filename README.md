@@ -14285,6 +14285,39 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les cotes d'un coffre de cheminée dans la pièce, celles d'un placard contre lui
+
+**Le dehors est ce qui n'est pas dans le bâti** (Claire). Sur son
+haussmannien, « 0,42 m » se lisait « 42 m » :
+- Les retours d'un coffre de cheminée passaient pour des façades, parce
+  qu'à 30 cm derrière eux il n'y a pas de pièce. Leurs cotes se posaient en
+  chaîne « dehors », dans le poché, qui en mangeait le début.
+- Un mur n'est plus une façade que si, derrière lui, on sort du contour
+  extérieur de la maçonnerie (`dansLeBati`).
+- Les retours et la face d'un coffre, les murs d'un placard muré, le pan
+  coupé tracé devant un angle plein se cotent comme des cloisons, du côté
+  de la pièce.
+- Le pan coupé d'un immeuble d'angle, lui, reste une façade.
+
+**Les cotes de cloison mieux tenues** :
+- **À l'étroit d'abord.** Une cote plus courte que son chiffre (la
+  profondeur d'un placard) choisit sa place avant les grandes. Elle n'en a
+  que quelques-unes, autour de ses bouts. Une grande glisse le long de son
+  mur.
+- **Au-delà du trait.** Son chiffre peut s'écrire au-delà d'un bout du
+  trait, dans son prolongement, comme à la main. Elle reste près de son
+  mur : elle ne flotte plus à 1,20 m dans la pièce voisine.
+- **Une cote reste dans la pièce de son mur.** Écrire ailleurs coûte
+  cher.
+- **Une ligne d'attache.** Un bout de trait qu'aucun mur de travers ne
+  rejoint reçoit sa ligne d'attache, du mur au trait.
+
+Sur le plan de Claire, il n'y a plus de chiffre sur le poché. Poser les
+cotes à l'étroit d'abord fait passer l'encre sous les cotes de cloison de
+185 à 132 demi-points, sans aucun chevauchement.
+
+Banc : `tournee4cotes`.
+
 ## Un plafond mal vu se dit à vérifier, les repères d'une maison à étages
 
 **L'habitable sous un plafond mal vu au LiDAR** (Sébastien) :

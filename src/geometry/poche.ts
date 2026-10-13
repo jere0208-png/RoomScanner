@@ -326,6 +326,44 @@ function porteurDe(o: WallSeg, walls: WallSeg[]): WallSeg | null {
 
 let memo: { walls: WallSeg[]; openings: WallSeg[]; rooms: RoomShape[] | undefined; facade: number; poche: Poche } | null = null;
 
+/** La maçonnerie à l'épaisseur des murs, avec le cœur de leurs nœuds. */
+function corpsDesMurs(walls: WallSeg[]): Poly[] {
+  const quads = wallQuadsOf(walls);
+  const corps: Poly[] = [];
+  for (const w of walls) {
+    if (Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) < 1e-6) continue;
+    const q = quads.get(w.id);
+    if (!q) continue;
+    corps.push([q.a1, q.b1, q.b2, q.a2]);
+  }
+  // Le cœur des nœuds de trois murs : la maçonnerie commune, sans laquelle
+  // les murs ne se toucheraient qu'en un point.
+  corps.push(...jonctionsDeMurs(walls));
+  return corps;
+}
+
+let memoBati: { walls: WallSeg[]; contours: Poly[] } | null = null;
+
+/**
+ * DANS LE BÂTI : à l'intérieur du contour extérieur de la maçonnerie — une
+ * pièce, mais aussi la masse d'une cheminée ou un placard muré, qui ne sont
+ * pas des pièces et ne sont pas pour autant le dehors.
+ *
+ * Revue « Claire » : les retours d'un coffre de cheminée et les murs d'un
+ * placard passaient pour des façades, parce qu'à 30 cm derrière eux il n'y
+ * a pas de pièce. Leurs cotes se posaient en chaîne « dehors » — sur le
+ * poché, où « 0,42 m » se lisait « 42 m ». Le dehors est ce qui n'est pas
+ * dans le bâti.
+ */
+export function dansLeBati(walls: WallSeg[], p: Pt): boolean {
+  if (!memoBati || memoBati.walls !== walls) {
+    // Les contours extérieurs seuls : les trous sont les pièces et les vides
+    // murés, que le contour extérieur entoure déjà.
+    memoBati = { walls, contours: region(corpsDesMurs(walls)).filter((c) => aireSignee(c) > 0) };
+  }
+  return memoBati.contours.some((c) => dansPoly(p, c));
+}
+
 /**
  * LE POCHÉ D'UN PLAN : la maçonnerie d'un seul tenant, façades épaissies,
  * baies découpées. Mémoïsé sur l'identité des listes, comme `wallQuadsOf`.
@@ -339,17 +377,7 @@ export function pocheDesMurs(
   if (memo && memo.walls === walls && memo.openings === openings && memo.rooms === rooms && memo.facade === facade) {
     return memo.poche;
   }
-  const quads = wallQuadsOf(walls);
-  const corps: Poly[] = [];
-  for (const w of walls) {
-    if (Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) < 1e-6) continue;
-    const q = quads.get(w.id);
-    if (!q) continue;
-    corps.push([q.a1, q.b1, q.b2, q.a2]);
-  }
-  // Le cœur des nœuds de trois murs : la maçonnerie commune, sans laquelle
-  // les murs ne se toucheraient qu'en un point.
-  corps.push(...jonctionsDeMurs(walls));
+  const corps = corpsDesMurs(walls);
 
   // Les pièces : ce qui est dedans. Une façade donne sur ce qui n'en est pas.
   const pieces = roomParts(walls, rooms)
