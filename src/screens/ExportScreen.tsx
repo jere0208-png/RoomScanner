@@ -46,6 +46,7 @@ import { fixtureMarks, multiWire, schemaRows } from '../geometry/schema';
 import { useModeElec } from '../store/usage';
 import { useReglagesTravaux } from '../store/reglagesTravaux';
 import { entrepriseAImprimer, useEntreprise } from '../store/entreprise';
+import { useCaseRetenue, useReglagesExport } from '../store/reglagesExport';
 import { piecesRetenues, travauxDesPieces } from '../geometry/travaux';
 import type { Fixture } from '../geometry/electrical';
 import { planRoutes } from '../geometry/elecplan';
@@ -206,13 +207,14 @@ const EXPORT_ICONS = {
 
 const styles = getStyles(c);
 
-  const [include3D, setInclude3D] = useState(true);
+  const modeExport = modeElec ? 'elec' : 'grandPublic';
+  const [include3D, setInclude3D] = useCaseRetenue(modeExport, 'vue3D', true);
   /**
    * LA PAGE DE GARDE — correctif de l'audit : le dossier s'ouvrait sur le
    * plan coté, sans dire de quoi il s'agissait. Cochée de base : c'est elle
    * qu'on voit en premier, chez l'acheteur comme chez le client.
    */
-  const [garde, setGarde] = useState(true);
+  const [garde, setGarde] = useCaseRetenue(modeExport, 'garde', true);
   /**
    * Les repères d'appareillage sur les perspectives : ÉTEINTS AU DÉPART —
    * relevé du patron : « dans la page export, le bloc vue 3D, enlève les
@@ -221,14 +223,14 @@ const styles = getStyles(c);
    * sur la feuille.
    */
   const [reperes3D, setReperes3D] = useState(false);
-  const [includeMetre, setIncludeMetre] = useState(true);
+  const [includeMetre, setIncludeMetre] = useCaseRetenue(modeExport, 'metre', true);
   /*
     « CE QU'IL FAUT ACHETER » DANS LE DOSSIER — relevé du patron, point 3 de
     la réflexion « grand public ». Coché d'office pour le particulier, qui
     refait son logement ; pas pour l'électricien, dont le client ne lui a
     pas demandé de compter les pots de peinture.
   */
-  const [includeAchats, setIncludeAchats] = useState(!modeElec);
+  const [includeAchats, setIncludeAchats] = useCaseRetenue(modeExport, 'achats', !modeElec);
   const reglages = useReglagesTravaux();
   useEffect(() => {
     if (!reglages.charge) reglages.charger();
@@ -243,6 +245,7 @@ const styles = getStyles(c);
   */
   const entreprise = useEntreprise();
   useEffect(() => {
+    if (!useReglagesExport.getState().charge) useReglagesExport.getState().charger();
     if (!entreprise.charge) entreprise.charger();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -253,14 +256,15 @@ const styles = getStyles(c);
     Qui imprime son entreprise remet le dossier à un client.
   */
   const particulier = !modeElec && !entrepriseDuDossier;
-  const [measures2D, setMeasures2D] = useState(true);
+  const [measures2D, setMeasures2D] = useCaseRetenue(modeExport, 'cotes2D', true);
   /**
    * Plan des gaines : le tracé du tableau à chaque appareil, celui-là même
    * dont le devis donne les longueurs. Décoché par défaut — un plan
    * d'architecte n'a pas à porter le tirage —, mais à un interrupteur près
    * quand c'est l'électricien qui imprime.
    */
-  const [gaines, setGaines] = useState(false);
+  // Revue « Karim » : l'électricien imprime son tirage — coché pour lui.
+  const [gaines, setGaines] = useCaseRetenue(modeExport, 'gaines', modeElec);
   const plafondStocke = useScanStore((s) => s.ceiling);
   const toutLePlafond = modeElec ? plafondStocke : AUCUN_PLAFOND;
   const toutesLesNotes = useScanStore((s) => s.notes);
@@ -269,7 +273,7 @@ const styles = getStyles(c);
    * Cochée d'office dès qu'un ruban LED est posé — revue « Claire » : le
    * dossier sortait sans un mètre de la lumière qu'elle avait dessinée.
    */
-  const [plafond, setPlafond] = useState(() => toutLePlafond.some((c) => c.kind === 'led'));
+  const [plafond, setPlafond] = useCaseRetenue(modeExport, 'plafond', modeElec || toutLePlafond.some((c) => c.kind === 'led'));
   const toutesLesPhotos = useScanStore((s) => s.photos);
   const toutesLesMesures = useScanStore((s) => s.mesures);
   /*
@@ -392,7 +396,7 @@ const styles = getStyles(c);
    * POUR L'ÉLECTRICIEN SEULEMENT — correctif de l'audit : le particulier, qui
    * ne perce pas, recevait une feuille par mur, un dossier interminable.
    */
-  const [elevations, setElevations] = useState(modeElec);
+  const [elevations, setElevations] = useCaseRetenue(modeExport, 'elevations', modeElec);
   /*
     TOUS LES MURS, OU SEULEMENT LES ÉQUIPÉS.
 
@@ -412,7 +416,7 @@ const styles = getStyles(c);
     « Élévations » pour alléger — les murs ÉQUIPÉS restent alors dans le
     dossier, et c'est le repli que l'on veut à ce moment-là, pas le vide.
   */
-  const [cotesElec, setCotesElec] = useState(modeElec);
+  const [cotesElec, setCotesElec] = useCaseRetenue(modeExport, 'cotesElec', modeElec);
   /*
     LES POINTS CARDINAUX — DE SÉRIE, SUR LE PLAN 2D SEULEMENT.
 
@@ -532,7 +536,7 @@ const styles = getStyles(c);
   }, []);
 
   /** Schémas unifilaire et multifilaire, tirés des mêmes circuits. */
-  const [schema, setSchema] = useState(false);
+  const [schema, setSchema] = useCaseRetenue(modeExport, 'schema', modeElec);
   const schemas = useMemo(() => {
     if (fixtures.length === 0) return null;
     const list = materialList(
@@ -543,7 +547,7 @@ const styles = getStyles(c);
       cheminements?.parCircuit,
       ceiling,
     );
-    const rows = schemaRows(list.circuits, list.differentials, fixtures);
+    const rows = schemaRows(list.circuits, list.differentials, fixtures, ceiling);
     return {
       rows,
       differentials: list.differentials,

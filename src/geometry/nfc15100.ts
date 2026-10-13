@@ -1693,20 +1693,94 @@ export function planCircuits(
    * seconde ne consomme rien.
    */
   const plafonniers = ceiling.filter((c) => CEILINGS[c.kind].watts > 0);
-  const surEclairage = [...lumieres, ...commandes];
-  // On répartit sur le nombre de points, plafond compris : douze spots et
-  // deux appliques font deux circuits, pas un.
-  const totalPoints = lumieres.length + plafonniers.length;
-  const nbCircuits = Math.max(
-    1,
-    Math.ceil(totalPoints / MAX_LUMIERE) || (commandes.length > 0 ? 1 : 0),
-  );
-  if (surEclairage.length > 0 || plafonniers.length > 0) {
-    const lotsMuraux = chunk(surEclairage, Math.ceil(surEclairage.length / nbCircuits) || 1);
-    const lotsPlafond = chunk(
-      plafonniers,
-      Math.ceil(plafonniers.length / nbCircuits) || 1,
-    );
+  /*
+    UNE COMMANDE ET SES POINTS NE SE SÉPARENT JAMAIS — revue « Karim » : les
+    commandes et les points se répartissaient chacun de leur côté, puis
+    s'appariaient par rang. Un circuit portait dix points, et l'interrupteur
+    de la cuisine partait sur C8 quand le plafonnier qu'il allume était sur
+    C9 — un câblage impossible, imprimé tel quel.
+
+    On forme donc des GROUPES : chaque commande avec tout ce qu'elle allume
+    (les liens), de proche en proche — un va-et-vient réunit ses deux
+    interrupteurs et leurs points. Ce qui n'est relié à rien se groupe par
+    pièce. Les groupes remplissent les circuits dans l'ordre, huit points au
+    plus ; un groupe de plus de huit points (douze spots sur un même
+    interrupteur) se coupe en circuits de huit, la commande avec le premier.
+    L'interrupteur général ne groupe rien : il coupe tout, au contacteur.
+  */
+  const general = commandes.filter((f) => f.kind === 'interGeneral');
+  type Element = { id: string; mural?: Fixture; haut?: CeilingFixture; piece: string; point: boolean };
+  const elements: Element[] = [
+    ...commandes.filter((f) => f.kind !== 'interGeneral').map((f) => ({ id: f.id, mural: f, piece: nomDe(f), point: false })),
+    ...lumieres.map((f) => ({ id: f.id, mural: f, piece: nomDe(f), point: true })),
+    ...plafonniers.map((h) => ({ id: h.id, haut: h, piece: suffixe.get(h.roomId) ?? '', point: true })),
+  ];
+  const parent = new Map(elements.map((e) => [e.id, e.id]));
+  const racine = (id: string): string => {
+    let r = id;
+    while (parent.get(r) !== r) r = parent.get(r)!;
+    parent.set(id, r);
+    return r;
+  };
+  const unir = (a: string, b: string) => {
+    if (!parent.has(a) || !parent.has(b)) return;
+    const ra = racine(a);
+    const rb = racine(b);
+    if (ra !== rb) parent.set(rb, ra);
+  };
+  for (const e of elements) {
+    const liens = e.haut?.commands ?? e.mural?.commands ?? [];
+    for (const cid of liens) unir(e.id, cid);
+  }
+  // Ce qui n'est relié à rien reste avec sa pièce.
+  const seulParPiece = new Map<string, string>();
+  for (const e of elements) {
+    const lie = elements.some((x) => x !== e && racine(x.id) === racine(e.id));
+    if (lie) continue;
+    const ancre = seulParPiece.get(e.piece);
+    if (ancre) unir(ancre, e.id);
+    else seulParPiece.set(e.piece, e.id);
+  }
+  const groupes: Element[][] = [];
+  const indexDu = new Map<string, number>();
+  for (const e of elements) {
+    const r = racine(e.id);
+    if (!indexDu.has(r)) {
+      indexDu.set(r, groupes.length);
+      groupes.push([]);
+    }
+    groupes[indexDu.get(r)!].push(e);
+  }
+  // Les circuits : des groupes entiers, huit points au plus.
+  const lotsEclairage: Element[][] = [];
+  let courant: Element[] = [];
+  const pointsDe = (l: Element[]) => l.filter((e) => e.point).length;
+  for (const g of groupes) {
+    if (pointsDe(g) > MAX_LUMIERE) {
+      if (courant.length > 0) lotsEclairage.push(courant);
+      courant = [];
+      const pts = g.filter((e) => e.point);
+      const cmds = g.filter((e) => !e.point);
+      for (let k = 0; k < pts.length; k += MAX_LUMIERE) {
+        lotsEclairage.push([...(k === 0 ? cmds : []), ...pts.slice(k, k + MAX_LUMIERE)]);
+      }
+      continue;
+    }
+    if (pointsDe(courant) + pointsDe(g) > MAX_LUMIERE && courant.length > 0) {
+      lotsEclairage.push(courant);
+      courant = [];
+    }
+    courant.push(...g);
+  }
+  if (courant.length > 0) lotsEclairage.push(courant);
+  if (lotsEclairage.length === 0 && general.length > 0) lotsEclairage.push([]);
+  if (lotsEclairage.length > 0) {
+    const lotsMuraux = lotsEclairage.map((l, i) => [
+      ...(i === 0 ? general : []),
+      ...l.filter((e) => e.mural).map((e) => e.mural!),
+    ]);
+    const lotsPlafond = lotsEclairage.map((l) => l.filter((e) => e.haut).map((e) => e.haut!));
+    const nbCircuits = lotsEclairage.length;
     for (let i = 0; i < nbCircuits; i++) {
       const lot = lotsMuraux[i] ?? [];
       const hauts = lotsPlafond[i] ?? [];

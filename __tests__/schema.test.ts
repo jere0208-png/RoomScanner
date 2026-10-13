@@ -151,9 +151,9 @@ describe('l’unifilaire', () => {
   });
 
   it('dit ce que chaque départ dessert, poste par poste', () => {
-    // Une prise simple plus une prise double : trois socles.
-    expect(rows[0].points).toContain('3 ×');
-    expect(rows[0].points).toMatch(/prise/i);
+    // Une prise simple plus une prise double : trois socles, que la norme
+    // compte pour deux points (revue « Karim » : c'est le point qui borne).
+    expect(rows[0].points).toBe('3 socles 16 A (2 points)');
   });
 
   it('rattache chaque départ à son différentiel', () => {

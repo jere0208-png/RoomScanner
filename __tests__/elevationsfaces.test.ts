@@ -211,5 +211,21 @@ describe('les gaines à la couleur de leur circuit', () => {
       const teinte = rgb(markColor(marks.get(f)!));
       expect(gaines).toContain(`[4 3] 0 d ${teinte} RG`);
     }
+
+    /*
+      REVUE « KARIM » : dix circuits, six lignes au tableau, le reste coupé
+      sans un mot. Sur deux colonnes, puis un renvoi au schéma.
+    */
+    const beaucoup = Array.from({ length: 14 }, (_, k) => ({ ...rows[0], mark: `C${k + 1}`, label: `Circuit ${k + 1}` }));
+    const src14 = latin1(
+      buildScanPdf(
+        { name: 'Deux pièces', walls: W, openings: [], objects: [], rooms: R, fixtures: fx, routes: routes.traces, roomNames: { a: 'Séjour', b: 'Chambre' } } as never,
+        false,
+        { metre: false, schemas: { rows: beaucoup, differentials: list.differentials, multi: [], marks } } as never,
+      ),
+    );
+    const t14 = texte(flux(src14).find((p) => texte(p).includes('Tirage par circuit'))!);
+    for (let k = 1; k <= 11; k++) expect(t14).toContain(`Circuit ${k} `.trim());
+    expect(t14).toContain('+ 3 circuits : voir le sch');
   });
 });

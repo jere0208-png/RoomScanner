@@ -1,0 +1,104 @@
+/**
+ * UNE COMMANDE ET SES POINTS NE SE SÉPARENT JAMAIS — revue « Karim » :
+ * « Éclairage 1 » portait dix points, et l'interrupteur de la cuisine partait
+ * sur un autre circuit que le plafonnier qu'il allume.
+ */
+import type { CeilingFixture } from '../src/geometry/ceiling';
+import type { Fixture } from '../src/geometry/electrical';
+import { MAX_LUMIERE, planCircuits } from '../src/geometry/nfc15100';
+import { schemaRows } from '../src/geometry/schema';
+import { chiffrer } from '../src/geometry/devis';
+import { buyingList } from '../src/geometry/conduits';
+
+const mur = (id: string, kind: Fixture['kind'], piece: string): Fixture =>
+  ({ id, kind, wallId: piece, along: 1, height: 1.1, side: 1 }) as Fixture;
+const dcl = (id: string, piece: string, commands: string[] = []): CeilingFixture =>
+  ({ id, kind: 'dcl', roomId: piece, at: { x: 0, z: 0 }, commands }) as CeilingFixture;
+
+const eclairages = (fixtures: Fixture[], ceiling: CeilingFixture[]) =>
+  planCircuits(fixtures, (f) => f.wallId, () => false, (f) => f.wallId, ceiling).filter((c) => c.nature === 'eclairage');
+
+describe('les circuits d’éclairage', () => {
+  it('ne dépassent jamais huit points, même sans aucun lien', () => {
+    const fixtures = [
+      ...[1, 2, 3, 4].map((k) => mur(`a${k}`, 'applique', 'sejour')),
+      ...[1, 2, 3, 4].map((k) => mur(`i${k}`, 'inter', 'sejour')),
+    ];
+    const ceiling = Array.from({ length: 12 }, (_, k) => dcl(`d${k}`, ['sejour', 'chambre', 'cuisine'][k % 3]));
+    const c = eclairages(fixtures, ceiling);
+    for (const x of c) expect(x.points).toBeLessThanOrEqual(MAX_LUMIERE);
+    expect(c.reduce((t, x) => t + x.points, 0)).toBe(16);
+  });
+
+  it('gardent chaque interrupteur avec ce qu’il allume', () => {
+    // Sept points au séjour et un ruban à la cuisine : le partage par rang
+    // envoyait l'interrupteur de la cuisine sur un autre circuit.
+    const fixtures = [mur('iSejour', 'inter', 'sejour'), mur('iCuisine', 'inter', 'cuisine')];
+    const ceiling = [
+      ...Array.from({ length: 7 }, (_, k) => dcl(`s${k}`, 'sejour', ['iSejour'])),
+      dcl('cuisine1', 'cuisine', ['iCuisine']),
+      dcl('cuisine2', 'cuisine', ['iCuisine']),
+    ];
+    const c = eclairages(fixtures, ceiling);
+    const circuitDe = (id: string) => c.find((x) => x.fixtureIds.includes(id) || (x.ceilingIds ?? []).includes(id))!;
+    expect(circuitDe('iCuisine').id).toBe(circuitDe('cuisine1').id);
+    expect(circuitDe('iCuisine').id).toBe(circuitDe('cuisine2').id);
+    expect(circuitDe('iSejour').id).toBe(circuitDe('s0').id);
+    for (const x of c) expect(x.points).toBeLessThanOrEqual(MAX_LUMIERE);
+  });
+
+  it('un va-et-vient réunit ses deux commandes et leurs points', () => {
+    const fixtures = [mur('va1', 'va', 'couloir'), mur('va2', 'va', 'couloir'), mur('i', 'inter', 'chambre')];
+    const ceiling = [dcl('c1', 'couloir', ['va1', 'va2']), dcl('ch', 'chambre', ['i'])];
+    const c = eclairages(fixtures, ceiling);
+    const circuitDe = (id: string) => c.find((x) => x.fixtureIds.includes(id) || (x.ceilingIds ?? []).includes(id))!;
+    expect(circuitDe('va1').id).toBe(circuitDe('va2').id);
+    expect(circuitDe('va1').id).toBe(circuitDe('c1').id);
+  });
+
+  it('douze spots sur un même interrupteur : deux circuits, la commande avec le premier', () => {
+    const fixtures = [mur('i', 'inter', 'sejour')];
+    const ceiling = Array.from({ length: 12 }, (_, k) => ({ ...dcl(`sp${k}`, 'sejour', ['i']), kind: 'spot' }) as CeilingFixture);
+    const c = eclairages(fixtures, ceiling);
+    expect(c.map((x) => x.points)).toEqual([8, 4]);
+    expect(c[0].fixtureIds).toContain('i');
+  });
+});
+
+describe('l’unifilaire dit ce que dessert un circuit d’éclairage', () => {
+  it('ses commandes ET ses points du plafond, sans perdre les majuscules', () => {
+    const fixtures = [mur('i', 'inter', 'sejour')];
+    const ceiling = [dcl('d1', 'sejour', ['i']), dcl('d2', 'sejour', ['i'])];
+    const circuits = planCircuits(fixtures, (f) => f.wallId, () => false, (f) => f.wallId, ceiling);
+    const [ligne] = schemaRows(circuits.filter((c) => c.nature === 'eclairage'), [], fixtures, ceiling);
+    expect(ligne.points).toContain('2 × point lumineux DCL');
+    expect(ligne.points).toContain('1 × interrupteur');
+  });
+});
+
+describe('le coffret garde sa réserve', () => {
+  it('vingt-quatre modules occupés : trois rangées, plus de 20 % libres', () => {
+    // 18 disjoncteurs + 3 différentiels (deux modules chacun) = 24 modules.
+    const circuits = Array.from({ length: 18 }, (_, k) => ({
+      id: `c${k}`, label: `Prises ${k}`, nature: 'prises', points: 1, section: 2.5, breaker: 20, rooms: [], fixtureIds: [],
+    })) as never[];
+    const diffs = [0, 1, 2].map((k) => ({ label: `D${k}`, type: 'AC', rating: 40, circuits: [] })) as never[];
+    const d = chiffrer([], circuits, diffs, 'dooxie');
+    const coffret = d.lignes.find((l) => l.code.startsWith('coffret-') && l.code !== 'coffret-com')!;
+    const rangees = Number(coffret.code.split('-')[1]);
+    expect(1 - 24 / (rangees * 13)).toBeGreaterThanOrEqual(0.2);
+  });
+});
+
+describe('le poussoir emporte son télérupteur', () => {
+  it('trois poussoirs sur un point : un télérupteur au bordereau', () => {
+    const fixtures = [mur('p1', 'poussoir', 'couloir'), mur('p2', 'poussoir', 'couloir'), mur('p3', 'poussoir', 'couloir')];
+    const ceiling = [dcl('c', 'couloir', ['p1', 'p2', 'p3'])];
+    const t = buyingList([], fixtures, ceiling).find((r) => r.code === 'telerupteur');
+    expect(t?.quantity).toBe(1);
+  });
+
+  it('sans poussoir, pas de télérupteur', () => {
+    expect(buyingList([], [mur('i', 'inter', 'x')], [dcl('c', 'x', ['i'])]).some((r) => r.code === 'telerupteur')).toBe(false);
+  });
+});

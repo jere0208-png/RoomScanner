@@ -510,14 +510,22 @@ export function chiffrer(
     phases, ce qui aurait fait acheter la mauvaise pièce à qui se fie à
     l'image.
 
-    On compte un module par disjoncteur, deux par différentiel, et deux de
-    réserve par rangée — la règle de tout tableau qu'on veut pouvoir
-    reprendre. Treize modules par rangée.
+    On compte un module par disjoncteur, deux par différentiel. Treize
+    modules par rangée.
+
+    LA RÉSERVE EST CELLE DE LA NORME — revue « Karim » : « deux de réserve
+    par rangée » donnait, pour 24 modules occupés, deux rangées et 7,7 %
+    de place libre. La NF C 15-100 demande au moins 20 % de réserve : les
+    modules occupés ne remplissent jamais plus des quatre cinquièmes du
+    coffret.
   */
   const modules =
-    [...calibres.values()].reduce((t2, q) => t2 + q, 0) + differentiels.length * 2;
+    [...calibres.values()].reduce((t2, q) => t2 + q, 0) +
+    differentiels.length * 2 +
+    // Le télérupteur et le contacteur se rangent au tableau, un module chacun.
+    achats.filter((a) => a.code === 'telerupteur' || a.code === 'contacteur-ig').reduce((t2, a) => t2 + a.quantity, 0);
   if (modules > 0) {
-    const rangees = Math.max(1, Math.min(4, Math.ceil((modules + 2) / MODULES_PAR_RANGEE)));
+    const rangees = Math.max(1, Math.min(4, Math.ceil(modules / (MODULES_PAR_RANGEE * 0.8))));
     poser({
       famille: 'Tableau',
       code: `coffret-${rangees}`,

@@ -161,6 +161,32 @@ export function estimerLaPose(
   return { lignes, heures, taux, ht, tauxTva, tva, ttc: Math.round((ht + tva) * 100) / 100 };
 }
 
+/**
+ * LES TOTAUX D'UN DEVIS REMIS AU CLIENT — revue « Karim » : les fournitures
+ * s'additionnaient au prix public TTC (TVA 20 %) à la main-d'œuvre taxée au
+ * taux du chantier, sans un seul total hors taxes. Un devis d'artisan donne
+ * le HT, la TVA et le TTC ; et en rénovation, le matériel fourni et posé
+ * par l'entreprise suit la main-d'œuvre au taux réduit (CGI art. 279-0 bis).
+ *
+ * Les fournitures sont donc ramenées hors taxes, puis tout le chantier
+ * prend un seul taux : celui de la pose. Sans pose chiffrée, le matériel
+ * seul reste à 20 %.
+ */
+export const TVA_DES_PRIX_PUBLICS = 0.2;
+
+export function totauxDuDevis(
+  fournituresTtcPublic: number,
+  pose: Pick<Pose, 'ht' | 'tauxTva'> | null,
+): { fournituresHt: number; poseHt: number; ht: number; tauxTva: number; tva: number; ttc: number } {
+  const cents = (v: number) => Math.round(v * 100) / 100;
+  const fournituresHt = cents(fournituresTtcPublic / (1 + TVA_DES_PRIX_PUBLICS));
+  const poseHt = pose ? cents(pose.ht) : 0;
+  const ht = cents(fournituresHt + poseHt);
+  const tauxTva = pose ? pose.tauxTva : TVA_DES_PRIX_PUBLICS;
+  const tva = cents(ht * tauxTva);
+  return { fournituresHt, poseHt, ht, tauxTva, tva, ttc: cents(ht + tva) };
+}
+
 /** « 23 h 30 », « 45 min ». */
 export function enHeures(h: number): string {
   const min = Math.round(h * 60);

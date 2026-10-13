@@ -223,7 +223,7 @@ import {
 } from '../components/Sheet';
 import { alerte } from '../ui/alerte';
 import { panne as expliquer } from '../ui/panne';
-import { ficheElec, motDuLien } from './result/ficheElec';
+import { ficheElec } from './result/ficheElec';
 import { astuce } from '../ui/astuce';
 import { celebrerSiAuxNormes, resetCelebration } from '../ui/auxNormes';
 import { useModeElec, useUsage } from '../store/usage';
@@ -1105,61 +1105,19 @@ export function ResultScreen() {
       allumePar,
       allume,
     });
-    const mot = motDuLien(f);
     /*
-      DÉTACHER SE FAIT D'OÙ L'ON VOIT LE LIEN. Il ne se défaisait que depuis
-      le point du plafond : celui qui regardait l'interrupteur voyait le lien
-      écrit et n'avait aucun moyen de le rompre.
+      HORS ÉDITION, LA FICHE SE LIT — revue « Karim » : elle permettait de
+      nouer et défaire des liens, et « Voir le mur » ouvrait l'établi
+      complet, où l'on posait et retirait des prises sans être passé en
+      édition. Elle dit ce qu'est l'appareil ; pour changer quoi que ce soit,
+      « Modifier » passe en édition, à l'endroit même.
     */
-    const liens = [
-      ...(f.commands ?? []).map((id) => ({ id, nom: nomLisible(id) })),
-      ...fixtures
-        .filter((x) => (x.commands ?? []).includes(f.id))
-        .map((x) => ({ id: x.id, nom: FIXTURES[x.kind].label.toLowerCase() })),
-      ...ceiling
-        .filter((cl) => (cl.commands ?? []).includes(f.id))
-        .map((cl) => ({ id: cl.id, nom: CEILINGS[cl.kind].label.toLowerCase() })),
-    ].filter((l) => !!l.nom);
     setMenu({
       title: titre,
       subtitle: sousTitre,
       actions: [
-        ...(mot
-          ? [
-              {
-                label: mot,
-                icon: 'fusionner' as const,
-                onPress: () => {
-                  seulGeste('lien');
-                  setPendingLienMur(f.id);
-                },
-              },
-            ]
-          : []),
-        ...liens.map((l) => ({
-          label: `Détacher ${l.nom}`,
-          icon: 'scinder' as const,
-          onPress: () => {
-            useScanStore.getState().lierElements(f.id, l.id);
-          },
-        })),
-        /*
-          LE TABLEAU POSÉ MÈNE À SON RELEVÉ — relevé du patron : « les deux
-          systèmes doivent être liés ». Celui qu'on touche au mur est celui
-          qu'on a reconstruit organe par organe : on y va d'un appui.
-        */
         ...(f.kind === 'tableau' && modeElec
           ? [
-              {
-                label: existant?.departs.length ? 'Ouvrir son relevé' : 'Relever ce tableau',
-                hint: existant?.departs.length
-                  ? `${existant.departs.length} organe(s) relevé(s) — tels qu’ils sont dessinés ici.`
-                  : reference.projete
-                    ? 'Pré-rempli du tableau dessiné ici : ajustez-le organe par organe.'
-                    : 'Reconstruisez-le organe par organe : il se dessinera tel quel.',
-                icon: 'tableau' as const,
-                onPress: () => ouvrirLeTableau(true),
-              },
               {
                 label: 'Voir le tableau fini',
                 hint: 'Son rendu réaliste, une étiquette sous chaque disjoncteur.',
@@ -1169,9 +1127,11 @@ export function ResultScreen() {
             ]
           : []),
         {
-          label: 'Voir le mur',
+          label: 'Modifier',
+          hint: 'Passe en édition et ouvre son mur : liens, cotes, hauteur.',
           icon: 'regle' as const,
           onPress: () => {
+            setEditMode(true);
             setElecWallId(f.wallId);
             setElecSel(f.id);
             setElecView('mur');
@@ -1333,12 +1293,14 @@ export function ResultScreen() {
   const showPhotos = useScanStore((s) => s.showPhotos);
   const showNotes = useScanStore((s) => s.showNotes);
   const [editMode, setEditMode] = useState(false);
-  // En sortant de l'édition, le plafond choisi se lâche : hors édition, il
-  // ne se prend pas (voir `onSelectCeiling`).
+  // En sortant de l'édition, le plafond choisi se lâche, et un lien en cours
+  // s'abandonne : hors édition, rien ne se modifie (voir `onSelectCeiling`).
   useEffect(() => {
     if (editMode) return;
     setSelCeiling(null);
     setSelRow(null);
+    setPendingLink(null);
+    setPendingLienMur(null);
   }, [editMode]);
   /**
    * Jeu de pastilles affiché. Il RETARDE sur `editMode` : les anciennes
@@ -4640,7 +4602,11 @@ export function ResultScreen() {
               }
               addCeiling(pendingCeiling!, part.roomId, at);
               haptic('succes');
-              setPendingCeiling(null);
+              /*
+                L'OUTIL RESTE EN MAIN — revue « Karim » : il se désarmait
+                après chaque pose, et quatre DCL coûtaient douze appuis. On
+                pose de point en point ; le bandeau d'attente le quitte.
+              */
             }}
             /*
               HORS ÉDITION, LE PLAFOND NE SE PREND PAS — relevé du patron : « on

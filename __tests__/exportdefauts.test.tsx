@@ -33,6 +33,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 import React from 'react';
 import { Switch, View } from 'react-native';
+import { useReglagesExport } from '../src/store/reglagesExport';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ExportScreen } from '../src/screens/ExportScreen';
 import { useScanStore } from '../src/store/scanStore';
@@ -132,14 +133,14 @@ describe('les options cochées à l’ouverture de l’export', () => {
   */
   // « Surfaces » est cochée : un dossier sans un nom de pièce ni un mètre
   // carré ne sert à personne (correctif de l'audit).
-  const COCHEES = ['Page de garde', 'Vues 3D', 'Métré', 'Cotes', 'Meubles', 'Surfaces', 'Murs de face', 'Tous les murs'];
+  // Revue « Karim » : l'électricien imprime son plafond et ses schémas —
+  // cochés pour lui, plus à recocher à chaque dossier. (Le plan des gaines
+  // aussi, quand ce plan a un tirage à montrer.)
+  const COCHEES = ['Page de garde', 'Vues 3D', 'Métré', 'Cotes', 'Meubles', 'Surfaces', 'Murs de face', 'Tous les murs', 'Plafond', 'Schémas'];
   const DECOCHEES = [
     'Cotes sur la 3D',
     'Menuiseries en couleur',
     'Couleurs relevées',
-    'Plafond',
-    'Plan des gaines',
-    'Schémas',
     'Murs équipés',
   ];
 
@@ -157,7 +158,19 @@ describe('les options cochées à l’ouverture de l’export', () => {
       expect({ [nom]: o.get(nom) }).toEqual({ [nom]: false });
     }
     // Et l'on a bien vu des réglages éteints : le banc n'est pas vide.
-    expect(DECOCHEES.filter((n) => o.has(n)).length).toBeGreaterThanOrEqual(4);
+    expect(DECOCHEES.filter((n) => o.has(n)).length).toBeGreaterThanOrEqual(3);
+  });
+
+  /*
+    REVUES « KARIM » ET « INÈS » : les cases se recochaient à chaque export.
+  */
+  it('retiennent le choix d’un export à l’autre', () => {
+    const t = monter();
+    const metre = t.root.findAllByType(Switch).find((sw) => sw.props.accessibilityLabel === 'Métré')!;
+    act(() => metre.props.onValueChange(false));
+    act(() => t.unmount());
+    expect(options(monter()).get('Métré')).toBe(false);
+    act(() => useReglagesExport.setState({ choix: {} }));
   });
 
   it('et les options du plan suivent, pour que l’aperçu ne mente pas', () => {

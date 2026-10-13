@@ -1073,6 +1073,31 @@ describe('l’écran des résultats', () => {
    * c'est l'un sous l'autre, et le second illisible.
    */
   /*
+   * HORS ÉDITION, LA FICHE D'UN APPAREIL SE LIT — revue « Karim » : on y
+   * nouait des liens, et « Voir le mur » ouvrait l'établi complet.
+   */
+  it('hors édition, la fiche d’un appareil se lit, et « Modifier » passe en édition', () => {
+    const tree = monter();
+    // Hors édition, le seul groupe touchable cerné d'un disque transparent
+    // est un appareil mural : le plafond ne répond pas.
+    const appareil = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .find((n) => n.findAllByType(Circle).some((cercle) => cercle.props.fill === 'transparent'));
+    expect(appareil).toBeDefined();
+    act(() => appareil!.props.onPress());
+    const vu = textes(tree);
+    expect(vu).not.toMatch(/Choisir l’interrupteur|Relier|Détacher|Voir le mur/);
+    // L'action du menu, telle que la feuille la recevra.
+    const menu = tree.root.findAll((n) => n.props?.data && Array.isArray(n.props.data.actions))[0];
+    const modifier = menu.props.data.actions.find((a: { label: string }) => a.label === 'Modifier');
+    expect(modifier).toBeDefined();
+    const edition = () => tree.root.findAll((n) => n.props?.label === 'Édition' && 'active' in n.props)[0];
+    expect(edition().props.active).toBe(false);
+    act(() => modifier.onPress());
+    expect(edition().props.active).toBe(true);
+  });
+
+  /*
    * HORS ÉDITION, LE PLAFOND NE SE PREND PAS — relevé du patron : « on ne
    * doit pas pouvoir éditer sans être en édition ».
    */

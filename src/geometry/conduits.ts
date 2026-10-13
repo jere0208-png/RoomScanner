@@ -455,6 +455,31 @@ export function buyingList(
       unit: 'u',
     });
   }
+  /*
+    LE POUSSOIR COMMANDE UN TÉLÉRUPTEUR — revue « Karim » : trois poussoirs
+    reliés à un point, et rien au tableau, alors que la fiche du poussoir
+    dit elle-même « télérupteur ». Un télérupteur par jeu de poussoirs qui
+    commande les mêmes points ; des poussoirs reliés à rien en demandent un.
+  */
+  const poussoirs = new Set(fixtures.filter((f) => f.kind === 'poussoir').map((f) => f.id));
+  if (poussoirs.size > 0) {
+    const jeux = new Set<string>();
+    for (const p of [...ceiling, ...fixtures]) {
+      const siens = (p.commands ?? []).filter((c) => poussoirs.has(c)).sort();
+      if (siens.length > 0) jeux.add(siens.join('|'));
+    }
+    const lies = new Set([...jeux].flatMap((j) => j.split('|')));
+    const telerupteurs = jeux.size + ([...poussoirs].some((p) => !lies.has(p)) ? 1 : 0);
+    out.push({
+      family: 'Appareillage',
+      code: 'telerupteur',
+      label: 'Télérupteur 16 A',
+      spec: 'Au tableau, commandé par les boutons-poussoirs',
+      quantity: telerupteurs,
+      unit: 'u',
+      note: 'un par groupe de poussoirs',
+    });
+  }
   const contacts = openings.filter((o) => o.detecteur).length;
   if (contacts > 0) {
     out.push({

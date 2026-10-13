@@ -28,7 +28,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { RoomScan } from 'react-native-room-scan';
 import { buildDevisPdf } from '../src/export/pdf';
 import type { Devis, LigneDevis } from '../src/geometry/devis';
-import { estimerLaPose } from '../src/geometry/mainDOeuvre';
+import { estimerLaPose, totauxDuDevis } from '../src/geometry/mainDOeuvre';
 import { DevisScreen } from '../src/screens/DevisScreen';
 import { ATTENTE_MIN } from '../src/components/PrixQuiSActualisent';
 import type { Fixture, FixtureKind } from '../src/geometry/electrical';
@@ -96,6 +96,20 @@ describe('le document', () => {
       pose,
     }),
   );
+
+  /*
+    REVUE « KARIM » : HT, TVA et TTC, au taux du chantier pour tout le
+    devis — fournitures ramenées hors taxes.
+  */
+  it('donne le HT, la TVA du chantier et le TTC', () => {
+    const t = totauxDuDevis(devisDe(lignes).total, pose);
+    expect(t.fournituresHt).toBeCloseTo(devisDe(lignes).total / 1.2, 2);
+    expect(t.tauxTva).toBe(pose.tauxTva);
+    expect(t.ttc).toBeCloseTo((t.fournituresHt + pose.ht) * (1 + pose.tauxTva), 1);
+    expect(src).toContain('(Total HT) Tj');
+    expect(src).toContain('(Fournitures HT) Tj');
+    expect(src).toMatch(/\(TVA \d+ %\) Tj/);
+  });
 
   it('l’entreprise, le client, le numéro et la date en tête', () => {
     expect(src).toContain('(Électricité Dupont) Tj');

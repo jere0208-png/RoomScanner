@@ -146,7 +146,7 @@ import { matieresDesSols } from '../ui/maquette';
 import { accentsDesPieces, peinturesDesPieces, solsDesPieces } from '../ui/habillage';
 import { cotesExterieures, ECART_DE_COTE } from '../geometry/cotes3d';
 import type { Devis } from '../geometry/devis';
-import { enHeures, type Pose } from '../geometry/mainDOeuvre';
+import { enHeures, totauxDuDevis, TVA_DES_PRIX_PUBLICS, type Pose } from '../geometry/mainDOeuvre';
 import { nomDeTeinte } from '../ui/peintures';
 
 const PAGE_W = 595;
@@ -4954,52 +4954,77 @@ function gainesPage(
       le dessin est centre dans sa boite, et le blanc qui reste au-dessus ne
       sert a rien.
     */
-    const x0 = box.x;
-    const w = box.w;
-    let y = box.y + box.h - 6;
-    d.text('Tirage par circuit', x0, y, 9, INK, { bold: true, align: 'left' });
-    y -= 14;
-    const cols = [x0, x0 + 26, x0 + w * 0.46, x0 + w * 0.64, x0 + w * 0.82];
-    d.text('Rep.', cols[0], y, 7, GREY_LIGHT, { align: 'left' });
-    d.text('Circuit', cols[1], y, 7, GREY_LIGHT, { align: 'left' });
-    d.text('Section', cols[2], y, 7, GREY_LIGHT, { align: 'left' });
-    d.text('Fils', cols[3], y, 7, GREY_LIGHT, { align: 'left' });
-    d.text('Conduit', cols[4], y, 7, GREY_LIGHT, { align: 'left' });
-    y -= 4;
-    d.line(x0, y, x0 + w, y, 0.6, '#D8DEE7');
-    y -= 12;
-    rows.forEach((r, i) => {
-      // On ne descend jamais sur le dessin : mieux vaut un tableau tronque
-      // qu'un tableau ecrit en travers du plan.
-      if (y < box.y + box.h - 110) return;
-      const teinte = circuitColor(i);
-      markerAt(d, { x: x0 + 7, y: y + 2 }, r.mark, teinte);
-      d.text(fitText(r.label, 8, cols[2] - cols[1] - 8), cols[1], y, 8, INK, {
-        align: 'left',
+    /*
+      LE TABLEAU NE SE TRONQUE PLUS EN SILENCE — revue « Karim » : sur un
+      T3 de dix circuits, C1 à C6 seulement, le reste coupé sans un mot. Il
+      se pose sur deux colonnes quand une ne suffit pas, et ce qui ne tient
+      toujours pas renvoie au schéma, en toutes lettres.
+    */
+    const HAUT = 110;
+    const PAS = 13;
+    const parColonne = Math.max(1, Math.floor((HAUT - 30) / PAS));
+    const nCol = rows.length > parColonne ? 2 : 1;
+    const capacite = parColonne * nCol;
+    const affiches = rows.length > capacite ? rows.slice(0, capacite - 1) : rows;
+    const reste = rows.length - affiches.length;
+    const yTitre = box.y + box.h - 6;
+    d.text('Tirage par circuit', box.x, yTitre, 9, INK, { bold: true, align: 'left' });
+    const largeur = box.w / nCol;
+    for (let c = 0; c < nCol; c++) {
+      const x0 = box.x + c * largeur;
+      const w = largeur - (nCol > 1 ? 10 : 0);
+      let y = yTitre - 14;
+      const cols = [x0, x0 + 26, x0 + w * 0.46, x0 + w * 0.64, x0 + w * 0.82];
+      d.text('Rep.', cols[0], y, 7, GREY_LIGHT, { align: 'left' });
+      d.text('Circuit', cols[1], y, 7, GREY_LIGHT, { align: 'left' });
+      d.text('Section', cols[2], y, 7, GREY_LIGHT, { align: 'left' });
+      d.text('Fils', cols[3], y, 7, GREY_LIGHT, { align: 'left' });
+      d.text('Conduit', cols[4], y, 7, GREY_LIGHT, { align: 'left' });
+      y -= 4;
+      d.line(x0, y, x0 + w, y, 0.6, '#D8DEE7');
+      y -= 12;
+      const tranche = affiches.slice(c * parColonne, (c + 1) * parColonne);
+      tranche.forEach((r, k) => {
+        const i = c * parColonne + k;
+        const teinte = circuitColor(i);
+        markerAt(d, { x: x0 + 7, y: y + 2 }, r.mark, teinte);
+        d.text(fitText(r.label, 8, cols[2] - cols[1] - 8), cols[1], y, 8, INK, {
+          align: 'left',
+        });
+        d.text(
+          r.section === null
+            ? 'courants faibles'
+            : `${fr1(r.section)} mm²`,
+          cols[2],
+          y,
+          8,
+          GREY,
+          { align: 'left' },
+        );
+        d.text(`${r.wires}`, cols[3], y, 8, GREY, { align: 'left' });
+        // Le diamètre se CALCULE ici, sur le compte de fils de cette ligne :
+        // c'est la règle du tiers, et elle se vérifie du regard.
+        d.text(
+          `ICTA ${conduitPour(r.section, r.wires)}`,
+          cols[4],
+          y,
+          8,
+          INK,
+          { bold: true, align: 'left' },
+        );
+        y -= PAS;
       });
-      d.text(
-        r.section === null
-          ? 'courants faibles'
-          : `${fr1(r.section)} mm²`,
-        cols[2],
-        y,
-        8,
-        GREY,
-        { align: 'left' },
-      );
-      d.text(`${r.wires}`, cols[3], y, 8, GREY, { align: 'left' });
-      // Le diamètre se CALCULE ici, sur le compte de fils de cette ligne :
-      // c'est la règle du tiers, et elle se vérifie du regard.
-      d.text(
-        `ICTA ${conduitPour(r.section, r.wires)}`,
-        cols[4],
-        y,
-        8,
-        INK,
-        { bold: true, align: 'left' },
-      );
-      y -= 13;
-    });
+      if (c === nCol - 1 && reste > 0) {
+        d.text(
+          `+ ${reste} circuit${reste > 1 ? 's' : ''} : voir le schéma unifilaire.`,
+          x0,
+          y,
+          8,
+          GREY,
+          { align: 'left' },
+        );
+      }
+    }
   };
 
   const page = planPage(ctx, sheet, undefined, false, {
@@ -7150,7 +7175,7 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   }
   place(24);
   d.line(X0, y + 8, X1, y + 8, 0.8, INK);
-  d.text('Total fournitures TTC', X0 + 8, y - 6, 10, INK, { bold: true, align: 'left' });
+  d.text('Total fournitures (prix publics TTC)', X0 + 8, y - 6, 10, INK, { bold: true, align: 'left' });
   d.text(enEuros(e.devis.total), X1 - 6, y - 6, 10, INK, { bold: true, align: 'right' });
   y -= 32;
 
@@ -7171,47 +7196,59 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
       d.line(X0, y - 5, X1, y - 5, 0.3, '#E3E7ED');
       y -= 16;
     }
-    place(52);
+    place(24);
     d.line(X0, y + 8, X1, y + 8, 0.8, INK);
-    const lignesPose: [string, number][] = [
-      ['Total main-d’œuvre HT', pose.ht],
-      [`TVA ${Math.round(pose.tauxTva * 100)} %`, pose.tva],
-      ['Total main-d’œuvre TTC', pose.ttc],
-    ];
-    for (const [mot, v] of lignesPose) {
-      d.text(mot, X0 + 8, y - 6, 9.5, INK, { bold: mot.startsWith('Total'), align: 'left' });
-      d.text(enEuros(v), X1 - 6, y - 6, 9.5, INK, { bold: mot.startsWith('Total'), align: 'right' });
-      y -= 15;
-    }
-    y -= 14;
+    d.text('Total main-d’œuvre HT', X0 + 8, y - 6, 9.5, INK, { bold: true, align: 'left' });
+    d.text(enEuros(pose.ht), X1 - 6, y - 6, 9.5, INK, { bold: true, align: 'right' });
+    y -= 29;
   }
 
   // ------------------------------------------------------------ le total
-  place(70, false);
-  const bx = 320;
-  const hauteurTotal = pose ? 62 : 44;
-  d.rect(bx, y - hauteurTotal + 10, X1 - bx, hauteurTotal, '#F4F6FA', null, 0);
-  let yt = y - 4;
-  d.text('Fournitures TTC', bx + 10, yt, 9, GREY, { align: 'left' });
-  d.text(enEuros(e.devis.total), X1 - 10, yt, 9, INK, { align: 'right' });
-  if (pose) {
-    yt -= 14;
-    d.text('Main-d’œuvre TTC', bx + 10, yt, 9, GREY, { align: 'left' });
-    d.text(enEuros(pose.ttc), X1 - 10, yt, 9, INK, { align: 'right' });
-  }
-  yt -= 20;
-  d.text('TOTAL TTC', bx + 10, yt, 12, INK, { bold: true, align: 'left' });
-  d.text(enEuros(e.devis.total + (pose?.ttc ?? 0)), X1 - 10, yt, 13, INK, { bold: true, align: 'right' });
-  y -= hauteurTotal + 18;
-
-  // ------------------------------------------------------- les mentions
+  /*
+    HT, TVA, TTC — voir `totauxDuDevis` : les fournitures ramenées hors
+    taxes, puis un seul taux pour tout le chantier.
+  */
+  const t = totauxDuDevis(e.devis.total, pose);
   const mentions = [
-    'Prix des fournitures TTC, relevés en enseigne : à confirmer à la commande.',
+    'Prix des fournitures relevés TTC en enseigne (TVA 20 %), ramenés hors taxes, à confirmer à la commande.',
+    ...(pose && t.tauxTva < TVA_DES_PRIX_PUBLICS
+      ? ['TVA au taux réduit des travaux de rénovation d’un logement de plus de deux ans, fournitures posées comprises (attestation du client requise).']
+      : []),
     ...(pose ? ['Main-d’œuvre estimée au temps de pose de chaque point, à confirmer après visite.'] : []),
     ...e.devis.exclusions.filter((x) => !(pose && /^Main-d/.test(x))),
   ];
-  for (const m of mentions) {
-    const ls = wrapText(m, 7.5, X1 - X0);
+  const lignesMentions = mentions.map((m) => wrapText(m, 7.5, X1 - X0));
+  /*
+    LE TOTAL, LES MENTIONS ET LE BON POUR ACCORD TIENNENT ENSEMBLE — revue
+    « Karim » : le cadre de signature partait seul en page 3. On réserve
+    leur place d'un coup ; s'ils ne tiennent pas, ils passent ensemble.
+  */
+  const hauteurFin =
+    (pose ? 4 : 3) * 14 + 48 + lignesMentions.reduce((h, ls) => h + ls.length * 10 + 2, 0) + 10 + 84;
+  place(Math.min(hauteurFin, 560), false);
+  const bx = 300;
+  const lignesTotal: [string, number][] = [
+    ['Fournitures HT', t.fournituresHt],
+    ...(pose ? ([['Main-d’œuvre HT', t.poseHt]] as [string, number][]) : []),
+    ['Total HT', t.ht],
+    [`TVA ${String(Math.round(t.tauxTva * 1000) / 10).replace('.', ',')} %`, t.tva],
+  ];
+  const hauteurTotal = lignesTotal.length * 14 + 30;
+  d.rect(bx, y - hauteurTotal + 10, X1 - bx, hauteurTotal, '#F4F6FA', null, 0);
+  let yt = y - 4;
+  for (const [mot, v] of lignesTotal) {
+    const gras = mot === 'Total HT';
+    d.text(mot, bx + 10, yt, 9, gras ? INK : GREY, { align: 'left', bold: gras });
+    d.text(enEuros(v), X1 - 10, yt, 9, INK, { align: 'right', bold: gras });
+    yt -= 14;
+  }
+  yt -= 6;
+  d.text('TOTAL TTC', bx + 10, yt, 12, INK, { bold: true, align: 'left' });
+  d.text(enEuros(t.ttc), X1 - 10, yt, 13, INK, { bold: true, align: 'right' });
+  y -= hauteurTotal + 18;
+
+  // ------------------------------------------------------- les mentions
+  for (const ls of lignesMentions) {
     place(ls.length * 10 + 2, false);
     for (const l of ls) {
       d.text(l, X0, y, 7.5, GREY, { align: 'left' });

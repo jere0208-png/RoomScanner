@@ -23,7 +23,8 @@
  * Ce module ne dessine rien : il produit la STRUCTURE des deux schémas. Le
  * PDF s'occupe du tracé, l'écran pourra s'en servir plus tard.
  */
-import { FIXTURES, postsOf, type Fixture, type FixtureKind } from './electrical';
+import { FIXTURES, postsOf, socketsOf, type Fixture, type FixtureKind } from './electrical';
+import { CEILINGS, type CeilingFixture } from './ceiling';
 import type { Circuit, Differential } from './nfc15100';
 import { conduitFor } from './conduits';
 
@@ -263,20 +264,46 @@ export function fixtureMarks(circuits: Circuit[]): Map<string, string> {
   return out;
 }
 
-/** Ce que dessert un départ, en toutes lettres. */
-function pointsOf(circuit: Circuit, fixtures: Fixture[]): string {
-  const parType = new Map<FixtureKind, number>();
-  for (const id of circuit.fixtureIds) {
-    const f = fixtures.find((x) => x.id === id);
-    if (!f) continue;
-    for (const k of postsOf(f.kind)) {
-      parType.set(k, (parType.get(k) ?? 0) + 1);
+/** « Prise 16 A » devient « prise 16 A » : l'unité garde sa majuscule. */
+const enMinuscule = (l: string) => l.charAt(0).toLowerCase() + l.slice(1);
+
+/**
+ * Ce que dessert un départ, en toutes lettres.
+ *
+ * LE SCHÉMA DIT CE QUE COMPTE LA NORME — revue « Karim » : « Prises 1 :
+ * 13 × prise 16 a » sur un circuit de douze socles (il comptait les postes
+ * des plaques), le coffret de communication portait « 3 × prise 16 a »
+ * (les socles des plaques RJ + prise), et un circuit d'éclairage ne
+ * montrait que ses interrupteurs. Un circuit de prises compte ses SOCLES ;
+ * un circuit d'éclairage, ses commandes ET ses points, plafond compris ;
+ * un départ de communication, ses seules prises de communication.
+ */
+function pointsOf(circuit: Circuit, fixtures: Fixture[], ceiling: CeilingFixture[] = []): string {
+  const siens = circuit.fixtureIds
+    .map((id) => fixtures.find((x) => x.id === id))
+    .filter((f): f is Fixture => !!f);
+  if (circuit.nature === 'prises') {
+    // Les socles qu'on pose, et les points que la norme compte (une prise
+    // double vaut un point) : c'est le second qui borne le circuit.
+    const socles = siens.reduce((t, f) => t + postsOf(f.kind).filter((k) => k === 'prise').length, 0);
+    const points = siens.reduce((t, f) => t + socketsOf(f.kind), 0);
+    if (socles === 0) return '—';
+    return `${socles} socle${socles > 1 ? 's' : ''} 16 A` + (points !== socles ? ` (${points} point${points > 1 ? 's' : ''})` : '');
+  }
+  const parType = new Map<string, number>();
+  const compter = (libelle: string) => parType.set(libelle, (parType.get(libelle) ?? 0) + 1);
+  for (const f of siens) {
+    for (const k of postsOf(f.kind) as FixtureKind[]) {
+      if (circuit.nature !== 'specialise' && circuit.nature !== 'cuisson' && circuit.nature !== 'sortie' && socketsOf(k) > 0) continue;
+      compter(enMinuscule(FIXTURES[k].label));
     }
   }
+  for (const id of circuit.ceilingIds ?? []) {
+    const h = ceiling.find((x) => x.id === id);
+    if (h) compter(enMinuscule(CEILINGS[h.kind].label));
+  }
   if (parType.size === 0) return '—';
-  return [...parType.entries()]
-    .map(([k, n]) => `${n} × ${FIXTURES[k].label.toLowerCase()}`)
-    .join(', ');
+  return [...parType.entries()].map(([k, n]) => `${n} × ${k}`).join(', ');
 }
 
 /**
@@ -291,6 +318,8 @@ export function schemaRows(
   circuits: Circuit[],
   differentials: Differential[],
   fixtures: Fixture[],
+  /** Les points du plafond : un circuit d'éclairage les dessert aussi. */
+  ceiling: CeilingFixture[] = [],
 ): SchemaRow[] {
   const marks = circuitMarks(circuits);
   const protecteur = new Map<string, string>();
@@ -305,7 +334,7 @@ export function schemaRows(
     section: c.section,
     conduit: conduitFor(c.section),
     wires: wiresOf(c, fixtures).length,
-    points: pointsOf(c, fixtures),
+    points: pointsOf(c, fixtures, ceiling),
     under: protecteur.get(c.label),
   }));
 }

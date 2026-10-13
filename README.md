@@ -14285,6 +14285,43 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le dossier de l'électricien se présente au client et au Consuel
+
+Revue « Karim », électricien : « je ne peux pas remettre ce dossier sans le
+reprendre à la main ».
+- **Une commande et ses points ne se séparent jamais.** Les circuits
+  d'éclairage répartissaient commandes et points chacun de son côté : un
+  circuit portait dix points, et l'interrupteur de la cuisine partait sur
+  un autre circuit que le plafonnier qu'il allume. Les circuits se forment
+  maintenant par groupes (une commande et tout ce qu'elle allume, un
+  va-et-vient et ses deux interrupteurs), huit points au plus.
+- **L'unifilaire dit ce que compte la norme** : les socles d'un circuit de
+  prises et ses points (« 13 socles 16 A (12 points) »), les points du
+  plafond d'un circuit d'éclairage, les seules prises de communication au
+  coffret, et « 16 A » avec sa majuscule.
+- **Le tableau de tirage ne se tronque plus en silence** : deux colonnes,
+  puis « + n circuits : voir le schéma unifilaire ».
+- **Le coffret garde 20 % de réserve**, comme le demande la norme (deux
+  modules par rangée en laissaient 7,7 %).
+- **Le poussoir emporte son télérupteur**, un par groupe de poussoirs, avec
+  son module au tableau.
+- **Le devis donne HT, TVA et TTC.** Les fournitures, relevées TTC en
+  enseigne, sont ramenées hors taxes, puis tout le chantier prend le taux de
+  la pose : 10 % en rénovation, matériel fourni et posé compris. Le total,
+  les mentions et le bon pour accord tiennent ensemble.
+- **Hors édition, la fiche d'un appareil se lit.** On y nouait des liens et
+  « Voir le mur » ouvrait l'établi complet ; « Modifier » passe maintenant
+  en édition, à l'endroit même. Sortir de l'édition abandonne un lien en
+  cours.
+- **Les cases du dossier se retiennent**, par mode : l'électricien n'a plus
+  à recocher plafond, schémas et gaines (cochés pour lui au départ), le
+  particulier à décocher les achats.
+- **L'outil Plafond reste en main** d'une pose à l'autre ; le bandeau
+  d'attente le quitte.
+
+Bancs : `circuitsparcommande` (nouveau), `schema`, `elevationsfaces`,
+`devispdf`, `bandeaux`, `exportdefauts`.
+
 ## Le dossier PDF se remet au client tel quel
 
 Revues « Thomas » (architecte d'intérieur) et « Inès » (agente immobilière),
