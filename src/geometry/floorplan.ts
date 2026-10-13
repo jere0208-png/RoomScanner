@@ -1829,7 +1829,9 @@ export function roomParts(walls: WallSeg[], rooms?: RoomShape[]): RoomPart[] {
         return garde.part;
       }
       const brute = makePart(r.id, items);
-      const part = r.hauteur ? { ...brute, hauteur: r.hauteur } : brute;
+      // Son faux plafond d'abord, puis la hauteur que le LiDAR a lue.
+      const h = r.hauteur ?? hauteurLue((r as { releve?: { plafond?: Parameters<typeof hauteurLue>[0] } | null }).releve?.plafond);
+      const part = h ? { ...brute, hauteur: h } : brute;
       partsGardees.set(r, { items, part });
       return part;
     });
@@ -2160,6 +2162,20 @@ export function roomHeight(walls: WallSeg[]): number {
  * séjour (3,20 m) ; l'élévation du séjour disait « sous 2,60 m » et la 3D
  * laissait un vide de 60 cm. La hauteur est une donnée de la PIÈCE.
  */
+/**
+ * LA HAUTEUR QUE LE LIDAR A LUE — revues « Malik » et « Hélène » : le métré
+ * prenait le plus haut des murs (2,60 m pour une chambre de 2,40, la cloison
+ * vue depuis l'open space ; 3,32 pour un plafond à 3,30). Un plafond plat,
+ * vu aux quatre cinquièmes au moins, donne sa hauteur à la pièce. Un rampant
+ * garde celle de ses murs.
+ */
+export function hauteurLue(
+  plafond: { hMin: number; hMax: number; hMoy: number; couverture: number; rampant: boolean } | null | undefined,
+): number | undefined {
+  if (!plafond || plafond.rampant || plafond.couverture < 0.8 || plafond.hMax - plafond.hMin > 0.1) return undefined;
+  return Math.round(plafond.hMoy * 100) / 100;
+}
+
 export function hauteurDeLaPiece(part: { walls: WallSeg[]; hauteur?: number }): number {
   return part.hauteur ?? roomHeight(part.walls);
 }

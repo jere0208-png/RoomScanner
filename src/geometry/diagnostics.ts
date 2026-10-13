@@ -219,8 +219,19 @@ export function checkPlan(
   // --- hauteurs qui détonnent
   const hauteurs = walls.map((w) => w.height);
   const hRef = med(hauteurs);
+  /*
+    LA JAMBETTE D'UN RAMPANT N'EST PAS UNE ERREUR — revue « Léon » : sous les
+    toits, le mur de 1,10 m était signalé « Corrigez la hauteur de la pièce si
+    c'est une erreur de scan », alors que la fiche reconnaissait le rampant.
+  */
+  const sousRampant = new Set(
+    rooms
+      .filter((r) => (r as { releve?: { plafond?: { rampant?: boolean } | null } | null }).releve?.plafond?.rampant)
+      .flatMap((r) => r.wallIds ?? []),
+  );
   for (const w of walls) {
     if (Math.abs(w.height - hRef) <= HAUTEUR_ECART) continue;
+    if (w.height < hRef && sousRampant.has(w.id)) continue;
     issues.push({
       kind: 'hauteur',
       severity: 'info',

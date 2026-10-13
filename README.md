@@ -14285,6 +14285,46 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## L'habitable sous les toits, la hauteur que le LiDAR a lue
+
+**Le bas du rampant, déduit de sa pente** (Léon). Sous les toits, les bas
+de pente sont justement ce que le LiDAR voit le moins. La part « debout »
+était comptée sur les seuls carreaux vus. Une chambre de bonne de 9 m²
+sortait donc à 8,33 m² habitables au lieu de 6,22 (+34 %), soit le chiffre
+d'une annonce.
+- RoomPlan relève le mur de jambette à sa vraie hauteur : il dit où le
+  rampant commence. Les carreaux vus en pente disent de combien il monte par
+  mètre.
+- Chaque carreau non vu prend la hauteur de sa jambette la plus proche,
+  plus la pente fois sa distance, sans dépasser le haut du plafond. Deux
+  versants ont chacun leur jambette et leur pente.
+- Sur la chambre de Léon, l'habitable revient à 1 % près. Le chiffre reste
+  dit « à vérifier », avec la part du plafond vue et celle qui est déduite.
+- Le plafond le plus bas ne passe plus au-dessus de la jambette. La fiche
+  annonçait « de 1,67 à 2,55 m » sous une jambette de 1,10 m.
+- Le diagnostic ne propose plus de « corriger » la jambette d'un rampant
+  reconnu.
+
+**Ce qui compte, et ce qui ne compte pas.**
+- Un plafond partout au-dessus de 1,80 m : tout compte, sans « à vérifier »
+  (Malik). Sur la mezzanine d'un loft, les garde-corps passaient pour des
+  murs bas.
+- Le cellier intérieur compte dans l'habitable (Gérard, Bérénice). Les
+  caves, garages, balcons, loggias et vérandas, non.
+
+**La hauteur que le LiDAR a lue** (Malik, Hélène). Un plafond plat, vu aux
+quatre cinquièmes au moins, donne sa hauteur à la pièce, au métré, en 3D et
+au chiffrage. Le plus haut des murs comptait 2,60 m pour une chambre de
+2,40, et 3,32 m pour un plafond à 3,30. Un rampant garde la hauteur de ses
+murs.
+
+**Les murs à peindre, chacun à sa hauteur** (Léon, Malik). Le tour de la
+pièce se multipliait par la hauteur de son plus haut mur. La jambette de
+1,10 m comptait 2,55 m, et la cloison de 2,60 m de la chambre comptait 5 m
+dans le loft. Le PDF et la fiche donnent maintenant le même chiffre.
+
+Banc : `tournee5habitable`.
+
 ## Une chose, une fois, passage après passage
 
 **Une baie vue des deux côtés de son mur reste une baie** (Thomas,

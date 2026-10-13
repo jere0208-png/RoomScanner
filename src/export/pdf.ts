@@ -4407,7 +4407,7 @@ function metrePage(
       ? perimetreDe(tourInterieur)
       : part.walls.reduce((s, x) => s + segLength(x), 0);
     const nets = tourInterieur
-      ? mursNetsDe(tourInterieur, h, baiesDeLaPiece(part, ctx.openings))
+      ? mursNetsDe(tourInterieur, h, baiesDeLaPiece(part, ctx.openings), part.walls)
       : wallAreaM2(part.walls, ctx.openings);
     totalArea2 += part.surface?.area ?? 0;
     totalWalls += nets;
@@ -4503,7 +4503,7 @@ function metrePage(
     y -= 13;
     d.text(
       hab.aVerifier > 0
-        ? `À vérifier : ${hab.aVerifier} pièce${hab.aVerifier > 1 ? 's ont' : ' a'} des murs sous 1,80 m, et la part basse n’a pas été mesurée. Estimation tirée du relevé, pas un mesurage certifié.`
+        ? `À vérifier : ${hab.aVerifier} pièce${hab.aVerifier > 1 ? 's ont' : ' a'} une part sous 1,80 m mal vue au relevé. Estimation tirée du relevé, pas un mesurage certifié.`
         : exclues > 0
           ? 'Hors garage, cave, balcon et annexes, et hors hauteur sous 1,80 m. Estimation tirée du relevé, pas un mesurage certifié.'
           : 'Estimation tirée du relevé, pas un mesurage certifié.',

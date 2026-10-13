@@ -28,6 +28,7 @@ import { frCategory } from './furniture';
 import { bearingName } from './naming';
 import { baiesDeLaPiece, mursNetsDe } from './travaux';
 import {
+  hauteurLue,
   murDeLOuverture,
   pointOnSeg,
   segLength,
@@ -62,6 +63,11 @@ export interface PlafondDeLaPiece {
    * une retouche (revue « Sébastien »). Absent des relevés d'avant.
    */
   solAuReleve?: number;
+  /**
+   * La part du plafond DÉDUITE de la pente du rampant, faute d'avoir été vue
+   * (0 à 1). Absente quand rien n'a été déduit.
+   */
+  estime?: number;
 }
 
 const arrondi = (v: number, pas = 0.01) => Math.round(v / pas) * pas;
@@ -78,6 +84,12 @@ export function plafondDeLaPiece(
   volume: VolumeReleve | null | undefined,
   contour: Pt[],
   surface: number,
+  /**
+   * Les murs de la pièce, avec leur hauteur relevée par RoomPlan : ceux qui
+   * sont nettement plus bas que le plafond sont des jambettes, d'où part le
+   * rampant. Dans le repère du volume.
+   */
+  murs: readonly { a: Pt; b: Pt; height: number }[] = [],
 ): PlafondDeLaPiece | null {
   if (!volume || contour.length < 3 || !(surface > 0) || !(volume.pas > 0)) return null;
   const { pas, minX, minZ, cols, rows, plafond } = volume;
@@ -88,23 +100,82 @@ export function plafondDeLaPiece(
   const r0 = Math.max(0, Math.floor((Math.min(...zs) - minZ) / pas));
   const r1 = Math.min(rows - 1, Math.ceil((Math.max(...zs) - minZ) / pas));
   const vus: number[] = [];
+  const nonVus: Pt[] = [];
+  const carreauxVus: { p: Pt; h: number }[] = [];
   for (let r = r0; r <= r1; r++) {
     for (let c = c0; c <= c1; c++) {
-      const h = plafond[r * cols + c] ?? 0;
-      if (h <= 0) continue;
       const centre = { x: minX + (c + 0.5) * pas, z: minZ + (r + 0.5) * pas };
-      if (pointInPolygon(centre, contour)) vus.push(h / 100);
+      if (!pointInPolygon(centre, contour)) continue;
+      const h = plafond[r * cols + c] ?? 0;
+      if (h <= 0) {
+        nonVus.push(centre);
+        continue;
+      }
+      vus.push(h / 100);
+      carreauxVus.push({ p: centre, h: h / 100 });
     }
   }
   if (vus.length < 4) return null;
-  const tries = [...vus].sort((a, b) => a - b);
+  const triesVus = [...vus].sort((a, b) => a - b);
+  const hMax = triesVus[Math.min(triesVus.length - 1, Math.round(0.95 * (triesVus.length - 1)))];
+
+  /*
+    LE BAS DU RAMPANT, DÉDUIT DE SA PENTE — revue « Léon » : sous les toits,
+    les bas de pente sont justement ce que le LiDAR voit le moins. La part
+    « debout », comptée sur les seuls carreaux vus, sortait l'habitable
+    d'une chambre de bonne à 8,33 m² au lieu de 6,22 (+34 %). Le mur de
+    jambette, que RoomPlan relève à sa vraie hauteur, dit où le rampant
+    commence ; les carreaux vus en pente disent de combien il monte par
+    mètre. Chaque carreau non vu prend la hauteur de sa jambette la plus
+    proche plus la pente fois sa distance — sans dépasser le haut du
+    plafond. Deux versants ont chacun leur jambette, et leur pente.
+  */
+  const jambettes = murs.filter(
+    (m) => m.height >= 0.5 && m.height <= hMax - ECART_RAMPANT && segLength(m as WallSeg) >= 0.5,
+  );
+  const estimes: number[] = [];
+  let jambetteBasse: number | null = null;
+  if (jambettes.length > 0 && nonVus.length > 0) {
+    const plusProche = (p: Pt) => {
+      let j = 0;
+      let d = Infinity;
+      jambettes.forEach((m, k) => {
+        const dk = pointOnSeg(p, m.a, m.b).dist;
+        if (dk < d) {
+          d = dk;
+          j = k;
+        }
+      });
+      return { j, d };
+    };
+    const sommes = jambettes.map(() => ({ num: 0, den: 0, n: 0 }));
+    for (const k of carreauxVus) {
+      if (k.h >= hMax - 0.05) continue;
+      const { j, d } = plusProche(k.p);
+      if (d < 0.1 || k.h < jambettes[j].height - 0.05) continue;
+      sommes[j].num += (k.h - jambettes[j].height) * d;
+      sommes[j].den += d * d;
+      sommes[j].n++;
+    }
+    const pentes = sommes.map((s) => (s.n >= 3 && s.den > 0 ? s.num / s.den : null));
+    for (const p of nonVus) {
+      const { j, d } = plusProche(p);
+      const pente = pentes[j];
+      if (pente === null || !(pente > 0)) continue;
+      estimes.push(Math.min(hMax, jambettes[j].height + pente * d));
+      jambetteBasse = Math.min(jambetteBasse ?? Infinity, jambettes[j].height);
+    }
+  }
+
+  const toutes = [...vus, ...estimes];
+  const tries = [...toutes].sort((a, b) => a - b);
   const centile = (q: number) => tries[Math.min(tries.length - 1, Math.max(0, Math.round(q * (tries.length - 1))))];
-  const hMin = centile(0.05);
-  const hMax = centile(0.95);
-  const hMoy = vus.reduce((s, h) => s + h, 0) / vus.length;
+  // Le plafond le plus bas ne passe pas au-dessus de la jambette qui le porte.
+  const hMin = jambetteBasse !== null ? Math.min(centile(0.05), jambetteBasse) : centile(0.05);
+  const hMoy = toutes.reduce((s, h) => s + h, 0) / toutes.length;
   const couverture = Math.min(1, (vus.length * pas * pas) / surface);
   const assezVu = couverture >= COUVERTURE_MIN;
-  const debout = vus.filter((h) => h >= HAUTEUR_HABITABLE).length / vus.length;
+  const debout = toutes.filter((h) => h >= HAUTEUR_HABITABLE).length / toutes.length;
   return {
     hMin: arrondi(hMin),
     hMax: arrondi(hMax),
@@ -113,6 +184,7 @@ export function plafondDeLaPiece(
     rampant: assezVu && hMax - hMin >= ECART_RAMPANT,
     surfaceHabitable: assezVu ? arrondi(surface * debout) : null,
     solAuReleve: arrondi(surface),
+    ...(estimes.length > 0 ? { estime: arrondi(Math.min(1, (estimes.length * pas * pas) / surface)) } : {}),
   };
 }
 
@@ -302,7 +374,7 @@ export function ficheDeLaPiece(p: {
   const mursBruts = p.murs.reduce((s, w) => s + segLength(w) * w.height, 0);
   const mursNets =
     p.contour.length >= 3
-      ? mursNetsDe(p.contour, hauteur, baiesDeLaPiece({ walls: p.murs }, p.ouvertures))
+      ? mursNetsDe(p.contour, hauteurLue(plafond) ?? hMurs, baiesDeLaPiece({ walls: p.murs }, p.ouvertures), p.murs)
       : Math.max(0, mursBruts - siennes.reduce((s, o) => s + aireOuv(o), 0));
   const perimetre =
     p.contour.length >= 3

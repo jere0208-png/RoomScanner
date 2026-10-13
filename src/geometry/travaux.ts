@@ -134,13 +134,51 @@ export function baiesDeLaPiece(part: Pick<RoomPart, 'walls'>, baies: WallSeg[]):
  * chaque baie à sa hauteur (jamais plus haute que le mur). L'écran, la
  * fiche, le PDF et le tableur passent tous par ici.
  */
-export function mursNetsDe(contour: Pt[], hauteur: number, baies: WallSeg[]): number {
+export function mursNetsDe(
+  contour: Pt[],
+  hauteur: number,
+  baies: WallSeg[],
+  /**
+   * LES MURS DE LA PIÈCE, CHACUN À SA HAUTEUR — revues « Léon » et
+   * « Malik » : le tour de la pièce se multipliait par la hauteur de son
+   * plus haut mur. Sous les toits, la jambette de 1,10 m comptait 2,55 m ;
+   * dans le loft, la cloison de la chambre (2,60 m) comptait 5 m. Chaque
+   * côté du contour prend la hauteur du mur qui le porte.
+   */
+  murs?: readonly WallSeg[],
+): number {
   if (contour.length < 3 || !(hauteur > 0)) return 0;
   const trous = baies.reduce(
     (t, o) => t + Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z) * Math.min(o.height || 0, hauteur),
     0,
   );
-  return Math.max(0, perimetre(contour) * hauteur - trous);
+  if (!murs || murs.length === 0) return Math.max(0, perimetre(contour) * hauteur - trous);
+  let aire = 0;
+  for (let i = 0; i < contour.length; i++) {
+    const a = contour[i];
+    const b = contour[(i + 1) % contour.length];
+    const L = Math.hypot(b.x - a.x, b.z - a.z);
+    if (L < 1e-9) continue;
+    const u = { x: (b.x - a.x) / L, z: (b.z - a.z) / L };
+    const m = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+    let h = hauteur;
+    let mieux = Infinity;
+    for (const w of murs) {
+      if (w.type !== undefined && w.type !== 'wall') continue;
+      const lw = Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z);
+      if (lw < 1e-9) continue;
+      if (Math.abs((u.x * (w.b.x - w.a.x) + u.z * (w.b.z - w.a.z)) / lw) < 0.95) continue;
+      const t = ((m.x - w.a.x) * (w.b.x - w.a.x) + (m.z - w.a.z) * (w.b.z - w.a.z)) / (lw * lw);
+      if (t < -0.05 || t > 1.05) continue;
+      const d = Math.abs(((m.x - w.a.x) * -(w.b.z - w.a.z) + (m.z - w.a.z) * (w.b.x - w.a.x)) / lw);
+      if (d <= 0.35 && d < mieux) {
+        mieux = d;
+        h = Math.min(w.height, hauteur);
+      }
+    }
+    aire += L * h;
+  }
+  return Math.max(0, aire - trous);
 }
 
 /**
@@ -223,7 +261,7 @@ export function travauxDesPieces(
       }
     }
     // Une baie ne monte pas plus haut que le mur qui la porte.
-    const murs = mursNetsDe(contour, hauteur, siennes);
+    const murs = mursNetsDe(contour, hauteur, siennes, part.walls);
     const decor = decorDe?.(part.roomId);
     out.push({
       roomId: part.roomId,

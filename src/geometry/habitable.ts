@@ -20,7 +20,7 @@
 import type { RoomPart } from './floorplan';
 import { hauteurDeLaPiece } from './floorplan';
 import type { PlafondDeLaPiece } from './fichePiece';
-import { HAUTEUR_HABITABLE } from './fichePiece';
+import { COUVERTURE_MIN, HAUTEUR_HABITABLE } from './fichePiece';
 
 type PtSol = { x: number; z: number };
 
@@ -82,7 +82,7 @@ const COUVERTURE_SURE = 0.8;
 
 /** Ce qui ne compte pas, d'après le nom qu'on a donné à la pièce. */
 const HORS_LOGEMENT =
-  /garage|cave|cellier|local|chaufferie|buanderie ext|balcon|terrasse|loggia|v[ée]randa|jardin d.hiver|remise|sous-sol|combles?|grenier|abri|atelier ext/i;
+  /garage|cave|local|chaufferie|buanderie ext|balcon|terrasse|loggia|v[ée]randa|jardin d.hiver|remise|sous-sol|combles?|grenier|abri|atelier ext/i;
 /*
   MAIS UNE PIÈCE HABITÉE LE RESTE — revue « Sébastien » : « Chambre sous
   combles », « Combles aménagés », « Grenier aménagé », « Bureau (ancien
@@ -152,6 +152,14 @@ export function surfacesHabitables(
     if (horsLogement(nom)) {
       habitable = 0;
       raison = `${nom} : garage, cave, balcon et annexes ne comptent pas`;
+    } else if (plafond && plafond.couverture >= COUVERTURE_MIN && plafond.hMin >= HAUTEUR_HABITABLE) {
+      /*
+        TOUT LE PLAFOND EST AU-DESSUS DE 1,80 M : TOUT COMPTE — revue
+        « Malik » : sur la mezzanine, le débord du plafond du loft passait
+        pour un rampant, et les garde-corps de 1,05 m pour des murs bas ; la
+        pièce restait « à vérifier », sous un plafond partout à 2,40 m. Un
+        muret ou un garde-corps n'est pas une jambette.
+      */
     } else if (plafond?.rampant && plafond.surfaceHabitable !== null) {
       /*
         L'HABITABLE SUIT LA RETOUCHE — revue « Sébastien » : un pignon reculé
@@ -173,7 +181,10 @@ export function surfacesHabitables(
       */
       if (plafond.couverture < COUVERTURE_SURE) {
         aVerifier = true;
-        raison = `la part sous 1,80 m ne compte pas — plafond vu à ${Math.round(plafond.couverture * 100)} %, à vérifier`;
+        // Le bas du rampant, quand il n'a pas été vu, est déduit de sa pente.
+        raison = plafond.estime
+          ? `la part sous 1,80 m ne compte pas — plafond vu à ${Math.round(plafond.couverture * 100)} %, le bas du rampant déduit de sa pente : à vérifier`
+          : `la part sous 1,80 m ne compte pas — plafond vu à ${Math.round(plafond.couverture * 100)} %, à vérifier`;
       }
     } else if (
       plafond &&

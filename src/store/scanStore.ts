@@ -258,8 +258,10 @@ function releveDeLaPiece(
   r: ScanResult,
   contour: { x: number; z: number }[],
   aire: number,
+  /** Les murs de la pièce, dans le repère du scan : ses jambettes (voir `plafondDeLaPiece`). */
+  murs: readonly { a: Pt; b: Pt; height: number }[] = [],
 ): RoomEntry['releve'] | undefined {
-  const plafond = plafondDeLaPiece(r.maillage?.volume, contour, aire);
+  const plafond = plafondDeLaPiece(r.maillage?.volume, contour, aire, murs);
   const surfaceSol = solReleveDe(r.sols, contour);
   return plafond || surfaceSol ? { plafond, surfaceSol } : undefined;
 }
@@ -3445,7 +3447,15 @@ export const useScanStore = create<ScanState>((set, get) => {
         les perdait. Le contour, décalé dans le plan, se relit dans le
         repère brut du scan.
       */
-      const releve = releveDeLaPiece(r, s.outline.map((p) => ({ x: p.x - dx, z: p.z - dz })), s.area);
+      const versLeBrutEtage = (p: Pt) => ({ x: p.x - dx, z: p.z - dz });
+      const releve = releveDeLaPiece(
+        r,
+        s.outline.map(versLeBrutEtage),
+        s.area,
+        walls
+          .filter((w) => s.wallIds.includes(w.id))
+          .map((w) => ({ a: versLeBrutEtage(w.a), b: versLeBrutEtage(w.b), height: w.height })),
+      );
       return {
         id: idPiece(i),
         name: noms[i],
@@ -7162,7 +7172,10 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Le plafond relevé par ce passage (dans le repère de l'iPhone), ou
         // celui du passage d'avant.
         const brut = sh.outline.map(versLeBrut);
-        const releve = releveDeLaPiece(r, brut, sh.area) ?? garde?.releve;
+        const sesMurs = walls
+          .filter((w) => sh.wallIds.includes(w.id))
+          .map((w) => ({ a: versLeBrut(w.a), b: versLeBrut(w.b), height: w.height }));
+        const releve = releveDeLaPiece(r, brut, sh.area, sesMurs) ?? garde?.releve;
         return {
           id: idPiece(i),
           name: garde?.name || auto[i],
@@ -7620,7 +7633,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const photosAuto = photosDesMurs(r.photosMurs ?? [], surfaces, walls);
       const names = nameRooms(kinds, shapes.map((s) => s.outline));
       const kept: RoomEntry[] = shapes.map((s, i) => {
-        const releve = releveDeLaPiece(r, s.outline, s.area);
+        const releve = releveDeLaPiece(r, s.outline, s.area, walls.filter((w) => s.wallIds.includes(w.id)));
         return {
           id: `room-${i + 1}`,
           name: names[i],
