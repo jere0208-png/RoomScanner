@@ -1108,6 +1108,14 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       if !dessus.isEmpty {
         sortie["dessus"] = dessus
       }
+      /*
+        L'ENCADREMENT RÉEL DES BAIES : où le mur plein reprend, de chaque côté
+        et sous l'appui (voir `profilsDesTableaux`).
+      */
+      let tableaux = RoomScanMaillage.profilsDesTableaux(sommets: sommets, baies: baies, trajet: chemin)
+      if !tableaux.isEmpty {
+        sortie["tableaux"] = tableaux
+      }
       resolve?(sortie)
     }
   }

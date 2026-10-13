@@ -346,6 +346,129 @@ enum RoomScanMaillage {
     return out
   }
 
+  // MARK: - L'encadrement réel des baies
+
+  /// Les tableaux et l'appui se lisent de dix centimètres DANS la baie…
+  static let depuisLeBord: Float = -0.10
+  /// … à trente centimètres sur le mur : vingt tranches de deux centimètres.
+  static let tranchesDuBord = 20
+
+  /**
+   L'ENCADREMENT RÉEL DE CHAQUE BAIE — relevé du patron, vidéo d'un scan à
+   l'appui : « l'encadrement de l'ouvrant n'est pas correctement pris en
+   compte ; il y a une marge de quelques centimètres que le scan ne repère
+   pas, pourtant bien visible à l'écran ».
+
+   RoomPlan cadre la baie à quelques centimètres près : son rectangle tombe
+   sur la face du linteau, au milieu du tableau. Le maillage voit où le mur
+   plein reprend. Pour chaque côté de la baie (gauche : vers le bout A,
+   droite : vers le bout B) et pour son appui, on range les sommets en
+   tranches de deux centimètres, de dix centimètres dans la baie à trente
+   sur le mur, et l'on garde de chaque tranche l'écart médian au plan de la
+   baie (cm, positif vers la pièce) et le nombre de points. Les côtés se
+   lisent sur la hauteur de la baie, quinze centimètres retirés en haut et
+   en bas ; l'appui sur sa largeur, dix centimètres retirés à chaque bout.
+   Le JavaScript lit où le mur reprend (`geometry/logique`).
+   */
+  static func profilsDesTableaux(
+    sommets: [SIMD3<Float>], baies: [Baie], trajet: [Float]
+  ) -> [String: [String: Any]] {
+    var out: [String: [String: Any]] = [:]
+    guard !sommets.isEmpty else { return out }
+    let n = tranchesDuBord
+    for baie in baies {
+      let t = baie.transform
+      let c = SIMD3<Float>(t.columns.3.x, t.columns.3.y, t.columns.3.z)
+      var ex = SIMD3<Float>(t.columns.0.x, 0, t.columns.0.z)
+      guard simd_length(ex) > 1e-4, baie.largeur > 0.3, baie.hauteur > 0.3 else { continue }
+      ex = simd_normalize(ex)
+      var nz = SIMD3<Float>(-ex.z, 0, ex.x)
+      let demi = baie.largeur / 2
+      let bas = c.y - baie.hauteur / 2
+      let haut = c.y + baie.hauteur / 2
+
+      // Le côté de la pièce : celui où la caméra est passée, à moins de 4 m.
+      var devant = 0
+      var derriere = 0
+      var i = 0
+      while i + 1 < trajet.count {
+        let dx = trajet[i] - c.x
+        let dz = trajet[i + 1] - c.z
+        if dx * dx + dz * dz < 16 {
+          let s = dx * nz.x + dz * nz.z
+          if s > 0.1 { devant += 1 } else if s < -0.1 { derriere += 1 }
+        }
+        i += 2
+      }
+      let oriente = devant + derriere >= 3 && devant != derriere
+      if oriente && derriere > devant { nz = -nz }
+
+      var gaucheT = [[Float]](repeating: [], count: n)
+      var droiteT = [[Float]](repeating: [], count: n)
+      var dessousT = [[Float]](repeating: [], count: n)
+      for p in sommets {
+        let dx = p.x - c.x
+        let dz = p.z - c.z
+        let w = dx * nz.x + dz * nz.z
+        guard abs(w) <= 0.6 else { continue }
+        let e = oriente ? w : abs(w)
+        let u = dx * ex.x + dz * ex.z
+        if p.y >= bas + 0.15 && p.y <= haut - 0.15 {
+          let vd = u - demi - depuisLeBord
+          if vd >= 0 {
+            let k = Int(vd / pasDuProfil)
+            if k < n { droiteT[k].append(e) }
+          }
+          let vg = -u - demi - depuisLeBord
+          if vg >= 0 {
+            let k = Int(vg / pasDuProfil)
+            if k < n { gaucheT[k].append(e) }
+          }
+        }
+        if abs(u) <= demi - 0.1 {
+          let vb = bas - depuisLeBord - p.y
+          if vb >= 0 {
+            let k = Int(vb / pasDuProfil)
+            if k < n { dessousT[k].append(e) }
+          }
+        }
+      }
+      func medianes(_ tranches: [[Float]]) -> ([Int], [Int]) {
+        var m = [Int]()
+        var comptes = [Int]()
+        for x in tranches {
+          comptes.append(x.count)
+          if x.isEmpty {
+            m.append(0)
+          } else {
+            let s = x.sorted()
+            m.append(Int((s[s.count / 2] * 100).rounded()))
+          }
+        }
+        return (m, comptes)
+      }
+      let (gauche, nombresGauche) = medianes(gaucheT)
+      let (droite, nombresDroite) = medianes(droiteT)
+      let (dessous, nombresDessous) = medianes(dessousT)
+      let vu = nombresGauche.contains(where: { $0 > 0 })
+        || nombresDroite.contains(where: { $0 > 0 })
+        || nombresDessous.contains(where: { $0 > 0 })
+      guard vu else { continue }
+      out[baie.id] = [
+        "pas": pasDuProfil,
+        "depuis": depuisLeBord,
+        "gauche": gauche,
+        "nombresGauche": nombresGauche,
+        "droite": droite,
+        "nombresDroite": nombresDroite,
+        "dessous": dessous,
+        "nombresDessous": nombresDessous,
+        "oriente": oriente,
+      ]
+    }
+    return out
+  }
+
   static func volume(sol: [Float], plafond: [SIMD2<Int32>: SIMD2<Float>]) -> [String: Any]? {
     guard sol.count >= 20, !plafond.isEmpty else { return nil }
     let tries = sol.sorted()

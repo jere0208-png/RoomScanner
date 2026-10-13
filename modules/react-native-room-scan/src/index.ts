@@ -214,6 +214,27 @@ export interface ScanResult {
     }
   >;
   /**
+   * L'ENCADREMENT RÉEL DE CHAQUE BAIE, par identifiant de surface : à
+   * travers chaque tableau (gauche vers le bout A, droite vers le bout B) et
+   * sous l'appui, l'écart du maillage au plan de la baie, tranche par
+   * tranche — c'est là qu'on lit où le mur plein reprend (voir
+   * `geometry/logique`).
+   */
+  tableaux?: Record<
+    string,
+    {
+      pas: number;
+      depuis: number;
+      gauche: number[];
+      nombresGauche: number[];
+      droite: number[];
+      nombresDroite: number[];
+      dessous?: number[];
+      nombresDessous?: number[];
+      oriente?: boolean;
+    }
+  >;
+  /**
    * LES SOLS QUE ROOMPLAN A MESURÉS (iOS 17) : le polygone exact de chacun,
    * à plat (`[x0, z0, x1, z1…]`), et sa hauteur.
    */

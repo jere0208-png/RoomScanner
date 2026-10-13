@@ -98,6 +98,7 @@ import {
   type WallSeg,
 } from '../geometry/floorplan';
 import { avecCoffresDuLidar } from '../geometry/coffreLidar';
+import { avecLesBordsDuLidar, releveLogique } from '../geometry/logique';
 import type { MurDouteux } from '../geometry/murDouteux';
 import { reunirLesCanapesDAngle } from '../geometry/canapeAngle';
 import { calerDansLaNiche, calerLesMeubles } from '../geometry/niche';
@@ -3297,9 +3298,14 @@ export const useScanStore = create<ScanState>((set, get) => {
     const entrants = r.rooms?.length
       ? r.rooms.flatMap((x) => x.objects ?? [])
       : r.objects ?? [];
-    // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR.
-    const segments = avecCoffresDuLidar(surfaces.map((s) => toSegment(s)), r.dessus);
-    const bruts = sansEclats(
+    // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR ;
+    // et l'encadrement réel de chaque baie (voir `geometry/logique`).
+    const segments = avecLesBordsDuLidar(
+      avecCoffresDuLidar(surfaces.map((s) => toSegment(s)), r.dessus),
+      r.dessus,
+      r.tableaux,
+    );
+    const nettoyes = sansEclats(
       mergeColinear(
         splitAtJunctions(
           weldCorners(
@@ -3309,11 +3315,14 @@ export const useScanStore = create<ScanState>((set, get) => {
       ),
       [],
     ).walls;
-    if (bruts.length === 0) {
+    if (nettoyes.length === 0) {
       set({ processing: false, scanning: false, etageEnCours: null });
       return;
     }
-    const ouverturesBrutes = segments.filter((s) => s.type !== 'wall');
+    // La logique de construction : d'équerre, sur des niveaux communs.
+    const logique = releveLogique(nettoyes, segments.filter((s) => s.type !== 'wall'));
+    const bruts = logique.walls;
+    const ouverturesBrutes = logique.openings;
 
     const emprise = (ws: WallSeg[]) => {
       const xs = ws.flatMap((w) => [w.a.x, w.b.x]);
@@ -6924,14 +6933,18 @@ export const useScanStore = create<ScanState>((set, get) => {
       const decaler = <T extends WallSeg>(w: T): T =>
         dx === 0 && dz === 0 && angle === 0 ? w : { ...w, a: placer(w.a), b: placer(w.b) };
       // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR.
-      const segments = avecCoffresDuLidar(surfaces.map((x) => toSegment(x)), r.dessus).map(decaler);
+      const segments = avecLesBordsDuLidar(
+        avecCoffresDuLidar(surfaces.map((x) => toSegment(x)), r.dessus),
+        r.dessus,
+        r.tableaux,
+      ).map(decaler);
       /*
         LA CLOISON MITOYENNE EST VUE DEUX FOIS — une fois depuis chaque
         pièce. Sans les réunir, chaque arête doublée fausse le parcours des
         faces, et le logement ressort en une seule pièce, ou en aucune.
       */
       // Les éclats de 0 cm que la soudure des coins laisse s'en vont (voir `ECLAT`).
-      const venus = sansEclats(
+      const nettoyes = sansEclats(
         mergeColinear(
           splitAtJunctions(
             weldCorners(
@@ -6941,11 +6954,14 @@ export const useScanStore = create<ScanState>((set, get) => {
         ),
         [],
       ).walls;
-      if (venus.length === 0) {
+      if (nettoyes.length === 0) {
         // Rien d'exploitable : on rend le plan tel qu'il était.
         set({ processing: false, scanning: false, screen: 'result' });
         return;
       }
+      // La logique de construction : d'équerre, sur des niveaux communs.
+      const logique = releveLogique(nettoyes, segments.filter((x) => x.type !== 'wall'));
+      const venus = logique.walls;
       const jeu = jeuDuNiveau(st, n);
       /*
         CES PASSAGES SONT-ILS CEUX DU PLAN ? — revues « Agathe » et « Inès ».
@@ -6984,7 +7000,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`),
       // et la porte collée à l'angle, dégagée du mur d'angle (voir
       // `baiesHorsDesAngles`).
-      const baiesVenues = baiesHorsDesAngles(baiesVitrees(segments.filter((x) => x.type !== 'wall'), walls), walls);
+      const baiesVenues = baiesHorsDesAngles(baiesVitrees(logique.openings, walls), walls);
       const milieu = (o: WallSeg) => ({ x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 });
       const baiesALaMain = jeu.openings.filter(
         (o) =>
@@ -7456,8 +7472,13 @@ export const useScanStore = create<ScanState>((set, get) => {
         : r.objects ?? [];
       const floor = r.floor ?? r.rooms?.[0]?.floor ?? null;
 
-      // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR.
-      const segments = avecCoffresDuLidar(surfaces.map((s) => toSegment(s)), r.dessus);
+      // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR ;
+      // et l'encadrement réel de chaque baie (voir `geometry/logique`).
+      const segments = avecLesBordsDuLidar(
+        avecCoffresDuLidar(surfaces.map((s) => toSegment(s)), r.dessus),
+        r.dessus,
+        r.tableaux,
+      );
       // Souder les coins, COUPER les murs là où une cloison vient buter
       // (sans ça aucun cycle ne passe par elle et tout l'appartement ressort
       // en une seule pièce), recoller les morceaux alignés, PUIS chercher les
@@ -7469,16 +7490,24 @@ export const useScanStore = create<ScanState>((set, get) => {
         l'étage les réunissaient ; ici, les deux pièces ressortaient en une
         seule, ouverte, « deux murs se superposent ».
       */
-      const walls = sansEclats(
+      const nettoyes = sansEclats(
         mergeColinear(
           splitAtJunctions(weldCorners(fusionnerMursDoubles(segments.filter((s) => s.type === 'wall')))),
         ),
         [],
       ).walls;
+      /*
+        LA LOGIQUE DE CONSTRUCTION — relevé du patron : « même si le scan
+        repère quelques centimètres de différence, il doit les réaligner ».
+        Les murs d'équerre et à la même hauteur, les baies sur leurs niveaux
+        communs (voir `geometry/logique`).
+      */
+      const logique = releveLogique(nettoyes, segments.filter((s) => s.type !== 'wall'));
+      const walls = logique.walls;
       // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`),
       // et la porte collée à l'angle, dégagée du mur d'angle (voir
       // `baiesHorsDesAngles`).
-      const openings = baiesHorsDesAngles(baiesVitrees(segments.filter((s) => s.type !== 'wall'), walls), walls);
+      const openings = baiesHorsDesAngles(baiesVitrees(logique.openings, walls), walls);
 
       // Détection automatique : les pièces sont les faces du graphe des murs.
       // Si rien ne se referme (scan trop partiel), tout tient en une pièce.

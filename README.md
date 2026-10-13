@@ -14285,6 +14285,52 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## La logique de construction : l'encadrement réel, les niveaux communs
+
+Le patron a envoyé la vidéo d'un scan sur chantier : une baie dans un mur
+de briques, sous un linteau en béton. Le cadre de RoomPlan ne collait pas
+au vrai tableau. En haut, il passait sur la face du linteau, 5 à 7 cm
+au-dessus de l'arête réelle ; sur les côtés, il tombait au milieu du
+tableau. Les ouvrants voisins, scannés ensuite, sortaient tous à quelques
+centimètres l'un de l'autre, là où un bâtiment les aligne. Sa consigne :
+« Fais ça pour toute détection, que ce soit les murs, les portes et
+autres : une logique imparable en termes de construction. »
+(`geometry/logique`).
+
+**L'encadrement réel, lu dans le maillage LiDAR.**
+- Au-dessus de chaque baie, le natif mesurait déjà le relief, pour le coffre
+  de volet. On y lit maintenant où le mur plein reprend : le haut de la baie
+  se recale sous le vrai linteau.
+- Le natif mesure aussi, de la même façon, à travers chaque tableau et sous
+  l'appui (`profilsDesTableaux`, relevé `tableaux`). Les côtés se recalent
+  sur les tableaux et l'appui sur la pierre.
+- Une arête n'est retenue que si le maillage montre un creux (le dehors, ou
+  la menuiserie en retrait) puis trois tranches de mur plein. Le recalage
+  est de 10 cm au plus. Un haut déjà repris par un coffre de volet ne bouge
+  pas.
+
+**Les niveaux communs.** Ce qui ne diffère que de l'erreur du scan prend
+une seule valeur, au centimètre (la médiane de la grappe) :
+- les murs à moins de 3° de la trame du logement se mettent d'équerre ;
+- les hauts et les pieds de murs à moins de 3 cm l'un de l'autre se
+  rejoignent ;
+- les linteaux à moins de 4 cm s'alignent, de même que les appuis des
+  fenêtres ;
+- les baies d'une même nature larges à 2 cm près prennent la même largeur,
+  autour de leur milieu ;
+- une porte, un passage ou une porte-fenêtre à moins de 8 cm du sol part du
+  sol.
+
+Au-delà de ces tolérances, l'écart est réel et il reste : une imposte, un
+mur de jambette, un pan coupé, une baie en biais. Une valeur seule ne
+bouge pas.
+
+Le passage s'applique à chaque scan : le relevé, un passage de plus, un
+étage. Ce qui a été tracé à la main n'est pas touché.
+
+Banc : `logiqueconstruction`. Le relevé natif des tableaux se vérifiera sur
+l'iPhone.
+
 ## Les étages rouverts sans dommage, recalés avec leurs passages
 
 **Rouvrir une maison à étages ne l'abîme plus** (Nadia). Le défaut était
