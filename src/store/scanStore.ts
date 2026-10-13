@@ -254,6 +254,13 @@ export interface RoomEntry {
  * LE RELEVÉ D'UNE PIÈCE, TIRÉ DU SCAN — le plafond dans son contour, le sol
  * que RoomPlan y a mesuré. `undefined` quand le scan n'en dit rien.
  */
+/** Les portes qui mènent à une pièce non relevée (voir `geometry/traversee`). */
+function marquerLesPortes<O extends WallSeg>(openings: O[], r: ScanResult): O[] {
+  const ids = new Set(r.portesVersNonReleve ?? []);
+  if (ids.size === 0) return openings;
+  return openings.map((o) => (ids.has(o.id) ? { ...o, versNonReleve: true } : o));
+}
+
 function releveDeLaPiece(
   r: ScanResult,
   contour: { x: number; z: number }[],
@@ -1002,6 +1009,7 @@ function separerLeMobilier(
   if (objects.length < 2) return objects;
   const bouges = separerMeubles(
     objects.map((o) => ({
+      category: o.category,
       cx: o.transform[12],
       cz: o.transform[14],
       width: o.width,
@@ -7078,7 +7086,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`),
       // et la porte collée à l'angle, dégagée du mur d'angle (voir
       // `baiesHorsDesAngles`).
-      const baiesVenues = baiesHorsDesAngles(baiesVitrees(logique.openings, walls), walls);
+      const baiesVenues = marquerLesPortes(baiesHorsDesAngles(baiesVitrees(logique.openings, walls), walls), r);
       const milieu = (o: WallSeg) => ({ x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 });
       const baiesALaMain = jeu.openings.filter(
         (o) =>
@@ -7588,7 +7596,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`),
       // et la porte collée à l'angle, dégagée du mur d'angle (voir
       // `baiesHorsDesAngles`).
-      const openings = baiesHorsDesAngles(baiesVitrees(logique.openings, walls), walls);
+      const openings = marquerLesPortes(baiesHorsDesAngles(baiesVitrees(logique.openings, walls), walls), r);
 
       // Détection automatique : les pièces sont les faces du graphe des murs.
       // Si rien ne se referme (scan trop partiel), tout tient en une pièce.
@@ -8614,12 +8622,19 @@ export const useScanStore = create<ScanState>((set, get) => {
         width !== undefined && Number.isFinite(width)
           ? Math.max(0.1, Math.min(6, width))
           : len;
-      const h =
-        height !== undefined && Number.isFinite(height)
-          ? Math.max(0.2, Math.min(3, height))
-          : o.height;
       // L'allège ne bouge pas : c'est le linteau qui monte ou descend.
       const base = o.yCenter - o.height / 2;
+      /*
+        LE LINTEAU NE SORT PAS DU MUR — revue « Malik » : « remonter au niveau
+        des autres » aurait porté la fenêtre de la chambre à 3,20 m sur un
+        mur de 2,40 m. La baie s'arrête sous le haut du mur qui la porte.
+      */
+      const { sol: solDuMur, hauteur: hauteurDuMur } = murPorteurDe(o, st.walls.filter((w) => niveauDe(w) === niveauDe(o)));
+      const plafondDeBaie = Math.max(0.2, hauteurDuMur - (base - solDuMur));
+      const h =
+        height !== undefined && Number.isFinite(height)
+          ? Math.max(0.2, Math.min(3, plafondDeBaie, height))
+          : o.height;
       set({
         openings: st.openings.map((x) =>
           x.id === id
@@ -8814,7 +8829,13 @@ export const useScanStore = create<ScanState>((set, get) => {
       const { sol, hauteur: plafond } = murPorteurDe(o, st.walls.filter((w) => niveauDe(w) === niveauDe(o)));
       let nouvelleBase = base;
       if (type === 'door') nouvelleBase = sol;
-      else if (type === 'window' && base - sol < 0.05) {
+      /*
+        UNE PORTE-FENÊTRE RESTE AU SOL — revue « Amandine » : la porte-fenêtre
+        que RoomPlan avait prise pour une porte, corrigée en « fenêtre »,
+        remontait à 35 cm du sol, posée sur une allège qu'elle n'a pas. Une
+        baie de la hauteur d'une porte qui part du sol reste au sol.
+      */
+      else if (type === 'window' && base - sol < 0.05 && o.height < 1.8) {
         // Bornée au mur : sur un mur bas, une baie haute ne peut pas
         // remonter de 95 cm sans sortir par le plafond.
         nouvelleBase =

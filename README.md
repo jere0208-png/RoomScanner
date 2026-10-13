@@ -14285,6 +14285,38 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les retouches : la porte-fenêtre au sol, l'évier dans son meuble, le DXF d'aplomb
+
+**Les baies corrigées à la main.**
+- Une porte-fenêtre corrigée en « fenêtre » reste au sol (Amandine). Elle
+  remontait à 35 cm, posée sur une allège qu'elle n'a pas.
+- Une baie ne s'agrandit plus au-dessus du mur qui la porte (Malik).
+
+**Les linteaux** (Malik, Hélène).
+- Une baie ne se compare plus qu'aux baies de sa façade. Dans un
+  haussmannien, les fenêtres sur cour (2,56 m) étaient « à remonter » au
+  niveau de celles sur rue (2,91 m).
+- On ne propose plus de remonter une baie au-dessus de son mur. La fenêtre
+  d'une chambre de 2,40 m allait monter à 3,20 m, d'après les baies de
+  l'atelier en double hauteur.
+
+**L'évier dans son meuble** (Amandine). L'évier et la plaque, rendus en
+boîtes dans le plan de travail, étaient « séparés » du meuble qui les porte
+et éjectés de 57 cm à travers le mur. Un appareil tout entier dans
+l'emprise d'un rangement y est encastré.
+
+**La porte d'une pièce non relevée** (Amandine). Le scan écarte ce qu'on
+n'a vu que par une porte, et c'est voulu. Mais seul un bandeau le disait,
+le temps d'une seconde. La porte est maintenant marquée, et le diagnostic
+garde le constat : « Une porte mène à une pièce non relevée », avec le
+geste pour la compléter.
+
+**Le DXF d'aplomb** (Gérard, Bérénice). Comme le PDF, il tourne la
+géométrie sur la trame du logement. Il sortait dans le repère du scan,
+tourné de 17° ou 27°.
+
+Banc : `tournee5divers`.
+
 ## L'habitable sous les toits, la hauteur que le LiDAR a lue
 
 **Le bas du rampant, déduit de sa pente** (Léon). Sous les toits, les bas

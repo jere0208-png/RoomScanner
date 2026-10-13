@@ -283,6 +283,11 @@ export interface ScanResult {
    */
   passages?: number;
   /**
+   * LES PORTES QUI DONNENT SUR CE QUI N'A ÉTÉ VU QUE PAR ELLES — posé côté JS
+   * (`geometry/traversee`) : la pièce derrière n'est pas relevée.
+   */
+  portesVersNonReleve?: string[];
+  /**
    * CE QUE ROOMPLAN DIT DE CHAQUE PIÈCE (iOS 17) : son type
    * (`kitchen`, `bathroom`, `bedroom`, `livingRoom`, `diningRoom`,
    * `unidentified`) et un point qui lui appartient.

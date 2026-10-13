@@ -86,6 +86,11 @@ export interface WallSeg {
    */
   open?: boolean;
   /**
+   * La pièce derrière cette porte n'a été vue que par elle, et n'est pas
+   * relevée (revue « Amandine ») : le diagnostic le garde en mémoire.
+   */
+  versNonReleve?: boolean;
+  /**
    * Confiance de RoomPlan dans cette détection (`low`, `medium`, `high`).
    * C'est lui qui sait le mieux de quoi il doute : le diagnostic du plan
    * s'en sert pour désigner les murs à vérifier.
@@ -1131,19 +1136,51 @@ export function meublesQuiSeChevauchent(
  * gênent pas : ils partagent la place au sol, pas le volume.
  */
 export function separerMeubles<
-  T extends { cx: number; cz: number; width: number; depth: number; yaw: number; y0: number; y1: number },
+  T extends { cx: number; cz: number; width: number; depth: number; yaw: number; y0: number; y1: number; category?: string },
 >(objets: T[]): { index: number; dx: number; dz: number }[] {
   const FRANC = 0.05;
   const bouges = objets.map(() => ({ dx: 0, dz: 0 }));
   const demi = (e: T, n: Pt) =>
     Math.abs(Math.cos(e.yaw) * n.x + Math.sin(e.yaw) * n.z) * (e.width / 2) +
     Math.abs(-Math.sin(e.yaw) * n.x + Math.cos(e.yaw) * n.z) * (e.depth / 2);
+  /*
+    L'ÉVIER EST DANS SON MEUBLE — revue « Amandine » : l'évier et la plaque,
+    que RoomPlan rend en boîtes dans le plan de travail, étaient « séparés »
+    du meuble qui les porte et éjectés de 57 cm à travers le mur. Un
+    appareil tout entier dans l'emprise d'un rangement y est encastré : on
+    ne les sépare pas.
+  */
+  const ENCASTRABLE = /sink|stove|cooktop|oven|dishwasher|washer|dryer|refrigerator/i;
+  const coins = (e: T) => {
+    const c = Math.cos(e.yaw);
+    const s = Math.sin(e.yaw);
+    return [
+      [-1, -1],
+      [1, -1],
+      [1, 1],
+      [-1, 1],
+    ].map(([u, v]) => ({
+      x: e.cx + c * (e.width / 2) * u - s * (e.depth / 2) * v,
+      z: e.cz + s * (e.width / 2) * u + c * (e.depth / 2) * v,
+    }));
+  };
+  const dedans = (p: Pt, e: T, marge: number) => {
+    const c = Math.cos(e.yaw);
+    const s = Math.sin(e.yaw);
+    const dx = p.x - e.cx;
+    const dz = p.z - e.cz;
+    return Math.abs(dx * c + dz * s) <= e.width / 2 + marge && Math.abs(-dx * s + dz * c) <= e.depth / 2 + marge;
+  };
+  const encastre = (a: T, b: T) =>
+    (ENCASTRABLE.test(a.category ?? '') && /storage|cabinet/i.test(b.category ?? '') && coins(a).every((p) => dedans(p, b, 0.05))) ||
+    (ENCASTRABLE.test(b.category ?? '') && /storage|cabinet/i.test(a.category ?? '') && coins(b).every((p) => dedans(p, a, 0.05)));
   // Trois passes : séparer deux meubles peut en rapprocher un troisième.
   for (let passe = 0; passe < 3; passe++) {
     for (let i = 0; i < objets.length; i++) {
       for (let j = i + 1; j < objets.length; j++) {
         const a = { ...objets[i], cx: objets[i].cx + bouges[i].dx, cz: objets[i].cz + bouges[i].dz };
         const b = { ...objets[j], cx: objets[j].cx + bouges[j].dx, cz: objets[j].cz + bouges[j].dz };
+        if (encastre(a, b)) continue;
         // À des étages différents, ils ne se gênent pas.
         const haut = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
         if (haut <= FRANC) continue;
@@ -2540,6 +2577,12 @@ export function linteauxRabotes(
   contours: Pt[][] = [],
   /** Le niveau du sol (celui de RoomPlan est à −1,30 m ; voir `solDesMurs`). */
   sol = 0,
+  /**
+   * Les murs : une baie ne remonte pas plus haut que celui qui la porte
+   * (revue « Malik » : une fenêtre de chambre « à remonter » à 3,20 m sur un
+   * mur de 2,40, d'après les baies de l'atelier en double hauteur).
+   */
+  murs: WallSeg[] = [],
 ): { id: string; linteau: number; actuel: number }[] {
   const dedans = (p: Pt) => contours.some((c) => c.length >= 3 && insidePoly(p, c));
   /** Un côté de la baie est-il hors de toute pièce ? */
@@ -2587,15 +2630,39 @@ export function linteauxRabotes(
   });
   if (baies.length < 2) return [];
   const hautDe = (o: WallSeg) => o.yCenter + o.height / 2;
-  const hauts = baies.map(hautDe).sort((a, b) => b - a);
   const ACCORD = 0.05;
-  const reference = hauts.find(
-    (h) => hauts.filter((x) => x <= h + 1e-9 && h - x <= ACCORD + 1e-9).length >= 2,
-  );
-  if (reference === undefined) return [];
-  return baies
-    .filter((o) => reference - hautDe(o) >= ecartMin - 1e-9)
-    .map((o) => ({ id: o.id, linteau: reference, actuel: hautDe(o) }));
+  /*
+    LES BAIES DE SA FAÇADE — revue « Hélène » : dans un haussmannien, les
+    fenêtres sur cour s'arrêtent à 2,56 m quand celles sur rue montent à
+    2,91 ; l'app proposait d'« un appui » de remonter toutes celles de la
+    cour. Un volet qui pend se trahit au milieu de ses voisines : une baie ne
+    se compare qu'aux autres baies de la même façade, et il faut que deux
+    d'entre elles s'accordent.
+  */
+  const memeFacade = (o: WallSeg, q: WallSeg) => {
+    const L = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z) || 1;
+    const Lq = Math.hypot(q.b.x - q.a.x, q.b.z - q.a.z) || 1;
+    const u = { x: (o.b.x - o.a.x) / L, z: (o.b.z - o.a.z) / L };
+    if (Math.abs((u.x * (q.b.x - q.a.x) + u.z * (q.b.z - q.a.z)) / Lq) < 0.95) return false;
+    const m = { x: (q.a.x + q.b.x) / 2 - o.a.x, z: (q.a.z + q.b.z) / 2 - o.a.z };
+    return Math.abs(m.x * -u.z + m.z * u.x) <= 0.3;
+  };
+  const sousSonMur = (o: WallSeg, reference: number) => {
+    if (murs.length === 0) return true;
+    const m = murDeLOuverture(o, murs);
+    return !m || reference <= m.yCenter + m.height / 2 + 0.02;
+  };
+  return baies.flatMap((o) => {
+    const hauts = baies
+      .filter((q) => q !== o && memeFacade(o, q))
+      .map(hautDe)
+      .sort((a, b) => b - a);
+    const reference = hauts.find(
+      (h) => hauts.filter((x) => x <= h + 1e-9 && h - x <= ACCORD + 1e-9).length >= 2,
+    );
+    if (reference === undefined || reference - hautDe(o) < ecartMin - 1e-9 || !sousSonMur(o, reference)) return [];
+    return [{ id: o.id, linteau: reference, actuel: hautDe(o) }];
+  });
 }
 
 /**

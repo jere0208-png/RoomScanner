@@ -244,11 +244,39 @@ export function sansCeQuOnAVuParLaPorte(r: ScanResult): {
     meubles: objets.length - meublesVus.size,
   };
   if (ecartes.murs + ecartes.ouvertures + ecartes.meubles === 0) return rien;
+  /*
+    LA PORTE QUI DONNE SUR CE QU'ON A ÉCARTÉ — revue « Amandine » : la salle
+    d'eau vue par sa porte disparaît du plan (c'est voulu), mais rien ne le
+    rappelait ensuite. Une porte gardée, derrière laquelle — du côté où la
+    caméra n'est pas passée — des murs ont été écartés, mène à une pièce non
+    relevée : on la nomme, le diagnostic la garde.
+  */
+  const ecartesMurs = murs.filter(({ s }) => !garde.has(s.id)).map(({ g }) => g);
+  const portesVersNonReleve: string[] = [];
+  for (const { s, g } of segs) {
+    if ((s.type !== 'door' && s.type !== 'opening') || !garde.has(s.id)) continue;
+    const L = Math.hypot(g.b.x - g.a.x, g.b.z - g.a.z);
+    if (L < 0.4) continue;
+    const m = { x: (g.a.x + g.b.x) / 2, z: (g.a.z + g.b.z) / 2 };
+    const n = { x: -(g.b.z - g.a.z) / L, z: (g.b.x - g.a.x) / L };
+    const pres = (sens: number) => {
+      const p = { x: m.x + n.x * sens * 0.5, z: m.z + n.z * sens * 0.5 };
+      return Math.min(...chemin.map(c => Math.hypot(c.x - p.x, c.z - p.z)));
+    };
+    const loin = pres(1) > pres(-1) ? 1 : -1;
+    const derriere = ecartesMurs.some(w => {
+      const q = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+      const devant = ((q.x - m.x) * n.x + (q.z - m.z) * n.z) * loin;
+      return devant > 0.2 && Math.hypot(q.x - m.x, q.z - m.z) < 4;
+    });
+    if (derriere) portesVersNonReleve.push(s.id);
+  }
   const surf = (l?: SurfaceData[]) => l?.filter(s => garde.has(s.id));
   const obj = (l?: ObjectData[]) => l?.filter(o => meublesVus.has(o));
   return {
     releve: {
       ...r,
+      ...(portesVersNonReleve.length > 0 ? { portesVersNonReleve } : {}),
       surfaces: surf(r.surfaces),
       objects: obj(r.objects),
       rooms: r.rooms?.map(x => ({

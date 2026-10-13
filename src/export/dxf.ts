@@ -26,6 +26,7 @@ import {
   arcDuBattant,
   epaisseurDe,
   pivotsDesBattants,
+  planFrameAngle,
   retraitDuCoin,
   roomParts,
   segLength,
@@ -144,7 +145,17 @@ const MM = 1000;
  * gauche au lieu de la droite —, une erreur qui ne se voit qu'une fois le
  * mobilier commandé.
  */
-const pt = (p: Pt) => ({ x: p.x * MM, y: -p.z * MM });
+/*
+  LE DESSIN SUR LA TRAME DU LOGEMENT — revues « Gérard » et « Bérénice » : le
+  PDF redressait le plan, le DXF le livrait dans le repère du scan, tourné de
+  17° ou 27°. Comme le PDF, il tourne la géométrie avant de la poser : les
+  murs sortent d'aplomb. Posée à chaque `buildDxf`.
+*/
+let tourner: (p: Pt) => Pt = (p) => p;
+const pt = (p: Pt) => {
+  const q = tourner(p);
+  return { x: q.x * MM, y: -q.z * MM };
+};
 
 /** Une paire code/valeur, la brique unique du format. */
 const paire = (code: number | string, valeur: string | number) =>
@@ -262,6 +273,10 @@ function cercle(calque: string, p: Pt, rayonMm: number): string {
  */
 export function buildDxf(plan: PlanPourDxf): string {
   let out = '';
+  const trame = planFrameAngle(plan.walls);
+  const cosT = Math.cos(-trame);
+  const sinT = Math.sin(-trame);
+  tourner = (p: Pt) => ({ x: p.x * cosT - p.z * sinT, z: p.x * sinT + p.z * cosT });
 
   /* ------------------------------------------------------------ en-tête */
   out += paire(0, 'SECTION') + paire(2, 'HEADER');
@@ -498,13 +513,15 @@ export function buildDxf(plan: PlanPourDxf): string {
     }
     // Le chiffre se lit depuis le bas ou la droite de la feuille, posé du
     // côté de la pièce, à 5 cm de son trait.
-    let angle = (Math.atan2(-u.z, u.x) * 180) / Math.PI;
+    const ur = tourner(u);
+    let angle = (Math.atan2(-ur.z, ur.x) * 180) / Math.PI;
     if (angle > 90.5) angle -= 180;
     if (angle <= -89.5) angle += 180;
     const r = (angle * Math.PI) / 180;
     // Le haut du texte, dans le repère du dessin (y vers le haut), puis du relevé.
     const haut = { x: -Math.sin(r), z: -Math.cos(r) };
-    const versLaPiece = haut.x * n.x + haut.z * n.z > 0;
+    const nr = tourner(n);
+    const versLaPiece = haut.x * nr.x + haut.z * nr.z > 0;
     const H = 0.12;
     const base = sur(sMil, D + 0.05 + (versLaPiece ? 0 : H));
     out += texteCentre(CALQUE.cotes, base, H * MM, angle, `${L.toFixed(2).replace('.', ',')} m`);

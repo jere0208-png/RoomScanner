@@ -141,7 +141,7 @@ export function checkPlan(
     .filter((c): c is NonNullable<typeof c> => !!c && c.length >= 3);
   // Les hauteurs se disent depuis le sol : celui de RoomPlan est à −1,30 m.
   const sol = solDesMurs(walls);
-  for (const r of linteauxRabotes(openings, undefined, contours, sol)) {
+  for (const r of linteauxRabotes(openings, undefined, contours, sol, walls)) {
     issues.push({
       kind: 'linteau',
       severity: 'alerte',

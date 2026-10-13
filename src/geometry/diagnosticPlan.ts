@@ -22,6 +22,7 @@
  * les coordonnées du client, qui ne regardent que l'artisan.
  */
 import { checkPlan } from './diagnostics';
+import { dansLeBati } from './poche';
 import { ECLAT, roomParts, segLength, type Pt, type RoomShape, type WallSeg } from './floorplan';
 
 export interface PlanADiagnostiquer {
@@ -206,6 +207,17 @@ export function pourquoiOuverte(
   return raisons;
 }
 
+/** Le point est-il dans le contour ? Parité des croisements d'un rayon. */
+function dansLeContour(p: Pt, pts: Pt[]): boolean {
+  let dedans = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i];
+    const b = pts[j];
+    if (a.z > p.z !== b.z > p.z && p.x < ((b.x - a.x) * (p.z - a.z)) / (b.z - a.z) + a.x) dedans = !dedans;
+  }
+  return dedans;
+}
+
 export function diagnostiquerPlan(plan: PlanADiagnostiquer): DiagnosticDuPlan {
   const murs = plan.walls.filter((w) => w.type === 'wall');
   const existants = new Set(plan.walls.map((w) => w.id));
@@ -308,6 +320,38 @@ export function diagnostiquerPlan(plan: PlanADiagnostiquer): DiagnosticDuPlan {
           : `${orphelins.length} murs ne bordent aucune pièce`,
       detail: `${longueur.toFixed(1).replace('.', ',')} m de murs que plus aucune pièce ne réclame : une pièce n’a sans doute pas été trouvée. « Redétecter les pièces », ou fermez le coin resté ouvert.`,
       murIds: orphelins.map((w) => w.id),
+    });
+  }
+
+  /*
+    UNE PORTE QUI DONNE SUR UNE PIÈCE NON RELEVÉE — revue « Amandine » : la
+    salle d'eau vue seulement depuis sa porte n'était pas relevée (c'est
+    voulu), mais seul un bandeau, le temps d'une seconde, le disait. Le
+    diagnostic le garde : une porte dont un côté est une pièce et l'autre ni
+    une pièce ni le dehors mène à une pièce qui manque au plan.
+  */
+  const contoursPieces = parts.map((p) => p.surface?.pts ?? []).filter((c) => c.length >= 3);
+  const dansUnePiece = (q: Pt) => contoursPieces.some((c) => dansLeContour(q, c));
+  for (const o of plan.openings) {
+    if (o.type !== 'door' && o.type !== 'opening') continue;
+    const L = segLength(o);
+    if (L < 0.4) continue;
+    const m = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+    const n = { x: -(o.b.z - o.a.z) / L, z: (o.b.x - o.a.x) / L };
+    const cote = (s: number) => ({ x: m.x + n.x * s * 0.45, z: m.z + n.z * s * 0.45 });
+    const [p1, p2] = [cote(1), cote(-1)];
+    const ici = dansUnePiece(p1);
+    const la = dansUnePiece(p2);
+    if (ici === la) continue;
+    const derriere = ici ? p2 : p1;
+    // Derrière, l'intérieur du bâti — ou ce que le scan n'a vu que par elle.
+    if (!o.versNonReleve && !dansLeBati(murs, derriere)) continue;
+    problemes.push({
+      gravite: 'info',
+      code: 'pieceNonRelevee',
+      titre: 'Une porte mène à une pièce non relevée',
+      detail: 'Entrez-y pour la scanner (« Scanner une pièce »), ou dessinez-la (« Ajouter une pièce »).',
+      murIds: [o.id],
     });
   }
 
