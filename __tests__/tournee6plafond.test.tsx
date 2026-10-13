@@ -195,7 +195,7 @@ describe('la cible du ruban sur le plan', () => {
 
 describe('plusieurs choses sous le doigt', () => {
   const DCL: CeilingFixture = { id: 'dcl', kind: 'dcl', roomId: 'room-1', at: { x: 2, z: 1.5 } };
-  function monter(onSelectCeiling: jest.Mock, onSelectObject: jest.Mock) {
+  function monter(onSelectCeiling: jest.Mock, onSelectObject?: jest.Mock, plafond: CeilingFixture[] = [DCL]) {
     useScanStore.setState({
       walls: MURS,
       openings: [],
@@ -213,7 +213,7 @@ describe('plusieurs choses sous le doigt', () => {
       ],
       rooms: ROOMS.map((r) => ({ ...r, name: 'Séjour', floor: null })),
       fixtures: [],
-      ceiling: [DCL],
+      ceiling: plafond,
       photos: [],
       showFurniture: true,
     } as never);
@@ -226,7 +226,7 @@ describe('plusieurs choses sous le doigt', () => {
           editable
           selectedWallId={null}
           onSelectWall={() => {}}
-          ceiling={[DCL]}
+          ceiling={plafond}
           showCeiling
           showFixtures
           onSelectCeiling={onSelectCeiling}
@@ -262,10 +262,42 @@ describe('plusieurs choses sous le doigt', () => {
 
   it('un seul élément sous le doigt : il est pris, sans question', () => {
     const plafond = jest.fn();
-    const { t, conteneur } = monter(plafond, jest.fn());
-    act(() => conteneur.props.onTouchStart({ nativeEvent: { pageX: 5, pageY: 5, locationX: 5, locationY: 5 } }));
+    // Les meubles ne se choisissent pas ici : seule la DCL est sous le doigt.
+    const { t, conteneur } = monter(plafond);
     const dcl = t.root.findAll((n) => n.props.accessibilityLabel === 'Point lumineux DCL')[0];
+    const rond = dcl.findAllByType(Circle)[0];
+    act(() => conteneur.props.onTouchStart({ nativeEvent: { pageX: rond.props.cx, pageY: rond.props.cy, locationX: rond.props.cx, locationY: rond.props.cy } }));
     act(() => dcl.props.onPress());
     expect(plafond).toHaveBeenCalledWith('dcl');
+  });
+
+  /*
+    LE DESSIN NE DÉCIDE PAS SEUL — relevé du patron : « la LED est
+    sélectionnée en cliquant au milieu ». Le moteur du dessin peut donner le
+    doigt au ruban qui fait le tour de la pièce ; la géométrie tranche.
+  */
+  it('le ruban qui fait le tour de la pièce ne prend pas le doigt posé au centre', () => {
+    const plafond = jest.fn();
+    const { t, conteneur } = monter(plafond, undefined, [DCL, RUBAN]);
+    const dcl = t.root.findAll((n) => n.props.accessibilityLabel === 'Point lumineux DCL')[0];
+    const rond = dcl.findAllByType(Circle)[0];
+    act(() => conteneur.props.onTouchStart({ nativeEvent: { pageX: rond.props.cx, pageY: rond.props.cy, locationX: rond.props.cx, locationY: rond.props.cy } }));
+    // Le dessin attribue le toucher au ruban…
+    const ruban = t.root.findAll((n) => n.props.accessibilityLabel === 'Ruban LED')[0];
+    const cible = ruban.findAll((n) => n.type === Path && typeof n.props.onPress === 'function')[0];
+    act(() => cible.props.onPress());
+    // … mais c'est la DCL qui est sous le doigt : c'est elle qu'on prend.
+    expect(plafond).toHaveBeenCalledTimes(1);
+    expect(plafond).toHaveBeenCalledWith('dcl');
+  });
+
+  it('au centre d’une pièce où il n’y a que le ruban, rien n’est pris', () => {
+    const plafond = jest.fn();
+    const { t, conteneur } = monter(plafond, undefined, [RUBAN]);
+    act(() => conteneur.props.onTouchStart({ nativeEvent: { pageX: 200, pageY: 150, locationX: 200, locationY: 150 } }));
+    const ruban = t.root.findAll((n) => n.props.accessibilityLabel === 'Ruban LED')[0];
+    const cible = ruban.findAll((n) => n.type === Path && typeof n.props.onPress === 'function')[0];
+    act(() => cible.props.onPress());
+    expect(plafond).not.toHaveBeenCalled();
   });
 });

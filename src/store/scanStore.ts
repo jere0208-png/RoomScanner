@@ -40,6 +40,7 @@ import {
   mergeColinear,
   sansEclats,
   baiesVitrees,
+  portesVuesOuvertes,
   baiesHorsDesAngles,
   lesPortesDeGarage,
   porteDeGarage,
@@ -3432,7 +3433,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         niveau: n,
       }));
     const walls = pose(bruts);
-    let openings = baiesHorsDesAngles(baiesVitrees(pose(ouverturesBrutes), walls), walls);
+    let openings = baiesHorsDesAngles(baiesVitrees(portesVuesOuvertes(pose(ouverturesBrutes), walls), walls), walls);
 
     const detected = detectRooms(walls, undefined, openings);
     const shapes =
@@ -7123,7 +7124,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`),
       // et la porte collée à l'angle, dégagée du mur d'angle (voir
       // `baiesHorsDesAngles`).
-      const baiesVenues = marquerLesPortes(baiesHorsDesAngles(baiesVitrees(logique.openings, walls), walls), r);
+      const baiesVenues = marquerLesPortes(baiesHorsDesAngles(baiesVitrees(portesVuesOuvertes(logique.openings, walls), walls), walls), r);
       const milieu = (o: WallSeg) => ({ x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 });
       const baiesALaMain = jeu.openings.filter(
         (o) =>
@@ -7634,7 +7635,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`),
       // et la porte collée à l'angle, dégagée du mur d'angle (voir
       // `baiesHorsDesAngles`).
-      let openings = marquerLesPortes(baiesHorsDesAngles(baiesVitrees(logique.openings, walls), walls), r);
+      let openings = marquerLesPortes(baiesHorsDesAngles(baiesVitrees(portesVuesOuvertes(logique.openings, walls), walls), walls), r);
 
       // Détection automatique : les pièces sont les faces du graphe des murs.
       // Si rien ne se referme (scan trop partiel), tout tient en une pièce.

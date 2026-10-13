@@ -2283,7 +2283,24 @@ export function FloorplanEditor({
   /** Le geste d'un élément touché : seul sous le doigt, il agit ; sinon, on demande. */
   const toucher = (defaut: CibleDuPlan, agir: () => void) => {
     const p = dernierToucher.current;
-    const autres = p ? ciblesAuPoint(p).filter((x) => x.cle !== defaut.cle) : [];
+    const ici = p ? ciblesAuPoint(p) : [];
+    /*
+      LE DESSIN NE DÉCIDE PAS SEUL DE CE QU'ON A TOUCHÉ — relevé du patron :
+      « la LED est sélectionnée en cliquant au milieu ». Le moteur du dessin
+      peut attribuer le doigt à un tracé qui fait le tour de la pièce alors
+      qu'on touche son centre. La géométrie tranche : un élément que le
+      doigt ne couvre pas cède la place à ce qui est vraiment dessous, et
+      s'il n'y a rien, rien ne se passe.
+    */
+    if (p && !ici.some((x) => x.cle === defaut.cle)) {
+      if (ici.length === 1) ici[0].choisir();
+      else if (ici.length > 1) {
+        haptic('leger');
+        setChoixSousLeDoigt({ x: p.x, y: p.y, cibles: ici });
+      }
+      return;
+    }
+    const autres = ici.filter((x) => x.cle !== defaut.cle);
     if (!p || autres.length === 0) {
       agir();
       return;
@@ -3961,7 +3978,8 @@ export function FloorplanEditor({
 
           {/* La poignée de l'appareil de plafond choisi : hors du SVG, comme
               celle d'un meuble — un PanResponder ne vit pas dans un tracé. */}
-          {selectedCeilingId &&
+          {editable &&
+            selectedCeilingId &&
             (() => {
               const cl = (ceiling ?? []).find((x) => x.id === selectedCeilingId);
               if (!cl) return null;
@@ -3979,7 +3997,8 @@ export function FloorplanEditor({
             })()}
 
           {/* Une ligne de spots choisie entière : chacun de ses spots la tire d'un bloc. */}
-          {!selectedCeilingId &&
+          {editable &&
+            !selectedCeilingId &&
             selectedCeilingRow &&
             (ceiling ?? [])
               .filter((cl) => cl.row === selectedCeilingRow)

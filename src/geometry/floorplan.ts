@@ -3192,6 +3192,37 @@ export function baiesVitrees<O extends WallSeg>(openings: O[], walls: WallSeg[],
 }
 
 /**
+ * LA PORTE OUVERTE PENDANT LE SCAN EST UNE PORTE — relevé du patron : « j'ai
+ * scanné ma chambre, il a détecté l'ouverture de porte, mais sur le plan
+ * aucune porte n'est placée » ; « ma porte a été détectée comme baie, alors
+ * que taille standard de porte ».
+ *
+ * Un vantail ouvert, plaqué contre le mur, RoomPlan ne le voit pas : il
+ * rend une OUVERTURE, et le plan dessinait un passage, sans battant. Une
+ * ouverture qui a les cotes d'une porte — de 60 cm à 1,05 m de large, de
+ * 1,85 m à 2,35 m de haut, au ras du sol — est une porte, vue ouverte. Plus
+ * large, c'est un vrai passage (une baie libre entre séjour et cuisine) ;
+ * en hauteur, une niche ou un passe-plat.
+ */
+export const PORTE_LARGEUR = { min: 0.6, max: 1.05 };
+export const PORTE_HAUTEUR = { min: 1.85, max: 2.35 };
+
+export function portesVuesOuvertes<O extends WallSeg>(openings: O[], walls: WallSeg[]): O[] {
+  let change = false;
+  const out = openings.map((o) => {
+    if (o.type !== 'opening') return o;
+    const l = segLength(o);
+    if (l < PORTE_LARGEUR.min || l > PORTE_LARGEUR.max) return o;
+    if (o.height < PORTE_HAUTEUR.min || o.height > PORTE_HAUTEUR.max) return o;
+    const bas = o.yCenter - o.height / 2 - murPorteurDe(o, walls).sol;
+    if (bas > 0.15) return o;
+    change = true;
+    return { ...o, type: 'door' as const, open: true };
+  });
+  return change ? out : openings;
+}
+
+/**
  * LE GARAGE SE RECONNAÎT À SA PORTE — revue « Bérénice » : le garage de la
  * villa ressortait « Pièce 2 », compté habitable (29,8 m² de trop dans
  * l'en-tête), et sa porte sectionnelle de 2,40 m, prise pour une baie, se

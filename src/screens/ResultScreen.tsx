@@ -1333,6 +1333,13 @@ export function ResultScreen() {
   const showPhotos = useScanStore((s) => s.showPhotos);
   const showNotes = useScanStore((s) => s.showNotes);
   const [editMode, setEditMode] = useState(false);
+  // En sortant de l'édition, le plafond choisi se lâche : hors édition, il
+  // ne se prend pas (voir `onSelectCeiling`).
+  useEffect(() => {
+    if (editMode) return;
+    setSelCeiling(null);
+    setSelRow(null);
+  }, [editMode]);
   /**
    * Jeu de pastilles affiché. Il RETARDE sur `editMode` : les anciennes
    * pastilles rentrent d'abord dans le bouton d'édition, les nouvelles en
@@ -4635,7 +4642,13 @@ export function ResultScreen() {
               haptic('succes');
               setPendingCeiling(null);
             }}
-            onSelectCeiling={(id) => {
+            /*
+              HORS ÉDITION, LE PLAFOND NE SE PREND PAS — relevé du patron : « on
+              ne doit pas pouvoir éditer sans être en édition ». Il ne répond
+              qu'à un lien en cours, parti de la fiche d'un interrupteur : c'est
+              le seul geste qui le vise sans le modifier.
+            */
+            onSelectCeiling={editMode || pendingLienMur || pendingLink ? (id) => {
               if (id !== null) {
                 effacerRetour();
                 setSelNote(null);
@@ -4740,7 +4753,7 @@ export function ResultScreen() {
                   },
                 ],
               });
-            }}
+            } : undefined}
             onSelectRoom={(id) => {
               seuleSelection('piece');
               if (id) effacerRetour();

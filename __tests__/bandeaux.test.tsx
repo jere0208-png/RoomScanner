@@ -375,6 +375,8 @@ describe('l’écran des résultats', () => {
    */
   it('prend la LIGNE au premier appui, le spot au second', () => {
     const tree = monter();
+    // Le plafond ne se prend qu'en édition.
+    act(() => bouton(tree, 'Édition')!.props.onPress());
     // Un SPOT, reconnu à son symbole : le disque cerné de quatre rayons.
     // Chercher « un groupe touchable » ne suffit pas — l'appareillage mural
     // en pose aussi, et le banc attrapait une prise TV.
@@ -445,6 +447,8 @@ describe('l’écran des résultats', () => {
    */
   it('la ligne de spots se relie à une commande d’un geste', () => {
     const tree = monter();
+    // Le plafond ne se prend qu'en édition.
+    act(() => bouton(tree, 'Édition')!.props.onPress());
     // Le spot de la légende d'architecte : deux ronds l'un dans l'autre.
     const RAYON = CEILING_SYMBOL.spot[0].d;
     const spot = tree.root
@@ -470,6 +474,8 @@ describe('l’écran des résultats', () => {
 
   it('ouvre le bandeau du plafond quand on touche l’appareil', () => {
     const tree = monter();
+    // Le plafond ne se prend qu'en édition.
+    act(() => bouton(tree, 'Édition')!.props.onPress());
     // Le calque de plafond enveloppe chaque appareil dans un groupe
     // touchable : c'est lui qui porte le geste, pas le disque.
     const groupe = tree.root
@@ -1066,8 +1072,30 @@ describe('l’écran des résultats', () => {
    * Ils occupent la même place au bas de l'écran : deux bandeaux ouverts,
    * c'est l'un sous l'autre, et le second illisible.
    */
+  /*
+   * HORS ÉDITION, LE PLAFOND NE SE PREND PAS — relevé du patron : « on ne
+   * doit pas pouvoir éditer sans être en édition ».
+   */
+  it('hors édition, aucun appareil de plafond ne répond au doigt', () => {
+    const tree = monter();
+    const RAYON = CEILING_SYMBOL.spot[0].d;
+    const touchables = tree.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .filter((n) => n.findAllByType(Path).some((p) => p.props.d === RAYON));
+    expect(touchables).toHaveLength(0);
+    // En édition, si.
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    expect(
+      tree.root
+        .findAll((n) => typeof n.props?.onPress === 'function')
+        .filter((n) => n.findAllByType(Path).some((p) => p.props.d === RAYON)).length,
+    ).toBeGreaterThan(0);
+  });
+
   it('ne montre jamais deux bandeaux à la fois', () => {
     const tree = monter();
+    // Le plafond ne se prend qu'en édition.
+    act(() => bouton(tree, 'Édition')!.props.onPress());
     const groupe = tree.root
       .findAll((n) => typeof n.props?.onPress === 'function')
       .find((n) =>

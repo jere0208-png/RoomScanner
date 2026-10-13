@@ -14285,6 +14285,28 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le plafond ne se prend qu'en édition, la porte ouverte reste une porte
+
+Trois relevés du patron.
+- **« Les éléments plafond sont cliquables même sans édition. »** Hors
+  édition, un appareil de plafond ne répond plus au doigt : ni réglage, ni
+  poignée pour le déplacer. Il ne répond qu'à un lien en cours, parti de la
+  fiche d'un interrupteur. Sortir de l'édition lâche le plafond choisi.
+- **« La LED est sélectionnée en cliquant au milieu. »** Le moteur du dessin
+  pouvait encore donner le doigt au ruban qui fait le tour de la pièce. La
+  géométrie tranche désormais : un élément que le doigt ne couvre pas cède
+  la place à ce qui est vraiment dessous (le point lumineux du centre), et
+  s'il n'y a rien, rien n'est pris.
+- **« Il a détecté l'ouverture de porte, mais aucune porte n'est placée. »**
+  Un vantail ouvert, plaqué contre le mur, RoomPlan ne le voit pas : il rend
+  une ouverture, que le plan dessinait en passage. Une ouverture aux cotes
+  d'une porte (de 60 cm à 1,05 m de large, de 1,85 m à 2,35 m de haut, au
+  ras du sol) devient une porte, vue ouverte (`portesVuesOuvertes`). Cela
+  vaut pour les nouveaux scans : sur un plan déjà enregistré, l'ouverture se
+  change en porte par « Nature ».
+
+Bancs : `portevueouverte` (nouveau), `tournee6plafond`, `bandeaux`.
+
 ## L'épaisseur d'un mur scanné part vers le dehors
 
 RoomPlan relève la face qu'il voit. Les cotes et les surfaces d'un plan
