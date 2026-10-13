@@ -3,6 +3,11 @@
  * « Éclairage 1 » portait dix points, et l'interrupteur de la cuisine partait
  * sur un autre circuit que le plafonnier qu'il allume.
  */
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(async () => null),
+  setItem: jest.fn(async () => undefined),
+  removeItem: jest.fn(async () => undefined),
+}));
 import type { CeilingFixture } from '../src/geometry/ceiling';
 import type { Fixture } from '../src/geometry/electrical';
 import { MAX_LUMIERE, planCircuits } from '../src/geometry/nfc15100';
@@ -100,5 +105,71 @@ describe('le poussoir emporte son télérupteur', () => {
 
   it('sans poussoir, pas de télérupteur', () => {
     expect(buyingList([], [mur('i', 'inter', 'x')], [dcl('c', 'x', ['i'])]).some((r) => r.code === 'telerupteur')).toBe(false);
+  });
+});
+
+describe('les hauteurs suivent les postes', () => {
+  const { checkElectrical } = require('../src/geometry/nfc15100');
+  const hauteurs = (f: Fixture[]) =>
+    (checkElectrical([], f, new Map()) as { code: string; severity: string; fixtureId?: string }[]).filter((c) => c.code === 'hauteur');
+  const a = (id: string, kind: Fixture['kind'], height: number) => ({ ...mur(id, kind, 'x'), height }) as Fixture;
+
+  it('un double interrupteur et l’interrupteur général à 1,60 m alertent, comme le simple', () => {
+    const c = hauteurs([a('i', 'inter', 1.6), a('i2', 'inter2', 1.6), a('ig', 'interGeneral', 1.6)]);
+    expect(c.filter((x) => x.severity === 'alerte').map((x) => x.fixtureId).sort()).toEqual(['i', 'i2', 'ig']);
+  });
+
+  it('une prise triple à 2 cm du sol alerte', () => {
+    expect(hauteurs([a('p3', 'prise3', 0.02)])[0]?.severity).toBe('alerte');
+  });
+
+  it('une prise à 1,80 m (télévision murale) n’est qu’une information', () => {
+    expect(hauteurs([a('p', 'prise', 1.8)])[0]?.severity).toBe('info');
+  });
+});
+
+describe('le bordereau', () => {
+  it('deux prises sous une même plaque se posent comme une prise double', () => {
+    const { estimerLaPose } = require('../src/geometry/mainDOeuvre');
+    const { ENTRAXE } = require('../src/geometry/electrical');
+    const p1 = { ...mur('a', 'prise', 'w'), along: 1, height: 0.3 } as Fixture;
+    const p2 = { ...mur('b', 'prise', 'w'), along: 1 + ENTRAXE, height: 0.3 } as Fixture;
+    const double = { ...mur('d', 'prise2', 'w'), along: 3, height: 0.3 } as Fixture;
+    const r = { taux: 50, chantier: 'renovation' };
+    expect(estimerLaPose([p1, p2], [], 0, r).heures).toBeCloseTo(estimerLaPose([double], [], 0, r).heures, 2);
+  });
+
+  it('un différentiel de 25 A se dit 25 A', () => {
+    const diffs = [{ label: 'D', type: 'AC', rating: 25, circuits: [] }, { label: 'A', type: 'A', rating: 40, circuits: [] }] as never[];
+    const d = chiffrer([], [], diffs, 'dooxie');
+    expect(d.lignes.some((l) => /différentiel 25 A 30 mA type AC/.test(l.libelle))).toBe(true);
+    expect(d.lignes.some((l) => /différentiel 40 A 30 mA type AC/.test(l.libelle))).toBe(false);
+  });
+});
+
+describe('l’applique murale et la boîte de dérivation', () => {
+  it('prennent une boîte de dérivation, sans plaque ni mécanisme', () => {
+    const l = buyingList([], [mur('ap', 'applique', 'w'), mur('bd', 'boite', 'w')], []);
+    expect(l.find((r) => r.code === 'boite-derivation')?.quantity).toBe(2);
+    expect(l.some((r) => r.code === 'boite-encastrement' || (r.code ?? '').startsWith('plaque-'))).toBe(false);
+    expect(l.some((r) => r.code === 'meca-applique' || r.code === 'meca-boite')).toBe(false);
+  });
+});
+
+describe('une prise posée devant un plan de travail', () => {
+  it('part à 1,10 m, pas derrière le meuble', () => {
+    const { useScanStore } = require('../src/store/scanStore');
+    const st = () => useScanStore.getState();
+    st().reset();
+    st().commencerAuClavier();
+    st().addRoomRect({ x: 0, z: 0 }, { x: 4, z: 3 }, 'Cuisine');
+    // Un plan de travail de 2 m contre le mur nord (z = 0), 60 cm de fond.
+    useScanStore.setState({
+      objects: [{ id: 'pt', category: 'countertop', width: 2, depth: 0.6, height: 0.9, transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 2, 0.45, 0.3, 1] }],
+    });
+    const nord = st().walls.find((w: { type: string; a: { z: number }; b: { z: number } }) => w.type === 'wall' && Math.abs(w.a.z) < 1e-6 && Math.abs(w.b.z) < 1e-6)!;
+    const id = st().addFixture('prise', nord.id, 2);
+    const f = st().fixtures.find((x: Fixture) => x.id === id)!;
+    expect(f.height).toBeCloseTo(1.1, 2);
   });
 });

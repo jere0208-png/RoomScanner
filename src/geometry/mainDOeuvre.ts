@@ -25,7 +25,7 @@
  * servent à ne pas oublier la pose, pas à remplacer le métré d'un artisan.
  */
 import type { CeilingFixture, CeilingKind } from './ceiling';
-import { FIXTURES, type Fixture, type FixtureKind } from './electrical';
+import { ENTRAXE, FIXTURES, type Fixture, type FixtureKind } from './electrical';
 
 export type NatureDeChantier = 'renovation' | 'neuf';
 
@@ -73,6 +73,10 @@ export const TEMPS_MUR: Record<FixtureKind, number> = {
   // Le tableau se compte à part, à ses protections : voir `TABLEAU_*`.
   tableau: 0,
 };
+
+/** Le poste de plus sous une plaque déjà posée : son mécanisme, sans saignée
+ *  (une prise double vaut 1,2 h, une simple 1,0). */
+export const POSTE_ACCOLE = 0.2;
 
 /** Temps de pose d'un point de PLAFOND, en heures, en rénovation. */
 export const TEMPS_PLAFOND: Record<CeilingKind, number> = {
@@ -137,13 +141,33 @@ export function estimerLaPose(
     l.heures += heures;
     parFamille.set(famille, l);
   };
+  /*
+    UNE PLAQUE, UNE SAIGNÉE — revue « Karim » : deux prises réunies sous une
+    même plaque comptaient deux heures, une prise double du catalogue 1,2.
+    Le poste posé à l'entraxe d'un autre (même mur, même face, même hauteur)
+    partage sa saignée et son arrivée : il ne coûte que son mécanisme.
+  */
+  const accole = new Set<string>();
+  const parMur = new Map<string, Fixture[]>();
+  for (const f of fixtures) {
+    if (f.kind === 'tableau') continue;
+    const cle = `${f.wallId}|${f.side}|${Math.round(f.height * 100)}`;
+    parMur.set(cle, [...(parMur.get(cle) ?? []), f]);
+  }
+  for (const rang of parMur.values()) {
+    const tries = [...rang].sort((a, b) => a.along - b.along);
+    for (let i = 1; i < tries.length; i++) {
+      if (Math.abs(tries[i].along - tries[i - 1].along - ENTRAXE) < 0.01) accole.add(tries[i].id);
+    }
+  }
   let tableau = false;
   for (const f of fixtures) {
     if (f.kind === 'tableau') {
       tableau = true;
       continue;
     }
-    ajouter(FIXTURES[f.kind]?.family ?? 'Divers', 1, (TEMPS_MUR[f.kind] ?? 1) * k);
+    const temps = accole.has(f.id) ? POSTE_ACCOLE : TEMPS_MUR[f.kind] ?? 1;
+    ajouter(FIXTURES[f.kind]?.family ?? 'Divers', 1, temps * k);
   }
   for (const cl of ceiling) ajouter(FAMILLE_PLAFOND, 1, (TEMPS_PLAFOND[cl.kind] ?? 0.8) * k);
   if (tableau || protections > 0) {

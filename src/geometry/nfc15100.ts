@@ -494,21 +494,44 @@ export function heightRuleAt(
   };
 }
 
+/*
+  LES RÈGLES SUIVENT LES POSTES — revue « Karim » : dix-sept appareils
+  n'avaient aucune règle. Un interrupteur simple à 1,60 m alertait, un double
+  ou l'interrupteur général à la même hauteur passaient ; une prise triple à
+  2 cm du sol aussi. Tout ce qui porte une commande prend la règle des
+  commandes, tout ce qui porte un socle celle des socles.
+
+  ET 1,30 M N'EST PAS UN MAXIMUM POUR UN SOCLE : la norme n'en fixe pas (une
+  prise derrière la télévision murale est à sa place). C'est la hauteur
+  d'ACCESSIBILITÉ : au-dessus, une simple information (`maxInfo`).
+*/
+const SOCLE = {
+  min: 0.05,
+  max: 1.3,
+  maxInfo: true,
+  regle:
+    'Socle 16 A : axe à 5 cm du sol au minimum. Au-delà de 1,30 m, il n’est plus ' +
+    'accessible à une personne en fauteuil (hors plan de travail).',
+};
+const COMMANDE = {
+  min: 0.9,
+  max: 1.3,
+  regle: 'Organe de commande : manette entre 0,90 m et 1,30 m du sol.',
+};
+
 export const HEIGHT_RULES: Partial<
-  Record<FixtureKind, { min?: number; max?: number; regle: string }>
+  Record<FixtureKind, { min?: number; max?: number; maxInfo?: boolean; regle: string }>
 > = {
-  prise: {
-    min: 0.05,
-    max: 1.3,
-    regle:
-      'Socle 16 A : axe à 5 cm du sol au minimum, 1,30 m au maximum ' +
-      '(hors plan de travail).',
-  },
-  prise2: {
-    min: 0.05,
-    max: 1.3,
-    regle: 'Socle 16 A : axe entre 5 cm et 1,30 m du sol.',
-  },
+  prise: SOCLE,
+  prise2: SOCLE,
+  prise3: SOCLE,
+  rjPrise: SOCLE,
+  rjPrise2: SOCLE,
+  tvPrise: SOCLE,
+  inter2: COMMANDE,
+  inter3: COMMANDE,
+  interGeneral: COMMANDE,
+  volet: COMMANDE,
   prise32: {
     min: 0.12,
     regle: 'Socle 32 A de cuisson : axe à 12 cm du sol au minimum.',
@@ -786,12 +809,15 @@ export function checkElectrical(
     } else if (rule.max !== undefined && f.height > rule.max + 1e-6 && !priseDAppareil(f)) {
       // Une prise d'appareil (hotte à 2 m, micro-ondes en hauteur) se pose
       // où est l'appareil : pas de hauteur maximale (revue « Mehdi »).
+      const info = 'maxInfo' in rule && !!rule.maxInfo;
       out.push({
         roomId: roomOfFixture(f),
         fixtureId: f.id,
-        severity: 'alerte',
+        severity: info ? 'info' : 'alerte',
         code: 'hauteur',
-        message: `${spec.label} posée à ${cm} cm : trop haut`,
+        message: info
+          ? `${spec.label} posée à ${cm} cm : hors de portée d’un fauteuil`
+          : `${spec.label} posée à ${cm} cm : trop haut`,
         regle: rule.regle,
         fix: remise,
       });

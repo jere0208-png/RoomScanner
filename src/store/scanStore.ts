@@ -3,6 +3,7 @@ import type { PlanLu } from '../geometry/lecturePlan';
 import type { Mesure } from '../geometry/regle';
 import { photosDesMurs } from '../geometry/photosAuto';
 import { create } from 'zustand';
+import { HEIGHT_RULES, estCuisine, heightRuleAt, worktopsOnWall } from '../geometry/nfc15100';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pasDeGeste } from './geste';
 import { catalogueDesPlans, deposerPlan, reprendrePlan, type Identite, retirerPlan } from '../net/coffrePlans';
@@ -5855,6 +5856,21 @@ export const useScanStore = create<ScanState>((set, get) => {
           );
         });
       let x = at ?? faceX(face, f.along);
+      /*
+        AU-DESSUS D'UN PLAN DE TRAVAIL, À 1,10 M — revue « Karim » : la
+        prise de cuisine partait à 25 cm, derrière le meuble, et l'alerte
+        « trop bas » tombait aussitôt. Là où le mur longe un plan de
+        travail, elle se pose 20 cm au-dessus, dans la plage de la crédence.
+      */
+      {
+        const piece = st.rooms.find((r) => r.id === roomOf(wall));
+        const plans = worktopsOnWall(face, st.objects, estCuisine(piece?.name ?? '', piece?.kind), solDesMurs(st.walls));
+        const regle = plans.length > 0 ? heightRuleAt(kind, x, plans) : null;
+        const plan = plans.find((w) => x >= w.from - 0.05 && x <= w.to + 0.05);
+        if (regle && plan && regle !== HEIGHT_RULES[kind]) {
+          f.height = Math.min(regle.max ?? Infinity, Math.max(regle.min ?? 0, plan.height + 0.2));
+        }
+      }
       let group: string | undefined;
       const voisin = surUnAutre(x);
       /*

@@ -776,7 +776,15 @@ export function buyingList(
     tableau ni le visiophone, qui se posent sur leur propre support — revue
     « Mehdi » : ils recevaient une boîte Ø 67 et une plaque 1 poste.
   */
-  const SANS_BOITE = new Set<string>(['tableau', 'videophone']);
+  /*
+    L'APPLIQUE ET LA BOÎTE DE DÉRIVATION MURALES NON PLUS — revue
+    « Karim » : l'applique murale recevait une boîte Ø 67, une plaque et un
+    « mécanisme » à 0 € imprimé « compris », quand la même au plafond prenait
+    une boîte de dérivation ; la boîte de dérivation recevait une plaque de
+    finition. Les deux prennent la boîte de dérivation, plus bas.
+  */
+  const SANS_BOITE = new Set<string>(['tableau', 'videophone', 'applique', 'boite']);
+  const SANS_MECANISME = new Set<string>(['applique', 'boite']);
   const parEnsemble = new Map<string, number>();
   for (const f of fixtures) {
     const cle = f.group ?? f.id;
@@ -820,6 +828,7 @@ export function buyingList(
     }
   }
   for (const [k, q] of parType) {
+    if (SANS_MECANISME.has(k)) continue;
     // Le visiophone s'achète en kit, moniteur et platine de rue (revue « Mehdi »).
     if (k === 'videophone') {
       out.push({
@@ -909,13 +918,13 @@ export function buyingList(
       note: 'une par point de centre',
     });
   }
-  const derivation = parPlafond.get('applique') ?? 0;
+  const derivation = (parPlafond.get('applique') ?? 0) + (parType.get('applique') ?? 0) + (parType.get('boite') ?? 0);
   if (derivation > 0) {
     out.push({
       family: 'Plafond',
       code: 'boite-derivation',
       label: 'Boîte de dérivation Ø 80 mm',
-      spec: 'Pour applique : la DCL ne convient qu\u2019au point de centre',
+      spec: 'Pour applique et dérivation : la DCL ne convient qu\u2019au point de centre',
       quantity: derivation,
       unit: 'u',
     });

@@ -466,13 +466,24 @@ export function chiffrer(
       note: 'un par circuit',
     });
   }
-  for (const type of ['A', 'AC'] as const) {
-    const q = differentiels.filter((d) => d.type === type).length;
-    if (q === 0) continue;
+  /*
+    LE CALIBRE QU'ON A CALCULÉ — revue « Karim » : un logement de 35 m² au
+    plus prend des différentiels de 25 A, et le bordereau les vendait sous
+    le nom d'un 40 A. Chaque calibre a sa ligne ; le 25 A, rare en rayon,
+    garde le prix du 40 A de la même gamme.
+  */
+  const parCalibre = new Map<string, { type: 'A' | 'AC'; rating: number; q: number }>();
+  for (const d of differentiels) {
+    const cle = `${d.type}-${d.rating}`;
+    const g = parCalibre.get(cle) ?? { type: d.type, rating: d.rating, q: 0 };
+    g.q++;
+    parCalibre.set(cle, g);
+  }
+  for (const { type, rating, q } of [...parCalibre.values()].sort((x, y) => (x.type === y.type ? x.rating - y.rating : x.type === 'A' ? -1 : 1))) {
     poser({
       famille: 'Tableau',
-      code: `diff-${type}`,
-      libelle: `Interrupteur différentiel 40 A 30 mA type ${type}`,
+      code: rating >= 63 ? `diff-${type}-63` : `diff-${type}`,
+      libelle: `Interrupteur différentiel ${rating} A 30 mA type ${type}`,
       precision:
         type === 'A'
           ? 'Exigé sur la cuisson et le lave-linge'

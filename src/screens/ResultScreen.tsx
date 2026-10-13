@@ -4626,8 +4626,34 @@ export function ResultScreen() {
                 });
                 return;
               }
-              addCeiling(pendingCeiling!, part.roomId, at);
+              const pose = addCeiling(pendingCeiling!, part.roomId, at);
               haptic('succes');
+              /*
+                LE LIEN QUI SE DEVINE SE NOUE TOUT SEUL — revue « Karim » :
+                un point lumineux posé dans une pièce qui n'a qu'un
+                interrupteur libre se reliait à la main, trois appuis par
+                lien. On le noue, on le dit, et « Délier » le défait.
+              */
+              if (pose && ['dcl', 'spot', 'spotSol', 'applique', 'ventilateur'].includes(pendingCeiling!)) {
+                const etat = useScanStore.getState();
+                const pris = new Set([
+                  ...etat.ceiling.flatMap((cl) => cl.commands ?? []),
+                  ...etat.fixtures.flatMap((fx) => fx.commands ?? []),
+                ]);
+                const libres = etat.fixtures.filter(
+                  (fx) =>
+                    ['inter', 'inter2', 'inter3', 'va', 'poussoir', 'variateur'].includes(fx.kind) &&
+                    placement.get(fx.id) === part.roomId &&
+                    !pris.has(fx.id),
+                );
+                if (libres.length === 1) {
+                  toggleCeilingCommand(pose, libres[0].id);
+                  astuce('Relié au seul interrupteur libre de la pièce.', {
+                    icone: 'elec',
+                    action: { label: 'Délier', faire: () => useScanStore.getState().toggleCeilingCommand(pose, libres[0].id) },
+                  });
+                }
+              }
               /*
                 L'OUTIL RESTE EN MAIN — revue « Karim » : il se désarmait
                 après chaque pose, et quatre DCL coûtaient douze appuis. On

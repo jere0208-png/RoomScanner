@@ -14285,6 +14285,26 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le chantier de l'électricien, suite
+
+Revue « Karim », électricien Pro, sur un T3 de 63 m².
+- **Les hauteurs suivent les postes.** Dix-sept appareils n'avaient aucune
+  règle : un double interrupteur ou l'interrupteur général à 1,60 m, une
+  prise triple à 2 cm du sol passaient sans un mot. Les commandes prennent la
+  règle des commandes, les socles celle des socles.
+- **1,30 m n'est pas un maximum pour un socle** : la norme n'en fixe pas.
+  Au-dessus, une simple information d'accessibilité (une prise derrière la
+  télévision murale est à sa place).
+- **Le bordereau dit vrai** : un différentiel de 25 A se vend sous son nom ;
+  deux prises réunies sous une plaque se posent comme une prise double ;
+  l'applique murale et la boîte de dérivation prennent une boîte de
+  dérivation, sans plaque ni « mécanisme » à 0 €.
+- **Devant un plan de travail, la prise part à 1,10 m**, plus à 25 cm
+  derrière le meuble.
+- **Le lien qui se devine se noue tout seul** : un point lumineux posé dans
+  une pièce qui n'a qu'un interrupteur libre s'y relie, et « Délier » le
+  défait.
+
 ## Lisible à 68 ans, envoyable sans retouche
 
 Revues « Bernard » (68 ans, gratuit, la chambre de sa petite-fille) et
