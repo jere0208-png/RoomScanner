@@ -48,6 +48,9 @@ const mur = (id: string, ax: number, az: number, bx: number, bz: number, extra: 
   height: 2.5,
   yCenter: 1.25,
   roomId: 'r1',
+  // Le trait sur l'axe : des murs vus de leurs deux faces. Un mur relevé
+  // d'un seul côté a son trait sur sa face (voir `murscanneface.test.ts`).
+  deuxFaces: true,
   ...extra,
 });
 const proche = (x: number, y: number, tol = 1e-6) => expect(Math.abs(x - y)).toBeLessThan(tol);
@@ -248,7 +251,7 @@ describe('les écrans', () => {
     const recu: unknown[] = [];
     const Cadre = () => {
       const [p, setP] = React.useState(piece() as ReturnType<typeof piece> | null);
-      return <CoupeSheet part={p} onClose={() => setP(null)} onCouper={(s) => recu.push(s)} />;
+      return <CoupeSheet part={p} walls={CHAMBRE} onClose={() => setP(null)} onCouper={(s) => recu.push(s)} />;
     };
     let t!: TestRenderer.ReactTestRenderer;
     act(() => {

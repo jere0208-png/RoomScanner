@@ -25,7 +25,7 @@
  * avec leurs moyens.
  */
 import { pointInPolygon } from './appearance';
-import { epaisseurDe, longueurCotee, segLength, type Pt, type RoomPart, type WallSeg } from './floorplan';
+import { demiFacesDe, epaisseurDe, longueurCotee, segLength, type Pt, type RoomPart, type WallSeg } from './floorplan';
 
 export interface P3 {
   x: number;
@@ -78,13 +78,15 @@ export function cotesExterieures(
     const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
     const n = { x: -u.z, z: u.x };
     const m = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
-    const nu = epaisseurDe(w) / 2;
-    const sonde = nu + 0.2;
+    const sonde = epaisseurDe(w) / 2 + 0.2;
     const d1 = dedans({ x: m.x + n.x * sonde, z: m.z + n.z * sonde });
     const d2 = dedans({ x: m.x - n.x * sonde, z: m.z - n.z * sonde });
     // Une cloison (des pièces des deux côtés) ou un mur isolé : pas de cote ici.
     if (d1 === d2) continue;
     const dehors = d1 ? { x: -n.x, z: -n.z } : n;
+    // Le nu extérieur : toute l'épaisseur dehors pour un mur relevé d'un côté.
+    const f = demiFacesDe(walls, w);
+    const nu = d1 ? f.moins : f.plus;
     const face = dehors.x * vers.x + dehors.z * vers.z > 0;
     const y = face ? 0 : w.height;
     const loin = nu + ecart;

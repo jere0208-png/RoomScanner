@@ -81,7 +81,9 @@ describe('un mur rencontré continue', () => {
     expect(aires[0]).toBeLessThan(0);
     expect(aires[1]).toBeGreaterThan(0);
     expect(dans({ x: 2, z: 1.5 }, contours)).toBe(false);
-    expect(dans({ x: 2, z: 0.03 }, contours)).toBe(true);
+    // Le trait d'un mur scanné est sa face : la maçonnerie part dehors.
+    expect(dans({ x: 2, z: -0.03 }, contours)).toBe(true);
+    expect(dans({ x: 2, z: 0.03 }, contours)).toBe(false);
   });
 });
 
@@ -95,18 +97,19 @@ describe('l’appartement d’exemple, en plan d’architecte', () => {
   it('les façades s’épaississent vers le dehors — et seulement vers le dehors', () => {
     const e = SUREPAISSEUR_FACADE;
     expect(e).toBeGreaterThan(0.05);
-    // Le mur du nord, loin des baies (x = 2,7) : de la face intérieure
-    // (z = +0,07) à la face de façade (z = −0,07 − e).
-    expect(dans({ x: 2.7, z: 0.06 }, c)).toBe(true);
-    expect(dans({ x: 2.7, z: 0.08 }, c)).toBe(false);
-    expect(dans({ x: 2.7, z: -0.07 - e + 0.01 }, c)).toBe(true);
-    expect(dans({ x: 2.7, z: -0.07 - e - 0.01 }, c)).toBe(false);
+    // Le mur du nord, loin des baies (x = 2,7) : de la face intérieure —
+    // le trait relevé, z = 0 — à la face de façade (z = −0,14 − e). Rien
+    // ne mord dans la pièce.
+    expect(dans({ x: 2.7, z: -0.01 }, c)).toBe(true);
+    expect(dans({ x: 2.7, z: 0.01 }, c)).toBe(false);
+    expect(dans({ x: 2.7, z: -0.14 - e + 0.01 }, c)).toBe(true);
+    expect(dans({ x: 2.7, z: -0.14 - e - 0.01 }, c)).toBe(false);
   });
 
   it('l’angle saillant de la façade est plein', () => {
     const e = SUREPAISSEUR_FACADE;
-    expect(dans({ x: -0.07 - e + 0.01, z: -0.07 - e + 0.01 }, c)).toBe(true);
-    expect(dans({ x: -0.07 - e - 0.01, z: -0.07 - e - 0.01 }, c)).toBe(false);
+    expect(dans({ x: -0.14 - e + 0.01, z: -0.14 - e + 0.01 }, c)).toBe(true);
+    expect(dans({ x: -0.14 - e - 0.01, z: -0.14 - e - 0.01 }, c)).toBe(false);
   });
 
   it('les cloisons gardent leur épaisseur', () => {
@@ -119,13 +122,16 @@ describe('l’appartement d’exemple, en plan d’architecte', () => {
 
   it('les baies sont des vides, à travers toute l’épaisseur', () => {
     // La fenêtre de la cuisine, au nord (x de 0,8 à 2,2).
-    for (const z of [0.05, 0, -0.1, -0.16]) expect(dans({ x: 1.5, z }, c)).toBe(false);
+    for (const z of [0.05, -0.01, -0.1, -0.2]) expect(dans({ x: 1.5, z }, c)).toBe(false);
     // La porte du séjour vers la chambre, dans le refend (z de 2,5 à 3,33).
     for (const x of [4.95, 5, 5.05]) expect(dans({ x, z: 2.9 }, c)).toBe(false);
-    // Et la menuiserie sait l'épaisseur où elle se loge : côté dehors, la façade.
+    // Et la menuiserie sait l'épaisseur où elle se loge : côté dehors, tout
+    // le mur et la façade ; côté pièce, rien — le trait est la face.
     const fenetre = poche.baies.find((b) => b.type === 'window' && Math.abs(b.a.z) < 1e-6 && b.a.x < 1)!;
-    expect(Math.max(fenetre.plus, fenetre.moins)).toBeCloseTo(0.07 + SUREPAISSEUR_FACADE, 6);
-    expect(Math.min(fenetre.plus, fenetre.moins)).toBeCloseTo(0.07, 6);
+    expect(Math.max(fenetre.plus, fenetre.moins)).toBeCloseTo(0.14 + SUREPAISSEUR_FACADE, 6);
+    expect(Math.min(fenetre.plus, fenetre.moins)).toBeCloseTo(0, 6);
+    // Le vitrage au cœur du mur, à sept centimètres du trait, dehors.
+    expect(Math.abs(fenetre.coeur)).toBeCloseTo(0.07, 6);
   });
 
   it('aucun nœud de trois murs n’a de lacune', () => {

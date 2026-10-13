@@ -149,11 +149,11 @@ describe('les coordonnées', () => {
       .filter(([code]) => code === '20')
       .map(([, v]) => parseFloat(v));
     // La pièce va de z = 0 à z = 3 m : en DXF, de −3000 à 0. Le contour des
-    // murs déborde d'une demi-épaisseur vers l'extérieur — c'est le mur
-    // lui-même, pas une erreur de repère : quelques centimètres, jamais des
-    // mètres.
+    // murs déborde de leur épaisseur et de la surépaisseur de façade vers
+    // l'extérieur — c'est le mur lui-même, pas une erreur de repère :
+    // quelques centimètres, jamais des mètres.
     expect(Math.min(...ys)).toBeLessThan(-2000);
-    expect(Math.max(...ys)).toBeLessThan(200);
+    expect(Math.max(...ys)).toBeLessThan(300);
     expect(Math.max(...ys)).toBeGreaterThan(0);
   });
 });
@@ -246,10 +246,10 @@ describe('le fichier relu comme le fera AutoCAD', () => {
         return Math.max(...xs) - Math.min(...xs);
       })
       .sort((a, b) => a - b);
-    // Le dedans : 4 m d axe, moins une demi-epaisseur de chaque cote.
-    expect(larges[0]).toBeCloseTo(4000 - 140, 0);
-    // La facade : plus une demi-epaisseur et la surepaisseur, de chaque cote.
-    expect(larges[1]).toBeCloseTo(4000 + 140 + 2 * 100, 0);
+    // Le dedans : les 4 m relevés — le trait d un mur scanne est sa face.
+    expect(larges[0]).toBeCloseTo(4000, 0);
+    // La facade : plus l epaisseur et la surepaisseur, de chaque cote.
+    expect(larges[1]).toBeCloseTo(4000 + 2 * 140 + 2 * 100, 0);
   });
 
   it('ne laisse aucune entite sans calque', () => {

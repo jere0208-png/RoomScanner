@@ -45,11 +45,16 @@ export function cotesExterieurs(walls: WallSeg[], parts: RoomPart[]): Map<string
  * du mur jusqu'au bord du poché (et un peu au-delà, pour le doigt), qui
  * déborde aux deux bouts comme les angles saillants du poché.
  */
-export function cibleDeFacade(w: WallSeg, cote: 1 | -1, marge = 0.04): Pt[] {
+export function cibleDeFacade(
+  w: WallSeg,
+  cote: 1 | -1,
+  marge = 0.04,
+  /** Du trait au nu extérieur : une demi-épaisseur, ou toute pour un mur relevé d'un côté. */
+  dedans = epaisseurDe(w) / 2,
+): Pt[] {
   const L = Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) || 1;
   const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
   const n = { x: -u.z * cote, z: u.x * cote };
-  const dedans = epaisseurDe(w) / 2;
   const dehors = dedans + SUREPAISSEUR_FACADE + marge;
   const bout = SUREPAISSEUR_FACADE;
   const a = { x: w.a.x - u.x * bout, z: w.a.z - u.z * bout };

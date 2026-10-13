@@ -79,8 +79,9 @@ describe('lâché dans un renfoncement qu’aucune pièce ne ferme', () => {
     const o = lui();
     const z = o.transform[14];
     const x = o.transform[12];
-    // Sous le mur sud de A (nu à 2,07), au-dessus du mur du fond (nu à 2,73).
-    expect(z - o.depth / 2).toBeGreaterThanOrEqual(2.07 - 1e-6);
+    // Sous le mur sud de A (relevé depuis A : son épaisseur part dans la
+    // niche, nu à 2,14), au-dessus du mur du fond (nu à 2,73).
+    expect(z - o.depth / 2).toBeGreaterThanOrEqual(2.14 - 1e-6);
     expect(z + o.depth / 2).toBeLessThanOrEqual(2.73 + 1e-6);
     // Et à gauche du retour (nu à 3,93).
     expect(x + o.width / 2).toBeLessThanOrEqual(3.93 + 1e-6);
@@ -89,20 +90,21 @@ describe('lâché dans un renfoncement qu’aucune pièce ne ferme', () => {
   it('un meuble relevé s’ajuste à la niche ; un meuble du catalogue garde ses cotes', () => {
     poser(frigo());
     useScanStore.getState().rangerMeuble('frigo', 3.65, 2.4);
-    // Il remplit l'entre-deux, d'un nu à l'autre.
-    expect(lui().depth).toBeCloseTo(0.66, 2);
+    // Il remplit l'entre-deux, d'un nu à l'autre : de 2,14 à 2,73.
+    expect(lui().depth).toBeCloseTo(0.59, 2);
 
     poser(frigo({ modele: 'frigo-combine' }));
     useScanStore.getState().rangerMeuble('frigo', 3.65, 2.4);
     expect(lui().depth).toBeCloseTo(0.39, 6);
-    expect(lui().transform[14]).toBeGreaterThan(2.07);
+    expect(lui().transform[14]).toBeGreaterThan(2.14);
   });
 
   it('lâché vraiment dehors, au-delà d’une façade, il revient dans sa pièce', () => {
     poser(frigo());
     useScanStore.getState().rangerMeuble('frigo', 2, -0.5);
     const z = lui().transform[14];
-    expect(z - lui().depth / 2).toBeGreaterThanOrEqual(0.07 - 1e-6);
+    // Dos au nu du mur nord de A : son trait, z = 0.
+    expect(z - lui().depth / 2).toBeGreaterThanOrEqual(-1e-6);
     expect(z).toBeLessThan(2);
   });
 

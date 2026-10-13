@@ -116,7 +116,9 @@ import {
 import { planFrameAngle } from '../geometry/floorplan';
 import { assignOpenings } from '../geometry/scene3d';
 import {
+  demiFacesDe,
   epaisseurDe,
+  facesDesMurs,
   estDessine,
   etendueDeLaPiece,
   longueurCotee,
@@ -2118,7 +2120,10 @@ function planPage(
     qu'un mur dépasse d'un mur ordinaire s'ajoute à l'emprise.
   */
   if (isFinite(minX)) {
-    const enPlus = Math.max(0, ...walls.map((w) => epaisseurDe(w) / 2)) - WALL_T / 2;
+    // Toute l'épaisseur d'un mur relevé d'un côté part dehors (`facesDesMurs`).
+    const faces = facesDesMurs(walls);
+    const enPlus =
+      Math.max(0, ...walls.map((w) => { const f = faces.get(w.id); return f ? Math.max(f.plus, f.moins) : epaisseurDe(w) / 2; })) - WALL_T / 2;
     if (enPlus > 1e-6) {
       minX -= enPlus;
       maxX += enPlus;
@@ -2287,6 +2292,7 @@ function planPage(
         centerOf(roomOf(ob)),
         undefined,
         0.02,
+        facesDesMurs(walls),
       );
       const cosY = Math.cos(o.yaw);
       const sinY = Math.sin(o.yaw);
@@ -2387,24 +2393,25 @@ function planPage(
         // Le bleu doux des fenêtres (voir `ui/encreElec`), dormant et vitrage.
         ligne(baie.plus, 0.7, BLEU_FENETRE);
         ligne(-baie.moins, 0.7, BLEU_FENETRE);
-        ligne(0.015, 0.8, BLEU_FENETRE);
-        ligne(-0.015, 0.8, BLEU_FENETRE);
+        ligne(baie.coeur + 0.015, 0.8, BLEU_FENETRE);
+        ligne(baie.coeur - 0.015, 0.8, BLEU_FENETRE);
       } else {
         // Ouverture sans menuiserie — ou porte de garage, qui ne bat pas :
         // double trait dans la trouée.
-        const wx = (-dz / len) * (WALL_T / 4);
-        const wz = (dx / len) * (WALL_T / 4);
+        // Au cœur du mur : décalé vers le dehors pour un mur relevé d'un côté.
+        const nx = baie ? baie.n.x : -dz / len;
+        const nz = baie ? baie.n.z : dx / len;
+        const k = baie?.coeur ?? 0;
+        const ca = baie?.a ?? o.a;
+        const cb = baie?.b ?? o.b;
         const color = !colorOpenings ? GREY : o.type === 'window' ? SKY : o.garage ? AMBER : GREY;
-        traitsMenuiserie.push({
-          pts: [px({ x: o.a.x + wx, z: o.a.z + wz }), px({ x: o.b.x + wx, z: o.b.z + wz })],
-          w: 1,
-          c: color,
-        });
-        traitsMenuiserie.push({
-          pts: [px({ x: o.a.x - wx, z: o.a.z - wz }), px({ x: o.b.x - wx, z: o.b.z - wz })],
-          w: 1,
-          c: color,
-        });
+        for (const decal of [k + WALL_T / 4, k - WALL_T / 4]) {
+          traitsMenuiserie.push({
+            pts: [px({ x: ca.x + nx * decal, z: ca.z + nz * decal }), px({ x: cb.x + nx * decal, z: cb.z + nz * decal })],
+            w: 1,
+            c: color,
+          });
+        }
       }
     }
     for (const t of traitsMenuiserie) encre.trait(t.pts, Math.max(0.8, t.w));
@@ -3290,7 +3297,10 @@ function planPage(
         const b = px(w.b);
         const u = unitaire({ x: b.x - a.x, y: b.y - a.y });
         const n = normalePage(w, sgn);
-        const E = (epaisseurDe(w) / 2 + SUREPAISSEUR_FACADE) * scale;
+        // Du trait au bord du poché : le nu extérieur (toute l'épaisseur pour
+        // un mur relevé d'un côté), puis la surépaisseur de façade.
+        const facesW = demiFacesDe(walls, w);
+        const E = ((sgn > 0 ? facesW.plus : facesW.moins) + SUREPAISSEUR_FACADE) * scale;
         const angle = angleDe(a, b);
         // Au nu pour un mur dessiné : la cote de l'écran (revue « Léa »),
         // avec ses pièces — un pan coupé n'a pas un demi-mur à chaque bout
@@ -3408,7 +3418,9 @@ function planPage(
         const u = unitaire({ x: b.x - a.x, y: b.y - a.y });
         const angle = angleDe(a, b);
         const porteur = walls.find((w) => (baiesDuMur.get(w.id) ?? []).includes(o));
-        const F = ((porteur ? epaisseurDe(porteur) : WALL_T) / 2) * scale;
+        // Du trait au nu, de chaque côté : celui d'un mur relevé d'un côté
+        // est sa face (voir `facesDesMurs`).
+        const facesP = porteur ? demiFacesDe(walls, porteur) : { plus: WALL_T / 2, moins: WALL_T / 2 };
         const txt = frLen(segLength(o));
         let mieux: { A: Pt; B: Pt; n: Pt; texte: Pt; cout: number; dansLaBaie?: boolean } | null =
           null;
@@ -3427,6 +3439,7 @@ function planPage(
         }
         for (const sgn of [1, -1]) {
           const n = normalePage(porteur ?? o, sgn);
+          const F = (sgn > 0 ? facesP.plus : facesP.moins) * scale;
           for (const off of [5, 10, 15, 21]) {
             const A = plus(a, n, F + off);
             const B = plus(b, n, F + off);
@@ -3490,7 +3503,7 @@ function planPage(
         if (longPage < 4) continue;
         const u = unitaire({ x: b.x - a.x, y: b.y - a.y });
         const angle = angleDe(a, b);
-        const F = (epaisseurDe(w) / 2) * scale;
+        const facesC = demiFacesDe(walls, w);
         const txt = `${frLen(longueurCotee(walls, w, parts))} m`;
         /*
           LES LIGNES D'ATTACHE D'UNE COTE ÉCARTÉE — revue « Claire » : la
@@ -3541,6 +3554,7 @@ function planPage(
         } | null = null;
         for (const sgn of [1, -1]) {
           const n = normalePage(w, sgn);
+          const F = (sgn > 0 ? facesC.plus : facesC.moins) * scale;
           const portees = [porteeAuBout(a, n), porteeAuBout(b, n)];
           const pieceDuBord = pieceDuPoint(plus({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, n, F + 1.5));
           for (const off of ecarts) {
@@ -6041,13 +6055,40 @@ function milieuDuPoche(
   contours: { x: number; z: number }[][],
   defaut: number,
 ): { centre: { x: number; z: number }; epaisseur: number } {
-  if (!dansLePoche(p, contours)) return { centre: p, epaisseur: defaut };
+  if (!dansLePoche(p, contours)) {
+    /*
+      LE TRAIT D'UN MUR SCANNÉ EST SUR LE BORD DU POCHÉ — c'est sa face, et
+      la maçonnerie part d'un seul côté (voir `facesDesMurs`). On entre
+      donc dans le mur du côté où il est, d'un pas de quatre millimètres.
+    */
+    let dedans: { x: number; z: number } | null = null;
+    for (let k = 0.004; !dedans && k <= defaut; k += 0.004) {
+      for (const s of [1, -1]) {
+        const q = { x: p.x + n.x * s * k, z: p.z + n.z * s * k };
+        if (dansLePoche(q, contours)) {
+          dedans = q;
+          break;
+        }
+      }
+    }
+    if (!dedans) return { centre: p, epaisseur: defaut };
+    p = dedans;
+  }
+  const dedans = (s: number, k: number) => dansLePoche({ x: p.x + n.x * s * k, z: p.z + n.z * s * k }, contours);
   const sortie = (s: number) => {
     let k = 0;
-    while (k < 0.6 && dansLePoche({ x: p.x + n.x * s * k, z: p.z + n.z * s * k }, contours)) {
-      k += 0.004;
+    while (k < 0.6 && dedans(s, k)) k += 0.004;
+    if (k === 0 || k >= 0.6) return k;
+    // Le bord se cherche ensuite à la dichotomie : le pas de quatre
+    // millimètres décentrait le numéro d'un demi-point.
+    let lo = k - 0.004;
+    let hi = k;
+    for (let i = 0; i < 12; i++) {
+      const mi = (lo + hi) / 2;
+      if (dedans(s, mi)) lo = mi;
+      else hi = mi;
     }
-    return k;
+    return (lo + hi) / 2;
   };
   const plus = sortie(1);
   const moins = sortie(-1);

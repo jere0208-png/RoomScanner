@@ -160,8 +160,15 @@ describe('accoler une pièce à un mur existant', () => {
     const id = useScanStore.getState().addRoomBox(3, 2.5, 'Chambre', 'n');
     const st = useScanStore.getState();
     const part = roomParts(st.walls, st.rooms).find((p) => p.roomId === id);
-    // 4 m de long (le mur) × 2,50 m de profond.
-    expect(part!.surface?.area ?? 0).toBeCloseTo(4 * 2.5, 1);
+    // 4 m de long (le mur) × 2,50 m de profond, tracés à l'axe.
+    const xs = part!.surface!.pts.map((p) => p.x);
+    const zs = part!.surface!.pts.map((p) => p.z);
+    expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(4, 3);
+    expect(Math.max(...zs) - Math.min(...zs)).toBeCloseTo(2.5, 3);
+    // Et sa surface se compte au nu, comme toute pièce tracée : 7 cm de
+    // chaque mur tracé, et le mur relevé du séjour, de ce côté-ci, tout
+    // entier — son trait est la face du séjour.
+    expect(part!.surface!.area).toBeCloseTo((4 - 0.14) * (2.5 - 0.14 - 0.07), 3);
   });
 
   /*

@@ -122,11 +122,15 @@ const tele = scene.faces.filter(
     f.fill !== PAL.wallTop &&
     f.fill !== PAL.floor,
 );
-/** Le refend, vu de la pièce d'à côté (z ≈ 3 − épaisseur/2). */
+/**
+ * Le refend, vu de la pièce d'à côté. Le mur de la chambre est relevé
+ * depuis la chambre : son trait (z = 3) est sa face, et son épaisseur part
+ * dans le séjour, jusqu'à z = 3 − 0,14.
+ */
 const refend = scene.faces.filter(
   (f) =>
     f.fill === PAL.wall &&
-    f.pts.every((p) => Math.abs(p.z - 2.93) < 0.02) &&
+    f.pts.every((p) => Math.abs(p.z - 2.86) < 0.02) &&
     f.pts.some((p) => Math.abs(p.x - 3) < 1.2),
 );
 

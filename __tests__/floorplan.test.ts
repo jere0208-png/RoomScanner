@@ -630,8 +630,10 @@ describe('meubles', () => {
 
   it('ramène un meuble à cheval sur un mur du côté de sa pièce', () => {
     const f = clampFootprint(toFootprint(tv), box, { x: 2, z: 1.5 });
-    // Aucun coin ne doit plus dépasser dans le mur (nu à z = 0,07).
-    expect(f.cz - tv.depth / 2).toBeGreaterThan(WALL_T / 2);
+    // Aucun coin ne doit plus dépasser dans le mur. Il est relevé d'un côté :
+    // son trait est sa face, le nu est à z = 0 — et la télé s'y plaque.
+    expect(f.cz - tv.depth / 2).toBeGreaterThan(0);
+    expect(f.cz - tv.depth / 2).toBeLessThan(0.01);
   });
 
   it('rend chaque meuble comme un volume, faces arrière masquées', () => {

@@ -77,7 +77,10 @@ import {
   estDessine,
   longueurCotee,
   repereDePiece,
+  demiFacesDe,
   epaisseurDe,
+  faceDuCote,
+  facesDesMurs,
   NIVEAU_RDC,
   niveauDe,
   niveauxPresents,
@@ -4549,7 +4552,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       const part = roomParts(st.walls, st.rooms).find((p) => p.roomId === roomId);
       if (!part?.surface) return false;
-      const seg = coupeDePiece(part, saisie);
+      const seg = coupeDePiece(part, saisie, st.walls);
       // La garde AVANT le point de reprise : voir `splitRoom`.
       if (!seg) return false;
       pushHistory('splitRoom');
@@ -5611,7 +5614,11 @@ export const useScanStore = create<ScanState>((set, get) => {
           const dedans = interiorSide(contre, st.walls, st.rooms);
           const n = { x: u.z * dedans, z: -u.x * dedans };
           // Une profondeur intérieure : du nu du mur mitoyen au nu du mur du fond.
-          const p = Math.max(0.6, profondeur) + (opts?.auNu ? (epaisseurDe(contre) + WALL_T) / 2 : 0);
+          // Le nu du mitoyen, de ce côté : à une demi-épaisseur de son axe,
+          // ou à toute son épaisseur du trait d'un mur relevé de la pièce
+          // voisine (`facesDesMurs`) — sinon la pièce gagnait le mur.
+          const nuMitoyen = faceDuCote(demiFacesDe(st.walls, contre), -dedans);
+          const p = Math.max(0.6, profondeur) + (opts?.auNu ? nuMitoyen + WALL_T / 2 : 0);
           /*
             LA LARGEUR TAPÉE EST TENUE — revues « Théo » et « Nicolas » : la
             pièce accolée prenait toute la longueur du mur choisi, et la
@@ -9324,7 +9331,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const depuis = entoure ? { x, z } : dansUnePiece ? ici : enFace ?? undefined;
       const ancre = part ? part.labelAt : depuis ?? ici;
       const contour = part?.surface?.pts;
-      const arrete = pushOutOfWalls({ x, z }, box, murs, ancre, contour, depuis);
+      const arrete = pushOutOfWalls({ x, z }, box, murs, ancre, contour, depuis, facesDesMurs(jeu.walls));
       /*
         LES VOISINS SONT CEUX DE LA PIÈCE D'ARRIVÉE, PAS CEUX D'AVANT.
 
@@ -9362,6 +9369,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           ancre,
           contour,
           depuis,
+          facesDesMurs(jeu.walls),
         );
       /**
        * RESTE-T-IL UN CHEVAUCHEMENT ? (deux rectangles tournés, par axes)
@@ -9471,14 +9479,14 @@ export const useScanStore = create<ScanState>((set, get) => {
         rouge sous le doigt. Deux réponses valent mieux qu'une seule mesure
         écrite deux fois.
       */
-      if (!poserLibre({ x: pose.x, z: pose.z }, box, murs).valide) {
+      if (!poserLibre({ x: pose.x, z: pose.z }, box, murs, facesDesMurs(jeu.walls)).valide) {
         for (let k = 1; k <= 10; k++) {
           const t = k / 10;
           const essai = resoudre({
             x: x + (ancre.x - x) * t,
             z: z + (ancre.z - z) * t,
           });
-          if (poserLibre(essai, box, murs).valide) {
+          if (poserLibre(essai, box, murs, facesDesMurs(jeu.walls)).valide) {
             pose = essai;
             break;
           }
@@ -9580,7 +9588,7 @@ export const useScanStore = create<ScanState>((set, get) => {
             x: fixe.x + leLong.x * (long * k),
             z: fixe.z + leLong.z * (long * k),
           };
-          const d = castToWall(de, n, murs);
+          const d = castToWall(de, n, murs, facesDesMurs(st.walls));
           if (d !== null) libre = Math.min(libre, d);
         }
         // Une butée qui vaudrait zéro — un bord déjà dans la maçonnerie —
@@ -9594,7 +9602,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         x: fixe.x + n.x * apres,
         z: fixe.z + n.z * apres,
       };
-      const colle = snapSideToWalls(bord, n, long / 2, murs);
+      const colle = snapSideToWalls(bord, n, long / 2, murs, undefined, facesDesMurs(st.walls));
       if (colle !== 0) {
         apres = Math.max(0.1, Math.min(12, apres + colle));
       }

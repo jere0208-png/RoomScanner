@@ -42,7 +42,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import { poserLibre } from '../src/geometry/poser';
-import { WALL_T, type Pt, type WallSeg } from '../src/geometry/floorplan';
+import { WALL_T, demiFacesDe, type Pt, type WallSeg } from '../src/geometry/floorplan';
 import { useScanStore } from '../src/store/scanStore';
 
 const st = () => useScanStore.getState();
@@ -61,6 +61,9 @@ const mur = (
   height: 2.5,
   yCenter: 1.25,
   roomId: 'r1',
+  // Le trait sur l'axe : des murs vus de leurs deux faces. Un mur relevé
+  // d'un seul côté a son trait sur sa face (voir `murscanneface.test.ts`).
+  deuxFaces: true,
 });
 
 /** Un sejour de 5 x 4, mur nord en z = 0. Le nu interieur est en z = 0,07. */
@@ -474,9 +477,12 @@ describe('mille lâchers sur le plan de référence', () => {
       );
       if (Math.max(...ts) < 0 || Math.min(...ts) > 1) return false;
       const ds = cs.map((p) => (p.x - w.a.x) * nx + (p.z - w.a.z) * nz);
-      // Deux millimètres de tolérance : un meuble posé AU nu n'est pas dedans.
+      // La bande que le plan dessine : de part et d'autre de l'axe, ou toute
+      // dehors pour un mur relevé d'un côté (`facesDesMurs`). Deux
+      // millimètres de tolérance : un meuble posé AU nu n'est pas dedans.
+      const f = demiFacesDe(SNAPSHOT_WALLS as WallSeg[], w);
       return (
-        Math.min(...ds) < NU - 0.002 && Math.max(...ds) > -NU + 0.002
+        Math.min(...ds) < f.plus - 0.002 && Math.max(...ds) > -f.moins + 0.002
       );
     });
 

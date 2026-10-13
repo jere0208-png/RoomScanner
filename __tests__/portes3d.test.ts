@@ -119,7 +119,9 @@ describe('une porte en volume à chaque ouvrant porte', () => {
     const [p] = portesDe(s);
     expect(p).toBeDefined();
     expect(p.width).toBeCloseTo(0.9, 2);
-    expect(p.cx).toBeCloseTo(4, 2);
+    // Au cœur de la cloison : relevée depuis la première pièce, son trait
+    // est sa face, et son épaisseur part dans la seconde.
+    expect(p.cx).toBeCloseTo(4.07, 2);
     expect(p.cz).toBeCloseTo(1.45, 2);
     expect(Number(attr(p, 'PorteAngle'))).toBeGreaterThan(0);
     // Elle se tient au seuil, à la hauteur de la baie.

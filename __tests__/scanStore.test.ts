@@ -783,11 +783,11 @@ describe('meubles posés à la main', () => {
 
   it('se colle au mur dès qu’on l’en approche, et s’aligne dessus', () => {
     const id = useScanStore.getState().addObject(LIT, 2, 2);
-    // Amené près du mur nord (z = 0) : il doit reculer contre lui.
-    useScanStore.getState().setObjectCenter(id, 2, 1.0);
+    // Amené cinq centimètres dans le mur nord (z = 0) : il en ressort.
+    useScanStore.getState().setObjectCenter(id, 2, 0.9);
     const o = useScanStore.getState().objects.find((x) => x.id === id)!;
-    // Dos au nu du mur : demi-profondeur + demi-épaisseur de mur.
-    expect(o.transform[14]).toBeCloseTo(1.9 / 2 + 0.07, 3);
+    // Dos au nu du mur — son trait, pour un mur relevé de la pièce.
+    expect(o.transform[14]).toBeCloseTo(1.9 / 2, 3);
     expect(o.transform[12]).toBeCloseTo(2, 6);
     // Et l'axe de profondeur du meuble regarde la pièce (vers +z).
     const yaw = Math.atan2(o.transform[2], o.transform[0]);

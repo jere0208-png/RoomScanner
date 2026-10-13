@@ -24,6 +24,7 @@
 import { dansLeBati, pocheDesMurs } from '../geometry/poche';
 import {
   arcDuBattant,
+  demiFacesDe,
   epaisseurDe,
   pivotsDesBattants,
   planFrameAngle,
@@ -490,15 +491,19 @@ export function buildDxf(plan: PlanPourDxf): string {
     const lax = segLength(w);
     if (lax < 1e-6) continue;
     const u = { x: (w.b.x - w.a.x) / lax, z: (w.b.z - w.a.z) / lax };
-    const e = epaisseurDe(w) / 2;
+    const demi = epaisseurDe(w) / 2;
     const mil = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
     // Du côté d'une pièce : une façade se cote dedans. Un mur qui n'en borde
     // aucune (le fond d'un coffre de cheminée, l'angle plein derrière un pan
     // coupé) se cote dehors, hors de la maçonnerie.
-    const deCote = (s: number): Pt => ({ x: mil.x - u.z * s * (e + 0.3), z: mil.z + u.x * s * (e + 0.3) });
+    const deCote = (s: number): Pt => ({ x: mil.x - u.z * s * (demi + 0.3), z: mil.z + u.x * s * (demi + 0.3) });
     const sgn =
       [1, -1].find((s) => dansUnePiece(deCote(s))) ?? [1, -1].find((s) => !dansLeBati(plan.walls, deCote(s))) ?? 1;
     const n = { x: -u.z * sgn, z: u.x * sgn };
+    // La face de ce côté : sur le trait, côté pièce, pour un mur relevé
+    // d'un côté (voir `facesDesMurs`).
+    const faces = demiFacesDe(plan.walls, w);
+    const e = sgn > 0 ? faces.plus : faces.moins;
     // Centrée sur le nu, entre les demi-murs qui ferment ses deux bouts.
     const r0 = w.auNu ? retraitDuCoin(plan.walls, w, w.a) : 0;
     const r1 = w.auNu ? retraitDuCoin(plan.walls, w, w.b) : 0;

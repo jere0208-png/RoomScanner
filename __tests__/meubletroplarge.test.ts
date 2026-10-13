@@ -92,9 +92,12 @@ const coins = (f: ObjectFootprint) => {
   }));
 };
 
-/** Le meuble tient-il dans le nu interieur des murs ? */
+/**
+ * Le meuble tient-il dans le nu interieur des murs ? Des murs releves d'un
+ * cote : leur trait est leur face, le nu est sur le trait.
+ */
 const dansLaPiece = (f: ObjectFootprint) => {
-  const nu = WALL_T / 2;
+  const nu = 0;
   return coins(f).every(
     (p) =>
       p.x >= nu - 1e-6 &&

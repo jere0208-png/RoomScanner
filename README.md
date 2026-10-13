@@ -14285,6 +14285,43 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## L'épaisseur d'un mur scanné part vers le dehors
+
+RoomPlan relève la face qu'il voit. Les cotes et les surfaces d'un plan
+scanné le savaient déjà, mais le dessin centrait l'épaisseur sur ce trait :
+la moitié du mur mordait dans la pièce, et tout ce qui se mesure depuis le
+nu se trompait de sept centimètres.
+- **Les élévations du PDF** étaient trop courtes d'une épaisseur : 4,86 m
+  pour un mur relevé de 5,00 m.
+- **Un meuble calé contre le mur** s'arrêtait à 7 cm de la vraie face. Le
+  frigo d'une niche de 62 cm se calait sur 48.
+- **Une baignoire de 1,70** relevée entre deux murs était recalée de
+  travers.
+- **« Ajouter une pièce »** contre un mur relevé donnait 4,04 m² pour une
+  pièce tapée de 1,75 × 2,00 : elle se comptait à l'axe, et gagnait la
+  moitié du mur.
+- **La façade** s'épaississait vers l'intérieur.
+
+Le trait d'un mur relevé d'un seul côté est maintenant sa face : son
+épaisseur part tout entière du côté où n'est pas la pièce qui l'a relevé
+(`facesDesMurs`). Une pièce accolée ensuite de l'autre côté n'y change
+rien, et un refend relevé d'un seul côté s'épaissit dans la pièce voisine,
+comme dans la réalité. Un mur dessiné, ou vu de ses deux faces, reste sur
+son axe.
+
+Tout ce qui mesurait depuis « une demi-épaisseur » lit maintenant la vraie
+face : le poché et ses baies (le vitrage au cœur du mur), la 3D (portes,
+fenêtres, coffres), la visite, le PDF et le DXF, le calage et la pose des
+meubles, les cotes de dégagement, la règle, le ruban LED en corniche, la
+cloison en T et la coupe d'une pièce à la cote. La pièce accolée à un mur
+relevé se compte au nu.
+
+La visite a gagné un garde-fou au passage : un pas qui finirait coincé
+dans un passage plus étroit que le visiteur est refusé.
+
+Bancs : `murscanneface` (nouveau), `poche`, `electrical`, `elevationpdf`,
+`dxf`, `exploration`, `meubleniche`, `ajoutpiece`.
+
 ## Le ruban LED s'allume avec son interrupteur
 
 Relevé du patron : « la LED s'allume bien si liée à un interrupteur ? ».

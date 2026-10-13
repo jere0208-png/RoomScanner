@@ -156,14 +156,18 @@ describe('ce qui arrête, et ce qui laisse passer', () => {
   it('une porte perce son mur : le refend devient deux pans pleins', () => {
     const refend = OBST.filter(
       (o): o is Extract<Obstacle, { kind: 'mur' }> =>
-        o.kind === 'mur' && Math.abs(o.a.x - 5) < 1e-6 && Math.abs(o.b.x - 5) < 1e-6,
+        // Relevé du séjour : son trait est sa face, et le pan qui arrête suit
+        // le cœur du mur, une demi-épaisseur dans la chambre.
+        o.kind === 'mur' && Math.abs(o.a.x - 5.07) < 1e-6 && Math.abs(o.b.x - 5.07) < 1e-6,
     );
     expect(refend).toHaveLength(2);
   });
 
   it('une fenêtre, non : on ne l’enjambe pas', () => {
+    // Le mur nord est relevé du séjour : son trait est sa face, et le pan
+    // qui arrête suit le cœur du mur, une demi-épaisseur dehors.
     const nord = OBST.filter(
-      (o) => o.kind === 'mur' && Math.abs(o.a.z) < 1e-6 && Math.abs(o.b.z) < 1e-6 && o.b.x <= 5 + 1e-6,
+      (o) => o.kind === 'mur' && Math.abs(o.a.z + 0.07) < 1e-6 && Math.abs(o.b.z + 0.07) < 1e-6 && o.b.x <= 5 + 1e-6,
     );
     expect(nord).toHaveLength(1);
   });
@@ -251,7 +255,8 @@ describe('on glisse au lieu de buter', () => {
     // Vers le nord-est : moitié dans le mur nord, moitié le long.
     const p = marcher(depart, -Math.PI / 4, 45);
     expect(p.x - depart.x).toBeGreaterThan(0.6);
-    expect(p.z).toBeGreaterThan(0.07 + RAYON_VISITEUR - 1e-3);
+    // Une épaule devant la face du mur, qui est son trait.
+    expect(p.z).toBeGreaterThan(RAYON_VISITEUR - 1e-3);
   });
 
   it('contre le canapé aussi', () => {

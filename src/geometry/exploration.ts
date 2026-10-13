@@ -35,7 +35,7 @@
  */
 import type { ObjectData } from 'react-native-room-scan';
 import {
-  epaisseurDe,
+  demiFacesDe,
   clampFootprint,
   roomOf,
   roomParts,
@@ -146,16 +146,22 @@ export function obstaclesDeLaVisite(
     if (len < 1e-6) continue;
     const ux = (w.b.x - w.a.x) / len;
     const uz = (w.b.z - w.a.z) / len;
-    const point = (t: number): Pt => ({ x: w.a.x + ux * t, z: w.a.z + uz * t });
+    // Le cœur du mur : sur le trait pour un mur à l'axe, décalé d'une
+    // demi-épaisseur vers le dehors pour un mur relevé d'un côté — on bute
+    // sur sa face, pas sept centimètres avant (voir `facesDesMurs`).
+    const f = demiFacesDe(walls, w);
+    const coeur = (f.plus - f.moins) / 2;
+    const demi = (f.plus + f.moins) / 2;
+    const point = (t: number): Pt => ({ x: w.a.x + ux * t - uz * coeur, z: w.a.z + uz * t + ux * coeur });
     let curseur = 0;
     for (const trou of trousDuMur(w, openings)) {
       if (trou.de > curseur + 1e-3) {
-        out.push({ kind: 'mur', a: point(curseur), b: point(trou.de), demi: epaisseurDe(w) / 2 });
+        out.push({ kind: 'mur', a: point(curseur), b: point(trou.de), demi });
       }
       curseur = Math.max(curseur, trou.a);
     }
     if (curseur < len - 1e-3) {
-      out.push({ kind: 'mur', a: point(curseur), b: point(len), demi: epaisseurDe(w) / 2 });
+      out.push({ kind: 'mur', a: point(curseur), b: point(len), demi });
     }
   }
 
@@ -366,6 +372,16 @@ export function deplacer(
   for (let i = 0; i < n; i++) {
     const precedent = p;
     p = resoudre({ x: p.x + dx / n, z: p.z + dz / n }, precedent, obstacles, rayon);
+    /*
+      UN PASSAGE PLUS ÉTROIT QUE SOI NE S'OUVRE PAS — entre le dos d'un
+      canapé et le mur, 35 cm pour une carrure de 36 : chaque appui repousse
+      le visiteur dans l'autre, et huit passes ne les départagent pas. Le
+      tronçon qui finit enfoncé est refusé : on reste où l'on était, libre.
+    */
+    if (!estLibre(p, obstacles, rayon) && estLibre(precedent, obstacles, rayon)) {
+      p = precedent;
+      break;
+    }
   }
   return p;
 }

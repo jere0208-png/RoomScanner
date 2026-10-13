@@ -431,11 +431,14 @@ const getStyles = themedStyles((c: Palette) =>
  */
 export function CoupeSheet({
   part,
+  walls,
   onClose,
   onCouper,
   onApercu,
 }: {
   part: RoomPart | null;
+  /** Les murs du plan entier : la face d'un mur s'y lit (`facesDesMurs`). */
+  walls: WallSeg[];
   onClose: () => void;
   onCouper: (saisie: SaisieCoupe) => void;
   onApercu?: (saisie: SaisieCoupe | null) => void;
@@ -447,7 +450,7 @@ export function CoupeSheet({
   const [depuisAutre, setDepuisAutre] = useState(false);
   const [epaisseur, setEpaisseur] = useState(0.07);
   const attente = useRef<null | (() => void)>(null);
-  const dims = part ? dimensionsDeCoupe(part) : null;
+  const dims = part ? dimensionsDeCoupe(part, walls) : null;
 
   // À chaque pièce ouverte : la coupe au milieu de la longueur, en cloison.
   useEffect(() => {
@@ -455,7 +458,7 @@ export function CoupeSheet({
     setSens('longueur');
     setDepuisAutre(false);
     setEpaisseur(0.07);
-    setDepuis(ecrireCm(coupeParDefaut(part, 'longueur', 0.07)));
+    setDepuis(ecrireCm(coupeParDefaut(part, 'longueur', 0.07, walls)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [part?.roomId]);
 
@@ -470,7 +473,7 @@ export function CoupeSheet({
 
   const choisirSens = (v: SaisieCoupe['sens']) => {
     setSens(v);
-    if (part) setDepuis(ecrireCm(coupeParDefaut(part, v, epaisseur)));
+    if (part) setDepuis(ecrireCm(coupeParDefaut(part, v, epaisseur, walls)));
   };
   const valider = () => {
     if (!saisie) return;

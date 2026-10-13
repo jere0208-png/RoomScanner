@@ -197,8 +197,8 @@ function Murs({ plan, k, c }: { plan: PlanDuFilm; k: ReturnType<typeof cadrage>;
             <G key={i}>
               <Path d={ligne(b, b.plus)} stroke={bleuFenetre(c)} strokeWidth={1.2} />
               <Path d={ligne(b, -b.moins)} stroke={bleuFenetre(c)} strokeWidth={1.2} />
-              <Path d={ligne(b, 0.015)} stroke={bleuFenetre(c)} strokeWidth={1.1} />
-              <Path d={ligne(b, -0.015)} stroke={bleuFenetre(c)} strokeWidth={1.1} />
+              <Path d={ligne(b, b.coeur + 0.015)} stroke={bleuFenetre(c)} strokeWidth={1.1} />
+              <Path d={ligne(b, b.coeur - 0.015)} stroke={bleuFenetre(c)} strokeWidth={1.1} />
             </G>
           );
         }

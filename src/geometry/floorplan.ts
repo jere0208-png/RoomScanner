@@ -522,6 +522,144 @@ export function pointOnSeg(p: Pt, a: Pt, b: Pt): { dist: number; t: number } {
 }
 
 /**
+ * OÙ SONT LES DEUX FACES D'UN MUR — la distance du trait à sa face +n
+ * (`plus`) et à sa face −n (`moins`), en mètres.
+ *
+ * Un mur dessiné, ou vu de ses deux faces, a son trait sur l'AXE : une
+ * demi-épaisseur de chaque côté. Un mur que le scan n'a vu que d'un côté a
+ * son trait sur la FACE qu'on a relevée — c'est déjà la règle des cotes
+ * (`longueurCotee`) et des surfaces. Son épaisseur part donc tout entière
+ * vers le dehors, du côté où n'est pas sa pièce.
+ *
+ * Relevé du patron : l'épaisseur centrée sur la face mangeait la pièce. Les
+ * élévations du PDF étaient trop courtes d'une épaisseur, un meuble calé
+ * contre le mur s'arrêtait à 7 cm de la vraie face, une baignoire de 1,70
+ * se calait sur 2,04, et une pièce ajoutée contre un mur relevé gagnait la
+ * moitié du mur.
+ *
+ * LE DEDANS EST LE CÔTÉ DE SA PIÈCE — celle qui l'a relevé (`roomId`), quand
+ * elle est fermée : à cinq centimètres du trait, un côté dans son contour,
+ * l'autre non. Une pièce qu'on accole ensuite de l'autre côté n'y change
+ * rien : le trait reste la face qu'on a vue. Un refend relevé d'un seul côté
+ * s'épaissit donc dans la pièce voisine, comme dans la réalité ; vu des deux
+ * côtés, la fusion l'a déjà posé sur son axe (`deuxFaces`).
+ *
+ * Sans pièce fermée à lui (un ancien plan, une pièce dont un mur manque),
+ * on lit les faces du graphe des murs : un côté dans l'une, l'autre dans
+ * aucune. Les deux côtés dedans (une cloison libre) ou dehors (un muret) :
+ * on ne sait pas, l'épaisseur reste centrée.
+ */
+export interface DemiFaces {
+  plus: number;
+  moins: number;
+}
+
+const facesGardees = new WeakMap<WallSeg[], Map<string, DemiFaces>>();
+
+/** Le mur relevé d'un seul côté : son trait est sa face. */
+export const estAUneFace = (w: WallSeg): boolean =>
+  w.type === 'wall' && !w.auNu && !w.deuxFaces;
+
+export function facesDesMurs(walls: WallSeg[], t?: number): Map<string, DemiFaces> {
+  if (t === undefined) {
+    const garde = facesGardees.get(walls);
+    if (garde) return garde;
+  }
+  const out = new Map<string, DemiFaces>();
+  let pieces: Map<string, Pt[]> | null = null;
+  let graphe: { niveau: number; pts: Pt[] }[] | null = null;
+  for (const w of walls) {
+    const e = t ?? epaisseurDe(w);
+    let plus = e / 2;
+    let moins = e / 2;
+    const len = segLength(w);
+    if (estAUneFace(w) && len > 1e-6) {
+      pieces ??= piecesFermees(walls);
+      const n = perp({ x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len });
+      const m = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+      const sonde = (s: number) => ({ x: m.x + n.x * s * 0.05, z: m.z + n.z * s * 0.05 });
+      const sienne = pieces.get(roomOf(w));
+      let cotePlus: boolean;
+      let coteMoins: boolean;
+      if (sienne) {
+        cotePlus = dansLeContour(sonde(1), sienne);
+        coteMoins = dansLeContour(sonde(-1), sienne);
+      } else {
+        graphe ??= facesDuGraphe(walls);
+        const niveau = niveauDe(w);
+        const dedans = (s: number) => graphe!.some((c) => c.niveau === niveau && dansLeContour(sonde(s), c.pts));
+        cotePlus = dedans(1);
+        coteMoins = dedans(-1);
+      }
+      if (cotePlus && !coteMoins) {
+        plus = 0;
+        moins = e;
+      } else if (coteMoins && !cotePlus) {
+        plus = e;
+        moins = 0;
+      }
+    }
+    out.set(w.id, { plus, moins });
+  }
+  if (t === undefined) facesGardees.set(walls, out);
+  return out;
+}
+
+/**
+ * Le contour de chaque pièce FERMÉE, par `roomId`. Le contour refermé d'une
+ * chaîne ouverte passe où il veut : il ne dit pas où est le dedans.
+ */
+function piecesFermees(walls: WallSeg[]): Map<string, Pt[]> {
+  const out = new Map<string, Pt[]>();
+  for (const { roomId, items } of groupByRoom(walls.filter((v) => v.type === 'wall'))) {
+    const s = roomSurface(items);
+    if (s?.exact && s.pts.length >= 3) out.set(roomId, s.pts);
+  }
+  return out;
+}
+
+/**
+ * Les faces du graphe des murs, niveau par niveau — ce que `detectRooms`
+ * appelle des pièces. Une face plus mince qu'un quart de mètre (deux fois
+ * son aire sur son périmètre : la largeur d'une bande) n'en est pas une :
+ * c'est l'entre-deux de deux murs parallèles.
+ */
+function facesDuGraphe(walls: WallSeg[]): { niveau: number; pts: Pt[] }[] {
+  const parNiveau = new Map<number, WallSeg[]>();
+  for (const w of walls) {
+    if (w.type !== 'wall') continue;
+    parNiveau.set(niveauDe(w), [...(parNiveau.get(niveauDe(w)) ?? []), w]);
+  }
+  const out: { niveau: number; pts: Pt[] }[] = [];
+  for (const [niveau, items] of parNiveau) {
+    for (const f of facesFermees(items)) {
+      let perimetre = 0;
+      for (let i = 0; i < f.outline.length; i++) {
+        const a = f.outline[i];
+        const b = f.outline[(i + 1) % f.outline.length];
+        perimetre += Math.hypot(b.x - a.x, b.z - a.z);
+      }
+      if (perimetre > 0 && (2 * f.area) / perimetre > 0.25) out.push({ niveau, pts: f.outline });
+    }
+  }
+  return out;
+}
+
+/** Les deux faces d'un mur pris dans son plan. */
+export function demiFacesDe(walls: WallSeg[], w: WallSeg): DemiFaces {
+  const f = facesDesMurs(walls).get(w.id);
+  if (f) return f;
+  const e = epaisseurDe(w);
+  return { plus: e / 2, moins: e / 2 };
+}
+
+/** Du trait à la face du côté `s` (le signe le long de `perpOf(u)`). */
+export const faceDuCote = (f: DemiFaces, s: number): number => (s >= 0 ? f.plus : f.moins);
+
+/** Le point est-il hors du corps du mur, d'un côté ou de l'autre ? `v` : sa distance signée au trait. */
+const horsDuCorps = (f: DemiFaces, v: number): boolean => v > f.plus || v < -f.moins;
+
+/**
  * Géométrie des murs épais avec de VRAIES jonctions.
  *
  * À chaque nœud, les bras (murs qui s'y rejoignent) sont triés par angle ;
@@ -541,8 +679,17 @@ export function wallQuads(walls: WallSeg[], t?: number): Map<string, WallQuad> {
     l'onglet entre une cloison de sept et un mur de vingt se coupe là où
     leurs faces se croisent vraiment.
   */
-  const demiDe = new Map(walls.map((w) => [w.id, (t ?? epaisseurDe(w)) / 2]));
-  const demi = (id: string) => demiDe.get(id) ?? WALL_T / 2;
+  const faces = facesDesMurs(walls, t);
+  /*
+    LA DISTANCE DU TRAIT À LA FACE, côté +n (1) ou −n (−1) : une
+    demi-épaisseur pour un mur sur son axe, zéro ou l'épaisseur entière pour
+    un mur relevé d'un côté (voir `facesDesMurs`).
+  */
+  const off = (id: string, cote: 1 | -1) => {
+    const f = faces.get(id);
+    if (!f) return WALL_T / 2;
+    return cote === 1 ? f.plus : f.moins;
+  };
   const plusEpais = Math.max(WALL_T, ...walls.map((w) => t ?? epaisseurDe(w)));
   const arms = new Map<string, Arm[]>();
   // Deux pièces mitoyennes ont chacune leur mur : leurs bouts ne se
@@ -599,24 +746,29 @@ export function wallQuads(walls: WallSeg[], t?: number): Map<string, WallQuad> {
       const hote = walls.find((v) => {
         if (v.id === arm.wallId || roomOf(v) !== armRoom) return false;
         const { dist, t: pos } = pointOnSeg(P, v.a, v.b);
-        return dist < demi(v.id) * 2 && pos > 0.02 && pos < 0.98;
+        return dist < (off(v.id, 1) + off(v.id, -1)) && pos > 0.02 && pos < 0.98;
       });
       // Le prolongement part À L'OPPOSÉ du corps du mur, dans celui du
-      // voisin — d'une demi-épaisseur DU VOISIN : c'est lui qu'on traverse.
-      const C = hote
-        ? { x: P.x - arm.dir.x * demi(hote.id), z: P.z - arm.dir.z * demi(hote.id) }
-        : P;
-      const half = demi(arm.wallId);
+      // voisin — jusqu'à sa face d'en face : c'est lui qu'on traverse.
+      let C = P;
+      if (hote) {
+        const lh = segLength(hote) || 1;
+        const nh = perp({ x: (hote.b.x - hote.a.x) / lh, z: (hote.b.z - hote.a.z) / lh });
+        const cote: 1 | -1 = -arm.dir.x * nh.x - arm.dir.z * nh.z >= 0 ? 1 : -1;
+        const prof = off(hote.id, cote);
+        C = { x: P.x - arm.dir.x * prof, z: P.z - arm.dir.z * prof };
+      }
       const nrm = perp(arm.dir);
       // +perp(dir) vaut +n en 'a' (dir = u) mais −n en 'b' (dir = −u).
       const sPlus: 1 | -1 = arm.end === 'a' ? 1 : -1;
+      const sMoins: 1 | -1 = sPlus === 1 ? -1 : 1;
       corner(arm.wallId, arm.end, sPlus, {
-        x: C.x + nrm.x * half,
-        z: C.z + nrm.z * half,
+        x: C.x + nrm.x * off(arm.wallId, sPlus),
+        z: C.z + nrm.z * off(arm.wallId, sPlus),
       });
-      corner(arm.wallId, arm.end, sPlus === 1 ? -1 : 1, {
-        x: C.x - nrm.x * half,
-        z: C.z - nrm.z * half,
+      corner(arm.wallId, arm.end, sMoins, {
+        x: C.x - nrm.x * off(arm.wallId, sMoins),
+        z: C.z - nrm.z * off(arm.wallId, sMoins),
       });
       continue;
     }
@@ -628,9 +780,11 @@ export function wallQuads(walls: WallSeg[], t?: number): Map<string, WallQuad> {
       const na = perp(A.dir);
       const nb = perp(B.dir);
       // Faces qui bordent le secteur A→B : côté +perp pour A, −perp pour B
-      // — chacune à SA demi-épaisseur.
-      const pa = { x: P.x + na.x * demi(A.wallId), z: P.z + na.z * demi(A.wallId) };
-      const pb = { x: P.x - nb.x * demi(B.wallId), z: P.z - nb.z * demi(B.wallId) };
+      // — chacune à SA distance du trait.
+      const ha = off(A.wallId, A.end === 'a' ? 1 : -1);
+      const hb = off(B.wallId, B.end === 'a' ? -1 : 1);
+      const pa = { x: P.x + na.x * ha, z: P.z + na.z * ha };
+      const pb = { x: P.x - nb.x * hb, z: P.z - nb.z * hb };
       let X = lineCross(pa, A.dir, pb, B.dir);
       // Murs alignés (secteur plat ou replié) : pas d'onglet, on reste au bord.
       if (!X) X = pa;
@@ -788,6 +942,8 @@ export function pushOutOfWalls(
    * exactement sur le nu.
    */
   depuis?: Pt,
+  /** Les faces lues sur le plan entier, quand `walls` n'en est qu'une pièce. */
+  faces: Map<string, DemiFaces> = facesDesMurs(walls),
 ): Pt {
   const cos = Math.cos(box.yaw);
   const sin = Math.sin(box.yaw);
@@ -821,6 +977,7 @@ export function pushOutOfWalls(
         l'alcôve pour le ramener au salon. « Tant qu'il y a ce retour de mur,
         ça ne rentre pas » — la place était pourtant là.
       */
+      const fw = faces.get(w.id) ?? demiFacesDe(walls, w);
       const versAncre = (inside.x - mid.x) * n.x + (inside.z - mid.z) * n.z;
       let sens = versAncre;
       if (depuis) {
@@ -831,12 +988,11 @@ export function pushOutOfWalls(
         const versIci = (p.x - w.a.x) * n.x + (p.z - w.a.z) * n.z;
         const versDepart =
           (depuis.x - w.a.x) * n.x + (depuis.z - w.a.z) * n.z;
-        sens =
-          Math.abs(versIci) > epaisseurDe(w) / 2
-            ? versIci
-            : Math.abs(versDepart) > epaisseurDe(w) / 2
-              ? versDepart
-              : versAncre;
+        sens = horsDuCorps(fw, versIci)
+          ? versIci
+          : horsDuCorps(fw, versDepart)
+            ? versDepart
+            : versAncre;
       }
       if (sens < 0) {
         n = { x: -n.x, z: -n.z };
@@ -846,9 +1002,10 @@ export function pushOutOfWalls(
       const demi =
         Math.abs((cos * n.x + sin * n.z) * (box.width / 2)) +
         Math.abs((-sin * n.x + cos * n.z) * (box.depth / 2));
-      // Le nu de CE mur : une cloison de sept laisse le meuble plus près
-      // de son axe qu'un porteur de vingt.
-      const mini = demi + epaisseurDe(w) / 2;
+      // Le nu de CE mur, du côté du meuble : une cloison de sept laisse le
+      // meuble plus près de son axe qu'un porteur de vingt, et le trait d'un
+      // mur relevé d'un côté est déjà sa face (`facesDesMurs`).
+      const mini = demi + faceDuCote(fw, sens);
       // Distance signée du centre au nu, comptée vers l'intérieur.
       const d = (p.x - w.a.x) * n.x + (p.z - w.a.z) * n.z;
       // Hors du segment : ce mur ne barre pas la route ici.
@@ -1277,6 +1434,8 @@ export function alignToFit(
   inside: Pt,
   outline?: Pt[],
   depuis?: Pt,
+  /** Les faces lues sur le plan entier, quand `walls` n'en est qu'une pièce. */
+  faces: Map<string, DemiFaces> = facesDesMurs(walls),
 ): number {
   /**
    * Le meuble TIENT-IL là, à cet angle et à cette taille ?
@@ -1303,6 +1462,7 @@ export function alignToFit(
       inside,
       outline,
       depuis,
+      faces,
     );
     for (const wall of walls) {
       const len = segLength(wall);
@@ -1314,9 +1474,10 @@ export function alignToFit(
       const demi =
         Math.abs((cos * n.x + sin * n.z) * (w / 2)) +
         Math.abs((-sin * n.x + cos * n.z) * (d / 2));
-      const dist = Math.abs((p.x - wall.a.x) * n.x + (p.z - wall.a.z) * n.z);
+      const sd = (p.x - wall.a.x) * n.x + (p.z - wall.a.z) * n.z;
+      const fw = faces.get(wall.id) ?? demiFacesDe(walls, wall);
       // Un centimètre de tolérance : c'est le jeu que laisse la poussée.
-      if (dist < demi + epaisseurDe(wall) / 2 - 0.01) return false;
+      if (sd < demi + fw.plus - 0.01 && sd > -(demi + fw.moins) + 0.01) return false;
     }
     return true;
   };
@@ -1406,6 +1567,8 @@ export function hugWall(
   inside: Pt,
   /** D'où vient le meuble : même raison que dans `pushOutOfWalls`. */
   depuis?: Pt,
+  /** Les faces lues sur le plan entier, quand `walls` n'en est qu'une pièce. */
+  faces: Map<string, DemiFaces> = facesDesMurs(walls),
 ): Pt {
   /** Le jour qu'on referme sans discuter. */
   const JOUR = 0.05;
@@ -1425,12 +1588,12 @@ export function hugWall(
       const versDepart = depuis
         ? (depuis.x - w.a.x) * n.x + (depuis.z - w.a.z) * n.z
         : 0;
-      const sens =
-        Math.abs(versIci) > epaisseurDe(w) / 2
-          ? versIci
-          : depuis && Math.abs(versDepart) > epaisseurDe(w) / 2
-            ? versDepart
-            : (inside.x - mid.x) * n.x + (inside.z - mid.z) * n.z;
+      const fw = faces.get(w.id) ?? demiFacesDe(walls, w);
+      const sens = horsDuCorps(fw, versIci)
+        ? versIci
+        : depuis && horsDuCorps(fw, versDepart)
+          ? versDepart
+          : (inside.x - mid.x) * n.x + (inside.z - mid.z) * n.z;
       if (sens < 0) {
         n = { x: -n.x, z: -n.z };
       }
@@ -1445,7 +1608,7 @@ export function hugWall(
         Math.abs((cos * n.x + sin * n.z) * (box.width / 2)) +
         Math.abs((-sin * n.x + cos * n.z) * (box.depth / 2));
       const jeu =
-        (p.x - w.a.x) * n.x + (p.z - w.a.z) * n.z - demi - epaisseurDe(w) / 2;
+        (p.x - w.a.x) * n.x + (p.z - w.a.z) * n.z - demi - faceDuCote(fw, sens);
       if (jeu <= 1e-4 || jeu > JOUR) continue;
       if (!mieux || jeu < mieux.jeu) mieux = { n, jeu };
     }
@@ -1500,6 +1663,8 @@ export function snapSideToWalls(
   walls: WallSeg[],
   /** Portée de l'aimant (m). */
   prise = 0.07,
+  /** Les faces lues sur le plan entier, quand `walls` n'en est qu'une pièce. */
+  faces: Map<string, DemiFaces> = facesDesMurs(walls),
 ): number {
   // La direction du côté : perpendiculaire à sa normale.
   const t = { x: -n.z, z: n.x };
@@ -1544,13 +1709,12 @@ export function snapSideToWalls(
     // Parallèles ? On compare les directions, au signe près.
     if (Math.abs(u.x * t.x + u.z * t.z) < DOUZE) continue;
     const nw = perpOf(u);
-    // Le nu du mur qui regarde le côté : l'axe, décalé d'une demi-épaisseur
-    // du bon côté. C'est cette face-là qu'on affleure, pas l'axe.
+    // Le nu du mur qui regarde le côté : le trait, décalé jusqu'à la face
+    // du bon côté (`facesDesMurs`). C'est cette face-là qu'on affleure.
     const versBord = (bord.x - w.a.x) * nw.x + (bord.z - w.a.z) * nw.z;
-    const face = {
-      x: w.a.x + nw.x * (versBord >= 0 ? epaisseurDe(w) / 2 : -epaisseurDe(w) / 2),
-      z: w.a.z + nw.z * (versBord >= 0 ? epaisseurDe(w) / 2 : -epaisseurDe(w) / 2),
-    };
+    const fw = faces.get(w.id) ?? demiFacesDe(walls, w);
+    const k = versBord >= 0 ? fw.plus : -fw.moins;
+    const face = { x: w.a.x + nw.x * k, z: w.a.z + nw.z * k };
     // Écart du côté au nu, mesuré le long de la normale du côté.
     const long = (face.x - bord.x) * n.x + (face.z - bord.z) * n.z;
     if (Math.abs(long) > prise) continue;
@@ -1660,6 +1824,14 @@ export interface RoomPart {
   centroid: Pt;
   /** Où poser le cartouche : au large, jamais dans un mur ni contre lui. */
   labelAt: Pt;
+}
+
+/**
+ * Une pièce ACCOLÉE : tracée aux cotes intérieures, sauf le mur relevé
+ * d'une voisine contre lequel on l'a posée (voir `addRoomBox`).
+ */
+function estAccolee(walls: WallSeg[]): boolean {
+  return walls.some((w) => w.auNu === true) && walls.every((w) => w.auNu === true || w.type !== 'wall' || estAUneFace(w) || !!w.deuxFaces);
 }
 
 /** Une pièce DESSINÉE : tous ses murs ont été tracés aux cotes intérieures (`auNu`). */
@@ -1795,8 +1967,22 @@ export function longueurCotee(
 function makePart(roomId: string, items: WallSeg[]): RoomPart {
   let surface = roomSurface(items);
   // Une pièce dessinée se compte au nu : voir `contourAuNu`.
-  if (surface?.exact && estDessine(items)) {
-    const nu = contourAuNu(surface.pts, items);
+  if (surface?.exact && (estDessine(items) || estAccolee(items))) {
+    /*
+      LA PIÈCE ACCOLÉE À UN MUR RELEVÉ SE COMPTE AU NU AUSSI — trois murs
+      tracés, et le mur scanné de la voisine. Son trait est la face de
+      l'AUTRE pièce : de ce côté-ci, le nu est à toute son épaisseur (voir
+      `facesDesMurs`). Elle se comptait à l'axe : 4,04 m² pour 1,75 × 2,00.
+    */
+    const nu = contourAuNu(surface.pts, items, (mur) =>
+      !mur
+        ? WALL_T / 2
+        : estAUneFace(mur)
+          ? roomOf(mur) === roomId
+            ? 0
+            : epaisseurDe(mur)
+          : epaisseurDe(mur) / 2,
+    );
     /*
       LA CLOISON QUI NE FERME RIEN PREND AUSSI SA PLACE AU SOL — revue
       « Karim » : le retour de 0,60 en 10 cm d'une niche laissait la chambre
@@ -2303,6 +2489,12 @@ export function clampFootprint(
   interior: { x: number; z: number },
   wallT = WALL_T,
   margin = 0.002,
+  /**
+   * Les faces des murs, lues sur le PLAN ENTIER (`facesDesMurs`). Les murs
+   * d'une seule pièce ne suffisent pas à les dire : vu d'une pièce, le
+   * refend qu'elle partage avec sa voisine paraît relevé d'un seul côté.
+   */
+  faces: Map<string, DemiFaces> = facesDesMurs(walls),
 ): ObjectFootprint {
   /*
     UN ESCALIER ENJAMBE SES MURS — revue « Nadia » : l'escalier droit qui
@@ -2361,7 +2553,14 @@ export function clampFootprint(
       if (d < minCorner) minCorner = d;
     }
     // Sa face à lui : l'épaisseur dite, sinon celle de référence.
-    const demi = (w.epaisseur !== undefined ? epaisseurDe(w) : wallT) / 2;
+    let demi = (w.epaisseur !== undefined ? epaisseurDe(w) : wallT) / 2;
+    /*
+      LE NU D'UN MUR SCANNÉ EST SON TRAIT — voir `facesDesMurs`. Une
+      baignoire de 1,70 relevée entre deux murs se repoussait de 7 cm à
+      chaque bout, puis le rabotage l'étirait pour combler le jour : 2,04.
+    */
+    const fw = faces.get(w.id);
+    if (fw && Math.abs(fw.plus - fw.moins) > 1e-9) demi = (side > 0 ? fw.plus : fw.moins) > 1e-9 ? 2 * demi : 0;
     const need = demi + margin - minCorner;
     // On accepte de déplacer jusqu'à la profondeur du meuble : de quoi
     // dégager une télé ou une étagère entièrement enfoncée dans la cloison.
@@ -3642,7 +3841,14 @@ export function retraitDuCoin(walls: WallSeg[], hote: WallSeg, coin: Pt): number
     const lo = segLength(o) || 1;
     const v = { x: (o.b.x - o.a.x) / lo, z: (o.b.z - o.a.z) / lo };
     if (Math.abs(u.x * v.z - u.z * v.x) < 0.5) continue;
-    retrait = Math.max(retrait, epaisseurDe(o) / 2);
+    /*
+      SA FACE DU CÔTÉ DU MUR — celle d'un mur relevé d'un côté est son trait
+      ou toute son épaisseur (voir `facesDesMurs`) : un coin de pièce scannée
+      ne recule de rien.
+    */
+    const versHote = Math.hypot(hote.a.x - coin.x, hote.a.z - coin.z) < Math.hypot(hote.b.x - coin.x, hote.b.z - coin.z) ? u : { x: -u.x, z: -u.z };
+    const cote = versHote.x * -v.z + versHote.z * v.x;
+    retrait = Math.max(retrait, faceDuCote(demiFacesDe(walls, o), cote));
   }
   return retrait;
 }
@@ -3686,10 +3892,13 @@ export function murNeufCote(
 ): { a: Pt; b: Pt } | null {
   const hote = walls.find((w) => w.id === pose.wallId);
   if (!hote || !(s.longueur > 0) || !(s.epaisseur > 0)) return null;
-  const eH = epaisseurDe(hote);
   const l0 = Math.hypot(pose.b.x - pose.a.x, pose.b.z - pose.a.z);
   if (l0 < 1e-6) return null;
   const d = { x: (pose.b.x - pose.a.x) / l0, z: (pose.b.z - pose.a.z) / l0 };
+  // Du trait du mur de départ à sa face, du côté où part le mur neuf : une
+  // demi-épaisseur, ou rien depuis le trait d'un mur relevé côté pièce.
+  const lh = segLength(hote) || 1;
+  const eH = 2 * faceDuCote(demiFacesDe(walls, hote), d.x * -(hote.b.z - hote.a.z) / lh + d.z * (hote.b.x - hote.a.x) / lh);
   const tirer = (p: Pt, axe: number) => ({
     a: { x: p.x, z: p.z },
     b: { x: p.x + d.x * axe, z: p.z + d.z * axe },
@@ -5124,7 +5333,13 @@ export function snapToNeighbours(
  * ses côtés, perpendiculairement, et on regarde ce qu'on rencontre. Rien
  * dans cette direction : pas de cote, plutôt qu'une cote fausse.
  */
-export function castToWall(from: Pt, dir: Pt, walls: WallSeg[]): number | null {
+export function castToWall(
+  from: Pt,
+  dir: Pt,
+  walls: WallSeg[],
+  /** Les faces lues sur le plan entier, quand `walls` n'en est qu'une pièce. */
+  faces?: Map<string, DemiFaces>,
+): number | null {
   let best = Infinity;
   let touche: WallSeg | null = null;
   for (const w of walls) {
@@ -5140,10 +5355,13 @@ export function castToWall(from: Pt, dir: Pt, walls: WallSeg[]): number | null {
     }
   }
   // Jusqu'au NU du mur, pas jusqu'à son axe : c'est la cote qu'on relève
-  // sur place, mètre contre la plinthe — au nu de CE mur, à son épaisseur.
-  return isFinite(best) && touche
-    ? Math.max(0, best - epaisseurDe(touche) / 2)
-    : null;
+  // sur place, mètre contre la plinthe — au nu de CE mur, de NOTRE côté.
+  // Celui d'un mur relevé d'un côté est son trait (`facesDesMurs`).
+  if (!isFinite(best) || !touche) return null;
+  const f = faces?.get(touche.id) ?? demiFacesDe(walls, touche);
+  const L = segLength(touche) || 1;
+  const cote = (from.x - touche.a.x) * -(touche.b.z - touche.a.z) / L + (from.z - touche.a.z) * (touche.b.x - touche.a.x) / L;
+  return Math.max(0, best - faceDuCote(f, cote));
 }
 
 /* ====================================================================== */
@@ -5320,25 +5538,43 @@ function rayonContour(de: Pt, d: Pt, poly: Pt[]): Pt | null {
 
 /**
  * Le mur qui ferme la pièce à cette extrémité de l'axe : c'est de SON nu
- * qu'on mesure. Absent, l'épaisseur de tous.
+ * qu'on mesure — du côté de la pièce, `dedans` le long de l'axe. Celui d'un
+ * mur relevé d'un côté est son trait, ou toute son épaisseur (voir
+ * `facesDesMurs`). Absent, la demi-épaisseur de tous.
  */
-function demiDuBord(walls: WallSeg[], axe: Pt, borne: number): number {
+function demiDuBord(
+  walls: WallSeg[],
+  faces: Map<string, DemiFaces>,
+  axe: Pt,
+  borne: number,
+  dedans: 1 | -1,
+): number {
   const w = walls.find(
     (x) =>
       x.type === 'wall' &&
       Math.abs(x.a.x * axe.x + x.a.z * axe.z - borne) < 0.08 &&
       Math.abs(x.b.x * axe.x + x.b.z * axe.z - borne) < 0.08,
   );
-  return (w ? epaisseurDe(w) : WALL_T) / 2;
+  if (!w) return WALL_T / 2;
+  const f = faces.get(w.id);
+  if (!f) return epaisseurDe(w) / 2;
+  const L = segLength(w) || 1;
+  const cote = (axe.x * dedans * -(w.b.z - w.a.z) + axe.z * dedans * (w.b.x - w.a.x)) / L;
+  return faceDuCote(f, cote);
 }
 
 /** Les deux dimensions d'une pièce, au nu, dans le sens où on la coupe. */
-export function dimensionsDeCoupe(part: RoomPart): { longueur: number; largeur: number } | null {
+export function dimensionsDeCoupe(
+  part: RoomPart,
+  /** Les murs du plan entier : la face d'un mur s'y lit (`facesDesMurs`). */
+  plan: WallSeg[] = part.walls,
+): { longueur: number; largeur: number } | null {
   const pts = part.surface?.pts;
   if (!pts || pts.length < 3) return null;
   const r = repereDePiece(pts);
+  const faces = facesDesMurs(plan);
   const nu = (axe: Pt, e: { min: number; max: number }) =>
-    e.max - e.min - demiDuBord(part.walls, axe, e.min) - demiDuBord(part.walls, axe, e.max);
+    e.max - e.min - demiDuBord(part.walls, faces, axe, e.min, 1) - demiDuBord(part.walls, faces, axe, e.max, -1);
   return { longueur: nu(r.long, r.eLong), largeur: nu(r.court, r.eCourt) };
 }
 
@@ -5358,6 +5594,8 @@ export function dimensionsDeCoupe(part: RoomPart): { longueur: number; largeur: 
 export function coupeDePiece(
   part: RoomPart,
   s: SaisieCoupe,
+  /** Les murs du plan entier : la face d'un mur s'y lit (`facesDesMurs`). */
+  plan: WallSeg[] = part.walls,
 ): { a: Pt; b: Pt } | null {
   const pts = part.surface?.pts;
   if (!pts || pts.length < 3 || !(s.epaisseur > 0) || !(s.depuis >= 0)) return null;
@@ -5366,7 +5604,7 @@ export function coupeDePiece(
   const e = s.sens === 'longueur' ? r.eLong : r.eCourt;
   const borne = s.depuisAutre ? e.max : e.min;
   const sens = s.depuisAutre ? -1 : 1;
-  let pos = borne + sens * (demiDuBord(part.walls, axe, borne) + s.depuis + s.epaisseur / 2);
+  let pos = borne + sens * (demiDuBord(part.walls, facesDesMurs(plan), axe, borne, sens) + s.depuis + s.epaisseur / 2);
   // La cloison reste DANS la pièce : au-delà, ce n'est plus une coupe.
   pos = Math.min(Math.max(pos, e.min + s.epaisseur / 2 + 0.02), e.max - s.epaisseur / 2 - 0.02);
   const pole = part.labelAt;
@@ -5384,8 +5622,9 @@ export function coupeParDefaut(
   part: RoomPart,
   sens: SaisieCoupe['sens'],
   epaisseur: number,
+  plan: WallSeg[] = part.walls,
 ): number {
-  const d = dimensionsDeCoupe(part);
+  const d = dimensionsDeCoupe(part, plan);
   if (!d) return 0;
   const v = (sens === 'longueur' ? d.longueur : d.largeur) / 2 - epaisseur / 2;
   return Math.max(0, Math.round(v * 100) / 100);

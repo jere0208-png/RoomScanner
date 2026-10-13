@@ -37,6 +37,9 @@ const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSe
   height: 2.5,
   yCenter: 1.25,
   roomId: 'r1',
+  // Le trait sur l'axe : des murs vus de leurs deux faces. Un mur relevé
+  // d'un seul côté a son trait sur sa face (voir `murscanneface.test.ts`).
+  deuxFaces: true,
 });
 
 /** Chambre de 3,50 × 2,44 m, coins à l'axe des murs. */

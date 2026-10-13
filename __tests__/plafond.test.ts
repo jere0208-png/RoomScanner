@@ -757,9 +757,10 @@ describe('les cotes du bandeau', () => {
     // Pièce 5 × 4 d'équerre ; un point à 1,20 m du mur de gauche.
     const at = { x: 1.2, z: 2 };
     const gap = castToWall(at, AXES(0).gauche, W);
-    // Le mur de gauche est en x = 0, son nu à 7 cm : 1,13 m.
+    // Le mur de gauche est en x = 0, relevé de la pièce : son trait est
+    // son nu, et l'on lit les 1,20 m qu'on mesure au mètre.
     expect(gap).not.toBeNull();
-    expect(gap!).toBeCloseTo(1.2 - 0.07, 2);
+    expect(gap!).toBeCloseTo(1.2, 2);
   });
 
   it('et déplacer de d change la distance de d, exactement', () => {

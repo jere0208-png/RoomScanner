@@ -23,7 +23,7 @@
  * garde ses cotes.
  */
 import type { ObjectData } from 'react-native-room-scan';
-import { epaisseurDe, segLength, solDesMurs, type Pt, type WallSeg } from './floorplan';
+import { demiFacesDe, segLength, solDesMurs, type Pt, type WallSeg } from './floorplan';
 
 /** Jusqu'où un meuble est réputé « contre » un mur (m). */
 const ECART_MAX = 0.2;
@@ -68,7 +68,14 @@ function ecartAuMur(m: Pt, n: Pt, t: Pt, demi: number, walls: WallSeg[]): number
     if (Math.abs(u.x * t.x + u.z * t.z) < PARALLELE) continue;
     // La distance de la ligne du mur au côté, le long de la normale.
     const loin = (w.a.x - m.x) * n.x + (w.a.z - m.z) * n.z;
-    const ecart = loin - epaisseurDe(w) / 2;
+    /*
+      JUSQU'À LA FACE TOURNÉE VERS LE MEUBLE — pas jusqu'à une
+      demi-épaisseur. Le trait d'un mur scanné EST sa face (voir
+      `facesDesMurs`) : le frigo calé à 7 cm du nu se cale contre lui.
+    */
+    const f = demiFacesDe(walls, w);
+    const cote = (m.x - w.a.x) * -u.z + (m.z - w.a.z) * u.x >= 0 ? f.plus : f.moins;
+    const ecart = loin - cote;
     if (ecart < -MORSURE_MAX || ecart > ECART_MAX) continue;
     // Le mur couvre-t-il au moins la moitié du côté ?
     const p0 = { x: m.x - t.x * demi, z: m.z - t.z * demi };

@@ -38,7 +38,7 @@
  * besoin de la pièce, de sa surface et des autres meubles, que la géométrie
  * d'un seul meuble ne connaît pas.
  */
-import { epaisseurDe, type Pt, type WallSeg } from './floorplan';
+import { demiFacesDe, facesDesMurs, type DemiFaces, type Pt, type WallSeg } from './floorplan';
 
 /** Ce qu'on sait d'un meuble pour le poser : son emprise et son cap. */
 export interface EmpriseMeuble {
@@ -105,14 +105,16 @@ export function poserLibre(
   vise: Pt,
   meuble: EmpriseMeuble,
   murs: WallSeg[],
+  /** Les faces lues sur le plan entier, quand `murs` n'en est qu'une pièce. */
+  faces: Map<string, DemiFaces> = facesDesMurs(murs),
 ): PoseMeuble {
   let dansLeMur = false;
 
   for (const w of murs) {
     if (w.type !== 'wall') continue;
-    // La bande de CE mur : sept centimètres pour une cloison, vingt pour
-    // un porteur.
-    const demi = epaisseurDe(w) / 2;
+    // La bande de CE mur : de sa face −n à sa face +n — de part et d'autre
+    // de l'axe, ou toute dehors pour un mur relevé d'un côté.
+    const f = faces.get(w.id) ?? demiFacesDe(murs, w);
     const cs = coins(vise, meuble);
     const infos = cs.map((p) => versLeMur(p, w));
     // Le meuble ne concerne que les murs qu'il LONGE : au-delà des bouts,
@@ -137,7 +139,7 @@ export function poserLibre(
       de jour derrière un canapé qu'on venait de coller. Un millimètre de
       tolérance.
     */
-    if (min < demi - 1e-3 && max > -demi + 1e-3) {
+    if (min < f.plus - 1e-3 && max > -f.moins + 1e-3) {
       dansLeMur = true;
       // Un seul mur mordu suffit à refuser : rien ne sert de mesurer les
       // autres. C'est aussi ce qui rend la boucle rapide sur un plan chargé,

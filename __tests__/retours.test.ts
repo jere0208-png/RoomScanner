@@ -72,6 +72,21 @@ describe('les retours d’un mur percé', () => {
     const runs = masonryRuns(wallRuns(W[0], [PORTE]), segLength(W[0]), face());
     expect(runs).toHaveLength(2);
     /**
+     * Le trait d'un mur scanné EST sa face intérieure : la porte, posée de
+     * 2,50 à 3,40 sur le trait, se lit à 2,50 et 3,40 depuis le coin.
+     */
+    expect(runs[0].x1).toBeCloseTo(2.5, 6);
+    expect(runs[1].x0).toBeCloseTo(3.4, 6);
+    // Et rien ne dépasse de la face.
+    expect(runs[0].x0).toBeGreaterThanOrEqual(0);
+    expect(runs[1].x1).toBeLessThanOrEqual(face().len + 1e-9);
+  });
+
+  it('sur un mur tracé à l’axe, se lisent depuis la face, pas depuis l’axe', () => {
+    const D = W.map((w) => ({ ...w, auNu: true }));
+    const faceD = wallFace(D[0], wallQuads(D).get('n'), 1);
+    const runs = masonryRuns(wallRuns(D[0], [PORTE]), segLength(D[0]), faceD);
+    /**
      * La porte occupe 2,50 → 3,40 SUR L'AXE. La face, elle, commence 7 cm
      * plus loin — la moitié de l'épaisseur du mur, mangée par le tableau de
      * l'angle. Les bords des retours se lisent donc à 2,43 et 3,33.

@@ -20,6 +20,7 @@ import {
   toFootprint,
   wallQuads,
   jonctionsDeMurs,
+  demiFacesDe,
   epaisseurDe,
   wallsCentroid,
   WALL_T,
@@ -3716,7 +3717,9 @@ export function buildScene(
         // le nu de la maçonnerie, pas sa profondeur : un rangement de 45 cm
         // est adossé comme une télé de 8, et l'ancien seuil de saillie le
         // laissait dehors pour un centimètre.
-        const jeu = Math.abs(d) - demi - WALL_T / 2;
+        // Le nu de SON côté : sur le trait pour un mur relevé d'un côté.
+        const faces = demiFacesDe(walls, w);
+        const jeu = Math.abs(d) - demi - (d >= 0 ? faces.plus : faces.moins);
         if (jeu > 0.12) continue;
         best = Math.abs(d);
         const sens = d >= 0 ? 1 : -1;
@@ -3837,9 +3840,12 @@ export function buildScene(
     const B = { x: p.w.a.x + u.x * p.t1 * L, z: p.w.a.z + u.z * p.t1 * L };
     const largeur = Math.hypot(B.x - A.x, B.z - A.z);
     if (largeur < 0.3) continue;
-    const centre = { x: (A.x + B.x) / 2, z: (A.z + B.z) / 2 };
     const ep = epaisseurDe(p.w);
     const n = { x: -u.z, z: u.x };
+    // Au cœur du mur : décalé vers le dehors pour un mur relevé d'un côté.
+    const facesP = demiFacesDe(walls, p.w);
+    const coeurP = (facesP.plus - facesP.moins) / 2;
+    const centre = { x: (A.x + B.x) / 2 + n.x * coeurP, z: (A.z + B.z) / 2 + n.z * coeurP };
     // Le battant du plan : sa normale vers la pièce de la porte, retournée si
     // elle ouvre vers l'extérieur ; son gond, celui du dessin.
     const dedans = interiorOf.get(roomOf(p.seg)) ?? interiorOf.get(roomOf(p.w));
@@ -3905,8 +3911,10 @@ export function buildScene(
     const largeur = (f.t1 - f.t0) * L;
     if (largeur < 0.2) continue;
     const tm = (f.t0 + f.t1) / 2;
-    const centre = { x: f.w.a.x + u.x * tm * L, z: f.w.a.z + u.z * tm * L };
     const n = { x: -u.z, z: u.x };
+    const facesF = demiFacesDe(walls, f.w);
+    const coeurF = (facesF.plus - facesF.moins) / 2;
+    const centre = { x: f.w.a.x + u.x * tm * L + n.x * coeurF, z: f.w.a.z + u.z * tm * L + n.z * coeurF };
     const dedans = interiorOf.get(roomOf(f.seg)) ?? interiorOf.get(roomOf(f.w));
     const sens = dedans && (dedans.x - centre.x) * n.x + (dedans.z - centre.z) * n.z < 0 ? -1 : 1;
     const auSol = f.y0 < 0.3;

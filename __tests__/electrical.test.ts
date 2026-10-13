@@ -82,12 +82,13 @@ describe('repère de la face de mur', () => {
   it('chaque face a SA longueur, et les deux sens sont opposés', () => {
     const plus = wallFace(w, q, 1);
     const moins = wallFace(w, q, -1);
-    // Les deux faces d'un mur ne mesurent pas la même chose : l'onglet des
-    // coins raccourcit celle de l'intérieur d'une épaisseur de mur et
-    // rallonge celle de l'extérieur d'autant. C'est bien ce qu'on veut —
-    // l'électricien mesure depuis le coin fini qu'il a sous les yeux.
-    expect(plus.len).toBeCloseTo(4 - WALL_T, 6);
-    expect(moins.len).toBeCloseTo(4 + WALL_T, 6);
+    // Les deux faces d'un mur ne mesurent pas la même chose. Celle de la
+    // pièce est la face que le scan a relevée : ses 4,00 m, de coin fini à
+    // coin fini — l'électricien mesure depuis le coin qu'il a sous les
+    // yeux. L'épaisseur part dehors, et l'onglet rallonge la face
+    // extérieure d'une épaisseur à chaque bout.
+    expect(plus.len).toBeCloseTo(4, 6);
+    expect(moins.len).toBeCloseTo(4 + 2 * WALL_T, 6);
     // La face +1 part de l'extrémité `a` ; la face −1 en part à l'envers.
     expect(plus.s1).toBeGreaterThan(plus.s0);
     expect(moins.s1).toBeLessThan(moins.s0);

@@ -40,6 +40,7 @@
  * les cotes de l'établi. Ils ne sont simplement plus dessinés.
  */
 import {
+  demiFacesDe,
   epaisseurDe,
   jonctionsDeMurs,
   pointOnSeg,
@@ -332,9 +333,15 @@ export interface BaieDuPoche {
   b: Pt;
   /** Normale unitaire du mur porteur. */
   n: Pt;
-  /** Jusqu'où va la maçonnerie, de part et d'autre de l'axe (m). */
+  /** Jusqu'où va la maçonnerie, de part et d'autre du trait (m). */
   plus: number;
   moins: number;
+  /**
+   * LE CŒUR DU MUR, compté depuis le trait le long de `n` (m) : zéro pour
+   * un mur sur son axe, une demi-épaisseur vers le dehors pour un mur
+   * relevé d'un côté. Le vitrage s'y dessine.
+   */
+  coeur: number;
 }
 
 export interface Poche {
@@ -436,7 +443,9 @@ export function pocheDesMurs(
     return walls.some((w) => {
       if (w.epaisseur === undefined) return false;
       const { dist, t } = pointOnSeg(m, w.a, w.b);
-      return t >= -1e-6 && t <= 1 + 1e-6 && Math.abs(dist - epaisseurDe(w) / 2) < 0.005;
+      if (t < -1e-6 || t > 1 + 1e-6) return false;
+      const f = demiFacesDe(walls, w);
+      return Math.abs(dist - f.plus) < 0.005 || Math.abs(dist - f.moins) < 0.005;
     });
   };
 
@@ -496,7 +505,10 @@ export function pocheDesMurs(
     const ux = (w ? w.b.x - w.a.x : dx) / (w ? Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) : L);
     const uz = (w ? w.b.z - w.a.z : dz) / (w ? Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) : L);
     const n = { x: -uz, z: ux };
-    const h = (w ? epaisseurDe(w) : 0.14) / 2;
+    // Les deux faces du porteur : de part et d'autre de l'axe, ou toute
+    // l'épaisseur dehors pour un mur relevé d'un côté (`facesDesMurs`).
+    const f = w ? demiFacesDe(walls, w) : { plus: 0.07, moins: 0.07 };
+    const h = Math.max(f.plus, f.moins);
     // Les deux bouts, ramenés sur l'axe du mur porteur.
     const sur = (p: Pt) => {
       if (!w) return p;
@@ -510,9 +522,9 @@ export function pocheDesMurs(
     const plusDehors = coteDehors(1);
     const moinsDehors = coteDehors(-1);
     // Une façade n'a de dehors que d'un côté ; deux dehors, c'est un mur isolé.
-    const plus = h + (plusDehors && !moinsDehors ? facade : 0);
-    const moins = h + (moinsDehors && !plusDehors ? facade : 0);
-    baies.push({ id: o.id, type: o.type, a, b, n, plus, moins });
+    const plus = f.plus + (plusDehors && !moinsDehors ? facade : 0);
+    const moins = f.moins + (moinsDehors && !plusDehors ? facade : 0);
+    baies.push({ id: o.id, type: o.type, a, b, n, plus, moins, coeur: (f.plus - f.moins) / 2 });
     const e = 0.02;
     vides.push([
       { x: a.x + n.x * (plus + e), z: a.z + n.z * (plus + e) },

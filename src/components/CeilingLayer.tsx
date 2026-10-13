@@ -27,7 +27,7 @@ import {
   wallFace,
   type Fixture,
 } from '../geometry/electrical';
-import { castToWall, type Pt, type RoomPart, type WallSeg } from '../geometry/floorplan';
+import { castToWall, facesDesMurs, type Pt, type RoomPart, type WallSeg } from '../geometry/floorplan';
 import { sortieDeLAppareil } from './FixtureLayer';
 import {
   TAILLE_ECART,
@@ -435,7 +435,7 @@ export function CeilingLayer({
           return (
             <G>
               {sens.map((d, ci) => {
-                const gap = castToWall(cl.at, d, murs);
+                const gap = castToWall(cl.at, d, murs, facesDesMurs(walls));
                 if (gap === null || gap < 0.02 || gap > 12) return null;
                 const to = {
                   x: cl.at.x + d.x * gap,

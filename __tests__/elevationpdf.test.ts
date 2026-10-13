@@ -174,16 +174,18 @@ describe('les feuilles d’élévation', () => {
     expect(vu).toContain('110');
     expect(vu).toContain('25');
     // Et sa distance au bord gauche du mur, en centimètres, depuis le NU :
-    // 0,35 sur l'axe, moins la demi-épaisseur du mur d'angle. (Ce banc
-    // lisait « 35 » dans « tableau 135 », la ligne de référence partie.)
-    expect(vu).toMatch(/\| 28 \|/);
+    // 0,35 sur le trait — celui d'un mur scanné EST sa face, et le coin
+    // fini est au bout du trait. (Ce banc lisait « 35 » dans « tableau
+    // 135 », la ligne de référence partie : on l'attend entre deux champs.)
+    expect(vu).toMatch(/\| 35 \|/);
   });
 
   it('cotent le retour de mur quand le mur est percé', () => {
     const vu = texte(doc({ elevations: true }));
-    // La porte laisse deux retours ; leurs largeurs sont écrites.
+    // La porte laisse deux retours ; leurs largeurs sont écrites. Celui de
+    // gauche fait ses 2,00 m relevés, d'angle fini à tableau.
     expect(vu).toContain('Porte');
-    expect(vu).toMatch(/\b19[0-9]\b/);
+    expect(vu).toMatch(/\| 200 \|/);
   });
 
   /*

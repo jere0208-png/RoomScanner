@@ -108,7 +108,6 @@ import {
   planFrameAngle,
   filtrerAuNiveau,
   altitudesDesNiveaux,
-  WALL_T,
   nomDuNiveau,
   abregerNiveau,
   niveauDe,
@@ -4540,8 +4539,8 @@ export function ResultScreen() {
                 setPendingCeiling(null);
                 const surface = part.surface!;
                 const contour = surface.nu ?? surface.pts;
-                // Un contour à l'axe (relevé au scan) recule d'abord d'un demi-mur.
-                const bord = surface.nu ? 0 : WALL_T / 2;
+                // Le contour est déjà au nu : celui d'une pièce dessinée, ou
+                // les faces relevées d'une pièce scannée (voir `facesDesMurs`).
                 const poserRuban = (trace: Pt[] | null, ferme: boolean, retrait?: number) => {
                   if (!trace) {
                     alerte('Pas la place', 'La pièce est trop petite pour ce retrait : essayez plus près des murs.');
@@ -4572,7 +4571,7 @@ export function ResultScreen() {
                     onSubmit: (t) => {
                       const v = lireCentimetres(t, { zero: true, seuilMetres: 1 });
                       if (v === null) return;
-                      poserRuban(rubanPeripherique(contour, bord + v), true, v);
+                      poserRuban(rubanPeripherique(contour, v), true, v);
                     },
                   });
                 const icone = <CeilingIcon kind="led" size={22} />;
@@ -4626,7 +4625,7 @@ export function ResultScreen() {
                       label: 'Le long du mur le plus proche',
                       hint: 'Du point touché : boîte à rideaux, tête de lit',
                       node: icone,
-                      onPress: () => poserRuban(rubanLeLongDuMur(contour, at, bord + 0.05), false),
+                      onPress: () => poserRuban(rubanLeLongDuMur(contour, at, 0.05), false),
                     },
                   ],
                 });
@@ -5557,7 +5556,7 @@ export function ResultScreen() {
                       changer: (m) => {
                         const surface = part.surface!;
                         const contour = surface.nu ?? surface.pts;
-                        const trace = rubanPeripherique(contour, (surface.nu ? 0 : WALL_T / 2) + m);
+                        const trace = rubanPeripherique(contour, m);
                         if (!trace) {
                           alerte('Pas la place', 'La pièce est trop petite pour ce retrait : essayez plus près des murs.');
                           return;
@@ -6981,12 +6980,13 @@ export function ResultScreen() {
       />
       <CoupeSheet
         part={coupePiece}
+        walls={walls}
         onClose={() => {
           setCoupePiece(null);
           setApercuMur(null);
         }}
         onApercu={(saisie: SaisieCoupe | null) => {
-          const seg = coupePiece && saisie ? coupeDePiece(coupePiece, saisie) : null;
+          const seg = coupePiece && saisie ? coupeDePiece(coupePiece, saisie, walls) : null;
           setApercuMur(
             seg
               ? { id: 'apercu-coupe', wallId: '', bout: 'a', angle: 0, a: seg.a, b: seg.b }

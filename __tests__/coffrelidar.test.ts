@@ -185,7 +185,7 @@ describe('le coffre est une vraie boîte, de quelque sens qu’on trace le mur',
     return sc.faces.filter(
       (f) =>
         f.pts.length >= 3 &&
-        f.pts.every((p) => p.x > 0.9 && p.x < 2.3 && p.y >= haut - 1e-3 && p.y <= haut + 0.25 + 1e-3 && p.z > 0) &&
+        f.pts.every((p) => p.x > 0.9 && p.x < 2.3 && p.y >= haut - 1e-3 && p.y <= haut + 0.25 + 1e-3 && p.z > -1e-6) &&
         f.pts.some((p) => p.z > 0.15),
     );
   };
@@ -194,7 +194,8 @@ describe('le coffre est une vraie boîte, de quelque sens qu’on trace le mur',
     it(`mur tracé ${sens > 0 ? 'dans un sens' : 'dans l’autre'} : la face avant regarde la pièce, toutes regardent dehors`, () => {
       const faces = coffreDe(sens);
       expect(faces.length).toBeGreaterThanOrEqual(4);
-      const centre = { x: 1.6, y: 1.4 + 1.35 / 2 + 0.125, z: 0.15 };
+      // Le coffre part de la face relevée (le trait) et avance de 18 cm.
+      const centre = { x: 1.6, y: 1.4 + 1.35 / 2 + 0.125, z: 0.09 };
       for (const f of faces) {
         const n = f.normal!;
         const c = f.pts.reduce((m, p) => ({ x: m.x + p.x / f.pts.length, y: m.y + p.y / f.pts.length, z: m.z + p.z / f.pts.length }), { x: 0, y: 0, z: 0 });

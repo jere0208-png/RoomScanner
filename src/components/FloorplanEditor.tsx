@@ -59,6 +59,8 @@ import {
   type WallSeg,
   pointOnSeg,
   epaisseurDe,
+  facesDesMurs,
+  type DemiFaces,
   etendueDeLaPiece,
   longueurCotee,
 } from '../geometry/floorplan';
@@ -300,10 +302,12 @@ export function coteVersLeMagasin(
 function footprintOf(
   o: ObjectData,
   partOf: Map<string, RoomPart>,
+  /** Les faces des murs du plan entier : voir `clampFootprint`. */
+  faces: Map<string, DemiFaces>,
 ): ObjectFootprint {
   const part = partOf.get(roomOf(o));
   if (!part) return toFootprint(o);
-  return clampFootprint(toFootprint(o), part.walls, part.labelAt);
+  return clampFootprint(toFootprint(o), part.walls, part.labelAt, undefined, undefined, faces);
 }
 
 /** Le cadrage du plan : rotation (rad), zoom, et déplacement en pixels. */
@@ -1752,6 +1756,7 @@ export function FloorplanEditor({
     () => new Map(parts.map((p) => [p.roomId, p])),
     [parts],
   );
+  const facesPlan = useMemo(() => facesDesMurs(walls), [walls]);
   /*
     LA PEINTURE DES MURS, EN BANDE LE LONG DE LEUR NU — correctif de
     l'audit : peindre un mur depuis la 2D ne changeait rien à l'écran. Une
@@ -1835,7 +1840,7 @@ export function FloorplanEditor({
       }
     >();
     if (!mapping || !showSurfaces || layout.w === 0) return out;
-    const foots = objects.map((o) => footprintOf(o, partOf));
+    const foots = objects.map((o) => footprintOf(o, partOf, facesPlan));
     const obstacles = [
       ...foots.map((f) => ({
         x: f.cx,
@@ -1993,6 +1998,7 @@ export function FloorplanEditor({
     view.zoom,
     parts,
     partOf,
+    facesPlan,
     roomById,
     objects,
     ceiling,
@@ -2210,7 +2216,7 @@ export function FloorplanEditor({
     if (onSelectObject && editable) {
       const m = mapping.toMeters(p);
       for (const o of objects) {
-        const f = footprintOf(o, partOf);
+        const f = footprintOf(o, partOf, facesPlan);
         const dx = m.x - f.cx;
         const dz = m.z - f.cz;
         const u = dx * Math.cos(f.yaw) + dz * Math.sin(f.yaw);
@@ -2591,7 +2597,7 @@ export function FloorplanEditor({
             {[...objects]
               .sort((a, b) => (a.category === 'tapis' ? 0 : 1) - (b.category === 'tapis' ? 0 : 1))
               .map((o) => {
-              const f = footprintOf(o, partOf);
+              const f = footprintOf(o, partOf, facesPlan);
               const ctr = mapping.toPx({ x: f.cx, z: f.cz });
               const w = f.width * mapping.scale;
               const d = f.depth * mapping.scale;
@@ -2761,7 +2767,7 @@ export function FloorplanEditor({
             {onSelectObject &&
               editable &&
               objects
-                .map((o) => ({ o, f: footprintOf(o, partOf) }))
+                .map((o) => ({ o, f: footprintOf(o, partOf, facesPlan) }))
                 .sort((a, b) => b.f.width * b.f.depth - a.f.width * a.f.depth)
                 .map(({ o, f }) => {
                   const ctr = mapping.toPx({ x: f.cx, z: f.cz });
@@ -3156,7 +3162,7 @@ export function FloorplanEditor({
               (() => {
                 const o = meublesDuNiveau.find((x) => x.id === selectedObjectId);
                 if (!o) return null;
-                const f = footprintOf(o, partOf);
+                const f = footprintOf(o, partOf, facesPlan);
                 const murs = partOf.get(roomOf(o))?.walls ?? walls;
                 const cos = Math.cos(f.yaw);
                 const sin = Math.sin(f.yaw);
@@ -3174,7 +3180,7 @@ export function FloorplanEditor({
                         x: f.cx + d.x * demi,
                         z: f.cz + d.z * demi,
                       };
-                      const gap = castToWall(from, d, murs);
+                      const gap = castToWall(from, d, murs, facesPlan);
                       // Ni collé, ni à l'autre bout du logement : au-delà de
                       // 4 m, ce n'est plus un dégagement, c'est du vide.
                       if (gap === null || gap < 0.02 || gap > 4) return null;
@@ -3389,7 +3395,7 @@ export function FloorplanEditor({
                   {/* Le vitrage : deux traits serrés au cœur du mur. */}
                   {o.type === 'window' &&
                     [0.015, -0.015].map((d, i) => {
-                      const v = vitre(d) ?? [a, b];
+                      const v = vitre((baie?.coeur ?? 0) + d) ?? [a, b];
                       return (
                         <Line
                           key={`v${i}`}
@@ -4018,7 +4024,7 @@ export function FloorplanEditor({
             (() => {
               const o = meublesDuNiveau.find((x) => x.id === selectedObjectId);
               if (!o) return null;
-              const f = footprintOf(o, partOf);
+              const f = footprintOf(o, partOf, facesPlan);
               const p = mapping.toPx({ x: f.cx, z: f.cz });
               // Boîte écran du rectangle tourné : c'est elle qu'on empoigne.
               const ang = f.yaw + view.rot;
@@ -4639,7 +4645,7 @@ function WallBody({
   */
   const facade =
     exterieur && onPress && !neuve
-      ? cibleDeFacade(wall, exterieur)
+      ? cibleDeFacade(wall, exterieur, undefined, quad ? distanceAuTrait(wall, exterieur > 0 ? quad.a1 : quad.a2) : undefined)
           .map((p) => mapping.toPx(p))
           .map((p) => `${p.x},${p.y}`)
           .join(' ')
@@ -5590,6 +5596,12 @@ function WallRotateHandle({
 }
 
 /** L'angle d'un mur, en degrés entiers — ce qu'on lit sur le plan. */
+/** La distance d'un coin du corps de mur à son trait : où est sa face. */
+function distanceAuTrait(w: WallSeg, p: Pt): number {
+  const L = Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) || 1;
+  return Math.abs(((p.x - w.a.x) * -(w.b.z - w.a.z) + (p.z - w.a.z) * (w.b.x - w.a.x)) / L);
+}
+
 function angleDe(w: WallSeg): number {
   return Math.round((Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x) * 180) / Math.PI);
 }

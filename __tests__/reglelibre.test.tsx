@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { act } from 'react-test-renderer';
 import type { ObjectData } from 'react-native-room-scan';
 import { accrocher, coinsDuMeuble, longueur, texteDeMesure } from '../src/geometry/regle';
-import { WALL_T, type WallSeg } from '../src/geometry/floorplan';
+import { type WallSeg } from '../src/geometry/floorplan';
 import { buildScanPdf } from '../src/export/pdf';
 import { useScanStore } from '../src/store/scanStore';
 
@@ -36,7 +36,8 @@ const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSe
   roomId: 'r1',
 });
 const MURS = [mur('n', 0, 0, 4, 0), mur('e', 4, 0, 4, 3), mur('s', 4, 3, 0, 3), mur('o', 0, 3, 0, 0)];
-const NU = WALL_T / 2;
+// Le trait d'un mur scanné est sa face : le nu, côté pièce, est sur le trait.
+const NU = 0;
 const commode = {
   id: 'c',
   category: 'storage',

@@ -24,7 +24,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import { act } from 'react-test-renderer';
 import type { ObjectData, SurfaceData } from 'react-native-room-scan';
 import { diagnostiquerPlan } from '../src/geometry/diagnosticPlan';
-import { epaisseurDe, roomParts, segLength, solDesMurs } from '../src/geometry/floorplan';
+import { roomParts, segLength, solDesMurs } from '../src/geometry/floorplan';
 import type { ProfilDessus } from '../src/geometry/coffreLidar';
 import { buildScene } from '../src/geometry/scene3d';
 import { buildScanPdf } from '../src/export/pdf';
@@ -372,13 +372,14 @@ describe('les défauts du scan, réparés en fin de scan', () => {
   it('le frigo se cale dans sa niche, entre ses trois murs', () => {
     scanner(NICHE);
     const frigo = st().objects.find((o) => o.category === 'refrigerator')!;
-    // Les deux joues de la niche, à 62 cm d'axe en axe.
+    // Les deux joues de la niche, relevées à 62 cm l'une de l'autre : le
+    // trait d'un mur scanné est sa face, le nu de la niche.
     const joues = st()
       .walls.filter((w) => Math.abs(w.a.x - w.b.x) < 0.02 && Math.min(w.a.z, w.b.z) < -0.3)
       .sort((p, q) => p.a.x - q.a.x);
     expect(joues).toHaveLength(2);
-    const gauche = joues[0].a.x + epaisseurDe(joues[0]) / 2;
-    const droite = joues[1].a.x - epaisseurDe(joues[1]) / 2;
+    const gauche = joues[0].a.x;
+    const droite = joues[1].a.x;
     // Le frigo de 46 cm, mal mesuré, remplit l'intervalle d'un nu à l'autre…
     expect(frigo.width).toBeCloseTo(droite - gauche, 2);
     // … et s'y centre.

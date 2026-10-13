@@ -750,10 +750,11 @@ describe('placer au centimètre, chez Théo', () => {
     const droite = e.find((x) => x.dir.x > 0.5)!;
     expect(droite.vers).toBe('lit');
     expect(droite.ecart).toBeCloseTo(1.2 - (0.95 + 0.225), 6);
-    // À gauche, rien entre lui et le mur : la cote reste au nu.
+    // À gauche, rien entre lui et le mur : la cote reste au nu — le trait
+    // de ce mur relevé, x = 0.
     const gauche = e.find((x) => x.dir.x < -0.5)!;
     expect(gauche.vers).toBeUndefined();
-    expect(gauche.ecart).toBeCloseTo(0.95 - 0.225 - 0.07, 6);
+    expect(gauche.ecart).toBeCloseTo(0.95 - 0.225, 6);
     // « 0 cm » le colle au lit.
     const p = centrePourEcart({ x: 0.95, z: 0.3 }, droite, 0)!;
     expect(p.x + 0.225).toBeCloseTo(1.2, 6);
