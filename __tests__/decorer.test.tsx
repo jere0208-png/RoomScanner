@@ -13,9 +13,10 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Text } from 'react-native';
+import { ScrollView, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { DecorSheet } from '../src/components/DecorSheet';
+import { Iso3DView } from '../src/components/Iso3DView';
 import { useScanStore } from '../src/store/scanStore';
 import { hexDeTeinte } from '../src/ui/habillage';
 
@@ -69,7 +70,11 @@ describe('la feuille « Décorer »', () => {
   it('peint les murs, pose le sol, teinte un meuble — aussitôt', () => {
     const t = monter();
     appuyer(t, 'Murs : Vert sauge');
+    // Un onglet par chose à décorer : le sol, puis les meubles.
+    appuyer(t, 'Sol');
     appuyer(t, 'Sol : Noyer');
+    appuyer(t, 'Meubles');
+    appuyer(t, 'Canapé 2 places');
     appuyer(t, 'Canapé 2 places : Bleu nuit');
     const r1 = useScanStore.getState().rooms.find((r) => r.id === 'r1')!;
     expect(r1.peinture).toBe('sauge');
@@ -83,10 +88,55 @@ describe('la feuille « Décorer »', () => {
 
   it('deux meubles du même nom se distinguent, et l’on passe d’une pièce à l’autre', () => {
     const t = monter();
+    appuyer(t, 'Meubles');
     expect(textes(t)).toEqual(expect.arrayContaining(['Chaise 1', 'Chaise 2']));
     appuyer(t, 'Chambre');
+    // Une autre pièce repart des murs : on rouvre ses meubles.
+    appuyer(t, 'Meubles');
     expect(textes(t)).toContain('Lit double 140');
     expect(textes(t)).not.toContain('Chaise 1');
+    act(() => t.unmount());
+  });
+});
+
+/*
+  RELEVÉ DU PATRON : « le scroll des éléments est trop capricieux », « les
+  murs avant sont gênants, modèle trop petit ».
+*/
+describe('décorer sans se battre avec l’écran', () => {
+  it('la maquette est en écorché, et cadrée plus serré', () => {
+    const t = monter();
+    const vue = t.root.findAllByType(Iso3DView)[0];
+    expect(vue.props.cutaway).toBe(true);
+    expect(vue.props.value.zoom).toBeGreaterThan(1.2);
+    act(() => t.unmount());
+  });
+
+  it('un doigt dans la liste arrête la maquette, qui repart ensuite', () => {
+    jest.useFakeTimers();
+    const t = monter();
+    const theta = () => t.root.findAllByType(Iso3DView)[0].props.value.theta;
+    const liste = t.root.findAllByType(ScrollView).find((n) => typeof n.props.onScrollBeginDrag === 'function')!;
+    act(() => liste.props.onTouchStart());
+    const arretee = theta();
+    act(() => jest.advanceTimersByTime(1500));
+    expect(theta()).toBe(arretee);
+    act(() => jest.advanceTimersByTime(2000));
+    expect(theta()).not.toBe(arretee);
+    act(() => t.unmount());
+    jest.useRealTimers();
+  });
+
+  it('chaque onglet dit sa teinte, et les meubles se choisissent un par un', () => {
+    const t = monter();
+    for (const o of ['Murs', 'Sol', 'Meubles']) {
+      expect(t.root.findAll((n) => n.props.accessibilityLabel === o && n.props.accessibilityRole === 'tab').length).toBeGreaterThan(0);
+    }
+    appuyer(t, 'Meubles');
+    // Un seul nuancier à la fois : celui du meuble choisi.
+    appuyer(t, 'Chaise 2');
+    expect(t.root.findAll((n) => n.props.accessibilityLabel === 'Chaise 2 : Bleu nuit').length).toBeGreaterThan(0);
+    expect(t.root.findAll((n) => n.props.accessibilityLabel === 'Chaise 1 : Bleu nuit')).toHaveLength(0);
     act(() => t.unmount());
   });
 });

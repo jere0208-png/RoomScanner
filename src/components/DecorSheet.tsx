@@ -10,7 +10,7 @@
  * s'applique aussitôt — la maquette, au-dessus, se repeint sous les yeux.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import type { ObjectData } from 'react-native-room-scan';
 import { SheetShell } from './Sheet';
@@ -44,34 +44,56 @@ export function nomDuMeuble(o: ObjectData): string {
   (`focusRoomId`), qui tourne d'un tour lent ; un doigt la reprend, et elle
   repart seule deux secondes et demie après. Elle vit à part : vingt images
   par seconde n'ont pas à redessiner tout le nuancier.
+
+  ET ELLE SE TAIT QUAND ON CHOISIT — relevé du patron : « le scroll des
+  éléments est trop capricieux ». Vingt images par seconde de maquette
+  occupaient le fil de l'application pendant qu'on faisait défiler les
+  teintes : le doigt accrochait. Un toucher dans la liste l'arrête, comme
+  un toucher sur elle (`repos`).
+
+  LES MURS DE DEVANT S'EFFACENT — « les murs avant sont gênants » : la
+  maquette est en écorché, quoi qu'on ait réglé ailleurs, et cadrée plus
+  serré (« modèle trop petit »).
 */
 const PAS_DU_TOUR = 1.2;
 const REPOS_APRES_LE_DOIGT = 2500;
+const ZOOM_DECOR = 1.3;
 
-function PieceTournante({ pieceId, niveau }: { pieceId: string | null; niveau?: number }) {
-  const [vue, setVue] = useState<View3DParams>({ ...DEFAULT_VIEW3D, tilt: 50 });
-  const touche = useRef(0);
+function PieceTournante({
+  pieceId,
+  niveau,
+  repos,
+}: {
+  pieceId: string | null;
+  niveau?: number;
+  /** L'instant du dernier toucher, sur la maquette ou dans la liste. */
+  repos: React.MutableRefObject<number>;
+}) {
+  const [vue, setVue] = useState<View3DParams>({ ...DEFAULT_VIEW3D, tilt: 50, zoom: ZOOM_DECOR });
   useEffect(() => {
     const id = setInterval(() => {
-      if (Date.now() - touche.current < REPOS_APRES_LE_DOIGT) return;
+      if (Date.now() - repos.current < REPOS_APRES_LE_DOIGT) return;
       setVue((v) => ({ ...v, theta: (v.theta + PAS_DU_TOUR) % 360 }));
     }, 50);
     return () => clearInterval(id);
-  }, []);
+  }, [repos]);
   return (
     <Iso3DView
       value={vue}
       onChange={(v) => {
-        touche.current = Date.now();
+        repos.current = Date.now();
         setVue(v);
       }}
       focusRoomId={pieceId}
       niveau={niveau}
       showMeasures={false}
       showNorth={false}
+      cutaway
     />
   );
 }
+
+type Onglet = 'murs' | 'sol' | 'meubles';
 
 export function DecorSheet({
   visible,
@@ -210,98 +232,192 @@ export function DecorSheet({
       })}
     </View>
   );
-  /** « Les murs : Vert sauge » — ce qui est pris se lit sans chercher la coche. */
-  const nomPris = (liste: Peinture[], cle: string) => liste.find((p) => p.cle === cle)?.nom;
 
   const st = useScanStore.getState;
+  const { height: hauteurEcran } = useWindowDimensions();
+  // L'aperçu prend un tiers de l'écran : on décore ce qu'on voit.
+  const hauteurApercu = Math.round(Math.min(360, Math.max(220, hauteurEcran * 0.34)));
+  const repos = useRef(0);
+  const [onglet, setOnglet] = useState<Onglet>('murs');
+  const [meubleId, setMeubleId] = useState<string | null>(null);
+  // Une autre pièce : on repart des murs, sans meuble choisi.
+  useEffect(() => {
+    setOnglet('murs');
+    setMeubleId(null);
+  }, [piece?.id]);
+  const meuble = meubles.find((o) => o.id === meubleId) ?? meubles[0] ?? null;
+  const peinture = piece ? PEINTURES.find((p) => p.cle === (piece.peinture ?? PEINTURE_DEFAUT)) : undefined;
+  const sol = piece ? SOLS.find((p) => p.cle === (piece.sol ?? SOL_DEFAUT)) : undefined;
+  const pastilleDe = (o: ObjectData) =>
+    TEINTES_MEUBLES.find((p) => p.cle === (o.teinte ? cleDeTeinte(o.teinte) : TEINTE_ORIGINE));
+
+  /*
+    TROIS ONGLETS, PAS UNE LISTE SANS FIN — relevé du patron : « revois une
+    amélioration en termes de facilité pour décorer ». Tout s'empilait :
+    les murs, le sol, puis un nuancier entier par meuble — trente rangées de
+    ronds pour une chambre meublée, dans une fenêtre de 340 points. Chaque
+    onglet montre sa teinte du moment : on sait ce qui est pris avant
+    d'ouvrir.
+  */
+  const ongletBouton = (cle: Onglet, nom: string, libelle: string, hex?: string) => {
+    const pris = onglet === cle;
+    return (
+      <TouchableOpacity
+        key={cle}
+        accessibilityRole="tab"
+        accessibilityLabel={nom}
+        accessibilityState={{ selected: pris }}
+        style={[s.onglet, pris && s.ongletPris]}
+        onPress={() => {
+          haptic('leger');
+          setOnglet(cle);
+        }}>
+        {hex ? <View style={[s.ongletTeinte, { backgroundColor: hex }]} /> : null}
+        <Text style={[s.ongletTexte, pris && s.ongletTextePris]} numberOfLines={1}>
+          {libelle}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <SheetShell visible={visible} onClose={onClose} defile={false}>
       <View style={s.tete}>
         <Text style={s.titre}>Décorer</Text>
-        <Text style={s.sous}>Murs, sol et meubles : la maquette change sous vos yeux. Le relevé, lui, ne bouge pas.</Text>
+        <Text style={s.sous}>Touchez une teinte : la pièce change sous vos yeux. Le relevé, lui, ne bouge pas.</Text>
       </View>
       {visible && piece ? (
-        <View style={s.apercu}>
-          <PieceTournante pieceId={piece.id} niveau={niveauDe(piece)} />
+        <View style={[s.apercu, { height: hauteurApercu }]}>
+          <PieceTournante pieceId={piece.id} niveau={niveauDe(piece)} repos={repos} />
         </View>
       ) : null}
-      <ScrollView style={s.corps} contentContainerStyle={s.corpsFond} showsVerticalScrollIndicator={false}>
-        {nommees.length === 0 ? (
-          <Text style={s.vide}>Aucune pièce sur ce plan : tracez ou redétectez les pièces pour les décorer.</Text>
-        ) : (
-          <>
-            {nommees.length > 1 && (
-              <View style={s.puces}>
-                {nommees.map((r, i) => {
-                  const prise = r.id === piece?.id;
-                  return (
-                    <TouchableOpacity
-                      key={r.id}
-                      accessibilityLabel={nomDeLaPiece(r, i)}
-                      accessibilityState={{ selected: prise }}
-                      style={[s.puce, prise && { backgroundColor: c.blue, borderColor: c.blue }]}
-                      onPress={() => {
-                        haptic('leger');
-                        setPieceId(r.id);
-                      }}>
-                      <Text style={[s.puceTexte, prise && { color: '#FFFFFF' }]} numberOfLines={1}>
-                        {nomDeLaPiece(r, i)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-            {piece && (
+      {nommees.length === 0 ? (
+        <Text style={s.vide}>Aucune pièce sur ce plan : tracez ou redétectez les pièces pour les décorer.</Text>
+      ) : (
+        <>
+          {nommees.length > 1 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={s.pucesBande}
+              contentContainerStyle={s.puces}
+              onTouchStart={() => (repos.current = Date.now())}>
+              {nommees.map((r, i) => {
+                const prise = r.id === piece?.id;
+                return (
+                  <TouchableOpacity
+                    key={r.id}
+                    accessibilityLabel={nomDeLaPiece(r, i)}
+                    accessibilityState={{ selected: prise }}
+                    style={[s.puce, prise && { backgroundColor: c.blue, borderColor: c.blue }]}
+                    onPress={() => {
+                      haptic('leger');
+                      setPieceId(r.id);
+                    }}>
+                    <Text style={[s.puceTexte, prise && { color: '#FFFFFF' }]} numberOfLines={1}>
+                      {nomDeLaPiece(r, i)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+          {piece && (
+            <View style={s.onglets} accessibilityRole="tablist">
+              {ongletBouton('murs', 'Murs', 'Murs', peinture?.hex)}
+              {ongletBouton('sol', 'Sol', 'Sol', sol?.hex)}
+              {ongletBouton('meubles', 'Meubles', meubles.length > 0 ? `Meubles · ${meubles.length}` : 'Meubles')}
+            </View>
+          )}
+          <ScrollView
+            style={s.corps}
+            contentContainerStyle={s.corpsFond}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            onTouchStart={() => (repos.current = Date.now())}
+            onScrollBeginDrag={() => (repos.current = Date.now())}>
+            {piece && onglet === 'murs' && (
               <>
-                <Text style={s.section}>
-                  {`Les murs : ${nomPris(PEINTURES, piece.peinture ?? PEINTURE_DEFAUT) ?? ''}`}
-                </Text>
+                <Text style={s.section}>{`Les murs : ${peinture?.nom ?? ''}`}</Text>
                 {nuancier(
                   PEINTURES,
                   piece.peinture ?? PEINTURE_DEFAUT,
                   (p) => `Murs : ${p.nom}`,
                   (cle) => st().setRoomPeinture(piece.id, cle === PEINTURE_DEFAUT ? null : cle),
-                )}
-                <Text style={s.section}>
-                  {`Le sol : ${nomPris(SOLS, piece.sol ?? SOL_DEFAUT) ?? ''}`}
-                </Text>
-                {nuancier(
-                  SOLS,
-                  piece.sol ?? SOL_DEFAUT,
-                  (p) => `Sol : ${p.nom}`,
-                  (cle) => st().setRoomSol(piece.id, cle === SOL_DEFAUT ? null : cle),
-                )}
-                <Text style={s.section}>Les meubles</Text>
-                {meubles.length === 0 ? (
-                  <Text style={s.vide}>Aucun meuble dans cette pièce.</Text>
-                ) : (
-                  meubles.map((o) => {
-                    const nom = nomsDesMeubles.get(o.id) ?? nomDuMeuble(o);
-                    return (
-                      <View key={o.id} style={s.meuble}>
-                        <Text style={s.meubleNom} numberOfLines={1}>
-                          {nom}
-                        </Text>
-                        {nuancier(
-                          TEINTES_MEUBLES,
-                          o.teinte ? cleDeTeinte(o.teinte) : TEINTE_ORIGINE,
-                          (p) => `${nom} : ${p.nom}`,
-                          (cle) => st().setObjectTeinte(o.id, hexDeTeinte(cle)),
-                          30,
-                        )}
-                      </View>
-                    );
-                  })
+                  44,
                 )}
                 <Text style={s.aide}>
                   Un mur seul se peint depuis sa barre, en mode édition sur le plan : « Peindre ».
                 </Text>
               </>
             )}
-          </>
-        )}
-      </ScrollView>
+            {piece && onglet === 'sol' && (
+              <>
+                <Text style={s.section}>{`Le sol : ${sol?.nom ?? ''}`}</Text>
+                {nuancier(
+                  SOLS,
+                  piece.sol ?? SOL_DEFAUT,
+                  (p) => `Sol : ${p.nom}`,
+                  (cle) => st().setRoomSol(piece.id, cle === SOL_DEFAUT ? null : cle),
+                  44,
+                )}
+              </>
+            )}
+            {piece && onglet === 'meubles' && (
+              meubles.length === 0 || !meuble ? (
+                <Text style={[s.vide, s.videMeubles]}>Aucun meuble dans cette pièce.</Text>
+              ) : (
+                <>
+                  {/*
+                    LES MEUBLES SE VOIENT D'UN COUP D'ŒIL — « apporte une
+                    meilleure visibilité aux éléments listés à décorer ».
+                    Chacun est une pastille à sa teinte du moment ; on en
+                    touche un, son nuancier s'ouvre dessous.
+                  */}
+                  <View style={s.meubles}>
+                    {meubles.map((o) => {
+                      const nom = nomsDesMeubles.get(o.id) ?? nomDuMeuble(o);
+                      const pris = o.id === meuble.id;
+                      const teinte = pastilleDe(o);
+                      return (
+                        <TouchableOpacity
+                          key={o.id}
+                          accessibilityLabel={nom}
+                          accessibilityState={{ selected: pris }}
+                          style={[s.meublePuce, pris && s.meublePucePris]}
+                          onPress={() => {
+                            haptic('leger');
+                            setMeubleId(o.id);
+                          }}>
+                          <View style={[s.meubleTeinte, { backgroundColor: teinte?.hex ?? c.surface }]} />
+                          <Text style={[s.meubleNom, pris && s.meubleNomPris]} numberOfLines={1}>
+                            {nom}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                  {(() => {
+                    const nom = nomsDesMeubles.get(meuble.id) ?? nomDuMeuble(meuble);
+                    return (
+                      <>
+                        <Text style={s.section}>{`${nom} : ${pastilleDe(meuble)?.nom ?? ''}`}</Text>
+                        {nuancier(
+                          TEINTES_MEUBLES,
+                          meuble.teinte ? cleDeTeinte(meuble.teinte) : TEINTE_ORIGINE,
+                          (p) => `${nom} : ${p.nom}`,
+                          (cle) => st().setObjectTeinte(meuble.id, hexDeTeinte(cle)),
+                          40,
+                        )}
+                      </>
+                    );
+                  })()}
+                </>
+              )
+            )}
+          </ScrollView>
+        </>
+      )}
     </SheetShell>
   );
 }
@@ -312,15 +428,15 @@ const getStyles = themedStyles((c: Palette) =>
     titre: { color: c.ink, fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
     sous: { color: c.inkSoft, fontSize: 13, lineHeight: 18, marginTop: 3 },
     apercu: {
-      height: 200,
       marginTop: 10,
       borderRadius: radius.md,
       overflow: 'hidden',
       backgroundColor: c.surfaceSunken,
     },
-    corps: { maxHeight: 340, marginTop: 10 },
+    corps: { flexShrink: 1, minHeight: 150, marginTop: 4 },
     corpsFond: { paddingBottom: 14 },
-    puces: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+    pucesBande: { flexGrow: 0, marginTop: 10 },
+    puces: { flexDirection: 'row', gap: 8, paddingRight: 8 },
     puce: {
       paddingHorizontal: 14,
       height: 34,
@@ -331,6 +447,53 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
     },
     puceTexte: { color: c.ink, fontSize: 14, fontWeight: '700' },
+    onglets: {
+      flexDirection: 'row',
+      gap: 6,
+      marginTop: 10,
+      padding: 4,
+      borderRadius: radius.md,
+      backgroundColor: c.surfaceSunken,
+    },
+    onglet: {
+      flex: 1,
+      height: 40,
+      borderRadius: radius.md - 3,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingHorizontal: 6,
+    },
+    ongletPris: {
+      backgroundColor: c.surface,
+      shadowColor: '#000',
+      shadowOpacity: 0.12,
+      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 1 },
+      elevation: 2,
+    },
+    ongletTeinte: { width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' },
+    ongletTexte: { color: c.inkSoft, fontSize: 14, fontWeight: '700' },
+    ongletTextePris: { color: c.ink, fontWeight: '800' },
+    meubles: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
+    meublePuce: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      height: 40,
+      paddingLeft: 6,
+      paddingRight: 14,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: c.lineStrong,
+      backgroundColor: c.surface,
+      maxWidth: '100%',
+    },
+    meublePucePris: { borderColor: c.blue, borderWidth: 2, backgroundColor: c.blueSoft },
+    meubleTeinte: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' },
+    meubleNom: { color: c.ink, fontSize: 14, fontWeight: '600', flexShrink: 1 },
+    meubleNomPris: { fontWeight: '800' },
     section: {
       color: c.inkSoft,
       fontSize: 12,
@@ -351,15 +514,8 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
       overflow: 'hidden',
     },
-    meuble: {
-      backgroundColor: c.surfaceSunken,
-      borderRadius: radius.md,
-      padding: 10,
-      marginBottom: 8,
-      gap: 8,
-    },
-    meubleNom: { color: c.ink, fontSize: 14, fontWeight: '700' },
-    vide: { color: c.inkSoft, fontSize: 13.5, lineHeight: 19 },
+    vide: { color: c.inkSoft, fontSize: 13.5, lineHeight: 19, marginTop: 10 },
+    videMeubles: { marginTop: 16 },
     aide: { color: c.inkFaint, fontSize: 12, lineHeight: 16, marginTop: 14 },
   }),
 );

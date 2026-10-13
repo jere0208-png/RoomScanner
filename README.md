@@ -14285,6 +14285,26 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Décorer, sans se battre avec l'écran
+
+Relevé du patron : « le scroll des éléments est trop capricieux ; les murs
+avant sont gênants, modèle trop petit ; apporte une meilleure visibilité
+aux éléments listés à décorer ».
+- **La maquette se tait quand on choisit.** Elle se redessinait vingt fois
+  par seconde pendant qu'on faisait défiler les teintes, et le doigt
+  accrochait. Un toucher dans la liste l'arrête ; elle repart seule deux
+  secondes et demie après.
+- **Les murs de devant s'effacent** (écorché forcé), et la pièce est cadrée
+  plus serré, dans un aperçu qui prend un tiers de l'écran au lieu de
+  200 points.
+- **Trois onglets au lieu d'une liste sans fin** : Murs, Sol, Meubles,
+  chacun avec la pastille de sa teinte du moment. Il n'y a plus trente
+  rangées de ronds pour une chambre meublée.
+- **Les meubles sont des pastilles à leur couleur** : on en touche un, son
+  seul nuancier s'ouvre dessous.
+
+Bancs : `decorer`, `retouchesdossier`, `centrage`.
+
 ## Le plafond ne se prend qu'en édition, la porte ouverte reste une porte
 
 Trois relevés du patron.

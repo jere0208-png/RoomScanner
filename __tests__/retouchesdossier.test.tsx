@@ -89,6 +89,7 @@ describe('« Décorer » reste sur la pièce, et la montre qui tourne', () => {
     });
     appuyer(t, 'Chambre');
     appuyer(t, 'Murs : Vert sauge');
+    appuyer(t, 'Sol');
     appuyer(t, 'Sol : Noyer');
     const r2 = useScanStore.getState().rooms.find((r) => r.id === 'r2')!;
     expect(r2.peinture).toBe('sauge');
