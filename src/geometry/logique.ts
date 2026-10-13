@@ -199,7 +199,7 @@ export function niveauxCommuns(valeurs: readonly number[], tol: number): number[
 function mursLogiques(walls: WallSeg[]): WallSeg[] {
   const murs = walls.filter((w) => w.type === 'wall');
   if (murs.length === 0) return walls;
-  const droits = murs.length >= 3 ? straightenWalls(walls, TOLERANCES_DU_RELEVE.equerre) : walls;
+  const droits = murs.length >= 3 ? straightenWalls(walls, TOLERANCES_DU_RELEVE.equerre, 0.12) : walls;
   const pieds = niveauxCommuns(
     droits.map((w) => (w.type === 'wall' ? w.yCenter - w.height / 2 : NaN)),
     TOLERANCES_DU_RELEVE.mur,
@@ -335,13 +335,23 @@ export function sansBaiesEnDouble(openings: WallSeg[]): WallSeg[] {
  * Et une porte de 1,20 m et plus, vue d'un seul tenant (la porte double
  * entre grand salon et salle à manger, 1,38), n'a pas un vantail de 1,38 :
  * aucune porte battante ne se fabrique ainsi. Elle en a deux.
+ *
+ * MAIS DEUX PORTES VOISINES NE SONT PAS DEUX VANTAUX — revue « Sandrine » :
+ * le WC et la salle de bains, deux portes de 0,73 séparées par 7 cm et la
+ * cloison qui tombe entre elles, devenaient une porte double de 1,53,
+ * ensuite déplacée de 83 cm. Les deux vantaux d'une porte se touchent : le
+ * jeu ne dépasse pas trois centimètres, et aucun mur n'arrive entre eux.
  */
-const JEU_ENTRE_VANTAUX = 0.1;
+const JEU_ENTRE_VANTAUX = 0.03;
 const PORTE_A_DEUX_VANTAUX = 1.2;
 const estUnVantail = (o: WallSeg, L: number) =>
   o.type === 'door' && !o.open && !o.garage && !o.vantaux && L >= 0.3 && L <= 1;
 
-export function portesDoubles(openings: WallSeg[]): WallSeg[] {
+export function portesDoubles(
+  openings: WallSeg[],
+  /** Les murs : un bout de cloison entre deux portes les sépare. */
+  walls: WallSeg[] = [],
+): WallSeg[] {
   const prises = new Set<string>();
   const out: WallSeg[] = [];
   for (let i = 0; i < openings.length; i++) {
@@ -377,6 +387,17 @@ export function portesDoubles(openings: WallSeg[]): WallSeg[] {
       // Le jeu entre les deux : un léger recouvrement est du bruit.
       const jeu = t0 >= L / 2 ? t0 - L : -t1;
       if (jeu < -0.05 || jeu > JEU_ENTRE_VANTAUX) continue;
+      // Un mur qui arrive entre les deux : ce sont deux portes.
+      const entreDeux = t0 >= L / 2 ? [L - 0.02, t0 + 0.02] : [t1 - 0.02, 0.02];
+      const separees = walls.some(
+        (w) =>
+          w.type === 'wall' &&
+          [w.a, w.b].some((p) => {
+            const tp = t(p);
+            return Math.abs(lat(p)) < 0.2 && tp > entreDeux[0] && tp < entreDeux[1];
+          }),
+      );
+      if (separees) continue;
       const debut = Math.min(0, t0);
       const fin = Math.max(L, t1);
       const haut = Math.max(o.yCenter + o.height / 2, q.yCenter + q.height / 2);
@@ -469,7 +490,7 @@ export function sansMeublesEnDouble<O extends ObjectData>(objets: O[]): O[] {
  */
 export function releveLogique(walls: WallSeg[], openings: WallSeg[]): { walls: WallSeg[]; openings: WallSeg[] } {
   const murs = mursLogiques(walls);
-  const suivies = reprojectOpenings(walls, murs, portesDoubles(sansBaiesEnDouble(openings)));
+  const suivies = reprojectOpenings(walls, murs, portesDoubles(sansBaiesEnDouble(openings), walls));
   const pieds = murs.filter((w) => w.type === 'wall').map((w) => w.yCenter - w.height / 2);
   const sol = pieds.length > 0 ? Math.min(...pieds) : 0;
   return { walls: murs, openings: baiesLogiques(suivies, sol) };

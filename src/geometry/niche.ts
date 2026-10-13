@@ -29,6 +29,8 @@ import { demiFacesDe, segLength, solDesMurs, type Pt, type WallSeg } from './flo
 const ECART_MAX = 0.2;
 /** Ce qu'il peut mordre dans le mur, et qu'on lui retire (m). */
 const MORSURE_MAX = 0.08;
+/** Ce que RoomPlan se trompe sur un meuble qui ne s'encastre pas (m). */
+const ERREUR_DE_MESURE = 0.05;
 /** Murs à 10° près parallèles au côté. */
 const PARALLELE = Math.cos((10 * Math.PI) / 180);
 
@@ -134,6 +136,17 @@ export function calerDansLaNiche<O extends ObjectData>(o: O, walls: WallSeg[]): 
   const d = r.d + dzAv + dzAr;
   // Un meuble qui doublerait n'est pas un meuble mal mesuré.
   if (w < 0.1 || d < 0.1 || w > r.w * 1.6 + 0.05 || d > r.d * 1.6 + 0.05) return null;
+  /*
+    SEUL CE QUI S'ENCASTRE REMPLIT SA NICHE — revue « Sandrine » : un lit de
+    1,40 relevé dans une alcôve de 1,75 sortait en 1,61 ; un lit change de
+    taille normalisée, pas de quelques centimètres. Le frigo, le lave-linge,
+    le four, le placard se logent dans leur niche (le relevé du patron) ;
+    tout le reste ne bouge que de l'erreur de mesure de RoomPlan.
+  */
+  const encastrable = /refrigerator|fridge|washer|dryer|dishwasher|oven|stove|storage|cabinet|wardrobe|placard/i.test(
+    o.category ?? '',
+  );
+  if (!encastrable && (Math.abs(w - r.w) > ERREUR_DE_MESURE || Math.abs(d - r.d) > ERREUR_DE_MESURE)) return null;
   const glisseX = (dxD - dxG) / 2;
   const glisseZ = (dzAr - dzAv) / 2;
   const t = [...o.transform];

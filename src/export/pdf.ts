@@ -121,6 +121,7 @@ import {
   facesDesMurs,
   estDessine,
   etendueDeLaPiece,
+  faceEntiere,
   longueurCotee,
   placeDuDetecteur,
   pointOnSeg,
@@ -3122,9 +3123,8 @@ function planPage(
       la place la moins encombrée qui gagne.
     */
     if (showDims) {
-      const surfacesPieces = parts
-        .map((pt) => pt.surface?.pts ?? [])
-        .filter((pts) => pts.length >= 3);
+      const partsAvecSurface = parts.filter((pt) => (pt.surface?.pts ?? []).length >= 3);
+      const surfacesPieces = partsAvecSurface.map((pt) => pt.surface!.pts);
       const dansUnePiece = (q: { x: number; z: number }) =>
         surfacesPieces.some((poly) => dansLePoche(q, [poly]));
       const centrePlan = centreDesMurs(walls);
@@ -3320,9 +3320,13 @@ function planPage(
           0,68 / 1,05, une chaîne de 4,93 sous un total de 4,80. Les bornes
           sont les nus ; chaque plein se mesure en mètres réels.
         */
+        // Pour tout mur, plus seulement un mur dessiné — revue « Sandrine » :
+        // sur un plan scanné, le dernier plein se mesurait jusqu'à l'axe du
+        // refend (« 1,00 / 1,40 / 2,65 » sous un total de 5,00). Le retrait
+        // d'un coin vaut zéro contre la face d'un mur relevé (`retraitDuCoin`).
         const Lax = segLength(w) || 1;
-        const t0nu = w.auNu ? Math.min(0.5, retraitDuCoin(walls, w, w.a) / Lax) : 0;
-        const t1nu = w.auNu ? Math.max(0.5, 1 - retraitDuCoin(walls, w, w.b) / Lax) : 1;
+        const t0nu = Math.min(0.5, retraitDuCoin(walls, w, w.a) / Lax);
+        const t1nu = Math.max(0.5, 1 - retraitDuCoin(walls, w, w.b) / Lax);
         const surMur = (tt: number) => ({ x: a.x + (b.x - a.x) * tt, y: a.y + (b.y - a.y) * tt });
         const aNu = surMur(t0nu);
         const bNu = surMur(t1nu);
@@ -3558,12 +3562,27 @@ function planPage(
           cout: number;
           taille: number;
           attaches: (readonly [Pt, Pt])[];
+          mot: string;
         } | null = null;
         for (const sgn of [1, -1]) {
           const n = normalePage(w, sgn);
           const F = (sgn > 0 ? facesC.plus : facesC.moins) * scale;
           const portees = [porteeAuBout(a, n), porteeAuBout(b, n)];
           const pieceDuBord = pieceDuPoint(plus({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, n, F + 1.5));
+          /*
+            LA COTE DE LA FACE QU'ON A SOUS LES YEUX — revue « Sandrine » : un
+            refend coupé à la jonction de deux pièces se cotait au plus long
+            de ses deux côtés, toutes pièces confondues (3,54 m côté chambre
+            pour une chambre de 3,50). Écrite d'un côté, elle cote la pièce
+            de ce côté.
+          */
+          const pieceIci = pieceDuBord >= 0 ? partsAvecSurface[pieceDuBord] : undefined;
+          const longueurIci = pieceIci ? longueurCotee(walls, w, [pieceIci]) : null;
+          const txtIci = longueurIci !== null ? `${frLen(longueurIci)} m` : txt;
+          // De ce côté, le mur n'est qu'un tronçon d'une face plus longue : on
+          // n'y écrit pas un morceau, on cote de l'autre côté.
+          const entiere = pieceIci ? faceEntiere(w, pieceIci) : null;
+          const troncon = longueurIci !== null && entiere !== null && entiere > longueurIci + 0.02 ? 5000 : 0;
           for (const off of ecarts) {
             const A = plus(a, n, F + off);
             const B = plus(b, n, F + off);
@@ -3591,7 +3610,7 @@ function planPage(
               [7.5, 6.5].flatMap((z) => (off >= 14 ? [[tt, 1, z], [tt, -1, z]] : [[tt, 1, z]])),
             )) {
               const c = plus({ x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t }, n, (taille * 0.64) * cote);
-              const q = boiteDuMot(txt, c.x, c.y, taille, angle);
+              const q = boiteDuMot(txtIci, c.x, c.y, taille, angle);
               if (!dansLaFenetre(q.boite)) continue;
               const chocs = libre(q.boite) ? 0 : 1;
               const cout =
@@ -3601,10 +3620,11 @@ function planPage(
                 barre * 400 +
                 coutAttaches +
                 (pieceDuBord >= 0 && pieceDuPoint(c) !== pieceDuBord ? 3000 : 0) +
+                troncon +
                 off * 0.5 +
                 Math.abs(t - 0.5) * 14 +
                 (taille < 7.5 ? 25 : 0);
-              if (!mieux || cout < mieux.cout) mieux = { A, B, n, texte: c, cout, taille, attaches };
+              if (!mieux || cout < mieux.cout) mieux = { A, B, n, texte: c, cout, taille, attaches, mot: txtIci };
             }
           }
         }
@@ -3614,7 +3634,7 @@ function planPage(
         trace(A, B, 0.6, TRAIT_COTE);
         tiret(A, u, n, 2.6, 0.8, TRAIT_COTE);
         tiret(B, u, n, 2.6, 0.8, TRAIT_COTE);
-        ecrire(txt, [mieux.texte], mieux.taille, angle, TEXTE_COTE);
+        ecrire(mieux.mot, [mieux.texte], mieux.taille, angle, TEXTE_COTE);
       }
 
     }

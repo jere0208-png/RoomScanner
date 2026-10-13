@@ -1963,6 +1963,51 @@ export function longueurCotee(
   return w.auNu ? longueurAuNu(walls, w) : L;
 }
 
+/**
+ * LA FACE ENTIÈRE dont ce mur n'est peut-être qu'un tronçon, vue de cette
+ * pièce : les côtés de son contour au nu alignés sur le mur, bout à bout.
+ * Un refend coupé à la jonction d'une autre pièce n'a, côté séjour, qu'une
+ * seule face de 5,00 m — que ses deux tronçons coteraient en morceaux.
+ */
+export function faceEntiere(w: WallSeg, part: { surface: RoomSurface | null }): number | null {
+  const nu = part.surface?.nu ?? part.surface?.pts;
+  const L = segLength(w);
+  if (!nu || nu.length < 3 || L < 1e-6) return null;
+  const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
+  const ecart = (p: Pt) => (p.x - w.a.x) * u.z - (p.z - w.a.z) * u.x;
+  const t = (p: Pt) => (p.x - w.a.x) * u.x + (p.z - w.a.z) * u.z;
+  // Les côtés parallèles au mur, rangés par leur ligne.
+  const cotes = nu
+    .map((a, i) => [a, nu[(i + 1) % nu.length]] as const)
+    .filter(([a, b]) => {
+      const le = Math.hypot(b.x - a.x, b.z - a.z);
+      return le > 1e-6 && Math.abs(((b.x - a.x) * u.z - (b.z - a.z) * u.x) / le) < 1e-3;
+    });
+  const sien = cotes
+    .map(([a, b]) => ({ d: (ecart(a) + ecart(b)) / 2, t0: Math.min(t(a), t(b)), t1: Math.max(t(a), t(b)) }))
+    .filter((c) => c.t1 > 0.01 && c.t0 < L - 0.01)
+    .sort((p, q) => Math.abs(p.d) - Math.abs(q.d))[0];
+  if (!sien || Math.abs(sien.d) > 0.25) return null;
+  const surLaLigne = cotes
+    .map(([a, b]) => ({ d: (ecart(a) + ecart(b)) / 2, t0: Math.min(t(a), t(b)), t1: Math.max(t(a), t(b)) }))
+    .filter((c) => Math.abs(c.d - sien.d) < 0.005)
+    .sort((p, q) => p.t0 - q.t0);
+  let t0 = sien.t0;
+  let t1 = sien.t1;
+  let bouge = true;
+  while (bouge) {
+    bouge = false;
+    for (const c of surLaLigne) {
+      if (c.t1 >= t0 - 0.005 && c.t0 <= t1 + 0.005 && (c.t0 < t0 - 1e-6 || c.t1 > t1 + 1e-6)) {
+        t0 = Math.min(t0, c.t0);
+        t1 = Math.max(t1, c.t1);
+        bouge = true;
+      }
+    }
+  }
+  return t1 - t0;
+}
+
 /** Complète une pièce : contour, centre, et point de pose du cartouche. */
 function makePart(roomId: string, items: WallSeg[]): RoomPart {
   let surface = roomSurface(items);
@@ -2429,10 +2474,27 @@ export function wallAreaM2(walls: WallSeg[], openings: WallSeg[]): number {
   return Math.max(0, gross - holes);
 }
 
-/** Hauteur sous plafond de la pièce : la plus courante parmi ses murs. */
+/**
+ * Hauteur sous plafond de la pièce : la plus courante parmi ses murs.
+ *
+ * LA MÉDIANE, PAS LE PLUS HAUT — revue « Sandrine » : le plus haut des
+ * murs faisait la pièce. Un relevé bruité (2,47 / 2,53 / 2,50 / 2,49)
+ * donnait 2,53 ; la chambre au faux plafond de 2,30 prenait les 2,50 du
+ * refend qu'elle partage avec le séjour. La médiane pondérée par la
+ * longueur garde ce que dit la majorité des murs.
+ */
 export function roomHeight(walls: WallSeg[]): number {
   if (walls.length === 0) return 0;
-  return Math.max(...walls.map((w) => w.height));
+  const tries = walls
+    .map((w) => ({ h: w.height, l: Math.max(segLength(w), 1e-3) }))
+    .sort((a, b) => a.h - b.h);
+  const total = tries.reduce((t, x) => t + x.l, 0);
+  let cumul = 0;
+  for (const x of tries) {
+    cumul += x.l;
+    if (cumul >= total / 2 - 1e-9) return x.h;
+  }
+  return tries[tries.length - 1].h;
 }
 
 /**
@@ -3050,7 +3112,7 @@ export function fusionnerMursDoubles(
     */
     let lo = 0;
     let hi = l;
-    const faces: { d: number; poids: number }[] = [{ d: 0, poids: l }];
+    const faces: { d: number; poids: number; sens: number }[] = [{ d: 0, poids: l, sens: 1 }];
     for (let ajout = true; ajout; ) {
       ajout = false;
       for (const o of tries) {
@@ -3070,7 +3132,7 @@ export function fusionnerMursDoubles(
         ajout = true;
         lo = Math.min(lo, t0);
         hi = Math.max(hi, t1);
-        faces.push({ d: (cote(o.a) + cote(o.b)) / 2, poids: lo2 });
+        faces.push({ d: (cote(o.a) + cote(o.b)) / 2, poids: lo2, sens: Math.sign(u.x * uo.x + u.z * uo.z) });
       }
     }
     /*
@@ -3090,10 +3152,34 @@ export function fusionnerMursDoubles(
         coupe = i;
       }
     }
-    let A = { x: origine.x + u.x * lo, z: origine.z + u.z * lo };
+    /*
+      UNE CLOISON FINE SE RECONNAÎT AU SENS DE SES FACES — revue
+      « Sandrine » : une cloison de 7 cm relevée à ±3 cm tombait sous les
+      5 cm d'écart une fois sur quatre ; ses deux faces devenaient un seul
+      trait, et le WC prenait 9 % de trop. Chaque pièce relève ses murs dans
+      son sens de tour : les deux faces d'une même cloison se parcourent en
+      sens contraires, deux relevés d'une même face dans le même. Sous
+      5 cm, à 2 cm au moins, un côté tout d'un sens et l'autre tout du sens
+      contraire : ce sont deux faces.
+    */
+    if (coupe < 0) {
+      for (let i = 0; i + 1 < rangees.length; i++) {
+        const g = rangees[i + 1].d - rangees[i].d;
+        if (g < 0.02 || (coupe >= 0 && g <= ecart)) continue;
+        const sensBas = rangees[0].sens;
+        const separes =
+          rangees.slice(0, i + 1).every((f) => f.sens === sensBas) &&
+          rangees.slice(i + 1).every((f) => f.sens === -sensBas);
+        if (separes) {
+          coupe = i;
+          ecart = g;
+        }
+      }
+    }
+    let A ={ x: origine.x + u.x * lo, z: origine.z + u.z * lo };
     let B = { x: origine.x + u.x * hi, z: origine.z + u.z * hi };
     if (coupe >= 0) {
-      const moyenne = (xs: { d: number; poids: number }[]) =>
+      const moyenne = (xs: { d: number; poids: number; sens: number }[]) =>
         xs.reduce((s, x) => s + x.d * x.poids, 0) / xs.reduce((s, x) => s + x.poids, 0);
       const bas = rangees.slice(0, coupe + 1);
       const haut = rangees.slice(coupe + 1);
@@ -3250,6 +3336,14 @@ export function porteDeGarage(
 ): string | null {
   if (contour.length < 3 || Math.abs(signedArea(contour)) < 12) return null;
   if (categories.some((c) => ON_Y_VIT.test(c))) return null;
+  /*
+    UNE PIÈCE VIDE N'EST PAS UN GARAGE — revue « Sandrine », métreuse : un
+    séjour relevé avant emménagement, ouvert sur le jardin par une baie de
+    2,40 m, devenait « Garage » et sa surface habitable tombait à 0,00 m².
+    Vide, rien ne départage un séjour d'un garage : la pièce reste une
+    pièce, comptée habitable, et se renomme d'un appui si c'en est un.
+  */
+  if (categories.length === 0) return null;
   const surLeContour = (o: WallSeg) => {
     const l = segLength(o);
     if (l < 0.05) return false;
@@ -3329,8 +3423,16 @@ export function baiesHorsDesAngles<O extends WallSeg>(openings: O[], tousLesMurs
     const t0 = Math.min(ta, tb);
     const t1 = Math.max(ta, tb);
     const largeur = t1 - t0;
-    const rA = retraitDuCoin(walls, mur, mur.a);
-    const rB = retraitDuCoin(walls, mur, mur.b);
+    /*
+      UNE CLOISON EN T D'ÉPAISSEUR SUPPOSÉE NE POUSSE PAS — revue
+      « Sandrine » : la porte du WC, relevée à 3,5 cm de l'axe d'une cloison
+      qui tombe en T sur le couloir, reculait de 7 cm devant les 14 cm qu'on
+      lui suppose. Le scan a vu la porte ET la cloison : à un T, une
+      épaisseur que personne n'a mesurée ne déplace pas la baie. À l'angle
+      d'une pièce, si : c'est le mur d'angle dessiné qui mangeait la porte.
+    */
+    const rA = pousseAuCoin(walls, mur, mur.a) ? retraitDuCoin(walls, mur, mur.a) : Math.min(retraitDuCoin(walls, mur, mur.a), Math.max(0, t0));
+    const rB = pousseAuCoin(walls, mur, mur.b) ? retraitDuCoin(walls, mur, mur.b) : Math.min(retraitDuCoin(walls, mur, mur.b), Math.max(0, L - t1));
     if (L - rA - rB < 0.3) return o;
     let n0 = t0;
     let n1 = t1;
@@ -3884,6 +3986,35 @@ export function retraitDuCoin(walls: WallSeg[], hote: WallSeg, coin: Pt): number
   return retrait;
 }
 
+/**
+ * Le mur qui ferme ce coin peut-il repousser une baie ? À l'angle d'une
+ * pièce, oui. À un T — le mur continue au-delà du coin —, seulement si son
+ * épaisseur est MESURÉE (vu des deux faces, tracé ou réglé à la main).
+ */
+function pousseAuCoin(walls: WallSeg[], hote: WallSeg, coin: Pt): boolean {
+  const L = segLength(hote) || 1;
+  const u = { x: (hote.b.x - hote.a.x) / L, z: (hote.b.z - hote.a.z) / L };
+  const auCoin = (o: WallSeg) =>
+    o.id !== hote.id &&
+    o.type === 'wall' &&
+    niveauDe(o) === niveauDe(hote) &&
+    (Math.hypot(o.a.x - coin.x, o.a.z - coin.z) < 0.05 || Math.hypot(o.b.x - coin.x, o.b.z - coin.z) < 0.05);
+  const travers = walls.filter((o) => {
+    if (!auCoin(o)) return false;
+    const lo = segLength(o) || 1;
+    const v = { x: (o.b.x - o.a.x) / lo, z: (o.b.z - o.a.z) / lo };
+    return Math.abs(u.x * v.z - u.z * v.x) >= 0.5;
+  });
+  const continue_ = walls.some((o) => {
+    if (!auCoin(o)) return false;
+    const lo = segLength(o) || 1;
+    const v = { x: (o.b.x - o.a.x) / lo, z: (o.b.z - o.a.z) / lo };
+    return Math.abs(u.x * v.z - u.z * v.x) < 0.1;
+  });
+  if (!continue_) return true;
+  return travers.some((o) => !!o.deuxFaces || !!o.auNu || o.epaisseur !== undefined);
+}
+
 /** La cote par défaut d'une cloison en T : celle du milieu du mur, au nu. */
 export function depuisParDefaut(
   walls: WallSeg[],
@@ -4185,12 +4316,18 @@ export function planFrameAngle(walls: WallSeg[]): number {
     second tour, seuls votent les murs à moins de 5° de la première trame ;
     un pan coupé, un mur à 80°, un bow-window n'y comptent plus.
   */
-  const ecartALaTrame = (a: number) => {
-    let d = (a - brute) % q;
+  const ecartA = (a: number, trame: number) => {
+    let d = (a - trame) % q;
     if (d < 0) d += q;
     return Math.min(d, q - d);
   };
-  return vote((a) => ecartALaTrame(a) < (5 * Math.PI) / 180) ?? brute;
+  // Revue « Sandrine » : à 5°, un vrai biais de 4° votait encore et
+  // faisait tourner la trame de 0,85° — les murs droits basculaient. Deux
+  // tours resserrés : 2° autour de la trame brute (le mur à 80° de Karim
+  // n'y compte plus), puis 1° autour de cette trame (le biais de 2,5° non
+  // plus).
+  const t2 = vote((a) => ecartA(a, brute) < (2 * Math.PI) / 180) ?? brute;
+  return vote((a) => ecartA(a, t2) < Math.PI / 180) ?? t2;
 }
 
 /** Union-find minimal sur des clés de nœud. */
@@ -4233,6 +4370,14 @@ function makeUnion() {
 export function straightenWalls(
   walls: WallSeg[],
   toleranceDeg = 8,
+  /**
+   * LE DÉCALAGE AU-DELÀ DUQUEL UN BIAIS EST VRAI (m) — revue « Sandrine » :
+   * un mur biais de 2,5° sur 3 m (13 cm d'un bout à l'autre) était remis
+   * d'équerre en fin de scan, et ses voisins faussés de 6 cm. Au-delà de
+   * ce décalage, et d'un degré, le mur garde son angle. Absent : l'angle
+   * seul décide (le bouton « Redresser », qu'on demande soi-même).
+   */
+  decalageMax?: number,
 ): WallSeg[] {
   if (walls.length === 0) return walls;
   const theta = planFrameAngle(walls);
@@ -4270,9 +4415,13 @@ export function straightenWalls(
     const dz = B.z - A.z;
     if (Math.hypot(dx, dz) < 1e-6) continue;
     const ang = Math.atan2(dz, dx);
+    const longueur = Math.hypot(dx, dz);
     const nearAxis = (target: number) => {
       const d = Math.abs(((ang - target + Math.PI) % Math.PI) - 0);
-      return Math.min(d, Math.PI - d) < tol;
+      const ecart = Math.min(d, Math.PI - d);
+      if (ecart >= tol) return false;
+      if (decalageMax !== undefined && ecart > Math.PI / 180 && longueur * Math.sin(ecart) > decalageMax) return false;
+      return true;
     };
     if (nearAxis(0)) uz.union(ka, kb); // horizontal : même z
     else if (nearAxis(Math.PI / 2)) ux.union(ka, kb); // vertical : même x

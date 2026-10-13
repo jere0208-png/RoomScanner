@@ -14285,6 +14285,38 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Peut-on signer un métré avec le scan ?
+
+Revue « Sandrine », métreuse : chaque cas part d'un relevé RoomPlan simulé,
+passe par la vraie fin de scan et affirme la valeur réelle au centimètre
+(`__tests__/fiabilitescan.test.ts`).
+- **Une pièce vide n'est plus un garage.** Un séjour sans meuble ouvert par
+  une baie de 2,40 devenait « Garage », compté 0 m² habitable.
+- **Deux portes voisines restent deux portes.** Le WC et la salle de bains,
+  séparés par une cloison en T, fusionnaient en une double porte : deux
+  vantaux ne se réunissent qu'à 3 cm, et jamais par-dessus un mur.
+- **Une baie n'est repoussée hors d'un angle que contre une épaisseur
+  mesurée.** Contre un refend d'un seul trait, elle reste où le scan l'a vue
+  (une porte relevée à 2 cm d'un refend glissait de 7 cm).
+- **La hauteur sous plafond est la médiane des murs, pondérée par leur
+  longueur** : un faux plafond garde ses 2,30, un relevé bruité de ±3 cm
+  donne 2,50 au centimètre.
+- **Un meuble relevé garde sa taille.** Seuls l'électroménager et les
+  rangements peuvent s'étirer jusqu'au mur : un lit de 1,40 dans une alcôve
+  de 1,75 restait un lit de 1,75.
+- **Les cotes intérieures tombent au droit des refends** : la chaîne de
+  façade et les cotes de cloisons se mesurent au nu de chaque pièce, et
+  font leur total.
+- **Une cloison fine garde ses deux faces.** Sous 5 cm d'écart, ses faces
+  se reconnaissent au sens où chaque pièce les parcourt ; une cloison de
+  7 cm relevée à 4,5 cm redevenait un trait à l'axe, le WC à 9 % de trop.
+- **Un vrai mur biais garde son angle.** Seul un mur qui s'écarte de moins
+  de 12 cm sur sa longueur est mis d'équerre, et la trame du plan se vote
+  en deux tours (2°, puis 1°) : un biais de 2,5° ou de 4° ne fait plus
+  basculer les murs droits.
+- **L'appartement d'exemple est meublé au nu des façades** : ses façades
+  s'épaississent dehors, ses meubles flottaient à 7 cm des murs.
+
 ## Le dossier de l'électricien se présente au client et au Consuel
 
 Revue « Karim », électricien : « je ne peux pas remettre ce dossier sans le

@@ -12,8 +12,9 @@
  *
  * Un T2 de 48 m² comme il y en a partout : séjour avec cuisine ouverte,
  * chambre, salle d'eau, entrée et un petit bureau. Meublé avec le catalogue
- * de l'application, chaque meuble posé contre la FACE de son mur — l'axe
- * moins une demi-épaisseur —, comme le ferait le doigt.
+ * de l'application, chaque meuble posé contre la FACE de son mur — le trait
+ * d'une façade, l'axe d'un refend moins une demi-épaisseur —, comme le
+ * ferait le doigt.
  */
 import type { ObjectData } from 'react-native-room-scan';
 import { CATALOGUE, catalogTransform, type CatalogItem } from '../geometry/catalogue';
@@ -123,8 +124,9 @@ const ITEMS = new Map<string, CatalogItem>(
   CATALOGUE.flatMap((f) => f.items).map((i) => [i.key, i]),
 );
 
-/** Le nu d'un mur : son axe, moins une demi-épaisseur. Les meubles posés
- *  contre lui gardent un centimètre de jeu, comme au rangement du doigt. */
+/** Le nu d'un REFEND : son axe, moins une demi-épaisseur. Une façade, elle,
+ *  s'épaissit vers le dehors : son trait EST son nu (`facesDesMurs`), et un
+ *  meuble posé « à l'axe moins NU » contre elle flottait à 7 cm du mur. */
 const NU = WALL_T / 2;
 
 /**
@@ -171,9 +173,9 @@ const OBJECTS: ObjectData[] = [
   // Séjour — la cuisine ouverte le long du mur nord, façades vers la pièce.
   // Deux millimètres de jeu au mur : retourné d'un demi-tour, un meuble posé
   // pile au nu le « mordrait » d'une erreur d'arrondi.
-  meuble('frigo', 0.07 + NU + 0.3, NU + 0.332, 2),
-  meuble('meubleBas120', 1.38, NU + 0.302, 2),
-  meuble('plaque', 2.28, NU + 0.262, 2),
+  meuble('frigo', 0.07 + 0.3, 0.332, 2),
+  meuble('meubleBas120', 1.38, 0.302, 2),
+  meuble('plaque', 2.28, 0.262, 2),
   // La table, ses quatre chaises tournées vers elle.
   meuble('tableRepas', 1.3, 2.1),
   meuble('chaise', 0.85, 1.4, 2),
@@ -188,19 +190,19 @@ const OBJECTS: ObjectData[] = [
   // Le fauteuil face au canapé, de l'autre côté de la table basse ; le
   // passage vers l'entrée reste libre derrière lui.
   meuble('fauteuil', 3.75, 2.95),
-  meuble('plante', 2.95, NU + 0.3),
+  meuble('plante', 2.95, 0.3),
   // Chambre — le lit, tête au mur est, entre ses deux chevets.
-  meuble('lit140', 8 - NU - 0.995, 1.8, 3),
-  meuble('chevet', 8 - NU - 0.175, 0.82, 3),
-  meuble('chevet', 8 - NU - 0.175, 2.78, 3),
+  meuble('lit140', 8 - 0.995, 1.8, 3),
+  meuble('chevet', 8 - 0.175, 0.82, 3),
+  meuble('chevet', 8 - 0.175, 2.78, 3),
   meuble('armoire2p', 5 + NU + 0.29, 0.75, 1),
   // Salle d'eau — la douche dans l'angle, ouverte vers la pièce.
-  meuble('douche', 8 - NU - 0.46, 3.6 + NU + 0.46, 3),
+  meuble('douche', 8 - 0.46, 3.6 + NU + 0.46, 3),
   meuble('meubleVasque', 6.15, 3.6 + NU + 0.26, 2),
-  meuble('wc', 7.45, 6 - NU - 0.35),
-  meuble('ll', 6.3, 6 - NU - 0.3),
+  meuble('wc', 7.45, 6 - 0.35),
+  meuble('ll', 6.3, 6 - 0.3),
   // Bureau, sous la fenêtre ouest — et le fauteuil face à lui.
-  meuble('bureau', NU + 0.31, 5.1, 1),
+  meuble('bureau', 0.31, 5.1, 1),
   meuble('fauteuilBureau', 0.95, 5.1, 3),
   meuble('biblio', 1.75, 4.2 + NU + 0.14, 2),
   // Entrée.
