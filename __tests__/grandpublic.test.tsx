@@ -224,7 +224,7 @@ describe('2 — la surface habitable du logement', () => {
   });
 
   it('se lit dans le bandeau, au métré du PDF et au tableur', () => {
-    expect(lire('src/screens/ResultScreen.tsx')).toContain("label: 'm² hab.'");
+    expect(lire('src/screens/ResultScreen.tsx')).toContain("label: 'm² habitables'");
     const pdf = latin1(
       buildScanPdf(
         { name: 'Mon appartement', walls: MURS, openings: BAIES, objects: [], rooms: PIECES, roomNames: { r1: 'Séjour' } },

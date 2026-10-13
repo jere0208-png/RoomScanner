@@ -59,6 +59,7 @@ const sansElec = (
       !!el && (modeElec || !cles.has(String(el.key))),
   );
 import { CalquesSheet } from '../../components/CalquesSheet';
+import { astuce } from '../../ui/astuce';
 import { getStyles } from './styles';
 
 /*
@@ -156,7 +157,10 @@ export function Toolbar2D({
   setMenu,
   setPendingCeiling,
   setPendingSpots,
+  onDecorer,
 }: Cadre & {
+  /** Ouvre « Décorer » (la vue passe en 3D). */
+  onDecorer?: () => void;
   /** Hauteur à franchir pour poser le trop-plein au-dessus des actions. */
   dessus: number;
   /** Le jeu de pastilles affiché : il RETARDE sur le mode d'édition. */
@@ -212,6 +216,26 @@ export function Toolbar2D({
   const setShowOpeningColors = useScanStore((s) => s.setShowOpeningColors);
   /** Le menu « Afficher » du plan : tout ce que la rangée ne garde pas. */
   const [afficher, setAfficher] = useState(false);
+  /*
+    « REDRESSER » DIT CE QU'IL A FAIT — revue « Léa » : il remettait tout le
+    plan d'équerre sans un mot ; elle croyait qu'il redressait un meuble, ou
+    qu'il ne faisait rien.
+  */
+  const redresser = () => {
+    const avant = new Map(useScanStore.getState().walls.map((w) => [w.id, w]));
+    straightenPlan();
+    const bouge = useScanStore
+      .getState()
+      .walls.some((w) => {
+        const v = avant.get(w.id);
+        return !v || Math.hypot(w.a.x - v.a.x, w.a.z - v.a.z) > 1e-3 || Math.hypot(w.b.x - v.b.x, w.b.z - v.b.z) > 1e-3;
+      });
+    if (bouge) {
+      astuce('Murs remis d’équerre.', { action: { label: 'Annuler', faire: () => useScanStore.getState().undo() } });
+    } else {
+      astuce('Le plan était déjà d’équerre.');
+    }
+  };
 
   /**
    * LE MENU DU PLAFOND.
@@ -320,7 +344,7 @@ export function Toolbar2D({
           icon="square"
           label="Redresser"
           active={false}
-          onPress={straightenPlan}
+          onPress={redresser}
         />,
         /*
           LE MEUBLE PASSE DEVANT L'APPAREIL — relevé du patron : « l'app
@@ -453,6 +477,11 @@ export function Toolbar2D({
           vide={contenu.appareils === 0 ? RIEN.appareils : null}
           onPress={() => setShowFixtures((v) => !v)}
         />,
+        /* Revue « Léa » : elle cherchait les couleurs, et « Décorer » ne
+           vivait qu'en 3D ou au fond du menu « … ». */
+        onDecorer && contenu.pieces > 0 ? (
+          <ToolPill key="decorer" icon="rouleau" label="Décorer" active={false} onPress={onDecorer} />
+        ) : null,
         <ToolPill
           key="afficher"
           icon="points"

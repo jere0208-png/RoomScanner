@@ -14285,6 +14285,40 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Comprendre sans réfléchir — le premier plan de quelqu'un qui découvre
+
+Revue « Léa », gratuite, premier plan, impatiente
+(`__tests__/parcoursnovice.test.tsx`).
+- **On scanne le logement, pas une pièce.** La tuile d'accueil dit
+  « Scanner mon logement — De pièce en pièce, sans arrêter », le film
+  « Marchez lentement de pièce en pièce ». Au menu du plan, « Scanner une
+  autre pièce » (réunie à ce plan) ne se confond plus avec « Dessiner une
+  pièce à la main ».
+- **Après le scan, pas de jargon.** La durée et la batterie restent dites à
+  tous ; le « maillage LiDAR » ne l'est qu'à l'électricien.
+- **Le premier plan est fêté.** La fête n'attendait qu'un plan gardé écran
+  ouvert, alors que la fin du scan garde le plan et ouvre l'écran d'un même
+  geste : elle ne venait jamais.
+- **Le film dit ce qui est gratuit** : l'image du plan ; le PDF et le DXF
+  sont dans Pro. L'alerte de l'invité tient en deux phrases.
+- **« Décorer » se trouve depuis le plan** : une pastille dans la barre 2D,
+  qui passe en 3D.
+- **La seconde fenêtre de fin de scan s'appelle « Ce que le scan a
+  trouvé »**, avec « C'est bon » : deux « Relevé terminé » de suite faisaient
+  croire qu'on avait déjà validé.
+- **L'en-tête ne répète pas un chiffre** : quand le sol et l'habitable se
+  valent, le particulier ne lit que « m² habitables » ; « m périmètre » en
+  toutes lettres.
+- **« Redresser » dit ce qu'il a fait** : « Murs remis d'équerre », avec
+  « Annuler » — ou « Le plan était déjà d'équerre ».
+- **La surface ne part plus pour un lit.** Quand aucune place n'est libre,
+  le cartouche se pose sur le meuble, fond presque plein, plutôt que de
+  retirer les m² (l'image gratuite partait sans eux).
+- **La feuille d'export parle au particulier** : « Tableau des surfaces »,
+  « Pour les logiciels 3D », « À envoyer à l'architecte ou au cuisiniste ».
+- **Au tout premier lancement, la boîte ne contient que la bienvenue** : les
+  notes de version ne s'adressent pas à qui arrive.
+
 ## Peut-on signer un métré avec le scan ?
 
 Revue « Sandrine », métreuse : chaque cas part d'un relevé RoomPlan simulé,

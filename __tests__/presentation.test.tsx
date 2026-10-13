@@ -357,7 +357,7 @@ describe('l’écran du scan, refondu', () => {
     const vu = textes(monter('scan'));
     // Les libellés sont mis en capitales par le style, pas par le texte.
     expect(vu).toContain('m² sol');
-    expect(vu).toContain('m périm.');
+    expect(vu).toContain('m périmètre');
   });
 
   it('et n’offre plus de les masquer', () => {
@@ -378,7 +378,7 @@ describe('l’écran du scan, refondu', () => {
       .find((n) => n.props.accessibilityLabel === 'Plus');
     expect(menu).toBeDefined();
     act(() => menu!.props.onPress());
-    expect(textes(tree)).toContain('Ajouter une pièce');
+    expect(textes(tree)).toContain('Dessiner une pièce à la main');
     // « Nouveau scan » y reste, mais il a quitté le pied de page.
     expect(textes(tree)).toContain('Nouveau scan');
   });

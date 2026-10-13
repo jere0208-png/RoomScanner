@@ -81,7 +81,7 @@ export function ExportSheet({
     [
       'obj',
       'Modèle 3D',
-      'Fichier OBJ, pour Blender.',
+      modeElec ? 'Fichier OBJ, pour Blender.' : 'Pour les logiciels 3D (fichier OBJ).',
       onObj,
     ],
     [
@@ -100,10 +100,11 @@ export function ExportSheet({
     */
     [
       'csv',
-      'Métré CSV',
+      // Revue « Léa » : « CSV » ne dit rien au particulier.
+      modeElec ? 'Métré CSV' : 'Tableau des surfaces',
       modeElec
         ? 'En colonnes, pour chiffrer dans Excel.'
-        : 'Surfaces et murs, pour Excel.',
+        : 'Pièce par pièce, à ouvrir dans Excel ou Numbers.',
       onCsv,
     ],
     /*
@@ -118,7 +119,7 @@ export function ExportSheet({
     [
       'dxf',
       'Plan DXF',
-      'En calques, pour AutoCAD. À envoyer à l’architecte.',
+      modeElec ? 'En calques, pour AutoCAD. À envoyer à l’architecte.' : 'À envoyer à l’architecte ou au cuisiniste.',
       onDxf,
     ],
     [

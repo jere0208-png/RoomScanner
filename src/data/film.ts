@@ -78,8 +78,8 @@ export interface Chapitre {
 export const CHAPITRES: Chapitre[] = [
   {
     cle: 'scan',
-    titre: 'Scannez la pièce',
-    phrase: 'Balayez lentement avec l’iPhone : murs, ouvertures et meubles sont relevés en direct.',
+    titre: 'Scannez votre logement',
+    phrase: 'Marchez lentement de pièce en pièce : murs, portes et meubles se relèvent en direct.',
     duree: 2400,
   },
   {
@@ -102,8 +102,8 @@ export const CHAPITRES: Chapitre[] = [
   },
   {
     cle: 'partage',
-    titre: 'Partagez un dossier pro',
-    phrase: 'Un PDF à imprimer, un DXF pour l’architecte, la 3D pour vos proches.',
+    titre: 'Partagez-le',
+    phrase: 'L’image du plan s’envoie gratuitement ; le dossier PDF et le DXF sont dans Pro.',
     duree: 1900,
   },
 ];

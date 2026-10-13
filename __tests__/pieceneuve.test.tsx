@@ -191,7 +191,7 @@ describe('deux poses de suite, depuis l’ecran', () => {
     const item = t.root
       .findAll((n) => typeof n.props?.onPress === 'function')
       .filter((n) =>
-        n.findAllByType(Text).some((x) => x.props.children === 'Ajouter une pièce'),
+        n.findAllByType(Text).some((x) => x.props.children === 'Dessiner une pièce à la main'),
       )
       .pop()!;
     act(() => item.props.onPress());

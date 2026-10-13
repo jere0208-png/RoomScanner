@@ -172,7 +172,7 @@ describe('le popup du choix', () => {
       act(() =>
         tree.root
           .findAllByType(TouchableOpacity)
-          .find((n) => n.props.accessibilityLabel === 'Intégrer')!
+          .find((n) => n.props.accessibilityLabel === 'C’est bon')!
           .props.onPress(),
       );
     // Sans geste : les meubles détectés, et rien d'électrique.

@@ -4,6 +4,8 @@ import { useScanStore } from '../store/scanStore';
 import { roomSurface } from '../geometry/floorplan';
 import { astuce } from '../ui/astuce';
 import { useAccountStore } from '../store/accountStore';
+import { useUsage } from '../store/usage';
+import { usePremieresFois } from '../store/premieresFois';
 import { usePannes } from '../ui/journalPannes';
 import { phraseEnergie } from '../ui/energie';
 import { bilanDuReleve } from '../geometry/bilan';
@@ -188,7 +190,9 @@ export function useRoomScan() {
 function annoncerLaDepense(r: ScanResult) {
   if (!r.energie) return;
   const bouts = [phraseEnergie(r.energie)];
-  if (r.maillage) {
+  // Revue « Léa » : « maillage LiDAR 3 ancres » ne dit rien au particulier.
+  // La durée et la batterie se lisent par tous ; le maillage reste au métier.
+  if (r.maillage && useUsage.getState().modeElec) {
     bouts.push(
       r.maillage.ancres > 0
         ? `maillage LiDAR ${r.maillage.ancres} ancre${r.maillage.ancres > 1 ? 's' : ''}`
@@ -196,6 +200,20 @@ function annoncerLaDepense(r: ScanResult) {
     );
   }
   astuce(bouts.join(' · '), { icone: 'elec' });
+}
+
+/**
+ * LA FÊTE DU PREMIER PLAN — revue « Léa » : l'écran du plan ne fêtait qu'un
+ * plan gardé PENDANT qu'il était ouvert. Or `finalize` garde le plan et
+ * ouvre l'écran d'un même geste : la fête ne venait jamais. On la dit ici,
+ * là où l'on sait qu'un plan vient de s'ajouter (même clé : jamais deux fois).
+ */
+function feterLePremierPlan(plansAvant: number) {
+  if (useScanStore.getState().saves.length <= plansAvant) return;
+  const premieres = usePremieresFois.getState();
+  if (!premieres.estNeuve('planGarde')) return;
+  premieres.marquer('planGarde');
+  astuce('Votre premier logement est dans la poche.', { fete: true });
 }
 
 /**
@@ -276,6 +294,7 @@ function resumerLeReleve() {
       store.setProcessing(true);
       const complement = useScanStore.getState().complementEnCours;
       const etage = useScanStore.getState().etageEnCours;
+      const plansAvant = useScanStore.getState().saves.length;
       try {
         // Le post-traitement RoomPlan prend quelques secondes.
         const brut = await RoomScan.stop();
@@ -337,6 +356,7 @@ function resumerLeReleve() {
         // Arrivé au plan : le prochain scan dira lui-même d'où il part.
         partiDUnPlan = false;
         montrerLeBilan();
+        feterLePremierPlan(plansAvant);
         annoncerLaDepense(result);
         if (ecartes) direCeQuiEstEcarte(ecartes);
       } catch (e: any) {

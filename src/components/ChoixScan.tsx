@@ -173,9 +173,11 @@ export function ChoixScan({
 
   return (
     <SheetShell visible={visible} onClose={onClose}>
-      <Text style={styles.titre}>Relevé terminé</Text>
+      {/* Revue « Léa » : deux fenêtres « Relevé terminé » de suite, elle
+          croyait avoir déjà validé. */}
+      <Text style={styles.titre}>Ce que le scan a trouvé</Text>
       <Text style={styles.sous}>
-        Cochez ce que le plan intègre — le reste ne se pose pas.
+        Décochez ce que vous ne voulez pas sur le plan.
       </Text>
       {lignes.map(l => (
         <TouchableOpacity
@@ -206,7 +208,7 @@ export function ChoixScan({
         </TouchableOpacity>
       ))}
       <TouchableOpacity
-        accessibilityLabel="Intégrer"
+        accessibilityLabel="C’est bon"
         style={styles.valider}
         activeOpacity={0.85}
         onPress={() => {
@@ -214,7 +216,7 @@ export function ChoixScan({
           onValider(choix);
         }}
       >
-        <Text style={styles.validerTexte}>Intégrer</Text>
+        <Text style={styles.validerTexte}>C’est bon</Text>
       </TouchableOpacity>
     </SheetShell>
   );

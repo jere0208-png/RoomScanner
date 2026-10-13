@@ -1947,7 +1947,7 @@ export function FloorplanEditor({
       let pos = part.labelAt;
       let gene = true;
       const contour = part.surface?.pts;
-      for (const essai of variantes) {
+      const chercher = (essai: typeof textes, garde: (cand: Pt, lw: number, lh: number) => boolean) => {
         const box = emprise(essai);
         const lw = box.w / mapping.scale;
         const lh = box.h / mapping.scale;
@@ -1976,14 +1976,37 @@ export function FloorplanEditor({
             );
             if (deborde) continue;
           }
-          if (cartoucheHeurte(cand, lw / 2, lh / 2, obstacles)) continue;
-          pos = cand;
+          if (!garde(cand, lw, lh)) continue;
+          return { cand, box };
+        }
+        return null;
+      };
+      for (const essai of variantes) {
+        const trouve = chercher(essai, (cand, lw, lh) => !cartoucheHeurte(cand, lw / 2, lh / 2, obstacles));
+        if (!trouve) continue;
+        pos = trouve.cand;
+        retenues = essai;
+        boite = trouve.box;
+        gene = false;
+        break;
+      }
+      /*
+        LA SURFACE NE PART PAS POUR UN LIT — revue « Léa » : sur 390 pt, la
+        chambre perdait ses m² parce que le lit occupait toute la place
+        libre ; l'image du plan, gratuite, partait sans elle. Quand rien
+        n'est libre, le cartouche à surface se pose PAR-DESSUS un meuble
+        (fond presque plein, voir `gene`) plutôt que de la retirer.
+      */
+      if (gene) {
+        for (const essai of variantes) {
+          if (!essai.some((l) => l.role === 'aire')) continue;
+          const trouve = chercher(essai, () => true);
+          if (!trouve) continue;
+          pos = trouve.cand;
           retenues = essai;
-          boite = box;
-          gene = false;
+          boite = trouve.box;
           break;
         }
-        if (!gene) break;
       }
       out.set(part.roomId, {
         pos,
@@ -3750,7 +3773,7 @@ export function FloorplanEditor({
                     /* Et son fond laisse voir davantage : sept dixièmes,
                        pas huit et demi. Ce qui passe dessous — un meuble,
                        une gaine — se devine sans qu'on ait à le déplacer. */
-                    fillOpacity={planElec ? 0 : 0.7}
+                    fillOpacity={gene ? 0.92 : planElec ? 0 : 0.7}
                     /*
                       SUR LE PLAN ÉLECTRIQUE, LE NOM EST UN TEXTE NU — comme
                       sur le plan de l'architecte. L'encadré, même à demi

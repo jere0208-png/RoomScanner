@@ -2130,6 +2130,9 @@ export function ResultScreen() {
     réflexion « grand public » : le chiffre qu'on écrit dans une annonce.
   */
   const habitable = useMemo(() => surfacesHabitables(rooms, parts, objects), [rooms, parts, objects]);
+  /** Le sol et l'habitable se valent : l'en-tête ne les répète pas. */
+  const solCommeHabitable =
+    !!surface && habitable.pieces.length > 0 && Math.abs(habitable.total - surface.area) < 0.05;
   /** La liste des surfaces que l'image partagée emporte (voir plus bas, `legendeImage`). */
   const legendeSurfaces = useMemo(() => {
     const virgule = (v: number) => v.toFixed(2).replace('.', ',');
@@ -3480,7 +3483,12 @@ export function ResultScreen() {
       ? [{ value: `${rooms.length}`, label: 'pièces' }]
       : []),
     { value: `${walls.length}`, label: 'murs' },
-    ...(surface
+    /*
+      UN CHIFFRE, PAS DEUX FOIS LE MÊME — revue « Bernard » : « 20,0 m² sol »
+      et « 20,0 m² hab. » côte à côte, il cherchait la différence. Quand le
+      sol et l'habitable se valent, le particulier ne lit que l'habitable.
+    */
+    ...(surface && !(solCommeHabitable && !modeElec)
       ? [
           {
             value: `${surface.exact ? '' : '≈ '}${fr(surface.area)}`,
@@ -3499,7 +3507,7 @@ export function ResultScreen() {
             // « À vérifier » sur la fiche et au PDF : l'en-tête, que l'on lit
             // d'abord, le dit aussi (revue « Léon »).
             value: `${(surface && !surface.exact) || habitable.aVerifier > 0 ? '≈ ' : ''}${fr(habitable.total)}`,
-            label: 'm² hab.',
+            label: 'm² habitables',
           },
         ]
       : []),
@@ -3514,7 +3522,7 @@ export function ResultScreen() {
           },
         ]
       : []),
-    { value: fr(perimeter), label: 'm périm.' },
+    { value: fr(perimeter), label: 'm périmètre' },
     ...(objects.length > 0
       ? [{ value: `${objects.length}`, label: 'meubles' }]
       : []),
@@ -3803,9 +3811,11 @@ export function ResultScreen() {
                      * sur les murs neufs — sans quoi ajouter une chambre
                      * coûterait vingt prises.
                      */
-                    label: 'Scanner une pièce',
+                    // Revue « Léa » : « Scanner une pièce » à côté de
+                    // « Ajouter une pièce », deux gestes, un même mot.
+                    label: 'Scanner une autre pièce',
                     icon: 'scanner' as const,
-                    hint: 'Un relevé de plus, réuni au plan. iOS 17, LiDAR.',
+                    hint: 'La chambre, la salle de bains… réunie à ce plan.',
                     onPress: () => {
                       demarrerComplement().catch((e: any) =>
                         alerte(
@@ -3895,7 +3905,7 @@ export function ResultScreen() {
                      * pièce aux cotes qu'on donne, en pointillés, et tout
                      * ce qui reste à faire se lit sur elle.
                      */
-                    label: 'Ajouter une pièce',
+                    label: 'Dessiner une pièce à la main',
                     icon: 'piece' as const,
                     hint: 'Elle se pose devant vous : poussez-la, étirez ses côtés.',
                     onPress: () => {
@@ -4942,6 +4952,10 @@ export function ResultScreen() {
             setMenu={setMenu}
             setPendingCeiling={setPendingCeiling}
             setPendingSpots={setPendingSpots}
+            onDecorer={() => {
+              basculerVue();
+              setDecorant(true);
+            }}
           />
           </View>
         ) : (

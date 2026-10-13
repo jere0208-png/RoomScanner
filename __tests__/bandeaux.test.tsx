@@ -1236,7 +1236,7 @@ describe('les feuilles de l’écran des résultats', () => {
   it('ouvre le choix des cotes plutôt qu’un mode d’attente', () => {
     const tree = monter();
     act(() => bouton(tree, 'Plus')!.props.onPress());
-    actionDuMenu(tree, 'Ajouter une pièce');
+    actionDuMenu(tree, 'Dessiner une pièce à la main');
     // Les gabarits sont la...
     expect(textes(tree)).toContain('WC');
     // ...et le calque qui attendait un glissement n'y est plus.
@@ -1257,7 +1257,7 @@ describe('les feuilles de l’écran des résultats', () => {
     const tree = monter();
     const avant = useScanStore.getState().rooms.length;
     act(() => bouton(tree, 'Plus')!.props.onPress());
-    actionDuMenu(tree, 'Ajouter une pièce');
+    actionDuMenu(tree, 'Dessiner une pièce à la main');
     const wc = tree.root
       .findAll(
         (n) =>
@@ -1539,6 +1539,20 @@ describe('la rangée d’outils', () => {
     expect(bouton(tree, 'Surfaces')).toBeUndefined();
   });
 
+  it('« Redresser » dit ce qu’il a fait', () => {
+    const { useAstuce } = require('../src/ui/astuce');
+    const tree = monter();
+    act(() => bouton(tree, 'Édition')!.props.onPress());
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    act(() => useAstuce.setState({ courante: null, file: [] }));
+    act(() => bouton(tree, 'Redresser')!.props.onPress());
+    const a = useAstuce.getState();
+    const dits = [a.courante, ...a.file].filter(Boolean).map((x: { texte: string }) => x.texte);
+    expect(dits.some((x: string) => /équerre/.test(x))).toBe(true);
+  });
+
   /*
     « REDRESSER » OUVRE LA RANGÉE — relevé du patron : « mets le bouton
     Redresser tout à gauche des autres boutons ».
@@ -1738,10 +1752,10 @@ describe('le menu du scan', () => {
     };
     const ordre = [
       'Ce qu’il faut acheter',
-      'Scanner une pièce',
+      'Scanner une autre pièce',
       'Scanner un étage',
       'Scanner un sous-sol',
-      'Ajouter une pièce',
+      'Dessiner une pièce à la main',
       'Ajouter un mur',
       'Redétecter les pièces',
       'Renommer le scan',

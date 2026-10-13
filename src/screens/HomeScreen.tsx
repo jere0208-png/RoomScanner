@@ -360,7 +360,7 @@ export function HomeScreen() {
                       fond={teintes.scan}
                       hauteur={HAUTE}
                       icone={SOLAIRES.scanner}
-                      titre={'Scanner\nune pièce'}
+                      titre={'Scanner\nmon logement'}
                       sous="Demande un iPhone Pro"
                       label="Scan indisponible sur cet appareil"
                       eteinte
@@ -377,8 +377,8 @@ export function HomeScreen() {
                       fond={teintes.scan}
                       hauteur={HAUTE}
                       icone={SOLAIRES.scanner}
-                      titre={'Scanner\nune pièce'}
-                      sous={supported === null ? 'Vérification…' : 'LiDAR · 2 minutes'}
+                      titre={'Scanner\nmon logement'}
+                      sous={supported === null ? 'Vérification…' : 'De pièce en pièce, sans arrêter'}
                       label="Commencer le scan"
                       desactivee={supported !== true}
                       onPress={scanner}
@@ -406,7 +406,7 @@ export function HomeScreen() {
                     hauteur={BASSE}
                     icone={SOLAIRES.crayon}
                     titre={'Dessiner\nun plan'}
-                    sous="Aux cotes, sans capteur"
+                    sous="Avec vos mesures, sans scanner"
                     label="Dessiner un plan sans scanner"
                     onPress={dessiner}
                   />

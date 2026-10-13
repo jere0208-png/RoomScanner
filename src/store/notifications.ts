@@ -14,7 +14,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { MESSAGES_EMBARQUES } from '../data/nouveautes';
+import { MESSAGES_EMBARQUES, NOUVEAUTES } from '../data/nouveautes';
 import { demanderLesMessages, lireMessages, type Message } from '../net/messages';
 
 const CLE = 'roomscanner.notifications.v1';
@@ -88,12 +88,20 @@ export const useNotifications = create<Etat>((set, get) => ({
     }
     const ids = (v: unknown) =>
       Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, 500) : [];
+    /*
+      LES NOTES DE VERSION NE S'ADRESSENT PAS À QUI ARRIVE — revue « Léa » :
+      au tout premier lancement, « Nouveau : … des cotes au millimètre »
+      attendait dans la boîte. Nouveau par rapport à quoi ? Sans rien sur le
+      disque, on ne garde que la bienvenue.
+    */
+    const premierLancement = brut === null;
     set({
       charge: true,
       recus: lireMessages(lu.recus ?? []) ?? [],
       lus: ids(lu.lus),
-      supprimes: ids(lu.supprimes),
+      supprimes: premierLancement ? NOUVEAUTES.map((m) => m.id) : ids(lu.supprimes),
     });
+    if (premierLancement) ecrire(get());
   },
 
   rafraichir: async () => {

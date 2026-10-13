@@ -760,10 +760,9 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     */
     alerte(
       `Envoyer ${quoi} fait partie du Pro`,
-      'Votre plan est prêt. L’image du plan, avec ses cotes, s’envoie ' +
-        'gratuitement, sans compte (« Exporter », puis « Image du plan »). ' +
-        'Le PDF coté, le tableur, le DXF, la 3D et le devis font partie ' +
-        'd’EchoPlan Pro, qui se prend avec un compte (création gratuite).',
+      // Revue « Léa » : quatre phrases au moment d'envoyer. Deux suffisent.
+      'L’image du plan s’envoie gratuitement (« Image du plan »). ' +
+        'Le PDF, le tableur, le DXF et la 3D sont dans Pro, avec un compte gratuit.',
       [
         { label: 'Plus tard' },
         { label: 'Créer mon compte', onPress: () => get().quitterInvite() },

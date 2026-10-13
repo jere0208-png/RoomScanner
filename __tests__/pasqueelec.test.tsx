@@ -131,7 +131,7 @@ describe('la fin du scan ne pose pas d’électricité sans qu’on la demande',
 
   const valider = (t: TestRenderer.ReactTestRenderer) => {
     const b = t.root.findAllByType(TouchableOpacity).find(
-      (n) => n.props.accessibilityLabel === 'Intégrer',
+      (n) => n.props.accessibilityLabel === 'C’est bon',
     )!;
     act(() => b.props.onPress());
   };
