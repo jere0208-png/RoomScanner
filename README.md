@@ -14285,6 +14285,31 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## L'image en grand, l'habitable de la maison, les poteaux
+
+**L'image partagée** (Léon, Nadia, Bérénice).
+- Plein cadre. L'image d'une chambre de 3 m sortait au plafond d'échelle
+  de l'écran (55 pt/m) : le plan sur la moitié de la largeur. Le temps de
+  la capture, un plan qu'on n'a ni zoomé ni déplacé s'agrandit jusqu'au
+  cadre. Un plan cadré à la main part tel qu'on le voit.
+- La légende dit de quel étage il s'agit, dès qu'il y en a plusieurs.
+- Elle porte l'habitable sous le total quand il diffère du sol (un
+  garage, une véranda, un rampant).
+
+**L'en-tête d'une maison** (Nadia). Il donnait le sol des niveaux réunis
+(99,5 m², trémie, escalier et cellier compris), jamais l'habitable de la
+maison (92,3 m²), qui ne paraissait qu'au PDF. « m² hab. maison » s'ajoute
+à côté.
+
+**Les poteaux** (Malik). Les quatre poteaux de 30 × 30 du loft restaient
+dans la surface de l'open space (85,52 m² pour 85,16). Le scan les rend en
+murs isolés, dessinés en noir au poché, mais ils étaient comptés au sol.
+Un mur qui ne borde aucune pièce et tient tout entier dans l'une d'elles
+(un poteau, une cloison libre) lui retire ce qu'il couvre. Un mur d'un
+autre niveau ne retire rien.
+
+Bancs : `tournee5image`, `tournee5poteaux`.
+
 ## La porte à deux vantaux, la fenêtre plus petite
 
 **La porte double** (Hélène, haussmannien). La porte double du salon

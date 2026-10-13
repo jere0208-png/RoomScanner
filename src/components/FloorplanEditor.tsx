@@ -29,6 +29,7 @@ import {
   bounds,
   castToWall,
   clampFootprint,
+  ECHELLE_MAX_PLAN,
   makeMapping,
   quadPoints,
   roomOf,
@@ -379,6 +380,14 @@ interface Props {
    */
   filigrane?: WallSeg[];
   /**
+   * L'IMAGE PARTAGÉE, PLEIN CADRE — revue « Léon » : l'image d'une chambre
+   * de 3 m sortait au plafond d'échelle de l'écran (55 pt/m), le plan sur la
+   * moitié de la largeur et le sol sur un dixième de l'image. Le temps de la
+   * capture, un plan qu'on n'a ni zoomé ni déplacé s'agrandit jusqu'au
+   * cadre. Un plan cadré à la main part tel qu'on le voit.
+   */
+  pleinCadre?: boolean;
+  /**
    * LES POSES OFFERTES À UN MUR NEUF — les fantômes bleus qu'on touche.
    *
    * Relevé du patron : « "Ajouter un mur" doit afficher les multiples
@@ -630,6 +639,7 @@ export function FloorplanEditor({
   cableRoutes: cableRoutesDemandees,
   circuitMarks: circuitMarksDemandes,
   filigrane,
+  pleinCadre,
   poses,
   onPose,
   recalage,
@@ -1163,11 +1173,14 @@ export function FloorplanEditor({
     plan ne respire toujours pas sous le doigt.
   */
   const nbPieces = rooms.length;
+  const auRepos =
+    Math.abs(view.zoom - 1) < 1e-3 && Math.abs(view.ox) < 0.5 && Math.abs(view.oy) < 0.5 && Math.abs(view.rot) < 1e-3;
+  const plafondDEchelle = pleinCadre && auRepos ? Infinity : ECHELLE_MAX_PLAN;
   const baseMapping = useMemo(() => {
     if (layout.w === 0 || layout.h === 0) return null;
-    return makeMapping(bounds([...walls, ...(filigrane ?? [])]), layout.w, layout.h);
+    return makeMapping(bounds([...walls, ...(filigrane ?? [])]), layout.w, layout.h, 40, plafondDEchelle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSaveId, niveauCourant, layout.w, layout.h, nbPieces]);
+  }, [currentSaveId, niveauCourant, layout.w, layout.h, nbPieces, plafondDEchelle]);
 
   // Cadrage composite : ajustement au canevas + navigation utilisateur.
   const mapping = useMemo(() => {

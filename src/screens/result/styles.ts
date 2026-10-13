@@ -337,6 +337,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   legendeImageLigne: { color: '#1B2230', fontSize: 11, fontWeight: '500' },
   legendeImageTotal: { fontWeight: '700', marginTop: 2 },
+  legendeImageTitre: { fontWeight: '700', marginBottom: 2 },
   watermark: {
     position: 'absolute',
     bottom: 10,

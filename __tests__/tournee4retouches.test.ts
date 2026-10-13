@@ -31,7 +31,8 @@ const st = () => useScanStore.getState();
 describe('l’image partagée', () => {
   it('emporte la liste des surfaces, le temps de la capture', () => {
     const ecran = lire('src', 'screens', 'ResultScreen.tsx');
-    expect(ecran).toContain("capturing && vue === '2d' && legendeSurfaces.lignes.length > 1");
+    // Une pièce seule n'a pas besoin de liste — sauf pour dire son étage (revue « Nadia »).
+    expect(ecran).toContain("capturing && vue === '2d' && (legendeSurfaces.lignes.length > 1 || niveaux.length > 1)");
     expect(ecran).toContain('{`Total · ${legendeSurfaces.total} m²`}');
   });
 });

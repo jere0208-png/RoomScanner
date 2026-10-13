@@ -1874,7 +1874,10 @@ const partsGardees = new WeakMap<
 export function roomParts(walls: WallSeg[], rooms?: RoomShape[]): RoomPart[] {
   if (rooms && rooms.some((r) => r.wallIds)) {
     const byId = new Map(walls.map((w) => [w.id, w]));
-    return rooms.map((r) => {
+    // Les murs qui ne bordent aucune pièce : un poteau, une cloison libre.
+    const reclames = new Set(rooms.flatMap((r) => r.wallIds ?? []));
+    const libres = walls.filter((w) => w.type === 'wall' && !reclames.has(w.id));
+    const laPiece = (r: RoomShape): RoomPart => {
       const items = (r.wallIds ?? [])
         .map((id) => byId.get(id))
         .filter((w): w is WallSeg => !!w);
@@ -1894,9 +1897,40 @@ export function roomParts(walls: WallSeg[], rooms?: RoomShape[]): RoomPart[] {
       const part = h ? { ...brute, hauteur: h } : brute;
       partsGardees.set(r, { items, part });
       return part;
-    });
+    };
+    return rooms.map((r) => sansLesMassifs(laPiece(r), libres));
   }
   return groupByRoom(walls).map(({ roomId, items }) => makePart(roomId, items));
+}
+
+/**
+ * LE POTEAU N'EST PAS DU SOL — revue « Malik » : les quatre poteaux de
+ * 30 × 30 du loft restaient dans la surface de l'open space (85,52 m² pour
+ * 85,16). Le scan les rend en murs isolés, qui ne bordent aucune pièce :
+ * dessinés en noir au poché, ils étaient comptés au sol. Un mur qui ne
+ * borde aucune pièce et tient tout entier dans l'une d'elles — un poteau,
+ * une cloison libre — lui retire ce qu'il couvre. Un mur d'un autre niveau
+ * ne retire rien.
+ */
+const massifsGardes = new WeakMap<RoomPart, { dedans: WallSeg[]; part: RoomPart }>();
+
+function sansLesMassifs(part: RoomPart, libres: WallSeg[]): RoomPart {
+  const s = part.surface;
+  if (libres.length === 0 || !s || s.pts.length < 3) return part;
+  const contour = s.nu ?? s.pts;
+  const niveau = part.walls[0] ? niveauDe(part.walls[0]) : NIVEAU_RDC;
+  const dedans = libres.filter(
+    (w) => niveauDe(w) === niveau && dansLeContour(w.a, contour) && dansLeContour(w.b, contour),
+  );
+  if (dedans.length === 0) return part;
+  const garde = massifsGardes.get(part);
+  if (garde && garde.dedans.length === dedans.length && garde.dedans.every((w, i) => w === dedans[i])) {
+    return garde.part;
+  }
+  const couvert = dedans.reduce((t, w) => t + segLength(w) * epaisseurDe(w), 0);
+  const out = { ...part, surface: { ...s, area: Math.max(0, s.area - couvert) } };
+  massifsGardes.set(part, { dedans, part: out });
+  return out;
 }
 
 /**
@@ -4978,13 +5012,20 @@ export function bounds(walls: WallSeg[]): Bounds {
  */
 export const ECHELLE_MAX_PLAN = 55;
 
-export function makeMapping(b: Bounds, viewW: number, viewH: number, margin = 40) {
+export function makeMapping(
+  b: Bounds,
+  viewW: number,
+  viewH: number,
+  margin = 40,
+  /** Le plafond d'échelle : celui de l'écran, ou aucun pour l'image (voir `pleinCadre`). */
+  plafond = ECHELLE_MAX_PLAN,
+) {
   const w = Math.max(b.maxX - b.minX, 0.5);
   const h = Math.max(b.maxZ - b.minZ, 0.5);
   const scale = Math.min(
     (viewW - margin * 2) / w,
     (viewH - margin * 2) / h,
-    ECHELLE_MAX_PLAN,
+    plafond,
   );
   const ox = (viewW - w * scale) / 2 - b.minX * scale;
   const oz = (viewH - h * scale) / 2 - b.minZ * scale;

@@ -2174,8 +2174,16 @@ export function ResultScreen() {
       }))
       .slice(0, 14);
     const total = parts.reduce((t, p) => t + (p.surface?.area ?? 0), 0);
-    return { lignes, total: virgule(total) };
-  }, [parts, rooms]);
+    /*
+      L'HABITABLE PART AUSSI — revue « Bérénice » : l'image disait le sol
+      (garage et véranda compris), pas le chiffre d'une annonce.
+    */
+    const hab =
+      habitable.pieces.length > 0 && Math.abs(habitable.total - total) >= 0.05
+        ? `${habitable.aVerifier > 0 ? '≈ ' : ''}${virgule(habitable.total)}`
+        : null;
+    return { lignes, total: virgule(total), hab };
+  }, [parts, rooms, habitable]);
   /*
     LE TOTAL DE LA MAISON — revue « Léa » : l'en-tête ne disait que le niveau
     affiché, et les 122 m² de la maison ne paraissaient qu'en page de garde
@@ -2185,19 +2193,30 @@ export function ResultScreen() {
     if (niveaux.length < 2) return null;
     let area = 0;
     let exact = true;
+    /*
+      ET L'HABITABLE DE LA MAISON — revue « Nadia » : l'en-tête donnait le
+      sol des deux niveaux (99,5 m², trémie, escalier et cellier compris),
+      jamais l'habitable de la maison (92,3), qui ne paraissait qu'au PDF.
+    */
+    let hab = 0;
+    let aVerifier = 0;
     for (const n of niveaux) {
-      const t = totalArea(
-        roomParts(
-          tousLesMurs.filter((w) => niveauDe(w) === n),
-          toutesLesPieces.filter((r) => niveauDe(r) === n),
-        ),
+      const piecesN = toutesLesPieces.filter((r) => niveauDe(r) === n);
+      const partsN = roomParts(
+        tousLesMurs.filter((w) => niveauDe(w) === n),
+        piecesN,
       );
+      const t = totalArea(partsN);
       if (!t) continue;
       area += t.area;
       exact = exact && t.exact;
+      const ids = new Set(piecesN.map((r) => r.id));
+      const h = surfacesHabitables(piecesN, partsN, tousLesMeubles.filter((o) => !!o.roomId && ids.has(o.roomId)));
+      hab += h.total;
+      aVerifier += h.aVerifier;
     }
-    return area > 0 ? { area, exact } : null;
-  }, [niveaux, tousLesMurs, toutesLesPieces]);
+    return area > 0 ? { area, exact, habitable: hab, aVerifier } : null;
+  }, [niveaux, tousLesMurs, toutesLesPieces, tousLesMeubles]);
   const mesuresDuNiveau = useMemo(
     () => toutesLesMesures.filter((m) => (m.niveau ?? 0) === niveauCourant),
     [toutesLesMesures, niveauCourant],
@@ -3519,6 +3538,14 @@ export function ResultScreen() {
     ...(surfaceMaison
       ? [{ value: `${surfaceMaison.exact ? '' : '≈ '}${fr(surfaceMaison.area)}`, label: 'm² maison' }]
       : []),
+    ...(surfaceMaison && (!modeElec || Math.abs(surfaceMaison.habitable - surfaceMaison.area) >= 0.5)
+      ? [
+          {
+            value: `${!surfaceMaison.exact || surfaceMaison.aVerifier > 0 ? '≈ ' : ''}${fr(surfaceMaison.habitable)}`,
+            label: 'm² hab. maison',
+          },
+        ]
+      : []),
     { value: fr(perimeter), label: 'm périm.' },
     ...(objects.length > 0
       ? [{ value: `${objects.length}`, label: 'meubles' }]
@@ -4295,6 +4322,7 @@ export function ResultScreen() {
             showFixtures={showFixtures}
             circuitMarks={showRoutes ? marks : undefined}
             filigrane={filigrane}
+            pleinCadre={capturing}
             /* Les fantômes bleus d'un mur neuf, et le doigt qui tranche. */
             poses={posesMur ?? (apercuMur ? [apercuMur] : undefined)}
             onPose={(id) => {
@@ -6585,8 +6613,14 @@ export function ResultScreen() {
           vérifier le prorata. Le temps de la capture, la carte porte la
           liste : chaque pièce, sa surface, et le total.
         */}
-        {capturing && vue === '2d' && legendeSurfaces.lignes.length > 1 && (
+        {capturing && vue === '2d' && (legendeSurfaces.lignes.length > 1 || niveaux.length > 1) && (
           <View style={styles.legendeImage} pointerEvents="none">
+            {/* De quel étage il s'agit — revue « Nadia ». */}
+            {niveaux.length > 1 && (
+              <Text style={[styles.legendeImageLigne, styles.legendeImageTitre]} numberOfLines={1}>
+                {nomDuNiveau(niveauCourant)}
+              </Text>
+            )}
             {legendeSurfaces.lignes.map((l) => (
               <Text key={l.id} style={styles.legendeImageLigne} numberOfLines={1}>
                 {`${l.nom} · ${l.aire} m²`}
@@ -6595,6 +6629,11 @@ export function ResultScreen() {
             <Text style={[styles.legendeImageLigne, styles.legendeImageTotal]} numberOfLines={1}>
               {`Total · ${legendeSurfaces.total} m²`}
             </Text>
+            {legendeSurfaces.hab && (
+              <Text style={[styles.legendeImageLigne, styles.legendeImageTotal]} numberOfLines={1}>
+                {`Habitable · ${legendeSurfaces.hab} m²`}
+              </Text>
+            )}
           </View>
         )}
 
