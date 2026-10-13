@@ -7303,9 +7303,11 @@ function gardePage(
   let habitable = 0;
   let avecHabitable = false;
   let aVerifier = 0;
+  let toutFerme = true;
   for (const c of niveaux ? niveaux.map((x) => x.ctx) : [ctx]) {
     const parts = roomParts(c.walls, c.rooms);
     nPieces += parts.length;
+    toutFerme = toutFerme && parts.every((p) => !!p.surface?.exact);
     sol += parts.reduce((t, p) => t + (p.surface?.area ?? 0), 0);
     const hab = surfacesHabitables(
       (c.rooms ?? []).map((r) => ({
@@ -7322,12 +7324,16 @@ function gardePage(
   }
   const cases: [string, string][] = [
     ['Pièces', String(nPieces)],
-    ['Surface au sol', `${fr1(sol)} m²`],
+    // Une pièce restée ouverte : la surface est approchée, et elle le dit
+    // (revue « Malik » : « 129,4 m² » sous une mezzanine ouverte).
+    ['Surface au sol', `${toutFerme ? '' : '≈ '}${fr1(sol)} m²`],
     // Seulement quand elle dit AUTRE CHOSE que la surface au sol : deux
     // cases au même chiffre se lisaient comme une erreur (revues du dossier).
+    // « À vérifier » dans l'intitulé : dans le chiffre, il débordait de sa
+    // case (revues « Léon » et « Malik »).
     ...(avecHabitable && (Math.abs(habitable - sol) >= 0.05 || aVerifier > 0)
       ? ([
-          ['Habitable estimée', `≈ ${fr1(habitable)} m²${aVerifier > 0 ? ' (à vérifier)' : ''}`],
+          [aVerifier > 0 ? 'Habitable estimée · à vérifier' : 'Habitable estimée', `≈ ${fr1(habitable)} m²`],
         ] as [string, string][])
       : []),
   ];

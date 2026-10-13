@@ -1738,11 +1738,23 @@ export function longueurCotee(
   w: WallSeg,
   parts?: ({ surface: RoomSurface | null; walls?: WallSeg[] })[],
 ): number {
-  if (!w.auNu) return segLength(w);
+  /*
+    UN PLAN SCANNÉ SE COTE AU NU DE SES REFENDS AUSSI — revue « Hélène » :
+    le refend vu de ses deux faces est posé sur son axe ; la façade qui le
+    rejoint se cotait jusqu'à cet axe — 6,01 m quand le métré, au nu, disait
+    5,80. Quand la pièce a un contour au nu, la cote d'un mur scanné est le
+    côté de ce contour qui court sur lui : sa face, de nu à nu.
+  */
+  const auNuDuScan =
+    !w.auNu &&
+    !!parts?.some((p) => !!p.surface?.nu && (!p.walls || p.walls.some((x) => x.id === w.id)));
+  if (!w.auNu && !auNuDuScan) return segLength(w);
   const L = segLength(w);
   if (parts && L > 1e-6) {
     const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
-    const h = epaisseurDe(w) / 2;
+    // La face d'un mur scanné est son trait ; celle d'un refend vu des deux
+    // faces, ou d'un mur dessiné, est à une demi-épaisseur.
+    const h = w.auNu || w.deuxFaces ? epaisseurDe(w) / 2 : 0;
     let face = 0;
     for (const part of parts) {
       const nu = part.surface?.nu;
@@ -1765,7 +1777,7 @@ export function longueurCotee(
     }
     if (face > 0) return face;
   }
-  return longueurAuNu(walls, w);
+  return w.auNu ? longueurAuNu(walls, w) : L;
 }
 
 /** Complète une pièce : contour, centre, et point de pose du cartouche. */

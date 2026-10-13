@@ -14285,6 +14285,23 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les cotes d'un plan scanné au nu des refends, la page de garde qui tient
+
+**Au nu des refends** (Hélène). Le refend vu de ses deux faces est posé sur
+son axe. La façade qui le rejoint se cotait jusqu'à cet axe : 6,01 m quand
+le métré, au nu, disait 5,80 ; et le retour de cheminée 0,46 pour 0,35.
+Quand la pièce a un contour au nu, la cote d'un mur scanné est le côté de
+ce contour qui court sur lui. Le plan dit maintenant la même chose que le
+métré.
+
+**La page de garde** (Léon, Malik).
+- « À vérifier » passe dans l'intitulé de la case, en petit. Dans le
+  chiffre, il débordait de sa case.
+- Quand une pièce reste ouverte, la surface au sol est approchée et
+  s'écrit « ≈ ».
+
+Banc : `tournee5cotes`.
+
 ## Les retouches : la porte-fenêtre au sol, l'évier dans son meuble, le DXF d'aplomb
 
 **Les baies corrigées à la main.**
