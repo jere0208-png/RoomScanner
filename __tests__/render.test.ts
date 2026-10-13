@@ -104,7 +104,8 @@ describe('export OBJ', () => {
     const obj = buildObj(input, 'T2');
     expect(obj).toContain('# T2 — exporté par EchoPlan');
     expect(obj).toContain('g Sols');
-    expect(obj).toContain('g Volumes');
+    // Un groupe par nature (revue « Claire ») : les murs ont le leur.
+    expect(obj).toContain('g Murs');
     // Autant d'indices de face que de sommets déclarés, et rien de vide.
     const verts = obj.split('\n').filter((l) => l.startsWith('v ')).length;
     const faces = obj.split('\n').filter((l) => l.startsWith('f ')).length;

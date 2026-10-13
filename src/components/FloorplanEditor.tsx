@@ -3726,6 +3726,24 @@ export function FloorplanEditor({
               );
             })()}
 
+          {/* Une ligne de spots choisie entière : chacun de ses spots la tire d'un bloc. */}
+          {!selectedCeilingId &&
+            selectedCeilingRow &&
+            (ceiling ?? [])
+              .filter((cl) => cl.row === selectedCeilingRow)
+              .map((cl) => (
+                <CeilingDragHandle
+                  key={`ligne-${cl.id}`}
+                  id={cl.id}
+                  ligne={selectedCeilingRow}
+                  center={mapping.toPx(cl.at)}
+                  rayon={Math.max(8, rayonDuPointLumineux(mapping.scale))}
+                  mapping={mapping}
+                  at={cl.at}
+                  onTap={() => onSelectCeiling?.(cl.id)}
+                />
+              ))}
+
           {/* Les bouts de la règle se glissent : un doigt n'y vise pas au centimètre. */}
           {regle &&
             (['a', 'b'] as const).map((bout) => {
@@ -4448,8 +4466,11 @@ export function CeilingDragHandle({
   mapping,
   at,
   onTap,
+  ligne,
 }: {
   id: string;
+  /** La ligne de spots choisie en entier : le glissé la déplace d'un bloc. */
+  ligne?: string;
   center: { x: number; y: number };
   rayon: number;
   mapping: EffMapping;
@@ -4469,6 +4490,8 @@ export function CeilingDragHandle({
   const startRef = useRef(at);
   const live = useRef({ mapping, at });
   live.current = { mapping, at };
+  /** Ce que la ligne a déjà avancé depuis le début du geste. */
+  const avance = useRef({ x: 0, z: 0 });
   const tapRef = useRef(onTap);
   tapRef.current = onTap;
   /* Le verrou du slop : un tap sur la poignée ne déplace plus rien. */
@@ -4483,11 +4506,25 @@ export function CeilingDragHandle({
         onPanResponderGrant: () => {
           seuil.reprendre();
           startRef.current = live.current.at;
+          avance.current = { x: 0, z: 0 };
           haptic('accroche');
         },
         onPanResponderMove: (_e, g) => {
           if (!seuil.franchi(g.dx, g.dy)) return;
           const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
+          if (ligne) {
+            const st = useScanStore.getState();
+            const avant = st.ceiling.find((c) => c.id === id)?.at;
+            st.moveCeilingRow(ligne, d.x - avance.current.x, d.z - avance.current.z);
+            const apres = useScanStore.getState().ceiling.find((c) => c.id === id)?.at;
+            if (avant && apres) {
+              avance.current = {
+                x: avance.current.x + (apres.x - avant.x),
+                z: avance.current.z + (apres.z - avant.z),
+              };
+            }
+            return;
+          }
           useScanStore.getState().moveCeiling(id, {
             x: startRef.current.x + d.x,
             z: startRef.current.z + d.z,
@@ -4503,7 +4540,7 @@ export function CeilingDragHandle({
         },
         onPanResponderTerminate: () => releaseHaptic('accroche'),
       }),
-    [id, seuil],
+    [id, seuil, ligne],
   );
   return (
     <View

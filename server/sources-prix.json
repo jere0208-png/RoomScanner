@@ -412,6 +412,14 @@
     }
    ]
   },
+  "contacteur-ig": {
+   "url": "https://www.castorama.fr/contacteur-de-puissance-bipolaire-2f-25a-230v-legrand/3245060927028_CAFR.prd",
+   "ean": "3245060927028",
+   "facteur": 1,
+   "intitule": "Contacteur de puissance bipolaire 2F 25A 230V Legrand",
+   "confiance": "proche",
+   "note": "Contacteur modulaire à bobine 230 V, commandé par l'interrupteur général pour couper l'éclairage. Fiche Castorama ambiguë sur le nombre de pôles (titre bipolaire, fiche 1 pôle)."
+  },
   "contacteur-jn": {
    "url": "https://www.castorama.fr/contacteur-20a-schneider-electric-resi9-xp/3606481323996_CAFR.prd",
    "ean": "3606481323996",

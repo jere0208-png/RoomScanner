@@ -188,6 +188,7 @@ export const REFS_CATALOGUE: Record<string, RefCatalogue> = {
   'led-profile': { ean: '4000870705186' },
   visiophone: { ean: '3345111122904' },
   'alarme-contact': { ean: '3660849508517' },
+  'contacteur-ig': { ean: '3245060927028' },
   'scie-cloche-67': { ean: '3663602810186' },
   'silicone': { ean: '5059340043692' },
   'sortie-cable-32': { ean: '3245060901493' },

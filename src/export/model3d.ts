@@ -45,10 +45,17 @@ export interface ModelForExport {
   fixtures?: Fixture[];
 }
 
-/** À quel groupe OBJ appartient une face. */
+/**
+ * À quel groupe OBJ appartient une face — revue « Claire » : deux groupes,
+ * « Sols » et « Volumes », pour tout le logement ; on ne pouvait pas masquer
+ * les meubles pour ne garder que l'architecture. Un groupe par nature.
+ */
 function groupOf(face: Face3D): string {
   if (face.isFloor) return 'Sols';
-  return 'Volumes';
+  if (face.menuiserie) return 'Menuiseries';
+  if (face.meuble || face.ownerId) return 'Meubles';
+  if (face.appareil) return 'Appareillage';
+  return 'Murs';
 }
 
 const n3 = (v: number) => (Math.round(v * 1000) / 1000).toString();

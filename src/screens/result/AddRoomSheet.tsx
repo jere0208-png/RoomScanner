@@ -155,8 +155,15 @@ export function AddRoomSheet({
           <Text style={styles.modalSubtitle}>{sousTitre}</Text>
           {surMesure ? (
             <View>
-              {champ('Largeur', largeur, setLargeur)}
-              {champ('Profondeur', profondeur, setProfondeur, () => ajouter())}
+              {/* Les mêmes mots que « Cotes » (revue « Inès ») : gauche-droite,
+                  haut-bas — et, accolée, le long du mur choisi. */}
+              {champ(accolee ? 'Largeur, le long du mur' : 'Largeur, gauche-droite', largeur, setLargeur)}
+              {champ(
+                accolee ? 'Profondeur, depuis le mur' : 'Profondeur, haut-bas',
+                profondeur,
+                setProfondeur,
+                () => ajouter(),
+              )}
               <View style={{ marginTop: 10 }}>
                 <Text style={styles.modalSubtitle}>Nom</Text>
                 <TextInput

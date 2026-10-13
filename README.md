@@ -14285,6 +14285,38 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## L'image emporte ses surfaces, le contacteur de l'interrupteur général, la ligne de spots d'un bloc
+
+**L'image partagée emporte la liste des surfaces** (Hugo). Sur un iPhone
+SE, elle ne portait qu'une surface sur neuf : les cartouches serrés la
+taisent, et le groupe de la colocation ne pouvait pas vérifier le prorata.
+Le temps de la capture, en 2D, la carte porte une légende : chaque pièce,
+sa surface, et le total.
+
+**L'interrupteur général commande un contacteur au tableau** (Mehdi).
+- Le bordereau compte un contacteur 2F 25 A (`contacteur-ig`) dès qu'un
+  interrupteur général est posé. Son prix est celui de Castorama :
+  Legrand, 78,90 €, vu le 13 octobre 2026, et repris par le relevé du
+  matin.
+- Les circuits d'éclairage disent qu'il les coupe.
+
+**Une ligne de spots se déplace d'un bloc** (Mehdi). Choisie entière, la
+ligne se glisse par n'importe lequel de ses spots (`moveCeilingRow`), sous
+un seul « Annuler ». Un pas qui sortirait un spot de la pièce est refusé.
+
+**L'OBJ range ses faces par nature** (Claire) : Sols, Murs, Menuiseries,
+Meubles, Appareillage. Il n'avait que « Sols » et « Volumes », et on ne
+pouvait pas masquer les meubles pour garder l'architecture.
+
+**« Décorer » liste aussi les tapis** (Yasmine) : la 3D savait les teindre.
+
+**Les mêmes mots pour les cotes** (Inès). « Ajouter une pièce » dit
+« Largeur, gauche-droite » et « Profondeur, haut-bas », comme « Cotes » ;
+« le long du mur » quand la pièce s'accole. Le ruban LED parle de « la face
+des murs », plus « du nu » (Bernard).
+
+Banc : `tournee4retouches`.
+
 ## Les mots lisibles, les liens justes, l'escalier hors de l'habitable
 
 **Les mots sous les boutons se lisent** (Bernard). « Centrer », « Retirer »

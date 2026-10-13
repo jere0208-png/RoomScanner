@@ -921,7 +921,7 @@ describe('la maison empilée de Léa', () => {
       alt,
     );
     expect(obj).toContain('g RDC Sols');
-    expect(obj).toContain('g R+1 Volumes');
+    expect(obj).toContain('g R+1 Murs');
     const ys = obj
       .split('\n')
       .filter((l) => l.startsWith('v '))

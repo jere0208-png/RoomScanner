@@ -703,6 +703,8 @@ export const TARIFS_COMMUNS: Record<string, Tarif> = {
   'led-profile': v([['Castorama', 19.95]]),
   visiophone: v([['Castorama', 149.9]]),
   'alarme-contact': v([['Castorama', 49.9]]),
+  // Le contacteur de l'interrupteur général : Legrand 2F 25 A, vu le 13/10/2026.
+  'contacteur-ig': v([['Castorama', 78.9]]),
   'gaine-vmc-125': v([['Castorama', 14.95]]),
   'bouche-vmc': v([['Castorama', 69.9]]),
 };

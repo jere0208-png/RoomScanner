@@ -2161,6 +2161,20 @@ export function ResultScreen() {
     réflexion « grand public » : le chiffre qu'on écrit dans une annonce.
   */
   const habitable = useMemo(() => surfacesHabitables(rooms, parts, objects), [rooms, parts, objects]);
+  /** La liste des surfaces que l'image partagée emporte (voir plus bas, `legendeImage`). */
+  const legendeSurfaces = useMemo(() => {
+    const virgule = (v: number) => v.toFixed(2).replace('.', ',');
+    const lignes = parts
+      .filter((p) => (p.surface?.area ?? 0) > 0)
+      .map((p, i) => ({
+        id: p.roomId,
+        nom: rooms.find((r) => r.id === p.roomId)?.name || `Pièce ${i + 1}`,
+        aire: `${p.surface!.exact ? '' : '≈ '}${virgule(p.surface!.area)}`,
+      }))
+      .slice(0, 14);
+    const total = parts.reduce((t, p) => t + (p.surface?.area ?? 0), 0);
+    return { lignes, total: virgule(total) };
+  }, [parts, rooms]);
   /*
     LE TOTAL DE LA MAISON — revue « Léa » : l'en-tête ne disait que le niveau
     affiché, et les 122 m² de la maison ne paraissaient qu'en page de garde
@@ -4494,7 +4508,7 @@ export function ResultScreen() {
                 const enRetrait = (titre: string, defaut: number) =>
                   setPrompt({
                     title: titre,
-                    subtitle: 'La distance du ruban au nu des murs.',
+                    subtitle: 'La distance entre le ruban et la face des murs, en centimètres.',
                     value: String(defaut),
                     unit: 'cm',
                     numeric: true,
@@ -6543,6 +6557,26 @@ export function ResultScreen() {
               />
             );
           })()}
+
+        {/*
+          LES SURFACES PARTENT AVEC L'IMAGE — revue « Hugo » : sur un iPhone
+          SE, l'image n'emportait qu'une surface sur neuf (les cartouches
+          serrés la taisent), et le groupe de la colocation ne pouvait pas
+          vérifier le prorata. Le temps de la capture, la carte porte la
+          liste : chaque pièce, sa surface, et le total.
+        */}
+        {capturing && vue === '2d' && legendeSurfaces.lignes.length > 1 && (
+          <View style={styles.legendeImage} pointerEvents="none">
+            {legendeSurfaces.lignes.map((l) => (
+              <Text key={l.id} style={styles.legendeImageLigne} numberOfLines={1}>
+                {`${l.nom} · ${l.aire} m²`}
+              </Text>
+            ))}
+            <Text style={[styles.legendeImageLigne, styles.legendeImageTotal]} numberOfLines={1}>
+              {`Total · ${legendeSurfaces.total} m²`}
+            </Text>
+          </View>
+        )}
 
         {/* Watermark EchoPlan, visible uniquement sur les images générées */}
         {capturing && (

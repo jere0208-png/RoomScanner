@@ -219,7 +219,7 @@ export function CeilingBar({
                             onPress={() =>
                               onPrompt({
                                 title: 'Retrait du ruban',
-                                subtitle: 'Sa distance au nu des murs, en centimètres. Tout le tracé suit.',
+                                subtitle: 'Sa distance à la face des murs, en centimètres. Tout le tracé suit.',
                                 value: String(Math.round(onRetrait.actuel * 100)),
                                 unit: 'cm',
                                 numeric: true,

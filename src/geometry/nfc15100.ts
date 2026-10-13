@@ -1715,7 +1715,9 @@ export function planCircuits(
         note:
           points === 0
             ? 'Commandes seules : les points lumineux ne sont pas encore posés.'
-            : undefined,
+            : fixtures.some((f) => f.kind === 'interGeneral')
+              ? 'Coupé par l’interrupteur général, au contacteur du tableau.'
+              : undefined,
       });
     }
   }

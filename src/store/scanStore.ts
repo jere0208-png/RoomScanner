@@ -2487,6 +2487,8 @@ interface ScanState {
   addObject: (item: CatalogItem, x: number, z: number) => string;
   /** Fait pivoter un meuble d'un quart de tour. */
   rotateObject: (id: string, quarts?: number) => void;
+  /** Déplace toute une ligne de spots d'un bloc, sans la sortir de sa pièce. */
+  moveCeilingRow: (row: string, dx: number, dz: number) => void;
   /** Le côté de la méridienne d'un canapé d'angle (revue « Yasmine »). */
   setMeridienne: (id: string, cote: 'gauche' | 'droite') => void;
   /** Oriente un meuble à l'angle donné (radians). */
@@ -6189,6 +6191,27 @@ export const useScanStore = create<ScanState>((set, get) => {
       pushHistory('removeCeilingRow');
       set({
         ceiling: get().ceiling.filter((c) => c.row !== row),
+        dirty: true,
+      });
+    },
+
+    /*
+      UNE LIGNE DE SPOTS SE DÉPLACE D'UN BLOC — revue « Mehdi » : il fallait
+      glisser les quatre spots un par un pour la recaler. Elle avance
+      entière ; un pas qui en sortirait un de la pièce est refusé.
+    */
+    moveCeilingRow: (row, dx, dz) => {
+      const st = get();
+      const ligne = st.ceiling.filter((c) => c.row === row);
+      if (ligne.length === 0 || (!dx && !dz)) return;
+      const part = roomParts(st.walls, st.rooms).find((p) => p.roomId === ligne[0].roomId);
+      const ring = part?.surface?.pts ?? [];
+      if (ring.length >= 3 && ligne.some((c) => !pointInPolygon({ x: c.at.x + dx, z: c.at.z + dz }, ring))) return;
+      pushHistory(`ceilingRow:${row}`);
+      set({
+        ceiling: st.ceiling.map((c) =>
+          c.row === row ? avecSaTrace(c, (p) => ({ x: p.x + dx, z: p.z + dz })) : c,
+        ),
         dirty: true,
       });
     },

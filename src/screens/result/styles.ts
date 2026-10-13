@@ -323,6 +323,20 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     bottom: 0,
     backgroundColor: c.bg,
   },
+  /** La liste des surfaces, sur l'image partagée seulement. */
+  legendeImage: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    maxWidth: '62%',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 9,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    gap: 1,
+  },
+  legendeImageLigne: { color: '#1B2230', fontSize: 11, fontWeight: '500' },
+  legendeImageTotal: { fontWeight: '700', marginTop: 2 },
   watermark: {
     position: 'absolute',
     bottom: 10,

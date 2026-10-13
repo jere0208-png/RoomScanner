@@ -122,8 +122,12 @@ export function DecorSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
   const piece = nommees.find((r) => r.id === pieceId) ?? nommees[0] ?? null;
+  /*
+    LES TAPIS SE DÉCORENT AUSSI — revue « Yasmine » : ils n'étaient pas dans
+    la liste, alors que la 3D sait les teindre (`tapis`, dans `modeles3d`).
+  */
   const meubles = useMemo(
-    () => (piece ? objects.filter((o) => o.roomId === piece.id && !/tapis/i.test(o.category ?? '')) : []),
+    () => (piece ? objects.filter((o) => o.roomId === piece.id) : []),
     [objects, piece],
   );
   // « Chaise 1 », « Chaise 2 » : deux meubles du même nom se distinguent.

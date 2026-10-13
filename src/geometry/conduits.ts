@@ -439,6 +439,22 @@ export function buyingList(
   openings: WallSeg[] = [],
 ): BuyRow[] {
   const out: BuyRow[] = [];
+  /*
+    L'INTERRUPTEUR GÉNÉRAL COMMANDE UN CONTACTEUR — revue « Mehdi » : il était
+    compté comme une commande de plus, sans rien au tableau. Il coupe
+    l'éclairage en sortant : c'est la bobine d'un contacteur de tableau
+    qu'il commande, et ce contacteur s'achète.
+  */
+  if (fixtures.some((f) => postsOf(f.kind).includes('interGeneral'))) {
+    out.push({
+      family: 'Appareillage',
+      code: 'contacteur-ig',
+      label: 'Contacteur 2F 25 A',
+      spec: 'Au tableau, commandé par l’interrupteur général : il coupe l’éclairage',
+      quantity: 1,
+      unit: 'u',
+    });
+  }
   const contacts = openings.filter((o) => o.detecteur).length;
   if (contacts > 0) {
     out.push({
