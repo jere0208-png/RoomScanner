@@ -21,10 +21,12 @@
  * conventions du dessin de bâtiment, et les deux erreurs qui ne se voient
  * qu'une fois le mobilier commandé.
  */
-import { pocheDesMurs } from '../geometry/poche';
+import { dansLeBati, pocheDesMurs } from '../geometry/poche';
 import {
   arcDuBattant,
+  epaisseurDe,
   pivotsDesBattants,
+  retraitDuCoin,
   roomParts,
   segLength,
   longueurCotee,
@@ -203,6 +205,40 @@ function texte(calque: string, p: Pt, hauteurMm: number, s: string): string {
     paire(40, hauteurMm.toFixed(1)) +
     paire(1, sansAccent(s))
   );
+}
+
+/**
+ * Un texte couché selon `angle` (degrés), centré sur son point : le R12
+ * prend alors le point d'alignement (11/21), et garde le point d'insertion
+ * pour les logiciels qui l'ignorent.
+ */
+function texteCentre(calque: string, p: Pt, hauteurMm: number, angle: number, s: string): string {
+  const q = pt(p);
+  return (
+    paire(0, 'TEXT') +
+    paire(8, calque) +
+    paire(10, q.x.toFixed(2)) +
+    paire(20, q.y.toFixed(2)) +
+    paire(30, '0.0') +
+    paire(40, hauteurMm.toFixed(1)) +
+    paire(1, sansAccent(s)) +
+    paire(50, angle.toFixed(1)) +
+    paire(72, 1) +
+    paire(11, q.x.toFixed(2)) +
+    paire(21, q.y.toFixed(2)) +
+    paire(31, '0.0')
+  );
+}
+
+/** Un point dans un contour fermé (pair-impair). */
+function dansLeContour(q: Pt, pts: Pt[]): boolean {
+  let dedans = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i];
+    const b = pts[j];
+    if (a.z > q.z !== b.z > q.z && q.x < ((b.x - a.x) * (q.z - a.z)) / (b.z - a.z) + a.x) dedans = !dedans;
+  }
+  return dedans;
 }
 
 function cercle(calque: string, p: Pt, rayonMm: number): string {
@@ -414,18 +450,64 @@ export function buildDxf(plan: PlanPourDxf): string {
     out += polyligne(CALQUE.meubles, [coin(-1, -1), coin(1, -1), coin(1, 1), coin(-1, 1)]);
   }
 
-  /* La cote de chaque mur, sur son calque : elle se relit, elle ne se calcule pas. */
+  /*
+    LA COTE DE CHAQUE MUR, COMME À LA PLANCHE — revue « Claire » : elle
+    n'était qu'un texte posé à plat sur l'axe du mur, dans la maçonnerie, et
+    couché en travers des murs verticaux ; rien à accrocher dans son
+    logiciel. Elle se trace maintenant DANS LA PIÈCE, au nu : une ligne de
+    cote de la longueur écrite, ses tirets à 45°, ses lignes d'attache
+    depuis la face du mur, et le chiffre le long du mur, lisible depuis le
+    bas ou la droite. Toujours en LINE et TEXT : une entité DIMENSION se
+    relit différemment d'un logiciel à l'autre.
+  */
+  const contoursDesPieces = decoupage
+    .map((x) => x.surface?.pts)
+    .filter((x): x is Pt[] => !!x && x.length >= 3);
+  const dansUnePiece = (q: Pt) => contoursDesPieces.some((c) => dansLeContour(q, c));
   for (const w of plan.walls) {
     // La cote du plan : au nu pour un mur dessiné (revue « Léa »).
     // Avec ses pièces : la face d'un pan coupé (revue « Claire »).
     const L = longueurCotee(plan.walls, w, decoupage);
     if (L < 0.2) continue;
-    out += texte(
-      CALQUE.cotes,
-      { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 },
-      120,
-      `${L.toFixed(2).replace('.', ',')} m`,
-    );
+    const lax = segLength(w);
+    if (lax < 1e-6) continue;
+    const u = { x: (w.b.x - w.a.x) / lax, z: (w.b.z - w.a.z) / lax };
+    const e = epaisseurDe(w) / 2;
+    const mil = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+    // Du côté d'une pièce : une façade se cote dedans. Un mur qui n'en borde
+    // aucune (le fond d'un coffre de cheminée, l'angle plein derrière un pan
+    // coupé) se cote dehors, hors de la maçonnerie.
+    const deCote = (s: number): Pt => ({ x: mil.x - u.z * s * (e + 0.3), z: mil.z + u.x * s * (e + 0.3) });
+    const sgn =
+      [1, -1].find((s) => dansUnePiece(deCote(s))) ?? [1, -1].find((s) => !dansLeBati(plan.walls, deCote(s))) ?? 1;
+    const n = { x: -u.z * sgn, z: u.x * sgn };
+    // Centrée sur le nu, entre les demi-murs qui ferment ses deux bouts.
+    const r0 = w.auNu ? retraitDuCoin(plan.walls, w, w.a) : 0;
+    const r1 = w.auNu ? retraitDuCoin(plan.walls, w, w.b) : 0;
+    const sMil = (r0 + lax - r1) / 2;
+    const s0 = sMil - L / 2;
+    const s1 = sMil + L / 2;
+    const D = e + 0.3;
+    const sur = (s: number, k: number): Pt => ({ x: w.a.x + u.x * s + n.x * k, z: w.a.z + u.z * s + n.z * k });
+    out += ligne(CALQUE.cotes, sur(s0, D), sur(s1, D));
+    for (const s of [s0, s1]) {
+      // La ligne d'attache, de la face du mur à un peu au-delà du trait.
+      out += ligne(CALQUE.cotes, sur(s, e + 0.02), sur(s, D + 0.05));
+      // Le tiret à 45°.
+      out += ligne(CALQUE.cotes, sur(s - 0.06, D - 0.06), sur(s + 0.06, D + 0.06));
+    }
+    // Le chiffre se lit depuis le bas ou la droite de la feuille, posé du
+    // côté de la pièce, à 5 cm de son trait.
+    let angle = (Math.atan2(-u.z, u.x) * 180) / Math.PI;
+    if (angle > 90.5) angle -= 180;
+    if (angle <= -89.5) angle += 180;
+    const r = (angle * Math.PI) / 180;
+    // Le haut du texte, dans le repère du dessin (y vers le haut), puis du relevé.
+    const haut = { x: -Math.sin(r), z: -Math.cos(r) };
+    const versLaPiece = haut.x * n.x + haut.z * n.z > 0;
+    const H = 0.12;
+    const base = sur(sMil, D + 0.05 + (versLaPiece ? 0 : H));
+    out += texteCentre(CALQUE.cotes, base, H * MM, angle, `${L.toFixed(2).replace('.', ',')} m`);
   }
 
   out += paire(0, 'ENDSEC');

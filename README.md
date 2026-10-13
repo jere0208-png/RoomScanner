@@ -14285,6 +14285,27 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les cotes du DXF tracées comme à la planche
+
+**Une vraie cote dans le DXF** (Claire). Chaque cote n'était qu'un texte
+posé à plat sur l'axe du mur : dans la maçonnerie, couché en travers des
+murs verticaux, et sans rien à accrocher dans son logiciel. Sur le calque
+`ECHOPLAN-COTES`, chaque mur a maintenant :
+- une ligne de cote de la longueur écrite, du nu au nu, à 30 cm de la face
+  du mur ;
+- ses tirets à 45° et ses lignes d'attache depuis la face ;
+- le chiffre le long du mur, centré, lisible depuis le bas ou la droite.
+
+**De quel côté.** Une façade se cote dedans, une cloison du côté d'une de
+ses pièces. Un mur qui ne borde aucune pièce se cote dehors, hors de la
+maçonnerie : le fond d'un coffre de cheminée, l'angle plein derrière un
+pan coupé.
+
+**Pas d'entité DIMENSION.** Le fichier reste en LINE et TEXT : une entité
+DIMENSION se relit différemment d'un logiciel à l'autre.
+
+Banc : `tournee4dxfcotes`.
+
 ## Les cotes d'un coffre de cheminée dans la pièce, celles d'un placard contre lui
 
 **Le dehors est ce qui n'est pas dans le bâti** (Claire). Sur son
