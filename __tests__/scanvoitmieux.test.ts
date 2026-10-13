@@ -89,8 +89,9 @@ describe('le type de chaque pièce, d’après RoomPlan', () => {
     expect(deduireLaPiece(['unidentified'], ['sofa'])).toBe('living');
     // Une cuvette seule dans ce que RoomPlan appelle salle de bains.
     expect(deduireLaPiece(['bathroom'], ['toilet'])).toBe('wc');
-    // Un séjour ouvert sur sa cuisine : la plus caractéristique.
-    expect(deduireLaPiece(['livingRoom', 'kitchen'], [])).toBe('kitchen');
+    // Un séjour ouvert sur sa cuisine : une pièce à vivre et sa cuisine,
+    // les deux usages (revues « Malik » et « Amandine »).
+    expect(deduireLaPiece(['livingRoom', 'kitchen'], [])).toBe('sejourCuisine');
   });
 
   it('nomme les pièces du relevé d’après ses sections', () => {

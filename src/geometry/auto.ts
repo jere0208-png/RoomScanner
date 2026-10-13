@@ -26,7 +26,8 @@
 import { COMMANDES_MURALES, FIXTURES, socketsOf, type Fixture, type FixtureKind } from './electrical';
 import type { CeilingFixture } from './ceiling';
 import type { Pt, WallSeg } from './floorplan';
-import { segLength, perpOf } from './floorplan';
+import { pointOnSeg, segLength, perpOf, solDesMurs } from './floorplan';
+import { volumeAt, volumeVerdict, wetZones } from './volumes';
 import {
   requirementFor,
   roomUse,
@@ -86,9 +87,19 @@ function retirer(libres: [number, number][], a: number, b: number): [number, num
 export function placesLibres(
   murs: WallSeg[],
   openings: WallSeg[],
-  objets: { width: number; depth: number; height: number; transform: number[] }[],
+  objets: { width: number; depth: number; height: number; transform: number[]; category?: string }[],
   fixtures: Fixture[],
   interieur: Pt,
+  /** La hauteur d'axe de ce qu'on pose : un meuble bas ne cache pas une prise haute. */
+  hauteur = H_PRISE,
+  /**
+   * LE SOL DU RELEVÉ — revues « Gérard » et « Thomas » : la hauteur d'un
+   * meuble se comparait à celle d'une prise sans retirer le sol du scan
+   * (−1,30 m) ; tout meuble de moins de 1,55 m passait pour « trop bas
+   * pour gêner », et neuf socles tombaient derrière le lit, le four, le
+   * lave-linge. Sans sol donné, celui des murs.
+   */
+  sol = solDesMurs(murs),
 ): MurLibre[] {
   return murs
     .map((wall) => {
@@ -128,7 +139,13 @@ export function placesLibres(
           prise derrière un meuble. En deçà, elle est perdue — et une prise
           perdue ne compte pas, même si la norme la voit.
         */
-        if (d - demiN > 0.6 || o.transform[13] + o.height / 2 < H_PRISE) continue;
+        if (d - demiN > 0.6) continue;
+        // Ce qui couvre la hauteur de pose cache la place ; au-dessus des
+        // feux et de l'évier, on ne pose jamais, à aucune hauteur.
+        const bas = o.transform[13] - o.height / 2 - sol;
+        const haut = bas + o.height;
+        const interdit = /stove|cooktop|sink/i.test(o.category ?? '');
+        if (!interdit && (haut < hauteur - 0.05 || bas > hauteur + 0.05)) continue;
         const demiU =
           Math.abs(cos * u.x + sin * u.z) * (o.width / 2) +
           Math.abs(-sin * u.x + cos * u.z) * (o.depth / 2);
@@ -177,7 +194,7 @@ export function poserAuxNormes(input: {
   rooms: (RoomInput & { kind?: RoomKind | null; interieur: Pt })[];
   walls: WallSeg[];
   openings: WallSeg[];
-  objects: { width: number; depth: number; height: number; transform: number[]; roomId?: string }[];
+  objects: { width: number; depth: number; height: number; transform: number[]; roomId?: string; category?: string }[];
   fixtures: Fixture[];
   ceiling: CeilingFixture[];
   /** Où tombe chaque appareil : `fixturePlacement` le sait déjà. */
@@ -188,6 +205,7 @@ export function poserAuxNormes(input: {
   const fixtures: Fixture[] = [];
   const ceiling: CeilingFixture[] = [];
   const rapport: string[] = [];
+  const sol = solDesMurs(input.walls);
 
   for (const room of input.rooms) {
     const use = roomUse(room.name, room.kind);
@@ -214,21 +232,47 @@ export function poserAuxNormes(input: {
     const murs = input.walls.filter((w) => room.wallIds.includes(w.id));
     if (murs.length === 0) continue;
     const objets = input.objects.filter((o) => !o.roomId || o.roomId === room.id);
-    const places = placesLibres(
-      murs,
-      input.openings,
-      objets,
-      input.fixtures,
-      room.interieur,
-    );
+    // Les places libres, hauteur par hauteur : un plan de travail cache une
+    // prise à 25 cm, pas une prise à 1,10 m.
+    const placesA = new Map<number, MurLibre[]>();
+    const placesPour = (h: number) => {
+      let p = placesA.get(h);
+      if (!p) {
+        p = placesLibres(murs, input.openings, objets, input.fixtures, room.interieur, h, sol);
+        placesA.set(h, p);
+      }
+      return p;
+    };
+    /*
+      LES VOLUMES DE LA SALLE D'EAU — revue « Thomas » : « Normes auto »
+      posait un socle à 11 cm de la baignoire, en volume 2, que son propre
+      contrôle classait « interdit ». Une place qui tombe dans un volume où
+      l'appareil est interdit se refuse, et l'on prend la suivante.
+    */
+    const zones = wetZones(objets as never, sol);
+    const permis = (kind: FixtureKind, wall: WallSeg, along: number, side: 1 | -1, height: number) => {
+      if (zones.length === 0) return true;
+      const L = segLength(wall) || 1;
+      const u = { x: (wall.b.x - wall.a.x) / L, z: (wall.b.z - wall.a.z) / L };
+      const nrm = perpOf(u);
+      const p = {
+        x: wall.a.x + u.x * along + nrm.x * side * 0.05,
+        z: wall.a.z + u.z * along + nrm.z * side * 0.05,
+      };
+      const v = volumeAt(p, height, zones);
+      return v === null || volumeVerdict(kind, v).allowed;
+    };
     const pose: string[] = [];
 
     /** Pose `n` appareils d'une nature, et dit combien ont trouvé leur place. */
     const poser = (kind: FixtureKind, n: number, height: number) => {
       let fait = 0;
-      for (let i = 0; i < n; i++) {
+      const places = placesPour(height);
+      for (let i = 0, essais = 0; i < n && essais < n * 8; essais++) {
         const place = prendre(places);
         if (!place) break;
+        if (!permis(kind, place.wall, place.along, place.side, height)) continue;
+        i++;
         fixtures.push({
           id: input.id(kind),
           kind,
@@ -244,8 +288,22 @@ export function poserAuxNormes(input: {
 
     const manqueSocles = Math.max(0, besoin.socles - socles);
     if (manqueSocles > 0) {
-      const fait = poser('prise', manqueSocles, H_PRISE);
-      if (fait > 0) pose.push(`${fait} socle${fait > 1 ? 's' : ''} 16 A`);
+      /*
+        LES SOCLES DE LA CUISINE, D'ABORD AU-DESSUS DU PLAN — revue
+        « Gérard » : six socles posés à 25 cm, puis le contrôle en
+        réclamait quatre au-dessus du plan de travail, et en ajoutait quatre
+        de plus — dix au lieu de six. Les quatre du plan se posent à 1,10 m,
+        les autres en bas.
+      */
+      const hauts = dedans.reduce((t, f) => t + (f.height >= 0.9 && !f.usage ? socketsOf(f.kind) : 0), 0);
+      const surPlan = Math.min(manqueSocles, Math.max(0, besoin.surPlan - hauts));
+      const faitHaut = surPlan > 0 ? poser('prise', surPlan, 1.1) : 0;
+      const fait = faitHaut + poser('prise', manqueSocles - faitHaut, H_PRISE);
+      if (fait > 0) {
+        pose.push(
+          `${fait} socle${fait > 1 ? 's' : ''} 16 A${faitHaut > 0 ? ` dont ${faitHaut} au-dessus du plan` : ''}`,
+        );
+      }
       if (fait < manqueSocles) {
         const rate = manqueSocles - fait;
         pose.push(`${rate} socle${rate > 1 ? 's' : ''} sans place libre`);
@@ -300,6 +358,7 @@ export interface ContexteCorrection {
     height: number;
     transform: number[];
     roomId?: string;
+    category?: string;
   }[];
   fixtures: Fixture[];
   id: (prefixe: string) => string;
@@ -360,26 +419,48 @@ export function corrigerConstat(
     };
   }
 
+  /*
+    LA PRISE D'UN APPAREIL SE POSE DERRIÈRE LUI — revue « Gérard » : les
+    trois circuits spécialisés et la cuisson cherchaient une place « hors
+    meubles », et une cuisine équipée n'en a aucune : « 0 sur 3 » restait
+    après « Normes auto ». Le lave-vaisselle, le lave-linge, le four, la
+    plaque relevés appellent leur prise derrière eux, sur le mur qui les
+    porte — où qu'ils soient : le lave-linge est souvent en salle d'eau.
+  */
+  const kindAppareil = fix.kind === 'prise20' || fix.kind === 'prise32' ? fix.kind : null;
+  const appareil = fix.type === 'poser' && kindAppareil !== null;
+  if (appareil && kindAppareil) {
+    const derriere = derriereUnAppareil(kindAppareil, fix.height ?? FIXTURES[kindAppareil].std, roomId, ctx);
+    if (derriere) return { fixtures: [derriere], ceiling: [] };
+  }
+
   // Poser au mur : les pièces candidates, la visée d'abord, puis toutes —
   // le tableau du logement n'a pas de pièce attitrée, il va où il y a de
-  // la place, de préférence en dégagement.
+  // la place, de préférence en dégagement. Jamais dehors.
   const candidates = roomId
     ? ctx.rooms.filter((r) => r.id === roomId)
-    : [...ctx.rooms].sort((a, b) => {
-        const rang = (r: RoomInput) =>
-          roomUse(r.name, r.kind) === 'circulation' ? 0 : 1;
-        return rang(a) - rang(b);
-      });
+    : [...ctx.rooms]
+        .filter((r) => roomUse(r.name, r.kind) !== 'exterieur')
+        .sort((a, b) => {
+          const rang = (r: RoomInput) =>
+            roomUse(r.name, r.kind) === 'circulation' ? 0 : 1;
+          return rang(a) - rang(b);
+        });
   for (const room of candidates) {
     const murs = ctx.walls.filter((w) => room.wallIds.includes(w.id));
     if (murs.length === 0) continue;
-    const objets = ctx.objects.filter((o) => !o.roomId || o.roomId === room.id);
+    // Une prise d'appareil sans appareil relevé va derrière le meuble bas :
+    // c'est là qu'on la pose, dans une cuisine équipée.
+    const objets = appareil ? [] : ctx.objects.filter((o) => !o.roomId || o.roomId === room.id);
+    const hauteur = fix.height ?? FIXTURES[fix.kind].std;
     const places = placesLibres(
       murs,
       ctx.openings,
       objets,
       ctx.fixtures,
       room.interieur,
+      hauteur,
+      solDesMurs(ctx.walls),
     );
     const place = prendre(places);
     if (!place) continue;
@@ -396,6 +477,51 @@ export function corrigerConstat(
       ],
       ceiling: [],
     };
+  }
+  return null;
+}
+
+/** Ce que chaque prise d'appareil dessert. */
+const APPAREILS: Record<'prise20' | 'prise32', RegExp> = {
+  prise20: /dishwasher|washer|dryer|oven/i,
+  prise32: /stove|cooktop/i,
+};
+
+/**
+ * Derrière quel appareil, encore sans sa prise, poser celle-ci : le mur de
+ * sa pièce le plus proche de lui, au droit de son milieu. `null` : aucun
+ * appareil relevé ne l'attend.
+ */
+function derriereUnAppareil(
+  kind: 'prise20' | 'prise32',
+  hauteur: number,
+  roomId: string | undefined,
+  ctx: ContexteCorrection,
+): Fixture | null {
+  const pieces = roomId ? [...ctx.rooms.filter((r) => r.id === roomId), ...ctx.rooms.filter((r) => r.id !== roomId)] : ctx.rooms;
+  for (const room of pieces) {
+    const murs = ctx.walls.filter((w) => room.wallIds.includes(w.id));
+    if (murs.length === 0) continue;
+    for (const o of ctx.objects) {
+      if (o.roomId !== room.id || !APPAREILS[kind].test(o.category ?? '')) continue;
+      const c = { x: o.transform[12], z: o.transform[14] };
+      let mieux: { wall: WallSeg; t: number; d: number } | null = null;
+      for (const w of murs) {
+        const { dist, t } = pointOnSeg(c, w.a, w.b);
+        if (dist <= Math.max(o.width, o.depth) / 2 + 0.4 && (!mieux || dist < mieux.d)) mieux = { wall: w, t, d: dist };
+      }
+      if (!mieux) continue;
+      const L = segLength(mieux.wall);
+      if (L < 0.3) continue;
+      const along = Math.min(L - 0.15, Math.max(0.15, mieux.t * L));
+      // Déjà servi : une prise de cette nature au droit de l'appareil.
+      if (ctx.fixtures.some((f) => f.kind === kind && f.wallId === mieux!.wall.id && Math.abs(f.along - along) < 0.6)) continue;
+      const u = { x: (mieux.wall.b.x - mieux.wall.a.x) / L, z: (mieux.wall.b.z - mieux.wall.a.z) / L };
+      const nrm = perpOf(u);
+      const mil = { x: (mieux.wall.a.x + mieux.wall.b.x) / 2, z: (mieux.wall.a.z + mieux.wall.b.z) / 2 };
+      const side: 1 | -1 = (room.interieur.x - mil.x) * nrm.x + (room.interieur.z - mil.z) * nrm.z >= 0 ? 1 : -1;
+      return { id: ctx.id(kind), kind, wallId: mieux.wall.id, along, height: hauteur, side };
+    }
   }
   return null;
 }

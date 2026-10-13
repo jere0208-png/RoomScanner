@@ -73,7 +73,15 @@ export type RoomKind =
   | 'wc'
   | 'bedroom'
   | 'living'
-  | 'dining';
+  | 'dining'
+  /**
+   * LA PIÈCE À VIVRE OUVERTE SUR SA CUISINE — revues « Malik » et
+   * « Amandine » : l'open space d'un loft (85 m²), le studio, ressortaient
+   * « Cuisine » — six socles exigés et aucune RJ45, au lieu des règles du
+   * séjour. Son nom porte les deux usages : le séjour compte ses socles, la
+   * cuisine y ajoute ses règles (voir `estCuisine`).
+   */
+  | 'sejourCuisine';
 
 const ROOM_FR: Record<RoomKind, string> = {
   kitchen: 'Cuisine',
@@ -82,6 +90,7 @@ const ROOM_FR: Record<RoomKind, string> = {
   bedroom: 'Chambre',
   living: 'Salon',
   dining: 'Salle à manger',
+  sejourCuisine: 'Séjour-cuisine',
 };
 
 /**
@@ -150,6 +159,9 @@ export function deduceRoomKind(categories: string[]): RoomKind | null {
     if (s < MIN_SCORE) continue;
     if (best === null || s > (score.get(best) ?? 0)) best = kind;
   }
+  // Une cuisine ET de quoi y vivre (un canapé, un lit) : une pièce ouverte.
+  const net = (k: RoomKind) => (score.get(k) ?? 0) >= MIN_SCORE;
+  if (best === 'kitchen' && (net('living') || net('bedroom'))) return 'sejourCuisine';
   return best;
 }
 
@@ -190,7 +202,22 @@ export function deduireLaPiece(labels: string[], categories: string[]): RoomKind
   const vus = labels.map(kindFromRoomPlan).filter((k): k is RoomKind => !!k);
   if (vus.length === 0) return meubles;
   const roomplan = PRIORITY.find((k) => vus.includes(k)) ?? vus[0];
-  if (roomplan === 'bathroom' && meubles === 'wc') return 'wc';
+  /*
+    UNE SALLE D'EAU AVEC SON WC RESTE UNE SALLE D'EAU — revues « Amandine »
+    et « Malik » : RoomPlan disait « bathroom », la pièce avait un lavabo et
+    une cuvette, et elle ressortait « WC » — aucun socle exigé, volumes
+    oubliés. Seule une cuvette sans rien d'autre fait des WC.
+  */
+  if (roomplan === 'bathroom' && meubles === 'wc' && !categories.some((c) => /sink|bathtub|shower|washer/i.test(c))) {
+    return 'wc';
+  }
+  // La cuisine vue avec un séjour (ou un coin nuit) : une pièce ouverte.
+  if (
+    roomplan === 'kitchen' &&
+    (vus.includes('living') || meubles === 'sejourCuisine' || deduceRoomKind(categories.filter((c) => !/refrigerator|stove|oven|dishwasher|sink/i.test(c))) === 'living')
+  ) {
+    return 'sejourCuisine';
+  }
   return roomplan;
 }
 

@@ -115,16 +115,18 @@ describe('constats', () => {
     const trop = issues.find((i) => i.message.includes('circuits'));
     expect(trop?.severity).toBe('info');
     expect(trop?.message).toContain('2 circuits');
-    // Et la pièce n'est donc PAS en alerte pour cette raison. Restent deux
+    // Et la pièce n'est donc PAS en alerte pour cette raison. Restent trois
     // alertes qui n'ont rien à voir avec le nombre de socles : l'absence
-    // de tableau, et les trois circuits spécialisés d'une cuisine — dix
-    // prises 16 A n'alimentent ni le four ni le lave-vaisselle.
+    // de tableau, les trois circuits spécialisés d'une cuisine — dix
+    // prises 16 A n'alimentent ni le four ni le lave-vaisselle — et la
+    // cuisson, qui a son circuit 32 A (revues « Gérard » et « Thomas »).
     expect(
       issues.filter(
         (i) =>
           i.severity === 'alerte' &&
           i.code !== 'tableau' &&
-          i.code !== 'specialises',
+          i.code !== 'specialises' &&
+          i.code !== 'cuisson',
       ),
     ).toHaveLength(0);
   });

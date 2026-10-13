@@ -580,11 +580,36 @@ export interface SavedScan {
  * appartement deviennent « Chambre » et « Chambre 2 ». Quand rien n'est assez
  * net pour trancher, la pièce prend son rang : « Pièce 3 ».
  */
-function nameRooms(kinds: (RoomKind | null)[]): string[] {
+/**
+ * UN COULOIR SE RECONNAÎT À SA FORME — revues « Thomas » et « Gérard » :
+ * RoomPlan ne nomme jamais un couloir, qui n'a pas de meuble ; il restait
+ * « Pièce 2 », et le tableau et le détecteur de fumée, qui vont en
+ * circulation, partaient au séjour. Une pièce de 2 m² au moins, large de
+ * 1,60 m au plus et deux fois et demie plus longue que large en est un. La
+ * largeur se lit de l'aire et du tour : un couloir en L aussi.
+ */
+function estUnCouloir(contour: Pt[]): boolean {
+  if (contour.length < 3) return false;
+  let aire = 0;
+  let tour = 0;
+  for (let i = 0, j = contour.length - 1; i < contour.length; j = i++) {
+    aire += contour[j].x * contour[i].z - contour[i].x * contour[j].z;
+    tour += Math.hypot(contour[i].x - contour[j].x, contour[i].z - contour[j].z);
+  }
+  aire = Math.abs(aire) / 2;
+  const demi = tour / 2;
+  const disc = demi * demi - 4 * aire;
+  if (aire < 2 || disc < 0) return false;
+  const largeur = (demi - Math.sqrt(disc)) / 2;
+  return largeur <= 1.6 && demi - largeur >= 2.5 * largeur;
+}
+
+function nameRooms(kinds: (RoomKind | null)[], contours?: Pt[][]): string[] {
   const taken: string[] = [];
   return kinds.map((kind, i) => {
-    if (!kind) return `Pièce ${i + 1}`;
-    const base = roomKindLabel(kind);
+    const couloir = !kind && !!contours?.[i] && estUnCouloir(contours[i]);
+    if (!kind && !couloir) return `Pièce ${i + 1}`;
+    const base = kind ? roomKindLabel(kind) : 'Couloir';
     const same = taken.filter(
       (n) => n === base || n.startsWith(`${base} `),
     ).length;
@@ -3162,7 +3187,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           .map((o) => o.category),
       ),
     );
-    const auto = nameRooms(kinds);
+    const auto = nameRooms(kinds, shapes.map((s) => s.outline));
     // Les noms donnés à la main survivent : on rattache chaque nouvelle
     // pièce à l'ancienne dont le point de cartouche tombe dedans.
     /*
@@ -3404,7 +3429,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           .map((o) => o.category),
       ),
     );
-    const noms = nameRooms(kinds);
+    const noms = nameRooms(kinds, shapes.map((s) => s.outline));
     const pieces: RoomEntry[] = shapes.map((s, i) => {
       /*
         LE PLAFOND RELEVÉ À L'ÉTAGE AUSSI — revue « Malik » : le relevé du
@@ -7080,7 +7105,7 @@ export const useScanStore = create<ScanState>((set, get) => {
             .map((o) => o.category),
         ),
       );
-      const auto = nameRooms(kinds);
+      const auto = nameRooms(kinds, shapes.map((s) => s.outline));
       // Les noms donnés à la main survivent au second passage : on rattache
       // chaque pièce neuve à l'ancienne dont le cartouche tombe dedans.
       const anciennes = roomParts(jeu.walls, jeu.rooms);
@@ -7550,7 +7575,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
       /* Chaque mur, photographié et redressé pendant le scan. */
       const photosAuto = photosDesMurs(r.photosMurs ?? [], surfaces, walls);
-      const names = nameRooms(kinds);
+      const names = nameRooms(kinds, shapes.map((s) => s.outline));
       const kept: RoomEntry[] = shapes.map((s, i) => {
         const releve = releveDeLaPiece(r, s.outline, s.area);
         return {

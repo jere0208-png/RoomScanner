@@ -14285,6 +14285,44 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## L'électricité sur un vrai scan : derrière les meubles, hors des volumes, la cuisson
+
+**« Normes auto » sur un vrai relevé** (Gérard, Thomas).
+- La hauteur d'un meuble se comparait à celle d'une prise sans retirer le
+  sol du scan (−1,30 m). Tout meuble de moins de 1,55 m passait pour « trop
+  bas pour gêner » : neuf socles tombaient derrière le lit, le four, le
+  lave-linge. Un meuble cache maintenant une place quand il couvre la
+  hauteur de pose, comptée depuis le sol.
+- Un socle se posait à 11 cm d'une baignoire, en volume 2, que le contrôle
+  de l'app classait « interdit ». Une place qui tombe dans un volume interdit
+  pour l'appareil se refuse, et l'on prend la suivante.
+- La cuisine recevait six socles à 25 cm, puis quatre de plus au-dessus du
+  plan de travail : dix au lieu de six. Les quatre du plan se posent
+  d'abord, à 1,10 m, puis les autres en bas. Jamais au-dessus des feux ni de
+  l'évier.
+
+**La cuisson et les circuits spécialisés** (Gérard, Thomas).
+- Une cuisine sans circuit de cuisson 32 A est maintenant signalée, et
+  « Normes auto » la corrige.
+- La prise d'un appareil (lave-vaisselle, lave-linge, four, plaque) se pose
+  derrière lui, sur le mur qui le porte, où qu'il soit. Elle cherchait une
+  place « hors meubles », et une cuisine équipée n'en a aucune : « 0 sur 3 »
+  restait après « Normes auto ».
+
+**Le type de chaque pièce.**
+- Balcon, loggia, terrasse : dehors, aucun socle exigé (Gérard). La loggia
+  suivait les règles du séjour.
+- Une cuisine avec un canapé ou un lit est un « Séjour-cuisine » (Malik,
+  Amandine). L'open space de 85 m² et le studio ressortaient « Cuisine » :
+  six socles et aucune RJ45.
+- Une salle d'eau avec son WC et un lavabo reste une salle d'eau (Amandine,
+  Malik). Seule une cuvette sans rien d'autre fait des WC.
+- Une pièce longue et étroite, sans meuble, s'appelle « Couloir » (Thomas,
+  Gérard). Le tableau et le détecteur de fumée, qui vont en circulation,
+  partaient au séjour.
+
+Bancs : `tournee5elec`, `nfc15100`, `scanvoitmieux`.
+
 ## La logique de construction : l'encadrement réel, les niveaux communs
 
 Le patron a envoyé la vidéo d'un scan sur chantier : une baie dans un mur

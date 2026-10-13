@@ -58,6 +58,12 @@ export type RoomUse =
   | 'sdb'
   | 'wc'
   | 'circulation'
+  /**
+   * BALCON, LOGGIA, TERRASSE — revue « Gérard » : la loggia, même nommée,
+   * suivait les règles du séjour (cinq socles et une RJ45), d'après sa table
+   * et ses chaises. Dehors, la norme n'exige rien.
+   */
+  | 'exterieur'
   | 'autre';
 
 const sansAccent = (s: string) =>
@@ -75,6 +81,7 @@ const sansAccent = (s: string) =>
  */
 export function roomUse(name: string, kind?: RoomKind | null): RoomUse {
   const n = sansAccent(name);
+  if (/loggia|balcon|terrasse/.test(n)) return 'exterieur';
   if (/sejour|salon|salle a manger|living|piece principale|piece a vivre/.test(n)) return 'sejour';
   if (/cuisine/.test(n)) return 'cuisine';
   if (/chambre/.test(n)) return 'chambre';
@@ -94,6 +101,7 @@ export function roomUse(name: string, kind?: RoomKind | null): RoomUse {
       return 'chambre';
     case 'living':
     case 'dining':
+    case 'sejourCuisine':
       return 'sejour';
     default:
       return 'autre';
@@ -158,6 +166,7 @@ export const USE_LABEL: Record<RoomUse, string> = {
   sdb: 'Salle d’eau',
   wc: 'WC',
   circulation: 'Circulation',
+  exterieur: 'Extérieur',
   autre: 'Autre pièce',
 };
 
@@ -247,6 +256,13 @@ export function requirementFor(use: RoomUse, area: number): RoomRequirement {
       };
     case 'wc':
       return { socles: 0, rj45: 0, surPlan: 0, regle: 'WC : aucun socle exigé.' };
+    case 'exterieur':
+      return {
+        socles: 0,
+        rj45: 0,
+        surPlan: 0,
+        regle: 'Balcon, loggia, terrasse : aucun socle exigé. Une prise dehors se pose en IP44.',
+      };
     default:
       return {
         socles: area >= 4 ? 1 : 0,
@@ -955,6 +971,29 @@ export function checkElectrical(
           type: 'poser',
           kind: 'prise20',
           label: 'Poser une 20 A',
+        },
+      });
+    }
+    /*
+      LA CUISSON — revues « Gérard » et « Thomas » : une cuisine dont la
+      plaque avait été relevée sortait sans circuit de cuisson, ni au
+      tableau, ni au devis. Seul le cas inverse (« 32 A hors cuisine ») se
+      contrôlait. Un socle 32 A, ou une sortie de câble « PL », suffit.
+    */
+    const cuisson = fixtures.some((f) => f.kind === 'prise32' || (f.kind === 'sortieCable' && f.usage === 'PL'));
+    if (!cuisson) {
+      out.push({
+        code: 'cuisson',
+        roomId: cuisines[0].id,
+        severity: 'alerte',
+        message: 'Logement : aucun circuit de cuisson 32 A',
+        regle:
+          'La cuisine reçoit un circuit dédié à la cuisson, en 6 mm² sous ' +
+          '32 A : un socle 32 A, ou une sortie de câble pour la plaque.',
+        fix: {
+          type: 'poser',
+          kind: 'prise32',
+          label: 'Poser une 32 A',
         },
       });
     }
