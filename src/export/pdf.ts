@@ -1651,6 +1651,13 @@ const frLen = (v: number) => v.toFixed(2).replace('.', ',');
 /** Ce qui est commun à toutes les feuilles d'un même export. */
 interface SheetContext {
   name: string;
+  /**
+   * LES MURS QUI ONT LEUR FEUILLE D'ÉLÉVATION dans ce dossier — revues
+   * « Thomas » et « Inès » : des numéros de 1 à 16 imprimés dans les murs
+   * d'un dossier sans élévations, qui ne renvoyaient à rien, et un mur 11
+   * sans feuille. Seuls ceux-là se numérotent ; absent, tous.
+   */
+  mursNumerotes?: string[];
   filename: string;
   /** Client et chantier, pour le cartouche. */
   client?: string;
@@ -4226,7 +4233,9 @@ function planPage(
         : estDessine(walls)
           ? 'Murs, ouvertures et surfaces aux cotes int\u00e9rieures \u2014 cotes en m\u00e8tres.'
           : 'Murs, ouvertures et surfaces relev\u00e9s au scan \u2014 cotes en m\u00e8tres.')) +
-    (extra?.sub ? '' : mentionSurface);
+    (extra?.sub ? '' : mentionSurface) +
+    // Le numéro d'un mur se dit : il renvoie à sa feuille d'élévation.
+    (!extra?.sub && wallNumbers(ctx).size > 0 ? ' \u00b7 N\u00b0 de mur : sa feuille d\u2019\u00e9l\u00e9vation.' : '');
   d.text(titre, FRAME.x + 24, TETE, 13, INK, {
     bold: true,
     align: 'left',
@@ -4435,7 +4444,14 @@ function metrePage(
     const lum = eclairage.get(part.roomId);
     const cells = [
       fitText(name, 10, cols[1] - cols[0] - 6),
-      `${frLen(ext.width)} × ${frLen(ext.depth)}`,
+      /*
+        LA LONGUEUR × LA LARGEUR D'UNE PIÈCE QUI EN A — revue « Thomas » :
+        un studio en L s'annonçait « 6,00 × 5,00 » pour 25 m², l'enveloppe
+        du L. Une pièce qui ne remplit pas son rectangle n'a pas deux cotes.
+      */
+      part.surface && Math.abs(ext.width * ext.depth - part.surface.area) <= 0.03 * Math.max(part.surface.area, 0.01)
+        ? `${frLen(ext.width)} × ${frLen(ext.depth)}`
+        : 'forme libre',
       part.surface ? `${part.surface.exact ? '' : '≈ '}${fr2(part.surface.area)}` : '—',
       fr2(perim),
       frLen(h),
@@ -4644,7 +4660,8 @@ function achatsPage(
   if (cout) {
     y -= 26;
     d.line(x0, y + 12, x0 + w, y + 12, 0.8, INK);
-    d.text('Total estimé', cols[0], y, 10.5, INK, { align: 'left', bold: true });
+    // Revue « Thomas » : un montant remis au client dit ce qu'il comprend.
+    d.text('Total estimé TTC', cols[0], y, 10.5, INK, { align: 'left', bold: true });
     d.text(`≈ ${euros(cout.total)}`, cols[3], y, 10.5, INK, { align: 'left', bold: true });
   }
   y -= 22;
@@ -4662,6 +4679,17 @@ function achatsPage(
     GREY,
     { align: 'left' },
   );
+  if (cout) {
+    y -= 12;
+    d.text(
+      fitText('Prix TTC, TVA 20 % comprise, fournitures seules, hors pose \u2014 estimation non contractuelle.', 8, w),
+      x0,
+      y,
+      8,
+      GREY,
+      { align: 'left' },
+    );
+  }
 
   // Le détail, pièce par pièce.
   y -= 34;
@@ -5413,6 +5441,7 @@ function dessinerUneFace(
     { bold: true, align: 'left' },
   );
   const poses0 = mine.length - dos.length;
+  const sansElec = (ctx.fixtures ?? []).length === 0;
   /*
     LE SOUS-TITRE SE REPLIE — relevé des revues du dossier : « …de l'autre
     face. » sortait du cadre de la feuille. Deux lignes au plus, dans la
@@ -5422,8 +5451,10 @@ function dessinerUneFace(
     (auDos ? `Au dos : ${auDos}. ` : '') +
       `Mur de ${face.len.toFixed(2).replace('.', ',')} m sous ` +
       `${H.toFixed(2).replace('.', ',')} m · ` +
-      `${poses0} appareil${poses0 > 1 ? 's' : ''} · cotes en cm ` +
-      'depuis le nu du mur et depuis le sol.' +
+      // Un dossier sans électricité ne parle pas d'appareils — revue
+      // « Thomas » : « 0 appareil » sur chaque feuille d'un architecte.
+      (sansElec ? '' : `${poses0} appareil${poses0 > 1 ? 's' : ''} · `) +
+      'cotes en cm depuis le nu du mur et depuis le sol.' +
       // La légende n'existe que s'il y a quelque chose à expliquer : on
       // ne commente pas ce qui n'est pas dessiné.
       (dos.length > 0
@@ -5862,7 +5893,9 @@ function dessinerUneFace(
     d.text(`${Math.round(bornes[i + 1] * 100) - Math.round(bornes[i] * 100)}`, px(m), yv - 2.5, 7, GREY, { bold: true });
   }
 
-  if (poses.length === 0) {
+  // Un dossier sans électricité n'a pas à le dire, sur chaque feuille, au
+  // milieu des baies et des meubles (revue « Thomas »).
+  if (poses.length === 0 && !sansElec) {
     d.text(
       'Aucun appareil sur ce mur.',
       px(face.len / 2),
@@ -5978,7 +6011,12 @@ function wallsInOrder(ctx: SheetContext): WallSeg[] {
  * la feuille s'est perdue.
  */
 function wallNumbers(ctx: SheetContext): Map<string, number> {
-  return new Map(wallsInOrder(ctx).map((w, i) => [w.id, i + 1]));
+  const retenus = ctx.mursNumerotes ? new Set(ctx.mursNumerotes) : null;
+  return new Map(
+    wallsInOrder(ctx)
+      .filter((w) => !retenus || retenus.has(w.id))
+      .map((w, i) => [w.id, i + 1]),
+  );
 }
 
 /**
@@ -7454,6 +7492,23 @@ function gardePage(
   return d.stream();
 }
 
+/**
+ * Le nom de chaque pièce sur un document : le sien, ou « Pièce n », rangée
+ * parmi les seules pièces qui n'en ont pas.
+ */
+export function nomsDesPieces(
+  rooms: { id: string; name?: string }[] | undefined,
+  noms: Record<string, string> | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = { ...(noms ?? {}) };
+  let rang = 0;
+  for (const r of rooms ?? []) {
+    const nom = (out[r.id] ?? r.name ?? '').trim();
+    out[r.id] = nom || `Pièce ${++rang}`;
+  }
+  return out;
+}
+
 /** Une feuille du dossier, telle que le sommaire la nomme. */
 export interface FeuilleDuDossier {
   genre:
@@ -7482,6 +7537,13 @@ function planifierUnNiveau(
   /** Le préfixe des images : deux niveaux n'ont pas le droit au même nom. */
   prefixe = '',
 ): { feuilles: FeuillePlanifiee[]; images: PdfImage[]; ctx: SheetContext } {
+  /*
+    UNE PIÈCE SANS NOM S'APPELLE PAREIL SUR TOUTES LES FEUILLES — revue
+    « Thomas » : le plan n'en disait rien, le métré la nommait « Pièce 3 »,
+    et une enfilade commençait à « Pièce 2 ». Elle reçoit ici son nom, une
+    fois, rangée parmi les seules pièces sans nom.
+  */
+  scan = { ...scan, roomNames: nomsDesPieces(scan.rooms, scan.roomNames) };
   const filename = pdfFilename(scan.name);
   const withMetre = opts.metre ?? true;
   /* La feuille de l existant : seulement si un tableau a ete releve. */
@@ -7536,6 +7598,7 @@ function planifierUnNiveau(
   const withGaines = (scan.routes?.length ?? 0) > 0;
   const ctx: SheetContext = {
     name: scan.name,
+    mursNumerotes: [...new Set(murs.map((m) => m.wall.id))],
     filename,
     client: scan.client,
     address: scan.address,

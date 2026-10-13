@@ -282,7 +282,7 @@ const ecrits = (page: string) => imprimer(page).mots.filter(dansLePlan).map((m) 
 // ------------------------------------------------------------------ dossiers
 
 const ex = appartementExemple();
-const exemple = (zoom = 1) =>
+const exemple = (zoom = 1, eleve = false) =>
   pagePlan(
     latin1(
       buildScanPdf(
@@ -297,7 +297,7 @@ const exemple = (zoom = 1) =>
           notes: [{ id: 'n1', text: 'Colonne montante ici', at: { x: 4.6, z: 0.4 } }],
         } as never,
         false,
-        { metre: false, surfaces: true, plan: { zoom } } as never,
+        { metre: false, surfaces: true, plan: { zoom }, ...(eleve ? { elevations: true, toutesElevations: true } : {}) } as never,
       ),
     ),
   );
@@ -474,7 +474,8 @@ describe('le numéro d’un mur se centre dans son épaisseur', () => {
 
 function mesurerLeCentrage() {
   {
-    const { encre, mots } = imprimer(exemple());
+    // Avec ses feuilles d'élévation : sans elles, les murs ne se numérotent pas.
+    const { encre, mots } = imprimer(exemple(1, true));
     const numeros = mots.filter((m) => m.blanc && /^\d+$/.test(m.txt) && dansLePlan(m));
     expect(numeros.length).toBeGreaterThan(8);
     const noir = (x: number, y: number) => {

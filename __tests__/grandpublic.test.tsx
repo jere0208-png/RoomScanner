@@ -178,7 +178,8 @@ describe('1 — le particulier ne voit pas l’établi de l’électricien', () 
     const ecran = lire('src/screens/ExportScreen.tsx');
     expect(ecran).toContain("['Propriétaire', client, 'Nom du propriétaire'");
     expect(ecran).toContain("['Adresse', address, 'Adresse du logement'");
-    expect(ecran).toContain('particulier: !modeElec,');
+    // Un particulier : ni électricien, ni entreprise à imprimer.
+    expect(ecran).toContain('const particulier = !modeElec && !entrepriseDuDossier;');
   });
 });
 

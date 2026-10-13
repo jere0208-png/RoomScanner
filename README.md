@@ -14285,6 +14285,34 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le dossier PDF se remet au client tel quel
+
+Revues « Thomas » (architecte d'intérieur) et « Inès » (agente immobilière),
+tous deux abonnés Pro : « je ne peux pas l'envoyer sans le reprendre ».
+- **L'entreprise s'imprime dans tous les modes.** Elle ne s'imprimait qu'en
+  mode électricien : l'architecte remettait un dossier à la marque
+  EchoPlan. « Mon entreprise » est proposée à tout abonné Pro, et dès
+  qu'elle est renseignée elle prend la place de la marque.
+- **Un client, pas un propriétaire.** Qui imprime son entreprise remet le
+  dossier à un client : « Client / Chantier » remplace « Propriétaire /
+  Adresse ».
+- **Les élévations sans électricité ne parlent plus d'appareils.** Ni
+  « 0 appareil » dans le sous-titre, ni « Aucun appareil sur ce mur » posé
+  au milieu des baies et des meubles.
+- **Les numéros de mur renvoient à quelque chose.** Seuls les murs qui ont
+  leur feuille d'élévation sont numérotés, sans trou dans la série, et le
+  plan dit ce que veut dire un numéro. Sans élévations, il n'en porte plus.
+- **Une pièce sans nom s'appelle pareil partout** (`nomsDesPieces`) : sur
+  le plan, au métré, aux achats et dans les titres d'élévation, « Pièce n »
+  rangée parmi les seules pièces sans nom.
+- **Les prix disent ce qu'ils comprennent** : total TTC, TVA 20 % comprise,
+  fournitures seules, hors pose, estimation non contractuelle.
+- **Le métré ne donne deux cotes qu'aux pièces rectangulaires.** Un studio
+  en L s'annonçait « 6,00 × 5,00 » pour 25 m² ; il dit « forme libre ».
+
+Bancs : `elevationpdf`, `elevationsfaces`, `entreprise`, `grandpublic`,
+`planepure`, `planlisible`.
+
 ## Décorer, sans se battre avec l'écran
 
 Relevé du patron : « le scroll des éléments est trop capricieux ; les murs

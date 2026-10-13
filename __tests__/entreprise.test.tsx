@@ -188,9 +188,16 @@ describe('à l’export', () => {
     expect(entrepriseDuDossier()).toEqual(DUPONT);
   });
 
-  it('celui du particulier, non', () => {
+  /*
+    Revues « Thomas » et « Inès » : l'architecte, l'agente immobilière
+    remettent aussi le dossier à un client. Renseignée, l'entreprise
+    s'imprime quel que soit le mode ; vide, le dossier garde la marque.
+  */
+  it('hors électricité aussi, dès qu’elle est renseignée', () => {
     useUsage.setState({ modeElec: false });
     useEntreprise.setState({ ...DUPONT, charge: true });
+    expect(entrepriseDuDossier()).toEqual(DUPONT);
+    useEntreprise.setState({ ...DUPONT, nom: '', charge: true });
     expect(entrepriseDuDossier()).toBeNull();
   });
 });

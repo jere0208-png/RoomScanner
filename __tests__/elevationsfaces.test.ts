@@ -90,7 +90,8 @@ const dossier = (fixtures: Fixture[], extra: Record<string, unknown> = {}) =>
       { metre: false, elevations: true, ...extra } as never,
     ),
   );
-const elevations = (src: string) => flux(src).filter((p) => texte(p).includes('lévation'));
+// Les feuilles d'élévation, pas le plan — sa légende parle aussi des élévations.
+const elevations = (src: string) => flux(src).filter((p) => texte(p).includes('lévation') && !texte(p).includes('Plan d'));
 
 /** De quel côté de la cloison est le séjour — lu sur le plan, pas supposé. */
 const SEJOUR: 1 | -1 = pieceDuCote(W[1], 1, W, R) === 'a' ? 1 : -1;

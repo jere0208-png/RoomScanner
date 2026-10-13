@@ -25,7 +25,7 @@ import {
 } from '../theme';
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from '../components/Iso3DView';
-import { buildScanPdf, pdfFilename, sommaireDuDossier, toBase64 } from '../export/pdf';
+import { buildScanPdf, nomsDesPieces, pdfFilename, sommaireDuDossier, toBase64 } from '../export/pdf';
 import { ApercuDuDossier } from '../components/ApercuDuDossier';
 import { haptic } from '../ui/haptic';
 import { hasCapturedColors } from '../geometry/appearance';
@@ -235,16 +235,24 @@ const styles = getStyles(c);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   /*
-    L'ENTREPRISE DE L'ARTISAN, EN TÊTE DE CHAQUE FEUILLE — correctif de
-    l'audit. Seulement pour l'électricien : le particulier relève son
-    propre logement.
+    L'ENTREPRISE, EN TÊTE DE CHAQUE FEUILLE — correctif de l'audit, puis
+    revues « Thomas » et « Inès » : l'architecte d'intérieur, l'agente
+    immobilière remettaient au client un dossier à la marque EchoPlan,
+    parce que l'entreprise ne s'imprimait qu'en mode électricien. Elle
+    s'imprime dès qu'on l'a renseignée, quel que soit le mode.
   */
   const entreprise = useEntreprise();
   useEffect(() => {
     if (!entreprise.charge) entreprise.charger();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const entrepriseDuDossier = modeElec ? entrepriseAImprimer(entreprise) : null;
+  const entrepriseDuDossier = entrepriseAImprimer(entreprise);
+  /*
+    UN DOSSIER DE PARTICULIER, OU POUR UN CLIENT — revue « Thomas » : son
+    client devenait « Propriétaire » et le dossier « Dossier du logement ».
+    Qui imprime son entreprise remet le dossier à un client.
+  */
+  const particulier = !modeElec && !entrepriseDuDossier;
   const [measures2D, setMeasures2D] = useState(true);
   /**
    * Plan des gaines : le tracé du tableau à chaque appareil, celui-là même
@@ -425,7 +433,8 @@ const styles = getStyles(c);
       travauxDesPieces(
         parts,
         openings,
-        (id, rang) => rooms.find((r) => r.id === id)?.name || `Pièce ${rang + 1}`,
+        // Le même nom que sur les feuilles du dossier (`nomsDesPieces`).
+        (id) => nomsDesPieces(rooms, {})[id] ?? '',
         // Le décor de « Décorer » : la peinture se compte par teinte.
         (id) => rooms.find((r) => r.id === id),
       ),
@@ -446,7 +455,7 @@ const styles = getStyles(c);
             travauxDesPieces(
               roomParts(x.walls, x.rooms),
               x.openings,
-              (id, rang) => `${nomDuNiveau(x.nv)} · ${x.rooms.find((r) => r.id === id)?.name || `Pièce ${rang + 1}`}`,
+              (id) => `${nomDuNiveau(x.nv)} · ${nomsDesPieces(x.rooms, {})[id] ?? ''}`,
               (id) => x.rooms.find((r) => r.id === id),
             ),
           )
@@ -646,7 +655,7 @@ const styles = getStyles(c);
         client,
         address,
         // Le particulier relève son propre logement : le cartouche le dit.
-        particulier: !modeElec,
+        particulier,
         entreprise: entrepriseDuDossier,
       },
       include3D,
@@ -959,7 +968,7 @@ const styles = getStyles(c);
                   LE PARTICULIER N'A NI CLIENT NI CHANTIER — relevé du patron,
                   point 1 de la réflexion « grand public ».
                 */
-                ...(modeElec
+                ...(!particulier
                   ? [
                       ['Client', client, 'Nom du client', (t: string) => setClientInfo(t, address)],
                       ['Chantier', address, 'Adresse du chantier', (t: string) => setClientInfo(client, t)],

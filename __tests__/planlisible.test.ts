@@ -144,7 +144,9 @@ describe('le plan imprimé se lit', () => {
     expect(vus).toContain('Cuisine');
     expect(vus).not.toContain('DCL');
     expect(vus).not.toContain('DAAF');
-    expect(vus.filter((t) => /^\d+$/.test(t)).length).toBeGreaterThanOrEqual(12);
+    // Les cotes d'appareil, en centimètres. (Les numéros de mur n'y sont plus
+    // sans feuilles d'élévation : ils ne renverraient à rien.)
+    expect(vus.filter((t) => /^\d+$/.test(t)).length).toBeGreaterThanOrEqual(10);
     expect(vus.filter((t) => t.includes('m')).length).toBeGreaterThanOrEqual(4);
   });
 

@@ -371,10 +371,11 @@ export function ProfilScreen() {
           MON ENTREPRISE — correctif de l'audit : le dossier PDF n'avait ni le
           nom ni les coordonnées de l'artisan, et la marque EchoPlan y était
           figée. Renseignée une fois ici, elle prend la place de la marque en
-          tête de chaque feuille. Pour l'électricien seulement : le
-          particulier relève son propre logement.
+          tête de chaque feuille. Pour l'électricien, et pour tout abonné
+          Pro (revues « Thomas » et « Inès » : l'architecte, l'agente
+          immobilière remettent aussi le dossier à un client).
         */}
-        {modeElec ? (
+        {modeElec || pro ? (
           <>
             <Text style={s.section}>Mon entreprise</Text>
             <Text style={s.sectionDit}>En tête de chaque feuille de vos dossiers, à la place d’EchoPlan.</Text>

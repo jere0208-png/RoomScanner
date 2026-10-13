@@ -160,11 +160,15 @@ describe('les feuilles d’élévation', () => {
     expect(vu).toContain('Mur 1');
   });
 
-  it('numérote TOUS les murs du plan, équipés ou non', () => {
-    // Le plan seul, sans élévation : les quatre pastilles y sont, sinon le
-    // numéro d'une feuille renverrait à un mur introuvable.
-    const vus = texte(doc({})).split(' | ');
-    for (const n of ['1', '2', '3', '4']) expect(vus).toContain(n);
+  it('numérote les murs qui ont leur feuille, et eux seuls', () => {
+    // Revues « Thomas » et « Inès » : sans élévation, des numéros qui ne
+    // renvoyaient à rien. Le plan seul n'en porte plus.
+    const seul = texte(doc({})).split(' | ');
+    for (const n of ['1', '2', '3', '4']) expect(seul).not.toContain(n);
+    // Toutes les élévations : les quatre murs, numérotés et expliqués.
+    const tout = texte(doc({ elevations: true, toutesElevations: true }));
+    for (const n of ['1', '2', '3', '4']) expect(tout.split(' | ')).toContain(n);
+    expect(tout).toContain('N° de mur : sa feuille');
   });
 
   it('portent la hauteur et la distance au bord de chaque appareil', () => {
@@ -304,8 +308,8 @@ describe('le cartouche de pièce', () => {
     // feuille : c'est l'occurrence SUIVIE de la surface qui nous intéresse.
     const i = src.indexOf('(20,0 m²) Tj');
     expect(i).toBeGreaterThan(0);
-    // Le fond est posé juste avant : blanc, et rempli.
-    const avant = src.slice(Math.max(0, i - 400), i);
+    // Le fond est posé avant le nom et la surface : blanc, et rempli.
+    const avant = src.slice(Math.max(0, i - 1500), i);
     expect(avant).toMatch(/1 1 1 rg[^)]* f\s/);
   });
 });
@@ -397,8 +401,9 @@ describe('le titre d’une élévation sans nom de pièce', () => {
     const vu = texte(src);
     expect(vu).not.toContain('mur, mur');
     // Le tiret cadratin du flux est un octet Windows-1252 : on ancre la
-    // vérification sur ce qui suit le numéro.
-    expect(vu).toMatch(/Mur \d · mur (nord|sud|est|ouest)/);
+    // vérification sur ce qui suit le numéro. La pièce sans nom prend le
+    // sien, le même sur toutes les feuilles (`nomsDesPieces`).
+    expect(vu).toMatch(/Mur \d · côté Pièce 1, mur (nord|sud|est|ouest)/);
   });
 });
 
