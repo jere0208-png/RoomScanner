@@ -3082,7 +3082,8 @@ export function FloorplanEditor({
                 l'affaire : ce qui compte, c'est le SENS d'ouverture.
               */
               const battant = (() => {
-                if (o.type !== 'door') return null;
+                // La porte de garage ne bat pas (voir `porteDeGarage`).
+                if (o.type !== 'door' || o.garage) return null;
                 const ancre = partOf.get(roomOf(o))?.labelAt;
                 if (!ancre) return null;
                 const dedans = mapping.toPx(ancre);
@@ -3169,8 +3170,7 @@ export function FloorplanEditor({
                       );
                     })}
                   {/* Un passage sans porte : son linteau, en tireté. */}
-                  {o.type !== 'window' &&
-                    o.type !== 'door' &&
+                  {((o.type !== 'window' && o.type !== 'door') || o.garage) &&
                     [face(1), face(-1)].map((f, i) =>
                       f ? (
                         <Line
@@ -3185,6 +3185,10 @@ export function FloorplanEditor({
                         />
                       ) : null,
                     )}
+                  {/* La porte de garage : son tablier fermé, dans la trouée. */}
+                  {o.type === 'door' && o.garage && (
+                    <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={choisie ? c.blue : color} strokeWidth={1.4} />
+                  )}
                   {/* La baie choisie : soulignée, quel que soit son genre. */}
                   {choisie && o.type !== 'window' && (
                     <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={c.blue} strokeWidth={4} strokeLinecap="butt" />

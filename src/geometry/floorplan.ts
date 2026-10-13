@@ -91,6 +91,12 @@ export interface WallSeg {
    */
   versNonReleve?: boolean;
   /**
+   * PORTE DE GARAGE — sectionnelle, basculante : elle ne bat pas. Ni
+   * battant ni quart de cercle sur le plan, et elle ne devient pas une baie
+   * malgré sa largeur (voir `porteDeGarage`).
+   */
+  garage?: boolean;
+  /**
    * Confiance de RoomPlan dans cette détection (`low`, `medium`, `high`).
    * C'est lui qui sait le mieux de quoi il doute : le diagnostic du plan
    * s'en sert pour désigner les murs à vérifier.
@@ -2908,7 +2914,7 @@ export function baiesVitrees<O extends WallSeg>(openings: O[], walls: WallSeg[],
   const dehors = (p: Pt) => !lesContours.some((c) => insidePoly(p, c));
   return openings.map((o) => {
     const l = segLength(o);
-    if (o.type !== 'door' || l < LARGEUR_DE_BAIE) return o;
+    if (o.type !== 'door' || o.garage || l < LARGEUR_DE_BAIE) return o;
     let facade: boolean;
     if (l >= BAIE_SANS_DOUTE) {
       /*
@@ -2929,6 +2935,77 @@ export function baiesVitrees<O extends WallSeg>(openings: O[], walls: WallSeg[],
     }
     return facade ? { ...o, type: 'window', open: undefined, pivot: undefined, versExterieur: undefined } : o;
   });
+}
+
+/**
+ * LE GARAGE SE RECONNAÎT À SA PORTE — revue « Bérénice » : le garage de la
+ * villa ressortait « Pièce 2 », compté habitable (29,8 m² de trop dans
+ * l'en-tête), et sa porte sectionnelle de 2,40 m, prise pour une baie, se
+ * dessinait en vitrage. RoomPlan ne connaît pas les garages, et le mobilier
+ * n'en dit rien : une étagère, un établi.
+ *
+ * Une pièce de 12 m² au moins est un garage quand elle s'ouvre SUR LE
+ * DEHORS, au ras du sol, par une baie de 2,20 m au moins, et que :
+ *   — rien n'y dit qu'on y vit : ni lit, ni canapé, ni télévision, ni
+ *     sanitaire, ni de quoi cuisiner, ni chaise ;
+ *   — aucune fenêtre n'y est à hauteur d'homme (allège sous 1,10 m) : le
+ *     jour d'un garage est petit et haut. Un séjour, une chambre, ont leurs
+ *     fenêtres.
+ * Rend l'identifiant de la porte de garage, ou `null`.
+ */
+export const LARGEUR_PORTE_DE_GARAGE = 2.2;
+const ON_Y_VIT = /bed|sofa|couch|television|^tv$|bathtub|shower|toilet|stove|oven|dishwasher|fireplace|chair/i;
+
+export function porteDeGarage(
+  contour: Pt[],
+  contours: Pt[][],
+  openings: WallSeg[],
+  categories: string[],
+  walls: WallSeg[],
+): string | null {
+  if (contour.length < 3 || Math.abs(signedArea(contour)) < 12) return null;
+  if (categories.some((c) => ON_Y_VIT.test(c))) return null;
+  const surLeContour = (o: WallSeg) => {
+    const l = segLength(o);
+    if (l < 0.05) return false;
+    const m = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+    for (let i = 0, j = contour.length - 1; i < contour.length; j = i++) {
+      const e = { x: contour[i].x - contour[j].x, z: contour[i].z - contour[j].z };
+      const le = Math.hypot(e.x, e.z);
+      if (le < 1e-6) continue;
+      const sinus = Math.abs(e.x * (o.b.z - o.a.z) - e.z * (o.b.x - o.a.x)) / (le * l);
+      if (sinus < 0.2 && pointOnSeg(m, contour[j], contour[i]).dist < 0.3) return true;
+    }
+    return false;
+  };
+  const dehors = (p: Pt) => !contours.some((c) => c.length >= 3 && insidePoly(p, c));
+  let porte: WallSeg | null = null;
+  for (const o of openings) {
+    if (o.type === 'opening' || !surLeContour(o)) continue;
+    const l = segLength(o);
+    const bas = o.yCenter - o.height / 2 - murPorteurDe(o, walls).sol;
+    const n = { x: -(o.b.z - o.a.z) / l, z: (o.b.x - o.a.x) / l };
+    const m = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+    const d = WALL_T / 2 + 0.25;
+    const facade = dehors({ x: m.x + n.x * d, z: m.z + n.z * d }) || dehors({ x: m.x - n.x * d, z: m.z - n.z * d });
+    if (l >= LARGEUR_PORTE_DE_GARAGE && bas < 0.15 && o.height >= 1.8 && facade) {
+      if (!porte || l > segLength(porte)) porte = o;
+      continue;
+    }
+    // Une fenêtre à hauteur d'homme : on y vit.
+    if (o.type === 'window' && l >= 0.5 && bas < 1.1) return null;
+  }
+  return porte?.id ?? null;
+}
+
+/** La porte de garage reconnue : une porte qui ne bat pas (voir `porteDeGarage`). */
+export function lesPortesDeGarage<O extends WallSeg>(openings: O[], ids: Set<string>): O[] {
+  if (ids.size === 0) return openings;
+  return openings.map((o) =>
+    ids.has(o.id)
+      ? { ...o, type: 'door', garage: true, open: undefined, pivot: undefined, versExterieur: undefined }
+      : o,
+  );
 }
 
 /**

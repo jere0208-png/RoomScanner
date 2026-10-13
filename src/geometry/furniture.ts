@@ -81,7 +81,17 @@ export type RoomKind =
    * séjour. Son nom porte les deux usages : le séjour compte ses socles, la
    * cuisine y ajoute ses règles (voir `estCuisine`).
    */
-  | 'sejourCuisine';
+  | 'sejourCuisine'
+  /**
+   * LE CELLIER, LA BUANDERIE — revue « Bérénice » : le congélateur, le
+   * lave-linge et le sèche-linge du cellier faisaient une « Cuisine 2 ».
+   */
+  | 'cellier'
+  /**
+   * LE GARAGE — que le mobilier ne dit pas : il se reconnaît à sa porte
+   * (voir `porteDeGarage`).
+   */
+  | 'garage';
 
 const ROOM_FR: Record<RoomKind, string> = {
   kitchen: 'Cuisine',
@@ -91,6 +101,8 @@ const ROOM_FR: Record<RoomKind, string> = {
   living: 'Salon',
   dining: 'Salle à manger',
   sejourCuisine: 'Séjour-cuisine',
+  cellier: 'Cellier',
+  garage: 'Garage',
 };
 
 /**
@@ -111,9 +123,28 @@ function votesFor(category: string): [RoomKind, number][] {
       ['bathroom', 1],
     ];
   }
-  if (c.includes('refrigerator') || c.includes('stove')) return [['kitchen', 3]];
+  /*
+    LE CONGÉLATEUR ET LE LAVE-LINGE DU CELLIER — revue « Bérénice » : un
+    réfrigérateur tranchait « cuisine » à lui seul, et le cellier, avec son
+    congélateur et ses deux machines, ressortait « Cuisine 2 ». Le froid
+    penche aussi vers le cellier, le linge y penche franchement : sans
+    rien pour cuisiner, ce sont eux qui l'emportent. À égalité, la cuisine
+    garde la main (voir `PRIORITY`).
+  */
+  if (c.includes('refrigerator')) {
+    return [
+      ['kitchen', 3],
+      ['cellier', 1],
+    ];
+  }
+  if (c.includes('stove')) return [['kitchen', 3]];
   if (c.includes('oven') || c.includes('dishwasher')) return [['kitchen', 2]];
-  if (c.includes('washer') || c.includes('dryer')) return [['bathroom', 1.5]];
+  if (c.includes('washer') || c.includes('dryer')) {
+    return [
+      ['cellier', 2],
+      ['bathroom', 1.5],
+    ];
+  }
   if (c.includes('sink')) {
     return [
       ['kitchen', 1],
@@ -136,6 +167,7 @@ const PRIORITY: RoomKind[] = [
   'wc',
   'living',
   'dining',
+  'cellier',
 ];
 
 /** Score minimal pour oser nommer : un seul indice faible ne suffit pas. */

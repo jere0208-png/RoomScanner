@@ -2348,7 +2348,7 @@ function planPage(
         inz = -inz;
       }
 
-      if (o.type === 'door') {
+      if (o.type === 'door' && !o.garage) {
         // Battant + arc d'ouverture, sur la charnière CHOISIE : deux
         // portes en vis-à-vis se rangent dos à dos plutôt que de croiser
         // leurs quarts de cercle.
@@ -2386,10 +2386,11 @@ function planPage(
         ligne(0.015, 0.8, BLEU_FENETRE);
         ligne(-0.015, 0.8, BLEU_FENETRE);
       } else {
-        // Ouverture sans menuiserie : double trait dans la trouée
+        // Ouverture sans menuiserie — ou porte de garage, qui ne bat pas :
+        // double trait dans la trouée.
         const wx = (-dz / len) * (WALL_T / 4);
         const wz = (dx / len) * (WALL_T / 4);
-        const color = colorOpenings && o.type === 'window' ? SKY : GREY;
+        const color = !colorOpenings ? GREY : o.type === 'window' ? SKY : o.garage ? AMBER : GREY;
         traitsMenuiserie.push({
           pts: [px({ x: o.a.x + wx, z: o.a.z + wz }), px({ x: o.b.x + wx, z: o.b.z + wz })],
           w: 1,

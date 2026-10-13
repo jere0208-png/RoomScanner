@@ -41,6 +41,8 @@ import {
   sansEclats,
   baiesVitrees,
   baiesHorsDesAngles,
+  lesPortesDeGarage,
+  porteDeGarage,
   LARGEUR_DE_BAIE,
   solDesMurs,
   openingsOn,
@@ -611,6 +613,32 @@ function estUnCouloir(contour: Pt[]): boolean {
   if (aire < 2 || disc < 0) return false;
   const largeur = (demi - Math.sqrt(disc)) / 2;
   return largeur <= 1.6 && demi - largeur >= 2.5 * largeur;
+}
+
+/**
+ * LES GARAGES — voir `porteDeGarage`. Une pièce dont rien ne dit l'usage,
+ * ou que seuls un congélateur, un lave-linge disent cellier ou cuisine, et
+ * qui s'ouvre sur la rue par une porte de garage, est un garage. Le type
+ * est réécrit sur place ; rend les portes de garage trouvées.
+ */
+function nommerLesGarages(
+  kinds: (RoomKind | null)[],
+  contours: Pt[][],
+  categoriesDe: (i: number) => string[],
+  openings: WallSeg[],
+  walls: WallSeg[],
+): Set<string> {
+  const portes = new Set<string>();
+  kinds.forEach((k, i) => {
+    const categories = categoriesDe(i);
+    const cuisine = categories.some((c) => /stove|oven|dishwasher|sink/i.test(c));
+    if (k && k !== 'cellier' && !(k === 'kitchen' && !cuisine)) return;
+    const porte = porteDeGarage(contours[i] ?? [], contours, openings, categories, walls);
+    if (!porte) return;
+    kinds[i] = 'garage';
+    portes.add(porte);
+  });
+  return portes;
 }
 
 function nameRooms(kinds: (RoomKind | null)[], contours?: Pt[][]): string[] {
@@ -3198,13 +3226,10 @@ export const useScanStore = create<ScanState>((set, get) => {
       ...o,
       roomId: idPiece(roomIndexAt({ x: o.transform[12], z: o.transform[14] }, contours)),
     }));
-    const kinds = shapes.map((s, i) =>
-      deduceRoomKind(
-        objects
-          .filter((o) => o.roomId === idPiece(i) && voteDansLaPiece(o, s.outline))
-          .map((o) => o.category),
-      ),
-    );
+    const categoriesDe = (i: number) =>
+      objects.filter((o) => o.roomId === idPiece(i) && voteDansLaPiece(o, shapes[i].outline)).map((o) => o.category);
+    const kinds = shapes.map((_, i) => deduceRoomKind(categoriesDe(i)));
+    const ouvertures = lesPortesDeGarage(jeu.openings, nommerLesGarages(kinds, contours, categoriesDe, jeu.openings, walls));
     const auto = nameRooms(kinds, shapes.map((s) => s.outline));
     // Les noms donnés à la main survivent : on rattache chaque nouvelle
     // pièce à l'ancienne dont le point de cartouche tombe dedans.
@@ -3301,6 +3326,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     });
     set({
       walls: remplacer(st.walls, jeu.walls, walls),
+      ...(ouvertures !== jeu.openings ? { openings: remplacer(st.openings, jeu.openings, ouvertures) } : {}),
       rooms: remplacer(st.rooms, jeu.rooms, rooms),
       objects: remplacer(st.objects, jeu.objects, objects),
       fixtures: remplacer(st.fixtures, jeu.fixtures, fixtures),
@@ -3403,7 +3429,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         niveau: n,
       }));
     const walls = pose(bruts);
-    const openings = baiesHorsDesAngles(baiesVitrees(pose(ouverturesBrutes), walls), walls);
+    let openings = baiesHorsDesAngles(baiesVitrees(pose(ouverturesBrutes), walls), walls);
 
     const detected = detectRooms(walls, undefined, openings);
     const shapes =
@@ -3434,6 +3460,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       ),
       walls,
     ), walls);
+    const categoriesDe = (i: number) =>
+      objects.filter((o) => o.roomId === idPiece(i) && voteDansLaPiece(o, shapes[i].outline)).map((o) => o.category);
     const kinds = shapes.map((sh, i) =>
       deduireLaPiece(
         // Les sections arrivent brutes : elles se décalent comme les murs.
@@ -3442,10 +3470,12 @@ export const useScanStore = create<ScanState>((set, get) => {
             (x) => sh.outline.length >= 3 && pointInPolygon({ x: x.x + dx, z: x.z + dz }, sh.outline),
           )
           .map((x) => x.label),
-        objects
-          .filter((o) => o.roomId === idPiece(i) && voteDansLaPiece(o, sh.outline))
-          .map((o) => o.category),
+        categoriesDe(i),
       ),
+    );
+    openings = lesPortesDeGarage(
+      openings,
+      nommerLesGarages(kinds, shapes.map((s) => s.outline), categoriesDe, openings, walls),
     );
     const noms = nameRooms(kinds, shapes.map((s) => s.outline));
     const pieces: RoomEntry[] = shapes.map((s, i) => {
@@ -7097,7 +7127,7 @@ export const useScanStore = create<ScanState>((set, get) => {
             return Math.hypot(p.x - q.x, p.z - q.z) < 0.4;
           }),
       );
-      const openings = [...baiesVenues, ...baiesALaMain].map(auNiveau);
+      let openings = [...baiesVenues, ...baiesALaMain].map(auNiveau);
       pushHistory('completerReleve');
 
       const detected = detectRooms(walls, undefined, openings);
@@ -7156,16 +7186,17 @@ export const useScanStore = create<ScanState>((set, get) => {
         }));
       const objects = [...meublesVenus, ...meublesALaMain];
       // Ce que RoomPlan dit de chaque pièce d'abord, le mobilier ensuite.
+      const categoriesDe = (i: number) =>
+        objects.filter((o) => o.roomId === idPiece(i) && voteDansLaPiece(o, shapes[i].outline)).map((o) => o.category);
       const kinds = shapes.map((sh, i) =>
         deduireLaPiece(
           (r.sections ?? [])
             .filter((x) => sh.outline.length >= 3 && pointInPolygon(placer({ x: x.x, z: x.z }), sh.outline))
             .map((x) => x.label),
-          objects
-            .filter((o) => o.roomId === idPiece(i) && voteDansLaPiece(o, sh.outline))
-            .map((o) => o.category),
+          categoriesDe(i),
         ),
       );
+      openings = lesPortesDeGarage(openings, nommerLesGarages(kinds, contours, categoriesDe, openings, walls));
       const auto = nameRooms(kinds, shapes.map((s) => s.outline));
       // Les noms donnés à la main survivent au second passage : on rattache
       // chaque pièce neuve à l'ancienne dont le cartouche tombe dedans.
@@ -7596,7 +7627,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`),
       // et la porte collée à l'angle, dégagée du mur d'angle (voir
       // `baiesHorsDesAngles`).
-      const openings = marquerLesPortes(baiesHorsDesAngles(baiesVitrees(logique.openings, walls), walls), r);
+      let openings = marquerLesPortes(baiesHorsDesAngles(baiesVitrees(logique.openings, walls), walls), r);
 
       // Détection automatique : les pièces sont les faces du graphe des murs.
       // Si rien ne se referme (scan trop partiel), tout tient en une pièce.
@@ -7628,15 +7659,21 @@ export const useScanStore = create<ScanState>((set, get) => {
         LE TYPE DE CHAQUE PIÈCE : ce que RoomPlan en dit (iOS 17), puis le
         mobilier — voir `deduireLaPiece`.
       */
-      const kinds = shapes.map((sh, i) => {
-        const id = `room-${i + 1}`;
-        return deduireLaPiece(
+      const categoriesDe = (i: number) =>
+        objects.filter((o) => o.roomId === `room-${i + 1}` && voteDansLaPiece(o, shapes[i].outline)).map((o) => o.category);
+      const kinds = shapes.map((sh, i) =>
+        deduireLaPiece(
           (r.sections ?? [])
             .filter((x) => sh.outline.length >= 3 && pointInPolygon({ x: x.x, z: x.z }, sh.outline))
             .map((x) => x.label),
-          objects.filter((o) => o.roomId === id && voteDansLaPiece(o, sh.outline)).map((o) => o.category),
-        );
-      });
+          categoriesDe(i),
+        ),
+      );
+      // Le garage, que ni RoomPlan ni le mobilier ne nomment : voir `porteDeGarage`.
+      openings = lesPortesDeGarage(
+        openings,
+        nommerLesGarages(kinds, shapes.map((s) => s.outline), categoriesDe, openings, walls),
+      );
       /* Chaque mur, photographié et redressé pendant le scan. */
       const photosAuto = photosDesMurs(r.photosMurs ?? [], surfaces, walls);
       const names = nameRooms(kinds, shapes.map((s) => s.outline));
@@ -8850,6 +8887,8 @@ export const useScanStore = create<ScanState>((set, get) => {
                 yCenter: nouvelleBase + x.height / 2,
                 // Une PORTE déclarée n'est plus un passage qu'on traverse (revue « Camille »).
                 ...(type !== 'opening' ? { open: undefined } : {}),
+                // Corrigée à la main, ce n'est plus une porte de garage.
+                garage: undefined,
               }
             : x,
         ),

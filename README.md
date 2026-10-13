@@ -14285,6 +14285,37 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le garage et sa porte, le cellier
+
+**Le garage** (Bérénice). RoomPlan ne connaît pas les garages, et le
+mobilier n'en dit rien : une étagère, un établi. Celui de la villa
+ressortait « Pièce 2 », compté habitable (29,8 m² de trop dans l'en-tête).
+Sa porte sectionnelle de 2,40 m, prise pour une baie, se dessinait en
+vitrage.
+
+Une pièce de 12 m² au moins est maintenant un garage si :
+- elle s'ouvre sur le dehors, au ras du sol, par une baie de 2,20 m au
+  moins ;
+- rien n'y dit qu'on y vit : ni lit, ni canapé, ni télévision, ni
+  sanitaire, ni de quoi cuisiner, ni chaise ;
+- aucune de ses fenêtres n'a d'allège sous 1,10 m (le jour d'un garage est
+  petit et haut).
+
+Elle s'appelle « Garage » et sort de l'habitable. Un congélateur ne la
+change pas en cuisine.
+
+**Sa porte** reste une porte, et elle ne bat pas. Ni battant ni quart de
+cercle, à l'écran, au PDF et au DXF : son tablier dans la trouée, son
+linteau en tireté. Corrigée à la main en fenêtre, elle redevient une
+fenêtre ordinaire.
+
+**Le cellier.** Le congélateur, le lave-linge et le sèche-linge du cellier
+faisaient une « Cuisine 2 ». Le linge penche maintenant vers le cellier,
+le froid aussi un peu : sans rien pour cuisiner, ils l'emportent. À
+égalité, la cuisine garde la main.
+
+Banc : `tournee5garage`.
+
 ## Les cotes d'un plan scanné au nu des refends, la page de garde qui tient
 
 **Au nu des refends** (Hélène). Le refend vu de ses deux faces est posé sur

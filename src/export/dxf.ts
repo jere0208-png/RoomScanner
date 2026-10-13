@@ -354,6 +354,8 @@ export function buildDxf(plan: PlanPourDxf): string {
     }
     // Le dormant.
     out += ligne(CALQUE.portes, o.a, o.b);
+    // La porte de garage ne bat pas : le dormant suffit.
+    if (o.garage) continue;
     const len = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z);
     if (len < 0.05) continue;
     const ux = (o.b.x - o.a.x) / len;
