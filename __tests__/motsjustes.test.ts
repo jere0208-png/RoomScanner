@@ -125,6 +125,13 @@ describe('le nom d’un releve neuf', () => {
     expect(nom).toContain('23h45');
   });
 
+  it('porte le nom de la pièce relevée, ou leur nombre', () => {
+    const d = new Date(2026, 9, 13, 21, 31);
+    expect(defaultName(d, [{ name: 'Chambre' }])).toBe('Chambre · 13/10');
+    expect(defaultName(d, [{ name: 'Séjour' }, { name: 'Chambre' }, { name: 'WC' }])).toBe('3 pièces · 13/10');
+    expect(defaultName(d, [{}])).toBe('Scan 13/10 · 21h31');
+  });
+
   it('garde ses deux chiffres, meme en janvier a une heure du matin', () => {
     expect(defaultName(new Date(2026, 0, 2, 1, 5))).toContain('02/01');
     expect(defaultName(new Date(2026, 0, 2, 1, 5))).toContain('01h05');

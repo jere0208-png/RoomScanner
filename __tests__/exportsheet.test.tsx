@@ -22,12 +22,13 @@ import { dark, light } from '../src/theme';
 import { useAccountStore } from '../src/store/accountStore';
 
 const appels: string[] = [];
-const monter = () => {
+const monter = (modeElec = true) => {
   let t!: TestRenderer.ReactTestRenderer;
   act(() => {
     t = TestRenderer.create(
       <ExportSheet
         visible
+        modeElec={modeElec}
         onClose={() => {}}
         onDismiss={() => {}}
         onPdf={() => appels.push('pdf')}
@@ -221,5 +222,18 @@ describe('le badge Pro', () => {
     expect(badges(t)).toEqual([]);
     act(() => t.unmount());
     act(() => useAccountStore.setState({ pro: false }));
+  });
+});
+
+describe('pour le particulier', () => {
+  it('le PDF et l’image d’abord ; les formats techniques sous « Autres formats »', () => {
+    const t = monter(false);
+    const titres = () => t.root.findAllByType(Text).map((n) => String(n.props.children));
+    expect(titres()).toContain('Plan PDF');
+    expect(titres()).toContain('Image du plan');
+    expect(titres()).not.toContain('Plan DXF');
+    const autres = t.root.findAllByType(TouchableOpacity).find((n) => n.props.accessibilityLabel === 'Autres formats')!;
+    act(() => autres.props.onPress());
+    expect(titres()).toContain('Plan DXF');
   });
 });

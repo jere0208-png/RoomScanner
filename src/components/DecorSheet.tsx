@@ -99,9 +99,12 @@ export function DecorSheet({
   visible,
   onClose,
   pieceInitiale,
+  onAchats,
 }: {
   visible: boolean;
   onClose: () => void;
+  /** Ouvre « Ce qu'il faut acheter » : les pots de la teinte choisie. */
+  onAchats?: () => void;
   /** La pièce à décorer d'abord : celle qu'on regarde, ou la première. */
   pieceInitiale?: string | null;
 }) {
@@ -346,8 +349,22 @@ export function DecorSheet({
                   (cle) => st().setRoomPeinture(piece.id, cle === PEINTURE_DEFAUT ? null : cle),
                   44,
                 )}
+                {/*
+                  LA COULEUR MÈNE AUX POTS — revue « Bernard » : choisir la
+                  teinte et compter les pots vivaient à deux endroits sans
+                  lien. On y va d'un appui.
+                */}
+                {onAchats && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Voir ma liste d’achats"
+                    style={({ pressed }) => [s.achats, pressed && { opacity: 0.7 }]}
+                    onPress={onAchats}>
+                    <Text style={s.achatsTexte}>Voir ma liste d’achats</Text>
+                  </Pressable>
+                )}
                 <Text style={s.aide}>
-                  Un mur seul se peint depuis sa barre, en mode édition sur le plan : « Peindre ».
+                  Pour peindre un seul mur : en mode Édition, touchez-le sur le plan, puis « Peindre ».
                 </Text>
               </>
             )}
@@ -505,7 +522,7 @@ const getStyles = themedStyles((c: Palette) =>
     },
     nuancier: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, rowGap: 8 },
     teinte: { alignItems: 'center' },
-    teinteNom: { color: c.inkSoft, fontSize: 10.5, lineHeight: 13, marginTop: 4, textAlign: 'center' },
+    teinteNom: { color: c.inkSoft, fontSize: 12, lineHeight: 15, marginTop: 4, textAlign: 'center' },
     teinteNomPrise: { color: c.ink, fontWeight: '800' },
     pastille: {
       borderWidth: 1,
@@ -516,6 +533,16 @@ const getStyles = themedStyles((c: Palette) =>
     },
     vide: { color: c.inkSoft, fontSize: 13.5, lineHeight: 19, marginTop: 10 },
     videMeubles: { marginTop: 16 },
-    aide: { color: c.inkFaint, fontSize: 12, lineHeight: 16, marginTop: 14 },
+    aide: { color: c.inkSoft, fontSize: 13, lineHeight: 18, marginTop: 14 },
+    achats: {
+      marginTop: 14,
+      minHeight: 44,
+      borderRadius: 12,
+      borderWidth: 1.5,
+      borderColor: c.blue,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    achatsTexte: { color: c.blue, fontSize: 15, fontWeight: '700' },
   }),
 );

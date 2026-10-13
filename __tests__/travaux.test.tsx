@@ -229,8 +229,8 @@ describe('la peinture, teinte par teinte', () => {
       .join(' | ');
     expect(vu).toContain('Vert sauge');
     expect(vu).toContain('Terracotta');
-    expect(vu).toContain('6 pots · 13 L pour 65 m²');
-    expect(vu).toContain('1 pot · 1,5 L pour 7,5 m²');
+    expect(vu).toContain('6 pots de 2,5 L · 13 L pour 65 m²');
+    expect(vu).toContain('1 pot de 2,5 L · 1,5 L pour 7,5 m²');
     act(() => t.unmount());
   });
 
@@ -281,22 +281,36 @@ describe('la feuille', () => {
       expect(vu).toContain(mot);
     }
     expect(vu).toContain('Pour tout le logement.');
-    expect(vu).toMatch(/2 couches à 10 m²\/L/);
+    expect(vu).toMatch(/2 couches, 1 litre pour 10 m²/);
     const coches = arbre!.root.findAll((x) => x.props?.accessibilityRole === 'checkbox' && typeof x.props?.onPress === 'function');
     expect(coches.map((x) => x.props.accessibilityLabel)).toEqual(['Chambre', 'Séjour']);
+  });
+
+  it('la liste s’envoie, gratuitement, avec la contenance de chaque pot', () => {
+    const { Share } = require('react-native');
+    const envoi = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    act(() => {
+      arbre = TestRenderer.create(<TravauxSheet visible onClose={() => {}} pieces={pieces} />);
+    });
+    const bouton = arbre!.root.findAll((x) => x.props?.accessibilityLabel === 'Envoyer ma liste' && typeof x.props?.onPress === 'function')[0];
+    act(() => bouton.props.onPress());
+    const message = (envoi.mock.calls[0][0] as { message: string }).message;
+    expect(message).toContain('Ma liste d’achats');
+    expect(message).toMatch(/Peinture des murs : \d+ pots? de 2,5 L/);
+    envoi.mockRestore();
   });
 
   it('décocher une pièce refait les comptes', () => {
     act(() => {
       arbre = TestRenderer.create(<TravauxSheet visible onClose={() => {}} pieces={pieces} />);
     });
-    const avant = textes(arbre!).find((x) => /m², chute comprise/.test(x));
+    const avant = textes(arbre!).find((x) => /m², marge des coupes comprise/.test(x));
     const sejour = arbre!.root.findAll((x) => x.props?.accessibilityLabel === 'Séjour' && typeof x.props?.onPress === 'function')[0];
     act(() => sejour.props.onPress());
-    const apres = textes(arbre!).find((x) => /m², chute comprise/.test(x));
+    const apres = textes(arbre!).find((x) => /m², marge des coupes comprise/.test(x));
     expect(apres).not.toBe(avant);
     // 12 m² + 10 % : la chambre seule.
-    expect(apres).toBe('13,2 m², chute comprise');
+    expect(apres).toBe('13,2 m², marge des coupes comprise');
     expect(textes(arbre!).join(' | ')).toContain('Pour 1 pièce sur 2.');
   });
 
@@ -427,7 +441,7 @@ describe('dans l’écran du plan', () => {
     return arbre!;
   };
   const pastille = (t: TestRenderer.ReactTestRenderer) =>
-    t.root.findAllByType(TouchableOpacity).find((x) => x.props.accessibilityLabel === 'Travaux');
+    t.root.findAllByType(TouchableOpacity).find((x) => x.props.accessibilityLabel === 'Achats');
 
   it('le grand public a sa pastille « Travaux », qui ouvre la feuille avec ses pièces', () => {
     const t = monter(false);

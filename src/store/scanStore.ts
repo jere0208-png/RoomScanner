@@ -1651,10 +1651,20 @@ const two = (n: number) => String(n).padStart(2, '0');
  * l'électricien a sous les yeux depuis des semaines, parfois ce qu'il a
  * dicté au client. Seuls les nouveaux prennent la forme courte.
  */
-export function defaultName(d: Date): string {
-  return `Scan ${two(d.getDate())}/${two(d.getMonth() + 1)} · ${two(
-    d.getHours(),
-  )}h${two(d.getMinutes())}`;
+export function defaultName(d: Date, pieces?: { name?: string }[]): string {
+  /*
+    CE QU'ON A RELEVÉ, PLUTÔT QUE L'HEURE — revue « Bernard » : la pièce
+    était reconnue « Chambre », le plan s'appelait « Scan 13/10 · 21h31 ».
+    Une pièce nommée donne son nom, plusieurs leur nombre ; la date reste.
+  */
+  const jour = `${two(d.getDate())}/${two(d.getMonth() + 1)}`;
+  const nommees = (pieces ?? []).filter((p) => (p.name ?? '').trim() !== '');
+  if (pieces && pieces.length === 1 && nommees.length === 1) {
+    const nom = nommees[0].name!.trim();
+    if (nom.length + 8 <= 18) return `${nom} · ${jour}`;
+  }
+  if (pieces && pieces.length > 1) return `${pieces.length} pièces · ${jour}`;
+  return `Scan ${jour} · ${two(d.getHours())}h${two(d.getMinutes())}`;
 }
 
 interface ScanState {
@@ -7750,7 +7760,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const save: SavedScan = {
         cleDuReleve: cle,
         id: `${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`,
-        name: defaultName(now),
+        name: defaultName(now, kept),
         createdAt: now.getTime(),
         updatedAt: now.getTime(),
         modelPath: r.modelPath ?? null,

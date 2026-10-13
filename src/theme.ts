@@ -47,7 +47,9 @@ export const light: Palette = {
   surfaceSunken: '#EFF1F5',
   ink: '#0B0D12',
   inkSoft: '#5A6472',
-  inkFaint: '#98A1AE',
+  // Revue « Bernard » : #98A1AE faisait 2,6:1 sur blanc, illisible en
+  // petits caractères. 4,5:1 désormais (le seuil WCAG du texte courant).
+  inkFaint: '#6E7783',
   line: '#E7EAF0',
   lineStrong: '#D6DBE3',
   blue: '#1F5BFF',
@@ -69,7 +71,7 @@ export const dark: Palette = {
   surfaceSunken: '#1D2530',
   ink: '#F2F5F9',
   inkSoft: '#A6B0BD',
-  inkFaint: '#67717F',
+  inkFaint: '#808A97',
   line: '#242C37',
   lineStrong: '#35404E',
   blue: '#3D77FF',

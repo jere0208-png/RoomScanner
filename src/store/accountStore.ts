@@ -901,3 +901,10 @@ export const identiteDuCompte = (): Identite | null => {
  */
 export const useDossierNet = (): boolean =>
   useAccountStore((a) => !!(a.compte && a.pro));
+
+/**
+ * L'IMAGE DU PLAN PART-ELLE SANS LE LOGO ? — revue « Inès ». Le logo signe
+ * l'image gratuite ; l'abonné remet la sienne à son client. Ce n'est pas une
+ * barrière (rien ne se verrouille ici), seulement une signature.
+ */
+export const useImageSansLogo = (): boolean => useAccountStore((st) => !!st.compte && st.pro);

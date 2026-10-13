@@ -74,7 +74,7 @@ export type ToolIcon =
 /** Hauteur du mot : imposée, pour que le calcul ne dépende pas des réglages
  *  de police du téléphone. */
 export const PILL_SIZE = 38;
-const PILL_LABEL_H = 12;
+const PILL_LABEL_H = 13;
 const PILL_LABEL_GAP = 3;
 export const PILL_GAP = 12;
 export const PILL_CELL_H = PILL_SIZE + PILL_LABEL_GAP + PILL_LABEL_H;
@@ -360,7 +360,10 @@ export function ToolPill({
       {label ? (
         <Text
           style={[styles.toolLabel, active && !eteint && styles.toolLabelActive]}
-          numberOfLines={1}>
+          numberOfLines={1}
+          // « Dimensions » tient dans sa cellule, quitte à céder un point.
+          adjustsFontSizeToFit
+          minimumFontScale={0.85}>
           {label}
         </Text>
       ) : null}
@@ -371,9 +374,10 @@ export function ToolPill({
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
   toolCell: { width: 58, alignItems: 'center', height: PILL_CELL_H },
+  /* Revue « Bernard » : 9,5 pt gris clair, illisible à 68 ans. */
   toolLabel: {
-    color: c.inkFaint,
-    fontSize: 9.5,
+    color: c.inkSoft,
+    fontSize: 10.5,
     lineHeight: PILL_LABEL_H,
     fontWeight: '700',
     letterSpacing: -0.1,

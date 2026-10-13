@@ -412,6 +412,8 @@ export function ScanScreen() {
       {!processing && (
         <TouchableOpacity
           style={styles.cancelButton}
+          // 40 pt de bouton, 52 de toucher (revue « Bernard »).
+          hitSlop={6}
           accessibilityLabel="Arrêter le scan"
           onPress={abandonner}>
           <CloseCross size={20} color={c.scanInk} weight={3} />
@@ -426,6 +428,7 @@ export function ScanScreen() {
           processing && styles.cacheEnAssemblage,
         ]}
         accessibilityLabel={torch ? 'Éteindre la torche' : 'Allumer la torche'}
+        hitSlop={6}
         onPress={toggleTorch}>
         <Svg width={18} height={18} viewBox="0 0 24 24">
           <Path

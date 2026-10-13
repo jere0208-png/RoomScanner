@@ -209,7 +209,7 @@ describe('sans le mode, l’électricité disparaît de l’écran', () => {
       expect(`${outil} : ${vu.has(outil)}`).toBe(`${outil} : false`);
     }
     // Ce qui sert à tout le monde reste.
-    for (const outil of ['Cotes', 'Meubles', 'Surfaces']) {
+    for (const outil of ['Dimensions', 'Meubles', 'Surfaces']) {
       expect(`${outil} : ${vu.has(outil)}`).toBe(`${outil} : true`);
     }
   });

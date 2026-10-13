@@ -139,8 +139,8 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     letterSpacing: -0.4,
   },
   metricLabel: {
-    color: c.inkFaint,
-    fontSize: 8.5,
+    color: c.inkSoft,
+    fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 0.2,
@@ -1110,6 +1110,17 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   */
   /* La liste des sorties : une carte par ligne, l'image en fond. */
   exportListe: { gap: 10, paddingBottom: 2 },
+  exportAutres: {
+    minHeight: 56,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: c.line,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    justifyContent: 'center',
+  },
+  exportAutresTexte: { color: c.ink, fontSize: 15, fontWeight: '700' },
+  exportAutresDetail: { color: c.inkSoft, fontSize: 13, marginTop: 2 },
   exportCarte: {
     height: 92,
     borderRadius: 18,

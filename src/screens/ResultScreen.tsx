@@ -184,7 +184,7 @@ import {
 } from '../geometry/electrical';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { duReleve, nomDePieceLibre, nomDeVersion, useScanStore } from '../store/scanStore';
-import { useAccountStore } from '../store/accountStore';
+import { useAccountStore, useImageSansLogo } from '../store/accountStore';
 import { demarrerComplement, demarrerEtage, lancerUnScan } from '../native/useRoomScan';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
 import { EnAttente } from '../components/PendingPill';
@@ -251,6 +251,10 @@ const SANS_NOTES: never[] = [];
  * qu'on ne perde rien en quittant l'app sur-le-champ.
  */
 const ENREGISTREMENT_AUTO_MS = 1500;
+
+/** Les pastilles du plan font 34 pt : leur zone de toucher va jusqu'à 44
+ *  (revue « Bernard »). */
+const HIT_PASTILLE = { top: 5, bottom: 5, left: 4, right: 4 };
 
 export function ResultScreen() {
   /**
@@ -888,8 +892,13 @@ export function ResultScreen() {
   };
   // Coupe : index de la pièce isolée en 3D (-1 = tout le logement).
   const [focusIdx, setFocusIdx] = useState(-1);
-  // Cotes du plan 2D masquées par défaut : la pastille « Cotes » les active.
-  const [showMeasures, setShowMeasures] = useState(false);
+  /*
+    Cotes du plan 2D masquées par défaut pour l'électricien : la pastille
+    « Cotes » les active. Revue « Bernard » : le particulier, lui, cherchait
+    les longueurs des murs, ne les voyait pas, et concluait que l'application
+    ne les mesurait pas — elles s'allument d'office pour lui.
+  */
+  const [showMeasures, setShowMeasures] = useState(() => !useUsage.getState().modeElec);
   // Éteintes d'office, comme les autres calques du modèle : voir
   // `showSurfaces` dans le magasin — on ouvre sur le bâti et ses meubles.
   const [show3DMeasures, setShow3DMeasures] = useState(false);
@@ -1434,6 +1443,7 @@ export function ResultScreen() {
     les deux pastilles du plan, son menu, son export, la fête des normes.
   */
   const modeElec = useModeElec();
+  const estPro = useImageSansLogo();
   /*
     UNE FIN DE SCAN SANS RIEN À COCHER NE S'OUVRE PAS.
 
@@ -1442,7 +1452,13 @@ export function ResultScreen() {
     intègre », et rien dessous. La question est donc consommée d'office :
     elle ne reviendra pas plus tard.
   */
-  const rienACocher = !!arrivage && !modeElec && arrivage.meubles <= 0;
+  /*
+    HORS MODE ÉLECTRICITÉ, PAS DE SECONDE FENÊTRE — revues « Inès » et
+    « Léa » : une seule case, déjà cochée (« garder les meubles »), à valider
+    après la carte bilan. Les meubles sont déjà sur le plan ; on les cache
+    d'un appui (« Meubles ») ou on en retire un au doigt.
+  */
+  const rienACocher = !!arrivage && !modeElec;
   useEffect(() => {
     if (rienACocher) useScanStore.getState().oublierArrivage();
   }, [rienACocher]);
@@ -5031,8 +5047,12 @@ export function ResultScreen() {
             {!modeElec && piecesTravaux.length > 0 && (
               <TouchableOpacity
                 style={[styles.vuePastille, rangeeSerree && styles.pastilleIcone]}
-                accessibilityLabel="Travaux"
+                // Revue « Bernard » : « Travaux » ici, « Ce qu'il faut
+                // acheter » au menu — deux noms pour une feuille. Et 34 pt
+                // de haut : la zone de toucher déborde jusqu'à 44.
+                accessibilityLabel="Achats"
                 accessibilityHint="Ce qu’il faut acheter : peinture, sol, plinthes"
+                hitSlop={{ top: 5, bottom: 5, left: 4, right: 4 }}
                 onPress={() => {
                   haptic('leger');
                   setTravauxOuvert(true);
@@ -5050,7 +5070,7 @@ export function ResultScreen() {
                     />
                   ))}
                 </Svg>
-                {!rangeeSerree && <Text style={styles.vuePastilleTexte}>Travaux</Text>}
+                {!rangeeSerree && <Text style={styles.vuePastilleTexte}>Achats</Text>}
               </TouchableOpacity>
             )}
             {modeElec && (
@@ -5134,6 +5154,7 @@ export function ResultScreen() {
             {walls.length > 0 && tab === '2d' && (
               <TouchableOpacity
                 style={[styles.vuePastille, styles.pastilleIcone, mesurant && { backgroundColor: teinte.blue }]}
+                hitSlop={HIT_PASTILLE}
                 accessibilityLabel="Mesurer"
                 accessibilityHint="Mesurer entre deux points du plan"
                 accessibilityState={{ selected: mesurant }}
@@ -5151,6 +5172,7 @@ export function ResultScreen() {
             {walls.length > 0 && (
               <TouchableOpacity
                 style={[styles.vuePastille, styles.explorerPastille, explorerIcone && styles.pastilleIcone]}
+                hitSlop={HIT_PASTILLE}
                 accessibilityLabel="Explorer"
                 accessibilityHint="Entrer dans la pièce et s’y promener"
                 onPress={() => {
@@ -5173,6 +5195,7 @@ export function ResultScreen() {
             {walls.length > 0 && tab === '3d' && (
               <TouchableOpacity
                 style={[styles.vuePastille, rangeeEnIcones && styles.pastilleIcone]}
+                hitSlop={HIT_PASTILLE}
                 accessibilityLabel="Réalité augmentée"
                 accessibilityHint="Poser la maquette chez soi, à travers la caméra"
                 onPress={() => voirChezSoi()}>
@@ -5185,6 +5208,7 @@ export function ResultScreen() {
             {niveaux.length > 1 && (
               <TouchableOpacity
                 style={styles.vuePastille}
+                hitSlop={HIT_PASTILLE}
                 accessibilityLabel="Changer d’étage"
                 onPress={() => setMenu(menuDesEtages())}>
                 <Text style={styles.vuePastilleTexte}>
@@ -5199,6 +5223,7 @@ export function ResultScreen() {
             )}
             <TouchableOpacity
               style={styles.vuePastille}
+              hitSlop={HIT_PASTILLE}
               accessibilityLabel={vue === '2d' ? 'Passer en 3D' : 'Passer en 2D'}
               onPress={basculerVue}>
               <Text style={styles.vuePastilleTexte}>
@@ -6630,7 +6655,9 @@ export function ResultScreen() {
         )}
 
         {/* Watermark EchoPlan, visible uniquement sur les images générées */}
-        {capturing && (
+        {/* Revue « Inès » : l'abonnée remettait au client une image à la
+            marque EchoPlan. Le logo signe l'image gratuite, pas celle du Pro. */}
+        {capturing && !estPro && (
           <View style={styles.watermark} pointerEvents="none">
             <Image
               source={require('../assets/echoplan.png')}
@@ -7090,6 +7117,12 @@ export function ResultScreen() {
         visible={decorant}
         onClose={() => setDecorant(false)}
         pieceInitiale={(focusIdx >= 0 ? rooms[focusIdx]?.id : null) ?? selectedRoomId}
+        onAchats={() => {
+          setDecorant(false);
+          // Une feuille à la fois : iOS refuse d'en présenter une pendant
+          // que l'autre se retire.
+          setTimeout(() => setTravauxOuvert(true), 400);
+        }}
       />
 
       {/* ---------- Un mur d'accent, côté pièce ---------- */}

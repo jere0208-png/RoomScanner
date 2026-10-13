@@ -292,6 +292,7 @@ export function SignInScreen() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Découvrir sans compte"
+        hitSlop={6}
         style={({ pressed }) => [s.sansCompte, pressed && s.enfonce]}
         onPress={entrerEnInvite}>
         <Text style={s.sansCompteTexte}>Découvrir sans compte</Text>

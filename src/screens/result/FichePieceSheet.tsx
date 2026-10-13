@@ -76,13 +76,22 @@ export function FichePieceSheet({
                 </View>
               )}
 
+              {fiche.cotesDesMurs.length > 0 && (
+                <>
+                  <Text style={s.section}>Longueur des murs</Text>
+                  <View style={s.bloc}>
+                    <Text style={s.ligne}>{fiche.cotesDesMurs.map((l) => fr(l)).join(' · ')} m</Text>
+                  </View>
+                </>
+              )}
+
               <View style={s.tuiles}>
                 <Tuile
                   mot="Surface au sol"
                   valeur={`${fiche.surfaceExacte ? '' : '≈ '}${fr(fiche.surface)} m²`}
                   note={
                     !fiche.surfaceExacte && fiche.surfaceReleve
-                      ? `RoomPlan a mesuré ${fr(fiche.surfaceReleve)} m²`
+                      ? `Le scan a mesuré ${fr(fiche.surfaceReleve)} m²`
                       : 'Le contour des murs'
                   }
                 />
@@ -90,7 +99,7 @@ export function FichePieceSheet({
                   <Tuile
                     mot="Surface habitable"
                     valeur={`${fr(fiche.surfaceHabitable)} m²`}
-                    note={fiche.raisonHabitable ?? `Sous ${fr(HAUTEUR_HABITABLE)} m exclu (loi Carrez)`}
+                    note={fiche.raisonHabitable ?? (modeElec ? `Sous ${fr(HAUTEUR_HABITABLE)} m exclu (loi Carrez)` : 'Celle d’une annonce')}
                     accent
                   />
                 )}
@@ -100,12 +109,12 @@ export function FichePieceSheet({
                   note={
                     fiche.hauteurMesuree
                       ? fiche.rampant
-                        ? 'Moyenne mesurée au LiDAR'
-                        : `Mesurée au LiDAR · ${fr(fiche.hauteurMin ?? fiche.hauteur)}–${fr(fiche.hauteurMax ?? fiche.hauteur)} m`
+                        ? 'Moyenne mesurée par le téléphone'
+                        : `Mesurée par le téléphone · ${fr(fiche.hauteurMin ?? fiche.hauteur)}–${fr(fiche.hauteurMax ?? fiche.hauteur)} m`
                       : 'La hauteur des murs'
                   }
                 />
-                <Tuile mot="Volume" valeur={`${fr(fiche.volume, 1)} m³`} note="Pour le chauffage et la VMC" />
+                <Tuile mot="Volume" valeur={`${fr(fiche.volume, 1)} m³`} note={modeElec ? 'Pour le chauffage et la VMC' : 'Pour choisir un chauffage'} />
                 <Tuile mot="Périmètre" valeur={`${fr(fiche.perimetre)} m`} note="Les plinthes" />
                 <Tuile mot="Murs à peindre" valeur={`${fr(fiche.mursNets, 1)} m²`} note="Ouvertures déduites" />
               </View>

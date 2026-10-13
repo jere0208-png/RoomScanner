@@ -128,7 +128,9 @@ export function ExportSheet({
       // Revues « Nadia », « Marie », « Sophie » : la seule sortie gratuite
       // ne disait pas qu'elle l'était.
       // Revue « Bernard » : il cherchait comment IMPRIMER son plan.
-      'La vue affichée, avec ses cotes : à envoyer ou à imprimer. Gratuite, avec le logo EchoPlan.',
+      pro
+        ? 'La vue affichée, avec ses cotes : à envoyer ou à imprimer, sans logo.'
+        : 'La vue affichée, avec ses cotes : à envoyer ou à imprimer. Gratuite, avec le logo EchoPlan.',
       onImage,
     ],
   ];
@@ -140,6 +142,15 @@ export function ExportSheet({
   const visibles = modeElec
     ? enOrdre
     : enOrdre.filter(([art]) => art !== 'materiel');
+  /*
+    LES DEUX SORTIES UTILES D'ABORD — revue « Inès » : le PDF et l'image,
+    qu'on envoie tous les jours, étaient mêlés à l'OBJ, au DXF et au
+    tableur. Hors mode électricien, ceux-là attendent sous « Autres
+    formats ». L'électricien, lui, chiffre au tableur : tout reste à vue.
+  */
+  const [autres, setAutres] = useState(false);
+  const principales = modeElec ? visibles : visibles.filter(([art]) => art === 'pdf' || art === 'image');
+  const secondaires = modeElec ? [] : visibles.filter(([art]) => art !== 'pdf' && art !== 'image');
   /*
     LA LARGEUR DES CARTES. L'image se dessine à la taille de la carte : elle
     est déduite de l'écran dès la première image (la feuille garde 28 points
@@ -183,7 +194,7 @@ export function ExportSheet({
               const w = e.nativeEvent.layout.width;
               if (w > 0 && Math.abs(w - largeur) > 1) setLargeur(w);
             }}>
-            {visibles.map(([art, titre, detail, action]) => {
+            {[...principales, ...(autres ? secondaires : [])].map(([art, titre, detail, action]) => {
               const sombre = FOND_SOMBRE(art, teinte);
               return (
                 <TouchableOpacity
@@ -230,6 +241,17 @@ export function ExportSheet({
                 </TouchableOpacity>
               );
             })}
+            {secondaires.length > 0 && !autres && (
+              <TouchableOpacity
+                style={styles.exportAutres}
+                accessibilityRole="button"
+                accessibilityLabel="Autres formats"
+                accessibilityHint="Modèle 3D, plan DXF, tableau des surfaces"
+                onPress={() => setAutres(true)}>
+                <Text style={styles.exportAutresTexte}>Autres formats</Text>
+                <Text style={styles.exportAutresDetail}>3D, DXF pour l’architecte, tableau des surfaces</Text>
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </Pressable>
       </Pressable>

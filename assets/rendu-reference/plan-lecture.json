@@ -252,7 +252,7 @@
                "props": {
                 "fill": {
                  "type": 0,
-                 "payload": 4288192942
+                 "payload": 4285429635
                 },
                 "propList": [
                  "fill"
@@ -600,7 +600,7 @@
             "fill": null,
             "stroke": {
              "type": 0,
-             "payload": 4288192942
+             "payload": 4285429635
             },
             "strokeWidth": 1,
             "strokeLinecap": 1,
@@ -622,7 +622,7 @@
             "fill": null,
             "stroke": {
              "type": 0,
-             "payload": 4288192942
+             "payload": 4285429635
             },
             "strokeWidth": 1,
             "strokeLinecap": 1,
@@ -644,7 +644,7 @@
             "fill": null,
             "stroke": {
              "type": 0,
-             "payload": 4288192942
+             "payload": 4285429635
             },
             "strokeWidth": 1,
             "strokeLinecap": 1,
@@ -666,7 +666,7 @@
             "fill": null,
             "stroke": {
              "type": 0,
-             "payload": 4288192942
+             "payload": 4285429635
             },
             "strokeWidth": 1,
             "strokeLinecap": 1,
@@ -688,7 +688,7 @@
             "fill": null,
             "stroke": {
              "type": 0,
-             "payload": 4288192942
+             "payload": 4285429635
             },
             "strokeWidth": 1,
             "strokeLinecap": 1,
@@ -774,7 +774,7 @@
             "fill": null,
             "stroke": {
              "type": 0,
-             "payload": 4288192942
+             "payload": 4285429635
             },
             "strokeWidth": 1,
             "strokeLinecap": 1,
@@ -796,7 +796,7 @@
             "fill": null,
             "stroke": {
              "type": 0,
-             "payload": 4288192942
+             "payload": 4285429635
             },
             "strokeWidth": 1,
             "strokeLinecap": 1,
@@ -882,7 +882,7 @@
             "fill": null,
             "stroke": {
              "type": 0,
-             "payload": 4288192942
+             "payload": 4285429635
             },
             "strokeWidth": 1,
             "strokeLinecap": 1,
@@ -904,7 +904,7 @@
             "fill": null,
             "stroke": {
              "type": 0,
-             "payload": 4288192942
+             "payload": 4285429635
             },
             "strokeWidth": 1,
             "strokeLinecap": 1,
@@ -1682,7 +1682,7 @@
             },
             "stroke": {
              "type": 0,
-             "payload": 4288192942
+             "payload": 4285429635
             },
             "strokeWidth": 1,
             "strokeDasharray": [
@@ -1710,7 +1710,7 @@
             },
             "stroke": {
              "type": 0,
-             "payload": 4288192942
+             "payload": 4285429635
             },
             "strokeWidth": 1,
             "strokeDasharray": [
@@ -3683,7 +3683,7 @@
            "props": {
             "fill": {
              "type": 0,
-             "payload": 4288192942
+             "payload": 4285429635
             },
             "propList": [
              "fill"

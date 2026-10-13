@@ -27,6 +27,7 @@ import {
   wallToRooms,
 } from '../geometry/nfc15100';
 import { useAccountStore } from '../store/accountStore';
+import { astuce } from '../ui/astuce';
 import { horsCorbeille, useScanStore, type SavedScan, type ScanFolder } from '../store/scanStore';
 import { haptic } from '../ui/haptic';
 import { alerte } from '../ui/alerte';
@@ -1074,7 +1075,13 @@ export function LibraryScreen() {
           label: 'Dupliquer',
           hint: 'Pour chiffrer deux variantes du même logement.',
           icon: 'scinder',
-          onPress: () => duplicateSave(item.id),
+          onPress: () => {
+            duplicateSave(item.id);
+            // Revue « Inès » : la copie arrivait sans un mot, quelque part
+            // dans la liste. On dit qu'elle existe, et sous quel nom.
+            const copie = useScanStore.getState().saves[0];
+            astuce(copie && copie.id !== item.id ? `Copie créée : « ${copie.name} »` : 'Copie créée.', { icone: 'dupliquer' });
+          },
         },
         // Sortir d'un dossier n'a de sens que dedans : ailleurs, la ligne
         // porterait un choix sans effet.

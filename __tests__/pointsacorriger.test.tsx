@@ -55,7 +55,7 @@ describe('le nord à orienter se dit en clair', () => {
     expect(ecran).toContain('return total > winLargeur - 2 * 16 - 20;');
     // « Explorer » garde son mot (revue « Chloé ») : serré, il se dit « Visite ».
     expect(ecran).toContain("<Text style={styles.explorerPastilleTexte}>{explorerCourt ? 'Visite' : 'Explorer'}</Text>");
-    expect(ecran).toContain('{!rangeeSerree && <Text style={styles.vuePastilleTexte}>Travaux</Text>}');
+    expect(ecran).toContain('{!rangeeSerree && <Text style={styles.vuePastilleTexte}>Achats</Text>}');
   });
 });
 

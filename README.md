@@ -14285,6 +14285,34 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Lisible à 68 ans, envoyable sans retouche
+
+Revues « Bernard » (68 ans, gratuit, la chambre de sa petite-fille) et
+« Inès » (agente immobilière, Pro).
+- **Les dimensions des murs se voient d'office** pour le particulier, et la
+  pastille s'appelle « Dimensions » (« Cotes » reste le mot de
+  l'électricien). La fiche de la pièce donne la longueur de chaque mur, et
+  parle sans jargon : « mesurée par le téléphone », « celle d'une annonce ».
+- **Les petits textes se lisent** : le gris clair passe de 2,6:1 à 4,5:1 de
+  contraste, les libellés des outils à 10,5 pt, ceux des chiffres à 10 pt.
+- **« 3 pots de 2,5 L »**, « 18 paquets de 2 m² », « 14 barres de 2,4 m » :
+  la contenance est dans le chiffre. Les réglages disent « 1 litre couvre »,
+  « Marge pour les coupes », « portes déduites ».
+- **La liste d'achats s'envoie, gratuitement** : « Envoyer ma liste » la
+  partage en texte simple, teinte par teinte.
+- **« Décorer » mène aux pots** (« Voir ma liste d'achats »), et la pastille
+  « Travaux » s'appelle « Achats ».
+- **Les pastilles de 34 pt se touchent sur 44**, comme la croix du scan, la
+  torche et « Découvrir sans compte ».
+- **Un plan neuf porte le nom de ce qu'on a relevé** : « Chambre · 13/10 »,
+  « 3 pièces · 13/10 », plutôt que l'heure du scan.
+- **Hors mode électricien, pas de seconde fenêtre après le scan** : les
+  meubles sont déjà sur le plan.
+- **La feuille d'export montre d'abord le PDF et l'image** ; le 3D, le DXF
+  et le tableau attendent sous « Autres formats ». L'image d'un abonné part
+  sans le logo EchoPlan.
+- **« Dupliquer » dit ce qu'il a fait** : « Copie créée : « … » ».
+
 ## Comprendre sans réfléchir — le premier plan de quelqu'un qui découvre
 
 Revue « Léa », gratuite, premier plan, impatiente

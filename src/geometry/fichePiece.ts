@@ -329,6 +329,12 @@ export interface FicheDeLaPiece {
   rampant: boolean;
   volume: number;
   perimetre: number;
+  /**
+   * La longueur de chaque mur, dans l'ordre du tour — revue « Bernard » : la
+   * fiche donnait le périmètre, pas les dimensions qu'il venait chercher.
+   * Deux côtés alignés (un T de cloison) font un seul mur.
+   */
+  cotesDesMurs: number[];
   /** Les murs, ouvertures déduites (m²) : ce qu'on peint. */
   mursNets: number;
   portes: number;
@@ -338,6 +344,31 @@ export interface FicheDeLaPiece {
   expositions: { aire: string; n: number }[] | null;
   equipements: { nom: string; n: number }[];
   circuits: CircuitConseille[];
+}
+
+/** Les côtés d'un contour, les côtés alignés réunis, au centimètre. */
+export function cotesDuTour(contour: Pt[]): number[] {
+  const n = contour.length;
+  if (n < 3) return [];
+  const cotes: { l: number; u: Pt }[] = [];
+  for (let i = 0; i < n; i++) {
+    const a = contour[i];
+    const b = contour[(i + 1) % n];
+    const l = Math.hypot(b.x - a.x, b.z - a.z);
+    if (l < 1e-6) continue;
+    const u = { x: (b.x - a.x) / l, z: (b.z - a.z) / l };
+    const der = cotes[cotes.length - 1];
+    if (der && der.u.x * u.x + der.u.z * u.z > Math.cos(Math.PI / 180)) der.l += l;
+    else cotes.push({ l, u });
+  }
+  if (cotes.length > 1) {
+    const [pre, der] = [cotes[0], cotes[cotes.length - 1]];
+    if (pre.u.x * der.u.x + pre.u.z * der.u.z > Math.cos(Math.PI / 180)) {
+      pre.l += der.l;
+      cotes.pop();
+    }
+  }
+  return cotes.map((c) => arrondi(c.l));
 }
 
 export function ficheDeLaPiece(p: {
@@ -421,6 +452,7 @@ export function ficheDeLaPiece(p: {
     rampant: !!plafond?.rampant,
     volume: arrondi(p.surface * hauteur, 0.1),
     perimetre: arrondi(perimetre),
+    cotesDesMurs: cotesDuTour(p.contour),
     mursNets: arrondi(mursNets, 0.1),
     portes: portes.length,
     fenetres: fenetres.length,

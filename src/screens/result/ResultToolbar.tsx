@@ -49,6 +49,8 @@ import { useModeElec } from '../../store/usage';
 const OUTILS_ELEC_PLAN = new Set(['plus', 'plafond', 'gaines', 'elec']);
 const OUTILS_ELEC_VOLUME = new Set(['volumes', 'nuit', 'plafond', 'reperes']);
 
+/* Revue « Bernard » : « Cotes » est un mot de métier ; le particulier
+   cherche les « Dimensions ». */
 const sansElec = (
   outils: (React.ReactElement | null | false | undefined)[],
   cles: Set<string>,
@@ -436,7 +438,7 @@ export function Toolbar2D({
         <ToolPill
           key="ruler"
           icon="ruler"
-          label="Cotes"
+          label={modeElec ? 'Cotes' : 'Dimensions'}
           active={showMeasures}
           vide={contenu.murs === 0 ? RIEN.cotes : null}
           onPress={() => setShowMeasures((v) => !v)}
@@ -521,7 +523,7 @@ export function Toolbar2D({
         {
           titre: 'Sur le plan',
           lignes: [
-            { cle: 'cotes', icone: 'ruler', libelle: 'Cotes', aide: 'Les longueurs des murs, au centimètre', actif: showMeasures, vide: contenu.murs === 0 ? RIEN.cotes : null, onBascule: () => setShowMeasures((v) => !v) },
+            { cle: 'cotes', icone: 'ruler', libelle: modeElec ? 'Cotes' : 'Dimensions', aide: 'Les longueurs des murs, au centimètre', actif: showMeasures, vide: contenu.murs === 0 ? RIEN.cotes : null, onBascule: () => setShowMeasures((v) => !v) },
             { cle: 'surfaces', icone: 'surface', libelle: 'Surfaces', aide: 'Le sol de chaque pièce et ses mètres carrés', actif: showSurfaces, vide: contenu.pieces === 0 ? RIEN.surfaces : null, onBascule: () => setShowSurfaces(!showSurfaces) },
             {
               cle: 'meubles', icone: 'furniture', libelle: 'Meubles', aide: 'Le mobilier relevé au scan ou ajouté', actif: showFurniture, vide: contenu.meubles === 0 ? RIEN.meubles2D : null,
@@ -678,7 +680,7 @@ export function Toolbar3D({
     <ToolPill
       key="ruler"
       icon="ruler"
-      label="Cotes"
+      label={modeElec ? 'Cotes' : 'Dimensions'}
       active={showMeasures}
       vide={contenu.murs === 0 ? RIEN.cotes : null}
       onPress={() => setShowMeasures((v) => !v)}
@@ -765,7 +767,7 @@ export function Toolbar3D({
         {
           titre: 'Mesures',
           lignes: [
-            { cle: 'cotes', icone: 'ruler', libelle: 'Cotes', aide: 'Les longueurs, posées sur les murs', actif: showMeasures, vide: contenu.murs === 0 ? RIEN.cotes : null, onBascule: () => setShowMeasures((v) => !v) },
+            { cle: 'cotes', icone: 'ruler', libelle: modeElec ? 'Cotes' : 'Dimensions', aide: 'Les longueurs, posées sur les murs', actif: showMeasures, vide: contenu.murs === 0 ? RIEN.cotes : null, onBascule: () => setShowMeasures((v) => !v) },
             { cle: 'surfaces', icone: 'etiquette', libelle: 'Surfaces', aide: 'Le nom et les mètres carrés de chaque pièce', actif: show3DSurfaces, vide: contenu.pieces === 0 ? RIEN.surfaces : null, onBascule: () => setShow3DSurfaces(!show3DSurfaces) },
           ],
         },

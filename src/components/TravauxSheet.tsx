@@ -22,7 +22,7 @@
  * (`store/reglagesTravaux`) et partent tels quels dans le dossier PDF.
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, Share, StyleSheet, Switch, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SheetShell } from './Sheet';
 import { haptic } from '../ui/haptic';
@@ -61,9 +61,9 @@ const plage = (de: number, a: number, pas: number) =>
 /** Les crans des hypothèses — ceux qu'on trouve en rayon. */
 const CRANS: { cle: keyof HypothesesTravaux; libelle: string; valeurs: number[]; dire: (v: number) => string }[] = [
   { cle: 'couches', libelle: 'Couches', valeurs: [1, 2, 3, 4], dire: (v) => `${v} couche${v > 1 ? 's' : ''}` },
-  { cle: 'rendement', libelle: 'Rendement', valeurs: plage(6, 16, 1), dire: (v) => `${nombre(v)} m²/L` },
+  { cle: 'rendement', libelle: '1 litre couvre', valeurs: plage(6, 16, 1), dire: (v) => `${nombre(v)} m²/L` },
   { cle: 'pot', libelle: 'Pot de peinture', valeurs: [0.5, 1, 2, 2.5, 3, 5, 10, 15], dire: (v) => `${nombre(v)} L` },
-  { cle: 'chute', libelle: 'Chute du sol', valeurs: [0, 0.05, 0.08, 0.1, 0.12, 0.15, 0.2], dire: (v) => `${Math.round(v * 100)} %` },
+  { cle: 'chute', libelle: 'Marge pour les coupes', valeurs: [0, 0.05, 0.08, 0.1, 0.12, 0.15, 0.2], dire: (v) => `${Math.round(v * 100)} %` },
   { cle: 'paquet', libelle: 'Paquet de sol', valeurs: plage(0.5, 4, 0.1), dire: (v) => `${nombre(v)} m²` },
   { cle: 'barre', libelle: 'Barre de plinthe', valeurs: [1, 2, 2.2, 2.4, 2.5, 3], dire: (v) => `${nombre(v)} m` },
 ];
@@ -130,29 +130,31 @@ export function TravauxSheet({
     {
       cle: 'murs',
       titre: 'Peinture des murs',
-      gros: `${a.murs.pots} pot${a.murs.pots > 1 ? 's' : ''}`,
+      // Revue « Bernard » : « 3 pots », mais de combien ? En rayon, il ne
+      // savait pas quoi prendre.
+      gros: `${a.murs.pots} pot${a.murs.pots > 1 ? 's' : ''} de ${nombre(hypotheses.pot)} L`,
       detail: `${nombre(a.murs.litres)} L pour ${nombre(a.murs.surface)} m²`,
       teinte: c.blue,
     },
     {
       cle: 'plafonds',
       titre: 'Peinture des plafonds',
-      gros: `${a.plafonds.pots} pot${a.plafonds.pots > 1 ? 's' : ''}`,
+      gros: `${a.plafonds.pots} pot${a.plafonds.pots > 1 ? 's' : ''} de ${nombre(hypotheses.pot)} L`,
       detail: `${nombre(a.plafonds.litres)} L pour ${nombre(a.plafonds.surface)} m²`,
       teinte: '#7A5AF0',
     },
     {
       cle: 'sol',
       titre: 'Revêtement de sol',
-      gros: `${a.sol.paquets} paquet${a.sol.paquets > 1 ? 's' : ''}`,
-      detail: `${nombre(a.sol.avecChute)} m², chute comprise`,
+      gros: `${a.sol.paquets} paquet${a.sol.paquets > 1 ? 's' : ''} de ${nombre(hypotheses.paquet)} m²`,
+      detail: `${nombre(a.sol.avecChute)} m², marge des coupes comprise`,
       teinte: '#B8742A',
     },
     {
       cle: 'plinthes',
       titre: 'Plinthes',
-      gros: `${a.plinthes.barres} barre${a.plinthes.barres > 1 ? 's' : ''}`,
-      detail: `${nombre(a.plinthes.metres)} m, seuils déduits`,
+      gros: `${a.plinthes.barres} barre${a.plinthes.barres > 1 ? 's' : ''} de ${nombre(hypotheses.barre)} m`,
+      detail: `${nombre(a.plinthes.metres)} m, portes déduites`,
       teinte: '#1E8E4E',
     },
   ];
@@ -196,7 +198,7 @@ export function TravauxSheet({
                 {t.pieces.length > 0 ? `${nomDeTeinte(t.cle)} · ${t.pieces.join(', ')}` : nomDeTeinte(t.cle)}
               </Text>
               <Text style={s.teinteDetail}>
-                {`${t.pots} pot${t.pots > 1 ? 's' : ''} · ${nombre(t.litres)} L pour ${nombre(t.surface)} m²`}
+                {`${t.pots} pot${t.pots > 1 ? 's' : ''} de ${nombre(hypotheses.pot)} L · ${nombre(t.litres)} L pour ${nombre(t.surface)} m²`}
               </Text>
             </View>
           ))}
@@ -211,11 +213,38 @@ export function TravauxSheet({
       ) : null}
 
       <Text style={s.hypotheses}>
-        {`${hypotheses.couches} couche${hypotheses.couches > 1 ? 's' : ''} à ${nombre(hypotheses.rendement)} m²/L, pots de ${nombre(hypotheses.pot)} L · ` +
-          `${Math.round(hypotheses.chute * 100)} % de chute, paquets de ${nombre(hypotheses.paquet)} m² · ` +
-          `plinthes de ${nombre(hypotheses.barre)} m. Portes et fenêtres déduites.` +
+        {`Calculé pour ${hypotheses.couches} couche${hypotheses.couches > 1 ? 's' : ''}, 1 litre pour ${nombre(hypotheses.rendement)} m² ` +
+          `(regardez l’étiquette du pot), ${Math.round(hypotheses.chute * 100)} % de marge pour les coupes du sol. ` +
+          `Portes et fenêtres déduites.` +
           (cout ? ' Prix indicatifs, à ajuster.' : '')}
       </Text>
+
+      {/*
+        LA LISTE S'EMPORTE, GRATUITEMENT — revue « Bernard » : la page
+        d'achats n'existait que dans le PDF, réservé au Pro. Un texte simple
+        part par Messages, Mail ou Notes, et se lit en rayon.
+      */}
+      {a.murs.pots + a.plafonds.pots + a.sol.paquets + a.plinthes.barres > 0 ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Envoyer ma liste"
+          style={({ pressed }) => [s.envoyer, pressed && s.rangPresse]}
+          onPress={() => {
+            haptic('leger');
+            const texte = [
+              tout ? 'Ma liste d’achats' : `Ma liste d’achats (${choisies.length} pièce${choisies.length > 1 ? 's' : ''})`,
+              ...cartes
+                .filter((k) => !/^0 /.test(k.gros))
+                .map((k) => `• ${k.titre} : ${k.gros} (${k.detail})`),
+              ...(a.murs.parTeinte ?? []).map(
+                (t) => `  – ${nomDeTeinte(t.cle)}${t.pieces.length > 0 ? ` (${t.pieces.join(', ')})` : ''} : ${t.pots} pot${t.pots > 1 ? 's' : ''} de ${nombre(hypotheses.pot)} L`,
+              ),
+            ].join('\n');
+            Share.share({ message: texte }).catch(() => {});
+          }}>
+          <Text style={s.envoyerTexte}>Envoyer ma liste</Text>
+        </Pressable>
+      ) : null}
 
       <View style={s.boutons}>
         <Pressable
@@ -275,6 +304,7 @@ export function TravauxSheet({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Revenir aux valeurs courantes"
+            hitSlop={10}
             onPress={() => {
               haptic('leger');
               reinitialiser();
@@ -322,7 +352,7 @@ export function TravauxSheet({
                   {p.nom}
                 </Text>
                 <Text style={s.rangDetail} numberOfLines={1}>
-                  {`Sol ${nombre(p.sol)} m² · murs ${nombre(p.murs)} m² · h. ${nombre(p.hauteur)} m`}
+                  {`Sol ${nombre(p.sol)} m² · murs ${nombre(p.murs)} m² · hauteur ${p.hauteur.toFixed(2).replace('.', ',')} m`}
                 </Text>
               </View>
             </Pressable>
@@ -394,7 +424,16 @@ const getStyles = themedStyles((c: Palette) =>
     carteTitre: { color: c.inkSoft, fontSize: 13, fontWeight: '600' },
     carteGros: { fontSize: 24, fontWeight: '700', letterSpacing: -0.5, marginTop: 4 },
     carteDetail: { color: c.inkSoft, fontSize: 12.5, marginTop: 2 },
-    hypotheses: { color: c.inkFaint, fontSize: 11.5, lineHeight: 16, marginTop: 12 },
+    hypotheses: { color: c.inkSoft, fontSize: 13, lineHeight: 18, marginTop: 12 },
+    envoyer: {
+      marginTop: 14,
+      minHeight: 48,
+      borderRadius: radius.md,
+      backgroundColor: c.blue,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    envoyerTexte: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
     cartePrix: { color: c.ink, fontWeight: '700' },
     total: {
       flexDirection: 'row',
