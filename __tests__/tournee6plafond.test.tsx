@@ -24,7 +24,11 @@ import { CeilingLayer } from '../src/components/CeilingLayer';
 import { FloorplanEditor } from '../src/components/FloorplanEditor';
 import { CEILING_SYMBOL, type CeilingFixture } from '../src/geometry/ceiling';
 import { detectRooms, mergeColinear, splitAtJunctions, weldCorners, type WallSeg } from '../src/geometry/floorplan';
+import { groupesDesAppareils } from '../src/geometry/appareils3d';
+import type { Fixture } from '../src/geometry/electrical';
+import { GENRE, basculer, lampesDeLInterrupteur, lampesDeLaScene, rangsDesLampes } from '../src/geometry/lumieres';
 import { maillageDeLaMaquette } from '../src/geometry/maquette3d';
+import { jalonsDuRuban, longueurDuRuban } from '../src/geometry/ruban';
 import { buildScene, type ScenePalette } from '../src/geometry/scene3d';
 import { maillageDeLaVisite } from '../src/geometry/visite3d';
 import { useScanStore } from '../src/store/scanStore';
@@ -110,6 +114,48 @@ describe('le ruban LED en 3D et en visite', () => {
   it('une caisse d’appareil, elle, reste réservée au vrai modèle', () => {
     const caisse = { ...ruban[0], sansModele: undefined };
     expect(maillageDeLaVisite([caisse], { sansMeubles: true }).maillage.length).toBe(0);
+  });
+});
+
+describe('le ruban LED lié à un interrupteur', () => {
+  // Relevé du patron : « la LED s'allume bien si liée à un interrupteur ? »
+  const INTER: Fixture = { id: 'i1', kind: 'inter', wallId: MURS[0].id, along: 2, height: 1.1, side: 1 };
+  const LIE: CeilingFixture = { ...RUBAN, commands: ['i1'] };
+  const sc = buildScene(MURS, [], [], { palette: PAL, rooms: ROOMS as never, showSurfaces: true, ceiling: [LIE], fixtures: [INTER] });
+  const lampes = lampesDeLaScene(sc.appareils ?? []);
+
+  it('est une lampe de la visite : une nappe douce, depuis le milieu de son tracé', () => {
+    const l = lampes.find((x) => x.id === 'cl-r')!;
+    expect(l).toBeDefined();
+    expect(l.genre).toBe(GENRE.plafonnier);
+    expect(l.x).toBeCloseTo(2, 2);
+    expect(l.z).toBeCloseTo(1.5, 2);
+  });
+
+  it('son diffuseur court sur tout le tracé, et s’allume avec elle', () => {
+    const groupes = groupesDesAppareils(sc.appareils ?? [], rangsDesLampes(lampes));
+    const diffuseur = groupes.filter((g) => g.mat === 'lumiere' && g.lampe === lampes.find((x) => x.id === 'cl-r')!.index);
+    expect(diffuseur.length).toBeGreaterThan(0);
+  });
+
+  it('l’interrupteur qui le commande l’allume, puis l’éteint', () => {
+    const siennes = lampesDeLInterrupteur(INTER, [INTER], [LIE], () => 'room-1').filter((id) => lampes.some((x) => x.id === id));
+    expect(siennes).toEqual(['cl-r']);
+    const allume = basculer(new Set(), siennes);
+    expect(allume.has('cl-r')).toBe(true);
+    expect(basculer(allume, siennes).has('cl-r')).toBe(false);
+  });
+
+  it('ses jalons se répartissent sur toute sa longueur', () => {
+    const j = jalonsDuRuban(RUBAN.trace!, true);
+    expect(j.length).toBeGreaterThan(8);
+    const xs = j.map((q) => q.x);
+    const zs = j.map((q) => q.z);
+    expect(Math.min(...xs)).toBeLessThan(0.5);
+    expect(Math.max(...xs)).toBeGreaterThan(3.5);
+    expect(Math.min(...zs)).toBeLessThan(0.5);
+    expect(Math.max(...zs)).toBeGreaterThan(2.5);
+    expect(longueurDuRuban(RUBAN.trace!, true)).toBeCloseTo(12.4, 6);
   });
 });
 

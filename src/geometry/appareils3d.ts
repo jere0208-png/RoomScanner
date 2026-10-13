@@ -130,6 +130,13 @@ export interface PoseDAppareil {
   /** Au plafond : ce qui y est posé. */
   plafond?: CeilingKind;
   /**
+   * LE TRACÉ D'UN RUBAN LED, relatif à la pose (m) — `x, z` en sont le premier
+   * point. Voir `ruban`.
+   */
+  trace?: { x: number; z: number }[];
+  /** Le ruban fait le tour : il revient à son départ. */
+  ferme?: boolean;
+  /**
    * LE RAIL D'UN TABLEAU RELEVÉ — ses rangées et ses organes, à leur place.
    * Absent : le tableau générique, quatre rangées garnies.
    */
@@ -807,6 +814,7 @@ export const DESCENTE_DE_LA_LUMIERE: Partial<Record<CeilingKind, number>> = {
   spot: 0.03,
   applique: 0.08,
   ventilateur: 0.37,
+  led: 0.05,
 };
 
 function dcl(a: Atelier) {
@@ -853,6 +861,29 @@ function dcl(a: Atelier) {
     T.lumiere,
     { seg: 24 },
   );
+}
+
+/**
+ * LE RUBAN LED — son diffuseur, le long de son tracé, juste sous le plafond.
+ *
+ * Relevé du patron : « la LED s'allume bien si liée à un interrupteur ? »
+ * Non : sans modèle, le ruban n'était pas une lampe — l'interrupteur de la
+ * visite n'avait rien à allumer. Il a désormais son diffuseur, un tube
+ * opalin de 2,4 cm qui court sur tout le tracé (en centimètres, relatif à
+ * son premier point) : éteint, il est d'un blanc laiteux ; allumé, il
+ * rayonne comme celui de n'importe quel luminaire (`lumiere`).
+ */
+function ruban(a: Atelier, p: PoseDAppareil) {
+  const tr = p.trace ?? [];
+  const chemin = p.ferme && tr.length > 2 ? [...tr, tr[0]] : tr;
+  for (let i = 0; i + 1 < chemin.length; i++) {
+    const q0 = chemin[i];
+    const q1 = chemin[i + 1];
+    a.tube([q0.x * 100, -4.5, q0.z * 100], [q1.x * 100, -4.5, q1.z * 100], 1.2, 1.2, 'lumiere', T.lumiere, {
+      seg: 8,
+      bouts: 'deux',
+    });
+  }
 }
 
 function plafonnier(a: Atelier) {
@@ -1067,6 +1098,9 @@ export function fabriquerAppareil(p: PoseDAppareil): ModeleLocal {
         case 'ventilateur':
           ventilateur(a);
           break;
+        case 'led':
+          ruban(a, p);
+          break;
         case 'daaf':
           daaf(a);
           break;
@@ -1181,6 +1215,8 @@ function cleDe(p: PoseDAppareil): string {
   return [
     p.genre,
     p.plafond ?? '',
+    // Deux rubans de tracés différents n'ont pas le même modèle.
+    (p.trace ?? []).map((q) => `${q.x.toFixed(3)},${q.z.toFixed(3)}`).join(';') + (p.ferme ? '@' : ''),
     (p.largeur ?? 0).toFixed(4),
     (p.hauteur ?? 0).toFixed(4),
     (p.postes ?? []).map((q) => `${q.kind}@${q.dx.toFixed(4)},${q.dy.toFixed(4)}`).join(';'),

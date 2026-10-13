@@ -76,6 +76,7 @@ import {
 } from '../geometry/volumes';
 import { DUREE_LEVEE, hauteurLevee } from '../ui/levee';
 import { DESCENTE_DE_LA_LUMIERE } from '../geometry/appareils3d';
+import { jalonsDuRuban } from '../geometry/ruban';
 import { ECLAT_LAMPE,
   MAQUETTE,
   crepuscule,
@@ -1882,6 +1883,8 @@ export function Iso3DView({
      */
     const posLampes: {
       id: string;
+      /** La clé du dessin, quand une lampe a plusieurs halos (un ruban). */
+      cle?: string;
       cx: number;
       cy: number;
       r: number;
@@ -2442,6 +2445,20 @@ export function Iso3DView({
       if (!(haut > 0.5)) continue;
       // À L'AMPOULE, pas au support : une DCL pend sous sa rosace.
       const q = project({ x: cl.at.x, y: haut - (DESCENTE_DE_LA_LUMIERE[cl.kind] ?? 0.08), z: cl.at.z });
+      /*
+        LE RUBAN S'ALLUME SUR TOUTE SA LONGUEUR — relevé du patron : « la LED
+        s'allume bien si liée à un interrupteur ? ». Son halo unique se posait
+        à son premier point, dans un coin de la pièce. Il en porte un petit à
+        chaque jalon de son tracé.
+      */
+      if (cl.kind === 'led' && (cl.trace?.length ?? 0) >= 2) {
+        const r = Math.max(HALO_MIN, Math.min(HALO_PART * radius3d * scale, HALO_LAMPE * scale)) * 0.55;
+        jalonsDuRuban(cl.trace!, cl.ferme).forEach((j, k) => {
+          const qj = project({ x: j.x, y: haut - (DESCENTE_DE_LA_LUMIERE.led ?? 0.05), z: j.z });
+          posLampes.push({ id: cl.id, cle: `${cl.id}-${k}`, cx: qj.sx, cy: qj.sy, r, genre: 'lumiere' });
+        });
+        continue;
+      }
       // Le rayon se calcule ICI, avec l'échelle du dessin : le rendu n'a plus
       // qu'à le poser, et il ne peut plus le deviner de travers.
       posLampes.push({
@@ -2900,7 +2917,7 @@ export function Iso3DView({
             {rendered.posLampes
               .filter((l) => l.genre === 'lumiere' && allumees.has(l.id))
               .map((l) => (
-                <React.Fragment key={`lum-${l.id}`}>
+                <React.Fragment key={`lum-${l.cle ?? l.id}`}>
                   {/*
                     TROIS CERCLES TIRÉS D'UN SEUL RAYON — la portée, la nappe,
                     la source. Trois nombres indépendants finiraient par se
@@ -2976,7 +2993,7 @@ export function Iso3DView({
                   .filter((l) => departVu.plafond.has(l.id))
                   .map((l) => (
                     <Circle
-                      key={`bague-${l.id}`}
+                      key={`bague-${l.cle ?? l.id}`}
                       testID={`bague-${l.id}`}
                       cx={l.cx}
                       cy={l.cy}

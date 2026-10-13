@@ -183,8 +183,14 @@ describe('au plafond', () => {
     };
     const sol: CeilingFixture = { id: 's', kind: 'spotSol', roomId: 'room-1', at: { x: 2, z: 1.5 } };
     const sc = scene([], [ruban, sol]);
-    // Ni l'un ni l'autre ne pend : pas de modèle de plafonnier.
-    expect((sc.appareils ?? []).filter((p) => p.genre === 'plafond')).toHaveLength(0);
+    // Ni l'un ni l'autre ne pend. Le ruban a son diffuseur, le long de son
+    // tracé (c'est lui qui s'allume) ; le spot au sol n'a pas de modèle.
+    const auPlafond = (sc.appareils ?? []).filter((p) => p.genre === 'plafond');
+    expect(auPlafond.map((p) => p.plafond)).toEqual(['led']);
+    const diffuseur = sommets(groupesDesAppareils(auPlafond)).filter((q) => q.mat === 'lumiere');
+    expect(Math.min(...diffuseur.map((q) => q.x))).toBeCloseTo(0.5, 1);
+    expect(Math.max(...diffuseur.map((q) => q.x))).toBeCloseTo(3.5, 1);
+    for (const q of diffuseur) expect(q.y).toBeGreaterThan(HAUT - 0.1);
     const bande = sc.faces.filter((f) => f.ownerId === 'cl-r');
     expect(bande.length).toBeGreaterThan(0);
     const xs = bande.flatMap((f) => f.pts.map((q) => q.x));

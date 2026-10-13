@@ -3262,6 +3262,25 @@ export function buildScene(
       const tr = cl.trace ?? [];
       const chemin = cl.ferme && tr.length > 2 ? [...tr, tr[0]] : tr;
       const yb = haut - 0.03;
+      /*
+        ET SON DIFFUSEUR, EN VRAI MODÈLE — c'est lui qui s'allume avec
+        l'interrupteur dans la visite (voir `ruban`, `lampesDeLaScene`). La
+        bande bleue reste : c'est elle qu'on voit de loin, éteint.
+      */
+      if (tr.length >= 2) {
+        appareils.push({
+          id: `cl-${cl.id}`,
+          genre: 'plafond',
+          plafond: 'led',
+          x: tr[0].x,
+          y: haut,
+          z: tr[0].z,
+          nx: 0,
+          nz: 0,
+          trace: tr.map((q) => ({ x: q.x - tr[0].x, z: q.z - tr[0].z })),
+          ferme: cl.ferme,
+        });
+      }
       for (let i = 0; i + 1 < chemin.length; i++) {
         const p = chemin[i];
         const q = chemin[i + 1];

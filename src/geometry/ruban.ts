@@ -228,6 +228,34 @@ export function rubanSousLesMeubles(
 }
 
 /** La longueur d'un ruban, en mètres — fermé, il revient à son départ. */
+/**
+ * DES POINTS RÉGULIERS LE LONG DU RUBAN — pour poser sa lumière sur toute sa
+ * longueur, et non à son départ. Un point tous les `pas` mètres au plus, au
+ * milieu de chaque tronçon ; `max` points au plus en tout.
+ */
+export function jalonsDuRuban(trace: Pt[], ferme = false, pas = 0.9, max = 14): Pt[] {
+  const chemin = ferme && trace.length > 2 ? [...trace, trace[0]] : trace;
+  const L = longueurDuRuban(trace, ferme);
+  if (chemin.length < 2 || L < 1e-6) return trace.slice(0, 1);
+  const n = Math.max(1, Math.min(max, Math.round(L / pas)));
+  const out: Pt[] = [];
+  for (let k = 0; k < n; k++) {
+    let reste = ((k + 0.5) / n) * L;
+    for (let i = 0; i + 1 < chemin.length; i++) {
+      const a = chemin[i];
+      const b = chemin[i + 1];
+      const l = Math.hypot(b.x - a.x, b.z - a.z);
+      if (reste <= l || i + 2 === chemin.length) {
+        const t = l > 0 ? Math.min(1, reste / l) : 0;
+        out.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t });
+        break;
+      }
+      reste -= l;
+    }
+  }
+  return out;
+}
+
 export function longueurDuRuban(trace: Pt[], ferme = false): number {
   let L = 0;
   const n = trace.length;

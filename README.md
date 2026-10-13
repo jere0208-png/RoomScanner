@@ -14285,6 +14285,26 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le ruban LED s'allume avec son interrupteur
+
+Relevé du patron : « la LED s'allume bien si liée à un interrupteur ? ».
+Non, pas vraiment : sur le plan, le lien existait (le tireté de commande,
+le circuit, le contrôle), mais la lumière ne suivait pas.
+- **Dans la visite**, rien ne s'allumait. Les lampes de la visite viennent
+  des modèles 3D des luminaires, et le ruban n'en avait pas : l'appui sur
+  l'interrupteur n'avait rien à allumer.
+- **Dans la maquette 3D**, un seul halo se posait au premier point du
+  ruban, dans un coin de la pièce.
+
+Le ruban a maintenant son diffuseur en vrai modèle : un tube opalin de
+2,4 cm qui court sur tout son tracé, juste sous la bande bleue. Éteint, il
+est d'un blanc laiteux ; allumé, il rayonne comme celui de n'importe quel
+luminaire. C'est une lampe de la visite : la nappe douce d'une corniche,
+depuis le milieu de son tracé. Dans la maquette, il porte un petit halo à
+chaque jalon de son tracé (`jalonsDuRuban`).
+
+Bancs : `tournee6plafond`, `allumerlalumiere`, `appareilsreels`.
+
 ## Le bilan du relevé et la lecture d'un plan, sans défiler
 
 Relevé du patron : « propose une refonte de la page de la note du scan,

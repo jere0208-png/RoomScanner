@@ -258,6 +258,29 @@ describe('le tap ne recadre plus la caméra', () => {
   });
 });
 
+describe('le ruban LED commandé s’allume sur toute sa longueur', () => {
+  it('pas un halo dans un coin : un par jalon de son tracé', () => {
+    const RUBAN: CeilingFixture = {
+      id: 'r1',
+      kind: 'led',
+      roomId: 'r1',
+      at: { x: 0.2, z: 0.2 },
+      trace: [{ x: 0.2, z: 0.2 }, { x: 4.8, z: 0.2 }, { x: 4.8, z: 3.8 }, { x: 0.2, z: 3.8 }],
+      ferme: true,
+      commands: ['i1'],
+    };
+    const t = monter();
+    act(() => useScanStore.setState({ ceiling: [LAMPE, RUBAN] }));
+    const cible = t.root.findAll((n) => String(n.props?.testID ?? '') === 'cible-i1')[0];
+    taper(t, cible.props.cx, cible.props.cy);
+    const duRuban = halos(t).filter((n) => n.props.testID === 'halo-r1');
+    expect(duRuban.length).toBeGreaterThan(8);
+    const xs = duRuban.map((n) => n.props.cx);
+    // Ils s'étalent sur la maquette : le ruban fait le tour de la pièce.
+    expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(50);
+  });
+});
+
 describe('un appui sur l’interrupteur allume ce qu’il commande', () => {
   it('rien n’est allumé au départ', () => {
     expect(halos(monter())).toHaveLength(0);

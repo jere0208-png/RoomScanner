@@ -18,7 +18,9 @@
  *   — le SPOT encastré tombe en cône net vers le sol ;
  *   — l'ampoule de la DCL rayonne tout autour, sous sa douille ;
  *   — le PLAFONNIER verse une nappe large et douce ;
- *   — le VENTILATEUR éclaire sous son moteur.
+ *   — le VENTILATEUR éclaire sous son moteur ;
+ *   — le RUBAN LED verse la nappe douce d'une corniche, depuis le milieu de
+ *     son tracé, et son diffuseur s'allume sur toute sa longueur.
  *
  * Et le diffuseur du luminaire s'allume avec lui : éteint, il est d'un blanc
  * opalin ; allumé, il rayonne.
@@ -93,16 +95,23 @@ export function lampesDeLaScene(appareils: readonly PoseDAppareil[]): Lampe[] {
           ? GENRE.plafonnier
           : p.plafond === 'ventilateur'
           ? GENRE.ventilateur
+          : p.plafond === 'led' && (p.trace?.length ?? 0) >= 2
+          ? GENRE.plafonnier
           : null;
     }
     if (genre === null) continue;
+    // Le ruban éclaire depuis le milieu de son tracé, pas depuis son départ.
+    const tr = p.plafond === 'led' ? p.trace ?? [] : [];
+    const milieu = tr.length
+      ? { x: tr.reduce((t, q) => t + q.x, 0) / tr.length, z: tr.reduce((t, q) => t + q.z, 0) / tr.length }
+      : { x: 0, z: 0 };
     out.push({
       id: p.id,
       index: out.length,
       genre,
-      x: p.x,
+      x: p.x + milieu.x,
       y: p.y,
-      z: p.z,
+      z: p.z + milieu.z,
       nx: p.nx,
       nz: p.nz,
       sources: genre === GENRE.appliqueMurale ? 2 : 1,
