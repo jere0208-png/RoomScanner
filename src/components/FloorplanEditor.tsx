@@ -3110,15 +3110,17 @@ export function FloorplanEditor({
                   cercle se croisaient — le plan racontait un contact qui
                   n'existe pas. `pivotsDesBattants` les range dos à dos.
                 */
+                const vantail = (pivot: { x: number; y: number }, opp: { x: number; y: number }) => {
+                  const rv = Math.hypot(opp.x - pivot.x, opp.y - pivot.y);
+                  const bout = { x: pivot.x + n.x * rv, y: pivot.y + n.y * rv };
+                  // Sens de l'arc : celui qui ramène le battant sur le dormant.
+                  const croix = n.x * (opp.y - pivot.y) - n.y * (opp.x - pivot.x);
+                  return { pivot, bout, autre: opp, r: rv, sens: croix > 0 ? 1 : 0 };
+                };
+                // La porte à deux vantaux : chacun de son tableau jusqu'au milieu.
+                if (o.vantaux === 2) return [vantail(a, { x: mx, y: my }), vantail(b, { x: mx, y: my })];
                 const cote = pivots.get(o.id) === 'b' ? b : a;
-                const opp = cote === a ? b : a;
-                const pivot = cote;
-                const bout = { x: pivot.x + n.x * r, y: pivot.y + n.y * r };
-                // Sens de l'arc : celui qui ramène le battant sur le dormant.
-                const ax = opp.x - pivot.x;
-                const ay = opp.y - pivot.y;
-                const croix = n.x * ay - n.y * ax;
-                return { pivot, bout, autre: opp, r, sens: croix > 0 ? 1 : 0 };
+                return [vantail(cote, cote === a ? b : a)];
               })();
               return (
                 <G
@@ -3205,13 +3207,16 @@ export function FloorplanEditor({
                   */}
                   {o.type === 'door' && battant && (() => {
                     const bloquee = !!portesBloquees?.has(o.id);
-                    const arc = `M ${battant.pivot.x} ${battant.pivot.y} L ${battant.bout.x} ${battant.bout.y} A ${battant.r} ${battant.r} 0 0 ${battant.sens} ${battant.autre.x} ${battant.autre.y}`;
+                    const arcs = battant.map(
+                      (f) => `M ${f.pivot.x} ${f.pivot.y} L ${f.bout.x} ${f.bout.y} A ${f.r} ${f.r} 0 0 ${f.sens} ${f.autre.x} ${f.autre.y}`,
+                    );
+                    const arc = arcs.join(' ');
                     return (
                       <>
                         {/* Un meuble dans le battant : la surface balayée
                             se teinte, la porte ne s'ouvre plus en grand. */}
                         {bloquee && (
-                          <Path d={`${arc} Z`} fill={c.danger} fillOpacity={0.12} stroke="none" pointerEvents="none" />
+                          <Path d={arcs.map((x) => `${x} Z`).join(' ')} fill={c.danger} fillOpacity={0.12} stroke="none" pointerEvents="none" />
                         )}
                         <Path
                           d={arc}

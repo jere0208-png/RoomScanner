@@ -14285,6 +14285,32 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## La porte à deux vantaux, la fenêtre plus petite
+
+**La porte double** (Hélène, haussmannien). La porte double du salon
+d'angle, 1,40 m, sortait en deux portes de 0,69 bout à bout : deux
+battants, deux cotes, deux passages de 0,60. Deux portes ne se touchent
+pas, chacune a son huisserie et un trumeau les sépare.
+
+Deux portes sont les deux vantaux d'une seule si elles sont :
+- alignées sur le même mur, bout à bout à 10 cm près ;
+- de même hauteur et de même pied ;
+- d'un mètre au plus chacune.
+
+Une porte de 1,20 m et plus vue d'un seul tenant (celle du grand salon,
+1,38) a aussi deux vantaux : aucune porte battante n'a un vantail de 1,38.
+Chaque vantail bat de son tableau jusqu'au milieu, à l'écran, au PDF, au
+DXF et au contrôle « ça passe ? ».
+
+**La fenêtre plus petite** (Hélène). Sur la cour, la fenêtre de l'office
+(allège 0,95, haut 2,55) se voyait proposer « un appui la remonte » à
+2,80, comme celles des chambres (allège 0,60). Un volet qui pend rabote le
+haut d'une baie, pas son allège. Une fenêtre dont l'allège est plus haute
+que celle de ses voisines est plus petite par dessin : elle n'est plus
+signalée.
+
+Banc : `tournee5ouvrants`.
+
 ## Le garage et sa porte, le cellier
 
 **Le garage** (Bérénice). RoomPlan ne connaît pas les garages, et le

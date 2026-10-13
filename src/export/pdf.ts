@@ -2354,25 +2354,29 @@ function planPage(
         // leurs quarts de cercle.
         const gond = pivotsPorte.get(o.id) === 'b' ? o.b : o.a;
         const opp = gond === o.a ? o.b : o.a;
-        const leafEnd = { x: gond.x + inx * len, z: gond.z + inz * len };
-        traitsMenuiserie.push({
-          pts: [px(gond), px(leafEnd)],
-          w: 1.4,
-          c: colorOpenings ? AMBER : GREY,
-        });
-        /*
-          L'ARC DU BATTANT — le calcul commun.
+        // Deux vantaux : chacun de son tableau jusqu'au milieu.
+        const feuilles: [{ x: number; z: number }, { x: number; z: number }][] = o.vantaux === 2 ? [[o.a, mid], [o.b, mid]] : [[gond, opp]];
+        for (const [g, q] of feuilles) {
+          const r = Math.hypot(q.x - g.x, q.z - g.z);
+          traitsMenuiserie.push({
+            pts: [px(g), px({ x: g.x + inx * r, z: g.z + inz * r })],
+            w: 1.4,
+            c: colorOpenings ? AMBER : GREY,
+          });
+          /*
+            L'ARC DU BATTANT — le calcul commun.
 
-          Il vivait ici recopié, et il portait le même défaut latent que
-          l'export CAO : sur certaines orientations, l'écart d'angle passait
-          la coupure à ±π et le tracé prenait le chemin long — un tour
-          complet qui traverse le mur. Un seul calcul, une seule correction.
-        */
-        traitsMenuiserie.push({
-          pts: arcDuBattant(gond, opp, { x: inx, z: inz }, len, 10).map(px),
-          w: 0.8,
-          c: GREY,
-        });
+            Il vivait ici recopié, et il portait le même défaut latent que
+            l'export CAO : sur certaines orientations, l'écart d'angle passait
+            la coupure à ±π et le tracé prenait le chemin long — un tour
+            complet qui traverse le mur. Un seul calcul, une seule correction.
+          */
+          traitsMenuiserie.push({
+            pts: arcDuBattant(g, q, { x: inx, z: inz }, r, 10).map(px),
+            w: 0.8,
+            c: GREY,
+          });
+        }
       } else if (o.type === 'window' && baie) {
         // Le dormant aux deux faces du tableau, le vitrage au cœur du mur.
         const ligne = (decalage: number, w: number, hex: string) => {

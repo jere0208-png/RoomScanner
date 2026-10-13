@@ -97,6 +97,11 @@ export interface WallSeg {
    */
   garage?: boolean;
   /**
+   * PORTE À DEUX VANTAUX (revue « Hélène ») : chacun bat depuis son tableau
+   * jusqu'au milieu. Absent = un seul vantail.
+   */
+  vantaux?: 2;
+  /**
    * Confiance de RoomPlan dans cette détection (`low`, `medium`, `high`).
    * C'est lui qui sait le mieux de quoi il doute : le diagnostic du plan
    * s'en sert pour désigner les murs à vérifier.
@@ -2679,6 +2684,20 @@ export function linteauxRabotes(
       (h) => hauts.filter((x) => x <= h + 1e-9 && h - x <= ACCORD + 1e-9).length >= 2,
     );
     if (reference === undefined || reference - hautDe(o) < ecartMin - 1e-9 || !sousSonMur(o, reference)) return [];
+    /*
+      UNE FENÊTRE PLUS PETITE N'EST PAS RABOTÉE — revue « Hélène » : sur la
+      cour, la fenêtre de l'office (allège 0,95, haut 2,55) se voyait
+      proposer d'« un appui » de monter à 2,80 comme celles des chambres
+      (allège 0,60). Un volet qui pend rabote le HAUT d'une baie ; son allège
+      reste celle de ses voisines. Une fenêtre dont l'allège est plus haute
+      que les leurs l'est par dessin.
+    */
+    if (o.type === 'window') {
+      const pieds = baies
+        .filter((q) => q !== o && memeFacade(o, q) && reference - hautDe(q) <= ACCORD + 1e-9 && hautDe(q) <= reference + 1e-9)
+        .map((q) => q.yCenter - q.height / 2);
+      if (pieds.length > 0 && o.yCenter - o.height / 2 > Math.max(...pieds) + 0.15) return [];
+    }
     return [{ id: o.id, linteau: reference, actuel: hautDe(o) }];
   });
 }
@@ -2933,7 +2952,9 @@ export function baiesVitrees<O extends WallSeg>(openings: O[], walls: WallSeg[],
       const d = WALL_T / 2 + 0.25;
       facade = dehors({ x: m.x + n.x * d, z: m.z + n.z * d }) || dehors({ x: m.x - n.x * d, z: m.z - n.z * d });
     }
-    return facade ? { ...o, type: 'window', open: undefined, pivot: undefined, versExterieur: undefined } : o;
+    return facade
+      ? { ...o, type: 'window', open: undefined, pivot: undefined, versExterieur: undefined, vantaux: undefined }
+      : o;
   });
 }
 
@@ -3003,7 +3024,7 @@ export function lesPortesDeGarage<O extends WallSeg>(openings: O[], ids: Set<str
   if (ids.size === 0) return openings;
   return openings.map((o) =>
     ids.has(o.id)
-      ? { ...o, type: 'door', garage: true, open: undefined, pivot: undefined, versExterieur: undefined }
+      ? { ...o, type: 'door', garage: true, open: undefined, pivot: undefined, versExterieur: undefined, vantaux: undefined }
       : o,
   );
 }

@@ -65,6 +65,13 @@ export function battantsDesPortes(
     if ((ancre.x - m.x) * n.x + (ancre.z - m.z) * n.z < 0) n = { x: -n.x, z: -n.z };
     // … ou vers l'autre, quand le vantail s'ouvre de ce côté-là.
     if (o.versExterieur) n = { x: -n.x, z: -n.z };
+    // La porte à deux vantaux : chacun bat de son tableau jusqu'au milieu.
+    if (o.vantaux === 2) {
+      for (const pivot of [o.a, o.b]) {
+        out.push({ id: o.id, pivot, ferme: m, ouvert: { x: pivot.x + (n.x * r) / 2, z: pivot.z + (n.z * r) / 2 }, r: r / 2 });
+      }
+      continue;
+    }
     const pivot = pivots.get(o.id) === 'b' ? o.b : o.a;
     const ferme = pivot === o.a ? o.b : o.a;
     out.push({ id: o.id, pivot, ferme, ouvert: { x: pivot.x + n.x * r, z: pivot.z + n.z * r }, r });

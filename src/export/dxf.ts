@@ -376,15 +376,16 @@ export function buildDxf(plan: PlanPourDxf): string {
     }
     const gond = pivots.get(o.id) === 'b' ? o.b : o.a;
     const opp = gond === o.a ? o.b : o.a;
-    // Le vantail, ouvert à angle droit.
-    const bout = { x: gond.x + nx * len, z: gond.z + nz * len };
-    out += ligne(CALQUE.portes, gond, bout);
-    // Et l'arc qu'il décrit, du dormant au vantail — le calcul commun,
-    // qui ramène l'écart d'angle dans le demi-tour (voir `arcDuBattant`).
-    out += polyligne(
-      CALQUE.portes,
-      arcDuBattant(gond, opp, { x: nx, z: nz }, len, 8),
-    );
+    // Deux vantaux : chacun de son tableau jusqu'au milieu.
+    const feuilles: [Pt, Pt][] = o.vantaux === 2 ? [[o.a, mid], [o.b, mid]] : [[gond, opp]];
+    for (const [g, q] of feuilles) {
+      const r = Math.hypot(q.x - g.x, q.z - g.z);
+      // Le vantail, ouvert à angle droit.
+      out += ligne(CALQUE.portes, g, { x: g.x + nx * r, z: g.z + nz * r });
+      // Et l'arc qu'il décrit, du dormant au vantail — le calcul commun,
+      // qui ramène l'écart d'angle dans le demi-tour (voir `arcDuBattant`).
+      out += polyligne(CALQUE.portes, arcDuBattant(g, q, { x: nx, z: nz }, r, 8));
+    }
   }
 
   /*

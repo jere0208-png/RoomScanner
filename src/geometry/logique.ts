@@ -324,6 +324,80 @@ export function sansBaiesEnDouble(openings: WallSeg[]): WallSeg[] {
 }
 
 /**
+ * LA PORTE À DEUX VANTAUX — revue « Hélène » : la porte double du salon
+ * d'angle, 1,40 m, sortait en deux portes de 0,69 bout à bout — deux
+ * battants, deux cotes, deux passages de 0,60 là où l'on passe un buffet.
+ * Deux portes ne se touchent pas : chacune a son huisserie, et un trumeau
+ * les sépare. Deux portes alignées sur le même mur, bout à bout à 10 cm
+ * près, de même hauteur et de même pied, d'un mètre au plus chacune, sont
+ * les deux vantaux d'une seule.
+ *
+ * Et une porte de 1,20 m et plus, vue d'un seul tenant (la porte double
+ * entre grand salon et salle à manger, 1,38), n'a pas un vantail de 1,38 :
+ * aucune porte battante ne se fabrique ainsi. Elle en a deux.
+ */
+const JEU_ENTRE_VANTAUX = 0.1;
+const PORTE_A_DEUX_VANTAUX = 1.2;
+const estUnVantail = (o: WallSeg, L: number) =>
+  o.type === 'door' && !o.open && !o.garage && !o.vantaux && L >= 0.3 && L <= 1;
+
+export function portesDoubles(openings: WallSeg[]): WallSeg[] {
+  const prises = new Set<string>();
+  const out: WallSeg[] = [];
+  for (let i = 0; i < openings.length; i++) {
+    const o = openings[i];
+    if (prises.has(o.id)) continue;
+    const L = segLength(o);
+    if (o.type === 'door' && !o.open && !o.garage && !o.vantaux && L >= PORTE_A_DEUX_VANTAUX) {
+      out.push({ ...o, vantaux: 2, pivot: undefined });
+      prises.add(o.id);
+      continue;
+    }
+    if (!estUnVantail(o, L)) {
+      out.push(o);
+      continue;
+    }
+    const u = { x: (o.b.x - o.a.x) / L, z: (o.b.z - o.a.z) / L };
+    const n = { x: -u.z, z: u.x };
+    const t = (p: Pt) => (p.x - o.a.x) * u.x + (p.z - o.a.z) * u.z;
+    const lat = (p: Pt) => (p.x - o.a.x) * n.x + (p.z - o.a.z) * n.z;
+    const pied = (w: WallSeg) => w.yCenter - w.height / 2;
+    let double: WallSeg | null = null;
+    for (let j = i + 1; j < openings.length && !double; j++) {
+      const q = openings[j];
+      if (prises.has(q.id)) continue;
+      const Lq = segLength(q);
+      if (!estUnVantail(q, Lq)) continue;
+      const uq = { x: (q.b.x - q.a.x) / Lq, z: (q.b.z - q.a.z) / Lq };
+      if (Math.abs(u.x * uq.x + u.z * uq.z) < 0.98) continue;
+      if (Math.abs(lat(q.a)) > 0.08 || Math.abs(lat(q.b)) > 0.08) continue;
+      if (Math.abs(q.height - o.height) > 0.1 || Math.abs(pied(q) - pied(o)) > 0.1) continue;
+      const t0 = Math.min(t(q.a), t(q.b));
+      const t1 = Math.max(t(q.a), t(q.b));
+      // Le jeu entre les deux : un léger recouvrement est du bruit.
+      const jeu = t0 >= L / 2 ? t0 - L : -t1;
+      if (jeu < -0.05 || jeu > JEU_ENTRE_VANTAUX) continue;
+      const debut = Math.min(0, t0);
+      const fin = Math.max(L, t1);
+      const haut = Math.max(o.yCenter + o.height / 2, q.yCenter + q.height / 2);
+      const bas = Math.min(pied(o), pied(q));
+      prises.add(q.id);
+      double = {
+        ...o,
+        a: { x: o.a.x + u.x * debut, z: o.a.z + u.z * debut },
+        b: { x: o.a.x + u.x * fin, z: o.a.z + u.z * fin },
+        height: haut - bas,
+        yCenter: (haut + bas) / 2,
+        vantaux: 2,
+        pivot: undefined,
+      };
+    }
+    out.push(double ?? o);
+  }
+  return prises.size > 0 ? out : openings;
+}
+
+/**
  * UN MEUBLE, UNE FOIS — revues « Thomas » et « Bérénice ».
  * - Le séjour repris à un passage de plus gardait deux canapés : l'ancien,
  *   poussé par le nouveau, partait de 87 cm dans le refend. Deux meubles de
@@ -395,7 +469,7 @@ export function sansMeublesEnDouble<O extends ObjectData>(objets: O[]): O[] {
  */
 export function releveLogique(walls: WallSeg[], openings: WallSeg[]): { walls: WallSeg[]; openings: WallSeg[] } {
   const murs = mursLogiques(walls);
-  const suivies = reprojectOpenings(walls, murs, sansBaiesEnDouble(openings));
+  const suivies = reprojectOpenings(walls, murs, portesDoubles(sansBaiesEnDouble(openings)));
   const pieds = murs.filter((w) => w.type === 'wall').map((w) => w.yCenter - w.height / 2);
   const sol = pieds.length > 0 ? Math.min(...pieds) : 0;
   return { walls: murs, openings: baiesLogiques(suivies, sol) };
