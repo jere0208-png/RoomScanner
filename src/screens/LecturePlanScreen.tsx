@@ -33,6 +33,7 @@ import {
   Animated,
   Easing,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   Share,
@@ -40,8 +41,9 @@ import {
   Text,
   View,
   useWindowDimensions,
+  type LayoutChangeEvent,
 } from 'react-native';
-import Svg, { Line, Path, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
@@ -226,9 +228,15 @@ export function LecturePlanScreen() {
         <Text style={s.titreBarre}>Lire un plan papier</Text>
         <View style={s.videBarre} />
       </View>
-      <ScrollView
-        contentContainerStyle={[s.contenu, { paddingBottom: insets.bottom + 32 }]}
-        showsVerticalScrollIndicator={false}>
+      {/*
+        PLUS DE DÉFILEMENT — relevé du patron : « fais une refonte de la page
+        pour la partie lecture d'un plan, sans scroll. Privilégie le visuel au
+        texte, avec des boutons qui donnent envie. » Chaque moment tient dans
+        l'écran : ce qui a de la place à prendre (l'illustration, la page
+        photographiée, le plan lu) prend la hauteur qui reste, le reste se
+        cale autour.
+      */}
+      <View style={[s.contenu, { paddingBottom: insets.bottom + 12 }]}>
         {etat.phase === 'invitation' && (
           <Invitation
             s={s}
@@ -263,47 +271,103 @@ export function LecturePlanScreen() {
           />
         )}
         {etat.phase === 'echec' && (
-          <View testID="lecture-echec" style={s.carte}>
-            <Text style={s.echecTitre}>
-              {etat.motif === 'pro'
-                ? 'Réservé au Pro'
-                : etat.motif === 'compte'
-                  ? compte
-                    ? 'Reconnectez-vous'
-                    : 'Un compte, d’abord'
-                  : etat.motif === 'plan'
-                    ? 'Ce plan ne se lit pas'
-                    : etat.motif === 'fichier'
-                      ? 'Ce fichier ne s’ouvre pas'
-                      : 'La lecture n’a pas abouti'}
-            </Text>
-            <Text style={s.echecTexte}>{etat.message}</Text>
-            {etat.motif === 'pro' && (
-              // Revues « Thomas » et « Sophie » : il levait le drapeau des
-              // tarifs du devis, et l'écran ne bougeait pas.
-              <Bouton s={s} principal libelle="Passer au Pro" onPress={() => ouvrirPaywall()} />
-            )}
-            {etat.motif === 'compte' && (
+          <View testID="lecture-echec" style={s.echec}>
+            <View style={s.echecCarte}>
+              <View style={[s.echecRond, { backgroundColor: etat.motif === 'pro' ? c.blueSoft : `${c.amber}22` }]}>
+                <Icone
+                  nom={etat.motif === 'pro' ? 'etoile' : etat.motif === 'compte' ? 'avatar' : etat.motif === 'fichier' ? 'planPapier' : 'aide'}
+                  taille={34}
+                  teinte={etat.motif === 'pro' ? c.blue : c.amber}
+                />
+              </View>
+              <Text style={s.echecTitre}>
+                {etat.motif === 'pro'
+                  ? 'Réservé au Pro'
+                  : etat.motif === 'compte'
+                    ? compte
+                      ? 'Reconnectez-vous'
+                      : 'Un compte, d’abord'
+                    : etat.motif === 'plan'
+                      ? 'Ce plan ne se lit pas'
+                      : etat.motif === 'fichier'
+                        ? 'Ce fichier ne s’ouvre pas'
+                        : 'La lecture n’a pas abouti'}
+              </Text>
+              <Text style={s.echecTexte}>{etat.message}</Text>
+            </View>
+            <View style={s.boutons}>
+              {etat.motif === 'pro' && (
+                // Revues « Thomas » et « Sophie » : il levait le drapeau des
+                // tarifs du devis, et l'écran ne bougeait pas.
+                <Bouton s={s} principal icone="etoile" libelle="Passer au Pro" onPress={() => ouvrirPaywall()} />
+              )}
+              {etat.motif === 'compte' && (
+                <Bouton
+                  s={s}
+                  principal
+                  icone="avatar"
+                  libelle={compte ? 'Me reconnecter' : 'Me connecter'}
+                  onPress={() => seReconnecter(etat.page)}
+                />
+              )}
+              {(etat.motif === 'reseau' || etat.motif === 'refus') && etat.page && (
+                <Bouton s={s} principal icone="pivoter" libelle="Réessayer" onPress={() => void lire(etat.page!)} />
+              )}
               <Bouton
                 s={s}
-                principal
-                libelle={compte ? 'Me reconnecter' : 'Me connecter'}
-                onPress={() => seReconnecter(etat.page)}
+                libelle={etat.motif === 'fichier' ? 'Choisir un autre fichier' : 'Reprendre une photo'}
+                onPress={() => setEtat({ phase: 'invitation' })}
               />
-            )}
-            {(etat.motif === 'reseau' || etat.motif === 'refus') && etat.page && (
-              <Bouton s={s} principal libelle="Réessayer" onPress={() => void lire(etat.page!)} />
-            )}
-            <Bouton
-              s={s}
-              libelle={etat.motif === 'fichier' ? 'Choisir un autre fichier' : 'Reprendre une photo'}
-              onPress={() => setEtat({ phase: 'invitation' })}
-            />
+            </View>
           </View>
         )}
-      </ScrollView>
+      </View>
     </RetourGlisse>
   );
+}
+
+// ------------------------------------------------------------------ les briques
+
+/** Une icône Solar, à la taille et la teinte voulues. */
+function Icone({ nom, taille, teinte }: { nom: keyof typeof SOLAIRES; taille: number; teinte: string }) {
+  return (
+    <Svg width={taille} height={taille} viewBox="0 0 24 24">
+      <Path d={SOLAIRES[nom]} fill={teinte} fillRule="evenodd" />
+    </Svg>
+  );
+}
+
+/** Un dégradé qui remplit son bloc, en fond. */
+function Degrade({ id, de, a }: { id: string; de: string; a: string }) {
+  return (
+    <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
+      <Defs>
+        <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          <Stop offset="0" stopColor={de} />
+          <Stop offset="1" stopColor={a} />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
+    </Svg>
+  );
+}
+
+/** La taille d'un bloc qui prend la place qui reste : on la lit, puis on dessine dedans. */
+function useCadre(): [{ w: number; h: number }, (e: LayoutChangeEvent) => void] {
+  const [cadre, setCadre] = useState({ w: 0, h: 0 });
+  const surMesure = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setCadre((p) => (Math.abs(p.w - width) < 0.5 && Math.abs(p.h - height) < 0.5 ? p : { w: width, h: height }));
+  };
+  return [cadre, surMesure];
+}
+
+/** Entre deux tailles, selon la hauteur de l'écran : de l'iPhone SE à un grand écran. */
+function useEchelle() {
+  const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const k = Math.max(0, Math.min(1, (height - insets.top - insets.bottom - 620) / 260));
+  return (petit: number, grand: number) => Math.round(petit + (grand - petit) * k);
 }
 
 // ------------------------------------------------------------------ 1. l'invitation
@@ -323,54 +387,186 @@ function Invitation({
   onPhoto: () => void;
   onFichier: () => void;
 }) {
+  const entre = useEchelle();
+  const [cadre, surCadre] = useCadre();
   return (
     <>
+      {/* LE HÉROS : la feuille photographiée devient un plan. Il prend la place qui reste. */}
       <View style={s.heros}>
-        <FeuilleDessinee c={c} />
-        <Text style={s.herosTitre}>Votre plan papier, en plan 2D</Text>
-        <Text style={s.herosTexte}>
-          Photographiez la feuille, ou ouvrez le plan reçu en PDF : ses murs, ses cotes, ses pièces et ses symboles
-          électriques sont lus, mis à l’échelle et redessinés. Vous vérifiez, puis vous modifiez comme n’importe quel
-          plan.
+        <Degrade id="lecture-heros" de={c.blueSoft} a={c.surface} />
+        <View style={s.herosDessin} onLayout={surCadre}>
+          {cadre.h > 40 && <DuPapierAuPlan c={c} largeur={cadre.w} hauteur={cadre.h} />}
+        </View>
+        <Text style={[s.herosTitre, { fontSize: entre(22, 27) }]}>Du papier au plan 2D</Text>
+        <Text style={s.herosTexte} numberOfLines={2}>
+          Murs, cotes, pièces et symboles : tout est lu, mis à l’échelle et redessiné.
         </Text>
       </View>
-      {CONSEILS.map((k) => (
-        <View key={k.titre} style={s.conseil}>
-          <View style={s.conseilIcone}>
-            <Svg width={20} height={20} viewBox="0 0 24 24">
-              <Path d={SOLAIRES[k.icone]} fill={c.blue} fillRule="evenodd" />
-            </Svg>
+      <View style={s.atouts}>
+        {CONSEILS.map((k) => (
+          <View key={k.titre} style={s.atoutCase}>
+            <View style={[s.atout, { height: entre(48, 56) }]} accessibilityLabel={`${k.titre} : ${k.texte}`}>
+              <View style={s.atoutIcone}>
+                <Icone nom={k.icone} taille={18} teinte={c.blue} />
+              </View>
+              <Text style={s.atoutTitre} numberOfLines={2}>
+                {k.titre}
+              </Text>
+            </View>
           </View>
-          <View style={s.conseilTextes}>
-            <Text style={s.conseilTitre}>{k.titre}</Text>
-            <Text style={s.conseilTexte}>{k.texte}</Text>
+        ))}
+      </View>
+      <View style={s.portes}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Scanner le plan"
+          style={({ pressed }) => [s.scanner, { height: entre(64, 76) }, pressed && s.enfonce]}
+          onPress={onScanner}>
+          <Degrade id="lecture-scanner" de="#2D6BFF" a="#5B3DF5" />
+          <View style={s.scannerIcone}>
+            <Icone nom="scanner" taille={26} teinte="#FFFFFF" />
           </View>
+          <View style={s.flexe}>
+            <Text style={s.scannerTitre}>Scanner le plan</Text>
+            <Text style={s.scannerSous} numberOfLines={1}>
+              La feuille se détecte et se redresse seule
+            </Text>
+          </View>
+          <Svg width={20} height={20} viewBox="0 0 24 24">
+            <Path d="M9 5l7 7-7 7" stroke="rgba(255,255,255,0.85)" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          </Svg>
+        </Pressable>
+        <View style={s.deux}>
+          <Tuile s={s} c={c} icone="image" titre="Une photo" sous="Photothèque" libelle="Importer une photo" hauteur={entre(58, 70)} onPress={onPhoto} />
+          <Tuile s={s} c={c} icone="planPapier" titre="Un fichier" sous="PDF ou image" libelle="Ouvrir un fichier" hauteur={entre(58, 70)} onPress={onFichier} />
         </View>
-      ))}
-      <Bouton s={s} principal libelle="Scanner le plan" onPress={onScanner} />
-      <Bouton s={s} libelle="Importer une photo" onPress={onPhoto} />
-      <Bouton s={s} libelle="Ouvrir un fichier" onPress={onFichier} />
-      <Text style={s.mention}>PDF ou image, depuis Fichiers, iCloud Drive ou une pièce jointe enregistrée.</Text>
-      <Text style={s.mention}>
-        {pro
-          ? 'Compris dans votre abonnement Pro.'
-          : 'Une lecture offerte pour essayer, puis réservée au Pro.'}{' '}
-        Le plan est lu par une IA (Claude, d’Anthropic) : nous ne le gardons pas.
+      </View>
+      <Text style={s.pied} numberOfLines={2}>
+        {pro ? 'Compris dans votre abonnement Pro.' : 'Une lecture offerte pour essayer, puis réservée au Pro.'} Lu par une IA
+        (Claude, d’Anthropic) : rien n’est gardé.
       </Text>
     </>
   );
 }
 
-/** Une feuille de plan, ses coins de cadrage : ce que le scanner cherche. */
-function FeuilleDessinee({ c }: { c: Palette }) {
-  const coin = (x: number, y: number, sx: number, sy: number) => `M${x} ${y + sy * 14} V${y} H${x + sx * 14}`;
+/** Une porte secondaire : l'icône dans sa pastille, deux mots. */
+function Tuile({
+  s,
+  c,
+  icone,
+  titre,
+  sous,
+  libelle,
+  hauteur,
+  onPress,
+}: {
+  s: ReturnType<typeof themed>;
+  c: Palette;
+  icone: keyof typeof SOLAIRES;
+  titre: string;
+  sous: string;
+  libelle: string;
+  hauteur: number;
+  onPress: () => void;
+}) {
   return (
-    <Svg width={150} height={118} viewBox="0 0 150 118">
-      <Rect x={22} y={14} width={106} height={90} rx={6} fill={c.surface} stroke={c.line} strokeWidth={1.5} />
-      <Path d="M38 32 H112 V88 H38 Z M38 60 H76 M76 32 V88 M92 60 V88" stroke={c.ink} strokeWidth={3} fill="none" strokeLinejoin="round" />
-      <Line x1={38} y1={24} x2={112} y2={24} stroke={c.inkFaint} strokeWidth={1} />
-      <Path d={[coin(12, 6, 1, 1), coin(138, 6, -1, 1), coin(12, 112, 1, -1), coin(138, 112, -1, -1)].join(' ')} stroke={c.blue} strokeWidth={3} fill="none" strokeLinecap="round" />
-    </Svg>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={libelle}
+      style={({ pressed }) => [s.tuile, { height: hauteur }, pressed && s.enfonce]}
+      onPress={onPress}>
+      <View style={s.tuileIcone}>
+        <Icone nom={icone} taille={22} teinte={c.blue} />
+      </View>
+      <View style={s.flexe}>
+        <Text style={s.tuileTitre} numberOfLines={1}>
+          {titre}
+        </Text>
+        <Text style={s.tuileSous} numberOfLines={1}>
+          {sous}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+/**
+ * LA FEUILLE QUI DEVIENT UN PLAN — la photo de gauche, ses coins de cadrage
+ * et la ligne qui la balaie ; la flèche qui pousse ; le plan de droite, ses
+ * pièces teintées et ses appareils. Dessinée à la taille du cadre.
+ */
+function DuPapierAuPlan({ c, largeur, hauteur }: { c: Palette; largeur: number; hauteur: number }) {
+  const k = Math.min(largeur / 320, hauteur / 170);
+  const balai = useRef(new Animated.Value(0)).current;
+  const pousse = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const boucle = Animated.loop(
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(balai, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+          Animated.timing(balai, { toValue: 0, duration: 1500, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        ]),
+        Animated.sequence([
+          Animated.timing(pousse, { toValue: 1, duration: 750, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(pousse, { toValue: 0, duration: 750, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+          Animated.timing(pousse, { toValue: 1, duration: 750, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(pousse, { toValue: 0, duration: 750, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+        ]),
+      ]),
+    );
+    boucle.start();
+    return () => boucle.stop();
+  }, [balai, pousse]);
+  const coin = (x: number, y: number, sx: number, sy: number) => `M${x} ${y + sy * 20} V${y} H${x + sx * 20}`;
+  return (
+    <View style={[fixe.rangee, { width: 320 * k, height: 170 * k }]}>
+      {/* La feuille, un peu de biais, comme posée sur la table. */}
+      <View style={{ width: 160 * k, height: 170 * k, transform: [{ rotate: '-6deg' }] }}>
+        <Svg width={160 * k} height={170 * k} viewBox="0 0 160 170">
+          <Rect x={18} y={22} width={124} height={128} rx={8} fill={c.surface} stroke={c.lineStrong} strokeWidth={1.5} />
+          <Path d="M36 44 H124 V132 H36 Z M36 88 H82 M82 44 V132 M100 88 V132" stroke={c.ink} strokeOpacity={0.78} strokeWidth={3} fill="none" strokeLinejoin="round" />
+          <Path d="M36 36 H124" stroke={c.inkFaint} strokeWidth={1} />
+          <Path
+            d={[coin(8, 12, 1, 1), coin(152, 12, -1, 1), coin(8, 160, 1, -1), coin(152, 160, -1, -1)].join(' ')}
+            stroke={c.blue}
+            strokeWidth={4}
+            fill="none"
+            strokeLinecap="round"
+          />
+        </Svg>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            fixe.balai,
+            {
+              left: 18 * k,
+              width: 124 * k,
+              top: 22 * k,
+              backgroundColor: c.blue,
+              transform: [{ translateY: balai.interpolate({ inputRange: [0, 1], outputRange: [0, 125 * k] }) }],
+            },
+          ]}
+        />
+      </View>
+      <Animated.View style={{ transform: [{ translateX: pousse.interpolate({ inputRange: [0, 1], outputRange: [-3 * k, 4 * k] }) }] }}>
+        <Svg width={40 * k} height={24 * k} viewBox="0 0 40 24">
+          <Path d="M6 12 H32 M24 4 L34 12 L24 20" stroke={c.blue} strokeWidth={4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      </Animated.View>
+      {/* Le plan dessiné : ses pièces teintées, ses appareils. */}
+      <Svg width={120 * k} height={130 * k} viewBox="0 0 120 130">
+        <Rect x={4} y={4} width={112} height={122} rx={14} fill={c.surface} />
+        <Rect x={18} y={20} width={40} height={44} fill={`${c.blue}1A`} />
+        <Rect x={58} y={20} width={44} height={90} fill={`${c.green}1A`} />
+        <Rect x={18} y={64} width={40} height={46} fill={`${c.amber}22`} />
+        <Path d="M18 20 H102 V110 H18 Z M18 64 H58 M58 20 V110" stroke={c.ink} strokeWidth={4} fill="none" strokeLinejoin="round" />
+        <Path d="M68 110 h14" stroke={c.surface} strokeWidth={5} />
+        <Path d="M34 20 h12" stroke={c.sky} strokeWidth={5} />
+        <Circle cx={38} cy={42} r={3.5} fill={ENCRE_ELEC} />
+        <Circle cx={80} cy={65} r={3.5} fill={ENCRE_ELEC} />
+        <Circle cx={38} cy={87} r={3.5} fill={ENCRE_ELEC} />
+      </Svg>
+    </View>
   );
 }
 
@@ -398,35 +594,102 @@ function Apercu({
   onLire: () => void;
   onAutre: () => void;
 }) {
-  const { width } = useWindowDimensions();
-  const larg = Math.min(width - 44, 420);
-  const haut = Math.min(larg * (page.hauteur / Math.max(1, page.largeur)), 420);
   const n = page.page ?? 1;
   const total = page.pages ?? 1;
   return (
-    <View testID="apercu-du-fichier">
-      <View style={[s.page, { width: larg, height: haut }]}>
-        <Image source={{ uri: `data:image/jpeg;base64,${page.base64}` }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+    <View testID="apercu-du-fichier" style={s.phase}>
+      <PageVue s={s} c={c} page={page}>
         {charge && (
           <View style={[StyleSheet.absoluteFill, s.voile]}>
             <ActivityIndicator color={c.blue} />
           </View>
         )}
-      </View>
+      </PageVue>
       {total > 1 && (
-        <>
-          <Text style={s.bilan}>
-            Page {n} sur {total}
-          </Text>
-          <Text style={s.mention}>Retenue : celle qui porte le plus de cotes. Changez-en si ce n’est pas le plan.</Text>
-          <View style={s.rangee}>
-            {n > 1 && <Bouton s={s} libelle="Page précédente" onPress={() => onPage(n - 1)} />}
-            {n < total && <Bouton s={s} libelle="Page suivante" onPress={() => onPage(n + 1)} />}
+        <View style={s.pages}>
+          <Fleche s={s} c={c} sens={-1} libelle="Page précédente" visible={n > 1} onPress={() => onPage(n - 1)} />
+          <View style={s.pagesMilieu}>
+            <Text style={s.pagesNumero}>
+              Page {n} sur {total}
+            </Text>
+            <Text style={s.pagesNote} numberOfLines={2}>
+              Retenue : celle qui porte le plus de cotes.
+            </Text>
           </View>
-        </>
+          <Fleche s={s} c={c} sens={1} libelle="Page suivante" visible={n < total} onPress={() => onPage(n + 1)} />
+        </View>
       )}
-      <Bouton s={s} principal libelle={total > 1 ? 'Lire cette page' : 'Lire ce plan'} onPress={onLire} />
-      <Bouton s={s} libelle="Choisir un autre plan" onPress={onAutre} />
+      <View style={s.boutons}>
+        <Bouton s={s} principal icone="oeil" libelle={total > 1 ? 'Lire cette page' : 'Lire ce plan'} onPress={onLire} />
+        <Bouton s={s} libelle="Choisir un autre plan" onPress={onAutre} />
+      </View>
+    </View>
+  );
+}
+
+/** Un rond fléché : la page d'avant, celle d'après. Absent au bout. */
+function Fleche({
+  s,
+  c,
+  sens,
+  libelle,
+  visible,
+  onPress,
+}: {
+  s: ReturnType<typeof themed>;
+  c: Palette;
+  sens: 1 | -1;
+  libelle: string;
+  visible: boolean;
+  onPress: () => void;
+}) {
+  if (!visible) return <View style={s.flecheVide} />;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={libelle}
+      hitSlop={8}
+      style={({ pressed }) => [s.fleche, pressed && s.enfonce]}
+      onPress={onPress}>
+      <Svg width={20} height={20} viewBox="0 0 24 24">
+        <Path
+          d={sens > 0 ? 'M9 5l7 7-7 7' : 'M15 5l-7 7 7 7'}
+          stroke={c.blue}
+          strokeWidth={2.4}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </Svg>
+    </Pressable>
+  );
+}
+
+/** La page prise, dans la place qui reste : l'image entière, jamais rognée. */
+function PageVue({
+  s,
+  c,
+  page,
+  children,
+}: {
+  s: ReturnType<typeof themed>;
+  c: Palette;
+  page: PageDePlan;
+  /** Ce qui se pose sur la page : un dessin, ou une fonction de sa taille. */
+  children?: React.ReactNode | ((cadre: { w: number; h: number }) => React.ReactNode);
+}) {
+  const [cadre, surCadre] = useCadre();
+  const ratio = page.hauteur / Math.max(1, page.largeur);
+  const w = Math.min(cadre.w, cadre.h / Math.max(ratio, 1e-3));
+  const h = w * ratio;
+  return (
+    <View style={s.pageCadre} onLayout={surCadre}>
+      {cadre.w > 0 && (
+        <View style={[s.page, { width: w, height: h, backgroundColor: c.surface }]}>
+          <Image source={{ uri: `data:image/jpeg;base64,${page.base64}` }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+          {typeof children === 'function' ? children({ w, h }) : children}
+        </View>
+      )}
     </View>
   );
 }
@@ -434,9 +697,6 @@ function Apercu({
 // ------------------------------------------------------------------ 2. la lecture
 
 function Lecture({ s, c, page, etape }: { s: ReturnType<typeof themed>; c: Palette; page: PageDePlan; etape: number }) {
-  const { width } = useWindowDimensions();
-  const larg = Math.min(width - 44, 420);
-  const haut = Math.min(larg * (page.hauteur / Math.max(1, page.largeur)), 360);
   const balai = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const boucle = Animated.loop(
@@ -456,34 +716,40 @@ function Lecture({ s, c, page, etape }: { s: ReturnType<typeof themed>; c: Palet
     return () => clearInterval(t);
   }, []);
   return (
-    <View testID="lecture-en-cours">
-      <View style={[s.page, { width: larg, height: haut }]}>
-        <Image source={{ uri: `data:image/jpeg;base64,${page.base64}` }} style={StyleSheet.absoluteFill} resizeMode="contain" />
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            s.balai,
-            { transform: [{ translateY: balai.interpolate({ inputRange: [0, 1], outputRange: [0, haut - 3] }) }] },
-          ]}
-        />
+    <View testID="lecture-en-cours" style={s.phase}>
+      <PageVue s={s} c={c} page={page}>
+        {({ h }: { w: number; h: number }) => (
+          <Animated.View
+            pointerEvents="none"
+            style={[s.balai, { transform: [{ translateY: balai.interpolate({ inputRange: [0, 1], outputRange: [0, Math.max(0, h - 3)] }) }] }]}
+          />
+        )}
+      </PageVue>
+      <View style={s.etapes}>
+        {ETAPES.map((e, i) => {
+          const faite = i < etape;
+          const active = i === etape;
+          return (
+            <View key={e} style={s.etape}>
+              <View style={[s.etapeRond, faite && { backgroundColor: c.green }, active && { backgroundColor: c.blueSoft }]}>
+                {faite ? (
+                  <Svg width={14} height={14} viewBox="0 0 24 24">
+                    <Path d="M5 12.5l4.5 4.5L19 7.5" stroke="#FFFFFF" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                  </Svg>
+                ) : active ? (
+                  <ActivityIndicator size="small" color={c.blue} />
+                ) : (
+                  <View style={s.etapePoint} />
+                )}
+              </View>
+              <Text style={[s.etapeTexte, !faite && !active && { color: c.inkFaint }]} numberOfLines={1}>
+                {e}
+              </Text>
+            </View>
+          );
+        })}
       </View>
-      {ETAPES.map((e, i) => {
-        const faite = i < etape;
-        const active = i === etape;
-        return (
-          <View key={e} style={s.etape}>
-            {faite ? (
-              <Text style={[s.etapeMarque, { color: c.green }]}>✓</Text>
-            ) : active ? (
-              <ActivityIndicator size="small" color={c.blue} />
-            ) : (
-              <Text style={[s.etapeMarque, { color: c.inkFaint }]}>•</Text>
-            )}
-            <Text style={[s.etapeTexte, !faite && !active && { color: c.inkFaint }]}>{e}</Text>
-          </View>
-        );
-      })}
-      <Text style={s.mention}>
+      <Text style={s.pied}>
         {patience < 20
           ? 'La lecture prend de vingt secondes à une minute selon le plan.'
           : 'Un plan chargé demande un peu plus : la lecture continue.'}
@@ -512,6 +778,7 @@ function Lu({
   onCreer: () => void;
   onReprendre: () => void;
 }) {
+  const entre = useEchelle();
   const r = plan.rapport;
   const teinte = r.confiance === 'bonne' ? c.green : r.confiance === 'moyenne' ? c.amber : c.danger;
   const mot =
@@ -522,11 +789,30 @@ function Lu({
       const cle = x.lu.toLowerCase() === x.vers.toLowerCase() ? x.vers : `${x.lu} → ${x.vers}`;
       vus.set(cle, (vus.get(cle) ?? 0) + 1);
     }
-    return [...vus.entries()].slice(0, 8);
+    return [...vus.entries()];
   }, [r.symboles.convertis]);
+  const [details, setDetails] = useState(false);
+  const [cadre, surCadre] = useCadre();
+  const echelle =
+    r.echelleDepuis === 'cotes'
+      ? `${r.cotes.retenues} cote${r.cotes.retenues > 1 ? 's' : ''} lue${r.cotes.retenues > 1 ? 's' : ''} tiennent le plan`
+      : r.echelleDepuis === 'surfaces'
+        ? 'Échelle prise sur les surfaces écrites'
+        : 'Échelle prise sur la largeur des portes';
+  const alertes = r.murs.aVerifier.length + r.cotes.ecartees.length + r.surfacesDouteuses.length + r.symboles.inconnus.length;
+  const chiffres: [keyof typeof SOLAIRES, number, string][] = [
+    ['rooms', plan.rooms.length, plan.rooms.length > 1 ? 'pièces' : 'pièce'],
+    ['murs', plan.walls.length, 'murs'],
+    ['ouvertures', plan.openings.length, plan.openings.length > 1 ? 'ouvertures' : 'ouverture'],
+    ['prise', r.symboles.poses, r.symboles.poses > 1 ? 'appareils' : 'appareil'],
+  ];
   return (
-    <View testID="lecture-lue">
-      <View style={s.carte}>
+    <View testID="lecture-lue" style={s.phase}>
+      {/* LE PLAN LU, dans toute la place qui reste, et sa confiance par-dessus. */}
+      <View style={s.planCarte}>
+        <View testID="apercu-plan-lu" style={s.flexe} onLayout={surCadre}>
+          {cadre.h > 40 && <ApercuDuPlanLu plan={plan} c={c} largeur={cadre.w} hauteur={cadre.h} />}
+        </View>
         {/*
           LE DIAGNOSTIC, D'UN APPUI LONG — relevé du patron : « il a scanné
           cela, rien à voir ». Pour savoir si la faute est à la lecture de
@@ -536,7 +822,7 @@ function Lu({
         */}
         <Pressable
           testID="confiance-de-lecture"
-          style={s.confiance}
+          style={[s.confiance, { backgroundColor: `${teinte}1F` }]}
           delayLongPress={700}
           onLongPress={() => {
             if (!brut) return;
@@ -546,47 +832,130 @@ function Lu({
           <View style={[s.pastille, { backgroundColor: teinte }]} />
           <Text style={[s.confianceMot, { color: teinte }]}>{mot}</Text>
         </Pressable>
-        <ApercuDuPlanLu plan={plan} c={c} />
-        <Text style={s.bilan}>
-          {plan.rooms.length} pièce{plan.rooms.length > 1 ? 's' : ''} · {plan.walls.length} murs ·{' '}
-          {plan.openings.length} ouverture{plan.openings.length > 1 ? 's' : ''} · {r.symboles.poses} appareil
-          {r.symboles.poses > 1 ? 's' : ''}
-        </Text>
       </View>
-
-      <View style={s.carte}>
-        <Text style={s.carteTitre}>Les mesures</Text>
-        <Text style={s.ligne}>
-          {r.echelleDepuis === 'cotes'
-            ? `${r.cotes.retenues} cote${r.cotes.retenues > 1 ? 's' : ''} lue${r.cotes.retenues > 1 ? 's' : ''} tiennent le plan`
-            : r.echelleDepuis === 'surfaces'
-              ? 'Aucune cote lisible : l’échelle vient des surfaces écrites'
-              : 'Aucune cote lisible : l’échelle vient de la largeur des portes'}
-          {r.cotes.relues > 0 ? ` (dont ${r.cotes.relues} relue${r.cotes.relues > 1 ? 's' : ''} dans leur unité)` : ''}.
-        </Text>
-        {r.cotes.ecartees.length > 0 && (
-          <Text style={[s.ligne, { color: c.amber }]}>
-            Écartée{r.cotes.ecartees.length > 1 ? 's' : ''} : {r.cotes.ecartees.map((e) => `« ${e.texte} »`).join(', ')} — contredite
-            {r.cotes.ecartees.length > 1 ? 's' : ''} par le reste du plan.
-          </Text>
-        )}
-        {r.murs.aVerifier.length > 0 && (
-          <Text style={[s.ligne, { color: c.amber }]}>
-            {r.murs.aVerifier.length} mur{r.murs.aVerifier.length > 1 ? 's' : ''} sans cote qui le
-            {r.murs.aVerifier.length > 1 ? 's' : ''} confirme, en orange : vérifiez-le
-            {r.murs.aVerifier.length > 1 ? 's' : ''} sur la feuille.
-          </Text>
-        )}
-        {r.surfacesDouteuses.map((d) => (
-          <Text key={d.piece} style={[s.ligne, { color: c.amber }]}>
-            {d.piece} : {d.ecrite} m² écrits, {d.calculee} m² dessinés.
-          </Text>
+      <View style={s.chiffres}>
+        {chiffres.map(([icone, v, l]) => (
+          <View key={l} style={[s.chiffre, { height: entre(62, 74) }]} accessibilityLabel={`${v} ${l}`}>
+            <Icone nom={icone} taille={16} teinte={c.blue} />
+            <Text style={s.chiffreValeur}>{v}</Text>
+            <Text style={s.chiffreLibelle} numberOfLines={1}>
+              {l}
+            </Text>
+          </View>
         ))}
       </View>
+      {/* CE QUI TIENT LE PLAN, ce qu'il faut vérifier : des pastilles, et le détail d'un appui. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Le détail de la lecture"
+        style={({ pressed }) => [s.badges, pressed && s.enfonce]}
+        onPress={() => setDetails(true)}>
+        <View style={[s.badge, { backgroundColor: `${c.green}1A` }]}>
+          <Icone nom="cotes2d" taille={16} teinte={c.green} />
+          <Text style={s.badgeTexte} numberOfLines={1}>
+            {echelle}
+          </Text>
+        </View>
+        {alertes > 0 && (
+          <View style={[s.badge, { backgroundColor: `${c.amber}1F` }]}>
+            <Icone nom="murs" taille={16} teinte={c.amber} />
+            <Text style={s.badgeTexte} numberOfLines={1}>
+              {r.murs.aVerifier.length > 0
+                ? `${r.murs.aVerifier.length} mur${r.murs.aVerifier.length > 1 ? 's' : ''} à vérifier, en orange`
+                : `${alertes} point${alertes > 1 ? 's' : ''} à vérifier`}
+            </Text>
+            <Text style={s.badgePlus}>Détail</Text>
+          </View>
+        )}
+        {conversions.length > 0 && (
+          <View style={[s.badge, { backgroundColor: c.surface }]}>
+            <Icone nom="prise" taille={16} teinte={c.blue} />
+            <Text style={s.badgeTexte} numberOfLines={1}>
+              {conversions[0][1] > 1 ? `${conversions[0][1]} × ` : ''}
+              {conversions[0][0]}
+            </Text>
+            {conversions.length > 1 && <Text style={s.badgePlus}>{`+${conversions.length - 1}`}</Text>}
+          </View>
+        )}
+      </Pressable>
+      <View style={s.boutons}>
+        <Bouton s={s} principal icone="valider" libelle="Créer le plan" onPress={onCreer} />
+        <Bouton s={s} lien libelle="Reprendre la photo" onPress={onReprendre} />
+      </View>
+      {essai && (
+        <Text style={s.pied}>C’était votre lecture d’essai : les suivantes sont comprises dans le Pro.</Text>
+      )}
+      <DetailsDeLaLecture
+        visible={details}
+        onFermer={() => setDetails(false)}
+        s={s}
+        c={c}
+        plan={plan}
+        conversions={conversions}
+        echelle={echelle}
+      />
+    </View>
+  );
+}
 
-      {(conversions.length > 0 || r.symboles.inconnus.length > 0) && (
-        <View style={s.carte}>
-          <Text style={s.carteTitre}>Les symboles</Text>
+/**
+ * LE DÉTAIL DE LA LECTURE, d'un appui sur les pastilles : toutes les cotes
+ * écartées, les surfaces qui ne collent pas, chaque symbole converti. La
+ * page n'en montre que l'essentiel ; le compagnon qui veut tout savoir
+ * l'ouvre.
+ */
+function DetailsDeLaLecture({
+  visible,
+  onFermer,
+  s,
+  c,
+  plan,
+  conversions,
+  echelle,
+}: {
+  visible: boolean;
+  onFermer: () => void;
+  s: ReturnType<typeof themed>;
+  c: Palette;
+  plan: PlanLu;
+  conversions: [string, number][];
+  echelle: string;
+}) {
+  const r = plan.rapport;
+  const insets = useSafeAreaInsets();
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onFermer}>
+      <Pressable style={s.voileModal} onPress={onFermer} accessibilityLabel="Fermer le détail" />
+      <View style={[s.feuille, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={s.poignee} />
+        <Text style={s.feuilleTitre}>Le détail de la lecture</Text>
+        <ScrollView style={s.feuilleListe} contentContainerStyle={s.feuilleContenu}>
+          <Text style={s.carteTitre}>Les mesures</Text>
+          <Text style={s.ligne}>
+            {echelle}
+            {r.cotes.relues > 0 ? ` (dont ${r.cotes.relues} relue${r.cotes.relues > 1 ? 's' : ''} dans leur unité)` : ''}.
+          </Text>
+          {r.cotes.ecartees.length > 0 && (
+            <Text style={[s.ligne, { color: c.amber }]}>
+              Écartée{r.cotes.ecartees.length > 1 ? 's' : ''} : {r.cotes.ecartees.map((e) => `« ${e.texte} »`).join(', ')} —
+              contredite{r.cotes.ecartees.length > 1 ? 's' : ''} par le reste du plan.
+            </Text>
+          )}
+          {r.murs.aVerifier.length > 0 && (
+            <Text style={[s.ligne, { color: c.amber }]}>
+              {r.murs.aVerifier.length} mur{r.murs.aVerifier.length > 1 ? 's' : ''} sans cote qui le
+              {r.murs.aVerifier.length > 1 ? 's' : ''} confirme, en orange : vérifiez-le
+              {r.murs.aVerifier.length > 1 ? 's' : ''} sur la feuille.
+            </Text>
+          )}
+          {r.surfacesDouteuses.map((d) => (
+            <Text key={d.piece} style={[s.ligne, { color: c.amber }]}>
+              {d.piece} : {d.ecrite} m² écrits, {d.calculee} m² dessinés.
+            </Text>
+          ))}
+          {(conversions.length > 0 || r.symboles.inconnus.length > 0) && (
+            <Text style={[s.carteTitre, fixe.espace]}>Les symboles</Text>
+          )}
           {conversions.map(([k, n]) => (
             <Text key={k} style={s.ligne}>
               {n > 1 ? `${n} × ` : ''}
@@ -596,38 +965,46 @@ function Lu({
           {r.symboles.inconnus.length > 0 && (
             <Text style={[s.ligne, { color: c.amber }]}>
               Non reconnu{r.symboles.inconnus.length > 1 ? 's' : ''}, non posé{r.symboles.inconnus.length > 1 ? 's' : ''} :{' '}
-              {r.symboles.inconnus.slice(0, 5).join(', ')}.
+              {r.symboles.inconnus.slice(0, 8).join(', ')}.
             </Text>
           )}
-        </View>
-      )}
-
-      <Bouton s={s} principal libelle="Créer le plan" onPress={onCreer} />
-      <Bouton s={s} libelle="Reprendre la photo" onPress={onReprendre} />
-      {essai && (
-        <Text style={s.mention}>C’était votre lecture d’essai : les suivantes sont comprises dans le Pro.</Text>
-      )}
-    </View>
+        </ScrollView>
+        <Bouton s={s} principal libelle="Fermer" onPress={onFermer} />
+      </View>
+    </Modal>
   );
 }
 
-/** Le plan reconstruit, à la largeur de la carte : murs, baies, pièces, appareils. */
-function ApercuDuPlanLu({ plan, c }: { plan: PlanLu; c: Palette }) {
-  const { width } = useWindowDimensions();
-  const L = Math.min(width - 76, 400);
+/** Le plan reconstruit, à la taille de sa carte : murs, baies, pièces, appareils. */
+function ApercuDuPlanLu({ plan, c, largeur, hauteur }: { plan: PlanLu; c: Palette; largeur: number; hauteur: number }) {
   const xs = plan.walls.flatMap((w) => [w.a.x, w.b.x]);
   const zs = plan.walls.flatMap((w) => [w.a.z, w.b.z]);
   const x0 = Math.min(...xs);
   const z0 = Math.min(...zs);
   const larg = Math.max(0.5, Math.max(...xs) - x0);
   const prof = Math.max(0.5, Math.max(...zs) - z0);
-  const k = Math.min((L - 16) / larg, 280 / prof);
-  const H = prof * k + 16;
-  const px = (p: { x: number; z: number }) => ({ x: 8 + (p.x - x0) * k, y: 8 + (p.z - z0) * k });
+  // La place sous la pastille de confiance est laissée libre.
+  const marge = 14;
+  const haut = 40;
+  const k = Math.min((largeur - 2 * marge) / larg, (hauteur - haut - marge) / prof);
+  const ox = (largeur - larg * k) / 2;
+  const oy = haut + (hauteur - haut - marge - prof * k) / 2;
+  const px = (p: { x: number; z: number }) => ({ x: ox + (p.x - x0) * k, y: oy + (p.z - z0) * k });
   const aVerifier = new Set(plan.rapport.murs.aVerifier);
   const parts = useMemo(() => roomParts(plan.walls, plan.rooms), [plan.walls, plan.rooms]);
+  const teintes = [c.blue, c.green, c.amber, c.sky, '#7C5CFF'];
   return (
-    <Svg testID="apercu-plan-lu" width={L} height={H} style={{ alignSelf: 'center', marginVertical: 8 }}>
+    <Svg width={largeur} height={hauteur}>
+      {/* Les pièces, teintées : on voit d'un coup d'œil ce qui a été reconnu. */}
+      {parts.map((p, i) =>
+        p.surface ? (
+          <Path
+            key={`sol-${p.roomId}`}
+            d={`${p.surface.pts.map((q, j) => `${j ? 'L' : 'M'}${px(q).x} ${px(q).y}`).join(' ')} Z`}
+            fill={`${teintes[i % teintes.length]}1A`}
+          />
+        ) : null,
+      )}
       {plan.walls.map((w) => {
         const a = px(w.a);
         const b = px(w.b);
@@ -666,18 +1043,18 @@ function ApercuDuPlanLu({ plan, c }: { plan: PlanLu; c: Palette }) {
         const len = segLength(w) || 1;
         const t = f.along / len;
         const p = px({ x: w.a.x + (w.b.x - w.a.x) * t, z: w.a.z + (w.b.z - w.a.z) * t });
-        return <Rect key={f.id} x={p.x - 2} y={p.y - 2} width={4} height={4} rx={1} fill={ENCRE_ELEC} />;
+        return <Rect key={f.id} x={p.x - 2.5} y={p.y - 2.5} width={5} height={5} rx={1} fill={ENCRE_ELEC} />;
       })}
       {plan.ceiling.map((cl) => {
         const p = px(cl.at);
-        return <Rect key={cl.id} x={p.x - 2.5} y={p.y - 2.5} width={5} height={5} rx={2.5} fill={ENCRE_ELEC} opacity={0.75} />;
+        return <Circle key={cl.id} cx={p.x} cy={p.y} r={3} fill={ENCRE_ELEC} opacity={0.8} />;
       })}
       {parts.map((p) => {
         const nom = plan.rooms.find((r) => r.id === p.roomId)?.name;
         if (!nom || !p.surface) return null;
         const q = px(p.labelAt);
         return (
-          <SvgText key={p.roomId} x={q.x} y={q.y + 4} fontSize={11} fontWeight="600" fill={c.inkSoft} textAnchor="middle">
+          <SvgText key={p.roomId} x={q.x} y={q.y + 4} fontSize={12} fontWeight="700" fill={c.inkSoft} textAnchor="middle">
             {nom}
           </SvgText>
         );
@@ -692,34 +1069,51 @@ function Bouton({
   s,
   libelle,
   principal,
+  lien,
+  icone,
   onPress,
 }: {
   s: ReturnType<typeof themed>;
   libelle: string;
   principal?: boolean;
+  /** Un simple lien, sous le bouton principal. */
+  lien?: boolean;
+  icone?: keyof typeof SOLAIRES;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={libelle}
-      style={({ pressed }) => [principal ? s.boutonPrincipal : s.boutonSecond, pressed && { opacity: 0.75 }]}
+      style={({ pressed }) => [
+        principal ? s.boutonPrincipal : lien ? s.boutonLien : s.boutonSecond,
+        pressed && s.enfonce,
+      ]}
       onPress={onPress}>
+      {principal && icone && <Icone nom={icone} taille={20} teinte="#FFFFFF" />}
       <Text style={principal ? s.boutonPrincipalTexte : s.boutonSecondTexte}>{libelle}</Text>
     </Pressable>
   );
 }
 
+/** Ce qui ne dépend pas du thème. */
+const fixe = StyleSheet.create({
+  rangee: { flexDirection: 'row', alignItems: 'center' },
+  balai: { position: 'absolute', height: 3, opacity: 0.85 },
+  espace: { marginTop: 14 },
+});
+
 const themed = (c: Palette) =>
   StyleSheet.create({
     fond: { flex: 1, backgroundColor: c.bg },
+    flexe: { flex: 1 },
     barre: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 22,
-      marginTop: 8,
-      marginBottom: 10,
+      paddingHorizontal: 18,
+      marginTop: 6,
+      marginBottom: 6,
     },
     rondBarre: {
       width: 40,
@@ -733,81 +1127,219 @@ const themed = (c: Palette) =>
     },
     titreBarre: { color: c.ink, fontSize: 17, fontWeight: '700' },
     videBarre: { width: 40, height: 40 },
-    contenu: { paddingHorizontal: 22 },
-    heros: { alignItems: 'center', marginBottom: 14 },
-    herosTitre: { color: c.ink, fontSize: 21, fontWeight: '800', textAlign: 'center', marginTop: 6 },
-    herosTexte: { color: c.inkSoft, fontSize: 14.5, lineHeight: 20, textAlign: 'center', marginTop: 8 },
-    conseil: {
+    // La page tient l'écran : une colonne, et sur tablette la largeur d'un téléphone.
+    contenu: { flex: 1, paddingHorizontal: 18, gap: 12, width: '100%', maxWidth: 560, alignSelf: 'center' },
+    phase: { flex: 1, gap: 12 },
+    enfonce: { transform: [{ scale: 0.97 }], opacity: 0.92 },
+
+    heros: {
+      flex: 1,
+      minHeight: 150,
+      borderRadius: 28,
+      overflow: 'hidden',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    herosDessin: { alignSelf: 'stretch', flex: 1, alignItems: 'center', justifyContent: 'center' },
+    herosTitre: { color: c.ink, fontWeight: '900', letterSpacing: -0.4, textAlign: 'center', marginTop: 6 },
+    herosTexte: { color: c.inkSoft, fontSize: 13.5, lineHeight: 18, textAlign: 'center', marginTop: 4, maxWidth: 320 },
+    atouts: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4, rowGap: 8 },
+    atoutCase: { width: '50%', paddingHorizontal: 4 },
+    atout: {
+      backgroundColor: c.surface,
+      borderRadius: 16,
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: c.surface,
-      borderRadius: radius.md,
-      padding: 12,
-      marginBottom: 8,
+      gap: 9,
+      paddingHorizontal: 12,
       ...shadowCard,
       shadowOpacity: 0.05,
     },
-    conseilIcone: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+    atoutIcone: {
+      width: 30,
+      height: 30,
+      borderRadius: 10,
       backgroundColor: c.blueSoft,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: 12,
     },
-    conseilTextes: { flex: 1 },
-    conseilTitre: { color: c.ink, fontSize: 14.5, fontWeight: '700' },
-    conseilTexte: { color: c.inkSoft, fontSize: 13, lineHeight: 18, marginTop: 2 },
-    boutonPrincipal: {
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: c.blue,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 14,
-    },
-    boutonPrincipalTexte: { color: '#FFFFFF', fontSize: 16.5, fontWeight: '700' },
-    boutonSecond: {
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: c.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 10,
-      borderWidth: 1,
-      borderColor: c.line,
-    },
-    boutonSecondTexte: { color: c.blue, fontSize: 15.5, fontWeight: '600' },
-    mention: { color: c.inkSoft, fontSize: 12.5, lineHeight: 17, textAlign: 'center', marginTop: 14 },
-    rangee: { flexDirection: 'row', justifyContent: 'center', gap: 10, flexWrap: 'wrap' },
-    voile: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.55)' },
-    page: {
-      alignSelf: 'center',
-      borderRadius: radius.md,
+    atoutTitre: { flex: 1, color: c.ink, fontSize: 13.5, fontWeight: '700' },
+    portes: { gap: 10 },
+    scanner: {
+      borderRadius: 22,
       overflow: 'hidden',
-      backgroundColor: c.surface,
-      marginBottom: 16,
-      ...shadowCard,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+      shadowColor: '#2D6BFF',
+      shadowOpacity: 0.35,
+      shadowRadius: 14,
+      shadowOffset: { width: 0, height: 8 },
     },
-    balai: { position: 'absolute', left: 0, right: 0, top: 0, height: 3, backgroundColor: c.blue, opacity: 0.85 },
-    etape: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7 },
-    etapeMarque: { width: 20, fontSize: 15, fontWeight: '800', textAlign: 'center' },
-    etapeTexte: { color: c.ink, fontSize: 14.5, marginLeft: 10 },
-    carte: {
+    scannerIcone: {
+      width: 42,
+      height: 42,
+      borderRadius: 14,
+      backgroundColor: 'rgba(255,255,255,0.18)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    scannerTitre: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
+    scannerSous: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
+    deux: { flexDirection: 'row', gap: 10 },
+    tuile: {
+      flex: 1,
       backgroundColor: c.surface,
-      borderRadius: radius.md,
-      padding: 16,
-      marginBottom: 10,
+      borderRadius: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 12,
+      ...shadowCard,
+      shadowOpacity: 0.06,
+    },
+    tuileIcone: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      backgroundColor: c.blueSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tuileTitre: { color: c.ink, fontSize: 14, fontWeight: '800' },
+    tuileSous: { color: c.inkSoft, fontSize: 11.5, fontWeight: '600' },
+    pied: { color: c.inkSoft, fontSize: 11.5, lineHeight: 15.5, textAlign: 'center' },
+
+    pageCadre: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    page: { borderRadius: radius.md, overflow: 'hidden', ...shadowCard },
+    voile: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.55)' },
+    pages: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    pagesMilieu: { flex: 1, alignItems: 'center' },
+    pagesNumero: { color: c.ink, fontSize: 16, fontWeight: '800' },
+    pagesNote: { color: c.inkSoft, fontSize: 12, textAlign: 'center', marginTop: 2 },
+    fleche: {
+      width: 46,
+      height: 46,
+      borderRadius: 23,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...shadowCard,
+      shadowOpacity: 0.07,
+    },
+    flecheVide: { width: 46, height: 46 },
+    balai: { position: 'absolute', left: 0, right: 0, top: 0, height: 3, backgroundColor: c.blue, opacity: 0.85 },
+    etapes: { backgroundColor: c.surface, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 12, gap: 2, ...shadowCard, shadowOpacity: 0.05 },
+    etape: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 34 },
+    etapeRond: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: c.surfaceSunken,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    etapePoint: { width: 6, height: 6, borderRadius: 3, backgroundColor: c.inkFaint },
+    etapeTexte: { flex: 1, color: c.ink, fontSize: 14, fontWeight: '600' },
+
+    planCarte: {
+      flex: 1,
+      minHeight: 140,
+      backgroundColor: c.surface,
+      borderRadius: 26,
+      overflow: 'hidden',
+      ...shadowCard,
+      shadowOpacity: 0.06,
+    },
+    confiance: {
+      position: 'absolute',
+      left: 12,
+      top: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      paddingHorizontal: 11,
+      paddingVertical: 6,
+      borderRadius: 999,
+    },
+    pastille: { width: 8, height: 8, borderRadius: 4 },
+    confianceMot: { fontSize: 13.5, fontWeight: '800' },
+    chiffres: { flexDirection: 'row', gap: 8 },
+    chiffre: {
+      flex: 1,
+      backgroundColor: c.surface,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 1,
       ...shadowCard,
       shadowOpacity: 0.05,
     },
-    carteTitre: { color: c.ink, fontSize: 15, fontWeight: '700', marginBottom: 6 },
-    confiance: { flexDirection: 'row', alignItems: 'center' },
-    pastille: { width: 10, height: 10, borderRadius: 5, marginRight: 8 },
-    confianceMot: { fontSize: 15, fontWeight: '700' },
-    bilan: { color: c.inkSoft, fontSize: 13.5, textAlign: 'center' },
+    chiffreValeur: { color: c.ink, fontSize: 19, fontWeight: '800', fontVariant: ['tabular-nums'] },
+    chiffreLibelle: { color: c.inkSoft, fontSize: 11, fontWeight: '600' },
+    badges: { gap: 6 },
+    badge: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 9 },
+    badgeTexte: { flex: 1, color: c.ink, fontSize: 13, fontWeight: '600' },
+    badgePlus: {
+      color: c.blue,
+      backgroundColor: c.blueSoft,
+      borderRadius: 999,
+      overflow: 'hidden',
+      paddingHorizontal: 8,
+      paddingVertical: 1,
+      fontSize: 12,
+      fontWeight: '800',
+    },
+    boutons: { gap: 4 },
+    boutonPrincipal: {
+      height: 54,
+      borderRadius: 18,
+      backgroundColor: c.blue,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      shadowColor: c.blue,
+      shadowOpacity: 0.3,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+    },
+    boutonPrincipalTexte: { color: '#FFFFFF', fontSize: 16.5, fontWeight: '800' },
+    boutonSecond: {
+      height: 48,
+      borderRadius: 16,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: c.line,
+      marginTop: 6,
+    },
+    boutonLien: { height: 40, alignItems: 'center', justifyContent: 'center' },
+    boutonSecondTexte: { color: c.blue, fontSize: 15, fontWeight: '700' },
+
+    echec: { flex: 1, justifyContent: 'space-between', gap: 12 },
+    echecCarte: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+    echecRond: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    echecTitre: { color: c.ink, fontSize: 22, fontWeight: '900', textAlign: 'center' },
+    echecTexte: { color: c.inkSoft, fontSize: 14.5, lineHeight: 20.5, marginTop: 8, textAlign: 'center' },
+
+    voileModal: { flex: 1, backgroundColor: 'rgba(8,10,14,0.45)' },
+    feuille: {
+      maxHeight: '80%',
+      backgroundColor: c.surface,
+      borderTopLeftRadius: 26,
+      borderTopRightRadius: 26,
+      paddingHorizontal: 18,
+      paddingTop: 10,
+    },
+    poignee: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: c.lineStrong, marginBottom: 10 },
+    feuilleTitre: { color: c.ink, fontSize: 18, fontWeight: '800', marginBottom: 6 },
+    feuilleListe: { flexGrow: 0 },
+    feuilleContenu: { paddingBottom: 12 },
+    carteTitre: { color: c.ink, fontSize: 15, fontWeight: '700', marginBottom: 4 },
     ligne: { color: c.inkSoft, fontSize: 13.5, lineHeight: 19, marginTop: 4 },
-    echecTitre: { color: c.ink, fontSize: 17, fontWeight: '700' },
-    echecTexte: { color: c.inkSoft, fontSize: 14, lineHeight: 20, marginTop: 6 },
   });

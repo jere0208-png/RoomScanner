@@ -14285,6 +14285,46 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le bilan du relevé et la lecture d'un plan, sans défiler
+
+Relevé du patron : « propose une refonte de la page de la note du scan,
+plus moderne et dynamique. Pas de scroll à faire, tout sur la même page
+d'écran, de manière responsive. Pareil pour la lecture d'un plan, sans
+scroll. Privilégie le visuel au texte, avec des boutons qui donnent
+envie. »
+
+**Le bilan du relevé** (`BilanDuReleve`). La carte empilait l'anneau, les
+étoiles, six chiffres, cinq barres, le conseil et trois boutons : plus
+haut qu'un téléphone, il fallait la faire défiler. C'est maintenant une
+page entière, découpée en blocs qui se partagent la hauteur de l'écran :
+- le héros, en dégradé : l'anneau du score, la mention, les étoiles ;
+- six tuiles, chacune avec son icône et son nombre qui monte ;
+- cinq jauges rondes pour les critères. La plus faible est en ambre, et le
+  conseil s'affiche dans une bulle qui la désigne ;
+- deux portes illustrées (la 3D, la réalité augmentée), puis le bouton qui
+  ramène au plan, et une croix pour fermer.
+
+**Lire un plan papier** (`LecturePlanScreen`). Chaque étape tient dans
+l'écran, sans défilement.
+- L'invitation. Une illustration animée montre la feuille balayée qui
+  devient un plan. Les quatre conseils tiennent en deux mots (le détail
+  reste à la lecture d'écran). Le bouton « Scanner le plan » est en
+  dégradé, et la photo et le fichier ont chacun leur tuile.
+- Pendant la lecture, la page photographiée prend la place qui reste, et
+  les étapes s'allument une à une.
+- Le plan lu se dessine en grand, ses pièces teintées, sa confiance
+  par-dessus. Ses chiffres sont en tuiles, et des pastilles disent ce qui
+  le tient et ce qu'il faut vérifier. Le détail complet (cotes écartées,
+  surfaces, chaque symbole) s'ouvre d'un appui dans une feuille.
+- Un échec se dit avec une icône, un titre et la seule porte utile.
+
+Ce qui a de la place à prendre (l'illustration, la page, le plan lu)
+prend la hauteur qui reste. Le reste se cale sur la hauteur utile, de
+l'iPhone SE à un grand écran. Sur tablette, la page garde la largeur d'un
+téléphone, au milieu.
+
+Bancs : `moderne`, `lectureplanecran`.
+
 ## Le ventilateur, le ruban LED, le choix sous le doigt
 
 **Le ventilateur** (relevé du patron : « il y a 3 hélices et l'icône est

@@ -39,7 +39,7 @@ jest.mock('../src/net/lecturePlan', () => ({
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import React from 'react';
-import { Text } from 'react-native';
+import { Modal, ScrollView, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { LecturePlanScreen } from '../src/screens/LecturePlanScreen';
 import { HomeScreen } from '../src/screens/HomeScreen';
@@ -156,6 +156,16 @@ describe('la page', () => {
     act(() => t.unmount());
   });
 
+  it('la page ne défile plus : tout tient dans l’écran, le visuel avant le texte', async () => {
+    // Relevé du patron : « fais une refonte de la page (…) sans scroll. »
+    const t = await monter();
+    expect(t.root.findAllByType(ScrollView)).toHaveLength(0);
+    // Les quatre conseils se disent en deux mots, le détail reste à la lecture d'écran.
+    expect(t.root.findAll((n) => n.props?.accessibilityLabel === 'Bien éclairé : Sans reflet ni ombre portée : près d’une fenêtre, flash éteint.').length).toBeGreaterThan(0);
+    expect(textes(t)).not.toMatch(/Sans reflet ni ombre portée/);
+    act(() => t.unmount());
+  });
+
   it('renoncer au scanner ramène à l’invitation, sans rien envoyer', async () => {
     mockScanner.mockResolvedValue(null);
     const t = await monter();
@@ -183,10 +193,23 @@ describe('la page', () => {
     expect(t.root.findAll((n) => n.props?.testID === 'apercu-plan-lu').length).toBeGreaterThan(0);
     const vu = textes(t);
     expect(vu).toContain('Lecture sûre');
-    expect(vu).toMatch(/2 pièces/);
+    // Les chiffres du plan lu sont des tuiles : « 2 », et « pièces » dessous.
+    expect(t.root.findAll((n) => n.props?.accessibilityLabel === '2 pièces').length).toBeGreaterThan(0);
     expect(vu).toMatch(/cotes lues tiennent le plan/);
     expect(vu).toContain('socket → Prise 16 A');
     expect(vu).toMatch(/C’était votre lecture d’essai/);
+
+    // Le plan lu tient l'écran : le détail des mesures et des symboles n'a
+    // sa liste qui défile que dans sa feuille, ouverte d'un appui.
+    const horsDesFeuilles = t.root
+      .findAllByType(ScrollView)
+      .filter((sv) => {
+        let n: typeof sv | null = sv.parent;
+        while (n && n.type !== Modal) n = n.parent;
+        return !n;
+      });
+    expect(horsDesFeuilles).toHaveLength(0);
+    expect(bouton(t, 'Le détail de la lecture')).toBeDefined();
 
     // Rien n'est créé tant qu'on n'a pas dit oui.
     expect(useScanStore.getState().walls).toHaveLength(0);

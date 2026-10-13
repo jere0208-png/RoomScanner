@@ -16,7 +16,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { NativeModules } from 'react-native';
+import { NativeModules, ScrollView } from 'react-native';
 import renderer, { act, type ReactTestInstance } from 'react-test-renderer';
 import { bilanDuReleve, type BilanDuReleve } from '../src/geometry/bilan';
 import { BilanDuReleveCarte } from '../src/components/BilanDuReleve';
@@ -202,6 +202,27 @@ describe('la carte du bilan', () => {
     act(() => bouton(t, 'Continuer sur le plan').props.onPress());
     expect(onVoir3D).toHaveBeenCalledTimes(1);
     expect(onRA).toHaveBeenCalledTimes(1);
+    expect(onFermer).toHaveBeenCalledTimes(1);
+    act(() => t.unmount());
+    jest.useRealTimers();
+  });
+
+  it('tient sur un écran, sans défiler : cinq jauges, le conseil qui désigne la plus faible, une croix', () => {
+    // Relevé du patron : « une refonte de la page de la note du scan (…) pas
+    // de scroll à faire, tout sur la même page d'écran, de manière responsive. »
+    jest.useFakeTimers();
+    const onFermer = jest.fn();
+    let t!: renderer.ReactTestRenderer;
+    act(() => {
+      t = renderer.create(
+        <BilanDuReleveCarte bilan={BILAN} onFermer={onFermer} onVoir3D={() => {}} onRealiteAugmentee={() => {}} />,
+      );
+    });
+    expect(t.root.findAllByType(ScrollView)).toHaveLength(0);
+    for (const k of BILAN.criteres) {
+      expect(t.root.findAll((n) => n.props.accessibilityLabel === `${k.libelle} : ${k.points} sur ${k.sur}`).length).toBeGreaterThan(0);
+    }
+    act(() => bouton(t, 'Fermer le bilan').props.onPress());
     expect(onFermer).toHaveBeenCalledTimes(1);
     act(() => t.unmount());
     jest.useRealTimers();
