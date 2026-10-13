@@ -168,6 +168,7 @@ import {
 } from '../geometry/nfc15100';
 import { TableauFiniSheet } from '../components/TableauFiniSheet';
 import { useTableauDeReference } from '../store/tableauDeReference';
+import { circuitsDuLogement } from '../geometry/tableauFini';
 import { buildMaterialPdf, materialFilename, toBase64 } from '../export/pdf';
 import { buildMetreCsv, metreFilename, type RoomMetre } from '../export/csv';
 import { buildDxf, dxfFilename } from '../export/dxf';
@@ -2438,6 +2439,16 @@ export function ResultScreen() {
     « C3 » devant un modèle qui dit « C2 » est pire que pas de repère.
   */
   const circuitsDuPlan = useMemo(() => {
+    /*
+      SUR UNE MAISON À ÉTAGES, LES REPÈRES DE LA MAISON — revue « Mehdi » :
+      à l'étage, « C1 » désignait les prises sur le plan et la plaque au
+      tableau. Le tableau numérote les départs de toute la maison
+      (`circuitsDuLogement`) ; le plan lit les mêmes.
+    */
+    if (niveaux.length > 1) {
+      const tout = useScanStore.getState();
+      return circuitsDuLogement(tout.walls, tout.rooms, tout.fixtures, tout.ceiling);
+    }
     const pieceDe = (f: Fixture) =>
       fige.rooms.find((r) => r.id === fige.placement.get(f.id));
     return planCircuits(
@@ -2447,7 +2458,9 @@ export function ResultScreen() {
       (f) => pieceDe(f)?.id,
       fige.ceiling,
     );
-  }, [fige.fixtures, fige.rooms, fige.placement, fige.ceiling]);
+    // Le niveau figé sert de signal ; une maison à étages relit tout le magasin.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fige.fixtures, fige.rooms, fige.placement, fige.ceiling, niveaux.length]);
   const marks = useMemo(() => fixtureMarks(circuitsDuPlan), [circuitsDuPlan]);
   /*
     D'UNE FENÊTRE À L'AUTRE — iOS refuse d'en présenter une pendant qu'une

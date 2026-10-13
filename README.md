@@ -14285,6 +14285,25 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Un plafond mal vu se dit à vérifier, les repères d'une maison à étages
+
+**L'habitable sous un plafond mal vu au LiDAR** (Sébastien) :
+- Sous un rampant vu à moins de 80 %, la part debout, comptée sur les seuls
+  carreaux vus, sortait trop haute. Les bas de pente sont les moins vus :
+  +14,9 % avec des sous-pentes vues à 40 %. Le chiffre est maintenant dit
+  « à vérifier », avec la part de plafond vue.
+- Plafond trop peu vu pour établir un rampant, mais avec des hauteurs sous
+  1,80 m : tout le sol comptait sans un mot (+38,6 % vu à 25 %, alors que
+  la fiche connaissait 1,13 m). La pièce est maintenant à vérifier, au PDF
+  comme à l'écran.
+
+**Les repères des circuits d'une maison à étages** (Mehdi). À l'étage,
+« C1 » désignait les prises sur le plan et la plaque au tableau. Le plan
+lit maintenant les départs de toute la maison (`circuitsDuLogement`),
+comme le tableau.
+
+Banc : `tournee4lidar`.
+
 ## L'image emporte ses surfaces, le contacteur de l'interrupteur général, la ligne de spots d'un bloc
 
 **L'image partagée emporte la liste des surfaces** (Hugo). Sur un iPhone

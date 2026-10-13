@@ -23,6 +23,9 @@ import { pointInPolygon } from './appearance';
 import type { PlafondDeLaPiece } from './fichePiece';
 import { HAUTEUR_HABITABLE } from './fichePiece';
 
+/** Sous cette part de plafond vu, la part debout d'un rampant est à vérifier. */
+const COUVERTURE_SURE = 0.8;
+
 /** Ce qui ne compte pas, d'après le nom qu'on a donné à la pièce. */
 const HORS_LOGEMENT =
   /garage|cave|cellier|local|chaufferie|buanderie ext|balcon|terrasse|loggia|v[ée]randa|jardin d.hiver|remise|sous-sol|combles?|grenier|abri|atelier ext/i;
@@ -107,6 +110,31 @@ export function surfacesHabitables(
         plafond.solAuReleve !== undefined ? Math.max(0, plafond.solAuReleve - plafond.surfaceHabitable) : null;
       habitable = basse !== null ? Math.max(0, sol - basse) : Math.min(sol, plafond.surfaceHabitable);
       raison = 'la part sous 1,80 m ne compte pas';
+      /*
+        UN PLAFOND À MOITIÉ VU SOUS-ESTIME LA PART BASSE — revue « Sébastien » :
+        les bas de pente sont les moins vus par le LiDAR, et la part debout,
+        comptée sur les seuls carreaux vus, sortait trop haute (+14,9 % avec
+        des sous-pentes vues à 40 %). Sous 80 % de plafond vu, le chiffre est
+        dit à vérifier.
+      */
+      if (plafond.couverture < COUVERTURE_SURE) {
+        aVerifier = true;
+        raison = `la part sous 1,80 m ne compte pas — plafond vu à ${Math.round(plafond.couverture * 100)} %, à vérifier`;
+      }
+    } else if (
+      plafond &&
+      plafond.surfaceHabitable === null &&
+      plafond.hMin < HAUTEUR_HABITABLE &&
+      plafond.hMax >= HAUTEUR_HABITABLE
+    ) {
+      /*
+        TROP PEU DE PLAFOND VU POUR TRANCHER, MAIS DES HAUTEURS SOUS 1,80 M —
+        revue « Sébastien » : vu à 25 %, le rampant n'était pas établi et
+        tout le sol comptait (+38,6 %), alors que la fiche connaissait une
+        hauteur de 1,13 m. La surface reste celle du sol, dite à vérifier.
+      */
+      aVerifier = true;
+      raison = 'plafond trop peu vu, des hauteurs sous 1,80 m : la part basse reste à mesurer';
     } else if ((plafond?.hMax ?? hauteurDeLaPiece(part)) < HAUTEUR_HABITABLE) {
       habitable = 0;
       raison = 'moins de 1,80 m sous plafond';
