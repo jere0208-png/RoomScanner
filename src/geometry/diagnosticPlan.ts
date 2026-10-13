@@ -287,6 +287,30 @@ export function diagnostiquerPlan(plan: PlanADiagnostiquer): DiagnosticDuPlan {
     });
   }
 
+  /*
+    DES MURS QUI NE BORDENT AUCUNE PIÈCE — revues « Gérard », « Hélène » et
+    « Bérénice » : quand un coin du scan ne se refermait pas, une pièce
+    entière disparaissait (le séjour de 74 m², la cuisine, le garage) et le
+    diagnostic se taisait — « 0 pièce ouverte ». Ses murs, eux, restent :
+    des murs pleins, de hauteur de pièce, que plus aucune pièce ne réclame.
+    Un garde-corps ou un muret (moins de 1,30 m) n'en est pas un.
+  */
+  const reclames = new Set(parts.flatMap((p) => p.walls.map((w) => w.id)));
+  const orphelins = murs.filter((w) => !reclames.has(w.id) && segLength(w) >= 1 && w.height >= 1.3);
+  if (orphelins.length > 0) {
+    const longueur = orphelins.reduce((s, w) => s + segLength(w), 0);
+    problemes.push({
+      gravite: longueur >= 3 ? 'alerte' : 'info',
+      code: 'murOrphelin',
+      titre:
+        orphelins.length === 1
+          ? 'Un mur ne borde aucune pièce'
+          : `${orphelins.length} murs ne bordent aucune pièce`,
+      detail: `${longueur.toFixed(1).replace('.', ',')} m de murs que plus aucune pièce ne réclame : une pièce n’a sans doute pas été trouvée. « Redétecter les pièces », ou fermez le coin resté ouvert.`,
+      murIds: orphelins.map((w) => w.id),
+    });
+  }
+
   // Une pièce sans aucun mur.
   for (const p of pieces) {
     if (p.murs === 0) {

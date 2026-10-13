@@ -14285,6 +14285,61 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Tournée n°5 : le scan ne perd plus de pièces
+
+Huit logements ont été fabriqués comme RoomPlan les rend, avec ses défauts :
+une chambre de bonne, un studio, un T3 des années 70, un haussmannien, un
+loft de biais, une maison sur deux niveaux, un T4 scanné en cinq passages et
+une villa en U. Sur quatre d'entre eux, une pièce entière disparaissait sans
+un mot : le séjour, la loggia, la cuisine, le garage.
+
+**La fusion des murs vus deux fois garde son étendue** (Thomas, Bérénice).
+- La fin du mur se recalculait sur sa longueur d'origine. Le second morceau
+  de façade allongeait le mur à 8,95 m ; l'éclat du coin, absorbé ensuite,
+  le ramenait à 5,30 m. Le séjour de 74 m² disparaissait.
+- Les deux bornes se tiennent maintenant dans un repère fixe et ne font que
+  s'écarter. On recommence tant qu'un mur s'ajoute.
+- Les faces se rangent en deux côtés, chacun moyenné : une face revue par un
+  second passage n'épaissit plus le mur.
+- Un mur de façade vu des deux côtés (une véranda, 31,5 cm) se réunit
+  jusqu'à 45 cm d'écart.
+
+**Un mur arrêté devant un refend le rejoint** (Gérard, Hélène, Bérénice).
+Seul un bout à moins de 3 cm d'une face était recalé sur l'axe. Le scan
+laisse 3 à 6 cm aux coins. Un bout tombé entre les deux faces, ou jusqu'à
+8 cm devant l'une, vient maintenant sur l'axe.
+
+**Les jonctions en T sont exactes** (Bérénice, Hélène).
+- Le bout qui bute se pose au point de coupe. Il restait à 0,3 mm, et la
+  cloison se recollait : le cellier se fondait dans le séjour.
+- Une jonction est un coin à moins de 5 cm d'un bout, et non plus à 20 cm
+  ou 3 % du mur (36 cm sur un couloir de 12 m).
+- Un même segment ne se trace qu'une fois.
+
+**Les nœuds et les coins** (Amandine, Léon).
+- Deux bouts à moins d'un dixième de millimètre sont le même nœud. Ils
+  tombaient de part et d'autre d'un arrondi, et la salle d'eau se fondait
+  dans le studio.
+- Un coin ouvert se soude à la rencontre de ses deux murs, et plus au
+  milieu de leurs bouts : 3,60 m et non 3,58, pignon d'équerre.
+- Les éclats couchés le long d'un mur (moins de 15 cm) s'en vont dès
+  l'arrivée du scan. Ils faisaient une encoche et une cote « 0,05 m ».
+
+**Le poché sans triangle noir** (Gérard, Nadia, Hélène, Thomas,
+Bérénice). Une chaîne de bords qui ne se refermait pas était gardée, et le
+remplissage la fermait d'un trait droit à travers la pièce, à l'écran, dans
+le PDF et dans le DXF. Les chaînes se recousent au millimètre ; ce qui
+reste ouvert ne se dessine pas.
+
+**Ce que l'app dit du relevé.**
+- Le bilan de fin de scan comptait 0 m² sur tout scan : il cherchait les
+  murs d'une pièce par un champ que le scan ne pose pas (Amandine). Il lit
+  maintenant les murs que chaque pièce nomme.
+- Le diagnostic signale les murs que plus aucune pièce ne réclame : alerte
+  à partir de 3 m de murs. Un garde-corps n'en est pas un.
+
+Bancs : `tournee5scans`, et les 90 cas de reproduction des huit testeurs.
+
 ## Les cotes du DXF tracées comme à la planche
 
 **Une vraie cote dans le DXF** (Claire). Chaque cote n'était qu'un texte

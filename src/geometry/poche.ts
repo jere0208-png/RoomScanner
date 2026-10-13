@@ -231,22 +231,62 @@ export function region(A: Poly[], B: Poly[] = []): Poly[] {
   });
   const pris = new Array(uniques.length).fill(false);
   const contours: Poly[] = [];
+  /*
+    UNE CHAÎNE QUI NE SE REFERME PAS N'EST PAS UN CONTOUR — revues
+    « Gérard », « Nadia », « Hélène », « Thomas » et « Bérénice » : deux
+    morceaux de façade à quelques dixièmes de degré laissaient un bord
+    orphelin ; la chaîne s'arrêtait là, était gardée telle quelle, et le
+    remplissage pair-impair la refermait d'un trait droit — un triangle noir
+    de 2 à 4 m à travers la pièce, à l'écran, dans le PDF et dans le DXF.
+    Les chaînes ouvertes se recousent bout à bout quand leurs extrémités se
+    touchent au millimètre ; ce qui reste ouvert ne se dessine pas.
+  */
+  const ouvertes: Pt[][] = [];
   for (let i = 0; i < uniques.length; i++) {
     if (pris[i]) continue;
     const depart = cle(uniques[i].a);
     const pts: Pt[] = [uniques[i].a];
     let cour = i;
+    let ferme = false;
     for (let garde = 0; garde < uniques.length + 2; garde++) {
       pris[cour] = true;
       const fin = uniques[cour].b;
-      if (cle(fin) === depart) break;
+      if (cle(fin) === depart) {
+        ferme = true;
+        break;
+      }
       pts.push(fin);
       const suite = (partants.get(cle(fin)) ?? []).find((j) => !pris[j]);
       if (suite === undefined) break;
       cour = suite;
     }
+    if (!ferme) {
+      ouvertes.push(pts);
+      continue;
+    }
     const simple = simplifier(pts);
     if (simple.length >= 3 && Math.abs(aireSignee(simple)) > 1e-8) contours.push(simple);
+  }
+  const touche = (p: Pt, q: Pt) => Math.hypot(p.x - q.x, p.z - q.z) < 1e-3;
+  for (let recousu = true; recousu && ouvertes.length > 0; ) {
+    recousu = false;
+    for (let i = 0; i < ouvertes.length && !recousu; i++) {
+      const c = ouvertes[i];
+      if (c.length >= 3 && touche(c[c.length - 1], c[0])) {
+        ouvertes.splice(i, 1);
+        const simple = simplifier(c);
+        if (simple.length >= 3 && Math.abs(aireSignee(simple)) > 1e-8) contours.push(simple);
+        recousu = true;
+        break;
+      }
+      const j = ouvertes.findIndex((d, k) => k !== i && touche(c[c.length - 1], d[0]));
+      if (j >= 0) {
+        const suite = ouvertes[j];
+        ouvertes[i] = [...c, ...suite.slice(1)];
+        ouvertes.splice(j, 1);
+        recousu = true;
+      }
+    }
   }
   return contours;
 }

@@ -23,11 +23,13 @@
  * point se lit dans ce que le relevé contient.
  */
 import type { ObjectData } from 'react-native-room-scan';
-import { roomSurface, type WallSeg } from './floorplan';
+import { roomParts, type WallSeg } from './floorplan';
 
 /** Ce que le bilan lit d'une pièce. */
 export interface PieceDuBilan {
   id: string;
+  /** Les murs qui la bordent, tels que la fin du scan les a rangés. */
+  wallIds?: string[];
   floor?: { texture?: { texels?: readonly unknown[] } } | null;
   releve?: { plafond?: unknown | null } | null;
 }
@@ -128,10 +130,22 @@ export function bilanDuReleve(e: {
   const murs = e.walls.filter(w => w.type === 'wall');
   if (murs.length === 0) return null;
   const pieces = e.rooms.length;
-  const aires = e.rooms.map(
-    r => roomSurface(murs.filter(w => w.roomId === r.id))?.area ?? 0,
+  /*
+    LES MURS DE CHAQUE PIÈCE SONT CEUX QU'ELLE NOMME — revue « Amandine » :
+    le bilan cherchait les murs d'une pièce par leur `roomId`, que la fin du
+    scan ne pose jamais. Toute pièce y valait 0 m² : « 0 m² », « Pièces
+    refermées 0 », et le conseil de longer un mur manquant sur un studio
+    parfaitement fermé.
+  */
+  const parts = roomParts(
+    murs,
+    e.rooms.map(r => ({ id: r.id, wallIds: r.wallIds })),
   );
-  const refermees = aires.filter(a => a > 1).length;
+  const surfaces = e.rooms.map(
+    r => parts.find(p => p.roomId === r.id)?.surface ?? null,
+  );
+  const aires = surfaces.map(s => s?.area ?? 0);
+  const refermees = surfaces.filter(s => !!s?.exact && s.area > 1).length;
   const surface = Math.round(aires.reduce((s, a) => s + a, 0));
   const part = (n: number, d: number) =>
     d > 0 ? Math.max(0, Math.min(1, n / d)) : 0;

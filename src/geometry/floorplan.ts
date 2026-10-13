@@ -2595,10 +2595,53 @@ export function linteauxRabotes(
  * et qu'ils SE RECOUVRENT — deux murs bout à bout sont un mur coupé, pas un
  * doublon, et deux cloisons de couloir ne se confondent pas.
  */
+/**
+ * LES ÉCLATS DU SCAN, COUCHÉS LE LONG D'UN MUR — revues « Amandine »,
+ * « Thomas », « Bérénice » et « Hélène » : RoomPlan laisse près des coins
+ * de petits morceaux de mur de quelques centimètres, posés sur un mur plus
+ * long. Le seuil des éclats (`ECLAT`, 5 mm) les gardait : une encoche et
+ * une cote « 0,05 m » sur l'image partagée, et, coupés puis soudés, des
+ * copies de façade qui égaraient la détection des pièces. Un morceau de
+ * moins de 15 cm qui longe un mur bien plus long, à 6 cm près, n'est pas un
+ * mur. Un retour de travers, lui, reste : il peut être vrai.
+ */
+export function sansEclatsLeLong(walls: WallSeg[]): WallSeg[] {
+  const ECLAT_DU_SCAN = 0.15;
+  const murs = walls.filter((w) => w.type === 'wall');
+  const jetes = new Set<string>();
+  for (const s of murs) {
+    const ls = segLength(s);
+    if (ls >= ECLAT_DU_SCAN || ls < 1e-6) continue;
+    const us = unit(s);
+    const porte = murs.some((w) => {
+      if (w.id === s.id || jetes.has(w.id)) return false;
+      const lw = segLength(w);
+      if (lw < Math.max(2 * ls, 0.3)) return false;
+      const uw = unit(w);
+      if (Math.abs(us.x * uw.x + us.z * uw.z) < 0.95) return false;
+      const lat = (p: Pt) => Math.abs((p.x - w.a.x) * -uw.z + (p.z - w.a.z) * uw.x);
+      if (lat(s.a) > 0.06 || lat(s.b) > 0.06) return false;
+      const t = (p: Pt) => (p.x - w.a.x) * uw.x + (p.z - w.a.z) * uw.z;
+      const t0 = Math.min(t(s.a), t(s.b));
+      const t1 = Math.max(t(s.a), t(s.b));
+      return t1 > -0.15 && t0 < lw + 0.15;
+    });
+    if (porte) jetes.add(s.id);
+  }
+  return jetes.size > 0 ? walls.filter((w) => !jetes.has(w.id)) : walls;
+}
+
 export function fusionnerMursDoubles(
-  walls: WallSeg[],
-  ecartMax = 0.3,
+  murs: WallSeg[],
+  /*
+    UN MUR DE FAÇADE VU DES DEUX CÔTÉS — revue « Bérénice » : la façade
+    d'une véranda, 31,5 cm, relevée du séjour et de la véranda. Au-delà de
+    30 cm, les deux faces restaient deux murs. Un mur porteur ancien va
+    jusqu'à 45 cm.
+  */
+  ecartMax = 0.45,
 ): WallSeg[] {
+  const walls = sansEclatsLeLong(murs);
   const out: WallSeg[] = [];
   const absorbes = new Set<string>();
   /*
@@ -2630,67 +2673,111 @@ export function fusionnerMursDoubles(
       if (w.type !== 'wall') out.push(w);
       continue;
     }
-    let A = { ...w.a };
-    let B = { ...w.b };
     const l = segLength(w) || 1;
-    const u = { x: (B.x - A.x) / l, z: (B.z - A.z) / l };
-    const n = { x: -u.z, z: u.x };
     const origine = { ...w.a };
-    let autreFace: number | null = null;
-    let epaisseur = w.epaisseur;
-    for (const o of tries) {
-      if (o.id === w.id || absorbes.has(o.id) || o.type !== 'wall') continue;
-      const lo = segLength(o) || 1;
-      const uo = { x: (o.b.x - o.a.x) / lo, z: (o.b.z - o.a.z) / lo };
-      if (Math.abs(u.x * uo.x + u.z * uo.z) < 0.95) continue;
-      // Distance latérale : les deux bouts doivent longer la même ligne.
-      const lat = (p: Pt) => Math.abs((p.x - A.x) * n.x + (p.z - A.z) * n.z);
-      if (lat(o.a) > ecartMax || lat(o.b) > ecartMax) continue;
-      // Recouvrement le long de l'axe : bout à bout ne compte pas.
-      const t = (p: Pt) => (p.x - A.x) * u.x + (p.z - A.z) * u.z;
-      const t0 = Math.min(t(o.a), t(o.b));
-      const t1 = Math.max(t(o.a), t(o.b));
-      const commun = Math.min(t1, l) - Math.max(t0, 0);
-      if (commun <= 0.05) continue;
-      // Absorbé : le mur retenu prend l'enveloppe des deux.
-      absorbes.add(o.id);
-      const deb = Math.min(0, t0);
-      const fin = Math.max(l, t1);
-      A = { x: A.x + u.x * deb, z: A.z + u.z * deb };
-      B = { x: A.x + u.x * (fin - deb), z: A.z + u.z * (fin - deb) };
-      const cote = (p: Pt) => (p.x - origine.x) * n.x + (p.z - origine.z) * n.z;
-      const d = (cote(o.a) + cote(o.b)) / 2;
-      if (autreFace === null && Math.abs(d) >= DEUX_FACES) {
-        autreFace = d;
-        epaisseur = Math.max(epaisseur ?? 0, Math.abs(d));
+    const u = { x: (w.b.x - w.a.x) / l, z: (w.b.z - w.a.z) / l };
+    const n = { x: -u.z, z: u.x };
+    const t = (p: Pt) => (p.x - origine.x) * u.x + (p.z - origine.z) * u.z;
+    const cote = (p: Pt) => (p.x - origine.x) * n.x + (p.z - origine.z) * n.z;
+    /*
+      L'ENVELOPPE SE TIENT DANS UN REPÈRE FIXE — revues « Thomas » et
+      « Bérénice » : la fin du mur se recalculait sur sa longueur
+      d'origine. Le second morceau de façade l'allongeait à 8,95 m, l'éclat
+      du coin, absorbé ensuite, le ramenait à 5,30 : 3,70 m de façade
+      effacés, et le séjour de 74 m² avec eux. Les deux bornes ne font plus
+      que s'écarter ; et l'on recommence tant qu'un mur s'ajoute, car celui
+      qui ne recouvrait que l'enveloppe agrandie la rejoint aussi.
+    */
+    let lo = 0;
+    let hi = l;
+    const faces: { d: number; poids: number }[] = [{ d: 0, poids: l }];
+    for (let ajout = true; ajout; ) {
+      ajout = false;
+      for (const o of tries) {
+        if (o.id === w.id || absorbes.has(o.id) || o.type !== 'wall') continue;
+        const lo2 = segLength(o) || 1;
+        const uo = { x: (o.b.x - o.a.x) / lo2, z: (o.b.z - o.a.z) / lo2 };
+        if (Math.abs(u.x * uo.x + u.z * uo.z) < 0.95) continue;
+        // Distance latérale : les deux bouts doivent longer la même ligne.
+        if (Math.abs(cote(o.a)) > ecartMax || Math.abs(cote(o.b)) > ecartMax) continue;
+        // Recouvrement le long de l'axe : bout à bout ne compte pas.
+        const t0 = Math.min(t(o.a), t(o.b));
+        const t1 = Math.max(t(o.a), t(o.b));
+        const commun = Math.min(t1, hi) - Math.max(t0, lo);
+        if (commun <= 0.05) continue;
+        // Absorbé : le mur retenu prend l'enveloppe des deux.
+        absorbes.add(o.id);
+        ajout = true;
+        lo = Math.min(lo, t0);
+        hi = Math.max(hi, t1);
+        faces.push({ d: (cote(o.a) + cote(o.b)) / 2, poids: lo2 });
       }
     }
-    if (autreFace !== null) {
-      const axe = autreFace / 2;
+    /*
+      LES FACES SE RANGENT EN DEUX CÔTÉS — revue « Thomas » : « l'autre
+      face » était la première trouvée à plus de 5 cm. Une face revue par un
+      second passage, décalée de 4 cm, épaississait un mur de 17 cm à 22,
+      selon l'ordre des surfaces. Les faces se partagent au plus grand écart
+      (5 cm au moins) ; chaque côté prend la moyenne de ses faces.
+    */
+    const rangees = [...faces].sort((p, q) => p.d - q.d);
+    let coupe = -1;
+    let ecart = DEUX_FACES - 1e-9;
+    for (let i = 0; i + 1 < rangees.length; i++) {
+      const g = rangees[i + 1].d - rangees[i].d;
+      if (g > ecart) {
+        ecart = g;
+        coupe = i;
+      }
+    }
+    let A = { x: origine.x + u.x * lo, z: origine.z + u.z * lo };
+    let B = { x: origine.x + u.x * hi, z: origine.z + u.z * hi };
+    if (coupe >= 0) {
+      const moyenne = (xs: { d: number; poids: number }[]) =>
+        xs.reduce((s, x) => s + x.d * x.poids, 0) / xs.reduce((s, x) => s + x.poids, 0);
+      const bas = rangees.slice(0, coupe + 1);
+      const haut = rangees.slice(coupe + 1);
+      const faceBas = moyenne(bas);
+      const faceHaut = moyenne(haut);
+      const axe = (faceBas + faceHaut) / 2;
+      const epaisseur = Math.max(w.epaisseur ?? 0, faceHaut - faceBas);
       A = { x: A.x + n.x * axe, z: A.z + n.z * axe };
       B = { x: B.x + n.x * axe, z: B.z + n.z * axe };
-      const t = (p: Pt) => (p.x - origine.x) * u.x + (p.z - origine.z) * u.z;
-      recales.push({ origine, u, n, faces: [0, autreFace], axe, de: t(A), a: t(B), id: w.id });
-      out.push({ ...w, a: A, b: B, epaisseur: epaisseur!, deuxFaces: true });
+      recales.push({ origine, u, n, faces: [faceBas, faceHaut], axe, de: lo, a: hi, id: w.id });
+      out.push({ ...w, a: A, b: B, epaisseur, deuxFaces: true });
     } else {
       out.push({ ...w, a: A, b: B });
     }
   }
   if (recales.length === 0) return out;
-  // Les murs arrêtés sur une face rejoignent l'axe.
-  const recaler = (p: Pt): Pt => {
+  /*
+    LES MURS ARRÊTÉS CONTRE UNE FACE REJOIGNENT L'AXE — revues « Gérard »,
+    « Hélène » et « Bérénice » : seul un bout à moins de 3 cm d'une face
+    était recalé. Le scan laisse 3 à 6 cm aux coins ; une façade arrêtée à
+    6 cm de la face d'un refend tombait à 16 cm de son axe, ni recalée ni
+    soudée, et le séjour, la loggia, la cuisine disparaissaient. Un bout de
+    mur de travers qui tombe entre les deux faces, ou à 8 cm devant l'une,
+    vient sur l'axe.
+  */
+  const JEU = 0.08;
+  const recaler = (p: Pt, w: WallSeg): Pt => {
+    const lw = segLength(w) || 1;
+    const uw = { x: (w.b.x - w.a.x) / lw, z: (w.b.z - w.a.z) / lw };
     for (const r of recales) {
+      if (Math.abs(uw.x * r.u.x + uw.z * r.u.z) > 0.7) continue;
       const t = (p.x - r.origine.x) * r.u.x + (p.z - r.origine.z) * r.u.z;
-      if (t < r.de - 0.05 || t > r.a + 0.05) continue;
+      if (t < r.de - 0.1 || t > r.a + 0.1) continue;
       const cote = (p.x - r.origine.x) * r.n.x + (p.z - r.origine.z) * r.n.z;
-      if (!r.faces.some((f) => Math.abs(cote - f) < 0.03)) continue;
+      if (cote < r.faces[0] - JEU || cote > r.faces[1] + JEU) continue;
       const k = r.axe - cote;
       return { x: p.x + r.n.x * k, z: p.z + r.n.z * k };
     }
     return p;
   };
   const fusionnes = new Set(recales.map((r) => r.id));
-  return out.map((w) => (fusionnes.has(w.id) || w.type !== 'wall' ? w : { ...w, a: recaler(w.a), b: recaler(w.b) }));
+  return out.map((w) =>
+    fusionnes.has(w.id) || w.type !== 'wall' ? w : { ...w, a: recaler(w.a, w), b: recaler(w.b, w) },
+  );
 }
 
 /**
@@ -3469,19 +3556,65 @@ export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
     const pi = points[i].wall[points[i].end];
     const room = roomOf(points[i].wall);
     const cluster = [i];
-    for (let j = i + 1; j < points.length; j++) {
-      if (assigned.has(j)) continue;
-      if (roomOf(points[j].wall) !== room) continue;
-      const pj = points[j].wall[points[j].end];
-      if (Math.hypot(pi.x - pj.x, pi.z - pj.z) < tol && !relies(cluster, j)) cluster.push(j);
+    /*
+      DE PROCHE EN PROCHE — revue « Hélène » : la grappe ne se mesurait qu'au
+      premier bout trouvé. Trois bouts à 14 cm l'un de l'autre en chaîne (un
+      coin, un éclat, la façade d'en face) ne se réunissaient pas : 28 cm du
+      premier au dernier, la pièce restait ouverte. Un bout rejoint la grappe
+      s'il est à portée de l'un de ses bouts — sans s'éloigner de plus d'une
+      fois et demie la tolérance du premier.
+    */
+    for (let ajout = true; ajout; ) {
+      ajout = false;
+      for (let j = i + 1; j < points.length; j++) {
+        if (assigned.has(j) || cluster.includes(j)) continue;
+        if (roomOf(points[j].wall) !== room) continue;
+        const pj = points[j].wall[points[j].end];
+        if (Math.hypot(pi.x - pj.x, pi.z - pj.z) >= tol * 1.5) continue;
+        const proche = cluster.some((k) => {
+          const pk = points[k].wall[points[k].end];
+          return Math.hypot(pk.x - pj.x, pk.z - pj.z) < tol;
+        });
+        if (proche && !relies(cluster, j)) {
+          cluster.push(j);
+          ajout = true;
+        }
+      }
     }
     if (cluster.length > 1) {
-      const cx =
+      let cx =
         cluster.reduce((s, k) => s + points[k].wall[points[k].end].x, 0) /
         cluster.length;
-      const cz =
+      let cz =
         cluster.reduce((s, k) => s + points[k].wall[points[k].end].z, 0) /
         cluster.length;
+      /*
+        UN COIN SE SOUDE À LA RENCONTRE DE SES DEUX MURS — revue « Léon » :
+        une façade arrêtée à 4 cm du pignon se soudait au milieu des deux
+        bouts. La façade perdait 2 cm (3,58 au lieu de 3,60) et le pignon
+        partait de travers d'un demi-degré. Deux murs qui se croisent
+        franchement se rejoignent là où leurs droites se coupent.
+      */
+      if (cluster.length === 2 && points[cluster[0]].wall !== points[cluster[1]].wall) {
+        const [p, q] = cluster.map((k) => points[k]);
+        const P = p.wall[p.end];
+        const Q = q.wall[q.end];
+        const dirDe = (w: WallSeg) => {
+          const l = segLength(w) || 1;
+          return { x: (w.b.x - w.a.x) / l, z: (w.b.z - w.a.z) / l };
+        };
+        const u1 = dirDe(p.wall);
+        const u2 = dirDe(q.wall);
+        const den = u1.x * u2.z - u1.z * u2.x;
+        if (Math.abs(den) > 0.26 && segLength(p.wall) > 0.1 && segLength(q.wall) > 0.1) {
+          const s = ((Q.x - P.x) * u2.z - (Q.z - P.z) * u2.x) / den;
+          const X = { x: P.x + u1.x * s, z: P.z + u1.z * s };
+          if (Math.hypot(X.x - P.x, X.z - P.z) < tol * 1.5 && Math.hypot(X.x - Q.x, X.z - Q.z) < tol * 1.5) {
+            cx = X.x;
+            cz = X.z;
+          }
+        }
+      }
       for (const k of cluster) {
         points[k].wall[points[k].end] = { x: cx, z: cz };
         assigned.add(k);
@@ -3505,7 +3638,11 @@ export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
       const len2 = dx * dx + dz * dz;
       if (len2 < 1e-9) continue;
       const t = ((p.x - v.a.x) * dx + (p.z - v.a.z) * dz) / len2;
-      if (t < 0.03 || t > 0.97) continue; // proche d'un bout : c'est un coin
+      // Proche d'un bout : c'est un coin. En centimètres, pas en part du mur
+      // — revue « Hélène » : 3 % d'un couloir de 12 m, c'étaient 36 cm, et une
+      // cloison arrêtée à 17 cm d'un nœud restait pendante.
+      const lv = Math.sqrt(len2);
+      if (t * lv < BOUT_DE_T || (1 - t) * lv < BOUT_DE_T) continue;
       const q = { x: v.a.x + dx * t, z: v.a.z + dz * t };
       const d = Math.hypot(p.x - q.x, p.z - q.z);
       if (d < teeTol && (!best || d < best.d)) best = { d, q };
@@ -3802,6 +3939,83 @@ function sliceTexture(
  * Le premier morceau garde l'identifiant d'origine : les ouvertures et les
  * sélections en cours continuent de le désigner.
  */
+/** Une clé par nœud : deux points à moins de `tol` (m) partagent la sienne. */
+function clesDesNoeuds(tol = 1e-4): (p: Pt) => string {
+  const pas = tol * 2;
+  const grille = new Map<string, { p: Pt; k: string }[]>();
+  let n = 0;
+  return (p: Pt) => {
+    const ix = Math.floor(p.x / pas);
+    const iz = Math.floor(p.z / pas);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        for (const c of grille.get(`${ix + dx}:${iz + dz}`) ?? []) {
+          if (Math.hypot(c.p.x - p.x, c.p.z - p.z) <= tol) return c.k;
+        }
+      }
+    }
+    const k = `n${n++}`;
+    const ici = `${ix}:${iz}`;
+    grille.set(ici, [...(grille.get(ici) ?? []), { p, k }]);
+    return k;
+  };
+}
+
+/** Plus près d'un bout que cela, une jonction est un coin, pas un T (m). */
+const BOUT_DE_T = 0.05;
+
+/**
+ * LES BOUTS QUI SE TOUCHENT PORTENT LES MÊMES COORDONNÉES — revue
+ * « Amandine » : deux bouts distants de 4e-16 m (0,00249999… et
+ * 0,0025000…) tombaient de part et d'autre d'un arrondi au millimètre ; le
+ * graphe y voyait deux nœuds, la cloison pendait, et la salle d'eau se
+ * fondait dans le studio. À moins d'un millimètre, ils deviennent un.
+ */
+function unifierLesNoeuds(walls: WallSeg[], tol = 1e-3): WallSeg[] {
+  const grille = new Map<string, Pt[]>();
+  const pas = tol * 2;
+  const canon = (p: Pt): Pt => {
+    const ix = Math.floor(p.x / pas);
+    const iz = Math.floor(p.z / pas);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        for (const q of grille.get(`${ix + dx}:${iz + dz}`) ?? []) {
+          if (Math.hypot(q.x - p.x, q.z - p.z) <= tol) return q;
+        }
+      }
+    }
+    const k = `${ix}:${iz}`;
+    grille.set(k, [...(grille.get(k) ?? []), p]);
+    return p;
+  };
+  let change = false;
+  const out = walls.map((w) => {
+    const a = canon(w.a);
+    const b = canon(w.b);
+    if (a === w.a && b === w.b) return w;
+    change = true;
+    return { ...w, a: { ...a }, b: { ...b } };
+  });
+  /*
+    UN MÊME SEGMENT NE SE TRACE QU'UNE FOIS — revue « Hélène » : un éclat
+    couché le long d'une façade, coupé et soudé, devenait la copie exacte du
+    morceau de façade qu'il longeait. Une arête doublée égare le parcours
+    des faces, et la salle à manger disparaissait.
+  */
+  const cle = (p: Pt) => `${p.x}:${p.z}`;
+  const vus = new Set<string>();
+  const uniques = out.filter((w) => {
+    const ka = cle(w.a);
+    const kb = cle(w.b);
+    const k = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+    if (ka === kb || vus.has(k)) return ka === kb;
+    vus.add(k);
+    return true;
+  });
+  if (uniques.length !== out.length) return uniques;
+  return change ? out : walls;
+}
+
 export function splitAtJunctions(walls: WallSeg[], tol = 0.08): WallSeg[] {
   const out: WallSeg[] = [];
   /*
@@ -3818,49 +4032,75 @@ export function splitAtJunctions(walls: WallSeg[], tol = 0.08): WallSeg[] {
     pris.add(id);
     return id;
   };
+  /*
+    LE BOUT QUI BUTE SE POSE AU POINT DE COUPE — revue « Bérénice » : le mur
+    se coupait à la projection du bout, mais le bout, lui, restait où il
+    était, à deux ou quatre dixièmes de millimètre. Deux nœuds au lieu d'un :
+    le recollage des murs alignés refermait la coupe, et le cellier se
+    fondait dans le séjour. Le point de coupe est calculé une fois, et le
+    mur coupé comme le mur qui bute le portent tous deux.
+  */
+  const at = (w: WallSeg, u: number): Pt => ({
+    x: w.a.x + (w.b.x - w.a.x) * u,
+    z: w.a.z + (w.b.z - w.a.z) * u,
+  });
+  const coupesDe = new Map<string, { t: number; P: Pt }[]>();
+  const poseDuBout = new Map<string, Pt>();
   for (const w of walls) {
     const len = segLength(w);
-    if (len < 1e-6) {
-      out.push(w);
-      continue;
-    }
-    const cuts: number[] = [];
+    if (len < 1e-6) continue;
+    const butees: { t: number; cle: string }[] = [];
     for (const v of walls) {
       if (v.id === w.id) continue;
       for (const end of ['a', 'b'] as const) {
         const { dist, t } = pointOnSeg(v[end], w.a, w.b);
         if (dist > tol || t <= 0 || t >= 1) continue;
-        // Trop près d'un bout : c'est un coin, pas un T — rien à couper.
-        if (t * len < 0.2 || (1 - t) * len < 0.2) continue;
-        cuts.push(t);
+        // Trop près d'un bout : c'est un coin, pas un T — rien à couper. En
+        // centimètres : la part d'un long mur faisait des dizaines de cm.
+        if (t * len < BOUT_DE_T || (1 - t) * len < BOUT_DE_T) continue;
+        butees.push({ t, cle: `${v.id}:${end}` });
       }
     }
-    if (cuts.length === 0) {
-      out.push(w);
+    if (butees.length === 0) continue;
+    butees.sort((p, q) => p.t - q.t);
+    // Deux bouts à moins de 2 cm l'un de l'autre font une seule coupe.
+    const coupes: { t: number; P: Pt }[] = [];
+    for (const b of butees) {
+      let c = coupes[coupes.length - 1];
+      if (!c || (b.t - c.t) * len > 0.02) {
+        c = { t: b.t, P: at(w, b.t) };
+        coupes.push(c);
+      }
+      if (!poseDuBout.has(b.cle)) poseDuBout.set(b.cle, c.P);
+    }
+    coupesDe.set(w.id, coupes);
+  }
+  for (const w of walls) {
+    const len = segLength(w);
+    const A = poseDuBout.get(`${w.id}:a`) ?? w.a;
+    const B = poseDuBout.get(`${w.id}:b`) ?? w.b;
+    const coupes = len < 1e-6 ? [] : coupesDe.get(w.id) ?? [];
+    if (coupes.length === 0) {
+      out.push(A === w.a && B === w.b ? w : { ...w, a: { ...A }, b: { ...B } });
       continue;
     }
-    cuts.sort((a, b) => a - b);
-    const uniq = cuts.filter((t, i) => i === 0 || t - cuts[i - 1] > 0.02);
-    let prev = 0;
+    const bornes = [{ t: 0, P: A }, ...coupes, { t: 1, P: B }];
     let n = 0;
-    for (const t of [...uniq, 1]) {
-      if (t - prev < 1e-6) continue;
-      const at = (u: number): Pt => ({
-        x: w.a.x + (w.b.x - w.a.x) * u,
-        z: w.a.z + (w.b.z - w.a.z) * u,
-      });
+    for (let k = 0; k + 1 < bornes.length; k++) {
+      const de = bornes[k];
+      const vers = bornes[k + 1];
+      if (vers.t - de.t < 1e-6) continue;
       out.push({
         ...w,
         id: n === 0 ? w.id : nomLibre(w.id, n),
-        a: at(prev),
-        b: at(t),
-        texture: sliceTexture(w.texture, prev, t),
+        a: { ...de.P },
+        b: { ...vers.P },
+        texture: sliceTexture(w.texture, de.t, vers.t),
       });
-      prev = t;
       n++;
     }
   }
-  return out;
+  return unifierLesNoeuds(out);
 }
 
 // ------------------------------------------- détection des pièces
@@ -4009,6 +4249,13 @@ export function pivotsDesBattants(
  * négative qu'on le reconnaît, et qu'on le jette.
  */
 export function facesFermees(walls: WallSeg[]): DetectedRoom[] {
+  /*
+    LES NŒUDS SE RECONNAISSENT AU DIXIÈME DE MILLIMÈTRE, pas à l'arrondi —
+    revue « Amandine » : 0,00249999… et 0,0025000… tombaient de part et
+    d'autre du millimètre, le parcours voyait deux nœuds, et la cloison
+    pendait. Deux bouts à moins de 0,1 mm sont le même nœud.
+  */
+  const cleDuNoeud = clesDesNoeuds();
 
   interface HalfEdge {
     wallId: string;
@@ -4031,7 +4278,7 @@ export function facesFermees(walls: WallSeg[]): DetectedRoom[] {
         angle: Math.atan2(to.z - from.z, to.x - from.x),
       };
       edges.push(he);
-      const k = nodeKey(from);
+      const k = cleDuNoeud(from);
       const list = outgoing.get(k) ?? [];
       list.push(he);
       outgoing.set(k, list);
@@ -4041,12 +4288,12 @@ export function facesFermees(walls: WallSeg[]): DetectedRoom[] {
 
   /** Arête suivante de la face : la précédente en angle autour du nœud. */
   const nextOf = (he: HalfEdge): HalfEdge | null => {
-    const list = outgoing.get(nodeKey(he.to));
+    const list = outgoing.get(cleDuNoeud(he.to));
     if (!list || list.length === 0) return null;
     // On repart de l'inverse de l'arête d'arrivée, puis on tourne d'un cran.
     const back = he.angle > 0 ? he.angle - Math.PI : he.angle + Math.PI;
     let idx = list.findIndex(
-      (e) => e.wallId === he.wallId && nodeKey(e.to) === nodeKey(he.from),
+      (e) => e.wallId === he.wallId && cleDuNoeud(e.to) === cleDuNoeud(he.from),
     );
     if (idx < 0) {
       // Nœud non partagé au point près : on se rabat sur l'angle.
