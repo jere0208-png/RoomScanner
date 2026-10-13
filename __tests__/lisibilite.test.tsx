@@ -107,8 +107,10 @@ describe('les chiffres de l’en-tête disent vrai', () => {
     expect(lire('src/screens/ResultScreen.tsx')).toContain('perimetreDesPieces(parts)');
   });
 
-  it('« m² hab. » porte « ≈ » quand la surface est approchée', () => {
-    expect(lire('src/screens/ResultScreen.tsx')).toMatch(/value: `\$\{surface && !surface\.exact \? '≈ ' : ''\}\$\{fr\(habitable\.total\)\}`/);
+  it('« m² hab. » porte « ≈ » quand la surface est approchée, ou l’habitable à vérifier', () => {
+    expect(lire('src/screens/ResultScreen.tsx')).toMatch(
+      /value: `\$\{\(surface && !surface\.exact\) \|\| habitable\.aVerifier > 0 \? '≈ ' : ''\}\$\{fr\(habitable\.total\)\}`/,
+    );
   });
 });
 

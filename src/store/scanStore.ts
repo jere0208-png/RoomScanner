@@ -945,7 +945,32 @@ export function floorsOf(
  * modèle, une table qui traverse un canapé coûte plus cher en crédibilité
  * qu'un meuble déplacé de trois centimètres.
  */
-function separerLeMobilier(objects: ObjectData[]): ObjectData[] {
+function separerLeMobilier(
+  objects: ObjectData[],
+  /*
+    NIVEAU PAR NIVEAU — revue « Nadia » : à la réouverture d'une maison,
+    les meubles des deux étages, recalés l'un au-dessus de l'autre, se
+    poussaient mutuellement. Le WC du bas reculait de 68 cm, le lit de la
+    chambre traversait la façade, et la retouche suivante l'enregistrait.
+    Avec ses pièces, chaque étage ne se sépare que de lui-même.
+  */
+  rooms?: readonly { id: string; niveau?: number }[],
+): ObjectData[] {
+  if (rooms && objects.length >= 2) {
+    const niveauDuMeuble = (o: ObjectData) => niveauDe(rooms.find((r) => r.id === o.roomId));
+    const niveaux = [...new Set(objects.map(niveauDuMeuble))];
+    if (niveaux.length > 1) {
+      const suite = objects.map((o) => o);
+      for (const n of niveaux) {
+        const indices = objects.map((o, i) => (niveauDuMeuble(o) === n ? i : -1)).filter((i) => i >= 0);
+        const separes = separerLeMobilier(indices.map((i) => objects[i]));
+        indices.forEach((i, k) => {
+          suite[i] = separes[k];
+        });
+      }
+      return suite;
+    }
+  }
   if (objects.length < 2) return objects;
   const bouges = separerMeubles(
     objects.map((o) => ({
@@ -980,27 +1005,9 @@ function migrateSave(brut: SavedScan): SavedScan {
   let s: SavedScan =
     propre.walls === (brut.walls ?? []) ? brut : { ...brut, walls: propre.walls, rooms: propre.rooms };
   /*
-    LA BAIE VITRÉE D'UN PLAN D'AVANT, rangée parmi les portes : elle balayait
-    le séjour d'un vantail de 2,40 m (voir `baiesVitrees`). Les contours sont
-    ceux des pièces du plan.
-  */
-  if ((s.openings ?? []).some((o) => o.type === 'door' && segLength(o) >= LARGEUR_DE_BAIE)) {
-    const contours = roomParts(s.walls ?? [], s.rooms ?? [])
-      .map((p) => p.surface?.pts ?? [])
-      .filter((c) => c.length >= 3);
-    const ouvertures = baiesVitrees(s.openings, s.walls ?? [], contours);
-    if (ouvertures !== s.openings) s = { ...s, openings: ouvertures };
-  }
-  /*
-    LA PORTE D'UN PLAN D'AVANT, ENFONCÉE DANS LE MUR D'ANGLE — relevé du
-    patron : « la porte est imbriquée dans le mur, cachant une partie ». Elle
-    se dégage à l'ouverture du plan (voir `baiesHorsDesAngles`).
-  */
-  if ((s.openings ?? []).length > 0) {
-    const recalees = baiesHorsDesAngles(s.openings, s.walls ?? []);
-    if (recalees !== s.openings) s = { ...s, openings: recalees };
-  }
-  /*
+    D'ABORD, LES BAIES D'AVANT PRENNENT LE NIVEAU DE LEUR MUR — tout ce qui
+    suit se fait étage par étage (revue « Nadia »).
+
     LES BAIES D'AVANT PRENNENT LE NIVEAU DE LEUR MUR — revue « Léa » : posées
     à l'étage, elles n'en portaient aucun et se rangeaient au
     rez-de-chaussée. On ne tranche que quand un seul niveau a un mur sous la
@@ -1020,6 +1027,38 @@ function migrateSave(brut: SavedScan): SavedScan {
       return { ...o, niveau: n };
     });
     if (change) s = { ...s, openings: baies };
+  }
+  /*
+    LA BAIE VITRÉE D'UN PLAN D'AVANT, rangée parmi les portes : elle balayait
+    le séjour d'un vantail de 2,40 m (voir `baiesVitrees`). Les contours sont
+    ceux des pièces DE SON ÉTAGE : celles du dessous ne disent pas si elle
+    donne dehors.
+  */
+  if ((s.openings ?? []).some((o) => o.type === 'door' && segLength(o) >= LARGEUR_DE_BAIE)) {
+    const niveaux = [...new Set(s.openings.map((o) => niveauDe(o)))];
+    let ouvertures = s.openings;
+    for (const n of niveaux) {
+      const murs = (s.walls ?? []).filter((w) => niveauDe(w) === n);
+      const contours = roomParts(murs, (s.rooms ?? []).filter((r) => niveauDe(r) === n))
+        .map((p) => p.surface?.pts ?? [])
+        .filter((c) => c.length >= 3);
+      const ici = ouvertures.filter((o) => niveauDe(o) === n);
+      const revues = baiesVitrees(ici, murs, contours);
+      if (revues !== ici) {
+        const parId = new Map(revues.map((o) => [o.id, o]));
+        ouvertures = ouvertures.map((o) => parId.get(o.id) ?? o);
+      }
+    }
+    if (ouvertures !== s.openings) s = { ...s, openings: ouvertures };
+  }
+  /*
+    LA PORTE D'UN PLAN D'AVANT, ENFONCÉE DANS LE MUR D'ANGLE — relevé du
+    patron : « la porte est imbriquée dans le mur, cachant une partie ». Elle
+    se dégage à l'ouverture du plan (voir `baiesHorsDesAngles`).
+  */
+  if ((s.openings ?? []).length > 0) {
+    const recalees = baiesHorsDesAngles(s.openings, s.walls ?? []);
+    if (recalees !== s.openings) s = { ...s, openings: recalees };
   }
   if (s.retouche?.plan?.walls) {
     const r = sansEclats(s.retouche.plan.walls, s.retouche.plan.rooms ?? []);
@@ -1619,7 +1658,19 @@ interface ScanState {
    * combien ils ont été décalés en entrant dans le plan (le pré-calage d'un
    * étage). Non persisté : un redémarrage les efface, côté iPhone aussi.
    */
-  passagesNatifs: { cle: string; niveau: number; dx: number; dz: number } | null;
+  passagesNatifs: {
+    cle: string;
+    niveau: number;
+    dx: number;
+    dz: number;
+    /**
+     * LA ROTATION DU RECALAGE (radians) — revue « Nadia » : un étage tourné
+     * de 7° pour se poser sur le rez-de-chaussée gardait ses passages à 0°.
+     * Le passage brut tourne d'abord autour de l'origine de sa session,
+     * puis glisse de (dx, dz). Absente : pas de rotation.
+     */
+    angle?: number;
+  } | null;
   /** Les passages de l'iPhone sont ceux du plan et du niveau à l'écran. */
   passagesDuPlanOuvert: () => boolean;
   /**
@@ -3345,14 +3396,24 @@ export const useScanStore = create<ScanState>((set, get) => {
       ),
     );
     const noms = nameRooms(kinds);
-    const pieces: RoomEntry[] = shapes.map((s, i) => ({
-      id: idPiece(i),
-      name: noms[i],
-      wallIds: s.wallIds,
-      kind: kinds[i] ?? undefined,
-      floor: r.floor ?? r.rooms?.[0]?.floor ?? null,
-      niveau: n,
-    }));
+    const pieces: RoomEntry[] = shapes.map((s, i) => {
+      /*
+        LE PLAFOND RELEVÉ À L'ÉTAGE AUSSI — revue « Malik » : le relevé du
+        rez-de-chaussée gardait sa hauteur et son rampant, celui de l'étage
+        les perdait. Le contour, décalé dans le plan, se relit dans le
+        repère brut du scan.
+      */
+      const releve = releveDeLaPiece(r, s.outline.map((p) => ({ x: p.x - dx, z: p.z - dz })), s.area);
+      return {
+        id: idPiece(i),
+        name: noms[i],
+        wallIds: s.wallIds,
+        kind: kinds[i] ?? undefined,
+        floor: r.floor ?? r.rooms?.[0]?.floor ?? null,
+        niveau: n,
+        ...(releve ? { releve } : {}),
+      };
+    });
 
     /* Ce que le viseur a posé pendant le relevé arrive avec lui. */
     const vise = ancrerElec(
@@ -3379,6 +3440,13 @@ export const useScanStore = create<ScanState>((set, get) => {
       // quitté.
       niveauCourant: n,
       etageEnCours: null,
+      /*
+        L'ÉTAGE A SA FENÊTRE DE FIN DE SCAN — revue « Nadia » : le
+        rez-de-chaussée proposait ses meubles et l'électricité aux normes,
+        l'étage rien. Pour une pièce posée à côté, on ne demande rien : elle
+        n'est pas encore à sa place.
+      */
+      ...(aCote ? {} : { arrivage: { meubles: objects.length, posesViseur: vise.fixtures.length + vise.ceiling.length } }),
       processing: false,
       scanning: false,
       screen: 'result',
@@ -6818,7 +6886,14 @@ export const useScanStore = create<ScanState>((set, get) => {
     oublierArrivage: () => set({ arrivage: null }),
     retirerMeubles: () => {
       pushHistory('retirerMeubles');
-      set({ objects: [], dirty: true });
+      // Ceux de l'étage à l'écran : décocher les meubles de l'étage qu'on
+      // vient de relever ne vide pas le rez-de-chaussée.
+      const st = get();
+      const n = st.niveauCourant;
+      set({
+        objects: st.objects.filter((o) => niveauDe(st.rooms.find((r) => r.id === o.roomId)) !== n),
+        dirty: true,
+      });
     },
 
     finalizeMerge: (r) => {
@@ -6838,10 +6913,16 @@ export const useScanStore = create<ScanState>((set, get) => {
       const cale = st.passagesNatifs?.niveau === n ? st.passagesNatifs : null;
       const dx = cale?.dx ?? 0;
       const dz = cale?.dz ?? 0;
+      // Et sa rotation, quand l'étage a été tourné (voir `passagesNatifs`).
+      const angle = cale?.angle ?? 0;
+      const ORIGINE = { x: 0, z: 0 };
+      const placer = (p: Pt): Pt => {
+        const q = angle ? pivoterPoint(p, ORIGINE, angle) : p;
+        return { x: q.x + dx, z: q.z + dz };
+      };
+      const versLeBrut = (p: Pt): Pt => pivoterPoint({ x: p.x - dx, z: p.z - dz }, ORIGINE, -angle);
       const decaler = <T extends WallSeg>(w: T): T =>
-        dx === 0 && dz === 0
-          ? w
-          : { ...w, a: { x: w.a.x + dx, z: w.a.z + dz }, b: { x: w.b.x + dx, z: w.b.z + dz } };
+        dx === 0 && dz === 0 && angle === 0 ? w : { ...w, a: placer(w.a), b: placer(w.b) };
       // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR.
       const segments = avecCoffresDuLidar(surfaces.map((x) => toSegment(x)), r.dessus).map(decaler);
       /*
@@ -6943,8 +7024,19 @@ export const useScanStore = create<ScanState>((set, get) => {
           // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
           reunirLesCanapesDAngle(entrants).map((o) => {
             const t = [...o.transform];
-            t[12] += dx;
-            t[14] += dz;
+            if (angle) {
+              const cs = Math.cos(angle);
+              const sn = Math.sin(angle);
+              for (const k of [0, 4, 8]) {
+                const x = t[k];
+                const z = t[k + 2];
+                t[k] = x * cs - z * sn;
+                t[k + 2] = x * sn + z * cs;
+              }
+            }
+            const p = placer({ x: t[12], z: t[14] });
+            t[12] = p.x;
+            t[14] = p.z;
             return {
               ...o,
               transform: t,
@@ -6965,7 +7057,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const kinds = shapes.map((sh, i) =>
         deduireLaPiece(
           (r.sections ?? [])
-            .filter((x) => sh.outline.length >= 3 && pointInPolygon({ x: x.x + dx, z: x.z + dz }, sh.outline))
+            .filter((x) => sh.outline.length >= 3 && pointInPolygon(placer({ x: x.x, z: x.z }), sh.outline))
             .map((x) => x.label),
           objects
             .filter((o) => o.roomId === idPiece(i) && voteDansLaPiece(o, sh.outline))
@@ -6985,7 +7077,7 @@ export const useScanStore = create<ScanState>((set, get) => {
           : undefined;
         // Le plafond relevé par ce passage (dans le repère de l'iPhone), ou
         // celui du passage d'avant.
-        const brut = sh.outline.map((p) => ({ x: p.x - dx, z: p.z - dz }));
+        const brut = sh.outline.map(versLeBrut);
         const releve = releveDeLaPiece(r, brut, sh.area) ?? garde?.releve;
         return {
           id: idPiece(i),
@@ -7010,7 +7102,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
       /* Ce que le viseur a posé PENDANT ce passage vient s'ajouter. */
       const viseMerge = ancrerElec(
-        (r.elec ?? []).map((v) => ({ ...v, x: v.x + dx, z: v.z + dz })),
+        (r.elec ?? []).map((v) => ({ ...v, ...placer({ x: v.x, z: v.z }) })),
         walls,
         kept.map((x, i) => ({ id: x.id, outline: shapes[i]?.outline })),
         (prefixe, k) => `${prefixe}-${Date.now().toString(36)}-${k}`,
@@ -7031,7 +7123,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         // les murs, et le natif les a gardées toutes, passage après passage.
         photos: remplacer(st.photos, jeu.photos, [
           ...photos.filter((ph) => !ph.auto),
-          ...photosDesMurs(r.photosMurs ?? [], surfaces, walls, { decalage: { dx, dz } }),
+          ...photosDesMurs(r.photosMurs ?? [], surfaces, walls, { decalage: { dx, dz, angle } }),
         ]),
         ceiling: remplacer(st.ceiling, jeu.ceiling, [...ceiling, ...viseMerge.ceiling]),
         north: typeof r.north === 'number' ? r.north : st.north,
@@ -7182,6 +7274,13 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       if (dx === 0 && dz === 0) return;
       pushHistory(`recalerNiveau:${n}`);
+      /*
+        LES PASSAGES DE L'IPHONE SUIVENT LEUR ÉTAGE — revue « Nadia » : un
+        étage interrompu, recalé, puis complété, voyait sa pièce de plus
+        tomber à l'ancienne place : « L'iPhone n'avait plus les passages ».
+      */
+      const pn = st.passagesNatifs;
+      if (pn && pn.niveau === n) set({ passagesNatifs: { ...pn, dx: pn.dx + dx, dz: pn.dz + dz } });
       const bouge = (p: Pt) => ({ x: p.x + dx, z: p.z + dz });
       const auNiveau = (w: WallSeg) => niveauDe(w) === n;
       const idsDuNiveau = new Set(
@@ -7231,6 +7330,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       const cs = Math.cos(angle);
       const sn = Math.sin(angle);
       const tourne = (p: Pt) => pivoterPoint(p, c, angle);
+      // Les passages de l'iPhone tournent avec leur étage (voir `recalerNiveau`).
+      const pn = st.passagesNatifs;
+      if (pn && pn.niveau === n) {
+        const d = tourne({ x: pn.dx, z: pn.dz });
+        set({ passagesNatifs: { ...pn, dx: d.x, dz: d.z, angle: (pn.angle ?? 0) + angle } });
+      }
       const dansLeNiveau = (roomId?: string) => {
         const piece = st.rooms.find((r) => r.id === roomId);
         return !!piece && niveauDe(piece) === n;
@@ -9626,7 +9731,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         scanName: b.name,
         walls: b.walls,
         openings: b.openings,
-        objects: separerLeMobilier(b.objects),
+        objects: separerLeMobilier(b.objects, b.rooms),
         rooms: b.rooms,
         fixtures: b.fixtures,
         ceiling: b.ceiling,
@@ -9847,7 +9952,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         rooms: save.rooms,
         walls: save.walls,
         openings: save.openings,
-        objects: separerLeMobilier(save.objects),
+        objects: separerLeMobilier(save.objects, save.rooms),
         fixtures: save.fixtures ?? [],
         photos: save.photos ?? [],
         ceiling: save.ceiling ?? [],

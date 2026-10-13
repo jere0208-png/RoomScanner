@@ -64,11 +64,17 @@ export function photosDesMurs(
   brutes: readonly PhotoDeMurBrute[],
   surfaces: readonly SurfaceData[],
   walls: readonly WallSeg[],
-  o: { decalage?: { dx: number; dz: number } } = {},
+  o: { decalage?: { dx: number; dz: number; angle?: number } } = {},
 ): PhotoAuto[] {
   const out: PhotoAuto[] = [];
   const dx = o.decalage?.dx ?? 0;
   const dz = o.decalage?.dz ?? 0;
+  // Un étage recalé TOURNE aussi : le passage brut tourne autour de
+  // l'origine de sa session, puis glisse.
+  const angle = o.decalage?.angle ?? 0;
+  const cs = Math.cos(angle);
+  const sn = Math.sin(angle);
+  const tourne = (p: { x: number; z: number }) => ({ x: p.x * cs - p.z * sn, z: p.x * sn + p.z * cs });
   for (const b of brutes) {
     if (!b.path) continue;
     const s = surfaces.find((x) => x.id === b.wallId && x.type === 'wall');
@@ -100,10 +106,13 @@ export function photosDesMurs(
       };
       nz = { x: -u.z, z: u.x };
     } else continue;
-    const a = { x: seg.a.x + dx, z: seg.a.z + dz };
-    const e = { x: seg.b.x + dx, z: seg.b.z + dz };
+    const pa = tourne(seg.a);
+    const pb = tourne(seg.b);
+    const a = { x: pa.x + dx, z: pa.z + dz };
+    const e = { x: pb.x + dx, z: pb.z + dz };
     // La normale du mur RoomPlan (son axe z), tournée vers celui qui photographiait.
-    const vers = { x: nz.x * (b.cote >= 0 ? 1 : -1), z: nz.z * (b.cote >= 0 ? 1 : -1) };
+    const nt = tourne(nz);
+    const vers = { x: nt.x * (b.cote >= 0 ? 1 : -1), z: nt.z * (b.cote >= 0 ? 1 : -1) };
     for (const w of walls) {
       if (w.type !== 'wall') continue;
       const L = segLength(w);

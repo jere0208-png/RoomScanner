@@ -14285,6 +14285,44 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les étages rouverts sans dommage, recalés avec leurs passages
+
+**Rouvrir une maison à étages ne l'abîme plus** (Nadia). Le défaut était
+silencieux, et la retouche suivante l'enregistrait.
+- Les meubles des deux étages, superposés, se poussaient l'un l'autre : le
+  WC du bas reculait de 68 cm, le lit de la chambre traversait la façade.
+  Les meubles se séparent maintenant étage par étage.
+- La fenêtre de l'étage se recalait sur l'angle du mur du dessous (30 cm).
+  Une baie ne se recale plus que sur les murs de son étage.
+- Une baie d'avant prend d'abord le niveau de son mur ; la baie vitrée se
+  juge sur les pièces de son étage.
+
+**Un étage recalé garde ses passages** (Nadia). Un étage interrompu, recalé
+et tourné de 7°, puis complété : la pièce de plus tombait à l'ancienne
+place, avec le message faux « L'iPhone n'avait plus les passages ». Les
+passages que garde l'iPhone suivent maintenant le glissé et la rotation de
+leur étage : murs, meubles, photos, sections et appareils posés au viseur.
+
+**L'étage scanné, comme le rez-de-chaussée** (Nadia, Malik).
+- Il a sa fenêtre de fin de scan, qui propose meubles et électricité.
+  Décocher les meubles ne retire que ceux de l'étage à l'écran.
+- Il garde le relevé de son plafond (hauteur, rampant).
+- Dans l'OBJ, un étage se pose sur le plus bas des plafonds pleins qu'il
+  couvre : la mezzanine d'un loft à 2,60 m, au-dessus de la chambre, et non
+  plus à 5,20 m, au-dessus du toit.
+
+**L'escalier** (Nadia).
+- Il n'est plus repoussé hors de ses murs, au plan, au PDF et en 3D.
+  L'escalier droit qui monte au-dessus du cellier était dessiné 1,03 m trop
+  près de la rue, à cheval sur le WC.
+- Il ne se déduit de l'habitable que pour la part de son emprise qui est
+  dans la pièce : 1,56 m² dans l'entrée, et non 2,97.
+
+**L'en-tête dit « ≈ » quand l'habitable est à vérifier** (Léon), comme la
+fiche et le PDF.
+
+Bancs : `tournee5etages`, `lisibilite`.
+
 ## Tournée n°5 : le scan ne perd plus de pièces
 
 Huit logements ont été fabriqués comme RoomPlan les rend, avec ses défauts :

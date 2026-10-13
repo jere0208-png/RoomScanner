@@ -2194,6 +2194,13 @@ export function clampFootprint(
   wallT = WALL_T,
   margin = 0.002,
 ): ObjectFootprint {
+  /*
+    UN ESCALIER ENJAMBE SES MURS — revue « Nadia » : l'escalier droit qui
+    monte au-dessus du cellier était repoussé dans l'entrée, 1,03 m vers la
+    rue, à cheval sur le WC, au plan, au PDF et en 3D. Il traverse une
+    cloison par nature ; on ne le recadre pas.
+  */
+  if (/stairs/i.test(f.category)) return f;
   let cx = f.cx;
   let cz = f.cz;
   /*
@@ -2834,9 +2841,15 @@ export function baiesVitrees<O extends WallSeg>(openings: O[], walls: WallSeg[],
  * deux nus, elle s'y réduit. Une baie qui ne touche aucun angle ne bouge pas,
  * et la liste rendue est la même quand rien n'a bougé.
  */
-export function baiesHorsDesAngles<O extends WallSeg>(openings: O[], walls: WallSeg[]): O[] {
+export function baiesHorsDesAngles<O extends WallSeg>(openings: O[], tousLesMurs: WallSeg[]): O[] {
   let change = false;
   const out = openings.map((o) => {
+    /*
+      LES MURS DE SON ÉTAGE — revue « Nadia » : rouverte, la fenêtre de la
+      salle de bains, à l'étage, se cherchait un mur parmi ceux des deux
+      niveaux et se recalait sur l'angle du WC du dessous : 30 cm de glissé.
+    */
+    const walls = tousLesMurs.filter((w) => niveauDe(w) === niveauDe(o));
     const mur = murDeLOuverture(o, walls);
     if (!mur) return o;
     const L = segLength(mur);
@@ -5645,10 +5658,35 @@ export function altitudesDesNiveaux(walls: WallSeg[], dalle = DALLE): Map<number
     const hs = murs.filter((w) => niveauDe(w) === n).map((w) => w.height);
     return hs.length > 0 ? Math.max(...hs) : 2.5;
   };
+  /*
+    CE QUI EST SOUS L'ÉTAGE, PAS LE PLUS HAUT DES MURS — revue « Malik » :
+    la mezzanine d'un loft se posait sur le mur de 5 m de l'atelier, à
+    5,20 m, au-dessus du toit, quand elle couvre une chambre de 2,40 m. On
+    prend la hauteur des murs du dessous qui tombent sous son emprise.
+  */
+  const sous = (n: number) => {
+    const dessus = murs.filter((w) => niveauDe(w) === n + 1);
+    if (dessus.length === 0) return hauteur(n);
+    const xs = dessus.flatMap((w) => [w.a.x, w.b.x]);
+    const zs = dessus.flatMap((w) => [w.a.z, w.b.z]);
+    const x0 = Math.min(...xs) - 0.3;
+    const x1 = Math.max(...xs) + 0.3;
+    const z0 = Math.min(...zs) - 0.3;
+    const z1 = Math.max(...zs) + 0.3;
+    const dessous = murs.filter((w) => {
+      if (niveauDe(w) !== n) return false;
+      const m = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+      return m.x >= x0 && m.x <= x1 && m.z >= z0 && m.z <= z1;
+    });
+    // Le plus bas des plafonds pleins du dessous : une mezzanine se pose
+    // sur la chambre de 2,40 m, pas sur l'atelier en double hauteur.
+    const pleins = dessous.map((w) => w.height).filter((h) => h >= 2);
+    return pleins.length > 0 ? Math.min(...pleins) : hauteur(n);
+  };
   const out = new Map<number, number>([[NIVEAU_RDC, 0]]);
   let alt = 0;
   for (let n = NIVEAU_RDC + 1; n <= haut; n++) {
-    alt += hauteur(n - 1) + dalle;
+    alt += sous(n - 1) + dalle;
     out.set(n, alt);
   }
   alt = 0;

@@ -3507,7 +3507,14 @@ export function ResultScreen() {
     */
     ...(habitable.pieces.length > 0 &&
     (!modeElec || Math.abs(habitable.total - habitable.sol) >= 0.5)
-      ? [{ value: `${surface && !surface.exact ? '≈ ' : ''}${fr(habitable.total)}`, label: 'm² hab.' }]
+      ? [
+          {
+            // « À vérifier » sur la fiche et au PDF : l'en-tête, que l'on lit
+            // d'abord, le dit aussi (revue « Léon »).
+            value: `${(surface && !surface.exact) || habitable.aVerifier > 0 ? '≈ ' : ''}${fr(habitable.total)}`,
+            label: 'm² hab.',
+          },
+        ]
       : []),
     ...(surfaceMaison
       ? [{ value: `${surfaceMaison.exact ? '' : '≈ '}${fr(surfaceMaison.area)}`, label: 'm² maison' }]
