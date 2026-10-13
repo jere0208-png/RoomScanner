@@ -11,6 +11,7 @@
  * au reste.
  */
 import React from 'react';
+import type { GestureResponderEvent } from 'react-native';
 import { Circle, G, Line, Path, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 import { plaqueDeCote } from '../geometry/cotes';
 import type { Palette } from '../theme';
@@ -59,6 +60,12 @@ const RAYON_POINT_LUMINEUX_M = 0.17;
 export function rayonDuPointLumineux(echelle: number): number {
   return Math.min(11, Math.max(2.5, echelle * RAYON_POINT_LUMINEUX_M));
 }
+
+/**
+ * LA LARGEUR DE LA CIBLE D'UN RUBAN LED (px) : le doigt, de part et d'autre
+ * du tracé — pas plus. Voir le dessin du ruban, plus bas.
+ */
+export const LARGEUR_CIBLE_RUBAN = 18;
 
 interface Mapping {
   scale: number;
@@ -116,7 +123,8 @@ export function CeilingLayer({
    * plafond, le mètre à bout de bras.
    */
   showMeasures?: boolean;
-  onSelectCeiling?: (id: string) => void;
+  /** `e` : le toucher, pour qui veut savoir ce qu'il y a d'autre sous le doigt. */
+  onSelectCeiling?: (id: string, e?: GestureResponderEvent) => void;
   fixtures?: Fixture[];
   walls: WallSeg[];
   /** Les onglets des murs, calculés une fois par le plan. */
@@ -160,7 +168,17 @@ export function CeilingLayer({
             (!!selectedCeilingRow && cl.row === selectedCeilingRow);
           /*
             LE RUBAN LED SUIT SON TRACÉ, en zigzag bleu — le dessin du plan
-            d'architecte. Il se touche sur toute sa longueur.
+            d'architecte. Il se touche sur toute sa longueur, ET NULLE PART
+            AILLEURS.
+
+            Relevé du patron : « quand une LED est posée, même si on clique
+            au centre de la pièce, elle est choisie ». Sa cible était une
+            polyligne, et le moteur du dessin compte l'INTÉRIEUR d'un tracé
+            dans ce qu'on touche, qu'il soit rempli ou non : un ruban qui fait
+            le tour de la pièce prenait tous les doigts posés dedans. La cible
+            est désormais faite de ses segments, un sous-tracé par segment —
+            un segment n'a pas d'intérieur —, et ses dessins ne se touchent
+            plus du tout (`pointerEvents`).
           */
           if (cl.trace && cl.trace.length >= 2) {
             const ecran = cl.trace.map((pt) => mapping.toPx(pt));
@@ -168,15 +186,14 @@ export function CeilingLayer({
             const dents = zigzag(ecran, pas, pas * 0.32, cl.ferme)
               .map((g) => `${g.x},${g.y}`)
               .join(' ');
-            const ligne = (cl.ferme ? [...ecran, ecran[0]] : ecran)
-              .map((g) => `${g.x},${g.y}`)
+            const tour = cl.ferme ? [...ecran, ecran[0]] : ecran;
+            const ligne = tour.map((g) => `${g.x},${g.y}`).join(' ');
+            const cible = tour
+              .slice(1)
+              .map((g, i) => `M${tour[i].x} ${tour[i].y} L${g.x} ${g.y}`)
               .join(' ');
             return (
-              <G
-                key={`cl-${cl.id}`}
-                accessibilityLabel={spec.label}
-                onPress={onSelectCeiling ? () => onSelectCeiling(cl.id) : undefined}>
-                <Polyline points={ligne} fill="none" stroke="transparent" strokeWidth={18} />
+              <G key={`cl-${cl.id}`} accessibilityLabel={spec.label}>
                 {choisi && (
                   <Polyline
                     points={ligne}
@@ -185,6 +202,7 @@ export function CeilingLayer({
                     strokeWidth={pas * 1.6}
                     strokeLinecap="round"
                     strokeLinejoin="round"
+                    pointerEvents="none"
                   />
                 )}
                 <Polyline
@@ -194,6 +212,15 @@ export function CeilingLayer({
                   strokeWidth={choisi ? 1.9 : 1.4}
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  pointerEvents="none"
+                />
+                <Path
+                  d={cible}
+                  fill="none"
+                  stroke="transparent"
+                  strokeWidth={LARGEUR_CIBLE_RUBAN}
+                  strokeLinecap="round"
+                  onPress={onSelectCeiling ? (e: GestureResponderEvent) => onSelectCeiling(cl.id, e) : undefined}
                 />
               </G>
             );
@@ -201,8 +228,9 @@ export function CeilingLayer({
           return (
             <G
               key={`cl-${cl.id}`}
+              accessibilityLabel={spec.label}
               onPress={
-                onSelectCeiling ? () => onSelectCeiling(cl.id) : undefined
+                onSelectCeiling ? (e: GestureResponderEvent) => onSelectCeiling(cl.id, e) : undefined
               }>
               {/* La cible du doigt ne rapetisse pas avec le dessin. */}
               <Circle cx={q.x} cy={q.y} r={Math.max(r + 6, 14)} fill="transparent" />

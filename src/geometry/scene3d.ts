@@ -88,6 +88,14 @@ export interface Face3D {
    * vrai tableau (voir `appareils3d`).
    */
   appareil?: boolean;
+  /**
+   * UN APPAREIL SANS MODÈLE — le ruban LED, le spot au sol : la carte
+   * graphique n'a rien à dessiner à leur place, elle reçoit donc la face.
+   * Relevé du patron : « la LED périmétrique n'apparaît pas en visite, ni
+   * en 3D » — écartée avec les caisses des appareils, elle n'avait pas de
+   * vrai modèle pour la remplacer.
+   */
+  sansModele?: boolean;
   /** Biais de tri (m), pour départager deux faces à la même profondeur. */
   bias?: number;
   isFloor?: boolean;
@@ -3245,7 +3253,10 @@ export function buildScene(
     /*
       LE RUBAN LED : une bande bleue juste sous le plafond, le long de son
       tracé — dessus et dessous, pour qu'on la voie d'en haut comme d'en
-      bas. Pas de modèle à poser : c'est une ligne de lumière.
+      bas —, et sa joue de trois centimètres, qu'on voit de face en visite :
+      à hauteur d'œil, une bande à plat sous le plafond se lit par la tranche,
+      c'est-à-dire pas du tout. Pas de modèle à poser : c'est une ligne de
+      lumière (`sansModele`).
     */
     if (cl.kind === 'led') {
       const tr = cl.trace ?? [];
@@ -3256,8 +3267,8 @@ export function buildScene(
         const q = chemin[i + 1];
         const L = Math.hypot(q.x - p.x, q.z - p.z);
         if (L < 1e-6) continue;
-        const nx = (-(q.z - p.z) / L) * 0.012;
-        const nz = ((q.x - p.x) / L) * 0.012;
+        const nx = (-(q.z - p.z) / L) * 0.02;
+        const nz = ((q.x - p.x) / L) * 0.02;
         const bande = [
           { x: p.x + nx, y: yb, z: p.z + nz },
           { x: q.x + nx, y: yb, z: q.z + nz },
@@ -3265,17 +3276,36 @@ export function buildScene(
           { x: p.x - nx, y: yb, z: p.z - nz },
         ];
         const milieu: P3 = { x: (p.x + q.x) / 2, y: yb, z: (p.z + q.z) / 2 };
+        const ruban = {
+          stroke: null,
+          shade: false,
+          ownerId: `cl-${cl.id}`,
+          roomId: cl.roomId,
+          depthAt: milieu,
+          appareil: true,
+          sansModele: true,
+        };
         for (const sens of [1, -1]) {
           faces.push({
+            ...ruban,
             pts: sens > 0 ? bande : [...bande].reverse(),
             fill: spec.color,
-            stroke: null,
-            shade: false,
             normal: { x: 0, y: sens, z: 0 },
-            ownerId: `cl-${cl.id}`,
-            roomId: cl.roomId,
-            depthAt: milieu,
-            appareil: true,
+          });
+        }
+        // La joue, sur l'axe du tracé : ses deux faces, une vers chaque côté.
+        const joue = [
+          { x: p.x, y: yb, z: p.z },
+          { x: q.x, y: yb, z: q.z },
+          { x: q.x, y: yb - 0.03, z: q.z },
+          { x: p.x, y: yb - 0.03, z: p.z },
+        ];
+        for (const sens of [1, -1]) {
+          faces.push({
+            ...ruban,
+            pts: sens > 0 ? joue : [...joue].reverse(),
+            fill: mixHex(spec.color, '#FFFFFF', 0.35),
+            normal: { x: (nx / 0.02) * sens, y: 0, z: (nz / 0.02) * sens },
           });
         }
       }
@@ -3303,6 +3333,7 @@ export function buildScene(
         roomId: cl.roomId,
         depthAt: { x: cl.at.x, y: ys, z: cl.at.z },
         appareil: true,
+        sansModele: true,
       });
       continue;
     }

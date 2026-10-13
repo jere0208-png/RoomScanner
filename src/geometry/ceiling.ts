@@ -264,18 +264,28 @@ export const CEILING_SYMBOL: Record<CeilingKind, { d: string; fill?: boolean }[]
     { d: 'M0 -9 V9' },
   ],
   // Le ruban LED, pour une légende ou un bouton : sa ligne brisée. Sur le
-  // plan, il suit son tracé (`trace`).
-  led: [{ d: 'M-9 1.5 L-6 -1.5 L-3 1.5 L0 -1.5 L3 1.5 L6 -1.5 L9 1.5' }],
+  // plan, il suit son tracé (`trace`). Ses dents montent à ±3 : à ±1,5, la
+  // légende et le bouton ne montraient qu'un trait (relevé du patron).
+  led: [{ d: 'M-9 3 L-6 -3 L-3 3 L0 -3 L3 3 L6 -3 L9 3' }],
   applique: [
     { d: 'M-7 4 h14' },
     { d: 'M-4 4 a4 4 0 0 1 8 0' },
     { d: 'M0 -6 v2' },
   ],
+  /*
+    LE VENTILATEUR, VU DU DESSOUS — relevé du patron : « il y a 3 hélices et
+    l'icône est mal faite ». Trois pales tracées à main levée, chacune de
+    sa forme. Le voici en quatre pales pincées au moyeu et larges au bout,
+    comme on le voit en levant la tête — tracées par ROTATION d'une seule
+    (`tools` : la pale à −45°, puis tous les quarts de tour) : la symétrie
+    est exacte.
+  */
   ventilateur: [
-    { d: 'M-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0', fill: true },
-    { d: 'M0 -2 C -3 -9 -8 -7 -8 -3 C -5 -3 -2 -2 0 -2' },
-    { d: 'M2 0 C 9 -3 7 -8 3 -8 C 3 -5 2 -2 2 0' },
-    { d: 'M-1 2 C -8 5 -6 9 -2 9 C -2 6 -1 4 -1 2' },
+    { d: 'M-2 0 a2 2 0 1 0 4 0 a2 2 0 1 0 -4 0' },
+    { d: 'M1.41 -2.55 L4.1 -6.22 A2.1 2.1 0 0 1 7.07 -3.25 L2.55 -1.41 Z' },
+    { d: 'M2.55 1.41 L6.22 4.1 A2.1 2.1 0 0 1 3.25 7.07 L1.41 2.55 Z' },
+    { d: 'M-1.41 2.55 L-4.1 6.22 A2.1 2.1 0 0 1 -7.07 3.25 L-2.55 1.41 Z' },
+    { d: 'M-2.55 -1.41 L-6.22 -4.1 A2.1 2.1 0 0 1 -3.25 -7.07 L-1.41 -2.55 Z' },
   ],
   // Le détecteur de fumée : le détecteur de l'architecte, cœur plein.
   daaf: [

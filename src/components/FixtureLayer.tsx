@@ -11,6 +11,7 @@
  * élément, et il est resté vert — l'extraction n'a pas bougé un point.
  */
 import React from 'react';
+import type { GestureResponderEvent } from 'react-native';
 import { Circle, G, Line, Path, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 import type { Palette } from '../theme';
 import {
@@ -89,6 +90,88 @@ export function sortieDeLAppareil(
   return sortieDuSymbole(symboleCompact(postsOf(f.kind), f.kind).symbole, echelle, bandeDeFacade(f, walls, dehors));
 }
 
+/**
+ * LES UNITÉS DESSINÉES DE L'APPAREILLAGE — une par plaque : deux prises
+ * liées à la main (`group`) ne font qu'un symbole, au milieu de l'ensemble,
+ * avec tous leurs postes. `rang` : l'échelonnement des unités posées au même
+ * point d'un mur (la deuxième se pose plus loin, sur le même filet).
+ *
+ * Le dessin et la recherche de ce qu'on touche (`FloorplanEditor`) lisent la
+ * même liste : un appareil se choisit là où il se voit.
+ */
+export function unitesDesAppareils(
+  fixtures: Fixture[],
+  walls: WallSeg[],
+  quads: Map<string, { a1: Pt; b1: Pt; a2: Pt; b2: Pt } | undefined>,
+) {
+  const placed = fixtures
+    .map((f) => {
+      const w = walls.find((x) => x.id === f.wallId);
+      if (!w) return null;
+      const face = wallFace(w, quads.get(w.id), f.side);
+      return { f, face, x: faceX(face, f.along) };
+    })
+    .filter((p): p is NonNullable<typeof p> => !!p);
+  /**
+   * Un ENSEMBLE se dessine une fois, avec tous ses postes.
+   *
+   * Deux prises liées à la main forment une double prise : sur le
+   * mur, c'est une plaque de 153 mm à deux mécanismes. Le plan,
+   * lui, dessinait le symbole de chaque appareil à sa propre
+   * place — deux socles distants de 71 mm, soit deux pixels à
+   * l'échelle d'un logement. On n'en voyait qu'un, et rien ne
+   * disait qu'ils étaient liés.
+   */
+  const lots = new Map<string, typeof placed>();
+  for (const it of placed) {
+    const cle = it.f.group ? `g:${it.f.group}:${it.f.wallId}:${it.f.side}` : `s:${it.f.id}`;
+    const l = lots.get(cle);
+    if (l) l.push(it);
+    else lots.set(cle, [it]);
+  }
+  const unites = [...lots.values()].map((membres) => {
+    const tri = [...membres].sort((a2, b2) => a2.x - b2.x);
+    const xs = tri.map((m) => m.x);
+    return {
+      f: tri[0].f,
+      face: tri[0].face,
+      // Le symbole se pose au MILIEU de l'ensemble, comme sa
+      // plaque : c'est ce qu'on voit sur le mur.
+      x: (Math.min(...xs) + Math.max(...xs)) / 2,
+      postes: tri.flatMap((m) => postsOf(m.f.kind)),
+      membres: tri.map((m) => m.f),
+    };
+  });
+  const ranks = stackRanks(
+    unites.map((p) => ({
+      id: p.f.id,
+      wallId: p.f.wallId,
+      side: p.f.side,
+      x: p.x,
+    })),
+  );
+  return unites.map((u) => ({ ...u, rang: ranks.get(u.f.id) ?? 0 }));
+}
+
+export type UniteDAppareil = ReturnType<typeof unitesDesAppareils>[number];
+
+/** Le centre écran du symbole d'une unité — et son point d'attache au mur. */
+export function poseDeLUnite(
+  u: UniteDAppareil,
+  mapping: Mapping,
+  walls: WallSeg[],
+  dehors: Map<string, 1 | -1> | undefined,
+  lod: number,
+) {
+  const { symbole } = symboleCompact(u.postes, u.f.kind);
+  const out =
+    sortieDuSymbole(symbole, mapping.scale, bandeDeFacade(u.f, walls, dehors)) + u.rang * (0.1 + 0.14 * lod);
+  return {
+    p: mapping.toPx(facePoint(u.face, u.x, out)),
+    anchor: mapping.toPx(facePoint(u.face, u.x, 0.02)),
+  };
+}
+
 export function FixtureLayer({
   fixtures,
   circuitMarks,
@@ -131,7 +214,8 @@ export function FixtureLayer({
    * a quelque chose et combien — et le symbole revient au relâcher.
    */
   navigating?: boolean;
-  onSelectFixture?: (id: string, wallId: string) => void;
+  /** `e` : le toucher, pour qui veut savoir ce qu'il y a d'autre sous le doigt. */
+  onSelectFixture?: (id: string, wallId: string, e?: GestureResponderEvent) => void;
   c: Palette;
 }) {
   /*
@@ -228,53 +312,7 @@ export function FixtureLayer({
           c'est la convention d'un plan d'électricien, et le seul moyen
           de distinguer les deux faces d'une même cloison. */}
       {(() => {
-        const placed = (fixtures ?? [])
-          .map((f) => {
-            const w = walls.find((x) => x.id === f.wallId);
-            if (!w) return null;
-            const face = wallFace(w, quads.get(w.id), f.side);
-            return { f, face, x: faceX(face, f.along) };
-          })
-          .filter((p): p is NonNullable<typeof p> => !!p);
-        /**
-         * Un ENSEMBLE se dessine une fois, avec tous ses postes.
-         *
-         * Deux prises liées à la main forment une double prise : sur le
-         * mur, c'est une plaque de 153 mm à deux mécanismes. Le plan,
-         * lui, dessinait le symbole de chaque appareil à sa propre
-         * place — deux socles distants de 71 mm, soit deux pixels à
-         * l'échelle d'un logement. On n'en voyait qu'un, et rien ne
-         * disait qu'ils étaient liés.
-         */
-        const lots = new Map<string, typeof placed>();
-        for (const it of placed) {
-          const cle = it.f.group
-            ? `g:${it.f.group}:${it.f.wallId}:${it.f.side}`
-            : `s:${it.f.id}`;
-          const l = lots.get(cle);
-          if (l) l.push(it);
-          else lots.set(cle, [it]);
-        }
-        const unites = [...lots.values()].map((membres) => {
-          const tri = [...membres].sort((a2, b2) => a2.x - b2.x);
-          const xs = tri.map((m) => m.x);
-          return {
-            f: tri[0].f,
-            face: tri[0].face,
-            // Le symbole se pose au MILIEU de l'ensemble, comme sa
-            // plaque : c'est ce qu'on voit sur le mur.
-            x: (Math.min(...xs) + Math.max(...xs)) / 2,
-            postes: tri.flatMap((m) => postsOf(m.f.kind)),
-          };
-        });
-        const ranks = stackRanks(
-          unites.map((p) => ({
-            id: p.f.id,
-            wallId: p.f.wallId,
-            side: p.f.side,
-            x: p.x,
-          })),
-        );
+        const unites = unitesDesAppareils(fixtures ?? [], walls, quads);
         /**
          * LA TAILLE DU SYMBOLE SUIT LE ZOOM.
          *
@@ -342,7 +380,8 @@ export function FixtureLayer({
           return null;
         };
 
-        return unites.map(({ f, face, x, postes }) => {
+        return unites.map((u) => {
+          const { f, face, postes } = u;
           const spec = FIXTURES[f.kind];
           // L'interrupteur général garde son violet, même à l'encre unique.
           const teinte = spec.teintePropre ?? encre ?? spec.color;
@@ -354,11 +393,7 @@ export function FixtureLayer({
           // Échelonnement : le deuxième appareil du même point se pose
           // plus loin du mur, sur le même filet. Le premier TOUCHE son mur.
           const lod = navigating ? 0 : elecLod;
-          const out =
-            sortieDuSymbole(symbol, mapping.scale, bandeDeFacade(f, walls, dehors)) +
-            (ranks.get(f.id) ?? 0) * (0.1 + 0.14 * lod);
-          const anchor = mapping.toPx(facePoint(face, x, 0.02));
-          const p = mapping.toPx(facePoint(face, x, out));
+          const { p, anchor } = poseDeLUnite(u, mapping, walls, dehors, lod);
           // Le symbole regarde SA face : sa tige rejoint le mur. Le
           // plan pouvant être tourné, l'angle se prend à l'écran.
           const dir =
@@ -385,7 +420,7 @@ export function FixtureLayer({
               accessibilityLabel={spec.label}
               onPress={
                 onSelectFixture
-                  ? () => onSelectFixture(f.id, f.wallId)
+                  ? (e: GestureResponderEvent) => onSelectFixture(f.id, f.wallId, e)
                   : undefined
               }>
               {/* Cible tactile élargie : le symbole fait 22 px, le

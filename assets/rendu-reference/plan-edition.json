@@ -9,6 +9,7 @@
    "overflow": "hidden"
   },
   "onLayout": "[fn]",
+  "onTouchStart": "[fn]",
   "onStartShouldSetResponder": "[fn]",
   "onMoveShouldSetResponder": "[fn]",
   "onStartShouldSetResponderCapture": "[fn]",
@@ -2304,7 +2305,8 @@
           "fill": {
            "type": 0,
            "payload": 4278190080
-          }
+          },
+          "accessibilityLabel": "Point lumineux DCL"
          },
          "children": [
           {
@@ -2416,7 +2418,8 @@
           "fill": {
            "type": 0,
            "payload": 4278190080
-          }
+          },
+          "accessibilityLabel": "Détecteur de fumée"
          },
          "children": [
           {

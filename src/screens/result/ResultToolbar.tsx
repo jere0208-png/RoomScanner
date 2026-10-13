@@ -14,12 +14,13 @@
  * la carte, et les gestes en attente.
  */
 import React, { useState } from 'react';
-import { Animated } from 'react-native';
+import { Animated, View } from 'react-native';
 import { useTheme } from '../../theme';
 import { RangeeOutils } from '../../components/RangeeOutils';
 import { ToolPill } from '../../components/ToolPill';
 import { CeilingIcon } from '../../components/CeilingIcon';
 import { VignetteProduit } from '../../components/VignetteProduit';
+import { photoDe } from '../../ui/produits';
 
 import {
   CEILINGS,
@@ -281,9 +282,21 @@ export function Toolbar2D({
           l'achètera. La LIGNE de spots garde son pictogramme — c'est un
           geste, pas un produit.
         */
+        /*
+          SANS PHOTO, SON DESSIN — pas son nom écrit dans une pastille.
+          Le ruban LED et le spot au sol n'ont pas de photo : leur vignette
+          écrivait « Ruban LED » en petit au milieu des produits. Ils
+          prennent leur pictogramme, comme la ligne de spots.
+        */
         ...CEILING_KINDS.map((k) => ({
           label: CEILINGS[k].label,
-          node: <VignetteProduit code={`plafond-${k}`} libelle={CEILINGS[k].label} taille={36} />,
+          node: photoDe(`plafond-${k}`) ? (
+            <VignetteProduit code={`plafond-${k}`} libelle={CEILINGS[k].label} taille={36} />
+          ) : (
+            <View style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+              <CeilingIcon kind={k} size={30} />
+            </View>
+          ),
           onPress: () => setPendingCeiling(k),
         })),
       ],

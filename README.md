@@ -14285,6 +14285,47 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le ventilateur, le ruban LED, le choix sous le doigt
+
+**Le ventilateur** (relevé du patron : « il y a 3 hélices et l'icône est
+mal faite »). Sur le plan, ses trois pales étaient tracées à main levée,
+chacune de sa forme. Au catalogue, un tourbillon plein détonnait au milieu
+d'icônes au trait. Il est redessiné vu du dessous : quatre pales pincées au
+moyeu et larges au bout, tracées par rotation d'une seule, donc
+exactement symétriques. C'est le même dessin au plan, au PDF et au
+catalogue.
+
+**Le tour des autres icônes.**
+- Le ruban LED de la légende et des boutons était un trait à peine
+  ondulé : ses dents montent à ±3.
+- Le ruban et le spot au sol, sans photo, s'écrivaient en toutes lettres
+  au milieu des photos du catalogue. Ils prennent leur pictogramme.
+
+**Le ruban LED en 3D et en visite.** Ses faces étaient marquées
+« appareil », et la 3D comme la visite écartent ces faces pour dessiner le
+vrai modèle à leur place. Le ruban n'en a pas : il disparaissait. Il
+passe maintenant tel quel (`sansModele`), avec une joue de 3 cm qu'on voit
+de face à hauteur d'œil. Le spot au sol aussi.
+
+**Le ruban ne prend plus les doigts de toute la pièce.** Sa cible était
+une polyligne, et le moteur du dessin compte l'intérieur d'un tracé dans
+ce qu'on touche, même sans remplissage. Un ruban qui fait le tour de la
+pièce prenait donc tous les appuis posés dedans. Sa cible est maintenant
+faite de ses segments (un segment n'a pas d'intérieur), et ses dessins ne
+se touchent plus. Il se choisit sur son zigzag, et nulle part ailleurs.
+
+**Plusieurs éléments sous le doigt : on demande.** Le plan donnait la
+main à ce qui était peint par-dessus : le point lumineux au-dessus de la
+table, le ruban le long du mur des prises. Au toucher, on cherche
+maintenant tout ce qui se choisit à cet endroit, chacun avec sa propre
+cible au dessin : appareil de plafond, ruban, appareil mural, meuble,
+menuiserie. S'il y en a plus d'un, une carte les nomme près du doigt,
+avec leur image. S'il n'y en a qu'un, rien ne change. Le dessin et la
+recherche lisent la même liste d'appareils (`unitesDesAppareils`), si
+bien qu'un appareil se choisit là où il se voit.
+
+Banc : `tournee6plafond`.
+
 ## L'image en grand, l'habitable de la maison, les poteaux
 
 **L'image partagée** (Léon, Nadia, Bérénice).

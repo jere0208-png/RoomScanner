@@ -74,8 +74,10 @@ import { markColor } from '../geometry/schema';
 import { bleuFenetre, encreElectrique } from '../ui/encreElec';
 import { cheminDuPoche, pocheDesMurs } from '../geometry/poche';
 import { cibleDeFacade, cotesExterieurs } from '../geometry/cibleMur';
-import { CeilingLayer, rayonDuPointLumineux } from './CeilingLayer';
-import { FixtureLayer } from './FixtureLayer';
+import { CeilingLayer, LARGEUR_CIBLE_RUBAN, rayonDuPointLumineux } from './CeilingLayer';
+import { CeilingIcon } from './CeilingIcon';
+import { FixtureLayer, poseDeLUnite, rayonDAppareil, unitesDesAppareils } from './FixtureLayer';
+import { VignetteAppareil } from './VignetteAppareil';
 import { OndeePose, useNaissances } from './Vivant';
 import { NotesLayer } from './NotesLayer';
 import { aimanterCoin, poserLibre } from '../geometry/poser';
@@ -85,8 +87,8 @@ import {
 } from '../ui/etiquettesPlafond';
 import type { Boite } from '../ui/ecarter';
 import { pointInPolygon as insidePoly } from '../geometry/appearance';
-import type { Fixture } from '../geometry/electrical';
-import { C_LED, type CeilingFixture } from '../geometry/ceiling';
+import { FIXTURES, type Fixture } from '../geometry/electrical';
+import { C_LED, CEILINGS, type CeilingFixture } from '../geometry/ceiling';
 import { CloseCross } from './CloseCross';
 import { CardinalRing, NorthBadge } from './CardinalRing';
 
@@ -622,6 +624,75 @@ function ToileDuPlan({
   );
 }
 
+/** Une chose qui se choisit sur le plan, telle que la carte du choix la nomme. */
+interface CibleDuPlan {
+  cle: string;
+  libelle: string;
+  /** Où elle est : au plafond, au mur, un meuble, une menuiserie. */
+  genre: string;
+  icone: React.ReactNode;
+  choisir: () => void;
+}
+
+/**
+ * LA CARTE DU CHOIX — posée au-dessus du doigt (en dessous s'il n'y a pas la
+ * place), tenue dans le cadre. Toucher ailleurs la referme sans rien choisir.
+ */
+function ChoixSousLeDoigt({
+  choix,
+  largeur,
+  hauteur,
+  onFermer,
+}: {
+  choix: { x: number; y: number; cibles: CibleDuPlan[] };
+  largeur: number;
+  hauteur: number;
+  onFermer: () => void;
+}) {
+  const styles = getStyles(useTheme());
+  const LARGEUR = 232;
+  const haut = 40 + choix.cibles.length * 52;
+  const left = Math.max(8, Math.min(largeur - LARGEUR - 8, choix.x - LARGEUR / 2));
+  const dessus = choix.y - haut - 22;
+  const top = dessus >= 8 ? dessus : Math.min(hauteur - haut - 8, choix.y + 22);
+  return (
+    <>
+      <TouchableOpacity
+        style={StyleSheet.absoluteFill}
+        activeOpacity={1}
+        onPress={onFermer}
+        accessibilityLabel="Fermer le choix"
+      />
+      <View pointerEvents="none" style={[styles.choixDoigt, { left: choix.x - 9, top: choix.y - 9 }]} />
+      <View style={[styles.choixCarte, { left, top: Math.max(8, top), width: LARGEUR }]} accessibilityRole="menu">
+        <Text style={styles.choixTitre}>{`${choix.cibles.length} éléments ici`}</Text>
+        {choix.cibles.map((cb) => (
+          <TouchableOpacity
+            key={cb.cle}
+            style={styles.choixLigne}
+            activeOpacity={0.6}
+            accessibilityRole="menuitem"
+            accessibilityLabel={`Choisir ${cb.libelle}`}
+            onPress={() => {
+              onFermer();
+              cb.choisir();
+            }}>
+            <View style={styles.choixIcone}>{cb.icone}</View>
+            <View style={styles.choixTextes}>
+              <Text style={styles.choixNom} numberOfLines={1}>
+                {cb.libelle}
+              </Text>
+              <Text style={styles.choixGenre} numberOfLines={1}>
+                {cb.genre}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </>
+  );
+}
+
 /** Un nom de pièce raccourci pour un cartouche serré : huit lettres et « … ». */
 function couperNom(nom: string): string {
   const lettres = Array.from(nom);
@@ -790,6 +861,16 @@ export function FloorplanEditor({
   const [view, setView] = useState(
     vueInitiale ?? { zoom: 1, ox: 0, oy: 0, rot: 0 },
   );
+  /** Le dernier doigt posé, dans le cadre du plan (px). Voir `toucher`. */
+  const dernierToucher = useRef<{ x: number; y: number } | null>(null);
+  /** Plusieurs choses sous le doigt : la carte qui demande laquelle. */
+  const [choixSousLeDoigt, setChoixSousLeDoigt] = useState<{
+    x: number;
+    y: number;
+    cibles: CibleDuPlan[];
+  } | null>(null);
+  // Le plan bouge : la carte, posée près d'un point, n'a plus de sens.
+  useEffect(() => setChoixSousLeDoigt(null), [view]);
   /*
     LE PLAN DIT OÙ IL EN EST — et la 3D reprend exactement là.
 
@@ -2084,6 +2165,127 @@ export function FloorplanEditor({
     return () => onViseur?.(null);
   }, [onViseur, viseur]);
 
+  /*
+    PLUSIEURS CHOSES SOUS LE DOIGT : ON DEMANDE — relevé du patron : « si
+    plusieurs éléments sur le même emplacement au clic, on demande la
+    sélection ». Le dessin donnait la main à ce qui était peint par-dessus :
+    le point lumineux au-dessus de la table, le ruban le long du mur où
+    sont les prises. Au toucher, on cherche tout ce qui se choisit à cet
+    endroit — chaque chose avec la cible qu'elle a au dessin —, et s'il y en
+    a plus d'une, une carte les nomme près du doigt. Une seule : rien ne
+    change, elle est prise.
+  */
+  const ciblesAuPoint = (p: { x: number; y: number }): CibleDuPlan[] => {
+    if (!mapping) return [];
+    const out: CibleDuPlan[] = [];
+    const auSegment = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const l2 = dx * dx + dy * dy;
+      const t = l2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+      return Math.hypot(a.x + dx * t - p.x, a.y + dy * t - p.y);
+    };
+    if (showCeiling && onSelectCeiling) {
+      const r = rayonDuPointLumineux(mapping.scale);
+      for (const cl of ceiling ?? []) {
+        let dessous: boolean;
+        if (cl.trace && cl.trace.length >= 2) {
+          const e = cl.trace.map((pt) => mapping.toPx(pt));
+          const tour = cl.ferme ? [...e, e[0]] : e;
+          dessous = tour.slice(1).some((g, i) => auSegment(tour[i], g) <= LARGEUR_CIBLE_RUBAN / 2);
+        } else {
+          const q = mapping.toPx(cl.at);
+          dessous = Math.hypot(q.x - p.x, q.y - p.y) <= Math.max(r + 6, 14);
+        }
+        if (dessous) out.push(cibleDuPlafond(cl.id));
+      }
+    }
+    if (showFixtures && onSelectFixture) {
+      const portee = Math.max(18, rayonDAppareil(mapping.scale) + 8);
+      for (const u of unitesDesAppareils(fixtures ?? [], walls, quads)) {
+        const q = poseDeLUnite(u, mapping, walls, dehorsDesMurs, elecLod).p;
+        if (Math.hypot(q.x - p.x, q.y - p.y) <= portee) out.push(cibleDeLAppareil(u.f.id));
+      }
+    }
+    if (onSelectObject && editable) {
+      const m = mapping.toMeters(p);
+      for (const o of objects) {
+        const f = footprintOf(o, partOf);
+        const dx = m.x - f.cx;
+        const dz = m.z - f.cz;
+        const u = dx * Math.cos(f.yaw) + dz * Math.sin(f.yaw);
+        const v = -dx * Math.sin(f.yaw) + dz * Math.cos(f.yaw);
+        if (Math.abs(u) <= f.width / 2 && Math.abs(v) <= f.depth / 2) out.push(cibleDuMeuble(o.id));
+      }
+    }
+    if (editable && onSelectOpening) {
+      for (const o of openings) {
+        if (auSegment(mapping.toPx(o.a), mapping.toPx(o.b)) <= 13) out.push(cibleDeLaBaie(o.id));
+      }
+    }
+    return out.filter((x): x is CibleDuPlan => !!x);
+  };
+  const cibleDuPlafond = (id: string): CibleDuPlan => {
+    const cl = (ceiling ?? []).find((x) => x.id === id);
+    const spec = cl ? CEILINGS[cl.kind] : null;
+    return {
+      cle: `plafond:${id}`,
+      libelle: spec?.label ?? 'Appareil de plafond',
+      genre: 'Au plafond',
+      icone: cl ? <CeilingIcon kind={cl.kind} size={22} /> : null,
+      choisir: () => onSelectCeiling?.(id),
+    };
+  };
+  const cibleDeLAppareil = (id: string): CibleDuPlan => {
+    const f = (fixtures ?? []).find((x) => x.id === id);
+    return {
+      cle: `appareil:${id}`,
+      libelle: f ? FIXTURES[f.kind].label : 'Appareil',
+      genre: 'Au mur',
+      icone: f ? <VignetteAppareil kind={f.kind} taille={28} /> : null,
+      choisir: () => f && onSelectFixture?.(f.id, f.wallId),
+    };
+  };
+  const cibleDuMeuble = (id: string): CibleDuPlan => {
+    const o = objects.find((x) => x.id === id);
+    return {
+      cle: `meuble:${id}`,
+      libelle: o ? frCategory(o.category) : 'Meuble',
+      genre: 'Meuble',
+      icone: (
+        <Svg width={20} height={20} viewBox="0 0 24 24">
+          <Path d={SOLAIRES.meubles} fill={c.inkSoft} />
+        </Svg>
+      ),
+      choisir: () => onSelectObject?.(id),
+    };
+  };
+  const cibleDeLaBaie = (id: string): CibleDuPlan => {
+    const o = openings.find((x) => x.id === id);
+    return {
+      cle: `baie:${id}`,
+      libelle: !o ? 'Menuiserie' : o.type === 'window' ? 'Fenêtre' : o.type === 'door' ? (o.garage ? 'Porte de garage' : 'Porte') : 'Passage',
+      genre: 'Menuiserie',
+      icone: (
+        <Svg width={20} height={20} viewBox="0 0 24 24">
+          <Path d={SOLAIRES.ouvertures} fill={c.inkSoft} />
+        </Svg>
+      ),
+      choisir: () => onSelectOpening?.(id),
+    };
+  };
+  /** Le geste d'un élément touché : seul sous le doigt, il agit ; sinon, on demande. */
+  const toucher = (defaut: CibleDuPlan, agir: () => void) => {
+    const p = dernierToucher.current;
+    const autres = p ? ciblesAuPoint(p).filter((x) => x.cle !== defaut.cle) : [];
+    if (!p || autres.length === 0) {
+      agir();
+      return;
+    }
+    haptic('leger');
+    setChoixSousLeDoigt({ x: p.x, y: p.y, cibles: [defaut, ...autres] });
+  };
+
   return (
     <View
       ref={hote}
@@ -2095,6 +2297,20 @@ export function FloorplanEditor({
           h: e.nativeEvent.layout.height,
         })
       }
+      onTouchStart={(e) => {
+        // Où le doigt s'est posé, dans le cadre du plan : voir `toucher`.
+        // `locationX` d'abord ; puis, mieux, par la page et la place du
+        // cadre — `locationX` se lit par rapport à la vue touchée, qui n'est
+        // pas toujours le cadre. La mesure revient bien avant le lâcher.
+        const { pageX, pageY, locationX, locationY } = e.nativeEvent;
+        dernierToucher.current = { x: locationX, y: locationY };
+        const vue = hote.current;
+        if (vue && typeof vue.measureInWindow === 'function') {
+          vue.measureInWindow((x, y) => {
+            if (Number.isFinite(x) && Number.isFinite(y)) dernierToucher.current = { x: pageX - x, y: pageY - y };
+          });
+        }
+      }}
       {...nav.panHandlers}>
       {/*
         SANS CAP, ON PROPOSE DE L'ORIENTER — sans refaire le scan.
@@ -2564,7 +2780,9 @@ export function FloorplanEditor({
                         ((f.yaw + view.rot) * 180) / Math.PI
                       })`}
                       onPress={() =>
-                        onSelectObject(o.id === selectedObjectId ? null : o.id)
+                        toucher(cibleDuMeuble(o.id), () =>
+                          onSelectObject(o.id === selectedObjectId ? null : o.id),
+                        )
                       }
                     />
                   );
@@ -3140,7 +3358,7 @@ export function FloorplanEditor({
                   key={o.id}
                   onPress={
                     editable && onSelectOpening
-                      ? () => onSelectOpening(choisie ? null : o.id)
+                      ? () => toucher(cibleDeLaBaie(o.id), () => onSelectOpening(choisie ? null : o.id))
                       : undefined
                   }>
                   {/* Cible tactile : une menuiserie fait 3 px d'épaisseur. */}
@@ -3326,7 +3544,9 @@ export function FloorplanEditor({
               /* Le bouton « Cotes » vaut aussi pour le plafond : les écarts
                  d'une ligne de spots s'y lisent comme ceux d'un mur. */
               showMeasures={showMeasures}
-              onSelectCeiling={onSelectCeiling}
+              onSelectCeiling={
+                onSelectCeiling ? (id) => toucher(cibleDuPlafond(id), () => onSelectCeiling(id)) : undefined
+              }
               fixtures={showFixtures ? fixtures : VIDE}
               walls={walls}
               quads={quads}
@@ -3346,7 +3566,11 @@ export function FloorplanEditor({
               viewRot={view.rot}
               elecLod={elecLod}
               navigating={false}
-              onSelectFixture={onSelectFixture}
+              onSelectFixture={
+                onSelectFixture
+                  ? (id, wallId) => toucher(cibleDeLAppareil(id), () => onSelectFixture(id, wallId))
+                  : undefined
+              }
               encre={encre}
               dehors={dehorsDesMurs}
               c={c}
@@ -4225,6 +4449,15 @@ export function FloorplanEditor({
               );
             })()}
         </Animated.View>
+      )}
+      {/* Plusieurs choses sous le doigt : laquelle ? (voir `toucher`) */}
+      {choixSousLeDoigt && (
+        <ChoixSousLeDoigt
+          choix={choixSousLeDoigt}
+          largeur={layout.w}
+          hauteur={layout.h}
+          onFermer={() => setChoixSousLeDoigt(null)}
+        />
       )}
     </View>
   );
@@ -5477,6 +5710,60 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     backgroundColor: c.surface,
     borderRadius: 20,
     overflow: 'hidden',
+  },
+  /** La carte du choix sous le doigt (voir `ChoixSousLeDoigt`). */
+  choixCarte: {
+    position: 'absolute',
+    backgroundColor: c.surface,
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: c.line,
+  },
+  choixTitre: {
+    color: c.inkSoft,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    paddingHorizontal: 10,
+    paddingBottom: 6,
+    textTransform: 'uppercase',
+  },
+  choixLigne: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 8,
+    height: 52,
+    borderRadius: 12,
+  },
+  choixIcone: {
+    minWidth: 36,
+    paddingHorizontal: 3,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: c.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  choixTextes: { flex: 1 },
+  choixNom: { color: c.ink, fontSize: 15, fontWeight: '600' },
+  choixGenre: { color: c.inkSoft, fontSize: 12, marginTop: 1 },
+  /** Le point touché, cerclé : on voit de quoi on parle. */
+  choixDoigt: {
+    position: 'absolute',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: c.blue,
+    backgroundColor: c.blueSoft,
   },
   /** La poignée de rotation d'un mur : un rond bleu clair, comme au meuble. */
   wallRotate: {
