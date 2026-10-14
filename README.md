@@ -14298,6 +14298,9 @@ simulé (branche `captures`). Ce qu'on y a vu, et corrigé :
   « + Meuble », « Édition » avaient le fond exact de la carte du plan, et
   leur ombre, noire sur du noir, ne se voyait pas. Ce qui porte une ombre de
   bouton prend, en sombre, une surface un cran plus claire.
+- « Continuer avec Apple » porte le logo Apple (exigé par les règles de
+  « Se connecter avec Apple » : un refus de revue évité), « Continuer avec
+  Google » le « G » de Google.
 - Les parcours Maestro touchent l'intérieur des feuilles modales à sa place
   (Maestro ne lit pas leur contenu), et retrouvent l'accueil depuis le
   profil.
