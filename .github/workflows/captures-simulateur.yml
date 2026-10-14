@@ -33,6 +33,10 @@ env:
   MAESTRO_CLI_NO_ANALYTICS: 1
   MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: true
 
+# Écrire la branche `captures` (voir « Publier sur la branche captures »).
+permissions:
+  contents: write
+
 jobs:
   captures:
     runs-on: macos-15
@@ -193,6 +197,30 @@ jobs:
             echo
             ls captures/ecrans | sed 's/^/- /'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # LES CAPTURES DANS LE DÉPÔT, sur une branche à part — l'environnement
+      # de revue ne peut pas télécharger les artefacts (stockage externe) ;
+      # git, si. Une branche orpheline, un seul commit remplacé à chaque
+      # passage sur main : le dépôt ne grossit pas. Le plan d'exemple
+      # seulement, aucune donnée réelle.
+      - name: Publier sur la branche captures
+        if: always() && github.event_name != 'pull_request'
+        run: |
+          set -e
+          DEST="$RUNNER_TEMP/branche-captures"
+          rm -rf "$DEST" && mkdir -p "$DEST/ecrans" "$DEST/journal"
+          cp captures/ecrans/*.png "$DEST/ecrans/" 2>/dev/null || true
+          cp captures/bilan.md "$DEST/" 2>/dev/null || true
+          # Le texte des échecs Maestro (commandes et erreurs), sans les images.
+          find captures/debug captures/brut -type f \( -name '*.json' -o -name '*.log' -o -name '*.txt' -o -name '*.xml' \) -size -400k 2>/dev/null \
+            | while read -r f; do cp "$f" "$DEST/journal/$(echo "$f" | tr '/' '_')"; done || true
+          cd "$DEST"
+          git init -q -b captures
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Captures du simulateur — ${GITHUB_SHA::7}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" captures:captures
 
       - name: Journal du simulateur si un parcours a échoué
         if: steps.maestro.outcome == 'failure'

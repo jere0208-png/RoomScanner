@@ -51,7 +51,7 @@ import { useCaseRetenue, useReglagesExport } from '../store/reglagesExport';
 import { piecesRetenues, travauxDesPieces } from '../geometry/travaux';
 import type { Fixture } from '../geometry/electrical';
 import { planRoutes } from '../geometry/elecplan';
-import { floorsOf, useScanStore } from '../store/scanStore';
+import { NOM_PLAN_MAX, floorsOf, useScanStore } from '../store/scanStore';
 import { useAccountStore, useDossierNet } from '../store/accountStore';
 import { deviceNames } from '../geometry/naming';
 import { PromptSheet, type PromptData } from '../components/Sheet';
@@ -992,6 +992,36 @@ const styles = getStyles(c);
             nom du client et l'adresse du chantier. Le crayon dit que ça
             s'édite.
           */}
+          {/*
+            LE TITRE DU DOSSIER — revue « Marc » : « 2 pièces · 14/10 » en
+            très gros sur la page de garde et dans chaque cartouche, et le
+            renommage caché au fond d'un menu. Il se change ici, où on le lit.
+          */}
+          <TouchableOpacity
+            accessibilityLabel="Renseigner : Titre du dossier"
+            style={[styles.dossierCase, styles.dossierTitreCase]}
+            onPress={() =>
+              setPrompt({
+                title: 'Titre du dossier',
+                subtitle: 'Il paraît en page de garde, dans chaque cartouche et dans le nom du fichier.',
+                value: scanName,
+                okLabel: 'Enregistrer',
+                maxLength: NOM_PLAN_MAX,
+                onSubmit: (t: string) => {
+                  if (t.trim()) useScanStore.getState().renameCurrent(t);
+                },
+              })
+            }>
+            <View style={styles.dossierEntete}>
+              <Text style={styles.dossierTitre}>TITRE</Text>
+              <Svg width={11} height={11} viewBox="0 0 24 24">
+                <Path d={SOLAIRES.crayon} fill={c.inkFaint} fillRule="evenodd" />
+              </Svg>
+            </View>
+            <Text style={styles.dossierValeur} numberOfLines={1}>
+              {scanName}
+            </Text>
+          </TouchableOpacity>
           <View style={styles.dossier}>
             {(
               [
@@ -1440,6 +1470,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   dossierValeur: { color: c.ink, fontSize: 14.5, fontWeight: '700', marginTop: 3 },
   dossierVide: { color: c.inkFaint, fontWeight: '600' },
+  dossierTitreCase: { flex: 0, marginTop: 4 },
   section: {
     color: c.inkSoft,
     fontSize: 12.5,

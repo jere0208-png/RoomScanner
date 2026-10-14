@@ -14293,6 +14293,9 @@ d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
   plafond »).
 - Une seule limite par nom (60 caractères pour un plan, 40 pour une
   pièce), un compteur à l'approche, et jamais un émoji coupé en deux.
+- Le titre du dossier se change à l'export (case « Titre », au-dessus du
+  client et du chantier) : c'est lui qu'on lit en page de garde, dans les
+  cartouches et dans le nom du fichier (Marc).
 - Le nom automatique d'un plan (« T3 · 14/10 ») se recompte après un
   étage ajouté ; un nom choisi reste. La vignette de la bibliothèque montre
   le niveau de départ seul, avec une pastille « 2 niveaux ».
@@ -14348,7 +14351,9 @@ d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 - **Captures du simulateur** (`.github/workflows/captures-simulateur.yml`,
   parcours Maestro dans `.maestro/`) : l'app compilée pour le simulateur
   iOS, parcourue écran par écran sur le plan d'exemple, en clair et en
-  sombre ; les PNG sortent dans l'artefact « captures-simulateur ». Le scan
+  sombre ; les PNG sortent dans l'artefact « captures-simulateur », et sur
+  la branche `captures` du dépôt (un seul commit, remplacé à chaque
+  passage sur main) avec le bilan et le texte des échecs. Le scan
   lui-même ne tourne pas sur simulateur (pas de LiDAR).
 
 ## Six personnes découvrent l'app — troisième lot
