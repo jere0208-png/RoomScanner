@@ -581,7 +581,24 @@ const styles = getStyles(c);
   /** Abonné : les feuilles de l'aperçu sont nettes ; sinon floutées. */
   const net = useDossierNet();
 
-  const doExport = async () => {
+  /*
+    LE CLIENT AVANT L'ENVOI — revue « Thomas » : sans client, le cartouche
+    de chaque feuille imprimait le nom du fichier, et le dossier partait
+    ainsi. On le rappelle une fois, au moment d'envoyer ; « Exporter quand
+    même » reste possible.
+  */
+  const doExport = () => {
+    if (!particulier && !client.trim() && net) {
+      alerte('Le client n’est pas renseigné', 'Son nom et l’adresse du chantier s’impriment sur chaque feuille.', [
+        { label: 'Le renseigner' },
+        { label: 'Exporter quand même', onPress: () => exporterLeDossier() },
+      ]);
+      return;
+    }
+    exporterLeDossier();
+  };
+
+  const exporterLeDossier = async () => {
     /* L'aperçu est libre, l'export est Pro : la barrière est ici — voir
        `exportOuvert`. */
     if (!exportOuvert('le dossier PDF')) return;

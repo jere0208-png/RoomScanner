@@ -14285,6 +14285,26 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le dossier d'un architecte d'intérieur, suite
+
+Revue « Thomas », architecte d'intérieur, Pro : « je l'envoie sans le
+relire ? ».
+- **Les noms des meubles ne se marchent plus dessus sur les élévations.**
+  Ils se posent après les baies, évitent leurs cotes, leur allège et la
+  vitre elle-même, se taillent à la largeur du meuble, restent dans le mur,
+  passent sur deux lignes au besoin, et disent ce qu'est le chiffre :
+  « Canapé · h 80 cm ».
+- **Le client avant l'envoi** : un abonné qui exporte sans client renseigné
+  se le voit rappeler une fois (« Exporter quand même » reste possible) ; le
+  cartouche n'imprime plus le nom du fichier par mégarde.
+- **Sur un duplex, chaque titre dit son niveau** : « Plan d'ensemble coté —
+  1er étage », « Métré par pièce — Rez-de-chaussée ».
+- **Les perspectives se renumérotent** après le retrait de celle qui redit
+  la page de garde : plus de « Perspective 2 » sans 1.
+- **Remise par un pro, la feuille d'achats s'appelle « Estimatif des
+  fournitures »** ; la colonne « Baies », qui comptait aussi les portes,
+  devient « Ouvertures ».
+
 ## Le chantier de l'électricien, suite
 
 Revue « Karim », électricien Pro, sur un T3 de 63 m².

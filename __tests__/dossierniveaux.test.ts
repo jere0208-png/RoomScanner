@@ -67,6 +67,12 @@ describe('un dossier pour toute la maison', () => {
     expect(src).toMatch(/\(Maison Martin . 1er étage\) Tj/);
   });
 
+  it('le titre de chaque feuille dit son niveau, pas seulement le cartouche', () => {
+    const src = latin1(buildScanPdf(logement, false, { metre: true, niveaux }));
+    expect(src).toMatch(/\(Plan d.ensemble coté . 1er étage\) Tj/);
+    expect(src).toMatch(/\(Métré par pièce . Rez-de-chaussée\) Tj/);
+  });
+
   it('la page de garde compte tout le logement', () => {
     const src = latin1(buildScanPdf(logement, false, { metre: false, garde: true, niveaux }));
     const garde = src.slice(src.indexOf('stream'), src.indexOf('endstream'));

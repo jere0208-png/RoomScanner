@@ -182,6 +182,7 @@ describe('sans abonnement : le dossier flouté, et l’envie de le déflouter', 
 
 describe('abonné : le dossier net, et il part', () => {
   it('les feuilles sont nettes, sans filigrane, et le bouton envoie', async () => {
+    act(() => require('../src/store/scanStore').useScanStore.getState().setClientInfo('Mme Durand', '12 rue des Lilas'));
     const t = monter(true);
     await bâtir();
     const o = apercu.mock.calls[apercu.mock.calls.length - 1][1];
@@ -194,6 +195,32 @@ describe('abonné : le dossier net, et il part', () => {
     expect(b).toBeDefined();
     await act(async () => {
       await b.props.onPress();
+    });
+    expect(partager).toHaveBeenCalledTimes(1);
+  });
+
+  it('sans client renseigné, il le rappelle une fois, et « Exporter quand même » envoie', async () => {
+    const { useScanStore } = require('../src/store/scanStore');
+    const { useAlerte } = require('../src/ui/alerte');
+    const { useUsage } = require('../src/store/usage');
+    act(() => useScanStore.getState().setClientInfo('', ''));
+    act(() => useUsage.setState({ modeElec: true }));
+    act(() => useAlerte.setState({ courante: null, file: [] }));
+    const t = monter(true);
+    await bâtir();
+    const b = t.root.findAll(
+      (n) => typeof n.props.accessibilityLabel === 'string' && n.props.accessibilityLabel === 'Exporter le PDF',
+      { deep: false },
+    )[0];
+    partager.mockClear();
+    await act(async () => {
+      await b.props.onPress();
+    });
+    const a = useAlerte.getState().courante;
+    expect(a?.titre).toBe('Le client n’est pas renseigné');
+    expect(partager).not.toHaveBeenCalled();
+    await act(async () => {
+      await a.actions.find((x: { label: string }) => x.label === 'Exporter quand même').onPress();
     });
     expect(partager).toHaveBeenCalledTimes(1);
   });
