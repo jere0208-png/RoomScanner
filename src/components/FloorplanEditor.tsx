@@ -2293,7 +2293,7 @@ export function FloorplanEditor({
     const o = openings.find((x) => x.id === id);
     return {
       cle: `baie:${id}`,
-      libelle: !o ? 'Menuiserie' : o.type === 'window' ? 'Fenêtre' : o.type === 'door' ? (o.garage ? 'Porte de garage' : 'Porte') : 'Passage',
+      libelle: !o ? 'Menuiserie' : o.type === 'window' ? 'Fenêtre' : o.type === 'door' ? (o.garage ? 'Porte de garage' : o.placard ? 'Façade de placard' : 'Porte') : 'Passage',
       genre: 'Menuiserie',
       icone: (
         <Svg width={20} height={20} viewBox="0 0 24 24">
@@ -3359,8 +3359,9 @@ export function FloorplanEditor({
                 l'affaire : ce qui compte, c'est le SENS d'ouverture.
               */
               const battant = (() => {
-                // La porte de garage ne bat pas (voir `porteDeGarage`).
-                if (o.type !== 'door' || o.garage) return null;
+                // La porte de garage ne bat pas (voir `porteDeGarage`), la
+                // façade de placard coulisse (voir `facadesDePlacard`).
+                if (o.type !== 'door' || o.garage || o.placard) return null;
                 const ancre = partOf.get(roomOf(o))?.labelAt;
                 if (!ancre) return null;
                 const dedans = mapping.toPx(ancre);
@@ -3468,6 +3469,23 @@ export function FloorplanEditor({
                   {o.type === 'door' && o.garage && (
                     <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={choisie ? c.blue : color} strokeWidth={1.4} />
                   )}
+                  {/* La façade de placard : ses vantaux coulissants, deux traits décalés. */}
+                  {o.type === 'door' && o.placard && (() => {
+                    const ex = b.x - a.x;
+                    const ey = b.y - a.y;
+                    const l = Math.hypot(ex, ey) || 1;
+                    const nx = (-ey / l) * 2.5;
+                    const ny = (ex / l) * 2.5;
+                    const mx = (a.x + b.x) / 2;
+                    const my = (a.y + b.y) / 2;
+                    const trait = choisie ? c.blue : color;
+                    return (
+                      <>
+                        <Line x1={a.x + nx} y1={a.y + ny} x2={mx + ex * 0.06 + nx} y2={my + ey * 0.06 + ny} stroke={trait} strokeWidth={1.3} />
+                        <Line x1={mx - ex * 0.06 - nx} y1={my - ey * 0.06 - ny} x2={b.x - nx} y2={b.y - ny} stroke={trait} strokeWidth={1.3} />
+                      </>
+                    );
+                  })()}
                   {/* La baie choisie : soulignée, quel que soit son genre. */}
                   {choisie && o.type !== 'window' && (
                     <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={c.blue} strokeWidth={4} strokeLinecap="butt" />

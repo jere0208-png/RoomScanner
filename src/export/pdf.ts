@@ -2369,7 +2369,7 @@ function planPage(
         inz = -inz;
       }
 
-      if (o.type === 'door' && !o.garage) {
+      if (o.type === 'door' && !o.garage && !o.placard) {
         // Battant + arc d'ouverture, sur la charnière CHOISIE : deux
         // portes en vis-à-vis se rangent dos à dos plutôt que de croiser
         // leurs quarts de cercle.
@@ -5696,6 +5696,8 @@ function dessinerUneFace(
             : 'Fenêtre'
           : estTraversante(t.seg)
           ? 'Passage'
+          : t.seg.placard
+          ? 'Placard'
           : 'Porte',
         px(gx + larg / 2),
         // Au-dessus du COFFRE quand il y en a un : posé sur le linteau, le

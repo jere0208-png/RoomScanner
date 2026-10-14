@@ -49,6 +49,7 @@ import {
   solDesMurs,
   openingsOn,
   pointOnSeg,
+  murDeLOuverture,
   pushOutOfObjects,
   separerMeubles,
   castToWall,
@@ -75,6 +76,8 @@ import {
   wallQuadsOf,
   wallRuns,
   weldCorners,
+  joindreLesCoins,
+  facadesDePlacard,
   fusionnerMursDoubles,
   estDessine,
   longueurCotee,
@@ -276,7 +279,7 @@ function releveDeLaPiece(
   murs: readonly { a: Pt; b: Pt; height: number }[] = [],
 ): RoomEntry['releve'] | undefined {
   const plafond = plafondDeLaPiece(r.maillage?.volume, contour, aire, murs);
-  const surfaceSol = solReleveDe(r.sols, contour);
+  const surfaceSol = solReleveDe(r.sols, contour, murs);
   return plafond || surfaceSol ? { plafond, surfaceSol } : undefined;
 }
 
@@ -644,6 +647,35 @@ function nommerLesGarages(
     portes.add(porte);
   });
   return portes;
+}
+
+/**
+ * LA NICHE FERMÉE PAR UNE FAÇADE DE PLACARD S'APPELLE « PLACARD » — revue
+ * d'un expert : elle ressortait « Pièce 2 », 1,2 m², avec l'alerte « pièce
+ * minuscule ». Une petite pièce sans meuble parlant, dont un mur porte une
+ * façade de placard et aucune autre porte.
+ */
+function nommerLesPlacards(
+  names: string[],
+  kinds: (RoomKind | null)[],
+  shapes: { outline: Pt[]; wallIds: string[]; area: number }[],
+  walls: WallSeg[],
+  openings: WallSeg[],
+): string[] {
+  const facades = openings.filter((o) => o.placard);
+  if (facades.length === 0) return names;
+  return names.map((nom, i) => {
+    const sh = shapes[i];
+    if (kinds[i] || !sh || sh.area <= 0 || sh.area >= 3) return nom;
+    const siens = walls.filter((w) => sh.wallIds.includes(w.id));
+    const surSesMurs = (o: WallSeg) => {
+      const mur = murDeLOuverture(o, siens);
+      return !!mur && pointOnSeg({ x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 }, mur.a, mur.b).dist < 0.1;
+    };
+    if (!facades.some(surSesMurs)) return nom;
+    if (openings.some((o) => !o.placard && o.type !== 'window' && surSesMurs(o))) return nom;
+    return 'Placard';
+  });
 }
 
 function nameRooms(kinds: (RoomKind | null)[], contours?: Pt[][]): string[] {
@@ -3386,11 +3418,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       : r.objects ?? [];
     // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR ;
     // et l'encadrement réel de chaque baie (voir `geometry/logique`).
-    const segments = avecLesBordsDuLidar(
-      avecCoffresDuLidar(surfaces.map((s) => toSegment(s)), r.dessus),
-      r.dessus,
-      r.tableaux,
+    // Les façades de placard, que RoomPlan range parmi les portes.
+    const placardsEtage = facadesDePlacard(
+      avecLesBordsDuLidar(avecCoffresDuLidar(surfaces.map((s) => toSegment(s)), r.dessus), r.dessus, r.tableaux),
+      entrants,
     );
+    const segments = placardsEtage.segments;
     const nettoyes = sansEclats(
       mergeColinear(
         splitAtJunctions(
@@ -3458,7 +3491,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     const objects: ObjectData[] = calerLesMeubles(orienterLesSieges(
       separerLeMobilier(
         // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
-        reunirLesCanapesDAngle(sansMeublesEnDouble(entrants)).map((o) => {
+        reunirLesCanapesDAngle(sansMeublesEnDouble(entrants.filter((o) => !placardsEtage.meublesDuPlacard.has(o.id)))).map((o) => {
           const t = [...o.transform];
           t[12] += dx;
           t[14] += dz;
@@ -7063,11 +7096,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       const decaler = <T extends WallSeg>(w: T): T =>
         dx === 0 && dz === 0 && angle === 0 ? w : { ...w, a: placer(w.a), b: placer(w.b) };
       // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR.
-      const relivres = avecLesBordsDuLidar(
-        avecCoffresDuLidar(surfaces.map((x) => toSegment(x)), r.dessus),
-        r.dessus,
-        r.tableaux,
-      ).map(decaler);
+      // Les façades de placard, reconnues dans le repère du passage.
+      const placardsPassage = facadesDePlacard(
+        avecLesBordsDuLidar(avecCoffresDuLidar(surfaces.map((x) => toSegment(x)), r.dessus), r.dessus, r.tableaux),
+        entrants,
+      );
+      const relivres = placardsPassage.segments.map(decaler);
       /*
         CE QUI A ÉTÉ RETIRÉ NE REVIENT PAS — revue « Thomas » : la pièce du
         voisin, retirée, revenait à chaque passage. Ce que le passage relivre
@@ -7088,10 +7122,11 @@ export const useScanStore = create<ScanState>((set, get) => {
       const ecarte = (p: Pt) => ecartees.some((c) => pres(p, c)) && !gardees.some((c) => pres(p, c));
       const milieuDe = (w: WallSeg) => ({ x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 });
       const segments = ecartees.length > 0 ? relivres.filter((w) => !ecarte(milieuDe(w))) : relivres;
-      const meublesDuPassage =
-        ecartees.length > 0
-          ? entrants.filter((o) => !ecarte(placer({ x: o.transform[12], z: o.transform[14] })))
-          : entrants;
+      const meublesDuPassage = entrants.filter(
+        (o) =>
+          !placardsPassage.meublesDuPlacard.has(o.id) &&
+          !(ecartees.length > 0 && ecarte(placer({ x: o.transform[12], z: o.transform[14] }))),
+      );
       /*
         LA CLOISON MITOYENNE EST VUE DEUX FOIS — une fois depuis chaque
         pièce. Sans les réunir, chaque arête doublée fausse le parcours des
@@ -7632,11 +7667,13 @@ export const useScanStore = create<ScanState>((set, get) => {
 
       // Le coffre de volet, que RoomPlan lisse, relu dans le maillage LiDAR ;
       // et l'encadrement réel de chaque baie (voir `geometry/logique`).
-      const segments = avecLesBordsDuLidar(
-        avecCoffresDuLidar(surfaces.map((s) => toSegment(s)), r.dessus),
-        r.dessus,
-        r.tableaux,
+      // Les façades de placard, que RoomPlan range parmi les portes : voir
+      // `facadesDePlacard`.
+      const placards = facadesDePlacard(
+        avecLesBordsDuLidar(avecCoffresDuLidar(surfaces.map((s) => toSegment(s)), r.dessus), r.dessus, r.tableaux),
+        incomingObjects,
       );
+      const segments = placards.segments;
       // Souder les coins, COUPER les murs là où une cloison vient buter
       // (sans ça aucun cycle ne passe par elle et tout l'appartement ressort
       // en une seule pièce), recoller les morceaux alignés, PUIS chercher les
@@ -7650,7 +7687,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       */
       const nettoyes = sansEclats(
         mergeColinear(
-          splitAtJunctions(weldCorners(fusionnerMursDoubles(segments.filter((s) => s.type === 'wall')))),
+          splitAtJunctions(joindreLesCoins(weldCorners(fusionnerMursDoubles(segments.filter((s) => s.type === 'wall'))))),
         ),
         [],
       ).walls;
@@ -7682,7 +7719,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const objects: ObjectData[] = calerLesMeubles(orienterLesSieges(
         separerLeMobilier(
           // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
-          reunirLesCanapesDAngle(sansMeublesEnDouble(incomingObjects)).map((o) => ({
+          reunirLesCanapesDAngle(sansMeublesEnDouble(incomingObjects.filter((o) => !placards.meublesDuPlacard.has(o.id)))).map((o) => ({
             ...o,
             roomId: `room-${roomIndexAt(
               { x: o.transform[12], z: o.transform[14] },
@@ -7714,7 +7751,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       );
       /* Chaque mur, photographié et redressé pendant le scan. */
       const photosAuto = photosDesMurs(r.photosMurs ?? [], surfaces, walls);
-      const names = nameRooms(kinds, shapes.map((s) => s.outline));
+      const names = nommerLesPlacards(nameRooms(kinds, shapes.map((s) => s.outline)), kinds, shapes, walls, openings);
       const kept: RoomEntry[] = shapes.map((s, i) => {
         const releve = releveDeLaPiece(r, s.outline, s.area, walls.filter((w) => s.wallIds.includes(w.id)));
         return {
@@ -8897,7 +8934,9 @@ export const useScanStore = create<ScanState>((set, get) => {
     setOpeningType: (id, type) => {
       const st = get();
       const o = st.openings.find((x) => x.id === id);
-      if (!o || o.type === type) return;
+      // Une façade de placard « déclarée porte » change de nature, même si
+      // son type était déjà « door ».
+      if (!o || (o.type === type && !o.placard)) return;
       pushHistory(`nature:${id}`);
       const base = o.yCenter - o.height / 2;
       // Le SOL DU MUR, pas le zéro du repère : voir `murPorteurDe`.
@@ -8925,8 +8964,10 @@ export const useScanStore = create<ScanState>((set, get) => {
                 yCenter: nouvelleBase + x.height / 2,
                 // Une PORTE déclarée n'est plus un passage qu'on traverse (revue « Camille »).
                 ...(type !== 'opening' ? { open: undefined } : {}),
-                // Corrigée à la main, ce n'est plus une porte de garage.
+                // Corrigée à la main, ce n'est plus une porte de garage, ni
+                // une façade de placard.
                 garage: undefined,
+                placard: undefined,
               }
             : x,
         ),

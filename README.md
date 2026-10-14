@@ -14285,6 +14285,30 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le dressing n'est pas une porte, le sol épouse les murs
+
+Relevé du patron, captures à l'appui, et revues de deux experts.
+- **La façade de placard n'est plus une porte.** RoomPlan range les portes
+  coulissantes d'un dressing toute hauteur parmi les portes ; le plan en
+  faisait une porte-fenêtre (2,00 × 2,45), une porte double qui battait dans
+  la chambre, un 1,60 + 0,80, une porte de garage, ou la reportait sur le
+  fond de sa niche. Une « porte » qui part du sol devient une façade de
+  placard quand un rangement haut la double, quand elle ferme une niche, ou
+  quand elle est toute hauteur (collée au plafond) et plus large que 1,10 m
+  — jamais entre deux pièces relevées. Ses vantaux se réunissent, elle
+  coulisse au plan (deux traits décalés), ne compte plus comme porte (ni au
+  bilan, ni pendant le scan), et sa niche s'appelle « Placard ». La vraie
+  porte haussmannienne de 2,60 sous 3,30, la baie coulissante, la porte de
+  garage restent ce qu'elles sont ; « C'est une porte » corrige à la main.
+- **Le sol épouse les murs.** Des murs arrêtés à 20 ou 30 cm d'un coin, ou
+  qui le dépassent, ne laissaient aucun sol : ils se rejoignent maintenant au
+  croisement de leurs droites (jamais à travers un mur). Une pièce ouverte
+  sur le couloir ne prend plus le couloir dans sa surface (15,60 m² pour 12),
+  et « Le scan a mesuré » ne dit plus 25 m² pour une chambre de 7,5 : le sol
+  de RoomPlan est recadré sur la pièce.
+- La dalle blanche de la mini-maquette, pendant le scan, est celle d'Apple :
+  elle ne se recale qu'à la fin ; le plan, lui, suit les murs.
+
 ## Pendant le scan : un mur à la fois, et le bandeau à sa place
 
 Relevé du patron, captures à l'appui, et revue d'un expert de la session

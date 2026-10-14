@@ -374,7 +374,7 @@ export function diagnostiquerPlan(plan: PlanADiagnostiquer): DiagnosticDuPlan {
   return {
     resume: {
       murs: murs.length,
-      portes: plan.openings.filter((o) => o.type === 'door').length,
+      portes: plan.openings.filter((o) => o.type === 'door' && !o.placard).length,
       fenetres: plan.openings.filter((o) => o.type === 'window').length,
       passages: plan.openings.filter((o) => o.type === 'opening').length,
       pieces: pieces.length,

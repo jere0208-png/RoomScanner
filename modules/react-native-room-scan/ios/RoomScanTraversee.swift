@@ -112,8 +112,21 @@ enum VuDuTrajet {
       let pas = Double(chemin.count) / 150
       chemin = (0..<150).map { chemin[Int(Double($0) * pas)] }
     }
+    /*
+      LA FAÇADE DE PLACARD NE COMPTE PAS — relevé du patron : « 3 portes »
+      pour une chambre qui n'en a qu'une, le dressing coulissant toute
+      hauteur compté deux fois. Une « porte » de 2,25 m et plus, collée au
+      plafond (12 cm près) et plus large que 1,10 m est une façade (voir
+      `facadesDePlacard` côté JS, qui la reclasse au plan).
+    */
+    let plafond = room.walls.map { $0.transform.columns.3.y + $0.dimensions.y / 2 }.max() ?? .greatestFiniteMagnitude
+    func placard(_ s: CapturedRoom.Surface) -> Bool {
+      s.dimensions.y >= 2.25 && s.dimensions.x > 1.1
+        && plafond - (s.transform.columns.3.y + s.dimensions.y / 2) <= 0.12
+    }
+    let vraiesPortes = room.doors.filter { !placard($0) }
     guard chemin.count >= 3, room.walls.count >= 3 else {
-      return (room.walls, room.doors.count, room.windows.count, room.objects.count)
+      return (room.walls, vraiesPortes.count, room.windows.count, room.objects.count)
     }
     let traits = room.walls.map { trait($0, allonge: 0.08) }
     var murs: [CapturedRoom.Surface] = []
@@ -132,7 +145,7 @@ enum VuDuTrajet {
     }
     // Trop peu de murs gardés : le chemin n'est sans doute pas dans leur repère.
     guard murs.count >= 3 else {
-      return (room.walls, room.doors.count, room.windows.count, room.objects.count)
+      return (room.walls, vraiesPortes.count, room.windows.count, room.objects.count)
     }
     func ouverture(_ s: CapturedRoom.Surface) -> Bool {
       let t = trait(s, allonge: 0)
@@ -140,7 +153,7 @@ enum VuDuTrajet {
       let m: SIMD2<Float> = somme * 0.5
       return vu(m, chemin: chemin, murs: traits, sauf: porteurs(t, murs: traits, ecart: 0.25))
     }
-    let portes = room.doors.filter(ouverture).count
+    let portes = vraiesPortes.filter(ouverture).count
     let fenetres = room.windows.filter(ouverture).count
     let objets = room.objects.filter { o in
       let c = SIMD2<Float>(o.transform.columns.3.x, o.transform.columns.3.z)

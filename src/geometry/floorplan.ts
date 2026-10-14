@@ -97,6 +97,13 @@ export interface WallSeg {
    */
   garage?: boolean;
   /**
+   * FAÇADE DE PLACARD — portes coulissantes (ou battantes) d'un placard, que
+   * RoomPlan range parmi les portes. Ni passage ni porte de pièce : elle ne
+   * se compte pas comme porte, ne bat pas, ne devient ni baie ni porte de
+   * garage (voir `facadesDePlacard`).
+   */
+  placard?: boolean;
+  /**
    * PORTE À DEUX VANTAUX (revue « Hélène ») : chacun bat depuis son tableau
    * jusqu'au milieu. Absent = un seul vantail.
    */
@@ -1809,9 +1816,84 @@ export function roomSurface(walls: WallSeg[]): RoomSurface | null {
   const loop = closedLoop(walls);
   if (loop) return { pts: loop, area: loopAreaM2(loop), exact: true };
 
-  const chain = longestChain(walls);
+  /*
+    UNE PIÈCE OUVERTE SE FERME PAR SA CORDE, SANS SES BRANCHES. La chaîne la
+    plus longue passait par la cloison du couloir qui part d'un coin : la
+    corde partait alors de son bout, en biais, et le sol débordait de 2 m
+    (15,60 m² pour une chambre de 12). On retire d'abord ce qui pend d'un
+    nœud à trois murs ; la branche qui part VERS L'EXTÉRIEUR dit où la pièce
+    s'arrête : on coupe le sol sur sa droite, du côté de la corde.
+  */
+  const { gardes, branches } = sansBranches(walls);
+  const chain = longestChain(gardes);
   if (chain.length < 3) return null;
-  return { pts: chain, area: loopAreaM2(chain), exact: false };
+  const pts = coupeParLesBranches(chain, gardes, branches);
+  return { pts, area: loopAreaM2(pts), exact: false };
+}
+
+const cleNoeud = (p: Pt) => `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
+
+/** Retire, de proche en proche, les murs qui pendent d'un nœud à trois murs ou plus. */
+function sansBranches(walls: WallSeg[]): { gardes: WallSeg[]; branches: WallSeg[] } {
+  let gardes = walls.filter((w) => segLength(w) >= ECLAT);
+  const branches: WallSeg[] = [];
+  for (;;) {
+    const deg = new Map<string, number>();
+    for (const w of gardes) for (const p of [w.a, w.b]) deg.set(cleNoeud(p), (deg.get(cleNoeud(p)) ?? 0) + 1);
+    const d = (p: Pt) => deg.get(cleNoeud(p)) ?? 0;
+    const pendants = gardes.filter((w) => (d(w.a) === 1 && d(w.b) >= 3) || (d(w.b) === 1 && d(w.a) >= 3));
+    if (pendants.length === 0) break;
+    branches.push(...pendants);
+    gardes = gardes.filter((w) => !pendants.includes(w));
+  }
+  return { gardes, branches };
+}
+
+/** Le polygone, coupé par la droite (p, q) : on garde le côté où `garde` > 0. */
+function couperParDroite(poly: Pt[], p: Pt, q: Pt, signe: number): Pt[] {
+  const cote = (m: Pt) => signe * ((q.x - p.x) * (m.z - p.z) - (q.z - p.z) * (m.x - p.x));
+  const out: Pt[] = [];
+  for (let i = 0; i < poly.length; i++) {
+    const A = poly[i];
+    const B = poly[(i + 1) % poly.length];
+    const ca = cote(A);
+    const cb = cote(B);
+    if (ca >= -1e-9) out.push(A);
+    if ((ca > 1e-9 && cb < -1e-9) || (ca < -1e-9 && cb > 1e-9)) {
+      const t = ca / (ca - cb);
+      out.push({ x: A.x + (B.x - A.x) * t, z: A.z + (B.z - A.z) * t });
+    }
+  }
+  return out;
+}
+
+function coupeParLesBranches(chain: Pt[], gardes: WallSeg[], branches: WallSeg[]): Pt[] {
+  let pts = chain;
+  const noeuds = new Set(chain.map(cleNoeud));
+  for (const br of branches) {
+    const pied = noeuds.has(cleNoeud(br.a)) ? br.a : noeuds.has(cleNoeud(br.b)) ? br.b : null;
+    if (!pied) continue;
+    const bout = pied === br.a ? br.b : br.a;
+    // Une branche tournée vers l'intérieur (un retour, une niche) ne coupe rien.
+    if (insidePoly({ x: (pied.x + bout.x) / 2, z: (pied.z + bout.z) / 2 }, pts)) continue;
+    const cote = (m: Pt) => (bout.x - pied.x) * (m.z - pied.z) - (bout.z - pied.z) * (m.x - pied.x);
+    // La corde (dernier → premier point) doit tomber du côté qu'on retire.
+    const corde = { x: (pts[0].x + pts[pts.length - 1].x) / 2, z: (pts[0].z + pts[pts.length - 1].z) / 2 };
+    const cc = cote(corde);
+    if (Math.abs(cc) < 0.05) continue;
+    // Les murs du côté gardé doivent l'emporter en longueur sur l'autre.
+    let garde = 0;
+    let retire = 0;
+    for (const w of gardes) {
+      const c = cote({ x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 });
+      if (c * cc < 0) garde += segLength(w);
+      else retire += segLength(w);
+    }
+    if (garde <= retire) continue;
+    const coupe = couperParDroite(pts, pied, bout, -Math.sign(cc));
+    if (coupe.length >= 3 && loopAreaM2(coupe) > 0.5) pts = coupe;
+  }
+  return pts;
 }
 
 /** Une pièce du plan : ses murs, son contour au sol, son centre. */
@@ -3245,14 +3327,14 @@ export const LARGEUR_DE_BAIE = 1.6;
 const BAIE_SANS_DOUTE = 2;
 
 export function baiesVitrees<O extends WallSeg>(openings: O[], walls: WallSeg[], contours?: Pt[][]): O[] {
-  if (!openings.some((o) => o.type === 'door' && segLength(o) >= LARGEUR_DE_BAIE)) return openings;
+  if (!openings.some((o) => o.type === 'door' && !o.placard && segLength(o) >= LARGEUR_DE_BAIE)) return openings;
   const lesContours = (contours ?? detectRooms(walls, undefined, openings).map((r) => r.outline)).filter(
     (c) => c.length >= 3,
   );
   const dehors = (p: Pt) => !lesContours.some((c) => insidePoly(p, c));
   return openings.map((o) => {
     const l = segLength(o);
-    if (o.type !== 'door' || o.garage || l < LARGEUR_DE_BAIE) return o;
+    if (o.type !== 'door' || o.garage || o.placard || l < LARGEUR_DE_BAIE) return o;
     let facade: boolean;
     if (l >= BAIE_SANS_DOUTE) {
       /*
@@ -3360,7 +3442,7 @@ export function porteDeGarage(
   const dehors = (p: Pt) => !contours.some((c) => c.length >= 3 && insidePoly(p, c));
   let porte: WallSeg | null = null;
   for (const o of openings) {
-    if (o.type === 'opening' || !surLeContour(o)) continue;
+    if (o.type === 'opening' || o.placard || !surLeContour(o)) continue;
     const l = segLength(o);
     const bas = o.yCenter - o.height / 2 - murPorteurDe(o, walls).sol;
     const n = { x: -(o.b.z - o.a.z) / l, z: (o.b.x - o.a.x) / l };
@@ -3385,6 +3467,185 @@ export function lesPortesDeGarage<O extends WallSeg>(openings: O[], ids: Set<str
       ? { ...o, type: 'door', garage: true, open: undefined, pivot: undefined, versExterieur: undefined, vantaux: undefined }
       : o,
   );
+}
+
+/*
+  LA FAÇADE DE PLACARD N'EST PAS UNE PORTE — relevé du patron, capture à
+  l'appui, et revue d'un expert : RoomPlan range les portes coulissantes d'un
+  dressing toute hauteur parmi les portes. Selon leur largeur, le plan en
+  faisait une porte-fenêtre (2,00 × 2,45), une porte double qui battait dans
+  la chambre (1,40), un 1,60 + 0,80 (trois vantaux), une porte de garage
+  (l'entrée de 12 m²), ou la reportait sur le fond de sa niche. Le compteur
+  disait « 3 portes » pour une chambre qui n'en a qu'une.
+
+  Une « porte » qui part du sol devient une façade de placard si :
+  - un meuble de rangement de 1,50 m ou plus la double ;
+  - ou elle ferme une niche (mur parallèle 30 à 90 cm derrière, aucun mur
+    sous elle), toute hauteur ou plus large que 1,10 m ;
+  - ou elle est toute hauteur (2,25 m et plus, à 12 cm du plafond au plus)
+    et, avec les vantaux qui la touchent, plus large que 1,10 m.
+  Jamais entre deux pièces relevées distinctes : c'est alors un passage. La
+  porte haussmannienne de 2,60 sous 3,30 reste une porte (pas au plafond).
+*/
+export const HAUTEUR_PLACARD = 2.25;
+export const LARGEUR_PLACARD = 1.1;
+const NICHE = { min: 0.3, max: 0.9 };
+
+export function facadesDePlacard<S extends WallSeg>(
+  segments: S[],
+  objets: readonly ObjectData[] = [],
+): { segments: S[]; meublesDuPlacard: Set<string> } {
+  const walls = segments.filter((s) => s.type === 'wall');
+  const meublesDuPlacard = new Set<string>();
+  const portes = segments.filter((s) => s.type === 'door' && !s.garage && !s.coffre && !s.placard);
+  if (portes.length === 0) return { segments, meublesDuPlacard };
+  const repere = (o: WallSeg) => {
+    const L = segLength(o);
+    const u = { x: (o.b.x - o.a.x) / L, z: (o.b.z - o.a.z) / L };
+    const n = { x: -u.z, z: u.x };
+    return {
+      L,
+      u,
+      t: (p: Pt) => (p.x - o.a.x) * u.x + (p.z - o.a.z) * u.z,
+      lat: (p: Pt) => (p.x - o.a.x) * n.x + (p.z - o.a.z) * n.z,
+    };
+  };
+  const recouvre = (o: WallSeg, w: WallSeg): { lat: number; commun: number } | null => {
+    const r = repere(o);
+    const Lw = segLength(w);
+    if (Lw < 1e-6) return null;
+    if (Math.abs(r.u.x * (w.b.x - w.a.x) + r.u.z * (w.b.z - w.a.z)) / Lw < 0.95) return null;
+    const t0 = Math.min(r.t(w.a), r.t(w.b));
+    const t1 = Math.max(r.t(w.a), r.t(w.b));
+    return { lat: (r.lat(w.a) + r.lat(w.b)) / 2, commun: Math.min(t1, r.L) - Math.max(t0, 0) };
+  };
+  const geometrie = (o: WallSeg) => {
+    const { sol, hauteur } = murPorteurDe(o, walls);
+    const bas = o.yCenter - o.height / 2 - sol;
+    const haut = o.yCenter + o.height / 2 - sol;
+    const toutHaut = o.height >= HAUTEUR_PLACARD && hauteur - haut <= 0.12;
+    return { bas, toutHaut, sol, hauteur };
+  };
+  let lesContours: Pt[][] | null = null;
+  const contours = () =>
+    (lesContours ??= facesFermees(splitAtJunctions(weldCorners(walls)))
+      .filter((f) => f.area >= AIRE_SANS_PORTE)
+      .map((f) => f.outline));
+  // 1. Les vantaux toute hauteur qui se touchent : une seule façade.
+  const prises = new Set<string>();
+  const groupes: S[][] = [];
+  for (const o of portes) {
+    if (prises.has(o.id) || segLength(o) < 0.3) continue;
+    prises.add(o.id);
+    const groupe = [o];
+    if (geometrie(o).toutHaut) {
+      let grandi = true;
+      while (grandi) {
+        grandi = false;
+        for (const q of portes) {
+          if (prises.has(q.id) || !geometrie(q).toutHaut) continue;
+          const touche = groupe.some((g) => {
+            const r = repere(g);
+            const c = recouvre(g, q);
+            if (!c || Math.abs(c.lat) > 0.08) return false;
+            const t0 = Math.min(r.t(q.a), r.t(q.b));
+            const t1 = Math.max(r.t(q.a), r.t(q.b));
+            return Math.max(t0 - r.L, -t1) <= 0.05 && Math.abs(q.height - g.height) <= 0.1;
+          });
+          if (touche) {
+            groupe.push(q);
+            prises.add(q.id);
+            grandi = true;
+          }
+        }
+      }
+    }
+    groupes.push(groupe);
+  }
+  // 2. Chaque groupe : façade de placard, ou porte.
+  const facades = new Map<string, S>();
+  const absorbes = new Set<string>();
+  const ajouts: S[] = [];
+  for (const groupe of groupes) {
+    const o = groupe[0];
+    const r = repere(o);
+    const ts = groupe.flatMap((g) => [r.t(g.a), r.t(g.b)]);
+    const debut = Math.min(...ts);
+    const fin = Math.max(...ts);
+    const L = fin - debut;
+    const g0 = geometrie(o);
+    if (g0.bas > 0.15) continue;
+    const toutHaut = groupe.every((g) => geometrie(g).toutHaut);
+    const a = { x: o.a.x + r.u.x * debut, z: o.a.z + r.u.z * debut };
+    const b = { x: o.a.x + r.u.x * fin, z: o.a.z + r.u.z * fin };
+    const facade = { ...o, a, b } as S;
+    const rf = repere(facade);
+    const meuble = objets.find((m) => {
+      if (!/storage|cabinet|wardrobe/i.test(m.category) || m.height < 1.5) return false;
+      const c = { x: m.transform[12], z: m.transform[14] };
+      if (Math.abs(rf.lat(c)) > m.depth / 2 + 0.25) return false;
+      const lu = Math.hypot(m.transform[0], m.transform[2]) || 1;
+      if (Math.abs((m.transform[0] * rf.u.x + m.transform[2] * rf.u.z) / lu) < 0.9) return false;
+      const tc = rf.t(c);
+      return Math.min(tc + m.width / 2, L) - Math.max(tc - m.width / 2, 0) >= 0.5 * Math.min(L, m.width);
+    });
+    const sous = walls.some((w) => {
+      const c = recouvre(facade, w);
+      return !!c && Math.abs(c.lat) < 0.1 && c.commun >= 0.7 * L;
+    });
+    const fond = walls.find((w) => {
+      const c = recouvre(facade, w);
+      return !!c && Math.abs(c.lat) >= NICHE.min && Math.abs(c.lat) <= NICHE.max && c.commun >= 0.7 * L;
+    });
+    const niche = !sous && !!fond;
+    // Deux pièces DISTINCTES de part et d'autre : porte de passage, pas placard.
+    const m = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+    const nrm = { x: -rf.u.z, z: rf.u.x };
+    const d = WALL_T / 2 + 0.25;
+    const piece = (p: Pt) => contours().findIndex((c) => insidePoly(p, c));
+    const p1 = piece({ x: m.x + nrm.x * d, z: m.z + nrm.z * d });
+    const p2 = piece({ x: m.x - nrm.x * d, z: m.z - nrm.z * d });
+    const entreDeuxPieces = p1 >= 0 && p2 >= 0 && p1 !== p2;
+    const estPlacard =
+      !!meuble ||
+      (!entreDeuxPieces && ((niche && (toutHaut || L > LARGEUR_PLACARD)) || (toutHaut && L > LARGEUR_PLACARD)));
+    if (!estPlacard) continue;
+    if (meuble) meublesDuPlacard.add(meuble.id);
+    const haut = Math.max(...groupe.map((g) => g.yCenter + g.height / 2));
+    const bas = Math.min(...groupe.map((g) => g.yCenter - g.height / 2));
+    facades.set(o.id, {
+      ...facade,
+      height: haut - bas,
+      yCenter: (haut + bas) / 2,
+      placard: true,
+      open: undefined,
+      pivot: undefined,
+      versExterieur: undefined,
+      vantaux: undefined,
+    });
+    for (const g of groupe.slice(1)) absorbes.add(g.id);
+    if (niche) {
+      // Le mur de façade qui manquait : la façade se pose dessus, pas sur le fond.
+      ajouts.push({
+        ...o,
+        id: `${o.id}~facade`,
+        type: 'wall',
+        a,
+        b,
+        height: g0.hauteur,
+        yCenter: g0.sol + g0.hauteur / 2,
+        open: undefined,
+        placard: undefined,
+        color: undefined,
+        texture: undefined,
+      } as S);
+    }
+  }
+  if (facades.size === 0) return { segments, meublesDuPlacard };
+  return {
+    segments: [...ajouts, ...segments.filter((x) => !absorbes.has(x.id)).map((x) => facades.get(x.id) ?? x)],
+    meublesDuPlacard,
+  };
 }
 
 /**
@@ -4272,6 +4533,76 @@ export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
     if (best) wall[end] = best.q;
   }
 
+  return out;
+}
+
+/**
+ * LES COINS QUI NE SE TOUCHENT PAS SE REJOIGNENT À LA RENCONTRE DE LEURS DROITES.
+ *
+ * `weldCorners` soude des BOUTS proches (15 cm). Or RoomPlan rend souvent un
+ * coin dont les deux murs s'arrêtent chacun à 20 cm du coin (diagonale de
+ * 28 cm), ou le dépassent chacun de 25 cm (une croix) : aucun bout n'est à
+ * portée de l'autre, la boucle ne se ferme pas, et la pièce n'a PLUS DE SOL
+ * du tout. Deux bouts LIBRES, de murs franchement non parallèles, dont les
+ * droites se coupent à moins de `portee` de chacun (en prolongeant ou en
+ * rognant), se rejoignent là — sauf si le prolongement traverse un autre mur.
+ */
+export function joindreLesCoins(walls: WallSeg[], portee = 0.4): WallSeg[] {
+  const out = walls.map((w) => ({ ...w, a: { ...w.a }, b: { ...w.b } }));
+  const cle = (p: Pt) => `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
+  const degre = new Map<string, number>();
+  for (const w of out) {
+    if (w.type !== 'wall') continue;
+    for (const p of [w.a, w.b]) degre.set(cle(p), (degre.get(cle(p)) ?? 0) + 1);
+  }
+  type Bout = { w: WallSeg; end: 'a' | 'b'; p: Pt; u: Pt; L: number };
+  const libres: Bout[] = [];
+  for (const w of out) {
+    const L = segLength(w);
+    if (w.type !== 'wall' || L < 0.3) continue;
+    for (const end of ['a', 'b'] as const) {
+      const p = w[end];
+      if (degre.get(cle(p)) !== 1) continue;
+      const o = end === 'b' ? w.a : w.b;
+      libres.push({ w, end, p, u: { x: (p.x - o.x) / L, z: (p.z - o.z) / L }, L });
+    }
+  }
+  const croise = (p: Pt, q: Pt, r: Pt, s: Pt) => {
+    const d = (q.x - p.x) * (s.z - r.z) - (q.z - p.z) * (s.x - r.x);
+    if (Math.abs(d) < 1e-12) return false;
+    const t = ((r.x - p.x) * (s.z - r.z) - (r.z - p.z) * (s.x - r.x)) / d;
+    const v = ((r.x - p.x) * (q.z - p.z) - (r.z - p.z) * (q.x - p.x)) / d;
+    return t > 1e-6 && t < 1 - 1e-6 && v > 1e-6 && v < 1 - 1e-6;
+  };
+  const paires: { i: number; j: number; X: Pt; cout: number }[] = [];
+  for (let i = 0; i < libres.length; i++) {
+    for (let j = i + 1; j < libres.length; j++) {
+      const A = libres[i];
+      const B = libres[j];
+      if (A.w === B.w || roomOf(A.w) !== roomOf(B.w)) continue;
+      const den = A.u.x * B.u.z - A.u.z * B.u.x;
+      if (Math.abs(den) < 0.5) continue; // moins de 30° : pas un coin
+      const s = ((B.p.x - A.p.x) * B.u.z - (B.p.z - A.p.z) * B.u.x) / den;
+      const t = ((B.p.x - A.p.x) * A.u.z - (B.p.z - A.p.z) * A.u.x) / den;
+      if (Math.abs(s) > portee || Math.abs(t) > portee) continue;
+      // On ne rogne jamais plus du tiers d'un mur.
+      if (s < -A.L / 3 || t < -B.L / 3) continue;
+      const X = { x: A.p.x + A.u.x * s, z: A.p.z + A.u.z * s };
+      const bloque = out.some(
+        (v) => v.type === 'wall' && v !== A.w && v !== B.w && (croise(A.p, X, v.a, v.b) || croise(B.p, X, v.a, v.b)),
+      );
+      if (!bloque) paires.push({ i, j, X, cout: Math.abs(s) + Math.abs(t) });
+    }
+  }
+  paires.sort((p, q) => p.cout - q.cout);
+  const pris = new Set<number>();
+  for (const { i, j, X } of paires) {
+    if (pris.has(i) || pris.has(j)) continue;
+    pris.add(i);
+    pris.add(j);
+    libres[i].w[libres[i].end] = { ...X };
+    libres[j].w[libres[j].end] = { ...X };
+  }
   return out;
 }
 

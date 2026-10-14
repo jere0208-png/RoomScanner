@@ -198,29 +198,115 @@ function aireDe(pts: Pt[]): number {
 }
 
 /**
- * LE SOL QUE ROOMPLAN A MESURÉ DANS CETTE PIÈCE (iOS 17) — celui dont le
- * centre tombe dans son contour. Sa surface est exacte même quand la boucle
- * des murs ne s'est pas refermée.
+ * LE SOL QUE ROOMPLAN A MESURÉ DANS CETTE PIÈCE (iOS 17) — RECADRÉ SUR ELLE.
+ *
+ * Le polygone `floors` de RoomPlan n'est PAS borné par les murs : par une
+ * porte ouverte il file dans le couloir, et un seul sol couvre parfois deux
+ * pièces. On en prenait l'aire brute (25 m² annoncés pour une chambre de
+ * 7,50), et le barycentre d'un sol en L, hors du L, le faisait oublier. On
+ * garde désormais la part du sol QUI TOMBE DANS LA PIÈCE : son contour s'il
+ * est fermé, sinon l'enveloppe convexe de ses murs.
  */
 export function solReleveDe(
   sols: readonly { coins: number[] }[] | null | undefined,
   contour: Pt[],
+  murs: readonly { a: Pt; b: Pt }[] = [],
 ): number | null {
-  if (!sols || contour.length < 3) return null;
-  let meilleure: number | null = null;
+  if (!sols) return null;
+  const cadre = contour.length >= 3 ? contour : enveloppeConvexe(murs.flatMap((m) => [m.a, m.b]));
+  if (cadre.length < 3) return null;
+  const tris = oreilles(cadre);
+  let meilleure = 0;
   for (const s of sols) {
     const pts: Pt[] = [];
     for (let i = 0; i + 1 < s.coins.length; i += 2) pts.push({ x: s.coins[i], z: s.coins[i + 1] });
     if (pts.length < 3) continue;
-    const c = {
-      x: pts.reduce((t, p) => t + p.x, 0) / pts.length,
-      z: pts.reduce((t, p) => t + p.z, 0) / pts.length,
-    };
-    if (!pointInPolygon(c, contour)) continue;
-    const a = aireDe(pts);
-    if (meilleure === null || a > meilleure) meilleure = a;
+    const dedans = tris.reduce((t, tri) => t + aireDe(couperParConvexe(pts, tri)), 0);
+    if (dedans > meilleure) meilleure = dedans;
   }
-  return meilleure === null ? null : arrondi(meilleure);
+  return meilleure >= 0.05 ? arrondi(meilleure) : null;
+}
+
+/** Enveloppe convexe (chaîne monotone d'Andrew). */
+export function enveloppeConvexe(points: Pt[]): Pt[] {
+  const p = [...points].sort((a, b) => a.x - b.x || a.z - b.z);
+  if (p.length < 3) return p;
+  const croix = (o: Pt, a: Pt, b: Pt) => (a.x - o.x) * (b.z - o.z) - (a.z - o.z) * (b.x - o.x);
+  const bas: Pt[] = [];
+  for (const q of p) {
+    while (bas.length >= 2 && croix(bas[bas.length - 2], bas[bas.length - 1], q) <= 1e-12) bas.pop();
+    bas.push(q);
+  }
+  const haut: Pt[] = [];
+  for (const q of [...p].reverse()) {
+    while (haut.length >= 2 && croix(haut[haut.length - 2], haut[haut.length - 1], q) <= 1e-12) haut.pop();
+    haut.push(q);
+  }
+  return [...bas.slice(0, -1), ...haut.slice(0, -1)];
+}
+
+/** Un polygone quelconque, coupé par un polygone CONVEXE (Sutherland–Hodgman). */
+function couperParConvexe(sujet: Pt[], convexe: Pt[]): Pt[] {
+  let sens = 0;
+  for (let i = 0; i < convexe.length; i++) {
+    const a = convexe[i];
+    const b = convexe[(i + 1) % convexe.length];
+    sens += a.x * b.z - b.x * a.z;
+  }
+  const k = sens >= 0 ? 1 : -1;
+  let out = sujet;
+  for (let i = 0; i < convexe.length && out.length > 0; i++) {
+    const A = convexe[i];
+    const B = convexe[(i + 1) % convexe.length];
+    const cote = (p: Pt) => k * ((B.x - A.x) * (p.z - A.z) - (B.z - A.z) * (p.x - A.x));
+    const entree = out;
+    out = [];
+    for (let j = 0; j < entree.length; j++) {
+      const P = entree[j];
+      const Q = entree[(j + 1) % entree.length];
+      const cp = cote(P);
+      const cq = cote(Q);
+      if (cp >= 0) out.push(P);
+      if ((cp >= 0) !== (cq >= 0)) {
+        const t = cp / (cp - cq);
+        out.push({ x: P.x + (Q.x - P.x) * t, z: P.z + (Q.z - P.z) * t });
+      }
+    }
+  }
+  return out;
+}
+
+/** Découpe un contour simple en triangles, par les oreilles. */
+function oreilles(poly: Pt[]): Pt[][] {
+  const pts = aireSigneeDe(poly) >= 0 ? [...poly] : [...poly].reverse();
+  const croix = (o: Pt, a: Pt, b: Pt) => (a.x - o.x) * (b.z - o.z) - (a.z - o.z) * (b.x - o.x);
+  const dansTri = (p: Pt, a: Pt, b: Pt, c: Pt) => croix(a, b, p) >= -1e-12 && croix(b, c, p) >= -1e-12 && croix(c, a, p) >= -1e-12;
+  const reste = pts.map((_, i) => i);
+  const tris: Pt[][] = [];
+  let garde = 0;
+  while (reste.length > 3 && garde++ < 10000) {
+    let coupe = false;
+    for (let i = 0; i < reste.length; i++) {
+      const a = pts[reste[(i - 1 + reste.length) % reste.length]];
+      const b = pts[reste[i]];
+      const c = pts[reste[(i + 1) % reste.length]];
+      if (croix(a, b, c) <= 1e-12) continue;
+      if (reste.some((k) => pts[k] !== a && pts[k] !== b && pts[k] !== c && dansTri(pts[k], a, b, c))) continue;
+      tris.push([a, b, c]);
+      reste.splice(i, 1);
+      coupe = true;
+      break;
+    }
+    if (!coupe) break;
+  }
+  if (reste.length === 3) tris.push(reste.map((k) => pts[k]));
+  return tris;
+}
+
+function aireSigneeDe(pts: Pt[]): number {
+  let s = 0;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) s += pts[j].x * pts[i].z - pts[i].x * pts[j].z;
+  return s / 2;
 }
 
 /* ====================================================================== */
@@ -393,7 +479,7 @@ export function ficheDeLaPiece(p: {
     const m = murDeLOuverture(o, p.tousLesMurs);
     return !!m && idsMurs.has(m.id);
   });
-  const portes = siennes.filter((o) => o.type === 'door');
+  const portes = siennes.filter((o) => o.type === 'door' && !o.placard);
   const fenetres = siennes.filter((o) => o.type === 'window');
   const aireOuv = (o: WallSeg) => segLength(o) * o.height;
   const surfaceVitree = fenetres.reduce((s, o) => s + aireOuv(o), 0);

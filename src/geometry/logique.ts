@@ -237,8 +237,10 @@ function baiesLogiques(openings: WallSeg[], sol: number): WallSeg[] {
     T.niveau,
   );
   const largeurs = new Map<string, number>();
-  for (const type of new Set(openings.map((o) => o.type))) {
-    const ici = openings.filter((o) => o.type === type);
+  // Une façade de placard ne s'aligne pas sur les portes de la maison.
+  const nature = (o: WallSeg) => (o.placard ? 'placard' : o.type);
+  for (const type of new Set(openings.map(nature))) {
+    const ici = openings.filter((o) => nature(o) === type);
     const l = niveauxCommuns(ici.map(segLength), T.largeur);
     ici.forEach((o, k) => largeurs.set(o.id, l[k]));
   }
@@ -345,7 +347,7 @@ export function sansBaiesEnDouble(openings: WallSeg[]): WallSeg[] {
 const JEU_ENTRE_VANTAUX = 0.03;
 const PORTE_A_DEUX_VANTAUX = 1.2;
 const estUnVantail = (o: WallSeg, L: number) =>
-  o.type === 'door' && !o.open && !o.garage && !o.vantaux && L >= 0.3 && L <= 1;
+  o.type === 'door' && !o.open && !o.garage && !o.placard && !o.vantaux && L >= 0.3 && L <= 1;
 
 export function portesDoubles(
   openings: WallSeg[],
@@ -358,7 +360,7 @@ export function portesDoubles(
     const o = openings[i];
     if (prises.has(o.id)) continue;
     const L = segLength(o);
-    if (o.type === 'door' && !o.open && !o.garage && !o.vantaux && L >= PORTE_A_DEUX_VANTAUX) {
+    if (o.type === 'door' && !o.open && !o.garage && !o.placard && !o.vantaux && L >= PORTE_A_DEUX_VANTAUX) {
       out.push({ ...o, vantaux: 2, pivot: undefined });
       prises.add(o.id);
       continue;

@@ -49,7 +49,7 @@ export function battantsDesPortes(
   rooms?: RoomShape[],
 ): Battant[] {
   // La porte de garage ne bat pas : elle ne balaie rien.
-  const portes = openings.filter((o) => o.type === 'door' && !o.garage);
+  const portes = openings.filter((o) => o.type === 'door' && !o.garage && !o.placard);
   if (portes.length === 0) return [];
   const partOf = new Map(roomParts(walls, rooms).map((p) => [p.roomId, p]));
   const pivots = pivotsDesBattants(portes.map((o) => ({ id: o.id, a: o.a, b: o.b, pivot: o.pivot })));

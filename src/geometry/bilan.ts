@@ -184,7 +184,8 @@ export function bilanDuReleve(e: {
     pieces,
     surface,
     murs: murs.length,
-    portes: e.openings.filter(o => o.type === 'door').length,
+    // Une façade de placard n'est pas une porte de la pièce.
+    portes: e.openings.filter(o => o.type === 'door' && !o.placard).length,
     fenetres: e.openings.filter(o => o.type === 'window').length,
     meubles: e.objects.length,
     score,
