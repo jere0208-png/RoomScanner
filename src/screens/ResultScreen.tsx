@@ -256,6 +256,9 @@ const ENREGISTREMENT_AUTO_MS = 1500;
  *  (revue « Bernard »). */
 const HIT_PASTILLE = { top: 5, bottom: 5, left: 4, right: 4 };
 
+/** Les pastilles du haut et la rangée d’outils du bas, posées sur le plan (pt). */
+const MARGES_DU_PLAN = { haut: 52, bas: 128 };
+
 export function ResultScreen() {
   /**
    * CE QUE LE SYSTÈME OCCUPE EN BAS, et qu'on lui laisse.
@@ -4389,6 +4392,7 @@ export function ResultScreen() {
         {vue === '2d' ? (
           <FloorplanEditor
             vueInitiale={vuePlanRef.current}
+            marges={capturing ? undefined : MARGES_DU_PLAN}
             onView={memoriserVuePlan}
             /* De quoi lâcher un meuble du catalogue à l'endroit du doigt. */
             onViseur={recevoirViseur}

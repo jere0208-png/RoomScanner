@@ -353,6 +353,14 @@ interface Props {
   showMeasures: boolean;
   /** Cadrage de départ — celui que la 3D avait, quand on en revient. */
   vueInitiale?: VuePlan;
+  /**
+   * CE QUE LES BARRES POSÉES SUR LE PLAN EN CACHENT, en haut et en bas (pt).
+   * Vu sur les captures du simulateur : le plan se centrait sur tout le
+   * canevas, et les pastilles du haut comme les outils du bas en mangeaient
+   * les bords — un grand vide au-dessus, le bas sous les boutons. Le
+   * cadrage de départ se centre sur ce qui reste visible.
+   */
+  marges?: { haut: number; bas: number };
   /** Cadrage courant, remonté à chaque geste : la 3D le reprend tel quel. */
   onView?: (v: VuePlan) => void;
   /**
@@ -707,6 +715,7 @@ function couperNom(nom: string): string {
 export function FloorplanEditor({
   showMeasures,
   vueInitiale,
+  marges,
   onView,
   onViseur,
   editable,
@@ -1264,9 +1273,22 @@ export function FloorplanEditor({
   const plafondDEchelle = pleinCadre && auRepos ? Infinity : ECHELLE_MAX_PLAN;
   const baseMapping = useMemo(() => {
     if (layout.w === 0 || layout.h === 0) return null;
-    return makeMapping(bounds([...walls, ...(filigrane ?? [])]), layout.w, layout.h, 40, plafondDEchelle);
+    const haut = marges?.haut ?? 0;
+    const utile = layout.h - haut - (marges?.bas ?? 0);
+    if (utile < layout.h * 0.5) {
+      return makeMapping(bounds([...walls, ...(filigrane ?? [])]), layout.w, layout.h, 40, plafondDEchelle);
+    }
+    const m = makeMapping(bounds([...walls, ...(filigrane ?? [])]), layout.w, utile, 40, plafondDEchelle);
+    return {
+      ...m,
+      toPx: (p: { x: number; z: number }) => {
+        const q = m.toPx(p);
+        return { x: q.x, y: q.y + haut };
+      },
+      toMeters: (px: { x: number; y: number }) => m.toMeters({ x: px.x, y: px.y - haut }),
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSaveId, niveauCourant, layout.w, layout.h, nbPieces, plafondDEchelle]);
+  }, [currentSaveId, niveauCourant, layout.w, layout.h, nbPieces, plafondDEchelle, marges?.haut, marges?.bas]);
 
   // Cadrage composite : ajustement au canevas + navigation utilisateur.
   const mapping = useMemo(() => {

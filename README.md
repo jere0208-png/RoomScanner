@@ -14298,6 +14298,9 @@ simulé (branche `captures`). Ce qu'on y a vu, et corrigé :
   « + Meuble », « Édition » avaient le fond exact de la carte du plan, et
   leur ombre, noire sur du noir, ne se voyait pas. Ce qui porte une ombre de
   bouton prend, en sombre, une surface un cran plus claire.
+- Le plan 2D se centre sur ce qui reste visible entre les pastilles du
+  haut et les outils du bas, au lieu de tout le canevas (un grand vide
+  au-dessus, le bas du plan sous les boutons).
 - « Continuer avec Apple » porte le logo Apple (exigé par les règles de
   « Se connecter avec Apple » : un refus de revue évité), « Continuer avec
   Google » le « G » de Google.
