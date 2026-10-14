@@ -5052,17 +5052,17 @@ function gainesPage(
         d.text(fitText(r.label, 8, cols[2] - cols[1] - 8), cols[1], y, 8, INK, {
           align: 'left',
         });
+        // « Courants faibles » débordait sur la colonne des fils (revue
+        // « Nadia ») : le sigle du métier tient dans la case.
         d.text(
-          r.section === null
-            ? 'courants faibles'
-            : `${fr1(r.section)} mm²`,
+          fitText(r.section === null ? 'VDI' : `${fr1(r.section)} mm²`, 8, cols[3] - cols[2] - 4),
           cols[2],
           y,
           8,
           GREY,
           { align: 'left' },
         );
-        d.text(`${r.wires}`, cols[3], y, 8, GREY, { align: 'left' });
+        d.text(r.section === null ? '—' : `${r.wires}`, cols[3], y, 8, GREY, { align: 'left' });
         // Le diamètre se CALCULE ici, sur le compte de fils de cette ligne :
         // c'est la règle du tiers, et elle se vérifie du regard.
         d.text(
