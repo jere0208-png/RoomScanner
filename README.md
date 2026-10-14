@@ -14285,6 +14285,17 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le devis d'artisan : HT ligne à ligne, SIRET et décennale
+
+- Les lignes de fournitures du devis s'écrivent en prix unitaire HT et
+  total HT (prix publics TTC ramenés hors taxes) ; la TVA du chantier
+  vient au total, comme avant (Nadia).
+- L'assurance décennale (assureur, contrat, zone) se renseigne au profil,
+  rubrique Entreprise, et s'imprime en tête du devis.
+- Exporter un devis sans SIRET ou sans décennale prévient : « Il manque
+  votre SIRET et votre assurance décennale » (Renseigner / Exporter quand
+  même).
+
 ## Le refend vu d'un seul côté (D7)
 
 - RoomPlan rend un mur vu d'un seul côté par un trait : la face vue. Pour

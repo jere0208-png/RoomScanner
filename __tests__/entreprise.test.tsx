@@ -53,6 +53,7 @@ const DUPONT = {
   telephone: '06 12 34 56 78',
   email: 'contact@dupont-elec.fr',
   siret: '123 456 789 00012',
+  decennale: 'MAAF n° 123456, France entière',
 };
 
 afterEach(() => {

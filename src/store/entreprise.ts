@@ -20,9 +20,15 @@ export interface Entreprise {
   telephone: string;
   email: string;
   siret: string;
+  /**
+   * L'ASSURANCE DÉCENNALE — assureur, numéro de contrat, zone couverte. Une
+   * mention obligatoire sur le devis d'un artisan du bâtiment (revue
+   * « Nadia » : elle n'existait nulle part).
+   */
+  decennale: string;
 }
 
-export const ENTREPRISE_VIDE: Entreprise = { nom: '', adresse: '', telephone: '', email: '', siret: '' };
+export const ENTREPRISE_VIDE: Entreprise = { nom: '', adresse: '', telephone: '', email: '', siret: '', decennale: '' };
 
 function disque(): {
   getItem: (k: string) => Promise<string | null>;
@@ -61,6 +67,7 @@ const champsDe = (e: Entreprise): Entreprise => ({
   telephone: e.telephone,
   email: e.email,
   siret: e.siret,
+  decennale: e.decennale ?? '',
 });
 
 function ecrire(e: Entreprise & { dernierDevis: DernierDevis | null }): void {

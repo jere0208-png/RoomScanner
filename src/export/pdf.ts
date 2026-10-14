@@ -830,6 +830,8 @@ export interface EntreprisePdf {
   telephone?: string;
   email?: string;
   siret?: string;
+  /** Assureur, contrat et zone de l'assurance décennale (voir `Entreprise`). */
+  decennale?: string;
 }
 /**
  * LA LIGNE DE TITRE, EN HAUT DE LA FEUILLE.
@@ -7190,6 +7192,9 @@ export function devisFilename(numero: string, chantier: string): string {
   return `Devis ${numero}${nom ? ` — ${nom}` : ''}.pdf`;
 }
 
+/** Un prix public TTC (TVA 20 %), ramené hors taxes au centime. */
+const horsTaxes = (ttc: number) => Math.round((ttc / (1 + TVA_DES_PRIX_PUBLICS)) * 100) / 100;
+
 export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   const X0 = 40;
   const X1 = PAGE_W - 40;
@@ -7206,8 +7211,8 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
     d.rect(X0, y - 6, X1 - X0, 18, '#EEF1F6', null, 0);
     d.text('Désignation', X0 + 8, y, 8, GREY, { bold: true, align: 'left' });
     d.text('Qté', COL_QTE, y, 8, GREY, { bold: true, align: 'right' });
-    d.text('PU TTC', COL_PU, y, 8, GREY, { bold: true, align: 'right' });
-    d.text('Total TTC', X1 - 6, y, 8, GREY, { bold: true, align: 'right' });
+    d.text('PU HT', COL_PU, y, 8, GREY, { bold: true, align: 'right' });
+    d.text('Total HT', X1 - 6, y, 8, GREY, { bold: true, align: 'right' });
     y -= 22;
   };
   const nouvellePage = () => {
@@ -7230,7 +7235,12 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   if (ent) {
     d.text(fitText(ent.nom, 15, 270), X0, y, 15, INK, { bold: true, align: 'left' });
     let yy = y - 16;
-    for (const l of [ent.adresse, [ent.telephone, ent.email].filter(Boolean).join(' · '), ent.siret ? `SIRET ${ent.siret}` : '']) {
+    for (const l of [
+      ent.adresse,
+      [ent.telephone, ent.email].filter(Boolean).join(' · '),
+      ent.siret ? `SIRET ${ent.siret}` : '',
+      ent.decennale ? `Assurance décennale : ${ent.decennale}` : '',
+    ]) {
       if (!l) continue;
       d.text(fitText(l, 8.5, 270), X0, yy, 8.5, GREY, { align: 'left' });
       yy -= 11;
@@ -7280,8 +7290,13 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
         d.text('—', COL_PU, y, 9, GREY, { align: 'right' });
         d.text(/non compt/i.test(l.note ?? '') ? 'non compté' : 'compris', X1 - 6, y, 9, GREY, { align: 'right' });
       } else {
-        d.text(l.pu === null ? 'à chiffrer' : enEuros(l.pu), COL_PU, y, 9, l.pu === null ? GREY : INK, { align: 'right' });
-        d.text(l.pu === null ? '—' : enEuros(l.total), X1 - 6, y, 9, INK, { align: 'right' });
+        /*
+          HORS TAXES, LIGNE À LIGNE — revue « Nadia » : un devis d'artisan
+          se lit en prix unitaires HT, la TVA du chantier vient au total.
+          Les prix relevés en enseigne sont TTC à 20 % : on les ramène.
+        */
+        d.text(l.pu === null ? 'à chiffrer' : enEuros(horsTaxes(l.pu)), COL_PU, y, 9, l.pu === null ? GREY : INK, { align: 'right' });
+        d.text(l.pu === null ? '—' : enEuros(horsTaxes(l.total)), X1 - 6, y, 9, INK, { align: 'right' });
       }
       d.line(X0, y - 5, X1, y - 5, 0.3, '#E3E7ED');
       y -= 16;
@@ -7290,8 +7305,8 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   }
   place(24);
   d.line(X0, y + 8, X1, y + 8, 0.8, INK);
-  d.text('Total fournitures (prix publics TTC)', X0 + 8, y - 6, 10, INK, { bold: true, align: 'left' });
-  d.text(enEuros(e.devis.total), X1 - 6, y - 6, 10, INK, { bold: true, align: 'right' });
+  d.text('Total fournitures HT', X0 + 8, y - 6, 10, INK, { bold: true, align: 'left' });
+  d.text(enEuros(totauxDuDevis(e.devis.total, null).fournituresHt), X1 - 6, y - 6, 10, INK, { bold: true, align: 'right' });
   y -= 32;
 
   // ------------------------------------------------- la pose, estimée

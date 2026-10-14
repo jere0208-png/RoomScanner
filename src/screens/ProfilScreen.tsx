@@ -658,6 +658,7 @@ const CHAMPS_ENTREPRISE: { cle: keyof Entreprise; label: string; icone: keyof ty
   { cle: 'email', label: 'E-mail', icone: 'tchat' },
   { cle: 'adresse', label: 'Adresse', icone: 'maison' },
   { cle: 'siret', label: 'SIRET', icone: 'bouclier' },
+  { cle: 'decennale', label: 'Assurance décennale', icone: 'bouclier' },
 ];
 
 const themed = (c: Palette) =>

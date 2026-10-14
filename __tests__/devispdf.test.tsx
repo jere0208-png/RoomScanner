@@ -68,7 +68,7 @@ const devisDe = (lignes: LigneDevis[]): Devis => ({
   legende: [],
 });
 
-const DUPONT = { nom: 'Électricité Dupont', telephone: '06 12 34 56 78', email: 'contact@dupont-elec.fr', siret: '123 456 789 00012', adresse: '12 rue des Lilas, Lyon' };
+const DUPONT = { nom: 'Électricité Dupont', telephone: '06 12 34 56 78', email: 'contact@dupont-elec.fr', siret: '123 456 789 00012', decennale: 'MAAF n° 123456, France entière', adresse: '12 rue des Lilas, Lyon' };
 
 describe('le document', () => {
   const lignes = [
@@ -109,6 +109,20 @@ describe('le document', () => {
     expect(src).toContain('(Total HT) Tj');
     expect(src).toContain('(Fournitures HT) Tj');
     expect(src).toMatch(/\(TVA \d+ %\) Tj/);
+  });
+
+  /*
+    REVUE « NADIA » : les prix unitaires d'un devis d'artisan sont HT ; la
+    décennale est une mention obligatoire.
+  */
+  it('les lignes en HT, la décennale en tête', () => {
+    const e = String.fromCharCode(0x80);
+    expect(src).toContain('(PU HT) Tj');
+    expect(src).not.toContain('(PU TTC) Tj');
+    // 20,00 € TTC au rayon : 16,67 € HT.
+    expect(src).toContain(`(16,67 ${e}) Tj`);
+    expect(src).toContain('(Total fournitures HT) Tj');
+    expect(src).toContain('Assurance décennale : MAAF n° 123456, France entière');
   });
 
   it('l’entreprise, le client, le numéro et la date en tête', () => {

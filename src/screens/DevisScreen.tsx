@@ -810,6 +810,25 @@ export function DevisScreen() {
       );
       return;
     }
+    /*
+      LES MENTIONS OBLIGATOIRES D'UN DEVIS D'ARTISAN — revue « Nadia » : le
+      SIRET et l'assurance décennale. On ne bloque pas, on prévient.
+    */
+    const ent = useEntreprise.getState();
+    const manque = [!ent.siret.trim() && 'votre SIRET', !ent.decennale.trim() && 'votre assurance décennale'].filter(
+      (x): x is string => !!x,
+    );
+    if (manque.length > 0) {
+      alerte(
+        `Il manque ${manque.join(' et ')}`,
+        'Un devis d’artisan du bâtiment doit les mentionner. Vous pouvez les renseigner au profil, rubrique Entreprise.',
+        [
+          { label: 'Renseigner', onPress: () => setScreen('profil') },
+          { label: 'Exporter quand même', onPress: () => void envoyer() },
+        ],
+      );
+      return;
+    }
     await envoyer();
   };
 
