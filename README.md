@@ -14304,6 +14304,9 @@ simulé (branche `captures`). Ce qu'on y a vu, et corrigé :
 - « Continuer avec Apple » porte le logo Apple (exigé par les règles de
   « Se connecter avec Apple » : un refus de revue évité), « Continuer avec
   Google » le « G » de Google.
+- La maquette 3D restait blanche à l'ouverture et n'apparaissait qu'au
+  premier glissement : la vue native se réveille une demi-seconde quand elle
+  prend sa taille et sa fenêtre.
 - Les parcours Maestro touchent l'intérieur des feuilles modales à sa place
   (Maestro ne lit pas leur contenu), et retrouvent l'accueil depuis le
   profil.

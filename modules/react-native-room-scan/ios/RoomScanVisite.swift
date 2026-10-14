@@ -689,7 +689,30 @@ final class RoomScanVisite: UIView {
 
   override func layoutSubviews() {
     super.layoutSubviews()
+    let change = vue.frame.size != bounds.size
     vue.frame = bounds
+    if change { reveiller() }
+  }
+
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    if window != nil { reveiller() }
+  }
+
+  /*
+    LA PREMIÈRE IMAGE, MÊME SANS GESTE — vu sur les captures du simulateur :
+    la maquette restait blanche à l'ouverture de la 3D, et n'apparaissait
+    qu'au premier glissement. La scène était posée avant que la vue n'ait sa
+    taille et sa fenêtre ; rendue à la demande, elle attendait un
+    changement. Une demi-seconde de rendu continu à chaque mise en place, puis
+    on rend la main au rendu à la demande.
+  */
+  private func reveiller() {
+    vue.isPlaying = true
+    vue.setNeedsDisplay()
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+      self?.vue.isPlaying = false
+    }
   }
 
   // ------------------------------------------------------------ couleurs
