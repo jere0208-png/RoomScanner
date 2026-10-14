@@ -296,13 +296,30 @@ export function passageDuMeuble(
   }
   const tout = chemin(() => true) ?? aretes.filter((e) => e.cotes.includes(cible));
   const coince = tout.find((e) => !tient(e)) ?? tout[0];
-  const kit = EN_KIT.test(objet.category ?? '');
+  /*
+    EN KIT, ÇA PASSE — revue « Chloé » : son lit de 160 s'annonçait « Ne
+    passe pas par la porte d'entrée » en orange, et la phrase disait plus
+    bas qu'il se monte sur place ; elle ne lisait que la pastille. Un
+    meuble livré en kit, ou un canapé d'angle livré en modules, passe : on
+    le dit en premier.
+  */
+  const modele = (objet as { modele?: string }).modele ?? '';
+  const modulaire = /angle|meridienne/i.test(modele) || (/sofa/i.test(objet.category ?? '') && objet.width > 2.4 && objet.depth > 1.2);
+  const kit = EN_KIT.test(objet.category ?? '') || modulaire;
+  if (kit) {
+    return {
+      ok: true,
+      court: modulaire ? 'Passe en modules' : 'Passe en kit',
+      detail:
+        `${nom} (${taille}) : monté, il ne passe pas par ${nomDeLArete(coince)} (${cm(coince.libre)} de passage) ; ` +
+        (modulaire ? 'livré en modules, il s’assemble dans la pièce.' : 'livré en kit, il se monte sur place.'),
+    };
+  }
   return {
     ok: false,
     court: `Ne passe pas par ${nomDeLArete(coince)}`,
     detail:
       `${nom} (${taille}) : ${nomDeLArete(coince)} laisse ${cm(coince.libre)} de passage ` +
-      `sur ${cm(coince.haut)} de haut ; il faudrait au moins ${cm(s1)} sur ${cm(s2)}.` +
-      (kit ? ' Livré en kit, il se monte sur place.' : ` ${reserve}`),
+      `sur ${cm(coince.haut)} de haut ; il faudrait au moins ${cm(s1)} sur ${cm(s2)}. ${reserve}`,
   };
 }

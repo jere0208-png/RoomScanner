@@ -228,6 +228,7 @@ const REMPLACE: Record<string, string> = {
 /** Une chaîne telle que le PDF l'écrira : un octet WinAnsi par signe. */
 function latin1(s: string): string {
   let out = '';
+  let efface = false;
   for (const ch of s) {
     const win = WIN_ANSI[ch];
     if (win !== undefined) {
@@ -239,9 +240,21 @@ function latin1(s: string): string {
       out += alt;
       continue;
     }
-    out += ch.codePointAt(0)! <= 0xff ? ch : '?';
+    /*
+      UN EMOJI NE DEVIENT PAS « ? » — revue « Hugo » : « 🏠 Coloc des Lilas ✨ »
+      s'imprimait « ? Coloc des Lilas ? ». Les pictogrammes, leurs
+      sélecteurs de variante et leurs liaisons n'ont pas de forme en
+      WinAnsi : ils s'effacent, le nom reste propre.
+    */
+    const code = ch.codePointAt(0)!;
+    if (code === 0x200d || (code >= 0xfe00 && code <= 0xfe0f) || /\p{Extended_Pictographic}/u.test(ch) || (code >= 0x1f3fb && code <= 0x1f3ff)) {
+      efface = true;
+      continue;
+    }
+    out += code <= 0xff ? ch : '?';
   }
-  return out;
+  // Le blanc qui séparait l'emoji du nom part avec lui.
+  return efface ? out.replace(/ {2,}/g, ' ').replace(/^ | $/g, '') : out;
 }
 
 function escText(s: string): string {
@@ -1161,7 +1174,10 @@ function drawSheetChrome(
   const ent = info.entreprise?.nom ? info.entreprise : null;
   if (ent) {
     const large = cols[0] - FRAME.x - 24;
-    d.text(fitText(ent.nom, 11, large), FRAME.x + 12, ty + 46, 11, INK, { bold: true, align: 'left' });
+    // Revue « Marc » : « Lefèvre Plomberie Ch… » sur chaque feuille. Le nom
+    // cède des points avant de céder des lettres, comme le projet.
+    const corpsNom = [11, 10, 9, 8].find((t) => fitText(ent.nom, t, large) === ent.nom) ?? 8;
+    d.text(fitText(ent.nom, corpsNom, large), FRAME.x + 12, ty + 46, corpsNom, INK, { bold: true, align: 'left' });
     const lignes = [
       ent.telephone,
       ent.email,
@@ -1169,7 +1185,8 @@ function drawSheetChrome(
       ent.siret ? `SIRET ${ent.siret}` : '',
     ].filter((x): x is string => !!x && !!x.trim());
     lignes.slice(0, 3).forEach((l, i) => {
-      d.text(fitText(l, 7, large), FRAME.x + 12, ty + 32 - i * 10, 7, GREY, { align: 'left' });
+      const corps = [7, 6.5, 6].find((t) => fitText(l, t, large) === l) ?? 6;
+      d.text(fitText(l, corps, large), FRAME.x + 12, ty + 32 - i * 10, corps, GREY, { align: 'left' });
     });
   } else {
     drawLogo(d, FRAME.x + 12, ty + 8, 50);

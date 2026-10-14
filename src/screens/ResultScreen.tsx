@@ -91,6 +91,7 @@ import {
 } from '../components/Iso3DView';
 import {
   fitsInRoom,
+  meubleDansLaPiece,
   posesDeMur,
   posesEnT,
   normaleSortante,
@@ -183,7 +184,7 @@ import {
   pieceDuCote,
 } from '../geometry/electrical';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { duReleve, nomDePieceLibre, nomDeVersion, useScanStore } from '../store/scanStore';
+import { duReleve, niveauDeDepart, nomDePieceLibre, nomDeVersion, useScanStore } from '../store/scanStore';
 import { useAccountStore, useImageSansLogo } from '../store/accountStore';
 import { demarrerComplement, demarrerEtage, lancerUnScan } from '../native/useRoomScan';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
@@ -224,7 +225,7 @@ import {
 import { alerte } from '../ui/alerte';
 import { panne as expliquer } from '../ui/panne';
 import { ficheElec } from './result/ficheElec';
-import { astuce } from '../ui/astuce';
+import { astuce, useAstuce } from '../ui/astuce';
 import { celebrerSiAuxNormes, resetCelebration } from '../ui/auxNormes';
 import { useModeElec, useUsage } from '../store/usage';
 import { usePremieresFois } from '../store/premieresFois';
@@ -1473,16 +1474,32 @@ export function ResultScreen() {
   */
   useEffect(() => {
     let minuterie: ReturnType<typeof setTimeout> | null = null;
+    /*
+      LE CALME, C'EST LE PLAN QUI NE CHANGE PAS — revue « Hugo » : le minuteur
+      repartait à chaque changement du magasin, même une simple sélection ;
+      qui touchait l'écran chaque seconde ne voyait jamais son étage
+      enregistré. Il ne repart que si le PLAN change, et jamais au-delà de
+      dix secondes d'attente.
+    */
+    let empreinte: unknown[] = [];
+    let premiereAttente = 0;
     const desabonner = useScanStore.subscribe((st) => {
       if (!st.dirty) return;
       // En mode Électricité, seul le plan NEUF s'enregistre seul : la
       // retouche d'un plan client attend la décision de l'électricien.
       if (modeElec && !planJamaisEnregistre()) return;
+      const nouvelle = [st.walls, st.rooms, st.openings, st.objects, st.fixtures, st.ceiling, st.notes, st.mesures, st.photos, st.scanName];
+      const change = nouvelle.some((x, i) => x !== empreinte[i]);
+      empreinte = nouvelle;
+      if (!change && minuterie) return;
+      const maintenant = Date.now();
+      if (!minuterie) premiereAttente = maintenant;
       if (minuterie) clearTimeout(minuterie);
+      const reste = Math.min(ENREGISTREMENT_AUTO_MS, Math.max(0, premiereAttente + 10_000 - maintenant));
       minuterie = setTimeout(() => {
         minuterie = null;
         useScanStore.getState().enregistrerAuto();
-      }, ENREGISTREMENT_AUTO_MS);
+      }, reste);
     });
     return () => {
       desabonner();
@@ -2010,6 +2027,10 @@ export function ResultScreen() {
     // Un plan qui n'a jamais été enregistré n'a pas de « modifications » :
     // c'est lui tout entier qui attend.
     if (dirty) {
+      // Revue « Paul » : « non enregistrées » alors que le plan s'enregistre
+      // tout seul — il croyait devoir faire quelque chose. Quand
+      // l'enregistrement automatique s'en charge, on le dit.
+      if (!modeElec || planJamaisEnregistre()) return 'Enregistrement automatique…';
       return !save || save.supprimeLe
         ? 'Plan non enregistré'
         : 'Modifications non enregistrées';
@@ -2238,6 +2259,14 @@ export function ResultScreen() {
   const portesBloquees = useMemo(() => new Set(bloquages.keys()), [bloquages]);
   // Le meuble choisi est-il logé entre des murs, un peu plus petit que sa place ?
   const calage = useMemo(() => (selectedObject ? calerDansLaNiche(selectedObject, walls) : null), [selectedObject, walls]);
+  /** Le meuble choisi rentre-t-il dans sa pièce ? Voir `meubleDansLaPiece`. */
+  const dansLaPiece = useMemo(
+    () =>
+      selectedObject
+        ? meubleDansLaPiece(selectedObject, parts.map((p) => p.surface?.nu ?? p.surface?.pts ?? []))
+        : null,
+    [selectedObject, parts],
+  );
   const calerMeuble = useScanStore((st) => st.calerMeuble);
   // Le verdict suit le meuble et ses cotes, pas chaque image d'un glissé.
   const verdictDePassage = useMemo(
@@ -2743,6 +2772,8 @@ export function ResultScreen() {
   */
   const sortirDuPlan = () => {
     rangerLeTravail();
+    // Hors du plan, un « Annuler » ne vaut plus (revue « Paul »).
+    useAstuce.getState().oublierLesAnnulations();
     setScreen(resultOrigin === 'library' ? 'library' : 'home');
   };
 
@@ -3337,6 +3368,7 @@ export function ResultScreen() {
     a choisi le clavier. Le conseil de balayage, lui, ne s'affiche que s'il
     y a eu un balayage.
   */
+  const niveauVideAilleurs = walls.length === 0 && tousLesMurs.some((w) => w.type === 'wall');
   if (walls.length === 0) {
     return (
       <View style={styles.container}>
@@ -3361,9 +3393,33 @@ export function ResultScreen() {
           </TouchableOpacity>
         </View>
         <View style={styles.emptyContainer}>
+        {/*
+          UN NIVEAU VIDE N'EST PAS UN PLAN VIDE — revue « Hugo » : après
+          « Dessiner un étage » puis Annuler, le niveau neuf s'affichait
+          « Aucun mur détecté », sans sélecteur d'étage, avec pour seule
+          issue « Refaire un scan », qui remettait tout à zéro. Le reste du
+          logement est là : on y revient d'un appui.
+        */}
+        {niveauVideAilleurs ? (
+          <>
+            <Text style={styles.emptyTitle}>Ce niveau est vide</Text>
+            <Text style={styles.emptyText}>
+              Le reste du logement est intact. Posez une pièce à ce niveau, ou revenez au plan.
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyPrimary}
+              accessibilityLabel="Revenir au plan"
+              onPress={() => useScanStore.getState().allerAuNiveau(niveauDeDepart(tousLesMurs))}>
+              <Text style={styles.primaryText}>Revenir au plan</Text>
+            </TouchableOpacity>
+          </>
+        ) : null}
+        {!niveauVideAilleurs && (
         <Text style={styles.emptyTitle}>
           {planVierge ? 'Plan vierge' : 'Aucun mur détecté'}
         </Text>
+        )}
+        {!niveauVideAilleurs && (
         <Text style={styles.emptyText}>
           {planVierge
             ? 'Posez une première pièce à ses cotes : les murs, les ' +
@@ -3373,6 +3429,7 @@ export function ResultScreen() {
               'lumière. Les grandes surfaces vitrées et les miroirs peuvent ' +
               'gêner la détection — ou tracez la pièce à ses cotes.'}
         </Text>
+        )}
         {/*
           LE BOUTON A SA TAILLE, PAS CELLE DE LA PAGE.
 
@@ -3383,17 +3440,23 @@ export function ResultScreen() {
           fait couper. Un style de rangée ne se réutilise pas dans une pile.
         */}
         <TouchableOpacity
-          style={styles.emptyPrimary}
+          style={niveauVideAilleurs ? styles.emptyGhost : styles.emptyPrimary}
           accessibilityLabel="Ajouter une pièce"
           onPress={() => setAjoutPiece(true)}>
-          <Text style={styles.primaryText}>Ajouter une pièce</Text>
+          <Text style={niveauVideAilleurs ? styles.emptyGhostText : styles.primaryText}>Ajouter une pièce</Text>
         </TouchableOpacity>
-        {!planVierge && (
+        {!planVierge && !niveauVideAilleurs && (
           <TouchableOpacity
             style={styles.emptyGhost}
             accessibilityLabel="Refaire un scan"
             onPress={() => {
-              // Il RELANCE un scan : il ramenait à l'accueil.
+              // Il RELANCE un scan : il ramenait à l'accueil. Et il range ce
+              // qui existe, après avoir demandé (revue « Hugo » : il
+              // remettait le plan à zéro sans un mot).
+              if (tousLesMurs.length > 0) {
+                nouveauScan();
+                return;
+              }
               reset();
               lancerUnScan().catch(refusDuScan);
             }}>
@@ -5008,6 +5071,12 @@ export function ResultScreen() {
               basculerVue();
               setDecorant(true);
             }}
+            onAjouterMeuble={() => {
+              setEditMode(true);
+              seulGeste();
+              setShowFurniture(true);
+              setCatalogue(true);
+            }}
           />
           </View>
         ) : (
@@ -5368,8 +5437,21 @@ export function ResultScreen() {
           couvrait le plan) ; ces deux mots-là, non.
         */}
         {vue === '2d' && selectedObject && showFurniture && !capturing && !objDims &&
-          ((verdictDePassage && !verdictDePassage.ok && !objDims) || calage) && (
+          ((verdictDePassage && !verdictDePassage.ok && !objDims) || calage || dansLaPiece) && (
             <View style={[styles.pucesDuMeuble, { bottom: etageCommandes }]} pointerEvents="box-none">
+              {/* « Ça rentre ? » — la première question, sa réponse d'abord. */}
+              {dansLaPiece ? (
+                <View
+                  accessibilityRole="text"
+                  accessibilityLabel={dansLaPiece.dedans ? 'Rentre dans la pièce' : `Dépasse de ${Math.round(dansLaPiece.depasse * 100)} cm`}
+                  style={[styles.puceDuMeuble, { borderColor: dansLaPiece.dedans ? teinte.green : teinte.danger }]}>
+                  <Text style={styles.puceDuMeubleTexte} numberOfLines={1}>
+                    {dansLaPiece.dedans
+                      ? `Rentre ✓${Number.isFinite(dansLaPiece.reste) ? ` · ${Math.round(dansLaPiece.reste * 100)} cm du mur` : ''}`
+                      : `Dépasse de ${Math.round(dansLaPiece.depasse * 100)} cm`}
+                  </Text>
+                </View>
+              ) : null}
               {verdictDePassage && !verdictDePassage.ok ? (
                 <TouchableOpacity
                   accessibilityRole="button"
@@ -6500,14 +6582,26 @@ export function ResultScreen() {
                 sansMot: true,
                 danger: true,
                 onPress: () => {
-                  removeWall(selectedWall.id);
-                  setSelectedWallId(null);
-                  // Revue « Paul » : retiré d'un appui, dans la rangée où
-                  // l'on cherche autre chose. On propose de revenir.
-                  astuce('Mur retiré.', {
-                    icone: 'undo',
-                    action: { label: 'Annuler', faire: () => useScanStore.getState().undo() },
-                  });
+                  const retirer = () => {
+                    removeWall(selectedWall.id);
+                    setSelectedWallId(null);
+                    // Revue « Paul » : retiré d'un appui, dans la rangée où
+                    // l'on cherche autre chose. On propose de revenir.
+                    astuce('Mur retiré.', {
+                      icone: 'undo',
+                      action: { label: 'Annuler', faire: () => useScanStore.getState().undo() },
+                    });
+                  };
+                  // Le particulier confirme : un mur entier part d'un appui
+                  // sur une poubelle de 34 points (revue « Paul »).
+                  if (modeElec) {
+                    retirer();
+                    return;
+                  }
+                  alerte('Retirer ce mur ?', 'Ses portes et fenêtres partent avec lui. « Annuler » le fera revenir.', [
+                    { label: 'Garder' },
+                    { label: 'Retirer', onPress: retirer },
+                  ]);
                 },
               },
             ]}

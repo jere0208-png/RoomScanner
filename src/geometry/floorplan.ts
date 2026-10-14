@@ -1788,6 +1788,46 @@ export function fitsInRoom(
   return petit <= dispoPetit && grand <= dispoGrand;
 }
 
+/**
+ * LE MEUBLE RENTRE-T-IL DANS SA PIÈCE ? — revue « Chloé » : sa première
+ * question (« mon canapé d'angle de 2,80 m rentre-t-il ? ») n'obtenait
+ * jamais de réponse ; élargi à 6,00 m dans un séjour de 5,50, il
+ * traversait les murs en silence. Ses quatre coins, contre le contour de
+ * la pièce où tombe son centre : de combien il dépasse (0 s'il rentre), et
+ * la place qui lui reste jusqu'au mur le plus proche.
+ */
+export function meubleDansLaPiece(
+  o: { width: number; depth: number; transform: number[] },
+  contours: Pt[][],
+): { dedans: boolean; depasse: number; reste: number } | null {
+  const c = { x: o.transform[12], z: o.transform[14] };
+  const contour = contours.find((k) => k.length >= 3 && insidePoly(c, k));
+  if (!contour) return null;
+  const yaw = Math.atan2(o.transform[2], o.transform[0]);
+  const cos = Math.cos(yaw);
+  const sin = Math.sin(yaw);
+  const coins = [
+    [-1, -1],
+    [1, -1],
+    [1, 1],
+    [-1, 1],
+  ].map(([sx, sz]) => {
+    const lx = (sx * o.width) / 2;
+    const lz = (sz * o.depth) / 2;
+    return { x: c.x + lx * cos - lz * sin, z: c.z + lx * sin + lz * cos };
+  });
+  const auBord = (p: Pt) =>
+    Math.min(...contour.map((q, i) => pointOnSeg(p, q, contour[(i + 1) % contour.length]).dist));
+  let depasse = 0;
+  let reste = Infinity;
+  for (const k of coins) {
+    const d = auBord(k);
+    if (insidePoly(k, contour)) reste = Math.min(reste, d);
+    else depasse = Math.max(depasse, d);
+  }
+  return { dedans: depasse < 0.02, depasse, reste: depasse < 0.02 ? reste : 0 };
+}
+
 export function quadPoints(q: WallQuad): Pt[] {
   return [q.a1, q.b1, q.b2, q.a2];
 }

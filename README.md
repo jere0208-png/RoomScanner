@@ -14285,6 +14285,34 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Six personnes découvrent l'app — second lot
+
+- **Les étages ne font plus croire que le plan a disparu** (Hugo) :
+  - un plan s'ouvre sur son rez-de-chaussée, plus sur l'étage regardé dans
+    un autre plan (« Aucun mur détecté » sur un plan qui a ses murs) ;
+  - « Annuler » et « Refaire » montrent le niveau qu'ils touchent, et ne
+    laissent plus la vue sur un étage vidé ;
+  - un niveau vide le dit (« Ce niveau est vide · Revenir au plan ») ;
+    « Refaire un scan » demande avant de tout reprendre ;
+  - l'enregistrement automatique n'attend plus qu'on cesse de toucher
+    l'écran : seul un changement du plan relance l'attente, dix secondes au
+    plus ;
+  - les emoji des noms ne s'impriment plus « ? » dans le dossier.
+- **Les meubles (Chloé)** :
+  - « Rentre ✓ · 1,10 m du mur » ou « Dépasse de 25 cm » dès qu'un meuble
+    est choisi : la première question, sa réponse ;
+  - un lit livré en kit, un canapé d'angle livré en modules « passent » ;
+    plus de pastille orange « Ne passe pas » démentie par sa propre phrase ;
+  - « + Meuble » en tête de la barre du plan, hors édition (« Meubles »
+    cachait les meubles).
+- **Paul** : « Mur retiré · Annuler » se montre tout de suite et s'oublie
+  hors du plan ; le particulier confirme avant de retirer un mur ; l'en-tête
+  dit « Enregistrement automatique… » au lieu de « non enregistrées ».
+- **Marc** : une entreprise renseignée hors mode Électricité fait un dossier
+  d'artisan (murs de face cochés, sans l'estimatif peinture) ; son nom
+  n'est plus coupé dans le cartouche ; une fenêtre ne prend plus le haut des
+  portes (60 × 60 restait 60 × 64).
+
 ## Six personnes découvrent l'app — premier lot
 
 Six testeurs qui ne connaissaient pas l'app (Chloé, primo-accédante ; Marc,

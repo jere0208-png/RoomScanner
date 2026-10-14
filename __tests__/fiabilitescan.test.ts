@@ -164,3 +164,11 @@ describe('D6 — un vrai mur biais garde son angle', () => {
     });
   }
 });
+
+describe('une fenêtre garde sa hauteur (revue « Marc »)', () => {
+  it('la fenêtre de 60 × 60 à 1,40 ne prend pas le haut des portes', () => {
+    scan([...rect(0, 0, 2.4, 1.9, 2.48), surf('window', [0.8, 0, 1.4, 0], 0.6, 1.4), surf('door', [2.4, 0.5, 2.4, 1.23], 2.04)]);
+    const f = st().openings.find((o) => o.type === 'window')!;
+    expect(f.height).toBeCloseTo(0.6, 2);
+  });
+});

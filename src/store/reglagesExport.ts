@@ -63,7 +63,7 @@ export const useReglagesExport = create<Etat>((set, get) => ({
  * valeur par défaut.
  */
 export function useCaseRetenue(
-  mode: 'elec' | 'grandPublic',
+  mode: 'elec' | 'grandPublic' | 'artisan',
   cle: string,
   defaut: boolean,
 ): [boolean, (v: boolean | ((avant: boolean) => boolean)) => void] {

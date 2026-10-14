@@ -207,7 +207,15 @@ const EXPORT_ICONS = {
 
 const styles = getStyles(c);
 
-  const modeExport = modeElec ? 'elec' : 'grandPublic';
+  /*
+    L'ARTISAN N'EST NI ÉLECTRICIEN NI PARTICULIER — revue « Marc »,
+    plombier : son dossier sortait avec « Ce qu'il faut acheter » (de la
+    peinture, sous son en-tête) et sans les murs de face, les seules vues
+    qui donnent les hauteurs. Une entreprise renseignée hors mode
+    Électricité est un artisan : ses cases et ses défauts à lui.
+  */
+  const entrepriseRenseignee = !!entrepriseAImprimer(useEntreprise());
+  const modeExport = modeElec ? 'elec' : entrepriseRenseignee ? 'artisan' : 'grandPublic';
   const [include3D, setInclude3D] = useCaseRetenue(modeExport, 'vue3D', true);
   /**
    * LA PAGE DE GARDE — correctif de l'audit : le dossier s'ouvrait sur le
@@ -230,7 +238,7 @@ const styles = getStyles(c);
     refait son logement ; pas pour l'électricien, dont le client ne lui a
     pas demandé de compter les pots de peinture.
   */
-  const [includeAchats, setIncludeAchats] = useCaseRetenue(modeExport, 'achats', !modeElec);
+  const [includeAchats, setIncludeAchats] = useCaseRetenue(modeExport, 'achats', modeExport === 'grandPublic');
   const reglages = useReglagesTravaux();
   useEffect(() => {
     if (!reglages.charge) reglages.charger();
@@ -396,7 +404,7 @@ const styles = getStyles(c);
    * POUR L'ÉLECTRICIEN SEULEMENT — correctif de l'audit : le particulier, qui
    * ne perce pas, recevait une feuille par mur, un dossier interminable.
    */
-  const [elevations, setElevations] = useCaseRetenue(modeExport, 'elevations', modeElec);
+  const [elevations, setElevations] = useCaseRetenue(modeExport, 'elevations', modeExport !== 'grandPublic');
   /*
     TOUS LES MURS, OU SEULEMENT LES ÉQUIPÉS.
 

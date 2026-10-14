@@ -1686,6 +1686,43 @@ const two = (n: number) => String(n).padStart(2, '0');
  * l'électricien a sous les yeux depuis des semaines, parfois ce qu'il a
  * dicté au client. Seuls les nouveaux prennent la forme courte.
  */
+/**
+ * APRÈS « ANNULER » OU « REFAIRE », ON VOIT CE QUI A CHANGÉ — revue
+ * « Hugo » : annuler le scan de l'étage laissait la vue sur un niveau vidé
+ * (« Aucun mur détecté », et le seul bouton remettait tout à zéro) ;
+ * annuler un renommage de l'étage, depuis le rez-de-chaussée, ne montrait
+ * rien. La vue va au niveau touché ; s'il est vide, au plus proche qui ne
+ * l'est pas.
+ */
+export function niveauApresRetour(
+  avant: readonly WallSeg[],
+  apres: readonly WallSeg[],
+  courant: number,
+  piecesAvant: readonly { niveau?: number }[] = [],
+  piecesApres: readonly { niveau?: number }[] = [],
+): number {
+  const deja = new Set<unknown>(avant);
+  const nouveaux = new Set<unknown>(apres);
+  const memesPieces = new Set<unknown>(piecesAvant);
+  const touche =
+    apres.find((w) => w.type === 'wall' && !deja.has(w)) ??
+    avant.find((w) => w.type === 'wall' && !nouveaux.has(w)) ??
+    piecesApres.find((r) => !memesPieces.has(r));
+  let cible = touche ? niveauDe(touche) : courant;
+  const niveaux = [...new Set(apres.filter((w) => w.type === 'wall').map((w) => niveauDe(w)))];
+  if (niveaux.length > 0 && !niveaux.includes(cible)) {
+    cible = niveaux.reduce((m, n) => (Math.abs(n - cible) < Math.abs(m - cible) ? n : m), niveaux[0]);
+  }
+  return niveaux.length === 0 ? courant : cible;
+}
+
+/** Le niveau où s'ouvre un plan : le rez-de-chaussée s'il a des murs, sinon le plus bas. */
+export function niveauDeDepart(walls: readonly WallSeg[]): number {
+  const niveaux = [...new Set(walls.filter((w) => w.type === 'wall').map((w) => niveauDe(w)))];
+  if (niveaux.length === 0 || niveaux.includes(NIVEAU_RDC)) return NIVEAU_RDC;
+  return Math.min(...niveaux);
+}
+
 export function defaultName(d: Date, pieces?: { name?: string; kind?: RoomKind | null }[]): string {
   /*
     CE QU'ON A RELEVÉ, PLUTÔT QUE L'HEURE — revue « Bernard » : la pièce
@@ -6848,6 +6885,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
       set({
         ...prev,
+        niveauCourant: niveauApresRetour(st.walls, prev.walls, st.niveauCourant, st.rooms, prev.rooms),
         canUndo: history.length > 0,
         canRedo: true,
         // Revenu à l'état enregistré : il n'y a plus rien à enregistrer, et
@@ -6875,6 +6913,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
       set({
         ...suite,
+        niveauCourant: niveauApresRetour(st.walls, suite.walls, st.niveauCourant, st.rooms, suite.rooms),
         canUndo: true,
         canRedo: avenir.length > 0,
         dirty: history.length !== savedDepth,
@@ -9996,6 +10035,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         resultOrigin: 'scan',
         scanName: b.name,
         walls: b.walls,
+        niveauCourant: niveauDeDepart(b.walls),
         openings: b.openings,
         objects: separerLeMobilier(b.objects, b.rooms),
         rooms: b.rooms,
@@ -10217,6 +10257,9 @@ export const useScanStore = create<ScanState>((set, get) => {
         cleDuReleve: save.cleDuReleve ?? null,
         rooms: save.rooms,
         walls: save.walls,
+        // Revue « Hugo » : le niveau regardé dans un AUTRE plan restait
+        // affiché ; le plan s'ouvrait sur un étage vide, « Aucun mur détecté ».
+        niveauCourant: niveauDeDepart(save.walls),
         openings: save.openings,
         objects: separerLeMobilier(save.objects, save.rooms),
         fixtures: save.fixtures ?? [],

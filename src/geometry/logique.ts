@@ -227,10 +227,22 @@ function baiesLogiques(openings: WallSeg[], sol: number): WallSeg[] {
   const basDe = (o: WallSeg) => o.yCenter - o.height / 2;
   // Une porte, un passage, une porte-fenêtre : du sol.
   const bas = openings.map((o) => (basDe(o) - sol <= T.seuil ? sol : basDe(o)));
-  const hauts = niveauxCommuns(
-    openings.map((o) => o.yCenter + o.height / 2),
-    T.niveau,
-  );
+  /*
+    LES LINTEAUX D'UNE MÊME NATURE ENSEMBLE, LES AUTRES SEULEMENT S'ILS SE
+    TOUCHENT — revue « Marc », plombier : la fenêtre de 60 × 60 de la salle
+    de bains (haut à 2,00) prenait le haut des portes (2,04) et
+    s'imprimait 60 × 64 ; il vérifie tout au mètre. Les linteaux d'une même
+    nature s'alignent à la tolérance du relevé ; d'une nature à l'autre, à
+    deux centimètres au plus.
+  */
+  const hautsBruts = openings.map((o) => o.yCenter + o.height / 2);
+  const parNature = new Array<number>(openings.length);
+  for (const type of new Set(openings.map((o) => o.type))) {
+    const idx = openings.map((o, i) => (o.type === type ? i : -1)).filter((i) => i >= 0);
+    const l = niveauxCommuns(idx.map((i) => hautsBruts[i]), T.niveau);
+    idx.forEach((i, k) => (parNature[i] = l[k]));
+  }
+  const hauts = niveauxCommuns(parNature, Math.min(T.niveau, 0.02));
   // Les appuis des fenêtres, entre eux.
   const appuis = niveauxCommuns(
     openings.map((o, i) => (o.type === 'window' && bas[i] > sol ? bas[i] : NaN)),

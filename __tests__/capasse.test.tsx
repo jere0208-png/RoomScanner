@@ -120,7 +120,9 @@ describe('le meuble passe-t-il jusqu’à sa pièce ?', () => {
   it('un lit monté ne passe pas l’entrée — le verdict dit qu’il se monte sur place', () => {
     const lit = meuble('l', 'bed', 6.5, 1.8, 1.46, 1.99, 0.95, salle('Chambre'));
     const v = passageDuMeuble(lit, contexte)!;
-    expect(v.ok).toBe(false);
+    // Revue « Chloé » : en kit, il PASSE — la pastille le dit d'abord.
+    expect(v.ok).toBe(true);
+    expect(v.court).toBe('Passe en kit');
     expect(v.detail).toMatch(/sur place/);
   });
 

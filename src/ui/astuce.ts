@@ -51,6 +51,8 @@ interface EtatAstuce {
   file: DonneesAstuce[];
   poser: (a: DonneesAstuce) => void;
   fermer: () => void;
+  /** Retire les « Annuler » en attente : hors du plan, ils ne valent plus. */
+  oublierLesAnnulations: () => void;
 }
 
 export const useAstuce = create<EtatAstuce>((set, get) => ({
@@ -65,11 +67,32 @@ export const useAstuce = create<EtatAstuce>((set, get) => ({
     */
     if (st.courante?.texte === a.texte) return;
     if (st.file.some((x) => x.texte === a.texte)) return;
+    /*
+      « ANNULER » PASSE DEVANT — revue « Paul » : « Mur retiré · Annuler »
+      attendait derrière la durée du scan et la batterie, et ne paraissait
+      qu'une fois revenu à l'accueil, où il ne servait plus à rien. Une
+      astuce qui permet de revenir en arrière se montre tout de suite.
+    */
+    if (st.courante && a.action && /annuler|délier/i.test(a.action.label)) {
+      set({ courante: a, file: [st.courante, ...st.file] });
+      return;
+    }
     if (st.courante) {
       set({ file: [...st.file, a] });
       return;
     }
     set({ courante: a });
+  },
+  oublierLesAnnulations: () => {
+    const st = get();
+    const garde = (x: DonneesAstuce | null) => !!x && !(x.action && /annuler|délier/i.test(x.action.label));
+    const file = st.file.filter(garde);
+    if (garde(st.courante)) {
+      set({ file });
+      return;
+    }
+    const [suivante, ...reste] = file;
+    set({ courante: suivante ?? null, file: reste });
   },
   fermer: () => {
     const st = get();

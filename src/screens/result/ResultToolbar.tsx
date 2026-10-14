@@ -160,9 +160,12 @@ export function Toolbar2D({
   setPendingCeiling,
   setPendingSpots,
   onDecorer,
+  onAjouterMeuble,
 }: Cadre & {
   /** Ouvre « Décorer » (la vue passe en 3D). */
   onDecorer?: () => void;
+  /** Passe en édition et ouvre le catalogue des meubles. */
+  onAjouterMeuble?: () => void;
   /** Hauteur à franchir pour poser le trop-plein au-dessus des actions. */
   dessus: number;
   /** Le jeu de pastilles affiché : il RETARDE sur le mode d'édition. */
@@ -435,6 +438,12 @@ export function Toolbar2D({
           notes, photos, gaines, plafond, couleurs des ouvertures — vit dans
           le menu « Afficher », au bout de la rangée.
         */
+        /* Revue « Chloé » : elle voulait AJOUTER son canapé, touchait
+           « Meubles » — qui cache les meubles. Le geste qu'on vient faire
+           a sa pastille, hors édition, en tête de rangée. */
+        !modeElec && onAjouterMeuble ? (
+          <ToolPill key="ajoutMeuble" icon="furniture" label="+ Meuble" active={false} ajout onPress={onAjouterMeuble} />
+        ) : null,
         <ToolPill
           key="ruler"
           icon="ruler"
