@@ -264,6 +264,7 @@ import {
   encombrement,
   milieuVisible,
   placerEtiquettes,
+  plaqueDeCote,
   type EtiquetteMobile,
 } from '../geometry/cotes';
 import { haptic, releaseHaptic } from '../ui/haptic';
@@ -2107,7 +2108,8 @@ export function FloorplanEditor({
         h: car.hpx,
       });
     }
-    const poses = placerEtiquettes(items, prises);
+    // Trois points de jeu : deux plaques ne se touchent pas (captures du simulateur).
+    const poses = placerEtiquettes(items, prises, 3);
     const boites = [...poses.entries()].map(([id, p]) => {
       const e = items.find((x) => x.id === id)!;
       return {
@@ -3303,19 +3305,31 @@ export function FloorplanEditor({
                   if (!pose) return null;
                   const px = pose.x;
                   const py = pose.y;
+                  const texte = run.length.toFixed(2).replace('.', ',');
+                  const p = plaqueDeCote(texte, 9.5);
                   return (
-                    <SvgText
-                      key={`run-${w.id}-${ri}`}
-                      x={px}
-                      y={py + 3}
-                      fill={run.kind === 'mur' ? c.inkSoft : c.blue}
-                      fontSize={9.5}
-                      fontWeight="700"
-                      opacity={detail}
-                      textAnchor="middle"
-                      transform={`rotate(${angle}, ${px}, ${py})`}>
-                      {run.length.toFixed(2).replace('.', ',')}
-                    </SvgText>
+                    <G key={`run-${w.id}-${ri}`} opacity={detail}>
+                      <Rect
+                        x={px - p.w / 2}
+                        y={py - p.h / 2}
+                        width={p.w}
+                        height={p.h}
+                        rx={3}
+                        fill={c.surface}
+                        opacity={0.92}
+                        transform={`rotate(${angle}, ${px}, ${py})`}
+                      />
+                      <SvgText
+                        x={px}
+                        y={py + 3.4}
+                        fill={run.kind === 'mur' ? c.inkSoft : c.blue}
+                        fontSize={9.5}
+                        fontWeight="700"
+                        textAnchor="middle"
+                        transform={`rotate(${angle}, ${px}, ${py})`}>
+                        {texte}
+                      </SvgText>
+                    </G>
                   );
                 }),
               )}
@@ -4752,17 +4766,39 @@ function WallBody({
         />
       )}
       {showMeasure && measureOpacity > 0.02 && (
-        <SvgText
-          opacity={measureOpacity}
-          x={mid.x}
-          y={mid.y + 3}
-          fill={selected ? c.blue : c.inkSoft}
-          fontSize={10}
-          fontWeight="600"
-          textAnchor="middle"
-          transform={`rotate(${angle}, ${mid.x}, ${mid.y})`}>
-          {label}
-        </SvgText>
+        <G opacity={measureOpacity}>
+          {/*
+            LA PLAQUE SOUS LE CHIFFRE — vu sur les captures du simulateur :
+            le semis du sol et les meubles passaient à travers les cotes
+            (« 3,00 m » sur le lave-linge). Taillée sur le texte, deux points
+            de débord (`plaqueDeCote`).
+          */}
+          {(() => {
+            const p = plaqueDeCote(label, 10);
+            return (
+              <Rect
+                x={mid.x - p.w / 2}
+                y={mid.y - p.h / 2}
+                width={p.w}
+                height={p.h}
+                rx={3}
+                fill={c.surface}
+                opacity={0.92}
+                transform={`rotate(${angle}, ${mid.x}, ${mid.y})`}
+              />
+            );
+          })()}
+          <SvgText
+            x={mid.x}
+            y={mid.y + 3.5}
+            fill={selected ? c.blue : c.inkSoft}
+            fontSize={10}
+            fontWeight="600"
+            textAnchor="middle"
+            transform={`rotate(${angle}, ${mid.x}, ${mid.y})`}>
+            {label}
+          </SvgText>
+        </G>
       )}
     </G>
   );

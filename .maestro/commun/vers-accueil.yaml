@@ -3,6 +3,23 @@
 appId: ${APP_ID}
 ---
 - runFlow: attendre-demarrage.yaml
+# Relancée sur un écran du compte (le parcours précédent s'y est arrêté).
+- runFlow:
+    when:
+      visible: "Abonnement"
+    commands:
+      - tapOn:
+          point: "10%,10%"
+      - waitForAnimationToEnd:
+          timeout: 3000
+- runFlow:
+    when:
+      visible: "Profil"
+    commands:
+      - tapOn:
+          point: "10%,10%"
+      - waitForAnimationToEnd:
+          timeout: 3000
 - runFlow:
     when:
       visible: "Découvrir sans compte"

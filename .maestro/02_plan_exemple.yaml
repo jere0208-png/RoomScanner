@@ -28,16 +28,10 @@ name: Plan d'exemple
 - waitForAnimationToEnd:
     timeout: 5000
 - takeScreenshot: ${THEME}-13-menu-du-plan
-- runFlow:
-    when:
-      visible: "Annuler"
-    commands:
-      - tapOn: "Annuler"
-- runFlow:
-    when:
-      visible: "Fermer"
-    commands:
-      - tapOn: "Fermer"
+# La croix de la feuille (Maestro ne lit pas l'intérieur des fenêtres
+# modales de React Native : on la touche à sa place).
+- tapOn:
+    point: "93%,11%"
 - waitForAnimationToEnd:
     timeout: 5000
 

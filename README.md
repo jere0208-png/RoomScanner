@@ -14285,6 +14285,23 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Vu sur les vraies captures du simulateur
+
+Premier passage de l'app réelle, compilée et parcourue sur un iPhone
+simulé (branche `captures`). Ce qu'on y a vu, et corrigé :
+- **Les cotes du plan avaient l'air transparentes** : le semis du sol et
+  les meubles passaient sous les chiffres (« 3,00 m » sur le lave-linge).
+  Chaque cote porte maintenant sa plaque, taillée sur le texte ; deux
+  plaques gardent trois points d'écart (deux cotes verticales se
+  touchaient).
+- **En sombre, les boutons disparaissaient** : « Achats », « 2D »,
+  « + Meuble », « Édition » avaient le fond exact de la carte du plan, et
+  leur ombre, noire sur du noir, ne se voyait pas. Ce qui porte une ombre de
+  bouton prend, en sombre, une surface un cran plus claire.
+- Les parcours Maestro touchent l'intérieur des feuilles modales à sa place
+  (Maestro ne lit pas leur contenu), et retrouvent l'accueil depuis le
+  profil.
+
 ## Saisies et noms (Hugo, Yasmine)
 
 - « 0 » se dit « 0,00 m, c'est trop peu » au lieu de « ne se lit pas » ;

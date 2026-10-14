@@ -126,11 +126,45 @@ export function themedStyles<T>(factory: (c: Palette) => T): (c: Palette) => T {
   return (c) => {
     let s = cache.get(c);
     if (!s) {
-      s = factory(c);
+      s = rehausser(factory(c), c);
       cache.set(c, s);
     }
     return s;
   };
+}
+
+/** La palette est-elle sombre ? (luminance du fond) */
+export function estSombre(c: Palette): boolean {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(c.bg);
+  if (!m) return false;
+  const [r, g, b] = [m[1], m[2], m[3]].map((x) => parseInt(x, 16) / 255);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.35;
+}
+
+/** Le fond d'un bouton posé sur une surface, en sombre : un cran plus clair. */
+export const SURFACE_BOUTON_SOMBRE = '#232B37';
+
+/*
+  EN SOMBRE, UN BOUTON NE SE DÉTACHE PAS PAR SON OMBRE — vu sur les vraies
+  captures du simulateur : les pastilles « Achats », « 2D », « + Meuble »,
+  « Édition » avaient le fond exact de la carte du plan, et l'ombre portée,
+  noire sur du noir, ne se voit pas. Ce qui porte une ombre de bouton
+  (rayon de 12 au plus : pas les cartes) prend, en sombre, une surface un
+  cran plus claire — comme les surfaces « élevées » d'iOS.
+*/
+function rehausser<T>(styles: T, c: Palette): T {
+  if (!estSombre(c) || !styles || typeof styles !== 'object') return styles;
+  // Sans muter : un style peut être gelé.
+  let copie: Record<string, unknown> | null = null;
+  for (const [k, v] of Object.entries(styles as Record<string, unknown>)) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) continue;
+    const st = v as { backgroundColor?: unknown; shadowRadius?: unknown };
+    if (st.backgroundColor === c.surface && typeof st.shadowRadius === 'number' && st.shadowRadius <= 12) {
+      copie ??= { ...(styles as Record<string, unknown>) };
+      copie[k] = { ...st, backgroundColor: SURFACE_BOUTON_SOMBRE };
+    }
+  }
+  return (copie ?? styles) as T;
 }
 
 /**

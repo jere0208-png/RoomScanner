@@ -4,6 +4,6 @@
 appId: ${APP_ID}
 ---
 - extendedWaitUntil:
-    visible: "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple"
+    visible: "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple|Profil|Abonnement"
     timeout: 60000
 - runFlow: fenetres-systeme.yaml
