@@ -77,6 +77,8 @@ import {
   wallRuns,
   weldCorners,
   joindreLesCoins,
+  preEquerrage,
+  epaisseursAccordees,
   facadesDePlacard,
   fusionnerMursDoubles,
   estDessine,
@@ -3427,8 +3429,8 @@ export const useScanStore = create<ScanState>((set, get) => {
     const nettoyes = sansEclats(
       mergeColinear(
         splitAtJunctions(
-          weldCorners(
-            fusionnerMursDoubles(segments.filter((s) => s.type === 'wall')),
+          epaisseursAccordees(
+            weldCorners(fusionnerMursDoubles(preEquerrage(segments.filter((s) => s.type === 'wall')))),
           ),
         ),
       ),
@@ -7136,8 +7138,8 @@ export const useScanStore = create<ScanState>((set, get) => {
       const nettoyes = sansEclats(
         mergeColinear(
           splitAtJunctions(
-            weldCorners(
-              fusionnerMursDoubles(segments.filter((x) => x.type === 'wall')),
+            epaisseursAccordees(
+              weldCorners(fusionnerMursDoubles(preEquerrage(segments.filter((x) => x.type === 'wall')))),
             ),
           ),
         ),
@@ -7687,7 +7689,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       */
       const nettoyes = sansEclats(
         mergeColinear(
-          splitAtJunctions(joindreLesCoins(weldCorners(fusionnerMursDoubles(segments.filter((s) => s.type === 'wall'))))),
+          splitAtJunctions(joindreLesCoins(epaisseursAccordees(weldCorners(fusionnerMursDoubles(preEquerrage(segments.filter((s) => s.type === 'wall'))))))),
         ),
         [],
       ).walls;

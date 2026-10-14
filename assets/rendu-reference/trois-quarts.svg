@@ -28,18 +28,14 @@
 <polyline points="263.92,153.41 264.02,156.5" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="263.92,153.41 263.92,77.59" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="264.02,156.5 264.02,80.69" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="306.67,137.43 314.25,143.86" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="306.67,164.73 314.25,171.15" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="306.67,164.73 306.67,137.43" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="246.25,98.7 264.02,92.82 264.02,80.69 246.25,86.57" fill="#fffdf9" stroke="#fffdf9" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polyline points="306.67,137.43 318.04,147.07" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="306.67,164.73 318.04,174.37" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="306.67,164.73 306.67,137.43" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="297.19,156.69 306.67,164.73 306.67,88.91 297.19,80.88" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="297.19,80.88 306.67,88.91" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="297.19,156.69 306.67,164.73" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="306.67,164.73 306.67,88.91" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polygon points="306.67,137.43 314.25,143.86 318.31,142.3 310.03,135.28" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polyline points="306.67,137.43 314.25,143.86" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="310.03,135.28 318.31,142.3" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="306.67,137.43 310.03,135.28" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="306.67,164.73 310.03,162.57 310.03,86.76 306.67,88.91" fill="#fefcf8" stroke="#fefcf8" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="275.87,76.76 287.72,72.84 289.31,69.19 276.61,73.39" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="306.67,88.91 310.03,86.76" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
@@ -48,23 +44,25 @@
 <polyline points="310.03,162.57 310.03,86.76" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="275.87,76.76 287.72,72.84" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="276.61,73.39 289.31,69.19" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polygon points="306.67,137.43 318.04,147.07 322.46,145.82 310.03,135.28" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polyline points="306.67,137.43 318.04,147.07" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="310.03,135.28 322.46,145.82" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="306.67,137.43 310.03,135.28" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="228.48,104.59 246.25,98.7 246.25,86.57 228.48,92.46" fill="#fffdf9" stroke="#fffdf9" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polyline points="314.25,143.86 321.83,150.29" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="314.25,171.15 321.83,177.58" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="287.72,72.84 297.19,80.88 299.67,77.97 289.31,69.19" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="287.72,72.84 297.19,80.88" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="289.31,69.19 299.67,77.97" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="225.83,102.34 228.48,104.59 228.48,92.46 225.83,90.21" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="264.02,80.69 275.87,76.76 276.61,73.39 263.92,77.59" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="306.87,137.3 314.49,143.77 314.49,110.41 306.87,103.94" fill="#ccc1b2" stroke="#ccc1b2" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polygon points="306.67,164.73 314.25,171.15 314.25,143.86 306.67,137.43" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polygon points="306.67,104.07 314.25,110.5 314.25,95.34 306.67,88.91" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="264.02,80.69 275.87,76.76" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="263.92,77.59 276.61,73.39" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="264.02,80.69 263.92,77.59" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polygon points="314.25,143.86 321.83,150.29 326.6,149.33 318.31,142.3" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polyline points="314.25,143.86 321.83,150.29" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="318.31,142.3 326.6,149.33" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polygon points="306.67,164.73 318.04,174.37 318.04,147.07 306.67,137.43" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="306.67,104.07 318.04,113.72 318.04,98.55 306.67,88.91" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polyline points="318.04,147.07 329.4,156.72" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="318.04,174.37 329.4,184.01" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="329.4,184.01 329.4,156.72" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="306.87,103.94 314.49,110.41" fill="none" stroke="#CDC3B2" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="306.87,137.3 314.49,143.77" fill="none" stroke="#CDC3B2" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="306.87,137.3 306.87,103.94" fill="none" stroke="#CDC3B2" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
@@ -72,9 +70,6 @@
 <polyline points="213.67,97.36 228.48,92.46" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="213.67,173.17 228.48,168.27" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="228.48,168.27 228.48,92.46" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="321.83,150.29 329.4,156.72" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="321.83,177.58 329.4,184.01" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="329.4,184.01 329.4,156.72" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="246.25,86.57 264.02,80.69" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="246.25,98.7 264.02,92.82" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="264.02,92.82 264.02,80.69" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
@@ -84,8 +79,7 @@
 <polyline points="264.02,80.69 263.92,77.59" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="297.19,80.88 306.67,88.91 310.03,86.76 299.67,77.97" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="314.49,143.77 322.11,150.23 322.11,116.87 314.49,110.41" fill="#ccc1b2" stroke="#ccc1b2" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polygon points="314.25,171.15 321.83,177.58 321.83,150.29 314.25,143.86" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polygon points="314.25,110.5 321.83,116.93 321.83,101.77 314.25,95.34" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="318.04,147.07 329.4,156.72 334.89,156.36 322.46,145.82" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="297.19,80.88 306.67,88.91" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="299.67,77.97 310.03,86.76" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="306.67,88.91 310.03,86.76" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
@@ -93,14 +87,13 @@
 <polyline points="329.4,184.01 334.89,183.65" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="329.4,184.01 329.4,156.72" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="334.89,183.65 334.89,156.36" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="318.04,147.07 329.4,156.72" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="322.46,145.82 334.89,156.36" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="329.4,156.72 334.89,156.36" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="198.86,178.08 213.67,173.17 213.67,97.36 198.86,102.26" fill="#fffdf9" stroke="#fffdf9" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="198.86,102.26 213.67,97.36" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="198.86,178.08 213.67,173.17" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="198.86,178.08 198.86,102.26" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polygon points="321.83,150.29 329.4,156.72 334.89,156.36 326.6,149.33" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polyline points="321.83,150.29 329.4,156.72" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="326.6,149.33 334.89,156.36" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="329.4,156.72 334.89,156.36" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="314.49,110.41 322.11,116.87" fill="none" stroke="#CDC3B2" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="314.49,143.77 322.11,150.23" fill="none" stroke="#CDC3B2" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="194.09,176.53 198.86,178.08 198.86,102.26 194.09,100.72" fill="#f4f0e9" stroke="#f4f0e9" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
@@ -112,6 +105,8 @@
 <polyline points="228.48,104.59 246.25,98.7" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="228.48,104.59 228.48,92.46" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="228.48,92.46 246.25,86.57 244.87,83.9 225.83,90.21" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="318.04,174.37 329.4,184.01 329.4,156.72 318.04,147.07" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="318.04,113.72 329.4,123.36 329.4,108.2 318.04,98.55" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="228.48,92.46 246.25,86.57" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="225.83,90.21 244.87,83.9" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="228.48,92.46 225.83,90.21" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
@@ -119,20 +114,15 @@
 <polyline points="225.83,102.34 228.48,104.59" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="225.83,102.34 225.83,90.21" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="228.48,104.59 228.48,92.46" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="306.67,88.91 314.25,95.34" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="306.67,104.07 314.25,110.5" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="306.67,104.07 306.67,88.91" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="322.11,150.23 329.73,156.7 329.73,123.34 322.11,116.87" fill="#ccc1b2" stroke="#ccc1b2" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polygon points="321.83,177.58 329.4,184.01 329.4,156.72 321.83,150.29" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polygon points="321.83,116.93 329.4,123.36 329.4,108.2 321.83,101.77" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polygon points="306.67,88.91 314.25,95.34 318.31,93.78 310.03,86.76" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polyline points="306.67,88.91 314.25,95.34" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="310.03,86.76 318.31,93.78" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="306.67,88.91 310.03,86.76" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="306.67,88.91 318.04,98.55" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="306.67,104.07 318.04,113.72" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="306.67,104.07 306.67,88.91" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="177.59,185.12 194.62,179.48 194.62,103.67 177.59,109.31" fill="#fffdf9" stroke="#fffdf9" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="177.59,109.31 194.62,103.67" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="177.59,185.12 194.62,179.48" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="194.62,179.48 194.62,103.67" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polygon points="306.67,88.91 318.04,98.55 322.46,97.3 310.03,86.76" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="194.62,179.48 204.09,187.52 204.09,111.7 194.62,103.67" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="322.11,116.87 329.73,123.34" fill="none" stroke="#CDC3B2" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="322.11,150.23 329.73,156.7" fill="none" stroke="#CDC3B2" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
@@ -140,6 +130,9 @@
 <polygon points="329.4,184.01 334.89,183.65 334.89,156.36 329.4,156.72" fill="#fdfaf6" stroke="#fdfaf6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="329.4,123.36 334.89,123 334.89,107.84 329.4,108.2" fill="#fdfaf6" stroke="#fdfaf6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="213.57,194.95 222.09,202.18 226.34,200.77 217.81,193.54" fill="#dad2c5" stroke="#dad2c5" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polyline points="306.67,88.91 318.04,98.55" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="310.03,86.76 322.46,97.3" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="306.67,88.91 310.03,86.76" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="194.62,103.67 204.09,111.7" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="194.62,179.48 204.09,187.52" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="194.62,179.48 194.62,103.67" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
@@ -153,8 +146,6 @@
 <polyline points="213.57,194.95 222.09,202.18" fill="none" stroke="#b4ac9d" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="213.57,195.55 222.09,202.79" fill="none" stroke="#b4ac9d" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="213.57,195.55 213.57,194.95" fill="none" stroke="#b4ac9d" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="314.25,95.34 321.83,101.77" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="314.25,110.5 321.83,116.93" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="329.4,184.01 336.98,190.44 336.98,114.62 329.4,108.2" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="329.4,108.2 336.98,114.62" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="329.4,184.01 336.98,190.44" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
@@ -162,13 +153,13 @@
 <polygon points="160.56,190.76 177.59,185.12 177.59,109.31 160.56,114.94" fill="#fffdf9" stroke="#fffdf9" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="160.56,114.94 177.59,109.31" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="160.56,190.76 177.59,185.12" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polygon points="314.25,95.34 321.83,101.77 326.6,100.81 318.31,93.78" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polyline points="314.25,95.34 321.83,101.77" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="318.31,93.78 326.6,100.81" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="198.86,102.26 213.67,97.36 209.96,95.46 194.09,100.72" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="198.86,102.26 213.67,97.36" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="194.09,100.72 209.96,95.46" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="222.09,202.18 230.62,209.41 234.87,208 226.34,200.77" fill="#dad2c5" stroke="#dad2c5" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polyline points="318.04,98.55 329.4,108.2" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="318.04,113.72 329.4,123.36" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="329.4,123.36 329.4,108.2" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="204.09,187.52 213.57,195.55 213.57,119.74 204.09,111.7" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="222.09,202.18 230.62,209.41" fill="none" stroke="#b4ac9d" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="226.34,200.77 234.87,208" fill="none" stroke="#b4ac9d" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
@@ -179,13 +170,14 @@
 <polyline points="222.09,202.18 230.62,209.41" fill="none" stroke="#b4ac9d" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="222.09,202.79 230.62,210.02" fill="none" stroke="#b4ac9d" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="230.62,210.02 230.62,209.41" fill="none" stroke="#b4ac9d" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="321.83,101.77 329.4,108.2" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="321.83,116.93 329.4,123.36" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="329.4,123.36 329.4,108.2" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="143.54,196.4 160.56,190.76 160.56,114.94 143.54,120.58" fill="#fffdf9" stroke="#fffdf9" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
+<polygon points="318.04,98.55 329.4,108.2 334.89,107.84 322.46,97.3" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polygon points="336.98,190.44 344.56,196.87 344.56,121.05 336.98,114.62" fill="#ece6de" stroke="#ece6de" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="143.54,120.58 160.56,114.94" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="143.54,196.4 160.56,190.76" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="318.04,98.55 329.4,108.2" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="322.46,97.3 334.89,107.84" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
+<polyline points="329.4,108.2 334.89,107.84" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="336.98,114.62 344.56,121.05" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="336.98,190.44 344.56,196.87" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="344.56,196.87 344.56,121.05" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
@@ -194,15 +186,11 @@
 <polyline points="230.62,210.02 234.87,208.61" fill="none" stroke="#b4ac9d" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="230.62,210.02 230.62,209.41" fill="none" stroke="#b4ac9d" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="234.87,208.61 234.87,208" fill="none" stroke="#b4ac9d" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polygon points="321.83,101.77 329.4,108.2 334.89,107.84 326.6,100.81" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
 <polyline points="213.57,119.74 217.81,118.33" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="213.57,195.55 217.81,194.15" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="213.57,195.55 213.57,119.74" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="217.81,194.15 217.81,118.33" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polygon points="177.59,109.31 194.62,103.67 194.09,100.72 176.15,106.66" fill="#F7F1E6" stroke="#F7F1E6" stroke-width="1" stroke-dasharray="0" stroke-linejoin="round"/>
-<polyline points="321.83,101.77 329.4,108.2" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="326.6,100.81 334.89,107.84" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
-<polyline points="329.4,108.2 334.89,107.84" fill="none" stroke="#DCD2C0" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="329.4,108.2 334.89,107.84" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="329.4,123.36 334.89,123" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>
 <polyline points="329.4,123.36 329.4,108.2" fill="none" stroke="#E0D6C5" stroke-width="1" stroke-dasharray="0" stroke-linecap="round"/>

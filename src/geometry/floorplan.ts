@@ -3126,9 +3126,15 @@ export function sansEclatsLeLong(walls: WallSeg[]): WallSeg[] {
       const lat = (p: Pt) => Math.abs((p.x - w.a.x) * -uw.z + (p.z - w.a.z) * uw.x);
       if (lat(s.a) > 0.06 || lat(s.b) > 0.06) return false;
       const t = (p: Pt) => (p.x - w.a.x) * uw.x + (p.z - w.a.z) * uw.z;
-      const t0 = Math.min(t(s.a), t(s.b));
-      const t1 = Math.max(t(s.a), t(s.b));
-      return t1 > -0.15 && t0 < lw + 0.15;
+      /*
+        COUCHÉ SUR LE MUR, PAS DANS SON PROLONGEMENT — revue d'un expert des
+        cotes : un vrai retour de 14 cm qui prolonge un mur (la chambre qui
+        dépasse le couloir d'une épaisseur) passait pour un éclat ; la
+        surface se trompait de 2,5 %. Seul un bout dont le milieu tombe sur
+        le mur est un éclat.
+      */
+      const tm = (t(s.a) + t(s.b)) / 2;
+      return tm > 0 && tm < lw;
     });
     if (porte) jetes.add(s.id);
   }
@@ -3208,7 +3214,17 @@ export function fusionnerMursDoubles(
         const t0 = Math.min(t(o.a), t(o.b));
         const t1 = Math.max(t(o.a), t(o.b));
         const commun = Math.min(t1, hi) - Math.max(t0, lo);
+        /*
+          BOUT À BOUT N'EST PAS DOUBLÉ — revue d'un expert des cotes : deux
+          morceaux d'un même mur qui se recouvrent de 6 cm à cause du bruit
+          devenaient les « deux faces » d'un mur de 17 cm (−31 cm sur la
+          cote). Un recouvrement court ne réunit que des morceaux sur la
+          même ligne (la façade qui continue) ; décalés de 5 cm et plus, il
+          leur faut 15 cm, ou la moitié du plus court.
+        */
         if (commun <= 0.05) continue;
+        const decale = Math.abs((cote(o.a) + cote(o.b)) / 2) >= DEUX_FACES;
+        if (decale && commun <= Math.min(0.15, 0.5 * Math.min(lo2, hi - lo))) continue;
         // Absorbé : le mur retenu prend l'enveloppe des deux.
         absorbes.add(o.id);
         ajout = true;
@@ -3225,11 +3241,22 @@ export function fusionnerMursDoubles(
       (5 cm au moins) ; chaque côté prend la moyenne de ses faces.
     */
     const rangees = [...faces].sort((p, q) => p.d - q.d);
+    /*
+      UNE SECONDE FACE DOIT PESER — revue d'un expert des cotes : un éclat de
+      10 cm à 6,6 cm d'un couloir de 9 m en faisait un mur à deux faces, et
+      tout le couloir se décalait de 3 cm. De chaque côté de la coupure, au
+      moins 50 cm de relevé, ou le quart de l'autre côté.
+    */
+    const pese = (i: number) => {
+      const bas = rangees.slice(0, i + 1).reduce((t, f) => t + f.poids, 0);
+      const haut = rangees.slice(i + 1).reduce((t, f) => t + f.poids, 0);
+      return Math.min(bas, haut) >= Math.min(0.5, 0.25 * Math.max(bas, haut));
+    };
     let coupe = -1;
     let ecart = DEUX_FACES - 1e-9;
     for (let i = 0; i + 1 < rangees.length; i++) {
       const g = rangees[i + 1].d - rangees[i].d;
-      if (g > ecart) {
+      if (g > ecart && pese(i)) {
         ecart = g;
         coupe = i;
       }
@@ -3247,7 +3274,7 @@ export function fusionnerMursDoubles(
     if (coupe < 0) {
       for (let i = 0; i + 1 < rangees.length; i++) {
         const g = rangees[i + 1].d - rangees[i].d;
-        if (g < 0.02 || (coupe >= 0 && g <= ecart)) continue;
+        if (g < 0.02 || (coupe >= 0 && g <= ecart) || !pese(i)) continue;
         const sensBas = rangees[0].sens;
         const separes =
           rangees.slice(0, i + 1).every((f) => f.sens === sensBas) &&
@@ -3274,7 +3301,14 @@ export function fusionnerMursDoubles(
       recales.push({ origine, u, n, faces: [faceBas, faceHaut], axe, de: lo, a: hi, id: w.id });
       out.push({ ...w, a: A, b: B, epaisseur, deuxFaces: true });
     } else {
-      out.push({ ...w, a: A, b: B });
+      /*
+        UNE MÊME FACE VUE DEUX FOIS : LA MOYENNE DE SES RELEVÉS — revue d'un
+        expert des cotes. Elle gardait la droite du plus long morceau ; deux
+        relevés valent mieux qu'un.
+      */
+      const d =
+        faces.length > 1 ? faces.reduce((t, f) => t + f.d * f.poids, 0) / faces.reduce((t, f) => t + f.poids, 0) : 0;
+      out.push({ ...w, a: { x: A.x + n.x * d, z: A.z + n.z * d }, b: { x: B.x + n.x * d, z: B.z + n.z * d } });
     }
   }
   if (recales.length === 0) return out;
@@ -4472,29 +4506,57 @@ export function weldCorners(walls: WallSeg[], tol = 0.15): WallSeg[] {
         cluster.reduce((s, k) => s + points[k].wall[points[k].end].z, 0) /
         cluster.length;
       /*
-        UN COIN SE SOUDE À LA RENCONTRE DE SES DEUX MURS — revue « Léon » :
-        une façade arrêtée à 4 cm du pignon se soudait au milieu des deux
-        bouts. La façade perdait 2 cm (3,58 au lieu de 3,60) et le pignon
-        partait de travers d'un demi-degré. Deux murs qui se croisent
-        franchement se rejoignent là où leurs droites se coupent.
+        UN COIN SE SOUDE À LA RENCONTRE DE SES MURS — revue « Léon » : une
+        façade arrêtée à 4 cm du pignon se soudait au milieu des deux bouts.
+        Revue d'un expert des cotes, ensuite : la façade d'une chambre rendue
+        en deux morceaux juste au pied de la cloison du dressing se soudait
+        au BARYCENTRE des trois bouts ; la cloison penchait de 3° et la
+        façade se cotait 1,98 + 2,23 au lieu de 1,85 + 2,35. Le coin est le
+        point le plus proche, aux moindres carrés, des DROITES de ses murs
+        (chacune pesant sa longueur, 3 m au plus) — dès que deux d'entre
+        elles se coupent franchement (15° et plus). Deux morceaux presque
+        alignés, eux, gardent le barycentre : ils se couperaient n'importe où.
       */
-      if (cluster.length === 2 && points[cluster[0]].wall !== points[cluster[1]].wall) {
-        const [p, q] = cluster.map((k) => points[k]);
-        const P = p.wall[p.end];
-        const Q = q.wall[q.end];
-        const dirDe = (w: WallSeg) => {
-          const l = segLength(w) || 1;
+      {
+        const murs = cluster.map((k) => points[k]).filter((pt) => segLength(pt.wall) >= 0.1);
+        const dirs = murs.map(({ wall: w }) => {
+          const l = segLength(w);
           return { x: (w.b.x - w.a.x) / l, z: (w.b.z - w.a.z) / l };
-        };
-        const u1 = dirDe(p.wall);
-        const u2 = dirDe(q.wall);
-        const den = u1.x * u2.z - u1.z * u2.x;
-        if (Math.abs(den) > 0.26 && segLength(p.wall) > 0.1 && segLength(q.wall) > 0.1) {
-          const s = ((Q.x - P.x) * u2.z - (Q.z - P.z) * u2.x) / den;
-          const X = { x: P.x + u1.x * s, z: P.z + u1.z * s };
-          if (Math.hypot(X.x - P.x, X.z - P.z) < tol * 1.5 && Math.hypot(X.x - Q.x, X.z - Q.z) < tol * 1.5) {
-            cx = X.x;
-            cz = X.z;
+        });
+        const secantes = dirs.some((d, i) => dirs.some((e, j) => j > i && Math.abs(d.x * e.z - d.z * e.x) > 0.26));
+        if (secantes) {
+          let sxx = 0;
+          let sxz = 0;
+          let szz = 0;
+          let bx = 0;
+          let bz = 0;
+          let W = 0;
+          murs.forEach(({ wall: w, end }, i) => {
+            const n = { x: -dirs[i].z, z: dirs[i].x };
+            const pt = w[end];
+            const poids = Math.min(segLength(w), 3);
+            const d = n.x * pt.x + n.z * pt.z;
+            sxx += poids * n.x * n.x;
+            sxz += poids * n.x * n.z;
+            szz += poids * n.z * n.z;
+            bx += poids * n.x * d;
+            bz += poids * n.z * d;
+            W += poids;
+          });
+          // Un petit rappel vers le barycentre tient la direction libre.
+          const eps = 1e-3 * W;
+          const a11 = sxx + eps;
+          const a22 = szz + eps;
+          const det = a11 * a22 - sxz * sxz;
+          if (Math.abs(det) > 1e-12) {
+            const r1 = bx + eps * cx;
+            const r2 = bz + eps * cz;
+            const Y = { x: (r1 * a22 - sxz * r2) / det, z: (a11 * r2 - sxz * r1) / det };
+            const bouts = cluster.map((k) => points[k].wall[points[k].end]);
+            if (bouts.every((q) => Math.hypot(Y.x - q.x, Y.z - q.z) < tol * 1.5)) {
+              cx = Y.x;
+              cz = Y.z;
+            }
           }
         }
       }
@@ -4615,6 +4677,83 @@ export function joindreLesCoins(walls: WallSeg[], portee = 0.4): WallSeg[] {
  * magnétisme de l'édition. Les axes du repère ARKit, eux, ne veulent rien
  * dire — ils dépendent de l'endroit où le scan a commencé.
  */
+/**
+ * REDRESSER CHAQUE MUR AVANT DE SOUDER — revue d'un expert des cotes, sur
+ * 400 relevés bruités : un mur penché d'1,3° (ou un mur « low » de 2°)
+ * passait le seuil du « vrai biais » et restait penché ; son coin se posait
+ * sur un bout décalé (−6 cm sur une façade de 5 m) et, au-delà de 15 cm,
+ * ne se soudait plus : la pièce disparaissait (7 relevés sur 400).
+ *
+ * Un mur presque d'équerre pivote autour de son MILIEU — le point le mieux
+ * mesuré d'un plan ajusté — jusqu'à la trame. Ses bouts reviennent au bruit
+ * près, la soudure les attrape au bon endroit. Un vrai biais (plus de 2°,
+ * 2,5° pour un mur que RoomPlan dit douteux) ne bouge pas.
+ */
+export function preEquerrage(walls: WallSeg[], hautDeg = 2, douteuxDeg = 2.5): WallSeg[] {
+  const theta = planFrameAngle(walls);
+  const q = Math.PI / 2;
+  return walls.map((w) => {
+    if (w.type !== 'wall' || w.angleVoulu) return w;
+    const L = segLength(w);
+    if (L < 0.3) return w;
+    const a = Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x);
+    let d = (a - theta) % q;
+    if (d > q / 2) d -= q;
+    if (d < -q / 2) d += q;
+    const douteux = w.confidence === 'low' || w.confidence === 'medium';
+    if (Math.abs(d) > ((douteux ? douteuxDeg : hautDeg) * Math.PI) / 180 || Math.abs(d) < 1e-9) return w;
+    const m = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+    const na = a - d;
+    const u = { x: (Math.cos(na) * L) / 2, z: (Math.sin(na) * L) / 2 };
+    return { ...w, a: { x: m.x - u.x, z: m.z - u.z }, b: { x: m.x + u.x, z: m.z + u.z } };
+  });
+}
+
+/**
+ * LA CLOISON À DEUX FACES RENDUE EN MORCEAUX GARDE UNE COTE — revue d'un
+ * expert des cotes : deux tronçons alignés d'une même cloison, mesurés à
+ * 7,0 et 7,1 cm d'épaisseur, ne se recollaient plus (`mergeColinear` refuse
+ * deux épaisseurs différentes) ; une cloison de 3,00 m sortait en 1,62 +
+ * 1,39. Bout à bout, alignés à 4° près, à 3 cm d'épaisseur près : ils
+ * prennent la même, la moyenne pondérée par leur longueur.
+ */
+export function epaisseursAccordees(walls: WallSeg[]): WallSeg[] {
+  const cle = (p: Pt) => `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
+  const parNoeud = new Map<string, WallSeg[]>();
+  for (const w of walls) for (const p of [w.a, w.b]) parNoeud.set(cle(p), [...(parNoeud.get(cle(p)) ?? []), w]);
+  const parent = new Map<string, string>();
+  const find = (k: string): string => {
+    const r = parent.get(k);
+    return r && r !== k ? find(r) : k;
+  };
+  for (const [, ws] of parNoeud) {
+    if (ws.length !== 2) continue;
+    const [p, q] = ws;
+    if (!p.deuxFaces || !q.deuxFaces || p.epaisseur === undefined || q.epaisseur === undefined) continue;
+    if (Math.abs(p.epaisseur - q.epaisseur) > 0.03) continue;
+    const lp = segLength(p);
+    const lq = segLength(q);
+    if (lp < 1e-6 || lq < 1e-6) continue;
+    const cosA = Math.abs(((p.b.x - p.a.x) * (q.b.x - q.a.x) + (p.b.z - p.a.z) * (q.b.z - q.a.z)) / (lp * lq));
+    if (cosA < Math.cos((4 * Math.PI) / 180)) continue;
+    parent.set(find(p.id), find(q.id));
+  }
+  const groupes = new Map<string, WallSeg[]>();
+  for (const w of walls) if (w.deuxFaces) groupes.set(find(w.id), [...(groupes.get(find(w.id)) ?? []), w]);
+  const e = new Map<string, number>();
+  for (const [, g] of groupes) {
+    if (g.length < 2) continue;
+    const L = g.reduce((t, w) => t + segLength(w), 0);
+    const m = g.reduce((t, w) => t + (w.epaisseur ?? 0) * segLength(w), 0) / L;
+    for (const w of g) e.set(w.id, m);
+  }
+  return e.size === 0 ? walls : walls.map((w) => (e.has(w.id) ? { ...w, epaisseur: e.get(w.id) } : w));
+}
+
+/** Le poids d'un mur selon la confiance que RoomPlan lui accorde. */
+const poidsDeConfiance = (w: WallSeg): number =>
+  w.confidence === 'low' ? 0.25 : w.confidence === 'medium' ? 0.6 : 1;
+
 export function planFrameAngle(walls: WallSeg[]): number {
   const q = Math.PI / 2;
   /** La trame que votent ces murs, pondérés par leur longueur. */
@@ -4628,9 +4767,11 @@ export function planFrameAngle(walls: WallSeg[]): number {
       if (!garde(a)) continue;
       // Période de 90° : on quadruple l'angle pour en faire un tour complet,
       // on moyenne les vecteurs, puis on revient. Un mur et son perpendiculaire
-      // votent ainsi pour la MÊME trame.
-      sx += len * Math.cos(4 * a);
-      sy += len * Math.sin(4 * a);
+      // votent ainsi pour la MÊME trame. Un mur que RoomPlan voit mal vote
+      // moins fort (revue d'un expert des cotes : il décalait la trame d'1°).
+      const k = poidsDeConfiance(w);
+      sx += len * k * Math.cos(4 * a);
+      sy += len * k * Math.sin(4 * a);
     }
     if (sx === 0 && sy === 0) return null;
     let t = Math.atan2(sy, sx) / 4;

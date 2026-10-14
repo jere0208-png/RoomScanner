@@ -14285,6 +14285,33 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Des cotes qu'un électricien peut signer
+
+Relevé du patron (« des cotes fiables ») et étude d'un expert des cotes :
+4 logements types × 100 relevés RoomPlan bruités comme les vrais (bouts à
+±2,5 cm, plan du mur à ±1,5 cm, ±1°, murs en morceaux, faces vues deux
+fois, éclats, murs « low » deux fois plus bruités), chaque cote imprimée
+comparée au réel (`__tests__/fiabilitecotes.test.ts`).
+- **Avant** : P95 de 4,65 cm sur les murs de plus d'un mètre, des cotes
+  fausses jusqu'à 1,37 m, et 7 relevés sur 400 qui perdaient une pièce.
+- **Après** (seuils verrouillés par le test) : P95 ≤ 3,3 cm, aucune cote
+  fausse de plus de 15 cm, aucune pièce perdue ; sur un relevé propre,
+  P95 < 1,6 cm. Le plancher physique de ce bruit est d'environ 2,3 cm.
+- Ce qui a changé :
+  - chaque mur presque d'équerre est redressé autour de son milieu AVANT la
+    soudure des coins (un vrai biais de plus de 2° ne bouge pas) ;
+  - un coin se soude au point le plus proche des droites de ses murs, aux
+    moindres carrés, et non plus au barycentre des bouts (la façade coupée
+    au pied de la cloison du dressing se cotait 1,98 + 2,23 au lieu de
+    1,85 + 2,35) ;
+  - deux morceaux bout à bout décalés ne font plus un mur épais de 17 cm ;
+    une « seconde face » doit peser ; une même face vue deux fois prend la
+    moyenne de ses relevés ;
+  - un vrai retour de 14 cm qui prolonge un mur n'est plus pris pour un
+    éclat ;
+  - une cloison à deux faces rendue en morceaux garde une seule cote ;
+  - un mur que RoomPlan voit mal vote moins fort pour la trame du plan.
+
 ## Le dressing n'est pas une porte, le sol épouse les murs
 
 Relevé du patron, captures à l'appui, et revues de deux experts.
