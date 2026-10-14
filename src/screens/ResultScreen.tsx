@@ -6324,7 +6324,8 @@ export function ResultScreen() {
         {/* Le mur sélectionné, en une ligne au pied du plan : sa longueur,
             sa hauteur sous plafond, et de quoi les changer. En haut, le
             bandeau mangeait le dessin qu'on est en train de regarder. */}
-        {vue === '2d' && !selectedObject && !selectedOpening && editMode && selectedWall && !capturing && (
+        {/* Pas pendant la pose au plafond : deux bandeaux pour un geste (revue « Nadia »). */}
+        {vue === '2d' && !selectedObject && !selectedOpening && !selCeiling && editMode && selectedWall && !capturing && (
           <StripBar
             key={selectedWall.id}
             styles={stylesBarres}
