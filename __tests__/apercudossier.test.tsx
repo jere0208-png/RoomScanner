@@ -171,11 +171,11 @@ describe('sans abonnement : le dossier flouté, et l’envie de le déflouter', 
       await b.props.onPress();
     });
     expect(partager).not.toHaveBeenCalled();
-    // L'invité se voit proposer le compte : c'est la porte de l'offre.
-    // Le titre dit que le PDF est Pro ; le message, que le compte s'ouvre
-    // gratuitement (revues « Thomas », « Nadia », « Marie »).
+    // L'invité se voit proposer l'offre (ses prix, sans compte) ou son
+    // compte s'il en a un (revues « Thomas », « Nadia », « Marie », « Yasmine »).
     const q = useAlerte.getState().courante;
-    expect(`${q?.titre ?? ''} ${q?.message ?? ''}`).toMatch(/compte/i);
+    expect(q?.titre).toMatch(/fait partie du Pro/);
+    expect((q?.actions ?? []).map((a) => a.label)).toEqual(['Plus tard', 'J’ai un compte', 'Voir l’offre Pro']);
     act(() => useAlerte.setState({ courante: null } as never));
   });
 });

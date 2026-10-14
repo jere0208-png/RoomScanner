@@ -762,10 +762,18 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       `Envoyer ${quoi} fait partie du Pro`,
       // Revue « Léa » : quatre phrases au moment d'envoyer. Deux suffisent.
       'L’image du plan s’envoie gratuitement (« Image du plan »). ' +
-        'Le PDF, le tableur, le DXF et la 3D sont dans Pro, avec un compte gratuit.',
+        'Le PDF, le tableur, le DXF et la 3D sont dans Pro.',
+      /*
+        LE PRIX D'ABORD, LE COMPTE ENSUITE — revue « Yasmine » : « Créer mon
+        compte » menait à l'écran de connexion, et le prix ne paraissait
+        qu'après. L'offre s'ouvre à tous ; c'est l'achat qui demande le
+        compte (`acheterPro`).
+      */
       [
         { label: 'Plus tard' },
-        { label: 'Créer mon compte', onPress: () => get().quitterInvite() },
+        // Celui qui a déjà le Pro sur un compte s'y reconnecte.
+        { label: 'J’ai un compte', onPress: () => get().quitterInvite() },
+        { label: 'Voir l’offre Pro', onPress: () => get().ouvrirPaywall() },
       ],
     );
     return false;

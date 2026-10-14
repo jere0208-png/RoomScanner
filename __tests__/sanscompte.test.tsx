@@ -199,7 +199,14 @@ describe('l’invité scanne librement, et paie à l’export', () => {
     // compte est la clé qui l'ouvre.
     const q = useAlerte.getState().courante;
     expect(q).toBeTruthy();
-    expect(`${q!.titre} ${q!.message ?? ''}`).toMatch(/compte/i);
+    /*
+      Revue « Yasmine » : le prix d'abord — « Voir l'offre Pro » ouvre la
+      page des prix à l'invité ; « J'ai un compte » ramène à la connexion.
+    */
+    const offre = q!.actions?.find((a) => /offre Pro/.test(a.label));
+    act(() => offre!.onPress?.());
+    expect(useAccountStore.getState().paywallVisible).toBe(true);
+    act(() => useAccountStore.setState({ paywallVisible: false } as never));
     const creer = q!.actions?.find((a) => /compte/i.test(a.label));
     expect(creer).toBeTruthy();
     act(() => creer!.onPress?.());
