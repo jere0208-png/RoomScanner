@@ -84,6 +84,38 @@ export interface PieceTravaux {
    * La somme fait `murs`.
    */
   teintes?: { cle: string; surface: number }[];
+  /**
+   * LA CRÉDENCE (m) : la longueur de plan de travail relevée le long des
+   * murs de la pièce — revue « Paul » : rien pour la faïence, ce qu'on pose
+   * d'abord dans une cuisine.
+   */
+  credence?: number;
+}
+
+/** La hauteur d'une crédence carrelée, du plan de travail aux meubles hauts (m). */
+export const HAUTEUR_CREDENCE = 0.6;
+
+/**
+ * La longueur de plan de travail le long des murs d'une pièce (m) : les
+ * portions de chaque mur, réunies quand elles se chevauchent (le plan et
+ * l'évier qu'il porte ne comptent qu'une fois).
+ */
+export function longueurDeCredence(
+  part: { walls: { id: string }[] },
+  plans: Map<string, { plans: { from: number; to: number }[] }>,
+): number {
+  let total = 0;
+  for (const w of part.walls) {
+    const p = plans.get(w.id)?.plans ?? [];
+    const tries = [...p].sort((a, b) => a.from - b.from);
+    let fin = -Infinity;
+    for (const x of tries) {
+      const debut = Math.max(x.from, fin);
+      if (x.to > debut) total += x.to - debut;
+      fin = Math.max(fin, x.to);
+    }
+  }
+  return total;
 }
 
 /** Le décor d'une pièce, tel que « Décorer » l'enregistre. */
@@ -234,6 +266,8 @@ export function travauxDesPieces(
   nomDe: (roomId: string, rang: number) => string,
   /** Le décor de chaque pièce (« Décorer ») : la peinture se compte par teinte. */
   decorDe?: (roomId: string) => DecorDeLaPiece | undefined,
+  /** La longueur de crédence de chaque pièce (m), voir `longueurDeCredence`. */
+  credenceDe?: (part: RoomPart) => number,
 ): PieceTravaux[] {
   const out: PieceTravaux[] = [];
   parts.forEach((part, rang) => {
@@ -263,6 +297,7 @@ export function travauxDesPieces(
     // Une baie ne monte pas plus haut que le mur qui la porte.
     const murs = mursNetsDe(contour, hauteur, siennes, part.walls);
     const decor = decorDe?.(part.roomId);
+    const credence = credenceDe?.(part) ?? 0;
     out.push({
       roomId: part.roomId,
       nom: nomDe(part.roomId, rang),
@@ -275,6 +310,7 @@ export function travauxDesPieces(
       portes,
       fenetres,
       ...(decor ? { teintes: teintesDeLaPiece(part, surface.pts, hauteur, murs, siennes, decor) } : {}),
+      ...(credence > 0.05 ? { credence: arrondi(credence, 0.01) } : {}),
     });
   });
   return out;
@@ -322,6 +358,8 @@ export interface Achats {
   plafonds: { surface: number; litres: number; pots: number };
   sol: { surface: number; avecChute: number; paquets: number };
   plinthes: { metres: number; barres: number };
+  /** La faïence de crédence : la longueur de plan de travail × 60 cm, marge comprise. */
+  faience: { longueur: number; surface: number; avecChute: number };
 }
 
 /** Ce qu'il faut acheter pour ces pièces, sur ces hypothèses. */
@@ -382,6 +420,11 @@ export function achats(pieces: PieceTravaux[], h: HypothesesTravaux = HYPOTHESES
       metres: arrondi(plinthes),
       barres: plinthes > 0 ? Math.ceil(plinthes / h.barre - 1e-9) : 0,
     },
+    faience: (() => {
+      const longueur = somme((p) => p.credence ?? 0);
+      const surface = longueur * HAUTEUR_CREDENCE;
+      return { longueur: arrondi(longueur), surface: arrondi(surface), avecChute: arrondi(surface * (1 + h.chute)) };
+    })(),
   };
 }
 

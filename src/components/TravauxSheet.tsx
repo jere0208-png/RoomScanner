@@ -126,7 +126,7 @@ export function TravauxSheet({
     basculerPiece(id, plan);
   };
 
-  const cartes: { cle: 'murs' | 'plafonds' | 'sol' | 'plinthes'; titre: string; gros: string; detail: string; teinte: string }[] = [
+  const cartes: { cle: 'murs' | 'plafonds' | 'sol' | 'plinthes' | 'faience'; titre: string; gros: string; detail: string; teinte: string }[] = [
     {
       cle: 'murs',
       titre: 'Peinture des murs',
@@ -158,6 +158,22 @@ export function TravauxSheet({
       detail: `${nombre(a.plinthes.metres)} m, portes déduites`,
       teinte: '#1E8E4E',
     },
+    /*
+      LA FAÏENCE DE CRÉDENCE — revue « Paul » : ce qu'on pose d'abord dans
+      une cuisine n'avait pas de carte. La longueur des plans de travail
+      relevés, sur 60 cm de haut ; seulement quand il y en a.
+    */
+    ...(a.faience.surface > 0
+      ? [
+          {
+            cle: 'faience' as const,
+            titre: 'Faïence / crédence',
+            gros: `${nombre(a.faience.avecChute)} m²`,
+            detail: `${nombre(a.faience.longueur)} m de plan de travail × 60 cm, marge des coupes comprise`,
+            teinte: '#2A8CA8',
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -178,7 +194,7 @@ export function TravauxSheet({
             <Text style={s.carteTitre}>{k.titre}</Text>
             <Text style={[s.carteGros, { color: k.teinte }]}>{k.gros}</Text>
             <Text style={s.carteDetail}>{k.detail}</Text>
-            {cout ? <Text style={[s.carteDetail, s.cartePrix]}>{`≈ ${euros(cout[k.cle])}`}</Text> : null}
+            {cout && k.cle !== 'faience' ? <Text style={[s.carteDetail, s.cartePrix]}>{`≈ ${euros(cout[k.cle])}`}</Text> : null}
           </View>
         ))}
       </View>

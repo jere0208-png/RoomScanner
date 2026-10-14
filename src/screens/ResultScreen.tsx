@@ -33,7 +33,7 @@ import { FichePieceSheet } from './result/FichePieceSheet';
 import { ficheDeLaPiece, type CircuitConseille } from '../geometry/fichePiece';
 import { ancrerElec } from '../geometry/viseur';
 import { TravauxSheet } from '../components/TravauxSheet';
-import { achats as achatsDe, coutDesAchats, piecesRetenues, travauxDesPieces } from '../geometry/travaux';
+import { achats as achatsDe, coutDesAchats, longueurDeCredence, piecesRetenues, travauxDesPieces } from '../geometry/travaux';
 import { surfacesHabitables } from '../geometry/habitable';
 import { accrocher, texteDeMesure } from '../geometry/regle';
 import { PEINTURES, hexDePeinture } from '../ui/peintures';
@@ -2172,8 +2172,10 @@ export function ResultScreen() {
         (id, rang) => rooms.find((r) => r.id === id)?.name || `Pièce ${rang + 1}`,
         // Le décor de « Décorer » : la peinture se compte par teinte.
         (id) => rooms.find((r) => r.id === id),
+        // La crédence : les plans de travail relevés (revue « Paul »).
+        ((plans) => (part: RoomPart) => longueurDeCredence(part, plans))(plansDeTravailParMur(walls, rooms, objects)),
       ),
-    [parts, openings, rooms],
+    [parts, openings, rooms, walls, objects],
   );
   const surface = totalArea(parts);
   /*
@@ -2702,7 +2704,7 @@ export function ResultScreen() {
         },
       ),
     ],
-    [fige.walls, fige.rooms, fige.openings, fige.objects, elecIssues, modeElec, cheminements, chevauchements],
+    [fige.walls, fige.rooms, fige.openings, fige.objects, fige.parts, elecIssues, modeElec, cheminements, chevauchements],
   );
   const alertes = useMemo(
     () => issues.filter((i) => i.severity === 'alerte').length,

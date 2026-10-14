@@ -180,3 +180,19 @@ describe('le duplex : les règles du logement comptent tous les niveaux (revue �
     expect(avec.some((i) => i.message.startsWith('Logement : ') && i.code === 'rj45')).toBe(false);
   });
 });
+
+import { achats, longueurDeCredence, type PieceTravaux } from '../src/geometry/travaux';
+
+describe('la faïence de crédence (revue « Paul »)', () => {
+  it('la longueur des plans relevés, l’évier compté une fois, sur 60 cm', () => {
+    const plans = new Map([['n', { plans: worktopsOnWall(FACE_N, [PLAN, EVIER], true) }]]);
+    const L = longueurDeCredence({ walls: [{ id: 'n' }, { id: 'e' }] }, plans);
+    expect(L).toBeCloseTo(2.6, 2);
+    const piece = { roomId: 'r1', nom: 'Cuisine', sol: 12, plafond: 12, perimetre: 14, hauteur: 2.5, murs: 30, plinthes: 13, portes: 1, fenetres: 1, credence: L } as PieceTravaux;
+    const a = achats([piece]);
+    expect(a.faience.longueur).toBeCloseTo(2.6, 1);
+    expect(a.faience.surface).toBeCloseTo(1.56, 1);
+    expect(a.faience.avecChute).toBeGreaterThan(a.faience.surface);
+    expect(achats([{ ...piece, credence: undefined }]).faience.surface).toBe(0);
+  });
+});

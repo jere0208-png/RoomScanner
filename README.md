@@ -14296,6 +14296,8 @@ d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 - L'invité qui touche un export Pro voit « Voir l'offre Pro » (les prix,
   sans compte ; l'achat le demandera) ou « J'ai un compte », au lieu
   d'être renvoyé à l'écran de connexion avant tout prix (Yasmine).
+- « Ce qu'il faut acheter » compte la faïence de crédence : la longueur des
+  plans de travail relevés × 60 cm, marge des coupes comprise (Paul).
 - Le titre du dossier se change à l'export (case « Titre », au-dessus du
   client et du chantier) : c'est lui qu'on lit en page de garde, dans les
   cartouches et dans le nom du fichier (Marc).
