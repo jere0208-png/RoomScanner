@@ -692,6 +692,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
                 openings: structure.openings,
                 objets: structure.objects,
                 sections: Self.sectionsJSON(structure.sections),
+                sols: Self.solsJSON(structure.floors),
                 exporter: { url in
                   try structure.export(to: url, exportOptions: .parametric)
                 },
@@ -874,6 +875,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
               openings: structure.openings,
               objets: structure.objects,
               sections: Self.sectionsJSON(structure.sections),
+              sols: Self.solsJSON(structure.floors),
               exporter: { url in
                 try structure.export(to: url, exportOptions: .parametric)
               },
@@ -914,7 +916,18 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    */
   static func solsDe(_ room: CapturedRoom) -> [[String: Any]] {
     guard #available(iOS 17.0, *) else { return [] }
-    return room.floors.compactMap { sol -> [String: Any]? in
+    return solsJSON(room.floors)
+  }
+
+  /*
+    LES SOLS D'UN RELEVÉ À PLUSIEURS PASSAGES — revue d'un expert de la
+    session : la structure fusionnée (`StructureBuilder`) était livrée sans
+    ses sols ; dès le second passage, la surface que RoomPlan avait mesurée
+    au sol se perdait. Le même encodage sert aux deux.
+  */
+  static func solsJSON(_ floors: [CapturedRoom.Surface]) -> [[String: Any]] {
+    guard #available(iOS 17.0, *) else { return [] }
+    return floors.compactMap { sol -> [String: Any]? in
       let coins = sol.polygonCorners
       guard coins.count >= 3 else { return nil }
       let t = sol.transform
@@ -1312,6 +1325,17 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       ]
       if withColors {
         out.merge(RoomColorSampler.shared.payload(for: s)) { a, _ in a }
+      }
+      /*
+        CE QUE ROOMPLAN SAIT ET QU'ON NE DISAIT PAS (iOS 17) — revue d'un
+        expert de la session : le mur qui porte une porte (plus besoin de le
+        deviner au plus proche, à 60 cm près), les bords réellement vus (un
+        bout non « complété » est un mur tronqué), l'étage.
+      */
+      if #available(iOS 17.0, *) {
+        if let parent = s.parentIdentifier { out["parentId"] = parent.uuidString }
+        out["completedEdges"] = s.completedEdges.map { String(describing: $0) }.sorted()
+        out["story"] = s.story
       }
       return out
     }

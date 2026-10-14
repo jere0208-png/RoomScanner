@@ -114,6 +114,8 @@ export interface WallSeg {
    * s'en sert pour désigner les murs à vérifier.
    */
   confidence?: string;
+  /** Le mur qui la porte, selon RoomPlan (iOS 17) : une porte, une fenêtre. */
+  parentId?: string;
   /**
    * HAUTEUR DU COFFRE DE VOLET ROULANT qui coiffe cette menuiserie (m).
    *
@@ -333,6 +335,7 @@ export function toSegment(s: SurfaceData, roomId?: string): WallSeg {
     roomId,
     open: isOpenPassage(s) || undefined,
     confidence: s.confidence,
+    ...(s.parentId ? { parentId: s.parentId } : {}),
   };
   if (s.ax !== undefined) {
     return {
@@ -6023,6 +6026,11 @@ export function castToWall(
 /** Le mur qui porte une ouverture : le plus proche de son milieu. */
 export function murDeLOuverture(o: WallSeg, walls: WallSeg[]): WallSeg | null {
   const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+  // RoomPlan dit lequel la porte (iOS 17) : on le croit, s'il est bien là.
+  if (o.parentId) {
+    const sien = walls.find((w) => w.type === 'wall' && w.id === o.parentId);
+    if (sien && pointOnSeg(mid, sien.a, sien.b).dist <= 0.25) return sien;
+  }
   let mur: WallSeg | null = null;
   let best = Infinity;
   for (const w of walls) {

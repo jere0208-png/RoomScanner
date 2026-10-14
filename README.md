@@ -14285,6 +14285,15 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Ce que RoomPlan sait, livré
+
+Revue d'un expert de la session RoomPlan.
+- **Les sols d'un relevé à plusieurs passages ne se perdent plus** : la
+  structure fusionnée est livrée avec ses sols.
+- **Le mur qui porte une porte est celui que RoomPlan désigne** (iOS 17),
+  plus seulement le plus proche à 60 cm près. Les bords réellement vus de
+  chaque mur et son étage sont livrés aussi.
+
 ## Des cotes qu'un électricien peut signer
 
 Relevé du patron (« des cotes fiables ») et étude d'un expert des cotes :

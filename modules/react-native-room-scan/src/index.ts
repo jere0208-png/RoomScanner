@@ -50,6 +50,12 @@ export interface SurfaceData {
   /** Hauteur en mètres. */
   height: number;
   confidence?: string;
+  /** iOS 17 : le mur qui porte cette porte ou cette fenêtre (son `id`). */
+  parentId?: string;
+  /** iOS 17 : les bords réellement vus (`top`, `bottom`, `left`, `right`). */
+  completedEdges?: string[];
+  /** iOS 17 : l'étage. */
+  story?: number;
   /** Catégorie RoomPlan brute, ex. `door(isOpen: true)`. */
   category?: string;
   /** iOS uniquement : matrice 4x4 colonne-major (16 floats). */
