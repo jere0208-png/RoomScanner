@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import Svg, { G, Line, Path, Polygon, Rect, Text as SvgText } from 'react-native-svg';
 import { ombreBouton, ombreAction, radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
-import { bounds, roomParts, totalArea, WALL_T } from '../geometry/floorplan';
+import { bounds, niveauDe, roomParts, totalArea, WALL_T } from '../geometry/floorplan';
 import {
   checkElectrical,
   fixturePlacement,
@@ -28,7 +28,7 @@ import {
 } from '../geometry/nfc15100';
 import { useAccountStore } from '../store/accountStore';
 import { astuce } from '../ui/astuce';
-import { horsCorbeille, useScanStore, type SavedScan, type ScanFolder } from '../store/scanStore';
+import { horsCorbeille, niveauDeDepart, useScanStore, type SavedScan, type ScanFolder } from '../store/scanStore';
 import { haptic } from '../ui/haptic';
 import { alerte } from '../ui/alerte';
 import { useModeElec } from '../store/usage';
@@ -219,7 +219,17 @@ const THUMB_H = 62;
  * retouché montre son nouveau contour à l'ouverture suivante de la liste.
  */
 export function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
-  const { parts } = decoupageDe(scan);
+  /*
+    UN SEUL NIVEAU, CELUI QUI S'OUVRE — revue « Hugo » : la vignette
+    superposait le rez-de-chaussée et l'étage (« ChambreChambre 2 »). Elle
+    montre le niveau de départ, et une pastille dit combien il y en a.
+  */
+  const n0 = niveauDeDepart(scan.walls);
+  const niveaux = new Set(scan.walls.filter((w) => w.type === 'wall').map((w) => niveauDe(w))).size;
+  const { parts: tousLesParts } = decoupageDe(scan);
+  const parts = niveaux > 1 ? tousLesParts.filter((p) => p.walls.some((w) => niveauDe(w) === n0)) : tousLesParts;
+  const murs = niveaux > 1 ? scan.walls.filter((w) => niveauDe(w) === n0) : scan.walls;
+  const baies = niveaux > 1 ? scan.openings.filter((o) => niveauDe(o) === n0) : scan.openings;
   const modeElec = useModeElec();
   // Les mêmes constats que sur le plan : une pièce en défaut sort en rouge
   // ici aussi, sinon la vignette raconterait autre chose que le plan.
@@ -236,7 +246,7 @@ export function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
   }
   // Le plan ENTIER, vu de dessus, redressé sur sa trame : une vignette de
   // travers ne ressemble pas au plan qu'on va ouvrir.
-  const b = bounds(scan.walls);
+  const b = bounds(murs);
   const pad = 5;
   const w = Math.max(0.5, b.maxX - b.minX);
   const h = Math.max(0.5, b.maxZ - b.minZ);
@@ -257,7 +267,7 @@ export function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
           />
         ) : null,
       )}
-      {scan.walls.map((wall) => (
+      {murs.map((wall) => (
         <Line
           key={wall.id}
           x1={px(wall.a.x)}
@@ -275,7 +285,7 @@ export function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
       ))}
       {/* Les ouvertures percent le mur : c'est ce qui fait reconnaître un
           plan d'un coup d'œil. */}
-      {scan.openings.map((o) => (
+      {baies.map((o) => (
         <Line
           key={o.id}
           x1={px(o.a.x)}
@@ -303,6 +313,14 @@ export function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
           </SvgText>
         );
       })}
+      {niveaux > 1 && (
+        <G>
+          <Rect x={THUMB_W - 46} y={3} width={43} height={12} rx={6} fill={c.blue} />
+          <SvgText x={THUMB_W - 24.5} y={11.6} fill="#FFFFFF" fontSize={7} fontWeight="700" textAnchor="middle">
+            {`${niveaux} niveaux`}
+          </SvgText>
+        </G>
+      )}
     </Svg>
   );
 }

@@ -14293,6 +14293,9 @@ d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
   plafond »).
 - Une seule limite par nom (60 caractères pour un plan, 40 pour une
   pièce), un compteur à l'approche, et jamais un émoji coupé en deux.
+- Le nom automatique d'un plan (« T3 · 14/10 ») se recompte après un
+  étage ajouté ; un nom choisi reste. La vignette de la bibliothèque montre
+  le niveau de départ seul, avec une pastille « 2 niveaux ».
 - Le total des surfaces au même arrondi partout dans les résumés
   (bilan au dixième, comme l'en-tête et la page de garde) ; la légende de
   l'image dit « Total au sol ».

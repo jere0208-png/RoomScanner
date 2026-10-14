@@ -402,6 +402,21 @@ describe('les défauts du scan, réparés en fin de scan', () => {
   });
 });
 
+describe('le nom automatique suit le logement (revue « Hugo »)', () => {
+  it('un étage de plus se recompte ; un nom choisi reste', () => {
+    scanner(T2);
+    const avant = st().scanName;
+    expect(avant).toMatch(/^T\d+ · /);
+    act(() => st().finalizeEtage(releve(ETAGE) as never, 1));
+    expect(st().scanName).not.toBe(avant);
+    expect(st().scanName).toMatch(/^T\d+ · /);
+    scanner(T2);
+    act(() => st().renameCurrent('Maison Dupont'));
+    act(() => st().finalizeEtage(releve(ETAGE) as never, 1));
+    expect(st().scanName).toBe('Maison Dupont');
+  });
+});
+
 describe('un duplex avec sous-sol', () => {
   it('trois niveaux, chacun fermé et juste', () => {
     scanner(T2);

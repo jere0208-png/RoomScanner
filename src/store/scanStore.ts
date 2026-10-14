@@ -3629,8 +3629,19 @@ export const useScanStore = create<ScanState>((set, get) => {
     );
 
     const cleDuPlan = st.cleDuReleve ?? nouvelleCle();
+    /*
+      LE NOM AUTOMATIQUE SUIT LE LOGEMENT — revue « Hugo » : la coloc de six
+      pièces sur deux niveaux restait « T3 · 14/10 ». Tant que le plan porte
+      le nom que l'app lui avait donné, il se recompte ; un nom choisi reste.
+    */
+    const creeLe = st.saves.find((x) => x.id === st.currentSaveId)?.createdAt;
+    const nomRecompte =
+      creeLe !== undefined && st.scanName === defaultName(new Date(creeLe), st.rooms)
+        ? defaultName(new Date(creeLe), [...st.rooms, ...pieces])
+        : null;
     pushHistory(aCote ? 'completerReleve' : 'ajouterEtage');
     set({
+      ...(nomRecompte ? { scanName: nomRecompte } : {}),
       walls: [...st.walls, ...walls],
       openings: [...st.openings, ...openings],
       rooms: [...st.rooms, ...pieces],
