@@ -1709,6 +1709,8 @@ interface ScanState {
   mursDouteux: number;
   /** Le plus proche des murs mal vus, nommé (voir `murDouteux`). */
   murDouteux: MurDouteux | null;
+  /** L'instant où le mur désigné a été bien vu : l'écran le fête. */
+  murValideA: number;
   /**
    * LE MUR QUI MANQUE, en direct — le plus grand trou du contour (m), zéro
    * quand la pièce est fermée. On le dit au moment de terminer, pendant
@@ -3923,6 +3925,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     instruction: '',
     mursDouteux: 0,
     murDouteux: null,
+    murValideA: 0,
     trouContour: 0,
     complementEnCours: false,
     cleDuReleve: null,
@@ -7005,6 +7008,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         trouContour: typeof u.trouContour === 'number' ? u.trouContour : 0,
         // Le plus proche des murs mal vus, nommé par le natif.
         murDouteux: u.murDouteux ?? null,
+        ...(u.murValide ? { murValideA: Date.now() } : {}),
         mursDouteux:
           typeof u.mursDouteux === 'number'
             ? u.mursDouteux
@@ -10393,6 +10397,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         instruction: '',
         mursDouteux: 0,
         murDouteux: null,
+        murValideA: 0,
         trouContour: 0,
         complementEnCours: false,
         // Un autre relevé commence : les passages de l'iPhone ne sont plus les siens.

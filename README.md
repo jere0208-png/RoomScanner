@@ -14285,6 +14285,23 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Pendant le scan : un mur à la fois, et le bandeau à sa place
+
+Relevé du patron, captures à l'appui, et revue d'un expert de la session
+RoomPlan.
+- **La pastille « Poser » ne recouvre plus le bandeau** : les bandeaux
+  passent sous les compteurs et lui laissent sa place à droite ; la phrase
+  tient en deux lignes.
+- **« 6 murs mal vus » ne s'affiche plus en permanence.** En direct, RoomPlan
+  laisse en confiance moyenne tout mur qu'on n'a pas encore vu de près ; on
+  ne guide plus que vers la confiance basse, et jamais vers un éclat de
+  moins de 50 cm.
+- **Un mur à la fois, et toujours le même** tant qu'il reste douteux : la
+  cible ne saute plus d'un mur à l'autre en tournant sur soi.
+- **Une consigne plutôt qu'un constat** : « Tournez-vous à gauche · mur de
+  1,9 m à revoir », une flèche qui montre où se tourner, et « +5 » pour les
+  autres. Quand le mur est bien vu : une vibration et « Mur validé ✓ ».
+
 ## Les fonds dégradés vont jusqu'au bord
 
 Relevé du patron, capture à l'appui : sur la carte de fin de scan, le fond

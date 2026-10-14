@@ -11,7 +11,7 @@ import {
 import Svg, { Path } from 'react-native-svg';
 import { RoomScan, RoomScanView, scanEvents, type EtatDeVisee } from 'react-native-room-scan';
 import { themedStyles, useTheme, type Palette } from '../theme';
-import { phraseDuMurDouteux } from '../geometry/murDouteux';
+import { consigneDuMur } from '../geometry/murDouteux';
 import { useScanStore } from '../store/scanStore';
 import { useModeElec } from '../store/usage';
 import { useRoomScan } from '../native/useRoomScan';
@@ -70,6 +70,23 @@ export function ScanScreen() {
   /* Ce que RoomPlan voit mal, tant qu'on peut encore y retourner. */
   const mursDouteux = useScanStore((s) => s.mursDouteux);
   const murDouteux = useScanStore((s) => s.murDouteux);
+  const consigne = consigneDuMur(mursDouteux, murDouteux);
+  /*
+    LE MUR REPASSÉ SE FÊTE — on désignait un mur, il vient d'être bien vu :
+    une vibration et « Mur validé » une seconde et demie. Repasser un mur
+    doit se sentir, sinon on ne sait pas quand s'arrêter.
+  */
+  const murValideA = useScanStore((s) => s.murValideA);
+  const [murValideVu, setMurValideVu] = useState(false);
+  // Celui d'un scan précédent ne se refête pas à l'ouverture de l'écran.
+  const murValideAvant = useRef(murValideA);
+  useEffect(() => {
+    if (!murValideA || murValideA === murValideAvant.current) return;
+    haptic('succes');
+    setMurValideVu(true);
+    const t = setTimeout(() => setMurValideVu(false), 1500);
+    return () => clearTimeout(t);
+  }, [murValideA]);
   /* Le mur qui manque : on le dit en terminant, pas pendant qu'on balaie. */
   const trouContour = useScanStore((s) => s.trouContour);
   const processing = useScanStore((s) => s.processing);
@@ -459,6 +476,17 @@ export function ScanScreen() {
             />
           ))}
         </View>
+      </View>
+      {/*
+        LES BANDEAUX, SOUS LES COMPTEURS ET JAMAIS SOUS « POSER » — relevé du
+        patron, captures à l'appui : la pastille « Poser » recouvrait le
+        bandeau et coupait sa phrase. Quand la pose est à l'écran, les
+        bandeaux lui laissent sa place à droite.
+      */}
+      <View
+        testID="bandeaux"
+        style={[styles.bandeaux, modeElec && !paused && !processing && styles.bandeauxAvecPose]}
+        pointerEvents="none">
         {paused && (
           <View style={[styles.instructionPill, styles.pausedPill]}>
             <Text style={styles.instructionText}>Scan en pause</Text>
@@ -483,13 +511,27 @@ export function ScanScreen() {
           balayant une pièce. Et rien du tout quand tout est franc — un
           voyant qui s'allume toujours n'avertit plus de rien.
         */}
-        {!paused && mursDouteux > 0 && (
-          <View style={[styles.instructionPill, styles.douteuxPill]}>
-            <View style={styles.instructionDot} />
-            <Text style={styles.instructionText}>
-              {/* LEQUEL — relevé du patron : « on n'informe pas lequel ». */}
-              {phraseDuMurDouteux(mursDouteux, murDouteux)}
+        {!paused && murValideVu && (
+          <View style={[styles.instructionPill, styles.validePill]} accessibilityLiveRegion="polite">
+            <Text style={styles.instructionText}>Mur validé ✓</Text>
+          </View>
+        )}
+        {!paused && !murValideVu && mursDouteux > 0 && (
+          <View style={[styles.instructionPill, styles.douteuxPill]} accessibilityLiveRegion="polite">
+            {/* LEQUEL, ET OÙ SE TOURNER — la flèche suit le mur désigné. */}
+            {consigne.fleche !== null ? (
+              <View style={[styles.fleche, { transform: [{ rotate: `${Math.round(consigne.fleche)}deg` }] }]}>
+                <Svg width={16} height={16} viewBox="0 0 24 24">
+                  <Path d="M12 3 L19 12 h-4.5 v9 h-5 v-9 H5 Z" fill={c.scanInk} />
+                </Svg>
+              </View>
+            ) : (
+              <View style={styles.instructionDot} />
+            )}
+            <Text style={styles.instructionText} numberOfLines={2}>
+              {consigne.texte}
             </Text>
+            {consigne.reste > 0 && <Text style={styles.resteBadge}>{`+${consigne.reste}`}</Text>}
           </View>
         )}
       </View>
@@ -991,7 +1033,24 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     backgroundColor: c.blue,
     marginRight: 8,
   },
-  instructionText: { color: c.scanInk, fontSize: 14, fontWeight: '600' },
+  instructionText: { color: c.scanInk, fontSize: 14, fontWeight: '600', flexShrink: 1 },
+  /* Sous les compteurs (58 + 44 + 10). */
+  bandeaux: { position: 'absolute', top: 112, left: 16, right: 16, alignItems: 'center' },
+  /* La pastille « Poser » : right 10 + environ 81 pt ; la colonne ouverte, 10 + 68. */
+  bandeauxAvecPose: { right: 100 },
+  validePill: { backgroundColor: 'rgba(29,185,84,0.92)' },
+  fleche: { marginRight: 8 },
+  resteBadge: {
+    marginLeft: 8,
+    color: c.scanInk,
+    fontSize: 12,
+    fontWeight: '800',
+    backgroundColor: 'rgba(0,0,0,0.18)',
+    borderRadius: 9,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    overflow: 'hidden',
+  },
   bottomHud: {
     position: 'absolute',
     bottom: 46,

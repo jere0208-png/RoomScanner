@@ -139,7 +139,15 @@ export interface ScanUpdate {
    * LE PLUS PROCHE DES MURS MAL VUS, vu du téléphone : de quel côté, à
    * quelle distance (m), et sa longueur (m) — de quoi le retrouver.
    */
-  murDouteux?: { cote: 'gauche' | 'droite' | 'devant' | 'derriere'; distance: number; longueur: number };
+  murDouteux?: {
+    cote: 'gauche' | 'droite' | 'devant' | 'derriere';
+    distance: number;
+    longueur: number;
+    /** À plat, vu du téléphone : 0 devant, +90 à droite, ±180 derrière (degrés). */
+    angle?: number;
+  };
+  /** Le mur qu'on désignait vient d'être bien vu. */
+  murValide?: boolean;
   /**
    * Le plus grand trou du contour (m) : deux bouts de mur libres qui se font
    * face — presque toujours un mur qui n'a pas été balayé. Zéro : fermé.

@@ -20,6 +20,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   private var lastLiveEmit = Date.distantPast
   /// Les cinq nombres du dernier aperçu envoyé : on ne renvoie pas le même.
   private var dernierApercu: [Int] = []
+  /// Le mur douteux qu'on désigne : il TIENT tant qu'il reste douteux.
+  private var cibleDouteuse: UUID?
   /**
    CE QUE LE SCAN COÛTE — relevé au départ, rendu à la fin.
 
@@ -1151,21 +1153,41 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       qu'un mur manque. Il faut entrer (voir `VuDuTrajet`).
     */
     let vus = VuDuTrajet.filtrer(room, chemin: trajet)
-    // « medium » compte autant que « low » : un mur moyen est un mur qu'on
-    // ferait mieux de repasser, et c'est gratuit tant qu'on est devant.
+    /*
+      SEULS LES MURS VRAIMENT MAL VUS — relevé du patron, capture à l'appui :
+      « 6 murs mal vus » s'affichait presque en permanence. En direct,
+      RoomPlan laisse en confiance MOYENNE tout mur qu'on n'a pas encore vu
+      de près ; les compter allumait un voyant qui n'avertissait plus de
+      rien. Pendant le scan, on ne guide que vers la confiance BASSE, et
+      jamais vers un éclat de moins de 50 cm (un bout près d'une porte, que
+      personne ne sait « repasser »).
+    */
     let doutes = vus.murs.filter { s in
-      if case .high = s.confidence { return false }
-      return true
+      guard s.dimensions.x >= 0.5 else { return false }
+      if case .low = s.confidence { return true }
+      return false
     }
     let douteux = doutes.count
     /*
-      LEQUEL — relevé du patron : « il est dit qu'un mur a été mal détecté,
-      mais on n'informe pas lequel ». Le plus proche des murs douteux, vu du
-      téléphone : son côté, sa distance, sa longueur.
+      LEQUEL, ET TOUJOURS LE MÊME — relevé du patron : « on n'informe pas
+      lequel ». Le plus proche, vu du téléphone ; puis on le GARDE tant
+      qu'il reste douteux : en tournant sur soi, la cible sautait d'un mur à
+      l'autre deux fois par seconde.
     */
-    let lequel: [String: Any]? = session.arSession.currentFrame.flatMap {
-      Self.murDouteuxLePlusProche(doutes, camera: $0.camera.transform)
+    var murValide = false
+    if let id = cibleDouteuse, !doutes.contains(where: { $0.identifier == id }) {
+      murValide = vus.murs.contains { m in
+        guard m.identifier == id else { return false }
+        if case .high = m.confidence { return true }
+        return false
+      }
+      cibleDouteuse = nil
     }
+    let gardee = doutes.first { $0.identifier == cibleDouteuse }
+    let lequel: [String: Any]? = session.arSession.currentFrame.flatMap {
+      Self.murDouteuxLePlusProche(gardee.map { [$0] } ?? doutes, camera: $0.camera.transform)
+    }
+    cibleDouteuse = gardee?.identifier ?? (lequel?["ident"] as? UUID)
     // Le plus grand trou du contour, au centimètre (voir `trouDuContour`).
     let trou = Self.trouDuContour(vus.murs)
     let apercu = [
@@ -1175,7 +1197,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       (lequel?["code"] as? Int) ?? -1,
       Int((((lequel?["distance"] as? Float) ?? 0) * 2).rounded()),
     ]
-    guard apercu != dernierApercu else { return }
+    guard apercu != dernierApercu || murValide else { return }
     dernierApercu = apercu
     var corps: [String: Any] = [
       "wallCount": vus.murs.count,
@@ -1185,7 +1207,9 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       "mursDouteux": douteux,
       "trouContour": trou,
     ]
-    if let l = lequel { corps["murDouteux"] = l.filter { $0.key != "code" } }
+    if let l = lequel { corps["murDouteux"] = l.filter { $0.key != "code" && $0.key != "ident" } }
+    // Le mur qu'on désignait vient d'être bien vu : on le fête.
+    if murValide { corps["murValide"] = true }
     RoomScanEvents.shared?.emit(name: "onScanUpdate", body: corps)
   }
 
@@ -1204,7 +1228,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     guard simd_length(avant) > 1e-4, simd_length(droite) > 1e-4 else { return nil }
     avant = simd_normalize(avant)
     droite = simd_normalize(droite)
-    var mieux: (d: Float, p: SIMD2<Float>, l: Float)? = nil
+    var mieux: (d: Float, p: SIMD2<Float>, l: Float, id: UUID)? = nil
     for m in murs {
       let t = m.transform
       let c = SIMD2<Float>(t.columns.3.x, t.columns.3.z)
@@ -1215,7 +1239,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       let s = max(-demi, min(demi, simd_dot(oeil - c, u)))
       let p = c + u * s
       let d = simd_length(p - oeil)
-      if mieux == nil || d < mieux!.d { mieux = (d: d, p: p, l: m.dimensions.x) }
+      if mieux == nil || d < mieux!.d { mieux = (d: d, p: p, l: m.dimensions.x, id: m.identifier) }
     }
     guard let m = mieux else { return nil }
     let vers = m.p - oeil
@@ -1229,7 +1253,9 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     else if f < -0.7 { cote = "derriere"; code = 1 }
     else if r > 0 { cote = "droite"; code = 2 }
     else { cote = "gauche"; code = 3 }
-    return ["cote": cote, "distance": m.d, "longueur": m.l, "code": code]
+    // L'angle, à plat : 0 devant, +90 à droite, ±180 derrière — la flèche.
+    let angle = atan2(r, f) * 180 / .pi
+    return ["cote": cote, "distance": m.d, "longueur": m.l, "code": code, "angle": angle, "ident": m.id]
   }
 
   func captureSession(_ session: RoomCaptureSession,
