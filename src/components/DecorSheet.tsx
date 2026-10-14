@@ -18,8 +18,7 @@ import { haptic } from '../ui/haptic';
 import { SOLAIRES } from '../ui/solaires';
 import { PEINTURES, PEINTURE_DEFAUT, type Peinture } from '../ui/peintures';
 import { SOLS, SOL_DEFAUT, TEINTES_MEUBLES, TEINTE_ORIGINE, cleDeTeinte, hexDeTeinte } from '../ui/habillage';
-import { catalogItem } from '../geometry/catalogue';
-import { frCategory } from '../geometry/furniture';
+import { nomDuMeuble } from '../geometry/furniture';
 import { useScanStore } from '../store/scanStore';
 import { niveauDe, nomDuNiveau } from '../geometry/floorplan';
 import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from './Iso3DView';
@@ -32,10 +31,8 @@ const sombre = (hex: string) => {
   return 0.299 * ((v >> 16) & 255) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255) < 140;
 };
 
-/** Le nom d'un meuble : celui du catalogue, sinon sa catégorie. */
-export function nomDuMeuble(o: ObjectData): string {
-  return o.nom || (o.modele && catalogItem(o.modele)?.label) || frCategory(o.category ?? '');
-}
+/** Le nom d'un meuble : voir `geometry/furniture`. */
+export { nomDuMeuble };
 
 /*
   LA PIÈCE TOURNE SOUS LES YEUX — relevé du patron : « améliore cette option

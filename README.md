@@ -14285,6 +14285,35 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Six personnes découvrent l'app — premier lot
+
+Six testeurs qui ne connaissaient pas l'app (Chloé, primo-accédante ; Marc,
+plombier ; Yasmine, agente immobilière ; Paul, 71 ans ; Nadia,
+électricienne ; Hugo, étudiant qui touche à tout).
+- **La profondeur de la pièce ne disparaît plus du plan PDF** (Paul : la
+  cuisine de 3,62 × 2,87 n'avait que sa largeur) : une cote totale qui ne
+  tient pas dehors s'écrit entre le mur et sa ligne de cote.
+- **La douche à l'italienne ne s'imprime plus « Baignoire »**, ni le meuble
+  vasque « Évier » (Marc) : le dossier dit le nom du meuble ; un évier de
+  salle d'eau est un lavabo.
+- **Un T2 s'appelle « T2 »**, plus « 5 pièces » (Yasmine) ; le libellé sous
+  la surface n'est plus coupé ; l'image d'annonce ne porte plus d'alertes
+  rouges de portes ; le renommage sélectionne le texte et ne parle plus d'un
+  bouton disparu.
+- **La note du bilan dit si les cotes sont fiables** : un relevé fermé et
+  bien vu est « Excellent », même sans couleur relevée (Marc, Yasmine,
+  Paul, Chloé : « 60/100 » sur un relevé parfait).
+- **Électricité (Nadia)** :
+  - « Normes auto » ne pose plus de prise en volume interdit de salle de
+    bains, ni d'appareil sur un mur plus bas que sa pose ;
+  - la liste du matériel n'écrit plus « Aucun écart » quand le contrôle a vu
+    une prise interdite, et ne se contredit plus sur les volumes ;
+  - les points lumineux posés automatiquement sont reliés à l'interrupteur
+    de leur pièce ; sans lien, plus de navette inventée ; un poussoir ne
+    fait pas de navette (89 m de navette achetés pour sept interrupteurs
+    simples) ;
+  - le total du devis à l'écran est celui du PDF (HT, TVA, TTC).
+
 ## Ce que RoomPlan sait, livré
 
 Revue d'un expert de la session RoomPlan.

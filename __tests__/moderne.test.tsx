@@ -97,10 +97,11 @@ describe('le bilan du relevé', () => {
       openings: [],
       objects: [],
     })!;
-    expect(b.score).toBe(35);
+    // La pièce est refermée (55) ; les murs mal vus coûtent 35 points.
+    expect(b.score).toBe(55);
     expect(b.etoiles).toBe(1);
-    expect(b.mention).toBe('À compléter');
-    // Vingt-cinq points perdus sur la précision : le plus gros manque.
+    expect(b.mention).toBe('Bon');
+    // Trente-cinq points perdus sur la précision : le plus gros manque.
     expect(b.conseil).toMatch(/passage lent/);
   });
 
@@ -471,5 +472,13 @@ describe('le menu « … » parle la langue de l’app', () => {
     expect(feuille).not.toContain(
       'strokeLinecap="round"\n                      strokeLinejoin',
     );
+  });
+});
+
+describe('la note dit si les cotes sont fiables', () => {
+  it('un relevé fermé et bien vu, sans aucune couleur relevée : « Excellent »', () => {
+    const b = bilanDuReleve({ rooms: [{ id: 'r1' }], walls: PIECE({ confidence: 'high' }), openings: [], objects: [] })!;
+    expect(b.score).toBeGreaterThanOrEqual(90);
+    expect(b.mention).toBe('Excellent');
   });
 });

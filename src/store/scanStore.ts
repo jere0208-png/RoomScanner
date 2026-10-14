@@ -1686,7 +1686,7 @@ const two = (n: number) => String(n).padStart(2, '0');
  * l'électricien a sous les yeux depuis des semaines, parfois ce qu'il a
  * dicté au client. Seuls les nouveaux prennent la forme courte.
  */
-export function defaultName(d: Date, pieces?: { name?: string }[]): string {
+export function defaultName(d: Date, pieces?: { name?: string; kind?: RoomKind | null }[]): string {
   /*
     CE QU'ON A RELEVÉ, PLUTÔT QUE L'HEURE — revue « Bernard » : la pièce
     était reconnue « Chambre », le plan s'appelait « Scan 13/10 · 21h31 ».
@@ -1698,7 +1698,20 @@ export function defaultName(d: Date, pieces?: { name?: string }[]): string {
     const nom = nommees[0].name!.trim();
     if (nom.length + 8 <= 18) return `${nom} · ${jour}`;
   }
-  if (pieces && pieces.length > 1) return `${pieces.length} pièces · ${jour}`;
+  /*
+    UN T2 EST UN T2 — revue « Yasmine », agente immobilière : « 5 pièces »
+    pour un séjour, une chambre, une salle de bains, un WC et un couloir ;
+    en immobilier, c'est un T5. On compte les pièces PRINCIPALES : séjour,
+    chambres, salle à manger, et toute pièce qu'on n'a pas su nommer.
+  */
+  if (pieces && pieces.length > 1) {
+    const principales = pieces.filter((p) =>
+      p.kind
+        ? p.kind === 'living' || p.kind === 'bedroom' || p.kind === 'sejourCuisine' || p.kind === 'dining'
+        : !/couloir|entr[ée]e|d[ée]gagement|placard|dressing|cellier|buanderie|garage|wc|toilette|bain|eau|cuisine/i.test(p.name ?? ''),
+    ).length;
+    return principales > 0 ? `T${principales} · ${jour}` : `${pieces.length} pièces · ${jour}`;
+  }
   return `Scan ${jour} · ${two(d.getHours())}h${two(d.getMinutes())}`;
 }
 

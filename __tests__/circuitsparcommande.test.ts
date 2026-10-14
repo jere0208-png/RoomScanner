@@ -173,3 +173,18 @@ describe('une prise posée devant un plan de travail', () => {
     expect(f.height).toBeCloseTo(1.1, 2);
   });
 });
+
+describe('pas de navette inventée (revue « Nadia »)', () => {
+  it('deux interrupteurs simples de deux pièces, sans lien : pas de va-et-vient', () => {
+    const c = eclairages([mur('i1', 'inter', 'sejour'), mur('i2', 'inter', 'chambre')], [dcl('d1', 'sejour'), dcl('d2', 'chambre')]);
+    expect(c.every((x) => x.vaEtVient === false)).toBe(true);
+  });
+  it('des poussoirs ne font pas de navette', () => {
+    const c = eclairages([mur('p1', 'poussoir', 'couloir'), mur('p2', 'poussoir', 'couloir')], [dcl('d', 'couloir', ['p1', 'p2'])]);
+    expect(c[0].vaEtVient).toBe(false);
+  });
+  it('un vrai va-et-vient reste un va-et-vient', () => {
+    const c = eclairages([mur('v1', 'va', 'couloir'), mur('v2', 'va', 'couloir')], [dcl('d', 'couloir', ['v1', 'v2'])]);
+    expect(c[0].vaEtVient).toBe(true);
+  });
+});

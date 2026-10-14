@@ -141,7 +141,7 @@ import {
   type P3,
   type ScenePalette,
 } from '../geometry/scene3d';
-import { frCategory, furnKind, furnitureStrokes, meridienneDe } from '../geometry/furniture';
+import { furnKind, furnitureStrokes, meridienneDe, nomDuMeuble, type RoomKind } from '../geometry/furniture';
 import { ecarterLesGaines } from '../geometry/routing';
 import { matieresDesSols } from '../ui/maquette';
 import { accentsDesPieces, peinturesDesPieces, solsDesPieces } from '../ui/habillage';
@@ -3347,16 +3347,21 @@ function planPage(
         tiret(A2, u, n, 3.2, 1, INK);
         tiret(B2, u, n, 3.2, 1, INK);
         const mil2 = { x: (A2.x + B2.x) / 2, y: (A2.y + B2.y) / 2 };
-        ecrire(
-          `${frLen(L)} m`,
-          [6.5, 15, 24].flatMap((k) =>
-            [0, -0.22, 0.22].map((g) => plus(plus(mil2, n, k), u, g * Math.hypot(b.x - a.x, b.y - a.y))),
-          ),
-          8.5,
-          angle,
-          INK,
-          (k) => k * 3,
+        /*
+          LA COTE TOTALE NE CÈDE JAMAIS — revue « Paul » : sur une cuisine de
+          3,62 × 2,87, les côtés verticaux portaient leurs lignes de cote
+          mais aucun chiffre ; dehors, la place sortait de la feuille, et la
+          valeur cédait en silence. C'est pourtant la feuille qu'on donne au
+          cuisiniste. En dernier recours, elle s'écrit entre le mur et sa
+          ligne de cote, côté intérieur.
+        */
+        const dehors = [6.5, 15, 24].flatMap((k) =>
+          [0, -0.22, 0.22].map((g) => plus(plus(mil2, n, k), u, g * Math.hypot(b.x - a.x, b.y - a.y))),
         );
+        const dedans = [-6.5, -RANG_MURS / 2].flatMap((k) =>
+          [0, -0.22, 0.22].map((g) => plus(plus(mil2, n, k), u, g * Math.hypot(b.x - a.x, b.y - a.y))),
+        );
+        ecrire(`${frLen(L)} m`, [...dehors, ...dedans], 8.5, angle, INK, (k) => (k < dehors.length ? k * 3 : 500 + k));
 
         // La chaîne des baies : pleins et vides, au plus près de la façade.
         const baies = (baiesDuMur.get(w.id) ?? [])
@@ -5749,7 +5754,9 @@ function dessinerUneFace(
   for (const { m, haut, bas, larg } of etiquettesMeubles) {
     const taille = 7;
     const largeur = (t: string) => t.length * taille * EM_TEXTE;
-    const nom = frCategory(m.category);
+    // Le nom qu'on lui a donné : « Douche à l'italienne », pas « Baignoire »
+    // (revue « Marc ») ; et un évier de salle d'eau est un lavabo.
+    const nom = nomDuMeuble(m, ((ctx.rooms ?? []).find((r) => r.id === m.roomId) as { kind?: RoomKind } | undefined)?.kind ?? null);
     const cm = `h ${Math.round(m.top * 100)} cm`;
     const place = Math.max(0, larg - 6);
     // Une ligne si tout tient ; sinon le nom (abrégé au besoin) sur la
@@ -7111,8 +7118,8 @@ export function buildMaterialPdf(
   note(
     'Document d’aide au chiffrage établi d’après les exigences usuelles de ' +
       'la NF C 15-100. Il ne vaut pas attestation de conformité : les ' +
-      'volumes de la salle d’eau, les points d’éclairage en plafond et la ' +
-      'puissance réellement raccordée ne sont pas vérifiés par l’application.',
+      'volumes de la salle d’eau ne sont vérifiés que là où la baignoire ou la ' +
+      'douche a été relevée, et la puissance réellement raccordée ne l’est pas.',
   );
 
   const filename = pdfFilename(`${name} - materiel`);

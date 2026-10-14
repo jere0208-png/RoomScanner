@@ -128,7 +128,17 @@ describe('le nom d’un releve neuf', () => {
   it('porte le nom de la pièce relevée, ou leur nombre', () => {
     const d = new Date(2026, 9, 13, 21, 31);
     expect(defaultName(d, [{ name: 'Chambre' }])).toBe('Chambre · 13/10');
-    expect(defaultName(d, [{ name: 'Séjour' }, { name: 'Chambre' }, { name: 'WC' }])).toBe('3 pièces · 13/10');
+    expect(defaultName(d, [{ name: 'Séjour' }, { name: 'Chambre' }, { name: 'WC' }])).toBe('T2 · 13/10');
+    // Revue « Yasmine » : un T2 avec salle de bains, WC et couloir n'est pas « 5 pièces ».
+    expect(
+      defaultName(d, [
+        { name: 'Séjour', kind: 'living' },
+        { name: 'Chambre', kind: 'bedroom' },
+        { name: 'Salle de bains', kind: 'bathroom' },
+        { name: 'WC', kind: 'wc' },
+        { name: 'Couloir' },
+      ]),
+    ).toBe('T2 · 13/10');
     expect(defaultName(d, [{}])).toBe('Scan 13/10 · 21h31');
   });
 

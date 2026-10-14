@@ -69,14 +69,22 @@ const BAREME: Record<
   CleDuCritere,
   { sur: number; libelle: string; conseil: string }
 > = {
+  /*
+    LA NOTE DIT SI LES COTES SONT FIABLES — revues « Marc », « Yasmine » et
+    « Paul » : un relevé géométriquement parfait, sans couleur relevée,
+    affichait « 60 / 100 · Bon ». La couleur des murs et du sol pesait 32
+    points : un artisan lisait « mes cotes ne valent que 60 % ». Les
+    pièces refermées et les murs bien vus font désormais la note ; la
+    couleur ne compte presque plus.
+  */
   structure: {
-    sur: 35,
+    sur: 55,
     libelle: 'Pièces refermées',
     conseil:
       'Un contour reste ouvert : longez le mur manquant avant de terminer.',
   },
   precision: {
-    sur: 25,
+    sur: 35,
     libelle: 'Murs bien vus',
     conseil:
       'Quelques murs ont été vus de loin : un passage lent, à un mètre, les fiabilise.',
@@ -87,19 +95,19 @@ const BAREME: Record<
     murs ni le sol : ce qu'il note, c'est d'en avoir lu la couleur.
   */
   murs: {
-    sur: 20,
+    sur: 2,
     libelle: 'Couleur des murs',
     conseil:
       'Balayez les murs à un ou deux mètres : leur couleur sera relevée.',
   },
   sol: {
-    sur: 12,
+    sur: 2,
     libelle: 'Couleur du sol',
     conseil:
       'Inclinez le téléphone vers le sol en marchant : sa couleur sera relevée.',
   },
   plafond: {
-    sur: 8,
+    sur: 6,
     libelle: 'Plafond mesuré',
     conseil:
       'Levez le téléphone vers le plafond un instant : sa hauteur sera mesurée.',

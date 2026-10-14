@@ -1681,6 +1681,12 @@ export function ResultScreen() {
       );
       // Les constats de pose rejoignent la conformité du document.
       list.issues.push(...constatsDePose(walls, openings, roomInputs, fixtures));
+      /*
+        ET LES VOLUMES DE LA SALLE D'EAU — revue « Nadia » : l'écran signalait
+        « Prise 16 A en volume 2 : interdit », la liste du matériel imprimait
+        « Aucun écart relevé ». Ce que le contrôle a vu part avec elle.
+      */
+      list.issues.push(...elecIssues.filter((x) => x.code === 'volumes' && x.fixtureId && x.severity === 'alerte'));
       // Et la chute de tension de chaque circuit trop long.
       list.issues.push(...constatsDeChute(cheminements?.chutes ?? []));
       // Le tirage et la commande : ce qu'un patron lit avant le reste.
@@ -4279,7 +4285,9 @@ export function ResultScreen() {
               minimumFontScale={0.65}>
               {m.value}
             </Text>
-            <Text style={styles.metricLabel} numberOfLines={1}>
+            {/* Revue « Yasmine » : « M² … » — le libellé du chiffre qui
+                compte était coupé ; il cède un peu de taille plutôt. */}
+            <Text style={styles.metricLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
               {m.label}
             </Text>
           </View>
@@ -4414,7 +4422,9 @@ export function ResultScreen() {
               setSelectedOpeningId(id);
             }}
             retourEfface={retourEfface}
-            portesBloquees={showFurniture ? portesBloquees : undefined}
+            // Pas d'alerte rouge sur l'image qu'on partage (revue « Yasmine ») :
+            // un meuble scanné peut être décalé de 10 cm.
+            portesBloquees={showFurniture && !capturing ? portesBloquees : undefined}
             regle={mesurant ? regle : null}
             onRegleTap={viserRegle}
             onRegleBout={(bout, p, tol) => {

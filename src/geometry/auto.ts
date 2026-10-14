@@ -272,6 +272,8 @@ export function poserAuxNormes(input: {
         const place = prendre(places);
         if (!place) break;
         if (!permis(kind, place.wall, place.along, place.side, height)) continue;
+        // Jamais sur un mur plus bas que la pose (revue « Nadia » : la jambette).
+        if (place.wall.height < height + 0.1) continue;
         i++;
         fixtures.push({
           id: input.id(kind),
@@ -320,17 +322,30 @@ export function poserAuxNormes(input: {
     }
     // Une commande d'éclairage par pièce : sans elle, le point lumineux ne
     // s'allume pas, et c'est le premier réflexe d'un contrôle.
+    const avantInter = fixtures.length;
     if (commandes === 0 && poser('inter', 1, H_INTER) > 0) {
       pose.push('1 interrupteur');
     }
     // Un point lumineux au centre, s'il n'y en a aucun.
     const dejaLumiere = input.ceiling.some((c) => c.roomId === room.id);
     if (!dejaLumiere) {
+      /*
+        RELIÉ À SA COMMANDE — revue « Nadia » : les points posés ici ne
+        l'étaient à aucun interrupteur ; le schéma passait alors le circuit
+        en va-et-vient, et le devis portait 89 m de navette pour sept
+        interrupteurs simples. Le point se relie à la seule commande murale
+        de la pièce, posée à l'instant ou déjà là.
+      */
+      const commandesIci = [
+        ...dedans.filter((f) => COMMANDES_MURALES.includes(f.kind)),
+        ...fixtures.slice(avantInter).filter((f) => COMMANDES_MURALES.includes(f.kind)),
+      ];
       ceiling.push({
         id: input.id('dcl'),
         kind: 'dcl',
         roomId: room.id,
         at: { ...room.interieur },
+        ...(commandesIci.length === 1 ? { commands: [commandesIci[0].id] } : {}),
       });
       pose.push('1 point lumineux');
     }
@@ -462,7 +477,33 @@ export function corrigerConstat(
       hauteur,
       solDesMurs(ctx.walls),
     );
-    const place = prendre(places);
+    /*
+      LA PLACE DOIT ÊTRE PERMISE — revue « Nadia », électricienne : la passe
+      qui complète posait une prise en volume 2 de la salle de bains, que le
+      contrôle déclarait aussitôt « interdit ». Même refus que la première
+      passe ; et jamais sur un mur plus bas que la pose (une jambette de
+      1,00 m sous un interrupteur à 1,10 m).
+    */
+    const zones = wetZones(ctx.objects.filter((o) => !o.roomId || o.roomId === room.id) as never, solDesMurs(ctx.walls));
+    let place: ReturnType<typeof prendre> = null;
+    for (let essai = 0; essai < 24; essai++) {
+      const p = prendre(places);
+      if (!p) break;
+      if (p.wall.height < hauteur + 0.1) continue;
+      if (zones.length > 0) {
+        const L = segLength(p.wall) || 1;
+        const u = { x: (p.wall.b.x - p.wall.a.x) / L, z: (p.wall.b.z - p.wall.a.z) / L };
+        const nrm = perpOf(u);
+        const pt = {
+          x: p.wall.a.x + u.x * p.along + nrm.x * p.side * 0.05,
+          z: p.wall.a.z + u.z * p.along + nrm.z * p.side * 0.05,
+        };
+        const v = volumeAt(pt, hauteur, zones);
+        if (v !== null && !volumeVerdict(fix.kind, v).allowed) continue;
+      }
+      place = p;
+      break;
+    }
     if (!place) continue;
     return {
       fixtures: [

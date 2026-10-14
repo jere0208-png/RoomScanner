@@ -1,3 +1,5 @@
+import { catalogItem } from './catalogue';
+
 /** Catégories de meubles détectées par RoomPlan, normalisées. */
 export type FurnKind =
   | 'bed'
@@ -332,6 +334,24 @@ export function hiddenByBox(
   const cy = (box.y0 + box.y1) / 2;
   if (!tranche(p.y - cy, dir.y, (box.y1 - box.y0) / 2)) return false;
   return t1 >= t0;
+}
+
+/**
+ * LE NOM D'UN MEUBLE, PARTOUT LE MÊME — revue « Marc », plombier : la douche
+ * à l'italienne posée du catalogue s'imprimait « Baignoire » sur les murs de
+ * face, le meuble vasque « Évier », parce que le dossier ne lisait que la
+ * catégorie. Celui qu'on lui a donné, sinon celui du catalogue, sinon sa
+ * catégorie — et un évier relevé en salle d'eau ou au WC est un lavabo.
+ */
+export function nomDuMeuble(
+  o: { nom?: string; modele?: string; category?: string },
+  piece?: RoomKind | null,
+): string {
+  if (o.nom) return o.nom;
+  const duCatalogue = o.modele ? catalogItem(o.modele)?.label : undefined;
+  if (duCatalogue) return duCatalogue;
+  if (furnKind(o.category ?? '') === 'sink' && (piece === 'bathroom' || piece === 'wc')) return 'Lavabo';
+  return frCategory(o.category ?? '');
 }
 
 export function frCategory(category: string): string {

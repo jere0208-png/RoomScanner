@@ -33,15 +33,16 @@ export function RenameSheet({
     <SheetShell visible={visible} onClose={onClose}>
       <View>
         <Text style={styles.modalTitle}>Nom du scan</Text>
-        <Text style={styles.modalSubtitle}>
-          Les modifications du plan s’enregistrent avec le bouton en bas à
-          droite du plan.
-        </Text>
+        {/* Revue « Yasmine » : la phrase renvoyait à un bouton qui n'existe
+            plus — le plan s'enregistre tout seul. */}
+        <Text style={styles.modalSubtitle}>Le nom qu’on lit dans vos plans et sur le dossier.</Text>
         <TextInput
           style={styles.modalInput}
           value={valeur}
           onChangeText={onChange}
           autoFocus
+          selectTextOnFocus
+          clearButtonMode="while-editing"
           maxLength={40}
           returnKeyType="done"
           onSubmitEditing={onRename}

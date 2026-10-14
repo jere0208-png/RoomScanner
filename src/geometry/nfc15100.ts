@@ -383,6 +383,11 @@ export interface WallFurniture {
   /** À quelle distance du nu du mur il se tient (m). */
   ecart: number;
   category: string;
+  /** Son nom donné ou son modèle du catalogue (voir `nomDuMeuble`). */
+  nom?: string;
+  modele?: string;
+  /** La pièce du meuble, quand on la connaît. */
+  roomId?: string;
 }
 
 /**
@@ -407,6 +412,9 @@ export function wallFurniture(
     depth: number;
     height: number;
     transform: number[];
+    nom?: string;
+    modele?: string;
+    roomId?: string;
   }[],
   floorY = 0,
 ): WallFurniture[] {
@@ -457,6 +465,9 @@ export function wallFurniture(
       base,
       ecart: Math.max(0, pres),
       category: o.category ?? '',
+      ...(o.nom ? { nom: o.nom } : {}),
+      ...(o.modele ? { modele: o.modele } : {}),
+      ...(o.roomId ? { roomId: o.roomId } : {}),
     });
   }
   return out.sort((p, q) => p.from - q.from);
@@ -941,7 +952,10 @@ export function checkElectrical(
           'dédié en 6 mm². Ailleurs, c’est probablement une erreur de type.',
       });
     }
-    if (use === 'sdb' && mine.some((f) => porteSocle(f.kind))) {
+    // Seulement quand l'appareil sanitaire n'est pas relevé : sinon les
+    // volumes SONT vérifiés plus bas, et les deux phrases se contredisaient
+    // (revue « Nadia »).
+    if (use === 'sdb' && mine.some((f) => porteSocle(f.kind)) && !(volumes && volumes.size > 0)) {
       out.push({
         roomId: room.id,
         severity: 'info',
@@ -1830,7 +1844,8 @@ export function planCircuits(
           (p.commands ?? []).filter((cid) => {
             if (cid === p.id) return false;
             const k = fixtures.find((x) => x.id === cid)?.kind;
-            return !!k && COMMANDES_MURALES.includes(k) && k !== 'interGeneral';
+            // Un poussoir commande un télérupteur : pas de navette (revue « Nadia »).
+            return !!k && COMMANDES_MURALES.includes(k) && k !== 'interGeneral' && k !== 'poussoir';
           }),
         ).size;
       const pointsIci: { id: string; commands?: string[] }[] = [
@@ -1839,8 +1854,13 @@ export function planCircuits(
       ];
       const lies = pointsIci.some((p) => (p.commands ?? []).length > 0);
       const vaDeclare = lot.some((f) => f.kind === 'va');
-      const vaEtVient =
-        lies || vaDeclare ? vaDeclare || pointsIci.some((p) => commandeurs(p) >= 2) : undefined;
+      /*
+        SANS LIEN, PAS DE NAVETTE INVENTÉE — revue « Nadia » : un circuit
+        d'éclairage sans aucun lien tracé passait en va-et-vient dès qu'il
+        portait deux interrupteurs (des pièces différentes) ; le devis
+        achetait des navettes pour rien. Seul un « va » posé le dit.
+      */
+      const vaEtVient = lies || vaDeclare ? vaDeclare || pointsIci.some((p) => commandeurs(p) >= 2) : false;
       add({
         label: `Éclairage ${i + 1}`,
         nature: 'eclairage',

@@ -16,6 +16,7 @@ import {
   TAUX_MAX,
   TAUX_MIN,
   enHeures,
+  totauxDuDevis,
   type NatureDeChantier,
   type Pose,
 } from '../geometry/mainDOeuvre';
@@ -40,6 +41,7 @@ export function PoseEstimee({
 }) {
   const c = useTheme();
   const s = getStyles(c);
+  const totaux = totauxDuDevis(materiel, pose);
   const pas = (sens: 1 | -1) => {
     const t = pose.taux + sens * PAS_DU_TAUX;
     if (t < TAUX_MIN || t > TAUX_MAX) return;
@@ -127,12 +129,18 @@ export function PoseEstimee({
         <Text style={[s.sousValeur, s.fort]}>{euros(pose.ttc)}</Text>
       </View>
 
+      {/*
+        LE MÊME TOTAL QUE LE DEVIS IMPRIMÉ — revue « Nadia » : l'écran
+        additionnait le matériel TTC à 20 % et la pose TTC à 10 % ; le PDF,
+        lui, ramène tout au HT puis applique le taux du chantier. 133 €
+        d'écart entre l'écran et le papier. Un seul calcul : `totauxDuDevis`.
+      */}
       <View style={s.total}>
-        <Text style={s.totalNom}>MATÉRIEL + POSE</Text>
-        <TotalQuiMonte valeur={materiel + pose.ttc} format={euros} style={s.totalValeur} />
+        <Text style={s.totalNom}>MATÉRIEL + POSE TTC</Text>
+        <TotalQuiMonte valeur={totaux.ttc} format={euros} style={s.totalValeur} />
       </View>
       <Text style={s.mention}>
-        Estimation à partir des points du plan : à ajuster au métré réel. Le matériel est compté au prix retenu sur le devis, TTC.
+        {`Total HT ${euros(totaux.ht)} · TVA ${pc(totaux.tauxTva)} ${euros(totaux.tva)}. Estimation à partir des points du plan, à ajuster au métré réel.`}
       </Text>
     </View>
   );

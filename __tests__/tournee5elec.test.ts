@@ -22,7 +22,7 @@ import { corrigerConstat, placesLibres, poserAuxNormes } from '../src/geometry/a
 import { checkElectrical, requirementFor, roomUse, wallToRooms, type RoomInput } from '../src/geometry/nfc15100';
 import { deduceRoomKind, deduireLaPiece } from '../src/geometry/furniture';
 import { socketsOf } from '../src/geometry/electrical';
-import { volumeAt, wetZones } from '../src/geometry/volumes';
+import { volumeAt, volumeVerdict, wetZones } from '../src/geometry/volumes';
 import type { WallSeg } from '../src/geometry/floorplan';
 import { useScanStore } from '../src/store/scanStore';
 
@@ -165,5 +165,27 @@ describe('le type de chaque pièce', () => {
       objects: [],
     } as never);
     expect(useScanStore.getState().rooms.map((r) => r.name)).toEqual(['Couloir']);
+  });
+});
+
+describe('la passe qui complète respecte les volumes (revue « Nadia »)', () => {
+  it('la prise manquante d’une salle de bains ne tombe jamais dans un volume interdit', () => {
+    const sdb: RoomInput = { id: 'r', name: 'Salle de bains', kind: 'bathroom', area: 3.2, wallIds: ['n2', 'e2', 's2', 'o2'] };
+    const petite = [mur('n2', 0, 0, 2, 0), mur('e2', 2, 0, 2, 1.6), mur('s2', 2, 1.6, 0, 1.6), mur('o2', 0, 1.6, 0, 0)];
+    const objets = [meuble('bathtub', 1, 0.35, 1.7, 0.7, 0.55)];
+    const ctx = { rooms: [{ ...sdb, interieur: { x: 1, z: 1.1 } }], walls: petite, openings: [], objects: objets, fixtures: [], id };
+    const zones = wetZones(objets as never, 0);
+    for (let k = 0; k < 6; k++) {
+      const r = corrigerConstat({ type: 'poser', kind: 'prise', label: '' }, 'r', ctx);
+      if (!r) break;
+      const f = r.fixtures[0];
+      const w = petite.find((x) => x.id === f.wallId)!;
+      const L = Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z);
+      const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
+      const p = { x: w.a.x + u.x * f.along - u.z * f.side * 0.05, z: w.a.z + u.z * f.along + u.x * f.side * 0.05 };
+      const v = volumeAt(p, f.height, zones);
+      expect(v === null || volumeVerdict('prise', v).allowed).toBe(true);
+      ctx.fixtures.push(f as never);
+    }
   });
 });
