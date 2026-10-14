@@ -28,6 +28,7 @@
  * vérifier » sinon, et les murs en cause se dessinent en orange.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Degrade } from '../components/Degrade';
 import {
   ActivityIndicator,
   Animated,
@@ -43,7 +44,7 @@ import {
   useWindowDimensions,
   type LayoutChangeEvent,
 } from 'react-native';
-import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
@@ -337,20 +338,6 @@ function Icone({ nom, taille, teinte }: { nom: keyof typeof SOLAIRES; taille: nu
   );
 }
 
-/** Un dégradé qui remplit son bloc, en fond. */
-function Degrade({ id, de, a }: { id: string; de: string; a: string }) {
-  return (
-    <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
-      <Defs>
-        <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor={de} />
-          <Stop offset="1" stopColor={a} />
-        </LinearGradient>
-      </Defs>
-      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
-    </Svg>
-  );
-}
 
 /** La taille d'un bloc qui prend la place qui reste : on la lit, puis on dessine dedans. */
 function useCadre(): [{ w: number; h: number }, (e: LayoutChangeEvent) => void] {

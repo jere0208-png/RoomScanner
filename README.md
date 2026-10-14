@@ -14285,6 +14285,16 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Les fonds dégradés vont jusqu'au bord
+
+Relevé du patron, capture à l'appui : sur la carte de fin de scan, le fond
+du score et des boutons « Voir en 3D » et « Chez moi » s'arrêtait avant leur
+bord droit, et « Réalité augmentée » débordait sur du blanc. Le dégradé, un
+`Svg` à « 100 % », gardait la taille lue pendant l'entrée animée de la
+carte. Il est maintenant mesuré et dessiné à la taille réelle du bloc, avec
+sa couleur en fond en attendant (`components/Degrade`, partagé avec la
+lecture de plan, qui avait le même défaut).
+
 ## Le dossier d'un architecte d'intérieur, suite
 
 Revue « Thomas », architecte d'intérieur, Pro : « je l'envoie sans le

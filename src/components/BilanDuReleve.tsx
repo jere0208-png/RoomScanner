@@ -27,6 +27,7 @@
  * Le score, lui, ne s'invente pas : voir `geometry/bilan`.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Degrade } from './Degrade';
 import {
   Animated,
   Easing,
@@ -38,7 +39,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 import type { BilanDuReleve, CleDuCritere } from '../geometry/bilan';
 import { haptic } from '../ui/haptic';
 import { SOLAIRES, type IconeSolaire } from '../ui/solaires';
@@ -87,20 +88,6 @@ function Icone({ nom, taille, teinte }: { nom: IconeSolaire; taille: number; tei
   );
 }
 
-/** Un dégradé qui remplit son bloc, en fond. */
-function Degrade({ id, de, a }: { id: string; de: string; a: string }) {
-  return (
-    <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" preserveAspectRatio="none">
-      <Defs>
-        <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <Stop offset="0" stopColor={de} />
-          <Stop offset="1" stopColor={a} />
-        </LinearGradient>
-      </Defs>
-      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
-    </Svg>
-  );
-}
 
 /** L'anneau du score : il se remplit jusqu'à sa note, en blanc sur le héros. */
 function Anneau({ score, actif, taille, trait }: { score: number; actif: boolean; taille: number; trait: number }) {
