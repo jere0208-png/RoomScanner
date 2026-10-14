@@ -66,6 +66,16 @@ export interface BornesDeCote {
   zero?: boolean;
   /** Ce qu'est la chose (« pour une pièce ») : il se lit dans le message. */
   pour?: string;
+  /**
+   * EN DESSOUS, INHABITUEL AUSSI — revue « Hugo » : un plafond à 0,50 m
+   * passait sans un mot. À confirmer, comme au-dessus de `douteux`.
+   */
+  douteuxBas?: number;
+  /**
+   * La plus petite lecture qu'on PROPOSE — revue « Hugo » : « 999 » en
+   * hauteur proposait « 1,00 m », un plafond à un mètre.
+   */
+  plausible?: number;
 }
 
 const enM = (v: number) => `${v.toFixed(2).replace('.', ',')} m`;
@@ -76,7 +86,14 @@ export const BORNES_PIECE: BornesDeCote = { min: 0.6, max: 30, douteux: 12, pour
 /** Un mur : de 5 cm à 60 m. */
 export const BORNES_MUR: BornesDeCote = { min: 0.05, max: 60, douteux: 20, pour: 'pour un mur' };
 /** Une hauteur sous plafond, d'un mur ou d'une pièce. */
-export const BORNES_HAUTEUR: BornesDeCote = { min: 0.3, max: 12, douteux: 4.5, pour: 'de hauteur' };
+export const BORNES_HAUTEUR: BornesDeCote = {
+  min: 0.3,
+  max: 12,
+  douteux: 4.5,
+  douteuxBas: 1.8,
+  plausible: 1.8,
+  pour: 'pour une hauteur sous plafond',
+};
 /** Une menuiserie : de 20 cm à 8 m, au-delà de 4 m on vérifie. */
 export const BORNES_MENUISERIE: BornesDeCote = { min: 0.2, max: 8, douteux: 4, pour: 'pour une menuiserie' };
 /** Le bas d'une fenêtre : du sol (zéro) à 3 m. */
@@ -113,6 +130,10 @@ export const verifierCentimetres =
  * celui qui tape.
  */
 export function fauteDeMetres(texte: string, quoi: string, bornes: BornesDeCote): FauteDeCote | null {
+  // « 0 » se lit très bien : c'est seulement trop peu (revue « Hugo »).
+  if (!bornes.zero && ZERO.test(texte)) {
+    return { message: `${quoi} : 0,00 m, c'est trop peu ${bornes.pour ?? ''}.`.replace(' .', '.') };
+  }
   const v = lireMetres(texte, { zero: bornes.zero });
   if (!texte.trim() || v === null) {
     return {
@@ -122,7 +143,7 @@ export function fauteDeMetres(texte: string, quoi: string, bornes: BornesDeCote)
     };
   }
   const plafond = bornes.douteux ?? bornes.max;
-  const dansLesBornes = (x: number) => x >= bornes.min && x <= plafond;
+  const dansLesBornes = (x: number) => x >= Math.max(bornes.min, bornes.plausible ?? 0) && x <= plafond;
   const lu = lireUneCote(texte);
   // Un entier sans unité, trop grand : des centimètres, des millimètres, ou une virgule oubliée.
   const probable =
@@ -138,6 +159,14 @@ export function fauteDeMetres(texte: string, quoi: string, bornes: BornesDeCote)
   }
   if (v < bornes.min) {
     return { message: `${quoi} : ${enM(v)}, c'est trop peu ${bornes.pour ?? ''}.`.replace(' .', '.') };
+  }
+  if (bornes.douteuxBas !== undefined && v < bornes.douteuxBas) {
+    return {
+      message:
+        `${quoi} : ${enM(v)}, c'est inhabituel ${bornes.pour ?? ''}.`.replace(' .', '.') +
+        ` Validez encore pour garder ${enM(v)}.`,
+      douteuse: true,
+    };
   }
   if (bornes.douteux !== undefined && v > bornes.douteux) {
     return {

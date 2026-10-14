@@ -1244,8 +1244,9 @@ const MUR_MAX_M = 60;
   traîne dans chaque export, dans chaque sauvegarde et dans le courrier du
   support. On coupe donc une fois pour toutes, là où le nom entre.
 */
-const NOM_PIECE_MAX = 40;
-const NOM_PLAN_MAX = 60;
+/** Les longueurs permises d'un nom : une pièce, un plan (revue « Hugo »). */
+export const NOM_PIECE_MAX = 40;
+export const NOM_PLAN_MAX = 60;
 const THEME_KEY = 'roomscanner.themePref.v1';
 const ACCENT_KEY = 'roomscanner.accentPref.v1';
 const ICONE_KEY = 'roomscanner.iconePref.v1';
@@ -6246,7 +6247,7 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     renameSave: (id, name) => {
       // Soixante caractères, comme l'en-tête (revue « Hugo » : 300 passaient).
-      const clean = couperLeNom(name.trim(), 60);
+      const clean = couperLeNom(name.trim(), NOM_PLAN_MAX);
       if (!clean) return;
       const st = get();
       const saves = st.saves.map((x) =>
@@ -8440,7 +8441,8 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     renameCurrent: (name) => {
-      const clean = name.trim().slice(0, NOM_PLAN_MAX);
+      // Sans couper un émoji en deux (revue « Hugo »).
+      const clean = couperLeNom(name.trim(), NOM_PLAN_MAX);
       if (!clean) return;
       set({ scanName: clean });
       // Le renommage est une action explicite : il s'enregistre seul,

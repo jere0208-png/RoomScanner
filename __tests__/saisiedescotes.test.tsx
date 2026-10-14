@@ -23,6 +23,7 @@ import { Text, TextInput } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import {
   BORNES_PIECE,
+  BORNES_HAUTEUR,
   fauteDeMetres,
   lireCentimetres,
   lireMetres,
@@ -111,6 +112,20 @@ describe('la faute d’une cote de pièce', () => {
   it('laisse passer une cote juste', () => {
     expect(fauteDeMetres('3,40', 'Largeur', BORNES_PIECE)).toBeNull();
     expect(fauteDeMetres('3m40', 'Largeur', BORNES_PIECE)).toBeNull();
+  });
+
+  /* Revue « Hugo » : des saisies absurdes, des messages justes. */
+  it('« 0 » est trop peu, pas illisible ; « 999 » de hauteur ne propose pas un plafond à 1 m', () => {
+    expect(fauteDeMetres('0', 'Largeur', BORNES_PIECE)?.message).toBe('Largeur : 0,00 m, c\'est trop peu pour une pièce.');
+    const h = fauteDeMetres('999', 'Hauteur', BORNES_HAUTEUR)!;
+    expect(h.proposition).toBeUndefined();
+    expect(h.message).toBe('Hauteur : 999,00 m, c\'est trop pour une hauteur sous plafond.');
+    // 250 tapé en centimètres, lui, se reconnaît.
+    expect(fauteDeMetres('250', 'Hauteur', BORNES_HAUTEUR)?.proposition).toBe('2,50');
+    const bas = fauteDeMetres('0,5', 'Hauteur', BORNES_HAUTEUR)!;
+    expect(bas.douteuse).toBe(true);
+    expect(bas.message).toMatch(/0,50 m, c'est inhabituel pour une hauteur sous plafond/);
+    expect(fauteDeMetres('2,50', 'Hauteur', BORNES_HAUTEUR)).toBeNull();
   });
 
   it('dit ce qui ne se lit pas', () => {

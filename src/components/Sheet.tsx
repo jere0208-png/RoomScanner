@@ -117,6 +117,12 @@ export interface PromptData {
   numeric?: boolean;
   okLabel?: string;
   /**
+   * LA LONGUEUR PERMISE, DITE — revue « Hugo » : les noms se coupaient en
+   * silence, en plein mot. Le champ s'arrête là, et un compteur paraît à
+   * l'approche de la limite.
+   */
+  maxLength?: number;
+  /**
    * LES COTES COURANTES, À TOUCHER PLUTÔT QU'À TAPER.
    *
    * Relevé du patron : « optimise des choses qui pourraient prendre plus en
@@ -555,8 +561,14 @@ export function PromptSheet({
               returnKeyType="done"
               onSubmitEditing={() => valider()}
               placeholderTextColor={c.inkFaint}
+              {...(vu.maxLength ? { maxLength: vu.maxLength } : {})}
             />
             {vu.unit ? <Text style={styles.unit}>{vu.unit}</Text> : null}
+            {vu.maxLength && texte.length >= vu.maxLength - 10 ? (
+              <Text style={styles.unit} accessibilityLabel={`${texte.length} caractères sur ${vu.maxLength}`}>
+                {`${texte.length}/${vu.maxLength}`}
+              </Text>
+            ) : null}
           </View>
           {faute ? (
             <View style={styles.faute}>

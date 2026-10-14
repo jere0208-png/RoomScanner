@@ -182,7 +182,7 @@ import {
   pieceDuCote,
 } from '../geometry/electrical';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { duReleve, niveauDeDepart, nomDePieceLibre, nomDeVersion, useScanStore } from '../store/scanStore';
+import { NOM_PIECE_MAX, duReleve, niveauDeDepart, nomDePieceLibre, nomDeVersion, useScanStore } from '../store/scanStore';
 import { useAccountStore, useImageSansLogo } from '../store/accountStore';
 import { demarrerComplement, demarrerEtage, lancerUnScan } from '../native/useRoomScan';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
@@ -7047,6 +7047,7 @@ export function ResultScreen() {
             title: 'Autre nom',
             subtitle: 'Laissez vide pour retirer le nom.',
             value: targetRoom?.name ?? '',
+            maxLength: NOM_PIECE_MAX,
             onSubmit: (t) => applyRoomName(t),
           });
         }}

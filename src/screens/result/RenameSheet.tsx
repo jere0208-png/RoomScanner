@@ -11,6 +11,7 @@ import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../../theme';
 import { SheetShell } from '../../components/Sheet';
 import { getStyles } from './styles';
+import { NOM_PLAN_MAX } from '../../store/scanStore';
 
 export function RenameSheet({
   visible,
@@ -43,10 +44,14 @@ export function RenameSheet({
           autoFocus
           selectTextOnFocus
           clearButtonMode="while-editing"
-          maxLength={40}
+          maxLength={NOM_PLAN_MAX}
           returnKeyType="done"
           onSubmitEditing={onRename}
         />
+        {/* La limite se voit avant d'être atteinte (revue « Hugo »). */}
+        {valeur.length >= NOM_PLAN_MAX - 10 && (
+          <Text style={styles.modalSubtitle}>{`${valeur.length}/${NOM_PLAN_MAX} caractères`}</Text>
+        )}
         <View style={styles.modalActions}>
           <TouchableOpacity style={styles.modalGhost} onPress={onClose}>
             <Text style={styles.modalGhostText}>Annuler</Text>

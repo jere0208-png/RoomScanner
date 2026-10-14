@@ -14285,6 +14285,18 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Saisies et noms (Hugo, Yasmine)
+
+- « 0 » se dit « 0,00 m, c'est trop peu » au lieu de « ne se lit pas » ;
+  « 999 » en hauteur ne propose plus un plafond à 1,00 m ; un plafond à
+  0,50 m demande confirmation (« inhabituel pour une hauteur sous
+  plafond »).
+- Une seule limite par nom (60 caractères pour un plan, 40 pour une
+  pièce), un compteur à l'approche, et jamais un émoji coupé en deux.
+- Le total des surfaces au même arrondi partout dans les résumés
+  (bilan au dixième, comme l'en-tête et la page de garde) ; la légende de
+  l'image dit « Total au sol ».
+
 ## Le devis d'artisan : HT ligne à ligne, SIRET et décennale
 
 - Les lignes de fournitures du devis s'écrivent en prix unitaire HT et
