@@ -211,6 +211,9 @@ jobs:
           rm -rf "$DEST" && mkdir -p "$DEST/ecrans" "$DEST/journal"
           cp captures/ecrans/*.png "$DEST/ecrans/" 2>/dev/null || true
           cp captures/bilan.md "$DEST/" 2>/dev/null || true
+          # Le journal de l'app elle-même (erreurs JS, SceneKit…), borné.
+          xcrun simctl spawn "$SIM_UDID" log show --last 60m --style compact \
+            --predicate 'process == "RoomScanner"' 2>/dev/null | tail -n 4000 > "$DEST/journal/app.log" || true
           # Le texte des échecs Maestro (commandes et erreurs), sans les images.
           find captures/debug captures/brut -type f \( -name '*.json' -o -name '*.log' -o -name '*.txt' -o -name '*.xml' \) -size -400k 2>/dev/null \
             | while read -r f; do cp "$f" "$DEST/journal/$(echo "$f" | tr '/' '_')"; done || true

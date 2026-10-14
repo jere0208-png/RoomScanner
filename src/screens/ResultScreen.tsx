@@ -257,7 +257,7 @@ const ENREGISTREMENT_AUTO_MS = 1500;
 const HIT_PASTILLE = { top: 5, bottom: 5, left: 4, right: 4 };
 
 /** Les pastilles du haut et la rangée d’outils du bas, posées sur le plan (pt). */
-const MARGES_DU_PLAN = { haut: 52, bas: 128 };
+const MARGES_DU_PLAN = { haut: 48, bas: 170 };
 
 export function ResultScreen() {
   /**

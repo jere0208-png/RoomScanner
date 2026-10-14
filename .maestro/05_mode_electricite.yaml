@@ -13,7 +13,8 @@ name: Mode Électricité
     element: "Mode Électricité"
     direction: DOWN
     timeout: 10000
-- tapOn: "Mode Électricité"
+- tapOn:
+    id: "interrupteur-electricite"
 - waitForAnimationToEnd:
     timeout: 3000
 - takeScreenshot: ${THEME}-40-profil-mode-electricite
@@ -55,6 +56,7 @@ name: Mode Électricité
     element: "Mode Électricité"
     direction: DOWN
     timeout: 10000
-- tapOn: "Mode Électricité"
+- tapOn:
+    id: "interrupteur-electricite"
 - waitForAnimationToEnd:
     timeout: 3000

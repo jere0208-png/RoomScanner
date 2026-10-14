@@ -358,6 +358,7 @@ export function ProfilScreen() {
             </Text>
           </View>
           <Switch
+            testID="interrupteur-electricite"
             accessibilityLabel="Mode Électricité"
             value={modeElec}
             onValueChange={(v) => {
