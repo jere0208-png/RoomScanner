@@ -8,7 +8,7 @@
 import { corrigerConstat, poserAuxNormes } from '../src/geometry/auto';
 import type { WallSeg } from '../src/geometry/floorplan';
 import type { Fixture } from '../src/geometry/electrical';
-import { checkElectrical, socleFaceAuPlan, worktopsOnWall } from '../src/geometry/nfc15100';
+import { checkElectrical, logementEntier, socleFaceAuPlan, worktopsOnWall } from '../src/geometry/nfc15100';
 import { deviceNames } from '../src/geometry/naming';
 
 const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
@@ -160,5 +160,23 @@ describe('le nom de la prise dit ce qu’elle est', () => {
     expect(noms.get('a')!.nom).toBe('Prise plan de travail 1');
     expect(noms.get('b')!.nom).toBe('Prise haute 1');
     expect(noms.get('c')!.nom).toBe('Prise réfrigérateur 1');
+  });
+});
+
+describe('le duplex : les règles du logement comptent tous les niveaux (revue « Nadia »)', () => {
+  it('à l’étage, « Logement : 1 prise RJ45 sur 2 » ne sort plus quand le logement en a 4', () => {
+    const etage = [{ id: 'e1', name: 'Chambre', kind: 'bedroom' as const, area: 11, wallIds: ['n', 'e', 's', 'o'] }];
+    const w2r = new Map(['n', 'e', 's', 'o'].map((w) => [w, ['e1']]));
+    const rj: Fixture = { id: 'rj', kind: 'rj45', wallId: 'n', along: 1, height: 0.25, side: 1 };
+    const seul = checkElectrical(etage, [rj], w2r);
+    expect(seul.some((i) => i.message === 'Logement : 1 prise RJ45 sur 2')).toBe(true);
+    const tout = logementEntier(
+      [{ name: 'Séjour', kind: 'living' }, { name: 'Chambre', kind: 'bedroom' }, ...etage],
+      [rj, { ...rj, id: 'a' }, { ...rj, id: 'b' }, { ...rj, id: 'c' }],
+      [],
+    );
+    expect(tout).toMatchObject({ rj45: 4, principales: 3 });
+    const avec = checkElectrical(etage, [rj], w2r, undefined, undefined, undefined, [], undefined, tout);
+    expect(avec.some((i) => i.message.startsWith('Logement : ') && i.code === 'rj45')).toBe(false);
   });
 });

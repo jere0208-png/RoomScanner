@@ -158,6 +158,7 @@ import {
   priseDeCuisine,
   roomUse,
   plansDeTravailParMur,
+  logementEntier,
   constatsDePose,
   fixturePlacement,
   materialList,
@@ -368,8 +369,17 @@ export function ResultScreen() {
   const addFixture = useScanStore((s) => s.addFixture);
   const toutLePlafond = useScanStore((s) => s.ceiling);
   // Ce qui vaut pour le LOGEMENT se cherche à tous les niveaux (revue « Mehdi »).
-  const tableauAuLogement = useScanStore((s) => s.fixtures.some((f) => f.kind === 'tableau'));
-  const daafAuLogement = useScanStore((s) => s.ceiling.some((c) => c.kind === 'daaf'));
+  /*
+    CE QUI SE COMPTE SUR TOUT LE LOGEMENT — tableau, DAAF, RJ45, circuits
+    spécialisés, cuisson —, tous niveaux confondus (revues « Mehdi » et
+    « Nadia ») : voir `logementEntier`.
+  */
+  const tousLesAppareils = toutLAppareillage;
+  const toutesLesPiecesDuLogement = useScanStore((s) => s.rooms);
+  const logement = useMemo(
+    () => logementEntier(toutesLesPiecesDuLogement, tousLesAppareils, toutLePlafond),
+    [toutesLesPiecesDuLogement, tousLesAppareils, toutLePlafond],
+  );
   /*
     L'ÉCRAN NE MONTRE QU'UN ÉTAGE.
 
@@ -2552,7 +2562,7 @@ export function ResultScreen() {
             // mur, appareil dans le vide d'une baie.
             { walls: fige.walls, openings: fige.openings },
             // Le tableau, le détecteur de fumée : ceux du logement entier.
-            { tableau: tableauAuLogement, daaf: daafAuLogement },
+            logement,
           ),
     [
       modeElec,
@@ -2565,8 +2575,7 @@ export function ResultScreen() {
       fige.ceiling,
       fige.walls,
       fige.openings,
-      tableauAuLogement,
-      daafAuLogement,
+      logement,
     ],
   );
   /*
@@ -3693,7 +3702,12 @@ export function ResultScreen() {
           wallWorktops,
           cl,
           { walls, openings },
-          { tableau: tableauAuLogement, daaf: daafAuLogement },
+          // Le logement, avec ce qu'on vient de poser à ce niveau.
+          logementEntier(
+            toutesLesPiecesDuLogement,
+            [...tousLesAppareils.filter((f) => !fx.some((x) => x.id === f.id)), ...fx],
+            [...toutLePlafond.filter((c) => !cl.some((x) => x.id === c.id)), ...cl],
+          ),
         ),
     );
     if (pose.conforme && suite.poses.length === 0) {

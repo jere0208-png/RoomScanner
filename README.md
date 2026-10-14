@@ -14342,6 +14342,10 @@ d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 - **Le réfrigérateur a sa prise** : posée à côté de lui, pas derrière une
   colonne de 1,80 m, hors du compte des socles, nommée « Prise
   réfrigérateur » ; circuit ou différentiel à part conseillé.
+- **Le duplex** : à l'étage, les règles du logement (RJ45 par pièce
+  principale, trois circuits spécialisés, cuisson, tableau, DAAF) comptent
+  tous les niveaux — plus de « Logement : 1 prise RJ45 sur 2 » quand le
+  logement en a quatre (Nadia).
 - **La 20 A sans appareil relevé ne part plus derrière le frigo** ; derrière
   un lave-vaisselle, un four, un lave-linge relevés, elle porte son sigle
   (LV, FO, LL…).

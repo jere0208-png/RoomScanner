@@ -788,6 +788,36 @@ export function avancementDesPieces(
   return out;
 }
 
+/**
+ * CE QUI SE COMPTE SUR TOUT LE LOGEMENT, quand l'écran n'en montre qu'un
+ * niveau — revues « Mehdi » et « Nadia » (duplex : « Logement : 1 prise
+ * RJ45 sur 2 » à l'étage, quand le logement en avait 4).
+ */
+export interface LogementEntier {
+  tableau: boolean;
+  daaf: boolean;
+  rj45?: number;
+  principales?: number;
+  /** Circuits spécialisés possibles : socles 20 A, sorties de câble sans usage. */
+  dedies?: number;
+  cuisson?: boolean;
+}
+
+export function logementEntier(
+  rooms: { name?: string; kind?: RoomKind | null }[],
+  fixtures: Fixture[],
+  ceiling: { kind: string }[],
+): LogementEntier {
+  return {
+    tableau: fixtures.some((f) => f.kind === 'tableau'),
+    daaf: ceiling.some((c) => c.kind === 'daaf'),
+    rj45: fixtures.reduce((somme, f) => somme + rjOf(f.kind), 0),
+    principales: rooms.filter((r) => PRINCIPALE.includes(roomUse(r.name ?? '', r.kind))).length,
+    dedies: fixtures.filter((f) => f.kind === 'prise20' || (f.kind === 'sortieCable' && !f.usage)).length,
+    cuisson: fixtures.some((f) => f.kind === 'prise32' || (f.kind === 'sortieCable' && f.usage === 'PL')),
+  };
+}
+
 export function checkElectrical(
   rooms: RoomInput[],
   fixtures: Fixture[],
@@ -825,7 +855,7 @@ export function checkElectrical(
    * le logement » (il est au palier). Ce qui vaut pour le LOGEMENT se
    * cherche dans le logement entier.
    */
-  logement?: { tableau: boolean; daaf: boolean },
+  logement?: LogementEntier,
 ): ElecIssue[] {
   const out: ElecIssue[] = [];
   if (geometrie) {
@@ -1080,9 +1110,9 @@ export function checkElectrical(
       (revue « Mehdi » : un lave-vaisselle, un sèche-serviettes et une
       climatisation faisaient « 3/3 »).
     */
-    const dedies = fixtures.filter(
-      (f) => f.kind === 'prise20' || (f.kind === 'sortieCable' && !f.usage),
-    ).length;
+    const dedies =
+      logement?.dedies ??
+      fixtures.filter((f) => f.kind === 'prise20' || (f.kind === 'sortieCable' && !f.usage)).length;
     if (dedies < 3) {
       out.push({
         code: 'specialises',
@@ -1109,7 +1139,8 @@ export function checkElectrical(
       tableau, ni au devis. Seul le cas inverse (« 32 A hors cuisine ») se
       contrôlait. Un socle 32 A, ou une sortie de câble « PL », suffit.
     */
-    const cuisson = fixtures.some((f) => f.kind === 'prise32' || (f.kind === 'sortieCable' && f.usage === 'PL'));
+    const cuisson =
+      logement?.cuisson ?? fixtures.some((f) => f.kind === 'prise32' || (f.kind === 'sortieCable' && f.usage === 'PL'));
     if (!cuisson) {
       out.push({
         code: 'cuisson',
@@ -1186,10 +1217,9 @@ export function checkElectrical(
   }
 
   // ------------------------------------------------------ vue d'ensemble
-  const principales = rooms.filter((r) =>
-    PRINCIPALE.includes(roomUse(r.name, r.kind)),
-  ).length;
-  const rj45Total = fixtures.reduce((somme, f) => somme + rjOf(f.kind), 0);
+  const principales =
+    logement?.principales ?? rooms.filter((r) => PRINCIPALE.includes(roomUse(r.name, r.kind))).length;
+  const rj45Total = logement?.rj45 ?? fixtures.reduce((somme, f) => somme + rjOf(f.kind), 0);
   const rj45Min = Math.max(2, principales);
   if (principales > 0 && rj45Total < rj45Min) {
     out.push({
