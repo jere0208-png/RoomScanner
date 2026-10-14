@@ -180,10 +180,44 @@ function aLaPiece(nom: string): string {
 }
 const cm = (v: number) => `${Math.round(v * 100)} cm`;
 
-/** « la porte de la chambre » — la porte, nommée par la pièce qui la porte. */
-export function nomDeLaPorte(o: WallSeg, rooms: { id: string; name?: string }[]): string {
-  const nom = rooms.find((r) => r.id === roomOf(o))?.name;
+/**
+ * « la porte entre la chambre et le séjour » — la porte, nommée par les deux
+ * pièces qu'elle sépare (revue « Nadia » : toutes s'appelaient « la porte
+ * du salon », faute de pièce à l'ouverture). Une seule pièce d'un côté :
+ * « la porte de la chambre ». Sans les contours, la pièce qui la porte.
+ */
+export function nomDeLaPorte(
+  o: WallSeg,
+  rooms: { id: string; name?: string }[],
+  parts?: { roomId: string; surface: { pts: Pt[] } | null }[],
+): string {
+  const nomDe = (id: string | undefined) => (id ? rooms.find((r) => r.id === id)?.name?.trim() : undefined) || undefined;
+  if (parts && parts.length > 0) {
+    const L = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z);
+    if (L > 1e-6) {
+      const m = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+      const n = { x: -(o.b.z - o.a.z) / L, z: (o.b.x - o.a.x) / L };
+      const pieceA = (s: number) =>
+        parts.find((p) => p.surface && p.surface.pts.length >= 3 && pointInPolygon({ x: m.x + n.x * s * 0.35, z: m.z + n.z * s * 0.35 }, p.surface.pts))?.roomId;
+      const a = nomDe(pieceA(1));
+      const b = nomDe(pieceA(-1));
+      if (a && b && a !== b) {
+        const [p1, p2] = [a, b].sort((x, y) => x.localeCompare(y, 'fr'));
+        return `la porte entre ${articleDe(p1)} et ${articleDe(p2)}`;
+      }
+      if (a || b) return `la porte ${deLaPiece((a ?? b)!)}`;
+    }
+  }
+  const nom = nomDe(roomOf(o));
   return nom ? `la porte ${deLaPiece(nom)}` : 'une porte';
+}
+
+/** « la chambre », « le séjour », « l'entrée ». */
+function articleDe(nom: string): string {
+  const d = deLaPiece(nom);
+  if (d.startsWith('du ')) return `le ${d.slice(3)}`;
+  if (d.startsWith('de l’')) return `l’${d.slice(5)}`;
+  return `la ${d.slice(6)}`;
 }
 
 interface Arete {

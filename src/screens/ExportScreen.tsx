@@ -43,7 +43,7 @@ import {
   roomInputsOf,
   wallToRooms,
 } from '../geometry/nfc15100';
-import { fixtureMarks, multiWire, schemaRows } from '../geometry/schema';
+import { pointMarks, multiWire, schemaRows } from '../geometry/schema';
 import { useModeElec } from '../store/usage';
 import { useReglagesTravaux } from '../store/reglagesTravaux';
 import { entrepriseAImprimer, useEntreprise } from '../store/entreprise';
@@ -564,7 +564,7 @@ const styles = getStyles(c);
       multi: list.circuits.map((circ, i) => multiWire(circ, fixtures, `C${i + 1}`)),
       // Le lien entre le plan et le tableau : chaque appareil sait de quel
       // départ il dépend, et c'est ce repère qui s'écrit sur le tracé.
-      marks: fixtureMarks(list.circuits),
+      marks: pointMarks(list.circuits),
     };
   }, [rooms, parts, fixtures, placement, cheminements, ceiling]);
   const [measures3D, setMeasures3D] = useState(false);

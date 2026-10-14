@@ -5135,6 +5135,26 @@ function unifilairePage(
     GREY,
     { align: 'left' },
   );
+  /*
+    POUR LE CONSUEL, CE QUE LE SCHÉMA DOIT PORTER — revue « Nadia » : le
+    régime du neutre, le calibre de l'AGCP, la prise de terre et la liaison
+    équipotentielle principale. L'app ne les mesure pas : un cadre à
+    compléter sur place, plutôt qu'un oubli au moment du contrôle.
+  */
+  {
+    const lw = 196;
+    const lx = x0 + w - lw;
+    const ly = y + 28;
+    d.rect(lx, ly - 50, lw, 50, '#FFFFFF', GREY_LIGHT, 0.6);
+    d.text('POUR LE CONSUEL — À COMPLÉTER', lx + 8, ly - 10, 6.5, GREY, { bold: true, align: 'left' });
+    const lignes = [
+      'Régime du neutre : TT',
+      'AGCP : ........ A, 500 mA sélectif',
+      'Prise de terre : ........ ohms (100 au plus)',
+      'Liaison équipotentielle principale : oui / non',
+    ];
+    lignes.forEach((l, i) => d.text(l, lx + 8, ly - 20 - i * 8.5, 7, INK, { align: 'left' }));
+  }
   y -= 10;
 
   // Les colonnes du schéma, fixées une fois : tout s'y aligne.
@@ -5166,8 +5186,11 @@ function unifilairePage(
     else parDiff.set(r.under, [...(parDiff.get(r.under) ?? []), r]);
   }
   const blocs: { titre: string; sous: string; rows: SchemaRow[]; aLaBarre: boolean }[] = [];
+  // Sous chaque différentiel, les départs dans l'ordre de leurs repères :
+  // C6 avant C7 (revue « Nadia »).
+  const rang = (r: SchemaRow) => Number(/\d+/.exec(r.mark)?.[0] ?? 0);
   diffs.forEach((diff, i2) => {
-    const list = parDiff.get(`ID${i2 + 1}`) ?? [];
+    const list = [...(parDiff.get(`ID${i2 + 1}`) ?? [])].sort((a, b) => rang(a) - rang(b));
     if (list.length === 0) return;
     blocs.push({
       titre: `ID${i2 + 1}`,
@@ -7438,6 +7461,7 @@ function detailDesDeparts(
   scan: ScanForPdf,
   marks: Map<string, string>,
   rows: SchemaRow[],
+  ceiling: CeilingFixture[] = [],
 ): Map<string, string> {
   const noms = scan.deviceNames;
   const out = new Map<string, string>();
@@ -7450,6 +7474,21 @@ function detailDesDeparts(
       if (!n) continue;
       const ou = [n.piece, n.mur].filter(Boolean).join(', ');
       parPiece.set(ou, [...(parPiece.get(ou) ?? []), n.nom]);
+    }
+    // Ce que le départ allume : les points du plafond, par pièce.
+    const auPlafond = new Map<string, Map<string, number>>();
+    for (const cl of ceiling) {
+      if (marks.get(cl.id) !== r.mark) continue;
+      const piece = (cl.roomId ? scan.roomNames?.[cl.roomId] : '') || '';
+      const parType = auPlafond.get(piece) ?? new Map<string, number>();
+      const label = CEILINGS[cl.kind].label;
+      parType.set(label, (parType.get(label) ?? 0) + 1);
+      auPlafond.set(piece, parType);
+    }
+    for (const [piece, parType] of auPlafond) {
+      const ou = piece ? `${piece}, plafond` : 'Plafond';
+      const liste = [...parType.entries()].map(([l, q]) => (q > 1 ? `${q} × ${l}` : l));
+      parPiece.set(ou, [...(parPiece.get(ou) ?? []), ...liste]);
     }
     const morceaux = [...parPiece.entries()].map(([ou, liste]) =>
       ou ? `${ou} \u2014 ${liste.join(', ')}` : liste.join(', '),
@@ -7932,7 +7971,7 @@ function planifierUnNiveau(
     feuilles.push({
       genre: 'unifilaire',
       titre: 'Schéma unifilaire',
-      fabriquer: (n) => unifilairePage(ctx, n, sch.rows, sch.differentials, detailDesDeparts(scan, sch.marks, sch.rows)),
+      fabriquer: (n) => unifilairePage(ctx, n, sch.rows, sch.differentials, detailDesDeparts(scan, sch.marks, sch.rows, opts.ceiling ?? [])),
     });
     /*
       PLUS DE FEUILLE MULTIFILAIRE — relevé unanime des revues du dossier :

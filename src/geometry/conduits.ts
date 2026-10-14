@@ -845,7 +845,12 @@ export function buyingList(
       family: 'Appareillage',
       code: `meca-${k}`,
       label: FIXTURES[k as keyof typeof FIXTURES].label,
-      spec: 'Mécanisme à encastrer, entraxe 60 mm, griffes ou vis',
+      // Le tableau n'est pas un mécanisme (revue « Nadia ») : son coffret se
+      // dimensionne aux modules, au rayon Tableau.
+      spec:
+        k === 'tableau'
+          ? 'Emplacement du tableau — coffret et protections comptés au rayon Tableau'
+          : 'Mécanisme à encastrer, entraxe 60 mm, griffes ou vis',
       quantity: q,
       unit: 'u',
     });

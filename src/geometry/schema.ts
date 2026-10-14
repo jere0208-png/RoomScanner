@@ -264,6 +264,20 @@ export function fixtureMarks(circuits: Circuit[]): Map<string, string> {
   return out;
 }
 
+/**
+ * LE REPÈRE DE CHAQUE POINT, plafond compris — revue « Nadia » : sur
+ * l'unifilaire, un circuit d'éclairage listait « Interrupteur 1 » et aucun
+ * point lumineux. Le dossier nomme aussi ce que le départ allume.
+ */
+export function pointMarks(circuits: Circuit[]): Map<string, string> {
+  const marks = circuitMarks(circuits);
+  const out = fixtureMarks(circuits);
+  for (const c of circuits) {
+    for (const id of c.ceilingIds ?? []) out.set(id, marks.get(c.id) ?? '');
+  }
+  return out;
+}
+
 /** « Prise 16 A » devient « prise 16 A » : l'unité garde sa majuscule. */
 const enMinuscule = (l: string) => l.charAt(0).toLowerCase() + l.slice(1);
 

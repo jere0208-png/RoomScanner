@@ -14349,6 +14349,14 @@ d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
   principale, trois circuits spécialisés, cuisson, tableau, DAAF) comptent
   tous les niveaux — plus de « Logement : 1 prise RJ45 sur 2 » quand le
   logement en a quatre (Nadia).
+- **Le schéma unifilaire** : un cadre « Pour le Consuel — à compléter »
+  (régime TT, calibre de l'AGCP, prise de terre, liaison équipotentielle
+  principale) ; les départs dans l'ordre de leurs repères sous chaque
+  différentiel (C6 avant C7) ; un circuit d'éclairage nomme aussi ses
+  points lumineux (« Cuisine, plafond — Point lumineux DCL, 2 × Spot »).
+- Les portes se nomment par les deux pièces qu'elles séparent (« la porte
+  entre la chambre et le séjour ») ; le tableau ne se décrit plus comme un
+  « mécanisme à encastrer » dans la liste du matériel (Nadia).
 - **La 20 A sans appareil relevé ne part plus derrière le frigo** ; derrière
   un lave-vaisselle, un four, un lave-linge relevés, elle porte son sigle
   (LV, FO, LL…).

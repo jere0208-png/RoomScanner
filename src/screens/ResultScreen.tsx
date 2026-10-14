@@ -2677,7 +2677,7 @@ export function ResultScreen() {
       ...[...meublesQuiBloquent(battantsDesPortes(fige.openings, fige.walls, fige.rooms), fige.objects)].map(
         ([porteId, ids], n) => {
           const porte = fige.openings.find((o) => o.id === porteId)!;
-          const nom = nomDeLaPorte(porte, fige.rooms);
+          const nom = nomDeLaPorte(porte, fige.rooms, fige.parts);
           const meuble = fige.objects.find((o) => o.id === ids[0]);
           /*
             POSÉ À LA MAIN, C'EST UNE ALERTE — revue « Théo » : le canapé
@@ -5519,7 +5519,7 @@ export function ResultScreen() {
             bloque={(() => {
               const porte = [...bloquages].find(([, ids]) => ids.includes(selectedObject.id))?.[0];
               const o = porte ? openings.find((x) => x.id === porte) : undefined;
-              return o ? `Gêne ${nomDeLaPorte(o, rooms)}` : null;
+              return o ? `Gêne ${nomDeLaPorte(o, rooms, parts)}` : null;
             })()}
             onPassage={() =>
               verdictDePassage &&
