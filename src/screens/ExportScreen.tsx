@@ -1128,7 +1128,13 @@ const styles = getStyles(c);
                 ? 'Le logement en perspective : le client s’y projette d’un regard.'
                 : 'Le logement en perspective : on s’y projette d’un regard.'
             }
-            pages={pagesDe(include3D, combien(sommaire, 'perspective'), Math.max(1, vues.length))}
+            // Revues « Paul » et « Marc » : « Rien à imprimer » sur une case
+            // cochée — la vue est en fait sur la page de garde.
+            pages={
+              include3D && garde && combien(sommaire, 'perspective') === 0
+                ? 'Sur la page de garde'
+                : pagesDe(include3D, combien(sommaire, 'perspective'), Math.max(1, vues.length))
+            }
             actif={include3D}
             label="Vues 3D"
             onChange={(v) => basculer(() => setInclude3D(v))}>

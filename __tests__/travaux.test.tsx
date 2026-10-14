@@ -277,7 +277,7 @@ describe('la feuille', () => {
       arbre = TestRenderer.create(<TravauxSheet visible onClose={() => {}} pieces={pieces} />);
     });
     const vu = textes(arbre!).join(' | ');
-    for (const mot of ['Peinture des murs', 'Peinture des plafonds', 'Revêtement de sol', 'Plinthes']) {
+    for (const mot of ['Peinture des murs', 'Peinture des plafonds', 'Sol (carrelage, parquet…)', 'Plinthes']) {
       expect(vu).toContain(mot);
     }
     expect(vu).toContain('Pour tout le logement.');

@@ -264,8 +264,8 @@ function Tuile({
 const CRITERE: Record<CleDuCritere, { court: string; icone: IconeSolaire }> = {
   structure: { court: 'Pièces', icone: 'maison' },
   precision: { court: 'Murs', icone: 'oeil' },
-  murs: { court: 'Image des murs', icone: 'rouleau' },
-  sol: { court: 'Image du sol', icone: 'surface' },
+  murs: { court: 'Couleur des murs', icone: 'rouleau' },
+  sol: { court: 'Couleur du sol', icone: 'surface' },
   plafond: { court: 'Plafond', icone: 'plafond' },
 };
 
@@ -321,7 +321,8 @@ function Jauge({
           <Icone nom={CRITERE[cle].icone} taille={Math.round(taille * 0.42)} teinte={faible ? c.amber : c.inkSoft} />
         </View>
       </View>
-      <Text style={[s.jaugeNom, faible && { color: c.amber }]} numberOfLines={2}>
+      {/* L'ambre sur blanc faisait 2,2:1 (revue « Paul ») : le nom reste lisible, l'anneau dit l'alerte. */}
+      <Text style={[s.jaugeNom, faible && { color: c.ink, fontWeight: '700' }]} numberOfLines={2}>
         {CRITERE[cle].court}
       </Text>
     </View>

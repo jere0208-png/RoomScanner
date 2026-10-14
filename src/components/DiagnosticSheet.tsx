@@ -33,6 +33,8 @@ export interface Constat {
   roomId?: string;
   /** Le meuble visé, quand le constat parle d'un meuble. */
   objectId?: string;
+  /** L'appareil visé, quand le constat parle d'un appareil. */
+  fixtureId?: string;
   /** De quoi on parle, sans lire la phrase : choisit l'icône de la ligne. */
   code?: string;
   /** Le geste qui règle le constat, quand il existe : un bouton le porte. */

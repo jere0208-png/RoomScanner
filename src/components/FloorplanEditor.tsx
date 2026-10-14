@@ -3238,10 +3238,12 @@ export function FloorplanEditor({
                       if (angle < -90) angle += 180;
                       const mx = (A.x + B.x) / 2;
                       const my = (A.y + B.y) / 2;
+                      // Revue « Marc » : « 100 » pour 0,99999 m, et aucune unité —
+                      // 100 quoi ? Le centimètre se dit, le mètre aussi.
                       const texte =
-                        gap < 1
-                          ? `${Math.round(gap * 100)}`
-                          : gap.toFixed(2).replace('.', ',');
+                        Math.round(gap * 100) < 100
+                          ? `${Math.round(gap * 100)} cm`
+                          : `${gap.toFixed(2).replace('.', ',')} m`;
                       return (
                         <G key={ci}>
                           <Line

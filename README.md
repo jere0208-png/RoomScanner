@@ -14285,6 +14285,20 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Six personnes découvrent l'app — troisième lot
+
+- Les dégagements autour d'un meuble disent leur unité (« 58 cm »,
+  « 1,20 m ») ; plus de « 100 » pour 0,99 m (Marc).
+- Un constat électrique sur un appareil ouvre sa fiche, plus seulement la
+  pièce (Nadia).
+- Les pièces de l'étage ne reprennent plus les noms du rez-de-chaussée
+  (Hugo : deux « Chambre », deux « Chambre 2 »).
+- Contrastes (Paul) : pastille « GRATUIT » sur un vert profond, nom du
+  critère faible du bilan en noir, compteurs du scan plus grands et plus
+  nets.
+- « Sol (carrelage, parquet…) » dans la liste d'achats ; « Vues 3D : sur la
+  page de garde » au lieu de « Rien à imprimer » (Paul, Marc).
+
 ## Six personnes découvrent l'app — second lot
 
 - **Les étages ne font plus croire que le plan a disparu** (Hugo) :

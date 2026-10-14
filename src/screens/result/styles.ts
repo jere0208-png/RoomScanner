@@ -1142,7 +1142,8 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   exportBadgeProTexte: { color: '#FFFFFF', fontSize: 10.5, fontWeight: '700', letterSpacing: 0.4 },
   exportBadgeGratuit: {
-    backgroundColor: c.green,
+    // Revue « Paul » : blanc sur le vert vif faisait 2,6:1. Un vert profond.
+    backgroundColor: '#14803C',
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,

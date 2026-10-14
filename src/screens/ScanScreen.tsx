@@ -1005,9 +1005,10 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   stat: { alignItems: 'center', paddingHorizontal: 9 },
   statBorder: { borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.14)' },
   statValue: { color: c.scanInk, fontSize: 15, fontWeight: '600' },
+  /* Revue « Paul » : 9 pt à 62 % sur la caméra, illisible pour un presbyte. */
   statLabel: {
-    color: 'rgba(244,246,250,0.62)',
-    fontSize: 9,
+    color: 'rgba(244,246,250,0.85)',
+    fontSize: 10,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.4,

@@ -2639,6 +2639,7 @@ export function ResultScreen() {
         hint: i.regle,
         severity: i.severity as string,
         roomId: i.roomId,
+        fixtureId: i.fixtureId,
         // Le sujet et le geste voyagent avec le constat : l'icône de la
         // ligne et son bouton « corriger » en vivent.
         code: i.code,
@@ -2811,6 +2812,15 @@ export function ResultScreen() {
     setTab('2d');
     setEditMode(true);
     setSelectedObjectId(null);
+    // Revue « Nadia » : « Prise 16 A en volume 2 » menait à la pièce. Le
+    // constat d'un appareil ouvre sa fiche, sur son mur.
+    const appareil = issue.fixtureId ? fixtures.find((f) => f.id === issue.fixtureId) : undefined;
+    if (appareil) {
+      setSelectedRoomId(null);
+      setSelectedWallId(null);
+      ouvrirLaFiche(appareil);
+      return;
+    }
     if (issue.objectId) {
       // Le meuble posé à la main : c'est lui qu'on déplace.
       setSelectedWallId(null);

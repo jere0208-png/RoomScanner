@@ -145,7 +145,8 @@ export function TravauxSheet({
     },
     {
       cle: 'sol',
-      titre: 'Revêtement de sol',
+      // Revue « Paul » : il cherchait « carrelage » et ne le trouvait pas.
+      titre: 'Sol (carrelage, parquet…)',
       gros: `${a.sol.paquets} paquet${a.sol.paquets > 1 ? 's' : ''} de ${nombre(hypotheses.paquet)} m²`,
       detail: `${nombre(a.sol.avecChute)} m², marge des coupes comprise`,
       teinte: '#B8742A',

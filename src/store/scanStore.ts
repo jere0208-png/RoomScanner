@@ -3579,7 +3579,17 @@ export const useScanStore = create<ScanState>((set, get) => {
       openings,
       nommerLesGarages(kinds, shapes.map((s) => s.outline), categoriesDe, openings, walls),
     );
-    const noms = nameRooms(kinds, shapes.map((s) => s.outline));
+    /*
+      DEUX « CHAMBRE » D'UN NIVEAU À L'AUTRE — revue « Hugo » : l'étage
+      reprenait les noms du rez-de-chaussée ; la coloc avait deux « Chambre »
+      et deux « Chambre 2 » dans le plan, la liste et la vignette. Les noms
+      se numérotent sur tout le logement.
+    */
+    const prisAilleurs = get().rooms.map((r) => r.name ?? '').filter(Boolean);
+    const noms = nameRooms(kinds, shapes.map((s) => s.outline)).reduce<string[]>((acc, nom) => {
+      acc.push(nom ? nomDePieceLibre(nom, [...prisAilleurs, ...acc]) || nom : nom);
+      return acc;
+    }, []);
     const pieces: RoomEntry[] = shapes.map((s, i) => {
       /*
         LE PLAFOND RELEVÉ À L'ÉTAGE AUSSI — revue « Malik » : le relevé du
