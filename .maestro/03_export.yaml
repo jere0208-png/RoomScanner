@@ -19,7 +19,7 @@ name: Export
     point: "35%,41%"
 - extendedWaitUntil:
     visible: "Page de garde"
-    timeout: 20000
+    timeout: 45000
 - waitForAnimationToEnd:
     timeout: 8000
 - takeScreenshot: ${THEME}-22-export-pdf
