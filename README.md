@@ -14285,6 +14285,22 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Le refend vu d'un seul côté (D7)
+
+- RoomPlan rend un mur vu d'un seul côté par un trait : la face vue. Pour
+  un refend, les deux côtés sont dans le logement et l'épaisseur restait
+  centrée sur ce trait — le dessin et le métré divergeaient de 7 cm par
+  côté.
+- Le chemin de la caméra tranche (`marquerLesFacesVues`) : le côté d'où
+  l'on voyait le mur, sans autre mur entre deux, est le côté vu (85 % des
+  regards, trois au moins). Le trait reste la face vue, l'épaisseur se
+  dessine de l'autre côté, et la pièce d'en face se compte à cette autre
+  face : le plan et le métré disent la même chose.
+- La pièce d'en face reçoit « cote à vérifier, cloison vue d'un seul
+  côté » : son nu repose sur une épaisseur supposée (14 cm), qu'on mesure
+  ou qu'on scanne. Une épaisseur saisie à la main fait taire le constat.
+- Vu des deux côtés, ou sans trajet : rien ne change.
+
 ## La cuisine aux normes, les relevés bruts, les captures du simulateur
 
 - **Les prises « plan de travail » sont au-dessus du plan** (Nadia) : dès

@@ -2,6 +2,7 @@ import { NOM_EXEMPLE, appartementExemple } from '../data/exemple';
 import type { PlanLu } from '../geometry/lecturePlan';
 import type { Mesure } from '../geometry/regle';
 import { photosDesMurs } from '../geometry/photosAuto';
+import { trajetDe } from '../geometry/traversee';
 import { create } from 'zustand';
 import { HEIGHT_RULES, estCuisine, heightRuleAt, worktopsOnWall } from '../geometry/nfc15100';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -65,6 +66,7 @@ import {
   type SaisieOuverture,
   WALL_T,
   planFrameAngle,
+  marquerLesFacesVues,
   reprojectOpenings,
   segLength,
   snapAngle,
@@ -7762,7 +7764,9 @@ export const useScanStore = create<ScanState>((set, get) => {
         communs (voir `geometry/logique`).
       */
       const logique = releveLogique(nettoyes, segments.filter((s) => s.type !== 'wall'));
-      const walls = logique.walls;
+      // Le refend relevé d'un seul côté : le chemin de la caméra dit lequel
+      // (voir `marquerLesFacesVues`, D7).
+      const walls = marquerLesFacesVues(logique.walls, trajetDe(r));
       // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`),
       // et la porte collée à l'angle, dégagée du mur d'angle (voir
       // `baiesHorsDesAngles`).

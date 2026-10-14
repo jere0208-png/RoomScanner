@@ -18,6 +18,8 @@ import {
   roomParts,
   segLength,
   solDesMurs,
+  cloisonsNonVues,
+  epaisseurDe,
   type RoomShape,
   type WallSeg,
 } from './floorplan';
@@ -32,7 +34,9 @@ export type IssueKind =
   | 'hauteur'
   | 'linteau'
   | 'pieceMinuscule'
-  | 'superposition';
+  | 'superposition'
+  /** Un refend vu de l'autre côté : la cote au nu de cette pièce est supposée (D7). */
+  | 'coteAVerifier';
 
 export interface PlanIssue {
   kind: IssueKind;
@@ -303,6 +307,27 @@ export function checkPlan(
         .toFixed(1)
         .replace('.', ',')} m²`,
       hint: 'Un placard compte comme une pièce : fusionnez-la ou retirez-la.',
+    });
+  }
+
+  /*
+    LA CLOISON VUE DE L'AUTRE CÔTÉ — D7. Le refend relevé d'un seul côté se
+    dessine et se compte à sa face vue ; de ce côté-ci, son nu est à une
+    épaisseur SUPPOSÉE. On le dit, plutôt que d'afficher une fausse
+    précision.
+  */
+  for (const part of parts) {
+    // Une épaisseur saisie à la main est mesurée : plus rien à vérifier.
+    const caches = cloisonsNonVues(part).filter((w) => w.epaisseur === undefined);
+    if (caches.length === 0) continue;
+    const e = Math.round(epaisseurDe(caches[0]) * 100);
+    issues.push({
+      kind: 'coteAVerifier',
+      severity: 'info',
+      roomId: part.roomId,
+      wallId: caches[0].id,
+      message: `${nameOf(rooms, part.roomId)} : cote à vérifier, cloison vue d’un seul côté`,
+      hint: `Le scan a vu cette cloison depuis la pièce voisine : son épaisseur (${e} cm) est supposée. Mesurez-la, ou scannez aussi ce côté.`,
     });
   }
 

@@ -12,8 +12,9 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 import { act } from 'react-test-renderer';
 import type { ObjectData, SurfaceData } from 'react-native-room-scan';
-import { roomParts, segLength, hauteurDeLaPiece } from '../src/geometry/floorplan';
+import { cloisonsNonVues, roomParts, segLength, hauteurDeLaPiece, wallQuads } from '../src/geometry/floorplan';
 import { surfacesHabitables } from '../src/geometry/habitable';
+import { checkPlan } from '../src/geometry/diagnostics';
 import { useScanStore } from '../src/store/scanStore';
 import { buildScanPdf } from '../src/export/pdf';
 
@@ -46,10 +47,10 @@ const rect = (x0: number, z0: number, x1: number, z1: number, h = 2.5) => [
   surf('wall', [x0, z1, x0, z0], h),
 ];
 const st = () => useScanStore.getState();
-const scan = (surfaces: SurfaceData[], objects: ObjectData[] = []) =>
+const scan = (surfaces: SurfaceData[], objects: ObjectData[] = [], trajet: number[] = []) =>
   act(() => {
     useScanStore.setState({ walls: [], openings: [], objects: [], rooms: [], fixtures: [], ceiling: [], saves: [], niveauCourant: 0 } as never);
-    st().finalize({ modelPath: '', surfaces, objects, trajet: [] } as never);
+    st().finalize({ modelPath: '', surfaces, objects, trajet } as never);
   });
 const pieces = () => roomParts(st().walls, st().rooms as never);
 const portes = () => st().openings.filter((o) => o.type === 'door');
@@ -151,6 +152,47 @@ describe('D7 — une baie relevée près d’un refend d’un seul trait reste �
     expect(Math.min(p.a.x, p.b.x)).toBeCloseTo(5.02, 2);
   });
 
+  // Le chemin de la caméra, en zigzag dans la pièce ouest seulement.
+  const ouest: number[] = [];
+  for (let x = 0.6; x <= 4.4; x += 0.4) ouest.push(x, 1 + (x % 0.8) * 4);
+  const refendDe = () => st().walls.find((w) => Math.abs(w.a.x - 5) < 0.02 && Math.abs(w.b.x - 5) < 0.02)!;
+
+  it('vu de l’ouest : le trait est sa face, l’épaisseur part à l’est', () => {
+    scan([...rect(0, 0, 8, 6), surf('wall', [5, 0, 5, 6], 2.5)], [], ouest);
+    const r = refendDe();
+    expect(r.vu!.x).toBeCloseTo(-1, 6);
+    // Le corps du mur dessiné va de 5,00 à 5,14.
+    const q = wallQuads(st().walls).get(r.id)!;
+    const xs = [q.a1, q.a2, q.b1, q.b2].map((p) => p.x);
+    expect(Math.min(...xs)).toBeCloseTo(5, 2);
+    expect(Math.max(...xs)).toBeCloseTo(5.14, 2);
+    // Le métré dit la même chose : 5,00 × 6 à l'ouest, 2,86 × 6 à l'est.
+    const parts = pieces();
+    const o = parts.find((p) => p.centroid.x < 5)!;
+    const e = parts.find((p) => p.centroid.x > 5)!;
+    expect(o.surface!.area).toBeCloseTo(30, 2);
+    expect(e.surface!.area).toBeCloseTo(2.86 * 6, 2);
+    // Et la pièce d'en face sait que sa cote au nu est supposée.
+    expect(cloisonsNonVues(o)).toEqual([]);
+    expect(cloisonsNonVues(e).map((w) => w.id)).toEqual([r.id]);
+    const aVerifier = checkPlan(st().walls, st().rooms as never).filter((i) => i.kind === 'coteAVerifier');
+    expect(aVerifier.map((i) => i.roomId)).toEqual([e.roomId]);
+    expect(aVerifier[0].hint).toContain('14 cm');
+  });
+
+  it('vu des deux côtés, ou sans trajet : on ne tranche pas', () => {
+    const deuxCotes = [...ouest];
+    for (let x = 5.6; x <= 7.6; x += 0.4) deuxCotes.push(x, 1 + (x % 0.8) * 4);
+    scan([...rect(0, 0, 8, 6), surf('wall', [5, 0, 5, 6], 2.5)], [], deuxCotes);
+    expect(refendDe().vu).toBeUndefined();
+    scan([...rect(0, 0, 8, 6), surf('wall', [5, 0, 5, 6], 2.5)]);
+    expect(refendDe().vu).toBeUndefined();
+  });
+
+  it('un mur de façade n’est jamais marqué : sa pièce dit déjà où est le dedans', () => {
+    scan([...rect(0, 0, 8, 6), surf('wall', [5, 0, 5, 6], 2.5)], [], ouest);
+    expect(st().walls.filter((w) => w.vu)).toHaveLength(1);
+  });
 });
 
 describe('D6 — un vrai mur biais garde son angle', () => {

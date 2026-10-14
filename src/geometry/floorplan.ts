@@ -208,6 +208,14 @@ export interface WallSeg {
    * pièces se comptent alors au nu de ce mur-là (revue « Sébastien »).
    */
   deuxFaces?: boolean;
+  /**
+   * LE CÔTÉ D'OÙ ON L'A VU (vecteur unitaire, à plat), pour un refend relevé
+   * d'un seul côté que sa pièce ne départage pas — les deux côtés sont dans
+   * le logement. Le trajet de la caméra le dit (`marquerLesFacesVues`) : le
+   * trait est la face vue, l'épaisseur part de l'autre côté (revue
+   * « Sandrine », D7).
+   */
+  vu?: { x: number; z: number };
 }
 
 /** Pièce d'un élément, valeur par défaut comprise. */
@@ -607,6 +615,11 @@ export function facesDesMurs(walls: WallSeg[], t?: number): Map<string, DemiFace
       } else if (coteMoins && !cotePlus) {
         plus = e;
         moins = 0;
+      } else if (w.vu) {
+        // Les deux côtés dans le logement : le côté vu le départage.
+        const vuPlus = w.vu.x * n.x + w.vu.z * n.z >= 0;
+        plus = vuPlus ? 0 : e;
+        moins = vuPlus ? e : 0;
       }
     }
     out.set(w.id, { plus, moins });
@@ -2133,6 +2146,74 @@ export function faceEntiere(w: WallSeg, part: { surface: RoomSurface | null }): 
   return t1 - t0;
 }
 
+/** De quel côté d'un refend marqué `vu` se tient cette pièce : celui vu, ou l'autre. */
+function cote(mur: WallSeg, pts: Pt[]): 'vu' | 'cache' | null {
+  if (!mur.vu) return null;
+  const m = { x: (mur.a.x + mur.b.x) / 2, z: (mur.a.z + mur.b.z) / 2 };
+  if (dansLeContour({ x: m.x + mur.vu.x * 0.05, z: m.z + mur.vu.z * 0.05 }, pts)) return 'vu';
+  if (dansLeContour({ x: m.x - mur.vu.x * 0.05, z: m.z - mur.vu.z * 0.05 }, pts)) return 'cache';
+  return null;
+}
+
+/**
+ * LES CLOISONS QUE CETTE PIÈCE N'A PAS VUES — le refend relevé de l'autre
+ * côté (D7). Son épaisseur est supposée : la cote au nu de ce côté-ci se
+ * vérifie sur place.
+ */
+export function cloisonsNonVues(part: { walls: WallSeg[]; surface: RoomSurface | null }): WallSeg[] {
+  const pts = part.surface?.pts;
+  if (!pts || pts.length < 3) return [];
+  return part.walls.filter((w) => w.vu && estAUneFace(w) && cote(w, pts) === 'cache');
+}
+
+/**
+ * LE CÔTÉ VU DE CHAQUE REFEND, d'après le chemin de la caméra (D7).
+ *
+ * RoomPlan rend un mur vu d'un seul côté par UN trait : la face vue. Pour un
+ * mur de façade, la pièce dit de quel côté (le dedans) ; pour un refend, les
+ * deux côtés sont dans le logement et l'épaisseur restait centrée — sept
+ * centimètres de faux de chaque côté. Le chemin de la caméra tranche : les
+ * points d'où l'on voyait le mur en face, sans autre mur entre deux. Un côté
+ * qui réunit 85 % des regards, et au moins trois, est le côté vu ; sinon on
+ * ne marque rien, et l'épaisseur reste centrée.
+ */
+export function marquerLesFacesVues(walls: WallSeg[], chemin: Pt[]): WallSeg[] {
+  if (chemin.length < 3) return walls;
+  const faces = facesDesMurs(walls);
+  const murs = walls.filter((w) => w.type === 'wall');
+  const croise = (p: Pt, q: Pt, a: Pt, b: Pt) => {
+    const d = (u: Pt, v: Pt, w: Pt) => (v.x - u.x) * (w.z - u.z) - (v.z - u.z) * (w.x - u.x);
+    return d(p, q, a) * d(p, q, b) < 0 && d(a, b, p) * d(a, b, q) < 0;
+  };
+  return walls.map((w) => {
+    if (!estAUneFace(w) || w.vu) return w;
+    const f = faces.get(w.id);
+    if (!f || Math.abs(f.plus - f.moins) > 1e-9) return w;
+    const L = segLength(w);
+    if (L < 0.3) return w;
+    const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
+    const n = perp(u);
+    let poidsPlus = 0;
+    let poidsMoins = 0;
+    let regards = 0;
+    for (const p of chemin) {
+      const t = (p.x - w.a.x) * u.x + (p.z - w.a.z) * u.z;
+      const d = (p.x - w.a.x) * n.x + (p.z - w.a.z) * n.z;
+      if (t < 0.05 || t > L - 0.05 || Math.abs(d) < 0.15 || Math.abs(d) > 4) continue;
+      const pied = { x: w.a.x + u.x * t, z: w.a.z + u.z * t };
+      if (murs.some((o) => o.id !== w.id && croise(p, pied, o.a, o.b))) continue;
+      regards++;
+      if (d > 0) poidsPlus += 1 / Math.abs(d);
+      else poidsMoins += 1 / Math.abs(d);
+    }
+    const tout = poidsPlus + poidsMoins;
+    if (regards < 3 || tout <= 0) return w;
+    if (poidsPlus / tout >= 0.85) return { ...w, vu: { x: n.x, z: n.z } };
+    if (poidsMoins / tout >= 0.85) return { ...w, vu: { x: -n.x, z: -n.z } };
+    return w;
+  });
+}
+
 /** Complète une pièce : contour, centre, et point de pose du cartouche. */
 function makePart(roomId: string, items: WallSeg[]): RoomPart {
   let surface = roomSurface(items);
@@ -2167,13 +2248,22 @@ function makePart(roomId: string, items: WallSeg[]): RoomPart {
       area -= longueurDedans(w.a, w.b, nu) * epaisseurDe(w);
     }
     surface = { ...surface, nu, area: Math.max(area, 0) };
-  } else if (surface?.exact && items.some((w) => w.deuxFaces)) {
+  } else if (surface?.exact && items.some((w) => w.deuxFaces || (w.vu && estAUneFace(w)))) {
     /*
       UN PLAN SCANNÉ SE RELÈVE AUX FACES — sauf le mur vu des deux côtés,
       que la fusion a posé sur son axe (revue « Sébastien ») : la pièce
       reprend son demi-mur de ce côté-là, et ses 20,00 m² au laser.
+
+      ET LE REFEND VU D'UN SEUL CÔTÉ (D7) : sa face vue est le trait, la
+      pièce de ce côté s'y compte ; celle d'en face se compte à l'autre
+      face, une épaisseur plus loin — comme le plan le dessine.
     */
-    const nu = contourAuNu(surface.pts, items, (mur) => (mur?.deuxFaces ? epaisseurDe(mur) / 2 : 0));
+    const pts = surface.pts;
+    const nu = contourAuNu(pts, items, (mur) => {
+      if (!mur) return 0;
+      if (mur.deuxFaces) return epaisseurDe(mur) / 2;
+      return mur.vu && estAUneFace(mur) && cote(mur, pts) === 'cache' ? epaisseurDe(mur) : 0;
+    });
     surface = { ...surface, nu, area: Math.max(loopAreaM2(nu), 0) };
   }
   const centroid = wallsCentroid(items);
@@ -6511,7 +6601,13 @@ export function pivoterNiveau<T extends WallSeg>(
   if (angle === 0) return walls;
   return walls.map((w) =>
     niveauDe(w) === niveau
-      ? { ...w, a: pivoterPoint(w.a, c, angle), b: pivoterPoint(w.b, c, angle) }
+      ? {
+          ...w,
+          a: pivoterPoint(w.a, c, angle),
+          b: pivoterPoint(w.b, c, angle),
+          // Le côté vu tourne avec le mur.
+          ...(w.vu ? { vu: pivoterPoint(w.vu, { x: 0, z: 0 }, angle) } : {}),
+        }
       : w,
   );
 }
