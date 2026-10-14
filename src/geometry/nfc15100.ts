@@ -37,7 +37,7 @@ import {
   facePoint,
   wallFace,
 } from './electrical';
-import { roomParts, wallQuadsOf, type Pt, type WallSeg } from './floorplan';
+import { roomOf, roomParts, solDesMurs, wallQuadsOf, type Pt, type WallSeg } from './floorplan';
 import {
   FIXTURES,
   postsOf,
@@ -292,6 +292,11 @@ export interface Worktop {
   to: number;
   /** Altitude du dessus, en mètres depuis le sol. */
   height: number;
+  /**
+   * Ce que porte ce dessus, quand ce n'est pas un plan libre : la plaque ou
+   * l'évier. La norme n'y veut aucun socle au-dessus.
+   */
+  nature?: 'cuisson' | 'evier';
 }
 
 /** Meubles qui portent un plan de travail (dessus entre 80 cm et 1 m). */
@@ -358,9 +363,55 @@ export function worktopsOnWall(
     const a = Math.max(0, x0);
     const b = Math.min(face.len, x1);
     if (b - a < 0.15) continue;
-    out.push({ from: a, to: b, height: haut });
+    const nature = /stove|cooktop/i.test(cat) ? 'cuisson' : /sink/i.test(cat) ? 'evier' : undefined;
+    out.push({ from: a, to: b, height: haut, ...(nature ? { nature } : {}) });
   }
   return out;
+}
+
+/**
+ * OÙ TOMBE UN SOCLE PAR RAPPORT AUX PLANS DE TRAVAIL DE SON MUR — revue
+ * « Nadia » : quatre prises à 1,10 m sur des murs nus passaient pour « au-
+ * dessus du plan de travail », et l'unifilaire les nommait ainsi. Seul un
+ * socle au droit d'un plan relevé, et plus haut que lui, y est vraiment ;
+ * au droit de la plaque ou de l'évier, il est à sa place interdite.
+ */
+export function socleFaceAuPlan(
+  x: number,
+  hauteur: number,
+  plans: Worktop[],
+): 'plan' | 'cuisson' | 'evier' | null {
+  const au = plans.filter((w) => x >= w.from - 0.02 && x <= w.to + 0.02 && hauteur >= w.height + 0.05);
+  const interdit = au.find((w) => w.nature);
+  if (interdit?.nature) return interdit.nature;
+  return au.length > 0 ? 'plan' : null;
+}
+
+/**
+ * LES PLANS DE TRAVAIL DE CHAQUE MUR, côté pièce — une seule recette pour
+ * l'écran, le contrôle et le nommage de l'export (qui disait « plan de
+ * travail » d'une prise à 1,10 m sur un mur nu).
+ */
+export function plansDeTravailParMur(
+  walls: WallSeg[],
+  rooms: { id: string; name?: string; kind?: RoomKind | null }[],
+  objects: Parameters<typeof worktopsOnWall>[1],
+): Map<string, { x: (f: { along: number }) => number; plans: Worktop[] }> {
+  const quads = wallQuadsOf(walls);
+  const sol = solDesMurs(walls);
+  const m = new Map<string, { x: (f: { along: number }) => number; plans: Worktop[] }>();
+  for (const w of walls) {
+    const piece = rooms.find((r) => r.id === roomOf(w));
+    const cuisine = estCuisine(piece?.name ?? '', piece?.kind);
+    for (const side of [1, -1] as const) {
+      const face = wallFace(w, quads.get(w.id), side);
+      const plans = worktopsOnWall(face, objects, cuisine, sol);
+      if (plans.length === 0) continue;
+      m.set(w.id, { x: (f) => faceX(face, f.along), plans });
+      break;
+    }
+  }
+  return m;
 }
 
 /** Un meuble vu DE FACE, projeté sur le mur. */
@@ -892,10 +943,34 @@ export function checkElectrical(
       });
     }
     if (req.surPlan > 0) {
-      const hauts = mine.reduce(
-        (somme, f) => somme + (f.height >= PLAN_TRAVAIL && !priseDAppareil(f) ? socketsOf(f.kind) : 0),
-        0,
-      );
+      /*
+        AU DROIT D'UN PLAN RELEVÉ, PAS À UNE HAUTEUR — revue « Nadia ». Dès
+        qu'un plan de travail de la pièce est connu, seul un socle qui le
+        surplombe compte ; sans plan relevé (cuisine vide), la hauteur d'axe
+        reste le seul indice, et on le dit.
+      */
+      const plansIci = worktops
+        ? [...worktops.entries()].filter(([w]) => roomOfWall.get(w)?.includes(room.id))
+        : [];
+      const planConnu = plansIci.length > 0;
+      let hauts = 0;
+      for (const f of mine) {
+        if (priseDAppareil(f) || socketsOf(f.kind) === 0) continue;
+        const surLeMur = planConnu ? worktops?.get(f.wallId) : undefined;
+        const ou = surLeMur ? socleFaceAuPlan(surLeMur.x(f), f.height, surLeMur.plans) : null;
+        if (ou === 'cuisson' || ou === 'evier') {
+          out.push({
+            code: 'surPlan',
+            roomId: room.id,
+            fixtureId: f.id,
+            severity: 'alerte',
+            message: `${label} : socle au-dessus ${ou === 'cuisson' ? 'de la plaque de cuisson' : 'de l’évier'}`,
+            regle: 'Aucun socle au-dessus des feux ni de la cuve de l’évier : déplacez-le le long du plan de travail.',
+          });
+          continue;
+        }
+        if (planConnu ? ou === 'plan' : f.height >= PLAN_TRAVAIL) hauts += socketsOf(f.kind);
+      }
       if (hauts < req.surPlan) {
         out.push({
           code: 'surPlan',
@@ -904,16 +979,30 @@ export function checkElectrical(
           message:
             `${label} : ${hauts} socle${hauts > 1 ? 's' : ''} au-dessus du ` +
             `plan de travail sur ${req.surPlan}`,
-          regle:
-            'Quatre des six socles de la cuisine se posent au-dessus du ' +
-            'plan de travail. L’app les reconnaît à leur hauteur d’axe, ' +
-            'à partir de 90 cm.',
+          regle: planConnu
+            ? 'Quatre des six socles de la cuisine se posent au-dessus du ' +
+              'plan de travail, au droit du plan relevé — jamais au-dessus ' +
+              'des feux ni de l’évier.'
+            : 'Quatre des six socles de la cuisine se posent au-dessus du ' +
+              'plan de travail. Aucun plan n’a été relevé : l’app les ' +
+              'reconnaît à leur hauteur d’axe, à partir de 90 cm.',
           fix: {
             type: 'poser',
             kind: 'prise',
             height: 1.1,
             label: 'Poser PC 110',
           },
+        });
+      } else if (!planConnu && worktops) {
+        out.push({
+          code: 'surPlan',
+          roomId: room.id,
+          severity: 'info',
+          message: `${label} : plan de travail non relevé`,
+          regle:
+            'Les socles hauts sont comptés au-dessus du plan de travail, ' +
+            'mais aucun plan n’a été relevé : vérifiez sur place qu’ils le ' +
+            'surplombent bien, hors feux et évier.',
         });
       }
     }

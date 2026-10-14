@@ -11,6 +11,7 @@ import { phraseEnergie } from '../ui/energie';
 import { bilanDuReleve } from '../geometry/bilan';
 import { useBilanStore } from '../store/bilanStore';
 import { sansCeQuOnAVuParLaPorte, type Ecartes } from '../geometry/traversee';
+import { garderLeReleveBrut } from '../ui/relevesBruts';
 
 /** Instructions RoomPlan (enum Swift) → libellés français. */
 const INSTRUCTIONS_FR: Record<string, string> = {
@@ -298,6 +299,9 @@ function resumerLeReleve() {
       try {
         // Le post-traitement RoomPlan prend quelques secondes.
         const brut = await RoomScan.stop();
+        // Le relevé tel que RoomPlan l'a rendu, pour pouvoir l'envoyer
+        // (profil › Diagnostic) avec les cotes prises au mètre.
+        if (brut) garderLeReleveBrut(brut, etage !== null ? 'etage' : complement ? 'complement' : 'scan');
         /*
           CE QU'ON A VU PAR LA PORTE N'EST PAS RELEVÉ : il faut traverser
           l'ouvrant (voir `geometry/traversee`). Écarté ici, une fois, avant

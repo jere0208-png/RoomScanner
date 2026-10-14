@@ -155,11 +155,9 @@ import { checkPlan } from '../geometry/diagnostics';
 import {
   checkElectrical,
   planCircuits,
-  estCuisine,
   priseDeCuisine,
   roomUse,
-  worktopsOnWall,
-  type Worktop,
+  plansDeTravailParMur,
   constatsDePose,
   fixturePlacement,
   materialList,
@@ -2340,22 +2338,7 @@ export function ResultScreen() {
    * Plans de travail par mur : la règle des 1,30 m dit « hors plan de
    * travail », encore faut-il savoir où il y en a un.
    */
-  const wallWorktops = useMemo(() => {
-    const quads = wallQuadsOf(walls);
-    const m = new Map<string, { x: (f: Fixture) => number; plans: Worktop[] }>();
-    for (const w of walls) {
-      const piece = rooms.find((r) => r.id === roomOf(w));
-      const cuisine = estCuisine(piece?.name ?? '', piece?.kind);
-      for (const side of [1, -1] as const) {
-        const face = wallFace(w, quads.get(w.id), side);
-        const plans = worktopsOnWall(face, objects, cuisine, solDesMurs(walls));
-        if (plans.length === 0) continue;
-        m.set(w.id, { x: (f: Fixture) => faceX(face, f.along), plans });
-        break;
-      }
-    }
-    return m;
-  }, [walls, rooms, objects]);
+  const wallWorktops = useMemo(() => plansDeTravailParMur(walls, rooms, objects), [walls, rooms, objects]);
 
   /**
    * Cheminement des gaines et métré : même source que l'export, pour que le

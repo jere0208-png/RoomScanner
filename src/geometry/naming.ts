@@ -12,7 +12,8 @@
  * boussole — scans anciens, appareil sans magnétomètre —, on ne nomme pas :
  * mieux vaut taire l'orientation qu'en inventer une.
  */
-import { FIXTURES, type Fixture } from './electrical';
+import { FIXTURES, USAGES, type Fixture } from './electrical';
+import { socleFaceAuPlan, type Worktop } from './nfc15100';
 import { perpOf, roomOf, segLength, type Pt, type WallSeg } from './floorplan';
 
 /** Les huit aires de vent, dans l'ordre des bearings croissants. */
@@ -133,13 +134,28 @@ const NOM_BASE: Partial<Record<Fixture['kind'], string>> = {
  * distinction que fait un électricien en parlant, et elle tient à la seule
  * hauteur de pose.
  */
-function qualite(f: Fixture): string {
+function qualite(f: Fixture, plans?: PlansParMur): string {
   const socle = f.kind === 'prise' || f.kind === 'prise2' || f.kind === 'prise3';
   if (!socle) return '';
+  // La prise d'un appareil se nomme par lui : « Prise réfrigérateur 1 ».
+  const usage = f.usage ? USAGES.find((u) => u.sigle === f.usage) : undefined;
+  if (usage) return ` ${usage.label.toLowerCase()}`;
   if (f.height <= 0.45) return ' plinthe';
-  if (f.height >= 0.85 && f.height <= 1.4) return ' plan de travail';
+  if (f.height >= 0.85 && f.height <= 1.4) {
+    /*
+      « PLAN DE TRAVAIL » SEULEMENT AU DROIT D'UN PLAN — revue « Nadia » :
+      quatre prises à 1,10 m sur des murs nus s'appelaient « Prise plan de
+      travail ». Quand on connaît les plans, une prise haute ailleurs se dit
+      « haute ».
+    */
+    if (!plans) return ' plan de travail';
+    const m = plans.get(f.wallId);
+    return m && socleFaceAuPlan(m.x(f), f.height, m.plans) === 'plan' ? ' plan de travail' : ' haute';
+  }
   return '';
 }
+
+type PlansParMur = Map<string, { x: (f: { along: number }) => number; plans: Worktop[] }>;
 
 export interface DeviceName {
   /** « Prise plinthe 2 » — le nom qu'on lit sur le schéma. */
@@ -164,6 +180,8 @@ export function deviceNames(
   roomNames: Record<string, string>,
   centers: Map<string, Pt>,
   north: number | null,
+  /** Les plans de travail par mur (`plansDeTravailParMur`), quand on les a. */
+  plans?: PlansParMur,
 ): Map<string, DeviceName> {
   const murs = new Map(walls.map((w) => [w.id, w]));
   const compte = new Map<string, number>();
@@ -178,7 +196,7 @@ export function deviceNames(
   });
   for (const f of ordre) {
     const roomId = placement.get(f.id) ?? '';
-    const base = `${NOM_BASE[f.kind] ?? FIXTURES[f.kind].label}${qualite(f)}`;
+    const base = `${NOM_BASE[f.kind] ?? FIXTURES[f.kind].label}${qualite(f, plans)}`;
     const cle = `${roomId}|${base}`;
     const n = (compte.get(cle) ?? 0) + 1;
     compte.set(cle, n);

@@ -1,0 +1,36 @@
+# L'export : la feuille des formats, puis l'écran du dossier PDF.
+appId: ${APP_ID}
+name: Export
+---
+- launchApp
+- runFlow: commun/ouvrir-exemple.yaml
+- tapOn: "Exporter"
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ${THEME}-20-export-formats
+- tapOn:
+    text: "Autres formats"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ${THEME}-21-export-autres-formats
+- scrollUntilVisible:
+    element: "Plan PDF"
+    direction: UP
+    timeout: 5000
+    optional: true
+- tapOn: "Plan PDF"
+- extendedWaitUntil:
+    visible: "Page de garde"
+    timeout: 20000
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: ${THEME}-22-export-pdf
+- scroll
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ${THEME}-23-export-pdf-suite
+- scroll
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ${THEME}-24-export-pdf-fin

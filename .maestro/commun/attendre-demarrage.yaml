@@ -1,0 +1,9 @@
+# Attend que l'app ait fini de lire son stockage : l'écran de chargement
+# (les deux logos) laisse place à la connexion, au film ou à l'accueil.
+# Le motif est une expression régulière : l'un OU l'autre suffit.
+appId: ${APP_ID}
+---
+- extendedWaitUntil:
+    visible: "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple"
+    timeout: 60000
+- runFlow: fenetres-systeme.yaml

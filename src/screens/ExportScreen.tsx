@@ -39,6 +39,7 @@ import {
 import {
   fixturePlacement,
   materialList,
+  plansDeTravailParMur,
   roomInputsOf,
   wallToRooms,
 } from '../geometry/nfc15100';
@@ -510,8 +511,9 @@ const styles = getStyles(c);
         Object.fromEntries(rooms.map((r) => [r.id, r.name])),
         new Map(parts.map((p) => [p.roomId, p.labelAt])),
         north,
+        plansDeTravailParMur(walls, rooms, objects),
       ),
-    [fixtures, walls, placement, rooms, parts, north],
+    [fixtures, walls, placement, rooms, parts, north, objects],
   );
   /**
    * CE QUI EST COCHÉ QUAND ON ARRIVE — relevé du patron : « dans l'export

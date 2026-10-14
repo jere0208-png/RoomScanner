@@ -25,6 +25,12 @@ import { datePanne, usePannes } from '../ui/journalPannes';
 import { phraseEnergie } from '../ui/energie';
 import { phraseMaillage } from '../geometry/maillage';
 import { RoomScan } from 'react-native-room-scan';
+import {
+  fichierDuReleveBrut,
+  lesRelevesBruts,
+  phraseDuReleveBrut,
+  type ReleveBrutResume,
+} from '../ui/relevesBruts';
 
 export function JournalSheet({
   visible,
@@ -38,6 +44,15 @@ export function JournalSheet({
   const incidents = usePannes((x) => x.incidents);
   const dernierScan = usePannes((x) => x.dernierScan);
   const vider = usePannes((x) => x.vider);
+  const [releves, setReleves] = React.useState<ReleveBrutResume[]>([]);
+  React.useEffect(() => {
+    if (!visible) return;
+    let vivant = true;
+    lesRelevesBruts().then((l) => vivant && setReleves(l));
+    return () => {
+      vivant = false;
+    };
+  }, [visible]);
 
   return (
     <SheetShell defile={false} visible={visible} onClose={fermer}>
@@ -76,6 +91,33 @@ export function JournalSheet({
               <Text style={s.partagerMot}>Partager le maillage</Text>
             </Pressable>
           )}
+        </View>
+      )}
+      {/*
+        LES RELEVÉS BRUTS — ce que RoomPlan a rendu, avant toute correction.
+        Envoyés avec les cotes prises au mètre, ils servent à régler le
+        calcul des plans sur de vraies pièces (voir `ui/relevesBruts`).
+      */}
+      {releves.length > 0 && (
+        <View style={s.bloc}>
+          <Text style={s.entete}>RELEVÉS BRUTS</Text>
+          <Text style={s.message}>
+            Le scan tel que l’iPhone l’a vu. Envoyez-le avec vos cotes prises au mètre pour améliorer la précision des plans.
+          </Text>
+          {releves.slice(0, 5).map((r) => (
+            <Pressable
+              key={r.cle}
+              accessibilityRole="button"
+              accessibilityLabel={`Envoyer le relevé brut du ${phraseDuReleveBrut(r)}`}
+              style={s.partager}
+              onPress={async () => {
+                const f = await fichierDuReleveBrut(r);
+                if (f) RoomScan.shareText(f.contenu, f.nom).catch(() => {});
+              }}>
+              <Text style={s.partagerMot}>Envoyer le relevé brut</Text>
+              <Text style={s.releve}>{phraseDuReleveBrut(r)}</Text>
+            </Pressable>
+          ))}
         </View>
       )}
       {incidents.length > 0 && (
@@ -141,6 +183,7 @@ const getStyles = themedStyles((c: Palette) =>
     pile: { color: c.inkFaint, fontSize: 10.5, lineHeight: 14, marginTop: 6 },
     partager: { alignSelf: 'flex-start', paddingVertical: 8, marginTop: 6 },
     partagerMot: { color: c.blue, fontSize: 14.5, fontWeight: '700' },
+    releve: { color: c.inkSoft, fontSize: 12, marginTop: 2 },
     vider: { alignSelf: 'center', paddingVertical: 12, marginTop: 4 },
     viderMot: { color: c.danger, fontSize: 14.5, fontWeight: '700' },
   }),

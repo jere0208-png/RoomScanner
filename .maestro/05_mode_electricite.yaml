@@ -1,0 +1,60 @@
+# Le mode Électricité : allumé depuis le compte, l'exemple montre son
+# installation (prises, éclairage, tableau). Le mode est éteint à la fin
+# pour que le passage suivant (thème sombre) reparte du grand public.
+appId: ${APP_ID}
+name: Mode Électricité
+---
+- launchApp
+- runFlow: commun/vers-accueil.yaml
+- tapOn: "Mon compte"
+- waitForAnimationToEnd:
+    timeout: 5000
+- scrollUntilVisible:
+    element: "Mode Électricité"
+    direction: DOWN
+    timeout: 10000
+- tapOn: "Mode Électricité"
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${THEME}-40-profil-mode-electricite
+
+- runFlow: commun/ouvrir-exemple.yaml
+- takeScreenshot: ${THEME}-41-plan-2d-electricite
+- tapOn:
+    text: "Édition"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ${THEME}-42-edition-electricite
+- tapOn:
+    text: "Édition"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: "Passer en 3D"
+- waitForAnimationToEnd:
+    timeout: 10000
+- takeScreenshot: ${THEME}-43-vue-3d-electricite
+- tapOn:
+    text: "Passer en 2D"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: "Exporter"
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ${THEME}-44-export-formats-electricite
+
+# Retour au grand public.
+- launchApp
+- runFlow: commun/vers-accueil.yaml
+- tapOn: "Mon compte"
+- waitForAnimationToEnd:
+    timeout: 5000
+- scrollUntilVisible:
+    element: "Mode Électricité"
+    direction: DOWN
+    timeout: 10000
+- tapOn: "Mode Électricité"
+- waitForAnimationToEnd:
+    timeout: 3000

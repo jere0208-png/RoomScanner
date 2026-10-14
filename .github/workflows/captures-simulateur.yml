@@ -1,0 +1,232 @@
+# CAPTURES DU SIMULATEUR — le rendu réel de l'app, écran par écran.
+#
+# Compile l'app pour le simulateur iOS (Release : le code JS est embarqué,
+# pas besoin de Metro), la lance, et la parcourt avec Maestro (mobile.dev,
+# libre) en prenant une capture PNG à chaque écran : premier lancement,
+# accueil, plan d'exemple en 2D et en 3D, export, compte, offre Pro,
+# bibliothèque, mode Électricité — en thème clair puis en thème sombre.
+# Les captures sont publiées dans l'artefact « captures-simulateur ».
+#
+# Le scan RoomPlan ne peut pas tourner sur le simulateur (pas de LiDAR) :
+# le parcours passe par l'appartement d'exemple. Les parcours sont dans
+# `.maestro/` à la racine.
+#
+# WORKFLOW À PART, exprès : il ne touche pas à la compilation de l'IPA
+# (build-ios-unsigned.yml) et ne peut pas la bloquer. Il tourne aussi sur
+# les pull requests, pour que la revue voie les écrans.
+name: Captures simulateur
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: captures-simulateur-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Version de Maestro épinglée (le script d'installation officiel lit
+  # MAESTRO_VERSION). À monter à la main.
+  MAESTRO_VERSION: 2.10.0
+  MAESTRO_CLI_NO_ANALYTICS: 1
+  MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: true
+
+jobs:
+  captures:
+    runs-on: macos-15
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      # Même Xcode que la compilation de l'IPA (SDK d'iOS 26, Liquid Glass).
+      - name: Choisir Xcode 26
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.3.app
+          xcodebuild -version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # Maestro tourne sur la JVM.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Installer les dépendances JS
+        run: npm ci
+
+      - name: Installer CocoaPods et les pods
+        run: |
+          bundle install
+          cd ios && bundle exec pod install
+
+      - name: Compiler pour le simulateur (Release, sans signature)
+        working-directory: ios
+        run: |
+          xcodebuild \
+            -workspace RoomScanner.xcworkspace \
+            -scheme RoomScanner \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build \
+            ARCHS=arm64 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+          APP="$PWD/build/Build/Products/Release-iphonesimulator/RoomScanner.app"
+          test -d "$APP"
+          echo "APP_PATH=$APP" >> "$GITHUB_ENV"
+          echo "APP_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")" >> "$GITHUB_ENV"
+
+      # Un iPhone de la version d'iOS la plus récente installée : de
+      # préférence l'iPhone 17, puis le 16, puis un Pro, puis n'importe lequel.
+      - name: Démarrer un simulateur
+        run: |
+          xcrun simctl list devices available -j > appareils.json
+          CHOIX=$(jq -r '
+            [ .devices | to_entries[]
+              | select(.key | test("SimRuntime\\.iOS-"))
+              | (.key | capture("iOS-(?<maj>[0-9]+)-(?<min>[0-9]+)")) as $v
+              | .value[]
+              | select(.name | startswith("iPhone"))
+              | . + { maj: ($v.maj | tonumber), min: ($v.min | tonumber),
+                      rang: (if .name == "iPhone 17" then 0
+                             elif .name == "iPhone 16" then 1
+                             elif (.name | test(" Pro$")) then 2
+                             else 3 end) } ]
+            | sort_by(-.maj, -.min, .rang) | first
+            | if . == null then "" else "\(.udid)|\(.name) (iOS \(.maj).\(.min))" end
+          ' appareils.json)
+          if [ -z "$CHOIX" ]; then
+            echo "Aucun iPhone disponible :"; xcrun simctl list devices available; exit 1
+          fi
+          UDID="${CHOIX%%|*}"
+          echo "Simulateur choisi : ${CHOIX#*|} — $UDID"
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+          echo "SIM_NOM=${CHOIX#*|}" >> "$GITHUB_ENV"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+          # Une barre d'état propre pour des captures comparables.
+          xcrun simctl status_bar "$UDID" override \
+            --time 9:41 --batteryState charged --batteryLevel 100 \
+            --cellularBars 4 --wifiBars 3 || true
+          xcrun simctl ui "$UDID" appearance light || true
+
+      - name: Installer l'app sur le simulateur
+        run: |
+          xcrun simctl install "$SIM_UDID" "$APP_PATH"
+          # Les autorisations d'avance : aucune fenêtre d'iOS sur le parcours.
+          xcrun simctl privacy "$SIM_UDID" grant all "$APP_ID" || true
+          echo "App installée : $APP_ID"
+
+      - name: Installer Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version
+
+      # Chaque parcours tourne seul : un écran qui manque ne coupe pas les
+      # suivants. Le premier efface les données (premier lancement) ; les
+      # autres repartent de l'accueil. Puis le thème sombre, sans le premier.
+      - name: Parcourir l'app avec Maestro
+        id: maestro
+        continue-on-error: true
+        run: |
+          mkdir -p captures/brut captures/debug
+          echo "| Thème | Parcours | Résultat |" > captures/bilan.md
+          echo "|---|---|---|" >> captures/bilan.md
+          ECHECS=0
+          parcourir() {
+            local theme="$1"; shift
+            for flow in "$@"; do
+              local nom; nom="$(basename "$flow" .yaml)"
+              echo "::group::$theme — $nom"
+              if maestro --device "$SIM_UDID" test "$flow" \
+                  -e APP_ID="$APP_ID" -e THEME="$theme" \
+                  --test-output-dir "captures/brut/$theme-$nom" \
+                  --debug-output "captures/debug/$theme-$nom" \
+                  --format junit --output "captures/brut/$theme-$nom.xml"; then
+                echo "| $theme | $nom | ok |" >> captures/bilan.md
+              else
+                echo "| $theme | $nom | **échec** |" >> captures/bilan.md
+                ECHECS=$((ECHECS + 1))
+              fi
+              echo "::endgroup::"
+            done
+          }
+          parcourir clair .maestro/0*.yaml
+          xcrun simctl ui "$SIM_UDID" appearance dark
+          parcourir sombre $(ls .maestro/0*.yaml | grep -v 01_premier_lancement)
+          xcrun simctl ui "$SIM_UDID" appearance light || true
+          echo "Parcours en échec : $ECHECS"
+          test "$ECHECS" -eq 0
+
+      # Les captures nommées par `takeScreenshot` sont rangées à plat dans
+      # captures/ecrans/ (les noms commencent par le thème puis un numéro
+      # d'ordre). Selon la version, Maestro les écrit dans --test-output-dir,
+      # dans le dossier courant ou sous ~/.maestro/tests : on ramasse tout.
+      - name: Rassembler les captures
+        if: always()
+        run: |
+          mkdir -p captures/ecrans captures/maestro-tests
+          find captures/brut -name '*.png' -type f -print0 2>/dev/null \
+            | xargs -0 -I{} cp -n {} captures/ecrans/ 2>/dev/null || true
+          find . -maxdepth 1 -name '*.png' -type f -exec mv -n {} captures/ecrans/ \; 2>/dev/null || true
+          if [ -d "$HOME/.maestro/tests" ]; then
+            cp -R "$HOME/.maestro/tests/." captures/maestro-tests/ || true
+          fi
+          {
+            echo "## Captures du simulateur"
+            echo
+            echo "Simulateur : ${SIM_NOM:-?} — app \`${APP_ID:-?}\`"
+            echo
+            cat captures/bilan.md 2>/dev/null || echo "_Aucun parcours lancé._"
+            echo
+            echo "Captures : $(ls captures/ecrans | wc -l | tr -d ' ') fichiers PNG dans l'artefact **captures-simulateur** (dossier \`ecrans/\`)."
+            echo
+            ls captures/ecrans | sed 's/^/- /'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Journal du simulateur si un parcours a échoué
+        if: steps.maestro.outcome == 'failure'
+        run: |
+          xcrun simctl spawn "$SIM_UDID" log show --last 20m --style compact \
+            --predicate 'process == "RoomScanner"' > captures/debug/simulateur.log 2>&1 || true
+          cp -R "$HOME/Library/Logs/DiagnosticReports" captures/debug/ 2>/dev/null || true
+
+      - name: Publier les captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: captures-simulateur
+          path: |
+            captures/ecrans/
+            captures/bilan.md
+            captures/brut/
+            captures/maestro-tests/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Publier le débogage Maestro
+        if: steps.maestro.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-debug
+          path: captures/debug/
+          if-no-files-found: warn
+          retention-days: 14
+
+      # Les captures sont publiées même quand un parcours échoue ; le job,
+      # lui, le dit en rouge.
+      - name: Verdict
+        if: steps.maestro.outcome == 'failure'
+        run: |
+          echo "Au moins un parcours Maestro a échoué : voir le résumé et l'artefact maestro-debug."
+          exit 1

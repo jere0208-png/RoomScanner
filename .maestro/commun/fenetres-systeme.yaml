@@ -1,0 +1,25 @@
+# Les fenêtres d'iOS (autorisations) et les alertes de l'app qui ne doivent
+# pas bloquer le parcours. Chaque bloc ne joue que si la fenêtre est là.
+appId: ${APP_ID}
+---
+- runFlow:
+    when:
+      visible: "Allow While Using App"
+    commands:
+      - tapOn:
+          text: "Allow While Using App"
+          optional: true
+- runFlow:
+    when:
+      visible: "Allow"
+    commands:
+      - tapOn:
+          text: "Allow"
+          optional: true
+- runFlow:
+    when:
+      visible: "Compris"
+    commands:
+      - tapOn:
+          text: "Compris"
+          optional: true

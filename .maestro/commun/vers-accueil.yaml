@@ -1,0 +1,32 @@
+# Ramène à l'accueil après un lancement, quel que soit l'état : connexion
+# (on entre en invité), film du premier lancement, question de l'usage.
+appId: ${APP_ID}
+---
+- runFlow: attendre-demarrage.yaml
+- runFlow:
+    when:
+      visible: "Découvrir sans compte"
+    commands:
+      - tapOn: "Découvrir sans compte"
+      - waitForAnimationToEnd:
+          timeout: 5000
+- runFlow:
+    when:
+      visible: "Passer le film"
+    commands:
+      - tapOn: "Passer le film"
+      - waitForAnimationToEnd:
+          timeout: 5000
+- runFlow:
+    when:
+      visible: "Passer la question"
+    commands:
+      - tapOn: "Mesurer et aménager"
+      - waitForAnimationToEnd:
+          timeout: 5000
+- runFlow: fenetres-systeme.yaml
+- extendedWaitUntil:
+    visible: "Voir un exemple"
+    timeout: 30000
+- waitForAnimationToEnd:
+    timeout: 5000

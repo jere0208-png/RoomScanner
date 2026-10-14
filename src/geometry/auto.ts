@@ -29,11 +29,15 @@ import type { Pt, WallSeg } from './floorplan';
 import { pointOnSeg, segLength, perpOf, solDesMurs } from './floorplan';
 import { volumeAt, volumeVerdict, wetZones } from './volumes';
 import {
+  estCuisine,
   requirementFor,
   roomUse,
+  socleFaceAuPlan,
   USE_LABEL,
+  worktopsOnWall,
   type ElecFix,
   type RoomInput,
+  type Worktop,
 } from './nfc15100';
 import type { RoomKind } from './furniture';
 
@@ -184,6 +188,69 @@ function prendre(places: MurLibre[]): { wall: WallSeg; along: number; side: 1 | 
   return null;
 }
 
+/** Les plans de travail que longe ce mur, côté pièce, en abscisse depuis `a`. */
+function plansDuMur(
+  wall: WallSeg,
+  interieur: Pt,
+  objets: Parameters<typeof worktopsOnWall>[1],
+  cuisine: boolean,
+  sol: number,
+): Worktop[] {
+  const len = segLength(wall);
+  if (len < 0.3) return [];
+  const u = { x: (wall.b.x - wall.a.x) / len, z: (wall.b.z - wall.a.z) / len };
+  const n = perpOf(u);
+  const mid = { x: (wall.a.x + wall.b.x) / 2, z: (wall.a.z + wall.b.z) / 2 };
+  const side = (interieur.x - mid.x) * n.x + (interieur.z - mid.z) * n.z >= 0 ? 1 : -1;
+  return worktopsOnWall(
+    { A: wall.a, ux: u.x, uz: u.z, nx: n.x * side, nz: n.z * side, len },
+    objets,
+    cuisine,
+    sol,
+  );
+}
+
+/** Ne garde, des places libres, que celles au droit d'un plan libre (ni feux, ni évier). */
+function auDroitDesPlans(places: MurLibre[], plans: Map<string, Worktop[]>): MurLibre[] {
+  const out: MurLibre[] = [];
+  for (const m of places) {
+    const p = plans.get(m.wall.id) ?? [];
+    let dessus: [number, number][] = [];
+    for (const w of p) if (!w.nature) dessus.push([w.from + 0.1, w.to - 0.1]);
+    for (const w of p) if (w.nature) dessus = retirer(dessus, w.from - 0.05, w.to + 0.05);
+    const libres: [number, number][] = [];
+    for (const [a, b] of m.libres) {
+      for (const [c, d] of dessus) {
+        const x0 = Math.max(a, c);
+        const x1 = Math.min(b, d);
+        if (x1 - x0 > 0.12) libres.push([x0, x1]);
+      }
+    }
+    if (libres.length > 0) out.push({ ...m, libres });
+  }
+  return out;
+}
+
+/** L'emprise d'un meuble le long d'un mur : abscisses depuis `a`, et sa distance. */
+function emprise(
+  o: { width: number; depth: number; transform: number[] },
+  wall: WallSeg,
+): { t0: number; t1: number; ecart: number } {
+  const len = segLength(wall) || 1;
+  const u = { x: (wall.b.x - wall.a.x) / len, z: (wall.b.z - wall.a.z) / len };
+  const n = perpOf(u);
+  const yaw = Math.atan2(o.transform[2], o.transform[0]);
+  const cos = Math.cos(yaw);
+  const sin = Math.sin(yaw);
+  const demiU = Math.abs(cos * u.x + sin * u.z) * (o.width / 2) + Math.abs(-sin * u.x + cos * u.z) * (o.depth / 2);
+  const demiN = Math.abs(cos * n.x + sin * n.z) * (o.width / 2) + Math.abs(-sin * n.x + cos * n.z) * (o.depth / 2);
+  const cx = o.transform[12];
+  const cz = o.transform[14];
+  const t = (cx - wall.a.x) * u.x + (cz - wall.a.z) * u.z;
+  const d = Math.abs((cx - wall.a.x) * n.x + (cz - wall.a.z) * n.z);
+  return { t0: t - demiU, t1: t + demiU, ecart: d - demiN };
+}
+
 /**
  * POSE TOUT CE QUI MANQUE, PIÈCE PAR PIÈCE.
  *
@@ -265,9 +332,8 @@ export function poserAuxNormes(input: {
     const pose: string[] = [];
 
     /** Pose `n` appareils d'une nature, et dit combien ont trouvé leur place. */
-    const poser = (kind: FixtureKind, n: number, height: number) => {
+    const poser = (kind: FixtureKind, n: number, height: number, places = placesPour(height)) => {
       let fait = 0;
-      const places = placesPour(height);
       for (let i = 0, essais = 0; i < n && essais < n * 8; essais++) {
         const place = prendre(places);
         if (!place) break;
@@ -288,6 +354,16 @@ export function poserAuxNormes(input: {
       return fait;
     };
 
+    const cuisine = estCuisine(room.name, room.kind);
+    const plans = new Map<string, Worktop[]>();
+    if (cuisine) {
+      for (const w of murs) {
+        const p = plansDuMur(w, room.interieur, objets, true, sol);
+        if (p.length > 0) plans.set(w.id, p);
+      }
+    }
+    const planConnu = [...plans.values()].some((p) => p.some((w) => !w.nature));
+
     const manqueSocles = Math.max(0, besoin.socles - socles);
     if (manqueSocles > 0) {
       /*
@@ -297,9 +373,25 @@ export function poserAuxNormes(input: {
         de plus — dix au lieu de six. Les quatre du plan se posent à 1,10 m,
         les autres en bas.
       */
-      const hauts = dedans.reduce((t, f) => t + (f.height >= 0.9 && !f.usage ? socketsOf(f.kind) : 0), 0);
+      /*
+        AU DROIT DU PLAN RELEVÉ — revue « Nadia » : les quatre « prises plan
+        de travail » tombaient sur les murs nus, aucune sur le mur de l'évier.
+        Quand la pièce a des plans relevés, elles se posent au-dessus d'eux
+        (20 cm plus haut que le dessus), jamais au droit des feux ni de
+        l'évier ; sans plan relevé, à 1,10 m comme avant.
+      */
+      const hauts = dedans.reduce((t, f) => {
+        if (f.usage || socketsOf(f.kind) === 0) return t;
+        const p = plans.get(f.wallId);
+        const ok = planConnu ? !!p && socleFaceAuPlan(f.along, f.height, p) === 'plan' : f.height >= 0.9;
+        return t + (ok ? socketsOf(f.kind) : 0);
+      }, 0);
       const surPlan = Math.min(manqueSocles, Math.max(0, besoin.surPlan - hauts));
-      const faitHaut = surPlan > 0 ? poser('prise', surPlan, 1.1) : 0;
+      const hPlan = planConnu
+        ? Math.round((Math.max(...[...plans.values()].flat().filter((w) => !w.nature).map((w) => w.height), 0.9) + 0.2) * 100) / 100
+        : 1.1;
+      const faitHaut =
+        surPlan > 0 ? poser('prise', surPlan, hPlan, planConnu ? auDroitDesPlans(placesPour(hPlan), plans) : placesPour(hPlan)) : 0;
       const fait = faitHaut + poser('prise', manqueSocles - faitHaut, H_PRISE);
       if (fait > 0) {
         pose.push(
@@ -311,6 +403,54 @@ export function poserAuxNormes(input: {
         pose.push(`${rate} socle${rate > 1 ? 's' : ''} sans place libre`);
       }
     }
+    /*
+      LE RÉFRIGÉRATEUR A SA PRISE — revue « Nadia ». Une prise dédiée (FRI),
+      À CÔTÉ de lui et pas derrière une colonne de 1,80 m : on doit pouvoir
+      le débrancher. Elle ne compte pas parmi les socles de la pièce.
+    */
+    if (cuisine) {
+      for (const frigo of objets.filter((o) => /refrigerator/i.test(o.category ?? ''))) {
+        const c = { x: frigo.transform[12], z: frigo.transform[14] };
+        const dejaServi = [...dedans, ...fixtures].some((f) => {
+          if (f.usage !== 'FRI') return false;
+          const w = murs.find((m) => m.id === f.wallId);
+          if (!w) return false;
+          const L = segLength(w) || 1;
+          const p = { x: w.a.x + ((w.b.x - w.a.x) * f.along) / L, z: w.a.z + ((w.b.z - w.a.z) * f.along) / L };
+          return Math.hypot(p.x - c.x, p.z - c.z) < Math.max(frigo.width, frigo.depth) + 0.6;
+        });
+        if (dejaServi) continue;
+        const places = placesPour(1.1);
+        let pose1: { m: MurLibre; along: number } | null = null;
+        for (const m of [...places].sort((a, b) => pointOnSeg(c, a.wall.a, a.wall.b).dist - pointOnSeg(c, b.wall.a, b.wall.b).dist)) {
+          const e = emprise(frigo, m.wall);
+          if (e.ecart > 0.4) continue;
+          for (const along of [e.t1 + 0.15, e.t0 - 0.15]) {
+            if (m.libres.some(([x0, x1]) => along >= x0 && along <= x1) && permis('prise', m.wall, along, m.side, 1.1)) {
+              pose1 = { m, along };
+              break;
+            }
+          }
+          if (pose1) break;
+        }
+        if (!pose1) {
+          pose.push('réfrigérateur : prise à placer sur place');
+          continue;
+        }
+        pose1.m.libres = retirer(pose1.m.libres, pose1.along - ECART, pose1.along + ECART);
+        fixtures.push({
+          id: input.id('prise'),
+          kind: 'prise',
+          wallId: pose1.m.wall.id,
+          along: pose1.along,
+          height: 1.1,
+          side: pose1.m.side,
+          usage: 'FRI',
+        });
+        pose.push('1 prise réfrigérateur (circuit ou différentiel à part conseillé)');
+      }
+    }
+
     const manqueRj = Math.max(0, besoin.rj45 - compte('rj45'));
     if (manqueRj > 0) {
       // Le rapport annonce ce qui a ÉTÉ posé, pas ce qui manquait : une
@@ -464,11 +604,15 @@ export function corrigerConstat(
   for (const room of candidates) {
     const murs = ctx.walls.filter((w) => room.wallIds.includes(w.id));
     if (murs.length === 0) continue;
-    // Une prise d'appareil sans appareil relevé va derrière le meuble bas :
-    // c'est là qu'on la pose, dans une cuisine équipée.
-    const objets = appareil ? [] : ctx.objects.filter((o) => !o.roomId || o.roomId === room.id);
-    const hauteur = fix.height ?? FIXTURES[fix.kind].std;
-    const places = placesLibres(
+    /*
+      Une prise d'appareil sans appareil relevé va au-dessus du meuble bas —
+      mais jamais derrière un meuble haut (revue « Nadia » : une 20 A
+      derrière le réfrigérateur de 1,80 m, inaccessible). À 1,10 m, seul ce
+      qui monte plus haut cache la place : `placesLibres` le sait.
+    */
+    const objets = ctx.objects.filter((o) => !o.roomId || o.roomId === room.id);
+    let hauteur = fix.height ?? FIXTURES[fix.kind].std;
+    let places = placesLibres(
       murs,
       ctx.openings,
       objets,
@@ -477,6 +621,19 @@ export function corrigerConstat(
       hauteur,
       solDesMurs(ctx.walls),
     );
+    // « Poser PC 110 » en cuisine : au-dessus du plan relevé, s'il y en a un.
+    if (fix.kind === 'prise' && hauteur >= 0.9 && estCuisine(room.name, room.kind)) {
+      const plans = new Map<string, Worktop[]>();
+      for (const w of murs) {
+        const p = plansDuMur(w, room.interieur, objets, true, solDesMurs(ctx.walls));
+        if (p.length > 0) plans.set(w.id, p);
+      }
+      const libres = [...plans.values()].flat().filter((w) => !w.nature);
+      if (libres.length > 0) {
+        hauteur = Math.round((Math.max(...libres.map((w) => w.height)) + 0.2) * 100) / 100;
+        places = auDroitDesPlans(places, plans);
+      }
+    }
     /*
       LA PLACE DOIT ÊTRE PERMISE — revue « Nadia », électricienne : la passe
       qui complète posait une prise en volume 2 de la salle de bains, que le
@@ -512,7 +669,7 @@ export function corrigerConstat(
           kind: fix.kind,
           wallId: place.wall.id,
           along: place.along,
-          height: fix.height ?? FIXTURES[fix.kind].std,
+          height: hauteur,
           side: place.side,
         },
       ],
@@ -520,6 +677,16 @@ export function corrigerConstat(
     };
   }
   return null;
+}
+
+/** Le sigle de l'appareil relevé, écrit dans le rond du symbole. */
+function sigleDe(categorie: string): string | undefined {
+  if (/dishwasher/i.test(categorie)) return 'LV';
+  if (/dryer/i.test(categorie)) return 'SL';
+  if (/washer/i.test(categorie)) return 'LL';
+  if (/oven/i.test(categorie)) return 'FO';
+  if (/stove|cooktop/i.test(categorie)) return 'PL';
+  return undefined;
 }
 
 /** Ce que chaque prise d'appareil dessert. */
@@ -561,7 +728,8 @@ function derriereUnAppareil(
       const nrm = perpOf(u);
       const mil = { x: (mieux.wall.a.x + mieux.wall.b.x) / 2, z: (mieux.wall.a.z + mieux.wall.b.z) / 2 };
       const side: 1 | -1 = (room.interieur.x - mil.x) * nrm.x + (room.interieur.z - mil.z) * nrm.z >= 0 ? 1 : -1;
-      return { id: ctx.id(kind), kind, wallId: mieux.wall.id, along, height: hauteur, side };
+      const usage = sigleDe(o.category ?? '');
+      return { id: ctx.id(kind), kind, wallId: mieux.wall.id, along, height: hauteur, side, ...(usage ? { usage } : {}) };
     }
   }
   return null;

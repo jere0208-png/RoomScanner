@@ -14285,6 +14285,30 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## La cuisine aux normes, les relevés bruts, les captures du simulateur
+
+- **Les prises « plan de travail » sont au-dessus du plan** (Nadia) : dès
+  qu'un plan de travail est relevé, seul un socle à son droit compte parmi
+  les quatre exigés, et « Normes auto » les y pose, 20 cm au-dessus du
+  dessus. Un socle au droit de la plaque ou de l'évier est signalé. Sans
+  plan relevé, la hauteur reste l'indice, et l'app le dit (« plan de
+  travail non relevé »). L'unifilaire ne nomme plus « Prise plan de
+  travail » une prise haute sur un mur nu (« Prise haute »).
+- **Le réfrigérateur a sa prise** : posée à côté de lui, pas derrière une
+  colonne de 1,80 m, hors du compte des socles, nommée « Prise
+  réfrigérateur » ; circuit ou différentiel à part conseillé.
+- **La 20 A sans appareil relevé ne part plus derrière le frigo** ; derrière
+  un lave-vaisselle, un four, un lave-linge relevés, elle porte son sigle
+  (LV, FO, LL…).
+- **Les relevés bruts** : chaque fin de scan garde ce que RoomPlan a rendu,
+  avant toute correction (dix au plus). Profil › Diagnostic › « Envoyer le
+  relevé brut » le partage en fichier, à joindre aux cotes prises au mètre.
+- **Captures du simulateur** (`.github/workflows/captures-simulateur.yml`,
+  parcours Maestro dans `.maestro/`) : l'app compilée pour le simulateur
+  iOS, parcourue écran par écran sur le plan d'exemple, en clair et en
+  sombre ; les PNG sortent dans l'artefact « captures-simulateur ». Le scan
+  lui-même ne tourne pas sur simulateur (pas de LiDAR).
+
 ## Six personnes découvrent l'app — troisième lot
 
 - Les dégagements autour d'un meuble disent leur unité (« 58 cm »,

@@ -1,0 +1,17 @@
+# Depuis un lancement : ouvre l'appartement d'exemple. Le scan RoomPlan est
+# impossible sur le simulateur (pas de LiDAR) : l'exemple tient lieu de relevé.
+appId: ${APP_ID}
+---
+- runFlow: vers-accueil.yaml
+- scrollUntilVisible:
+    element: "Voir un exemple"
+    direction: DOWN
+    timeout: 10000
+    optional: true
+- tapOn: "Voir un exemple"
+- extendedWaitUntil:
+    visible: "Options du plan"
+    timeout: 20000
+- runFlow: fenetres-systeme.yaml
+- waitForAnimationToEnd:
+    timeout: 8000

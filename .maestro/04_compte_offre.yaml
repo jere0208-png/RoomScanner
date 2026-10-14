@@ -1,0 +1,63 @@
+# Le compte, l'offre Pro (paywall), la bibliothèque et les notifications.
+appId: ${APP_ID}
+name: Compte et offre
+---
+- launchApp
+- runFlow: commun/vers-accueil.yaml
+
+# Les notifications (la cloche porte le nombre de non lues dans son libellé).
+- tapOn:
+    text: "Notifications.*"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ${THEME}-30-notifications
+- tapOn:
+    text: "Retour"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# La page du compte.
+- runFlow: commun/vers-accueil.yaml
+- tapOn: "Mon compte"
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ${THEME}-31-profil
+- scroll
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${THEME}-32-profil-suite
+
+# L'offre Pro.
+- scrollUntilVisible:
+    element: "Voir l’offre Pro"
+    direction: UP
+    timeout: 10000
+    optional: true
+- tapOn: "Voir l’offre Pro"
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: ${THEME}-33-offre-pro
+- scroll
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${THEME}-34-offre-pro-suite
+- tapOn:
+    text: "Retour"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# La bibliothèque (vide sur un simulateur neuf : c'est aussi un écran).
+- scrollUntilVisible:
+    element: "Mes scans"
+    direction: DOWN
+    timeout: 10000
+    optional: true
+- tapOn:
+    text: "Mes scans"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ${THEME}-35-bibliotheque

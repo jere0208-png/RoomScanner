@@ -1,0 +1,60 @@
+# L'appartement d'exemple : plan 2D, mode édition, menu du plan, vue 3D.
+appId: ${APP_ID}
+name: Plan d'exemple
+---
+- launchApp
+- runFlow: commun/vers-accueil.yaml
+- takeScreenshot: ${THEME}-10-accueil
+- runFlow: commun/ouvrir-exemple.yaml
+- takeScreenshot: ${THEME}-11-plan-2d
+
+# Le mode édition : la rangée d'outils change de contenu.
+- tapOn:
+    text: "Édition"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ${THEME}-12-plan-2d-edition
+- tapOn:
+    text: "Édition"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# Le menu « ⋯ » du plan.
+- tapOn:
+    text: "Plus"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ${THEME}-13-menu-du-plan
+- runFlow:
+    when:
+      visible: "Annuler"
+    commands:
+      - tapOn: "Annuler"
+- runFlow:
+    when:
+      visible: "Fermer"
+    commands:
+      - tapOn: "Fermer"
+- waitForAnimationToEnd:
+    timeout: 5000
+
+# La maquette 3D.
+- tapOn: "Passer en 3D"
+- waitForAnimationToEnd:
+    timeout: 10000
+- takeScreenshot: ${THEME}-14-vue-3d
+- swipe:
+    direction: LEFT
+    duration: 600
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ${THEME}-15-vue-3d-tournee
+- tapOn:
+    text: "Passer en 2D"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 5000
