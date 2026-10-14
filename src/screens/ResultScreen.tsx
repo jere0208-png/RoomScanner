@@ -6767,7 +6767,7 @@ export function ResultScreen() {
               </Text>
             ))}
             <Text style={[styles.legendeImageLigne, styles.legendeImageTotal]} numberOfLines={1}>
-              {`Total · ${legendeSurfaces.total} m²`}
+              {`Total au sol · ${legendeSurfaces.total} m²`}
             </Text>
             {legendeSurfaces.hab && (
               <Text style={[styles.legendeImageLigne, styles.legendeImageTotal]} numberOfLines={1}>

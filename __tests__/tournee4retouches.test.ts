@@ -33,7 +33,7 @@ describe('l’image partagée', () => {
     const ecran = lire('src', 'screens', 'ResultScreen.tsx');
     // Une pièce seule n'a pas besoin de liste — sauf pour dire son étage (revue « Nadia »).
     expect(ecran).toContain("capturing && vue === '2d' && (legendeSurfaces.lignes.length > 1 || niveaux.length > 1)");
-    expect(ecran).toContain('{`Total · ${legendeSurfaces.total} m²`}');
+    expect(ecran).toContain('{`Total au sol · ${legendeSurfaces.total} m²`}');
   });
 });
 

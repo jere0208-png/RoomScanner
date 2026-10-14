@@ -413,7 +413,7 @@ export function BilanDuReleveCarte({
               </Text>
               <Etoiles n={bilan.etoiles} actif={actif} taille={entre(k, 24, 30)} />
               <Text style={s.resume} numberOfLines={1}>
-                {`${bilan.pieces} pièce${bilan.pieces > 1 ? 's' : ''} · ${bilan.surface} m²`}
+                {`${bilan.pieces} pièce${bilan.pieces > 1 ? 's' : ''} · ${String(bilan.surfaceAuDixieme ?? bilan.surface).replace('.', ',')} m²`}
               </Text>
             </View>
           </Animated.View>

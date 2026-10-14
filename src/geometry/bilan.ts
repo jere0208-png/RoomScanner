@@ -52,6 +52,11 @@ export interface BilanDuReleve {
   pieces: number;
   /** Surface totale des pièces refermées, au mètre carré. */
   surface: number;
+  /**
+   * La même, au dixième — revue « Yasmine » : le bilan disait « 45 m² »,
+   * l'en-tête « 44,9 m² » ; deux arrondis pour un chiffre sèment le doute.
+   */
+  surfaceAuDixieme?: number;
   murs: number;
   portes: number;
   fenetres: number;
@@ -191,6 +196,7 @@ export function bilanDuReleve(e: {
   return {
     pieces,
     surface,
+    surfaceAuDixieme: Math.round(aires.reduce((s, a) => s + a, 0) * 10) / 10,
     murs: murs.length,
     // Une façade de placard n'est pas une porte de la pièce.
     portes: e.openings.filter(o => o.type === 'door' && !o.placard).length,
