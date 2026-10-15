@@ -209,7 +209,7 @@ export function RoomBar({
           <Geste
             nom="Fiche de la pièce"
             mot="Fiche"
-            d={SOLAIRES.check}
+            d={SOLAIRES.loupe}
             styles={styles}
             onPress={onFiche}
           />

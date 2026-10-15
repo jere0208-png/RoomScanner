@@ -14304,6 +14304,8 @@ les onglets Murs / Sol / Meubles, et choisir un meuble ou une couleur était
   du meuble choisi s'ouvre dessous, en grandes pastilles nommées.
 - **Annuler** sans quitter la feuille : on ose essayer quand on peut
   revenir.
+- **La coche est une coche** : l'icône `check` dessinait une loupe ; chaque
+  teinte choisie (Décorer, Peindre, Diagnostic) s'ornait d'une loupe.
 
 ## Vu sur les vraies captures du simulateur
 

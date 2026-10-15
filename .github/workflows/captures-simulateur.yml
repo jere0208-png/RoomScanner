@@ -152,11 +152,16 @@ jobs:
             for flow in "$@"; do
               local nom; nom="$(basename "$flow" .yaml)"
               echo "::group::$theme — $nom"
-              if maestro --device "$SIM_UDID" test "$flow" \
+              # Une seconde chance : le pilote XCTest du simulateur rate
+              # parfois son démarrage, sans que l'app y soit pour rien.
+              lancer() {
+                maestro --device "$SIM_UDID" test "$flow" \
                   -e APP_ID="$APP_ID" -e THEME="$theme" \
                   --test-output-dir "captures/brut/$theme-$nom" \
                   --debug-output "captures/debug/$theme-$nom" \
-                  --format junit --output "captures/brut/$theme-$nom.xml"; then
+                  --format junit --output "captures/brut/$theme-$nom.xml"
+              }
+              if lancer || { sleep 5; lancer; }; then
                 echo "| $theme | $nom | ok |" >> captures/bilan.md
               else
                 echo "| $theme | $nom | **échec** |" >> captures/bilan.md

@@ -107,7 +107,7 @@ export function PeintureSheet({
                       {prise && (
                         <Svg width={22} height={22} viewBox="0 0 24 24">
                           <Path
-                            d={SOLAIRES.check}
+                            d={SOLAIRES.coche}
                             fill="none"
                             /* La coche se pose SUR la teinte : sur un
                                anthracite, une coche sombre ne se voit pas. */
@@ -162,7 +162,7 @@ export function PeintureSheet({
                           {prise && (
                             <Svg width={22} height={22} viewBox="0 0 24 24">
                               <Path
-                                d={SOLAIRES.check}
+                                d={SOLAIRES.coche}
                                 fill="none"
                                 stroke={sombre(s.hex) ? '#FFFFFF' : c.ink}
                                 strokeWidth={2.2}

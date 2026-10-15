@@ -224,7 +224,7 @@ export function DiagnosticSheet({
               <Text style={[styles.jaugeChiffre, { color: c.danger }]}>{alertes}</Text>
             ) : (
               <Svg width={24} height={24} viewBox="0 0 24 24">
-                <Path d={SOLAIRES.check} fill="none" stroke={c.green} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d={SOLAIRES.coche} fill="none" stroke={c.green} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             )}
           </View>
@@ -292,7 +292,7 @@ export function DiagnosticSheet({
           <View style={styles.fete}>
             <View style={styles.feteRond}>
               <Svg width={44} height={44} viewBox="0 0 24 24">
-                <Path d={SOLAIRES.check} fill="none" stroke="#FFFFFF" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
+                <Path d={SOLAIRES.coche} fill="none" stroke="#FFFFFF" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>
             </View>
             {/* Quelques éclats autour du rond : la fête, sans confettis. */}

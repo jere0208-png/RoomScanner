@@ -279,7 +279,7 @@ export function DecorSheet({
               {on && (
                 <Svg width={taille * 0.5} height={taille * 0.5} viewBox="0 0 24 24">
                   <Path
-                    d={SOLAIRES.check}
+                    d={SOLAIRES.coche}
                     fill="none"
                     stroke={sombre(p.hex) ? '#FFFFFF' : c.ink}
                     strokeWidth={2.6}
@@ -320,7 +320,7 @@ export function DecorSheet({
           setOnglet(cle);
         }}>
         {visuel}
-        <Text style={[s.tuileNom, pris && s.tuileNomPris]} numberOfLines={1}>
+        <Text style={[s.tuileNom, pris && s.tuileNomPris]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
           {nom}
         </Text>
         <Text style={s.tuileValeur} numberOfLines={1}>
@@ -422,7 +422,7 @@ export function DecorSheet({
 
           {piece && (
             <View style={s.tuiles} accessibilityRole="tablist">
-              {tuile('ambiances', 'Ambiances', ambianceActuelle?.nom ?? 'Au choix', rondTuile(c.blueSoft, null, SOLAIRES.baguette))}
+              {tuile('ambiances', 'Ambiance', ambianceActuelle?.nom ?? 'Au choix', rondTuile(c.blueSoft, null, SOLAIRES.baguette))}
               {tuile('murs', 'Murs', peinture?.nom ?? '', rondTuile(peinture?.hex ?? '#FFFFFF'))}
               {tuile('sol', 'Sol', sol?.nom ?? '', rondTuile(sol?.hex ?? '#D9CBB4', sol?.motif))}
               {tuile(

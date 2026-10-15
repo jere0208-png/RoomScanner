@@ -162,7 +162,7 @@ describe('décorer, la refonte : ambiances, surprise, annuler', () => {
 
   it('une ambiance pose les murs et le sol ensemble, sur la pièce seule', () => {
     const t = monter();
-    appuyer(t, 'Ambiances');
+    appuyer(t, 'Ambiance');
     appuyer(t, 'Ambiance : Nature');
     expect([piece('r1').peinture, piece('r1').sol]).toEqual(['sauge', 'chene']);
     expect(piece('r2').peinture).toBeUndefined();
@@ -176,7 +176,7 @@ describe('décorer, la refonte : ambiances, surprise, annuler', () => {
 
   it('« Tout le logement » applique l’ambiance à chaque pièce', () => {
     const t = monter();
-    appuyer(t, 'Ambiances');
+    appuyer(t, 'Ambiance');
     appuyer(t, 'Tout le logement');
     appuyer(t, 'Ambiance : Chic');
     expect([piece('r1').peinture, piece('r2').peinture, piece('r2').sol]).toEqual(['anthracite', 'anthracite', 'noyer']);
@@ -185,7 +185,7 @@ describe('décorer, la refonte : ambiances, surprise, annuler', () => {
 
   it('la surprise change les murs et le sol ; « Annuler » revient en arrière', () => {
     const t = monter();
-    appuyer(t, 'Ambiances');
+    appuyer(t, 'Ambiance');
     appuyer(t, 'Surprise : une ambiance au hasard');
     const apres = piece('r1');
     expect(apres.peinture).toBeTruthy();
