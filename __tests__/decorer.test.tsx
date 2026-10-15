@@ -151,3 +151,55 @@ describe('le geste se trouve', () => {
     expect(ecran).toContain('<DecorSheet');
   });
 });
+
+/*
+  LA REFONTE — relevé du patron, capture à l'appui : les puces des pièces
+  passaient sous les onglets ; « trop compliqué pour choisir… plus ludique et
+  moderne ».
+*/
+describe('décorer, la refonte : ambiances, surprise, annuler', () => {
+  const piece = (id: string) => useScanStore.getState().rooms.find((r) => r.id === id)!;
+
+  it('une ambiance pose les murs et le sol ensemble, sur la pièce seule', () => {
+    const t = monter();
+    appuyer(t, 'Ambiances');
+    appuyer(t, 'Ambiance : Nature');
+    expect([piece('r1').peinture, piece('r1').sol]).toEqual(['sauge', 'chene']);
+    expect(piece('r2').peinture).toBeUndefined();
+    // La tuile et l'aperçu disent l'ambiance prise.
+    expect(textes(t)).toContain('Nature');
+    // « D'origine » rend la pièce telle que relevée.
+    appuyer(t, 'Ambiance : D’origine');
+    expect([piece('r1').peinture ?? null, piece('r1').sol ?? null]).toEqual([null, null]);
+    act(() => t.unmount());
+  });
+
+  it('« Tout le logement » applique l’ambiance à chaque pièce', () => {
+    const t = monter();
+    appuyer(t, 'Ambiances');
+    appuyer(t, 'Tout le logement');
+    appuyer(t, 'Ambiance : Chic');
+    expect([piece('r1').peinture, piece('r2').peinture, piece('r2').sol]).toEqual(['anthracite', 'anthracite', 'noyer']);
+    act(() => t.unmount());
+  });
+
+  it('la surprise change les murs et le sol ; « Annuler » revient en arrière', () => {
+    const t = monter();
+    appuyer(t, 'Ambiances');
+    appuyer(t, 'Surprise : une ambiance au hasard');
+    const apres = piece('r1');
+    expect(apres.peinture).toBeTruthy();
+    expect(apres.sol).toBeTruthy();
+    expect(apres.sol).not.toBe('auto');
+    appuyer(t, 'Annuler le dernier changement');
+    appuyer(t, 'Annuler le dernier changement');
+    expect(piece('r1').peinture ?? null).toBeNull();
+    act(() => t.unmount());
+  });
+
+  it('chaque pièce montre ses deux couleurs, et les bandes ne se compressent plus', () => {
+    const src = lire('src/components/DecorSheet.tsx');
+    expect(src).toMatch(/pucesBande: \{ flexGrow: 0, flexShrink: 0, height: 48/);
+    expect(src).toMatch(/tuiles: \{[^}]*flexShrink: 0/);
+  });
+});

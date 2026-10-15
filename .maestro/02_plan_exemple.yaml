@@ -52,3 +52,18 @@ name: Plan d'exemple
     optional: true
 - waitForAnimationToEnd:
     timeout: 5000
+
+# La feuille « Décorer » (en dernier : rien ne dépend de sa fermeture).
+- tapOn:
+    text: "Décorer"
+    optional: true
+- waitForAnimationToEnd:
+    timeout: 6000
+- takeScreenshot: ${THEME}-16-decorer
+- swipe:
+    start: "50%,85%"
+    end: "50%,45%"
+    duration: 500
+- waitForAnimationToEnd:
+    timeout: 3000
+- takeScreenshot: ${THEME}-17-decorer-bas

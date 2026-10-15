@@ -10,7 +10,7 @@
  * s'applique aussitôt — la maquette, au-dessus, se repeint sous les yeux.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import type { ObjectData } from 'react-native-room-scan';
 import { SheetShell } from './Sheet';
@@ -90,7 +90,27 @@ function PieceTournante({
   );
 }
 
-type Onglet = 'murs' | 'sol' | 'meubles';
+type Onglet = 'ambiances' | 'murs' | 'sol' | 'meubles';
+
+/*
+  LES AMBIANCES, EN UN APPUI — relevé du patron : « trop compliqué pour
+  choisir… fais une refonte intelligente, plus ludique et moderne ». Une
+  ambiance pose ensemble les murs et le sol qui vont ensemble ; on part
+  d'elle, puis on retouche. « D'origine » rend la pièce telle que relevée.
+*/
+export const AMBIANCES: { cle: string; nom: string; peinture: string; sol: string }[] = [
+  { cle: 'scandinave', nom: 'Scandinave', peinture: 'blanc', sol: 'blanchi' },
+  { cle: 'nature', nom: 'Nature', peinture: 'sauge', sol: 'chene' },
+  { cle: 'douceur', nom: 'Douceur', peinture: 'lin', sol: 'blanchi' },
+  { cle: 'terre', nom: 'Terre cuite', peinture: 'terracotta', sol: 'ciment' },
+  { cle: 'mer', nom: 'Bord de mer', peinture: 'bleuGris', sol: 'carrelage' },
+  { cle: 'mineral', nom: 'Minéral', peinture: 'perle', sol: 'beton' },
+  { cle: 'chic', nom: 'Chic', peinture: 'anthracite', sol: 'noyer' },
+  { cle: 'origine', nom: 'D’origine', peinture: PEINTURE_DEFAUT, sol: SOL_DEFAUT },
+];
+
+const hexPeinture = (cle: string) => PEINTURES.find((p) => p.cle === cle)?.hex ?? '#FFFFFF';
+const hexSol = (cle: string) => SOLS.find((p) => p.cle === cle)?.hex ?? '#D9CBB4';
 
 export function DecorSheet({
   visible,
@@ -109,6 +129,7 @@ export function DecorSheet({
   const s = getStyles(c);
   const rooms = useScanStore((st) => st.rooms);
   const objects = useScanStore((st) => st.objects);
+  const canUndo = useScanStore((st) => st.canUndo);
   /*
     SUR PLUSIEURS NIVEAUX, CHAQUE PIÈCE DIT LE SIEN — correctif de l'audit :
     deux « Chambre » ne se distinguaient pas, et l'aperçu restait celui du
@@ -133,9 +154,8 @@ export function DecorSheet({
   const [pieceId, setPieceId] = useState<string | null>(null);
   /*
     LA PIÈCE CHOISIE NE SE PERD PLUS — relevé du patron : « lorsqu'on change
-    de pièce, on revient à la première pièce si on change de couleur ». La
-    pièce se reprenait à CHAQUE changement des pièces du plan — et peindre
-    un mur en est un. Elle ne se reprend plus qu'à l'ouverture de la feuille.
+    de pièce, on revient à la première pièce si on change de couleur ». Elle
+    ne se reprend qu'à l'ouverture de la feuille.
   */
   const etaitVisible = useRef(false);
   useEffect(() => {
@@ -168,62 +188,107 @@ export function DecorSheet({
     );
   }, [meubles]);
 
-  /** Une rangée de pastilles : la coche sur celle qui est prise. */
+  const st = useScanStore.getState;
+  const { height: hauteurEcran } = useWindowDimensions();
+  // L'aperçu prend un bon quart de l'écran : on décore ce qu'on voit, et
+  // tout le reste tient en dessous sans se marcher dessus.
+  const hauteurApercu = Math.round(Math.min(320, Math.max(180, hauteurEcran * 0.29)));
+  const repos = useRef(0);
+  const [onglet, setOnglet] = useState<Onglet>('murs');
+  const [meubleId, setMeubleId] = useState<string | null>(null);
+  const [partout, setPartout] = useState(false);
+  // Une autre pièce : on repart des murs, sans meuble choisi.
+  useEffect(() => {
+    setOnglet((o) => (o === 'ambiances' ? o : 'murs'));
+    setMeubleId(null);
+  }, [piece?.id]);
+  const meuble = meubles.find((o) => o.id === meubleId) ?? meubles[0] ?? null;
+  const peinture = piece ? PEINTURES.find((p) => p.cle === (piece.peinture ?? PEINTURE_DEFAUT)) : undefined;
+  const sol = piece ? SOLS.find((p) => p.cle === (piece.sol ?? SOL_DEFAUT)) : undefined;
+  const pastilleDe = (o: ObjectData) =>
+    TEINTES_MEUBLES.find((p) => p.cle === (o.teinte ? cleDeTeinte(o.teinte) : TEINTE_ORIGINE));
+
+  const peindre = (roomId: string, cle: string) => st().setRoomPeinture(roomId, cle === PEINTURE_DEFAUT ? null : cle);
+  const poserSol = (roomId: string, cle: string) => st().setRoomSol(roomId, cle === SOL_DEFAUT ? null : cle);
+  /** L'ambiance, sur la pièce — ou sur tout le logement. */
+  const appliquer = (a: { peinture: string; sol: string }) => {
+    if (!piece) return;
+    haptic('succes');
+    for (const r of partout ? nommees : [piece]) {
+      peindre(r.id, a.peinture);
+      poserSol(r.id, a.sol);
+    }
+  };
+  /** Le hasard : une teinte de mur et un sol qui ne sont pas ceux d'avant. */
+  const surprise = () => {
+    if (!piece) return;
+    const murs = PEINTURES.filter((p) => p.cle !== (piece.peinture ?? PEINTURE_DEFAUT));
+    const sols = SOLS.filter((p) => p.cle !== SOL_DEFAUT && p.cle !== (piece.sol ?? SOL_DEFAUT));
+    appliquer({
+      peinture: murs[Math.floor(Math.random() * murs.length)].cle,
+      sol: sols[Math.floor(Math.random() * sols.length)].cle,
+    });
+  };
+  const ambianceActuelle = piece
+    ? AMBIANCES.find((a) => a.peinture === (piece.peinture ?? PEINTURE_DEFAUT) && a.sol === (piece.sol ?? SOL_DEFAUT))
+    : undefined;
+
+  /** Une grille de pastilles : la coche sur celle qui est prise, qui grossit. */
   const nuancier = (
     liste: (Peinture & { motif?: 'parquet' | 'carrelage' | null })[],
     prise: string,
     dire: (p: Peinture) => string,
     choisir: (cle: string) => void,
-    taille = 40,
+    taille = 48,
   ) => (
     <View style={s.nuancier}>
       {liste.map((p) => {
         const on = p.cle === prise;
         /*
           LE NOM SOUS LE ROND — revue « Chloé » : sept blancs et beiges
-          indiscernables sur fond blanc, deux gris unis pour le béton ciré et
-          la moquette, et rien pour dire « vert sauge et chêne clair » à
-          quelqu'un. La grille des peintures du mur l'écrivait déjà.
+          indiscernables sur fond blanc, et rien pour dire « vert sauge et
+          chêne clair » à quelqu'un.
         */
         return (
-          <View key={p.cle} style={[s.teinte, { width: taille + 18 }]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={dire(p)}
-            accessibilityState={{ selected: on }}
-            hitSlop={4}
-            onPress={() => {
-              haptic('leger');
-              choisir(p.cle);
-            }}
-            style={[
-              s.pastille,
-              { width: taille, height: taille, borderRadius: taille / 2, backgroundColor: p.hex },
-              on && { borderColor: c.blue, borderWidth: 3 },
-            ]}>
-            {p.motif ? (
-              <Svg width={taille} height={taille} viewBox="0 0 24 24" style={StyleSheet.absoluteFill}>
-                {p.motif === 'parquet'
-                  ? [6, 12, 18].map((y) => <Path key={y} d={`M0 ${y} H24`} stroke="#00000026" strokeWidth={0.8} />)
-                  : [8, 16].flatMap((k) => [
-                      <Path key={`h${k}`} d={`M0 ${k} H24`} stroke="#FFFFFF99" strokeWidth={0.9} />,
-                      <Path key={`v${k}`} d={`M${k} 0 V24`} stroke="#FFFFFF99" strokeWidth={0.9} />,
-                    ])}
-              </Svg>
-            ) : null}
-            {on && (
-              <Svg width={taille * 0.5} height={taille * 0.5} viewBox="0 0 24 24">
-                <Path
-                  d={SOLAIRES.check}
-                  fill="none"
-                  stroke={sombre(p.hex) ? '#FFFFFF' : c.ink}
-                  strokeWidth={2.6}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </Svg>
-            )}
-          </Pressable>
+          <View key={p.cle} style={[s.teinte, { width: taille + 22 }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={dire(p)}
+              accessibilityState={{ selected: on }}
+              hitSlop={4}
+              onPress={() => {
+                haptic('leger');
+                choisir(p.cle);
+              }}
+              style={({ pressed }) => [
+                s.pastille,
+                { width: taille, height: taille, borderRadius: taille / 2, backgroundColor: p.hex },
+                on && { borderColor: c.blue, borderWidth: 3, transform: [{ scale: 1.08 }] },
+                pressed && { transform: [{ scale: 0.92 }] },
+              ]}>
+              {p.motif ? (
+                <Svg width={taille} height={taille} viewBox="0 0 24 24" style={StyleSheet.absoluteFill}>
+                  {p.motif === 'parquet'
+                    ? [6, 12, 18].map((y) => <Path key={y} d={`M0 ${y} H24`} stroke="#00000026" strokeWidth={0.8} />)
+                    : [8, 16].flatMap((k) => [
+                        <Path key={`h${k}`} d={`M0 ${k} H24`} stroke="#FFFFFF99" strokeWidth={0.9} />,
+                        <Path key={`v${k}`} d={`M${k} 0 V24`} stroke="#FFFFFF99" strokeWidth={0.9} />,
+                      ])}
+                </Svg>
+              ) : null}
+              {on && (
+                <Svg width={taille * 0.5} height={taille * 0.5} viewBox="0 0 24 24">
+                  <Path
+                    d={SOLAIRES.check}
+                    fill="none"
+                    stroke={sombre(p.hex) ? '#FFFFFF' : c.ink}
+                    strokeWidth={2.6}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </Svg>
+              )}
+            </Pressable>
             <Text style={[s.teinteNom, on && s.teinteNomPrise]} numberOfLines={2}>
               {p.nom}
             </Text>
@@ -233,68 +298,84 @@ export function DecorSheet({
     </View>
   );
 
-  const st = useScanStore.getState;
-  const { height: hauteurEcran } = useWindowDimensions();
-  // L'aperçu prend un tiers de l'écran : on décore ce qu'on voit.
-  const hauteurApercu = Math.round(Math.min(360, Math.max(220, hauteurEcran * 0.34)));
-  const repos = useRef(0);
-  const [onglet, setOnglet] = useState<Onglet>('murs');
-  const [meubleId, setMeubleId] = useState<string | null>(null);
-  // Une autre pièce : on repart des murs, sans meuble choisi.
-  useEffect(() => {
-    setOnglet('murs');
-    setMeubleId(null);
-  }, [piece?.id]);
-  const meuble = meubles.find((o) => o.id === meubleId) ?? meubles[0] ?? null;
-  const peinture = piece ? PEINTURES.find((p) => p.cle === (piece.peinture ?? PEINTURE_DEFAUT)) : undefined;
-  const sol = piece ? SOLS.find((p) => p.cle === (piece.sol ?? SOL_DEFAUT)) : undefined;
-  const pastilleDe = (o: ObjectData) =>
-    TEINTES_MEUBLES.find((p) => p.cle === (o.teinte ? cleDeTeinte(o.teinte) : TEINTE_ORIGINE));
-
   /*
-    TROIS ONGLETS, PAS UNE LISTE SANS FIN — relevé du patron : « revois une
-    amélioration en termes de facilité pour décorer ». Tout s'empilait :
-    les murs, le sol, puis un nuancier entier par meuble — trente rangées de
-    ronds pour une chambre meublée, dans une fenêtre de 340 points. Chaque
-    onglet montre sa teinte du moment : on sait ce qui est pris avant
-    d'ouvrir.
+    QUATRE TUILES, CE QU'ON CHANGE — la refonte. Les puces des pièces, les
+    onglets et les nuanciers se chevauchaient dans la feuille (relevé du
+    patron, capture à l'appui) : trois bandes souples se disputaient une
+    hauteur fixe. Chaque bande a maintenant sa hauteur ; seule la liste du
+    bas défile. Une tuile montre sa teinte du moment, en grand : on sait ce
+    qui est pris avant d'ouvrir.
   */
-  const ongletBouton = (cle: Onglet, nom: string, libelle: string, hex?: string) => {
+  const tuile = (cle: Onglet, nom: string, valeur: string, visuel: React.ReactNode) => {
     const pris = onglet === cle;
     return (
-      <TouchableOpacity
+      <Pressable
         key={cle}
         accessibilityRole="tab"
         accessibilityLabel={nom}
         accessibilityState={{ selected: pris }}
-        style={[s.onglet, pris && s.ongletPris]}
+        style={({ pressed }) => [s.tuile, pris && s.tuilePrise, pressed && { transform: [{ scale: 0.96 }] }]}
         onPress={() => {
           haptic('leger');
           setOnglet(cle);
         }}>
-        {hex ? <View style={[s.ongletTeinte, { backgroundColor: hex }]} /> : null}
-        <Text style={[s.ongletTexte, pris && s.ongletTextePris]} numberOfLines={1}>
-          {libelle}
+        {visuel}
+        <Text style={[s.tuileNom, pris && s.tuileNomPris]} numberOfLines={1}>
+          {nom}
         </Text>
-      </TouchableOpacity>
+        <Text style={s.tuileValeur} numberOfLines={1}>
+          {valeur}
+        </Text>
+      </Pressable>
     );
   };
+  const rondTuile = (hex: string, motif?: 'parquet' | 'carrelage' | null, icone?: string) => (
+    <View style={[s.tuileRond, { backgroundColor: hex }]}>
+      {motif ? (
+        <Svg width={30} height={30} viewBox="0 0 24 24" style={StyleSheet.absoluteFill}>
+          {motif === 'parquet'
+            ? [6, 12, 18].map((y) => <Path key={y} d={`M0 ${y} H24`} stroke="#00000026" strokeWidth={0.8} />)
+            : [8, 16].flatMap((k) => [
+                <Path key={`h${k}`} d={`M0 ${k} H24`} stroke="#FFFFFF99" strokeWidth={0.9} />,
+                <Path key={`v${k}`} d={`M${k} 0 V24`} stroke="#FFFFFF99" strokeWidth={0.9} />,
+              ])}
+        </Svg>
+      ) : null}
+      {icone ? (
+        <Svg width={18} height={18} viewBox="0 0 24 24">
+          <Path d={icone} fill={sombre(hex) ? '#FFFFFF' : c.ink} fillRule="evenodd" />
+        </Svg>
+      ) : null}
+    </View>
+  );
 
   return (
     <SheetShell visible={visible} onClose={onClose} defile={false}>
       <View style={s.tete}>
         <Text style={s.titre}>Décorer</Text>
-        <Text style={s.sous}>Touchez une teinte : la pièce change sous vos yeux. Le relevé, lui, ne bouge pas.</Text>
+        {/* Annuler sans quitter : on ose essayer quand on peut revenir. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Annuler le dernier changement"
+          accessibilityState={{ disabled: !canUndo }}
+          disabled={!canUndo}
+          hitSlop={8}
+          style={({ pressed }) => [s.annuler, !canUndo && { opacity: 0.35 }, pressed && { opacity: 0.6 }]}
+          onPress={() => {
+            haptic('leger');
+            st().undo();
+          }}>
+          <Svg width={18} height={18} viewBox="0 0 24 24">
+            <Path d={SOLAIRES.undo} fill={c.ink} fillRule="evenodd" />
+          </Svg>
+        </Pressable>
       </View>
-      {visible && piece ? (
-        <View style={[s.apercu, { height: hauteurApercu }]}>
-          <PieceTournante pieceId={piece.id} niveau={niveauDe(piece)} repos={repos} />
-        </View>
-      ) : null}
+
       {nommees.length === 0 ? (
         <Text style={s.vide}>Aucune pièce sur ce plan : tracez ou redétectez les pièces pour les décorer.</Text>
       ) : (
         <>
+          {/* LES PIÈCES, chacune avec ses deux couleurs du moment. */}
           {nommees.length > 1 && (
             <ScrollView
               horizontal
@@ -305,30 +386,54 @@ export function DecorSheet({
               {nommees.map((r, i) => {
                 const prise = r.id === piece?.id;
                 return (
-                  <TouchableOpacity
+                  <Pressable
                     key={r.id}
+                    accessibilityRole="button"
                     accessibilityLabel={nomDeLaPiece(r, i)}
                     accessibilityState={{ selected: prise }}
-                    style={[s.puce, prise && { backgroundColor: c.blue, borderColor: c.blue }]}
+                    style={[s.puce, prise && s.pucePrise]}
                     onPress={() => {
                       haptic('leger');
                       setPieceId(r.id);
                     }}>
-                    <Text style={[s.puceTexte, prise && { color: '#FFFFFF' }]} numberOfLines={1}>
+                    <View style={s.puceTeintes}>
+                      <View style={[s.puceTeinte, { backgroundColor: hexPeinture(r.peinture ?? PEINTURE_DEFAUT) }]} />
+                      <View style={[s.puceTeinte, s.puceTeinte2, { backgroundColor: hexSol(r.sol ?? SOL_DEFAUT) }]} />
+                    </View>
+                    <Text style={[s.puceTexte, prise && s.puceTextePris]} numberOfLines={1}>
                       {nomDeLaPiece(r, i)}
                     </Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 );
               })}
             </ScrollView>
           )}
+
+          {visible && piece ? (
+            <View style={[s.apercu, { height: hauteurApercu }]}>
+              <PieceTournante pieceId={piece.id} niveau={niveauDe(piece)} repos={repos} />
+              {ambianceActuelle && ambianceActuelle.cle !== 'origine' ? (
+                <View style={s.badgeAmbiance} pointerEvents="none">
+                  <Text style={s.badgeAmbianceTexte}>{ambianceActuelle.nom}</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
           {piece && (
-            <View style={s.onglets} accessibilityRole="tablist">
-              {ongletBouton('murs', 'Murs', 'Murs', peinture?.hex)}
-              {ongletBouton('sol', 'Sol', 'Sol', sol?.hex)}
-              {ongletBouton('meubles', 'Meubles', meubles.length > 0 ? `Meubles · ${meubles.length}` : 'Meubles')}
+            <View style={s.tuiles} accessibilityRole="tablist">
+              {tuile('ambiances', 'Ambiances', ambianceActuelle?.nom ?? 'Au choix', rondTuile(c.blueSoft, null, SOLAIRES.baguette))}
+              {tuile('murs', 'Murs', peinture?.nom ?? '', rondTuile(peinture?.hex ?? '#FFFFFF'))}
+              {tuile('sol', 'Sol', sol?.nom ?? '', rondTuile(sol?.hex ?? '#D9CBB4', sol?.motif))}
+              {tuile(
+                'meubles',
+                'Meubles',
+                meubles.length > 0 ? `${meubles.length} meuble${meubles.length > 1 ? 's' : ''}` : 'Aucun',
+                rondTuile(c.surfaceSunken, null, SOLAIRES.meubles),
+              )}
             </View>
           )}
+
           <ScrollView
             style={s.corps}
             contentContainerStyle={s.corpsFond}
@@ -336,6 +441,62 @@ export function DecorSheet({
             keyboardShouldPersistTaps="handled"
             onTouchStart={() => (repos.current = Date.now())}
             onScrollBeginDrag={() => (repos.current = Date.now())}>
+            {piece && onglet === 'ambiances' && (
+              <>
+                <View style={s.ligneTitre}>
+                  <Text style={s.section}>Une ambiance, en un appui</Text>
+                  {nommees.length > 1 && (
+                    <Pressable
+                      accessibilityRole="switch"
+                      accessibilityLabel="Tout le logement"
+                      accessibilityState={{ checked: partout }}
+                      style={[s.portee, partout && s.porteeOn]}
+                      onPress={() => {
+                        haptic('leger');
+                        setPartout((v) => !v);
+                      }}>
+                      <Text style={[s.porteeTexte, partout && s.porteeTexteOn]}>
+                        {partout ? 'Tout le logement' : 'Cette pièce'}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+                <View style={s.ambiances}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Surprise : une ambiance au hasard"
+                    style={({ pressed }) => [s.ambiance, s.ambianceSurprise, pressed && { transform: [{ scale: 0.96 }] }]}
+                    onPress={surprise}>
+                    <Text style={s.de}>🎲</Text>
+                    <Text style={[s.ambianceNom, { color: '#FFFFFF' }]}>Surprise</Text>
+                  </Pressable>
+                  {AMBIANCES.map((a) => {
+                    const prise = ambianceActuelle?.cle === a.cle;
+                    return (
+                      <Pressable
+                        key={a.cle}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Ambiance : ${a.nom}`}
+                        accessibilityState={{ selected: prise }}
+                        style={({ pressed }) => [s.ambiance, prise && s.ambiancePrise, pressed && { transform: [{ scale: 0.96 }] }]}
+                        onPress={() => appliquer(a)}>
+                        {/* Le mur au-dessus, le sol en dessous : la pièce en miniature. */}
+                        <View style={s.miniature}>
+                          <View style={[s.miniMur, { backgroundColor: hexPeinture(a.peinture) }]} />
+                          <View style={[s.miniSol, { backgroundColor: hexSol(a.sol) }]} />
+                        </View>
+                        <Text style={[s.ambianceNom, prise && s.ambianceNomPris]} numberOfLines={1}>
+                          {a.nom}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <Text style={s.aide}>
+                  Une ambiance pose les murs et le sol ensemble ; retouchez ensuite avec « Murs », « Sol » ou « Meubles ».
+                </Text>
+              </>
+            )}
             {piece && onglet === 'murs' && (
               <>
                 <Text style={s.section}>{`Les murs : ${peinture?.nom ?? ''}`}</Text>
@@ -343,8 +504,7 @@ export function DecorSheet({
                   PEINTURES,
                   piece.peinture ?? PEINTURE_DEFAUT,
                   (p) => `Murs : ${p.nom}`,
-                  (cle) => st().setRoomPeinture(piece.id, cle === PEINTURE_DEFAUT ? null : cle),
-                  44,
+                  (cle) => peindre(piece.id, cle),
                 )}
                 {/*
                   LA COULEUR MÈNE AUX POTS — revue « Bernard » : choisir la
@@ -368,13 +528,7 @@ export function DecorSheet({
             {piece && onglet === 'sol' && (
               <>
                 <Text style={s.section}>{`Le sol : ${sol?.nom ?? ''}`}</Text>
-                {nuancier(
-                  SOLS,
-                  piece.sol ?? SOL_DEFAUT,
-                  (p) => `Sol : ${p.nom}`,
-                  (cle) => st().setRoomSol(piece.id, cle === SOL_DEFAUT ? null : cle),
-                  44,
-                )}
+                {nuancier(SOLS, piece.sol ?? SOL_DEFAUT, (p) => `Sol : ${p.nom}`, (cle) => poserSol(piece.id, cle))}
               </>
             )}
             {piece && onglet === 'meubles' && (
@@ -383,34 +537,38 @@ export function DecorSheet({
               ) : (
                 <>
                   {/*
-                    LES MEUBLES SE VOIENT D'UN COUP D'ŒIL — « apporte une
-                    meilleure visibilité aux éléments listés à décorer ».
-                    Chacun est une pastille à sa teinte du moment ; on en
-                    touche un, son nuancier s'ouvre dessous.
+                    LES MEUBLES EN CARTES QUI DÉFILENT — chacune à sa teinte du
+                    moment ; on en touche une, son nuancier s'ouvre dessous.
                   */}
-                  <View style={s.meubles}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={s.meublesBande}
+                    contentContainerStyle={s.meubles}
+                    onTouchStart={() => (repos.current = Date.now())}>
                     {meubles.map((o) => {
                       const nom = nomsDesMeubles.get(o.id) ?? nomDuMeuble(o);
                       const pris = o.id === meuble.id;
                       const teinte = pastilleDe(o);
                       return (
-                        <TouchableOpacity
+                        <Pressable
                           key={o.id}
+                          accessibilityRole="button"
                           accessibilityLabel={nom}
                           accessibilityState={{ selected: pris }}
-                          style={[s.meublePuce, pris && s.meublePucePris]}
+                          style={({ pressed }) => [s.meubleCarte, pris && s.meubleCartePrise, pressed && { transform: [{ scale: 0.96 }] }]}
                           onPress={() => {
                             haptic('leger');
                             setMeubleId(o.id);
                           }}>
                           <View style={[s.meubleTeinte, { backgroundColor: teinte?.hex ?? c.surface }]} />
-                          <Text style={[s.meubleNom, pris && s.meubleNomPris]} numberOfLines={1}>
+                          <Text style={[s.meubleNom, pris && s.meubleNomPris]} numberOfLines={2}>
                             {nom}
                           </Text>
-                        </TouchableOpacity>
+                        </Pressable>
                       );
                     })}
-                  </View>
+                  </ScrollView>
                   {(() => {
                     const nom = nomsDesMeubles.get(meuble.id) ?? nomDuMeuble(meuble);
                     return (
@@ -421,7 +579,7 @@ export function DecorSheet({
                           meuble.teinte ? cleDeTeinte(meuble.teinte) : TEINTE_ORIGINE,
                           (p) => `${nom} : ${p.nom}`,
                           (cle) => st().setObjectTeinte(meuble.id, hexDeTeinte(cle)),
-                          40,
+                          44,
                         )}
                       </>
                     );
@@ -438,88 +596,124 @@ export function DecorSheet({
 
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
-    tete: { paddingRight: 44, paddingLeft: 2 },
-    titre: { color: c.ink, fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
-    sous: { color: c.inkSoft, fontSize: 13, lineHeight: 18, marginTop: 3 },
-    apercu: {
-      marginTop: 10,
-      borderRadius: radius.md,
-      overflow: 'hidden',
+    tete: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 48, paddingLeft: 2, flexShrink: 0 },
+    titre: { color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.5, flex: 1 },
+    annuler: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       backgroundColor: c.surfaceSunken,
-    },
-    corps: { flexShrink: 1, minHeight: 150, marginTop: 4 },
-    corpsFond: { paddingBottom: 14 },
-    pucesBande: { flexGrow: 0, marginTop: 10 },
-    puces: { flexDirection: 'row', gap: 8, paddingRight: 8 },
-    puce: {
-      paddingHorizontal: 14,
-      height: 34,
-      borderRadius: 17,
-      borderWidth: 1,
-      borderColor: c.lineStrong,
-      backgroundColor: c.surface,
-      justifyContent: 'center',
-    },
-    puceTexte: { color: c.ink, fontSize: 14, fontWeight: '700' },
-    onglets: {
-      flexDirection: 'row',
-      gap: 6,
-      marginTop: 10,
-      padding: 4,
-      borderRadius: radius.md,
-      backgroundColor: c.surfaceSunken,
-    },
-    onglet: {
-      flex: 1,
-      height: 40,
-      borderRadius: radius.md - 3,
-      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 6,
-      paddingHorizontal: 6,
     },
-    ongletPris: {
-      backgroundColor: c.surface,
-      shadowColor: '#000',
-      shadowOpacity: 0.12,
-      shadowRadius: 4,
-      shadowOffset: { width: 0, height: 1 },
-      elevation: 2,
-    },
-    ongletTeinte: { width: 16, height: 16, borderRadius: 8, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' },
-    ongletTexte: { color: c.inkSoft, fontSize: 14, fontWeight: '700' },
-    ongletTextePris: { color: c.ink, fontWeight: '800' },
-    meubles: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
-    meublePuce: {
+    pucesBande: { flexGrow: 0, flexShrink: 0, height: 48, marginTop: 10 },
+    puces: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 8 },
+    puce: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
-      height: 40,
       paddingLeft: 6,
       paddingRight: 14,
+      height: 40,
       borderRadius: 20,
-      borderWidth: 1,
-      borderColor: c.lineStrong,
-      backgroundColor: c.surface,
-      maxWidth: '100%',
+      backgroundColor: c.surfaceSunken,
     },
-    meublePucePris: { borderColor: c.blue, borderWidth: 2, backgroundColor: c.blueSoft },
-    meubleTeinte: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' },
-    meubleNom: { color: c.ink, fontSize: 14, fontWeight: '600', flexShrink: 1 },
-    meubleNomPris: { fontWeight: '800' },
+    pucePrise: { backgroundColor: c.ink },
+    puceTeintes: { flexDirection: 'row' },
+    puceTeinte: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: c.surface },
+    puceTeinte2: { marginLeft: -8 },
+    puceTexte: { color: c.ink, fontSize: 14, fontWeight: '700' },
+    puceTextePris: { color: c.surface },
+    apercu: {
+      flexShrink: 0,
+      marginTop: 8,
+      borderRadius: radius.lg,
+      overflow: 'hidden',
+      backgroundColor: c.surfaceSunken,
+    },
+    badgeAmbiance: {
+      position: 'absolute',
+      top: 10,
+      left: 10,
+      paddingHorizontal: 10,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: c.surfaceVoile,
+      justifyContent: 'center',
+    },
+    badgeAmbianceTexte: { color: c.ink, fontSize: 12.5, fontWeight: '800' },
+    tuiles: { flexDirection: 'row', gap: 8, marginTop: 10, flexShrink: 0 },
+    tuile: {
+      flex: 1,
+      height: 92,
+      borderRadius: radius.md,
+      backgroundColor: c.surfaceSunken,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 4,
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    tuilePrise: { backgroundColor: c.surface, borderColor: c.blue },
+    tuileRond: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      borderWidth: 1,
+      borderColor: c.line,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    tuileNom: { color: c.ink, fontSize: 13.5, fontWeight: '700', marginTop: 6 },
+    tuileNomPris: { color: c.blue, fontWeight: '800' },
+    tuileValeur: { color: c.inkSoft, fontSize: 11, marginTop: 1 },
+    corps: { flexShrink: 1, minHeight: 140, marginTop: 4 },
+    corpsFond: { paddingBottom: 18 },
+    ligneTitre: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     section: {
       color: c.inkSoft,
       fontSize: 12,
       fontWeight: '800',
       letterSpacing: 0.7,
       textTransform: 'uppercase',
-      marginTop: 16,
-      marginBottom: 8,
+      marginTop: 14,
+      marginBottom: 10,
     },
-    nuancier: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, rowGap: 8 },
+    portee: {
+      marginTop: 6,
+      height: 30,
+      paddingHorizontal: 12,
+      borderRadius: 15,
+      backgroundColor: c.surfaceSunken,
+      justifyContent: 'center',
+    },
+    porteeOn: { backgroundColor: c.blue },
+    porteeTexte: { color: c.ink, fontSize: 12.5, fontWeight: '700' },
+    porteeTexteOn: { color: '#FFFFFF' },
+    ambiances: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+    ambiance: {
+      width: '30%',
+      flexGrow: 1,
+      minWidth: 96,
+      height: 92,
+      borderRadius: radius.md,
+      backgroundColor: c.surfaceSunken,
+      padding: 8,
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    ambiancePrise: { borderColor: c.blue, backgroundColor: c.surface },
+    ambianceSurprise: { backgroundColor: c.blue, alignItems: 'center', justifyContent: 'center' },
+    de: { fontSize: 28 },
+    miniature: { flex: 1, borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: c.line },
+    miniMur: { flex: 1.4 },
+    miniSol: { flex: 1 },
+    ambianceNom: { color: c.ink, fontSize: 13, fontWeight: '700', marginTop: 6, textAlign: 'center' },
+    ambianceNomPris: { color: c.blue, fontWeight: '800' },
+    nuancier: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, rowGap: 10 },
     teinte: { alignItems: 'center' },
-    teinteNom: { color: c.inkSoft, fontSize: 12, lineHeight: 15, marginTop: 4, textAlign: 'center' },
+    teinteNom: { color: c.inkSoft, fontSize: 12, lineHeight: 15, marginTop: 5, textAlign: 'center' },
     teinteNomPrise: { color: c.ink, fontWeight: '800' },
     pastille: {
       borderWidth: 1,
@@ -528,15 +722,30 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
       overflow: 'hidden',
     },
+    meublesBande: { flexGrow: 0, flexShrink: 0, height: 96, marginTop: 12 },
+    meubles: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 8 },
+    meubleCarte: {
+      width: 104,
+      height: 88,
+      borderRadius: radius.md,
+      backgroundColor: c.surfaceSunken,
+      padding: 10,
+      borderWidth: 2,
+      borderColor: 'transparent',
+      justifyContent: 'space-between',
+    },
+    meubleCartePrise: { borderColor: c.blue, backgroundColor: c.surface },
+    meubleTeinte: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: c.line },
+    meubleNom: { color: c.ink, fontSize: 13, fontWeight: '600' },
+    meubleNomPris: { fontWeight: '800' },
     vide: { color: c.inkSoft, fontSize: 13.5, lineHeight: 19, marginTop: 10 },
     videMeubles: { marginTop: 16 },
     aide: { color: c.inkSoft, fontSize: 13, lineHeight: 18, marginTop: 14 },
     achats: {
-      marginTop: 14,
-      minHeight: 44,
-      borderRadius: 12,
-      borderWidth: 1.5,
-      borderColor: c.blue,
+      marginTop: 16,
+      minHeight: 46,
+      borderRadius: 14,
+      backgroundColor: c.blueSoft,
       alignItems: 'center',
       justifyContent: 'center',
     },

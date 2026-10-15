@@ -14285,6 +14285,26 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## « Décorer », refait
+
+Relevé du patron, capture à l'appui : les puces des pièces passaient sous
+les onglets Murs / Sol / Meubles, et choisir un meuble ou une couleur était
+« trop compliqué ».
+- **Chaque bande a sa hauteur** ; seule la liste du bas défile. Plus rien ne
+  se chevauche.
+- **Les pièces** : une pastille par pièce, avec ses deux couleurs du moment
+  (le mur, le sol).
+- **Quatre grandes tuiles** — Ambiances, Murs, Sol, Meubles — qui montrent
+  chacune sa teinte prise.
+- **Les ambiances, en un appui** : Scandinave, Nature, Douceur, Terre cuite,
+  Bord de mer, Minéral, Chic, D'origine — les murs et le sol qui vont
+  ensemble ; sur la pièce, ou sur « Tout le logement ». Et « Surprise » 🎲,
+  une combinaison au hasard.
+- **Les meubles en cartes** qui défilent, chacune à sa teinte ; le nuancier
+  du meuble choisi s'ouvre dessous, en grandes pastilles nommées.
+- **Annuler** sans quitter la feuille : on ose essayer quand on peut
+  revenir.
+
 ## Vu sur les vraies captures du simulateur
 
 Premier passage de l'app réelle, compilée et parcourue sur un iPhone
