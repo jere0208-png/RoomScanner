@@ -32,9 +32,19 @@ jobs:
           name: rendu-reference
           path: assets/rendu-reference/
 
+  # LA COMPILATION NE L'ATTEND PLUS : elle part en même temps que les
+  # contrôles, et l'IPA ne se publie (job `publier`) que si les deux ont
+  # réussi. Même résultat, quatre minutes de moins.
   build:
-    needs: checks
     runs-on: macos-15
+    env:
+      USE_CCACHE: '1'
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 2G
+      CCACHE_COMPRESS: '1'
+      # Les chemins absolus du runner ne doivent pas empêcher la réutilisation.
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_SLOPPINESS: clang_index_store,file_stat_matches,include_file_ctime,include_file_mtime,ivfsoverlay,pch_defines,modules,system_headers,time_macros
     steps:
       - uses: actions/checkout@v4
 
@@ -49,19 +59,57 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+
+      # LES MODULES JS, GARDÉS TELS QUELS tant que package-lock.json ne
+      # change pas : `npm ci` reconstruirait exactement les mêmes.
+      - name: Retrouver node_modules
+        id: modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json', 'modules/**/package.json') }}
 
       - name: Installer les dépendances JS
+        if: steps.modules.outputs.cache-hit != 'true'
         run: npm ci
+
+      - name: Retrouver les gems
+        uses: actions/cache@v4
+        with:
+          path: vendor/bundle
+          key: gems-${{ runner.os }}-${{ hashFiles('Gemfile', 'Gemfile.lock') }}
+
+      # LES PODS : mêmes versions tant que le Podfile, les modules JS et
+      # les podspecs ne bougent pas. `pod install` repasse quand même (il
+      # régénère le code natif de React Native), mais sans rien télécharger.
+      - name: Retrouver les pods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios/Pods
+            ios/Podfile.lock
+          key: pods-${{ runner.os }}-xcode26-${{ hashFiles('ios/Podfile', 'package-lock.json', 'modules/**/*.podspec') }}
 
       - name: Installer CocoaPods et les pods
         run: |
+          bundle config set path vendor/bundle
           bundle install
+          command -v ccache >/dev/null || brew install ccache
           cd ios && bundle exec pod install
+
+      # LE CACHE DE COMPILATION : un fichier inchangé ne se recompile pas.
+      - name: Retrouver le cache de compilation
+        uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-${{ runner.os }}-xcode26-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ runner.os }}-xcode26-
 
       - name: Compiler (Release, sans signature)
         working-directory: ios
         run: |
+          ccache -z || true
           xcodebuild \
             -workspace RoomScanner.xcworkspace \
             -scheme RoomScanner \
@@ -72,6 +120,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             build
+          ccache -s || true
 
       - name: Empaqueter l'IPA
         working-directory: ios
@@ -80,9 +129,24 @@ jobs:
           cp -R build/Build/Products/Release-iphoneos/RoomScanner.app Payload/
           zip -qry RoomScanner-unsigned.ipa Payload
 
+      - name: Garder l'IPA en attendant les contrôles
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipa-en-attente
+          path: ios/RoomScanner-unsigned.ipa
+          retention-days: 1
+
+  # L'IPA NE SORT QUE SI LES CONTRÔLES ONT RÉUSSI — comme avant.
+  publier:
+    needs: [checks, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ipa-en-attente
       - name: Publier l'artefact
         uses: actions/upload-artifact@v4
         with:
           name: RoomScanner-unsigned-ipa
-          path: ios/RoomScanner-unsigned.ipa
+          path: RoomScanner-unsigned.ipa
           retention-days: 14

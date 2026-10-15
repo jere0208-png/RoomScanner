@@ -29,7 +29,9 @@ target 'RoomScanner' do
       installer,
       config[:reactNativePath],
       :mac_catalyst_enabled => false,
-      # :ccache_enabled => true
+      # Le cache de compilation, en CI seulement (USE_CCACHE=1) : le même
+      # code, les mêmes options, compilé une fois puis réutilisé.
+      :ccache_enabled => ENV['USE_CCACHE'] == '1'
     )
   end
 end

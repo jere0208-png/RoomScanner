@@ -77,3 +77,7 @@ yarn-error.log
 # Le mot de passe de la page des notifications : sur le serveur seulement.
 server/messages-cle.php
 server/messages.json.verrou
+
+# Caches de la CI (compilation, gems)
+.ccache/
+vendor/bundle/

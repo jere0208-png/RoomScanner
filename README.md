@@ -14285,6 +14285,20 @@ code d'offre passe par l'App Store ; « aucun abonnement » retire le Pro
 d'abonnement, un silence ne retire rien, ni le Pro d'un ancien code),
 `parcourscompte.test.ts`.
 
+## Un IPA plus vite, pour le même résultat
+
+Le passage durait environ quinze minutes, tout en série : contrôles et
+tests (4 min), puis sur le Mac l'installation JS (2 min), les pods (4 min),
+la compilation (5 min).
+- **La compilation part en même temps que les contrôles** ; l'IPA ne se
+  publie (job `publier`) que si les deux ont réussi, comme avant.
+- **Les dépendances sont gardées tant qu'elles ne changent pas** :
+  `node_modules` (clé : `package-lock.json`), les gems, les pods (clé :
+  Podfile, `package-lock.json`, podspecs).
+- **Un cache de compilation (ccache)**, en CI seulement (`USE_CCACHE=1`
+  dans le Podfile) : un fichier inchangé ne se recompile pas.
+Le premier passage remplit les caches ; les suivants en profitent.
+
 ## « Décorer », refait
 
 Relevé du patron, capture à l'appui : les puces des pièces passaient sous
