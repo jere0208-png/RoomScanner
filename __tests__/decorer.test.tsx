@@ -89,12 +89,15 @@ describe('la feuille « Décorer »', () => {
   it('deux meubles du même nom se distinguent, et l’on passe d’une pièce à l’autre', () => {
     const t = monter();
     appuyer(t, 'Meubles');
-    expect(textes(t)).toEqual(expect.arrayContaining(['Chaise 1', 'Chaise 2']));
+    // Le numéro est une pastille à part ; le nom entier reste dit à VoiceOver.
+    const libelles = () => t.root.findAll((n) => typeof n.props.accessibilityLabel === 'string' && n.props.onPress).map((n) => n.props.accessibilityLabel);
+    expect(libelles()).toEqual(expect.arrayContaining(['Chaise 1', 'Chaise 2']));
+    expect(textes(t)).toEqual(expect.arrayContaining(['1', '2', 'Chaise']));
     appuyer(t, 'Chambre');
     // Une autre pièce repart des murs : on rouvre ses meubles.
     appuyer(t, 'Meubles');
-    expect(textes(t)).toContain('Lit double 140');
-    expect(textes(t)).not.toContain('Chaise 1');
+    expect(libelles()).toContain('Lit double 140');
+    expect(libelles()).not.toContain('Chaise 1');
     act(() => t.unmount());
   });
 });
@@ -191,9 +194,9 @@ describe('décorer, la refonte : ambiances, surprise, annuler', () => {
     expect(apres.peinture).toBeTruthy();
     expect(apres.sol).toBeTruthy();
     expect(apres.sol).not.toBe('auto');
+    // UN appui défait toute l'ambiance : les murs ET le sol.
     appuyer(t, 'Annuler le dernier changement');
-    appuyer(t, 'Annuler le dernier changement');
-    expect(piece('r1').peinture ?? null).toBeNull();
+    expect([piece('r1').peinture ?? null, piece('r1').sol ?? null]).toEqual([null, null]);
     act(() => t.unmount());
   });
 

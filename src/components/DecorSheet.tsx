@@ -16,7 +16,7 @@ import type { ObjectData } from 'react-native-room-scan';
 import { SheetShell } from './Sheet';
 import { haptic } from '../ui/haptic';
 import { SOLAIRES } from '../ui/solaires';
-import { PEINTURES, PEINTURE_DEFAUT, type Peinture } from '../ui/peintures';
+import { PEINTURES, type Peinture } from '../ui/peintures';
 import { SOLS, SOL_DEFAUT, TEINTES_MEUBLES, TEINTE_ORIGINE, cleDeTeinte, hexDeTeinte } from '../ui/habillage';
 import { nomDuMeuble } from '../geometry/furniture';
 import { useScanStore } from '../store/scanStore';
@@ -85,12 +85,25 @@ function PieceTournante({
       niveau={niveau}
       showMeasures={false}
       showNorth={false}
+      decor
       cutaway
     />
   );
 }
 
 type Onglet = 'ambiances' | 'murs' | 'sol' | 'meubles';
+
+/*
+  « D'ORIGINE » N'EST PAS « BLANC CASSÉ » — revue « Inès » : le blanc se
+  rangeait comme « aucune peinture », et sur un plan scanné le mur gardait
+  la couleur relevée ; « Scandinave » laissait des murs verts. Le blanc
+  s'enregistre désormais pour lui-même, et « D'origine » a sa pastille.
+*/
+const ORIGINE = 'origine';
+const MUR_RELEVE = { cle: ORIGINE, nom: 'D’origine', hex: '#E6E9EE' };
+/** Une coche se lit sur la teinte, quel que soit le thème. */
+const COCHE_CLAIRE = '#0B0D12';
+const nbsp = (texte: string) => texte.replace(/ :/g, '\u00A0:');
 
 /*
   LES AMBIANCES, EN UN APPUI — relevé du patron : « trop compliqué pour
@@ -106,10 +119,10 @@ export const AMBIANCES: { cle: string; nom: string; peinture: string; sol: strin
   { cle: 'mer', nom: 'Bord de mer', peinture: 'bleuGris', sol: 'carrelage' },
   { cle: 'mineral', nom: 'Minéral', peinture: 'perle', sol: 'beton' },
   { cle: 'chic', nom: 'Chic', peinture: 'anthracite', sol: 'noyer' },
-  { cle: 'origine', nom: 'D’origine', peinture: PEINTURE_DEFAUT, sol: SOL_DEFAUT },
+  { cle: 'origine', nom: 'D’origine', peinture: ORIGINE, sol: SOL_DEFAUT },
 ];
 
-const hexPeinture = (cle: string) => PEINTURES.find((p) => p.cle === cle)?.hex ?? '#FFFFFF';
+const hexPeinture = (cle: string) => PEINTURES.find((p) => p.cle === cle)?.hex ?? MUR_RELEVE.hex;
 const hexSol = (cle: string) => SOLS.find((p) => p.cle === cle)?.hex ?? '#D9CBB4';
 
 export function DecorSheet({
@@ -130,6 +143,8 @@ export function DecorSheet({
   const rooms = useScanStore((st) => st.rooms);
   const objects = useScanStore((st) => st.objects);
   const canUndo = useScanStore((st) => st.canUndo);
+  // « Annuler » ne défait que ce qu'on a changé ici (revue « Inès » : il
+  // pouvait défaire une retouche du plan faite avant d'ouvrir la feuille).
   /*
     SUR PLUSIEURS NIVEAUX, CHAQUE PIÈCE DIT LE SIEN — correctif de l'audit :
     deux « Chambre » ne se distinguaient pas, et l'aperçu restait celui du
@@ -147,11 +162,17 @@ export function DecorSheet({
         : rooms,
     [rooms, plusieursNiveaux],
   );
-  const nomDeLaPiece = (r: (typeof rooms)[number], i: number) => {
-    const nom = r.name || `Pièce ${i + 1}`;
+  const nomDeLaPiece = (r: (typeof rooms)[number], _i: number) => {
+    // Le même numéro que sur le plan, pas celui du tri par niveau.
+    const nom = r.name || `Pièce ${rooms.indexOf(r) + 1}`;
     return plusieursNiveaux ? `${nom} · ${nomDuNiveau(niveauDe(r))}` : nom;
   };
   const [pieceId, setPieceId] = useState<string | null>(null);
+  const [onglet, setOnglet] = useState<Onglet>('murs');
+  const [partout, setPartout] = useState(false);
+  /** Les changements faits depuis l'ouverture : « Annuler » ne défait qu'eux. */
+  const [faits, setFaits] = useState(0);
+  const peutAnnuler = canUndo && faits > 0;
   /*
     LA PIÈCE CHOISIE NE SE PERD PLUS — relevé du patron : « lorsqu'on change
     de pièce, on revient à la première pièce si on change de couleur ». Elle
@@ -159,7 +180,14 @@ export function DecorSheet({
   */
   const etaitVisible = useRef(false);
   useEffect(() => {
-    if (visible && !etaitVisible.current) setPieceId(pieceInitiale ?? nommees[0]?.id ?? null);
+    if (visible && !etaitVisible.current) {
+      setPieceId(pieceInitiale ?? nommees[0]?.id ?? null);
+      // Chaque ouverture repart des murs, sur la pièce seule (revue « Inès » :
+      // « Tout le logement » restait armé d'une fois sur l'autre).
+      setOnglet('murs');
+      setPartout(false);
+      setFaits(0);
+    }
     etaitVisible.current = visible;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
@@ -192,37 +220,63 @@ export function DecorSheet({
   const { height: hauteurEcran } = useWindowDimensions();
   // L'aperçu prend un bon quart de l'écran : on décore ce qu'on voit, et
   // tout le reste tient en dessous sans se marcher dessus.
-  const hauteurApercu = Math.round(Math.min(320, Math.max(180, hauteurEcran * 0.29)));
+  const hauteurApercu = Math.round(
+    hauteurEcran < 700 ? Math.max(150, hauteurEcran * 0.22) : Math.min(320, Math.max(180, hauteurEcran * 0.29)),
+  );
   const repos = useRef(0);
-  const [onglet, setOnglet] = useState<Onglet>('murs');
   const [meubleId, setMeubleId] = useState<string | null>(null);
-  const [partout, setPartout] = useState(false);
   // Une autre pièce : on repart des murs, sans meuble choisi.
   useEffect(() => {
     setOnglet((o) => (o === 'ambiances' ? o : 'murs'));
     setMeubleId(null);
   }, [piece?.id]);
   const meuble = meubles.find((o) => o.id === meubleId) ?? meubles[0] ?? null;
-  const peinture = piece ? PEINTURES.find((p) => p.cle === (piece.peinture ?? PEINTURE_DEFAUT)) : undefined;
-  const sol = piece ? SOLS.find((p) => p.cle === (piece.sol ?? SOL_DEFAUT)) : undefined;
-  const pastilleDe = (o: ObjectData) =>
-    TEINTES_MEUBLES.find((p) => p.cle === (o.teinte ? cleDeTeinte(o.teinte) : TEINTE_ORIGINE));
+  const peinture = piece
+    ? piece.peinture
+      ? PEINTURES.find((p) => p.cle === piece.peinture) ?? { cle: piece.peinture, nom: 'Teinte inconnue', hex: MUR_RELEVE.hex }
+      : MUR_RELEVE
+    : undefined;
+  const sol = piece
+    ? SOLS.find((p) => p.cle === (piece.sol ?? SOL_DEFAUT)) ?? { cle: piece.sol ?? '', nom: 'Sol inconnu', hex: '#D9CBB4', motif: null }
+    : undefined;
+  /*
+    UNE TEINTE HORS NUANCIER SE DIT — revue « Hugo » : « D’origine » se
+    cochait sur un meuble peint d'une couleur que le nuancier ne connaît pas.
+  */
+  const pastilleDe = (o: ObjectData) => {
+    if (o.teinte && !TEINTES_MEUBLES.some((t) => t.hex.toLowerCase() === o.teinte!.toLowerCase())) {
+      return { cle: '', nom: 'Teinte personnalisée', hex: o.teinte };
+    }
+    return TEINTES_MEUBLES.find((p) => p.cle === (o.teinte ? cleDeTeinte(o.teinte) : TEINTE_ORIGINE));
+  };
 
-  const peindre = (roomId: string, cle: string) => st().setRoomPeinture(roomId, cle === PEINTURE_DEFAUT ? null : cle);
-  const poserSol = (roomId: string, cle: string) => st().setRoomSol(roomId, cle === SOL_DEFAUT ? null : cle);
+  /** Un changement compté seulement s'il change quelque chose. */
+  const compter = (fait: () => void) => {
+    const avant = st().rooms;
+    const avantMeubles = st().objects;
+    fait();
+    if (st().rooms !== avant || st().objects !== avantMeubles) setFaits((n) => n + 1);
+  };
+  const peindre = (roomId: string, cle: string) =>
+    compter(() => st().setRoomPeinture(roomId, cle === ORIGINE ? null : cle));
+  const poserSol = (roomId: string, cle: string) =>
+    compter(() => st().setRoomSol(roomId, cle === SOL_DEFAUT ? null : cle));
   /** L'ambiance, sur la pièce — ou sur tout le logement. */
   const appliquer = (a: { peinture: string; sol: string }) => {
     if (!piece) return;
     haptic('succes');
-    for (const r of partout ? nommees : [piece]) {
-      peindre(r.id, a.peinture);
-      poserSol(r.id, a.sol);
-    }
+    compter(() =>
+      st().appliquerAmbiance(
+        (partout ? nommees : [piece]).map((r) => r.id),
+        a.peinture === ORIGINE ? null : a.peinture,
+        a.sol === SOL_DEFAUT ? null : a.sol,
+      ),
+    );
   };
   /** Le hasard : une teinte de mur et un sol qui ne sont pas ceux d'avant. */
   const surprise = () => {
     if (!piece) return;
-    const murs = PEINTURES.filter((p) => p.cle !== (piece.peinture ?? PEINTURE_DEFAUT));
+    const murs = PEINTURES.filter((p) => p.cle !== (piece.peinture ?? ORIGINE));
     const sols = SOLS.filter((p) => p.cle !== SOL_DEFAUT && p.cle !== (piece.sol ?? SOL_DEFAUT));
     appliquer({
       peinture: murs[Math.floor(Math.random() * murs.length)].cle,
@@ -230,7 +284,7 @@ export function DecorSheet({
     });
   };
   const ambianceActuelle = piece
-    ? AMBIANCES.find((a) => a.peinture === (piece.peinture ?? PEINTURE_DEFAUT) && a.sol === (piece.sol ?? SOL_DEFAUT))
+    ? AMBIANCES.find((a) => a.peinture === (piece.peinture ?? ORIGINE) && a.sol === (piece.sol ?? SOL_DEFAUT))
     : undefined;
 
   /** Une grille de pastilles : la coche sur celle qui est prise, qui grossit. */
@@ -239,7 +293,7 @@ export function DecorSheet({
     prise: string,
     dire: (p: Peinture) => string,
     choisir: (cle: string) => void,
-    taille = 48,
+    taille = 46,
   ) => (
     <View style={s.nuancier}>
       {liste.map((p) => {
@@ -250,7 +304,7 @@ export function DecorSheet({
           chêne clair » à quelqu'un.
         */
         return (
-          <View key={p.cle} style={[s.teinte, { width: taille + 22 }]}>
+          <View key={p.cle} style={s.teinte}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={dire(p)}
@@ -281,7 +335,7 @@ export function DecorSheet({
                   <Path
                     d={SOLAIRES.coche}
                     fill="none"
-                    stroke={sombre(p.hex) ? '#FFFFFF' : c.ink}
+                    stroke={sombre(p.hex) ? '#FFFFFF' : COCHE_CLAIRE}
                     strokeWidth={2.6}
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -323,7 +377,7 @@ export function DecorSheet({
         <Text style={[s.tuileNom, pris && s.tuileNomPris]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
           {nom}
         </Text>
-        <Text style={s.tuileValeur} numberOfLines={1}>
+        <Text style={s.tuileValeur} numberOfLines={2}>
           {valeur}
         </Text>
       </Pressable>
@@ -343,7 +397,7 @@ export function DecorSheet({
       ) : null}
       {icone ? (
         <Svg width={18} height={18} viewBox="0 0 24 24">
-          <Path d={icone} fill={sombre(hex) ? '#FFFFFF' : c.ink} fillRule="evenodd" />
+          <Path d={icone} fill={sombre(hex) ? '#FFFFFF' : COCHE_CLAIRE} fillRule="evenodd" />
         </Svg>
       ) : null}
     </View>
@@ -351,19 +405,20 @@ export function DecorSheet({
 
   return (
     <SheetShell visible={visible} onClose={onClose} defile={false}>
-      <View style={s.tete}>
+      <View style={s.tete} onTouchStart={() => (repos.current = Date.now())}>
         <Text style={s.titre}>Décorer</Text>
         {/* Annuler sans quitter : on ose essayer quand on peut revenir. */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Annuler le dernier changement"
-          accessibilityState={{ disabled: !canUndo }}
-          disabled={!canUndo}
+          accessibilityState={{ disabled: !peutAnnuler }}
+          disabled={!peutAnnuler}
           hitSlop={8}
-          style={({ pressed }) => [s.annuler, !canUndo && { opacity: 0.35 }, pressed && { opacity: 0.6 }]}
+          style={({ pressed }) => [s.annuler, !peutAnnuler && { opacity: 0.35 }, pressed && { opacity: 0.6 }]}
           onPress={() => {
             haptic('leger');
             st().undo();
+            setFaits((n) => Math.max(0, n - 1));
           }}>
           <Svg width={18} height={18} viewBox="0 0 24 24">
             <Path d={SOLAIRES.undo} fill={c.ink} fillRule="evenodd" />
@@ -372,7 +427,7 @@ export function DecorSheet({
       </View>
 
       {nommees.length === 0 ? (
-        <Text style={s.vide}>Aucune pièce sur ce plan : tracez ou redétectez les pièces pour les décorer.</Text>
+        <Text style={s.vide}>Aucune pièce sur ce plan : dessinez vos pièces sur le plan pour les décorer.</Text>
       ) : (
         <>
           {/* LES PIÈCES, chacune avec ses deux couleurs du moment. */}
@@ -397,12 +452,19 @@ export function DecorSheet({
                       setPieceId(r.id);
                     }}>
                     <View style={s.puceTeintes}>
-                      <View style={[s.puceTeinte, { backgroundColor: hexPeinture(r.peinture ?? PEINTURE_DEFAUT) }]} />
+                      <View style={[s.puceTeinte, { backgroundColor: hexPeinture(r.peinture ?? ORIGINE) }]} />
                       <View style={[s.puceTeinte, s.puceTeinte2, { backgroundColor: hexSol(r.sol ?? SOL_DEFAUT) }]} />
                     </View>
-                    <Text style={[s.puceTexte, prise && s.puceTextePris]} numberOfLines={1}>
-                      {nomDeLaPiece(r, i)}
-                    </Text>
+                    <View style={s.puceMots}>
+                      <Text style={[s.puceTexte, prise && s.puceTextePris]} numberOfLines={1}>
+                        {r.name || `Pièce ${rooms.indexOf(r) + 1}`}
+                      </Text>
+                      {plusieursNiveaux ? (
+                        <Text style={[s.puceNiveau, prise && s.puceTextePris]} numberOfLines={1}>
+                          {nomDuNiveau(niveauDe(r))}
+                        </Text>
+                      ) : null}
+                    </View>
                   </Pressable>
                 );
               })}
@@ -410,7 +472,11 @@ export function DecorSheet({
           )}
 
           {visible && piece ? (
-            <View style={[s.apercu, { height: hauteurApercu }]}>
+            <View
+              style={[s.apercu, { height: hauteurApercu }]}
+              // Un doigt posé, même immobile, arrête le tour (revue « Hugo »).
+              onTouchStart={() => (repos.current = Date.now())}
+              onTouchMove={() => (repos.current = Date.now())}>
               <PieceTournante pieceId={piece.id} niveau={niveauDe(piece)} repos={repos} />
               {ambianceActuelle && ambianceActuelle.cle !== 'origine' ? (
                 <View style={s.badgeAmbiance} pointerEvents="none">
@@ -421,8 +487,8 @@ export function DecorSheet({
           ) : null}
 
           {piece && (
-            <View style={s.tuiles} accessibilityRole="tablist">
-              {tuile('ambiances', 'Ambiance', ambianceActuelle?.nom ?? 'Au choix', rondTuile(c.blueSoft, null, SOLAIRES.baguette))}
+            <View style={s.tuiles} accessibilityRole="tablist" onTouchStart={() => (repos.current = Date.now())}>
+              {tuile('ambiances', 'Ambiance', ambianceActuelle?.nom ?? 'Personnalisée', rondTuile(c.blueSoft, null, SOLAIRES.baguette))}
               {tuile('murs', 'Murs', peinture?.nom ?? '', rondTuile(peinture?.hex ?? '#FFFFFF'))}
               {tuile('sol', 'Sol', sol?.nom ?? '', rondTuile(sol?.hex ?? '#D9CBB4', sol?.motif))}
               {tuile(
@@ -456,7 +522,7 @@ export function DecorSheet({
                         setPartout((v) => !v);
                       }}>
                       <Text style={[s.porteeTexte, partout && s.porteeTexteOn]}>
-                        {partout ? 'Tout le logement' : 'Cette pièce'}
+                        {partout ? `Tout le logement · ${nommees.length} pièces` : 'Cette pièce'}
                       </Text>
                     </Pressable>
                   )}
@@ -499,10 +565,10 @@ export function DecorSheet({
             )}
             {piece && onglet === 'murs' && (
               <>
-                <Text style={s.section}>{`Les murs : ${peinture?.nom ?? ''}`}</Text>
+                <Text style={s.section}>{nbsp(`Les murs : ${peinture?.nom ?? ''}`)}</Text>
                 {nuancier(
-                  PEINTURES,
-                  piece.peinture ?? PEINTURE_DEFAUT,
+                  [MUR_RELEVE, ...PEINTURES],
+                  piece.peinture ?? ORIGINE,
                   (p) => `Murs : ${p.nom}`,
                   (cle) => peindre(piece.id, cle),
                 )}
@@ -527,7 +593,7 @@ export function DecorSheet({
             )}
             {piece && onglet === 'sol' && (
               <>
-                <Text style={s.section}>{`Le sol : ${sol?.nom ?? ''}`}</Text>
+                <Text style={s.section}>{nbsp(`Le sol : ${sol?.nom ?? ''}`)}</Text>
                 {nuancier(SOLS, piece.sol ?? SOL_DEFAUT, (p) => `Sol : ${p.nom}`, (cle) => poserSol(piece.id, cle))}
               </>
             )}
@@ -550,6 +616,8 @@ export function DecorSheet({
                       const nom = nomsDesMeubles.get(o.id) ?? nomDuMeuble(o);
                       const pris = o.id === meuble.id;
                       const teinte = pastilleDe(o);
+                      // Le numéro à part : coupé en fin de nom, il ne distinguait plus rien.
+                      const rang = nom === nomDuMeuble(o) ? null : nom.slice(nomDuMeuble(o).length + 1);
                       return (
                         <Pressable
                           key={o.id}
@@ -561,9 +629,16 @@ export function DecorSheet({
                             haptic('leger');
                             setMeubleId(o.id);
                           }}>
-                          <View style={[s.meubleTeinte, { backgroundColor: teinte?.hex ?? c.surface }]} />
+                          <View style={s.meubleHaut}>
+                            <View style={[s.meubleTeinte, { backgroundColor: teinte?.hex ?? c.surface }]} />
+                            {rang ? (
+                              <View style={s.meubleRang}>
+                                <Text style={s.meubleRangTexte}>{rang}</Text>
+                              </View>
+                            ) : null}
+                          </View>
                           <Text style={[s.meubleNom, pris && s.meubleNomPris]} numberOfLines={2}>
-                            {nom}
+                            {nomDuMeuble(o)}
                           </Text>
                         </Pressable>
                       );
@@ -573,12 +648,12 @@ export function DecorSheet({
                     const nom = nomsDesMeubles.get(meuble.id) ?? nomDuMeuble(meuble);
                     return (
                       <>
-                        <Text style={s.section}>{`${nom} : ${pastilleDe(meuble)?.nom ?? ''}`}</Text>
+                        <Text style={s.section}>{nbsp(`${nom} : ${pastilleDe(meuble)?.nom ?? ''}`)}</Text>
                         {nuancier(
                           TEINTES_MEUBLES,
                           meuble.teinte ? cleDeTeinte(meuble.teinte) : TEINTE_ORIGINE,
                           (p) => `${nom} : ${p.nom}`,
-                          (cle) => st().setObjectTeinte(meuble.id, hexDeTeinte(cle)),
+                          (cle) => compter(() => st().setObjectTeinte(meuble.id, hexDeTeinte(cle))),
                           44,
                         )}
                       </>
@@ -622,7 +697,9 @@ const getStyles = themedStyles((c: Palette) =>
     puceTeintes: { flexDirection: 'row' },
     puceTeinte: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: c.surface },
     puceTeinte2: { marginLeft: -8 },
+    puceMots: { maxWidth: 190 },
     puceTexte: { color: c.ink, fontSize: 14, fontWeight: '700' },
+    puceNiveau: { color: c.inkSoft, fontSize: 10.5, fontWeight: '600' },
     puceTextePris: { color: c.surface },
     apercu: {
       flexShrink: 0,
@@ -645,7 +722,7 @@ const getStyles = themedStyles((c: Palette) =>
     tuiles: { flexDirection: 'row', gap: 8, marginTop: 10, flexShrink: 0 },
     tuile: {
       flex: 1,
-      height: 92,
+      height: 102,
       borderRadius: radius.md,
       backgroundColor: c.surfaceSunken,
       alignItems: 'center',
@@ -667,10 +744,10 @@ const getStyles = themedStyles((c: Palette) =>
     },
     tuileNom: { color: c.ink, fontSize: 13.5, fontWeight: '700', marginTop: 6 },
     tuileNomPris: { color: c.blue, fontWeight: '800' },
-    tuileValeur: { color: c.inkSoft, fontSize: 11, marginTop: 1 },
+    tuileValeur: { color: c.inkSoft, fontSize: 11, lineHeight: 13, marginTop: 1, textAlign: 'center' },
     corps: { flexShrink: 1, minHeight: 140, marginTop: 4 },
     corpsFond: { paddingBottom: 18 },
-    ligneTitre: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    ligneTitre: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     section: {
       color: c.inkSoft,
       fontSize: 12,
@@ -681,6 +758,7 @@ const getStyles = themedStyles((c: Palette) =>
       marginBottom: 10,
     },
     portee: {
+      flexShrink: 0,
       marginTop: 6,
       height: 30,
       paddingHorizontal: 12,
@@ -711,10 +789,11 @@ const getStyles = themedStyles((c: Palette) =>
     miniSol: { flex: 1 },
     ambianceNom: { color: c.ink, fontSize: 13, fontWeight: '700', marginTop: 6, textAlign: 'center' },
     ambianceNomPris: { color: c.blue, fontWeight: '800' },
-    nuancier: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, rowGap: 10 },
-    teinte: { alignItems: 'center' },
+    // Cinq par rangée, sur toute la largeur : plus de vide à droite.
+    nuancier: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 10 },
+    teinte: { alignItems: 'center', width: '20%' },
     teinteNom: { color: c.inkSoft, fontSize: 12, lineHeight: 15, marginTop: 5, textAlign: 'center' },
-    teinteNomPrise: { color: c.ink, fontWeight: '800' },
+    teinteNomPrise: { color: c.ink, fontWeight: '700' },
     pastille: {
       borderWidth: 1,
       borderColor: c.line,
@@ -735,6 +814,17 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'space-between',
     },
     meubleCartePrise: { borderColor: c.blue, backgroundColor: c.surface },
+    meubleHaut: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    meubleRang: {
+      minWidth: 22,
+      height: 22,
+      borderRadius: 11,
+      paddingHorizontal: 6,
+      backgroundColor: c.ink,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    meubleRangTexte: { color: c.surface, fontSize: 12, fontWeight: '800' },
     meubleTeinte: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' },
     meubleNom: { color: c.ink, fontSize: 13, fontWeight: '600' },
     meubleNomPris: { fontWeight: '800' },

@@ -1950,6 +1950,8 @@ interface ScanState {
   setRoomPeinture: (roomId: string, cle: string | null) => void;
   /** Choisit le sol d'une pièce. `null` le rend à la maquette. */
   setRoomSol: (roomId: string, cle: string | null) => void;
+  /** Une ambiance : murs et sol de plusieurs pièces, en UN geste annulable. */
+  appliquerAmbiance: (roomIds: string[], peinture: string | null, sol: string | null) => void;
   /** Peint un mur d'une pièce, côté pièce. `null` lui rend la teinte de la pièce. */
   setMurAccent: (roomId: string, wallId: string, cle: string | null) => void;
   /** Teinte un meuble (#RRGGBB). `null` lui rend sa couleur d'origine. */
@@ -4268,11 +4270,16 @@ export const useScanStore = create<ScanState>((set, get) => {
      * le dossier ; `null` retire la peinture, et le mur retrouve la teinte
      * que le scan lui avait relevée — ou le blanc du dessin.
      */
+    /*
+      UNE TEINTE, UN GESTE — revue « Hugo » : la clé portait « : », la marque
+      des gestes continus ; deux teintes choisies en moins d'une seconde
+      fusionnaient, et « Annuler » sautait la première.
+    */
     setRoomPeinture: (roomId, cle) => {
       const st = get();
       const piece = st.rooms.find((r) => r.id === roomId);
       if (!piece || (piece.peinture ?? null) === cle) return;
-      pushHistory(`peinture:${roomId}`);
+      pushHistory(`peinture-${roomId}`);
       set({
         rooms: st.rooms.map((r) =>
           r.id === roomId
@@ -4298,7 +4305,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       const piece = st.rooms.find((r) => r.id === roomId);
       if (!piece || (piece.sol ?? null) === cle) return;
-      pushHistory(`sol:${roomId}`);
+      pushHistory(`sol-${roomId}`);
       set({
         rooms: st.rooms.map((r) =>
           r.id === roomId ? (cle ? { ...r, sol: cle } : (({ sol: _retire, ...reste }) => reste)(r)) : r,
@@ -4307,11 +4314,36 @@ export const useScanStore = create<ScanState>((set, get) => {
       });
     },
 
+    /*
+      UNE AMBIANCE, UN GESTE — les murs et le sol de chaque pièce visée
+      changent ensemble, et « Annuler » les rend ensemble (deux entrées par
+      pièce, sinon : quatre appuis pour défaire une ambiance sur deux pièces).
+    */
+    appliquerAmbiance: (roomIds, peinture, sol) => {
+      const st = get();
+      const vise = new Set(roomIds);
+      const change = st.rooms.some(
+        (r) => vise.has(r.id) && ((r.peinture ?? null) !== peinture || (r.sol ?? null) !== sol),
+      );
+      if (!change) return;
+      pushHistory('ambiance');
+      set({
+        rooms: st.rooms.map((r) => {
+          if (!vise.has(r.id)) return r;
+          const reste = { ...r };
+          delete reste.peinture;
+          delete reste.sol;
+          return { ...reste, ...(peinture ? { peinture } : {}), ...(sol ? { sol } : {}) };
+        }),
+        dirty: true,
+      });
+    },
+
     setMurAccent: (roomId, wallId, cle) => {
       const st = get();
       const piece = st.rooms.find((r) => r.id === roomId);
       if (!piece || (piece.accents?.[wallId] ?? null) === cle) return;
-      pushHistory(`accent:${roomId}:${wallId}`);
+      pushHistory(`accent-${roomId}-${wallId}`);
       set({
         rooms: st.rooms.map((r) => {
           if (r.id !== roomId) return r;
@@ -4330,7 +4362,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       const meuble = st.objects.find((o) => o.id === objectId);
       if (!meuble || (meuble.teinte ?? null) === hex) return;
-      pushHistory(`teinte:${objectId}`);
+      pushHistory(`teinte-${objectId}`);
       set({
         objects: st.objects.map((o) =>
           o.id === objectId ? (hex ? { ...o, teinte: hex } : (({ teinte: _retiree, ...reste }) => reste)(o)) : o,

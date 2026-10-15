@@ -14321,6 +14321,38 @@ les onglets Murs / Sol / Meubles, et choisir un meuble ou une couleur était
 - **La coche est une coche** : l'icône `check` dessinait une loupe ; chaque
   teinte choisie (Décorer, Peindre, Diagnostic) s'ornait d'une loupe.
 
+## « Décorer », un aperçu sans intrus et des teintes sûres
+
+Relevé du patron, capture à l'appui : l'aperçu de « Décorer » montrait les
+repères électriques et le plafond équipé, jusqu'à ceux des autres pièces.
+Deux testeurs (« Inès », « Hugo ») ont ensuite repassé toute la feuille.
+- **L'aperçu ne montre que la pièce choisie** (`Iso3DView`, prop `decor`) :
+  ni prise, ni interrupteur, ni repère, ni plafonnier (même en mode
+  électricité). Le plafond est aussi filtré par pièce partout où la maquette
+  vise une seule pièce.
+- **Plus de meuble ni de fenêtre d'à côté** : un meuble sans pièce n'est plus
+  rangé d'office dans « room-1 », et une baie doit se trouver sur l'axe du
+  mur (15 cm) et dans sa longueur. Avant, une fenêtre près du coin de la
+  pièce voisine entrait dans l'aperçu et le décentrait.
+- **Les meubles et le sol sont toujours visibles dans « Décorer »**, même
+  s'ils sont masqués sur la maquette : c'est ce qu'on y teint.
+- **« Blanc » n'est plus « D'origine »** : « D'origine » rend la couleur
+  relevée ; « Blanc cassé » (et l'ambiance Scandinave) peint vraiment en
+  blanc, ce qui ne changeait rien sur un relevé grisé.
+- **« Annuler » défait un choix à la fois**. Deux teintes choisies coup sur
+  coup ne fusionnent plus en une seule étape ; une ambiance (murs + sol) se
+  défait d'un seul appui. Le bouton ne remonte pas avant l'ouverture de la
+  feuille.
+- **À chaque ouverture, la feuille repart propre** : onglet Murs, pièce
+  seule (« Tout le logement » ne reste plus enclenché d'une fois sur
+  l'autre).
+- Coche lisible sur les teintes claires en mode sombre ; numéro du meuble en
+  pastille (« Chaise » ①, ②) au lieu d'un nom tronqué ; teinte inconnue ou
+  personnalisée nommée comme telle ; le doigt posé sur l'aperçu ou les tuiles
+  arrête la rotation ; aperçu réduit sur les petits écrans.
+- Bancs : `decorsolide.test.tsx` compare deux rendus, avec et sans
+  l'intrus. Il échoue sur l'ancien code et passe sur le nouveau.
+
 ## Vu sur les vraies captures du simulateur
 
 Premier passage de l'app réelle, compilée et parcourue sur un iPhone

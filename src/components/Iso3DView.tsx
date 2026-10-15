@@ -352,6 +352,10 @@ interface Props {
   showElecTags?: boolean;
   /** N'afficher qu'une pièce : ses murs, son sol, ses meubles. */
   focusRoomId?: string | null;
+  /** Ni appareils, ni repères, ni plafond équipé : la décoration seule. */
+  sansElectricite?: boolean;
+  /** « Décorer » : sans électricité, et toujours avec les meubles et le sol. */
+  decor?: boolean;
   /**
    * N'AFFICHER QU'UN MUR — celui qu'on est en train de présenter.
    *
@@ -464,6 +468,21 @@ interface Props {
   tourne le modèle, ce qui est précisément le moment où l'on n'en a pas les
   moyens.
 */
+/*
+  UNE BAIE DE CE MUR, ET PAS DU VOISIN — revues « Inès » et « Hugo » : à
+  0,6 m près, la fenêtre de la cuisine, posée près du coin du séjour, entrait
+  dans l'aperçu du séjour et décentrait le cadrage. Sur l'axe du mur (15 cm),
+  et dans sa longueur.
+*/
+function baieDuMur(o: WallSeg, w: WallSeg): boolean {
+  const m = midOf(o);
+  const p = pointOnSeg(m, w.a, w.b);
+  if (p.dist > 0.15) return false;
+  const L = Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) || 1;
+  const t = ((m.x - w.a.x) * (w.b.x - w.a.x) + (m.z - w.a.z) * (w.b.z - w.a.z)) / (L * L);
+  return t > 0.001 && t < 0.999;
+}
+
 const AUCUN_APPAREIL: Fixture[] = [];
 const AUCUN_PLAFOND: CeilingFixture[] = [];
 
@@ -491,6 +510,8 @@ export function Iso3DView({
   light = false,
   prebuildRooms,
   circuits,
+  sansElectricite = false,
+  decor = false,
 }: Props) {
   /*
     LE MODE ÉLECTRICITÉ, LU À LA SOURCE — comme pour le plan (voir
@@ -502,7 +523,12 @@ export function Iso3DView({
     s'éteint avec eux. La 3D est montée par l'écran du relevé, par l'export
     et par l'exploration ; c'est donc ICI que la décision se prend, une fois.
   */
-  const modeElec = useModeElec();
+  /*
+    SANS ÉLECTRICITÉ, MÊME EN MODE ÉLECTRICITÉ — « Décorer » montre les
+    murs, le sol et les meubles ; les repères de prises et le plafond équipé
+    n'y ont rien à faire (relevé du patron).
+  */
+  const modeElec = useModeElec() && !sansElectricite && !decor;
   const showElecTags = modeElec && showElecTagsDemande;
   const showCeiling = modeElec && showCeilingDemande;
   const showVolumes = modeElec && showVolumesDemande;
@@ -513,9 +539,10 @@ export function Iso3DView({
   const tousLesMeubles = useScanStore((s) => s.objects);
   const niveauAffiche = useScanStore((s) => s.niveauCourant);
   const niveauCourant = niveau ?? niveauAffiche;
-  const showFurniture = useScanStore((s) => s.showFurniture);
+  // « Décorer » montre toujours les meubles et le sol : c'est ce qu'on y teint.
+  const showFurniture = useScanStore((s) => s.showFurniture) || decor;
   // Le sol, à part des surfaces (qui ne sont plus que les étiquettes).
-  const showSol = useScanStore((s) => s.showSol);
+  const showSol = useScanStore((s) => s.showSol) || decor;
   const north = useScanStore((s) => s.north);
   const toutLePlafondStocke = useScanStore((s) => s.ceiling);
   const toutesLesPieces = useScanStore((s) => s.rooms);
@@ -550,7 +577,7 @@ export function Iso3DView({
     rooms: piecesDuNiveau,
     fixtures: appareillageDuNiveau,
     objects: meublesDuNiveau,
-    ceiling,
+    ceiling: plafondDuNiveau,
   } = useMemo(
     () =>
       filtrerAuNiveau(
@@ -598,6 +625,15 @@ export function Iso3DView({
   // La présentation impose l'écorché ; ailleurs, c'est le réglage qui décide.
   const solidWalls = cutaway === undefined ? solidWallsReglage : !cutaway;
   const allRooms = piecesDuNiveau;
+  /*
+    LE PLAFOND DE LA PIÈCE VISÉE, ET LUI SEUL — relevé du patron, capture de
+    « Décorer » à l'appui : les suspensions et les spots des autres pièces
+    flottaient autour du bureau, et tiraient le cadrage de côté.
+  */
+  const ceiling = useMemo(
+    () => (focusRoomId ? plafondDuNiveau.filter((cl) => cl.roomId === focusRoomId) : plafondDuNiveau),
+    [plafondDuNiveau, focusRoomId],
+  );
   // Coupe : on ne garde que la pièce visée, murs et meubles compris.
   const rooms = useMemo(
     () => (focusRoomId ? allRooms.filter((r) => r.id === focusRoomId) : allRooms),
@@ -610,13 +646,13 @@ export function Iso3DView({
   }, [walls, rooms, focusRoomId]);
   const keptOpenings = useMemo(() => {
     if (!focusRoomId) return openings;
-    return openings.filter((o) =>
-      keptWalls.some((w) => pointOnSeg(midOf(o), w.a, w.b).dist < 0.6),
-    );
+    return openings.filter((o) => keptWalls.some((w) => baieDuMur(o, w)));
   }, [openings, keptWalls, focusRoomId]);
   const keptObjects = useMemo(
     () =>
-      focusRoomId ? objects.filter((o) => roomOf(o) === focusRoomId) : objects,
+      // Le roomId exact : un meuble sans pièce n'appartient pas à « room-1 »
+      // (revue « Hugo » : il décentrait et rapetissait l'aperçu).
+      focusRoomId ? objects.filter((o) => o.roomId === focusRoomId) : objects,
     [objects, focusRoomId],
   );
   // L'appareillage suit son mur : en coupe sur une pièce, les prises des
@@ -1088,7 +1124,7 @@ export function Iso3DView({
     openings,
     objects,
     allFixtures,
-    ceiling,
+    plafondDuNiveau,
     palette,
     showSurfaces,
     showSol,
@@ -1107,16 +1143,14 @@ export function Iso3DView({
       const ids = new Set(rs[0]?.wallIds ?? []);
       const ws = focus ? walls.filter((w) => ids.has(w.id)) : walls;
       const os = focus
-        ? openings.filter((o) =>
-            ws.some((w) => pointOnSeg(midOf(o), w.a, w.b).dist < 0.6),
-          )
+        ? openings.filter((o) => ws.some((w) => baieDuMur(o, w)))
         : openings;
       const murs = new Map(ws.map((w) => [w.id, w]));
       return {
         rooms: rs,
         walls: ws,
         openings: os,
-        objects: focus ? objects.filter((o) => roomOf(o) === focus) : objects,
+        objects: focus ? objects.filter((o) => o.roomId === focus) : objects,
         // Les appareils de sa face seulement : voir `fixtures` plus haut.
         fixtures: focus
           ? allFixtures.filter((f) => {
@@ -1168,7 +1202,9 @@ export function Iso3DView({
         floors: floorsOf(e.rooms),
         rooms: e.rooms,
         fixtures: e.fixtures,
-        ceiling: showCeiling ? ceiling : [],
+        // Le plafond de CETTE pièce : la scène bâtie d'avance ne dépend pas
+        // de la pièce regardée à l'instant.
+        ceiling: showCeiling ? (focus ? plafondDuNiveau.filter((cl) => cl.roomId === focus) : plafondDuNiveau) : [],
         peintures,
         sols,
         accents,
@@ -1186,7 +1222,7 @@ export function Iso3DView({
       showSurfaces,
       showSol,
       showTextures,
-      ceiling,
+      plafondDuNiveau,
       showCeiling,
       peintures,
       sols,
