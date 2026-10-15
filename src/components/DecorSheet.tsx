@@ -735,7 +735,7 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'space-between',
     },
     meubleCartePrise: { borderColor: c.blue, backgroundColor: c.surface },
-    meubleTeinte: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: c.line },
+    meubleTeinte: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' },
     meubleNom: { color: c.ink, fontSize: 13, fontWeight: '600' },
     meubleNomPris: { fontWeight: '800' },
     vide: { color: c.inkSoft, fontSize: 13.5, lineHeight: 19, marginTop: 10 },
