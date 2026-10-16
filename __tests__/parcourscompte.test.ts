@@ -134,7 +134,7 @@ describe('le parcours complet d’un abonne', () => {
     ac().connecter(MARTIN);
     await tick();
     const rendu = await ac().restaurerPro();
-    expect(rendu).toBe(true);
+    expect(rendu).toBe('restaure');
     expect(ac().pro).toBe(true);
     // Il ne repasse pas a la caisse : l'export lui est rendu.
     expect(ac().exportOuvert()).toBe(true);

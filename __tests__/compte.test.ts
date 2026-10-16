@@ -216,29 +216,38 @@ describe('la suppression du compte', () => {
 });
 
 /*
-  L'INVITÉ N'EST JAMAIS PRO — relevé du patron : « le mode invité est en Pro,
-  et donc pas d'intérêt de faire un compte ». L'App Store répondait pour
-  l'identifiant Apple du téléphone, et la réponse passait l'application en
-  Pro sans regarder qui était connecté ; la déconnexion laissait le Pro en
-  place. Le Pro appartient au compte.
+  L'INVITÉ N'HÉRITE PAS DU PRO D'UN COMPTE — relevé du patron : « le mode
+  invité est en Pro, et donc pas d'intérêt de faire un compte ». La
+  déconnexion laissait le Pro en place, et le Pro d'un code ou d'un autre
+  compte passait à l'invité.
+
+  MIS À JOUR (revue App Store, 5.1.1) : l'invité peut désormais acheter et
+  restaurer SANS compte. L'abonnement de SON identifiant Apple le rend donc
+  Pro — c'est StoreKit qui le dit ; le Pro d'un compte (code, serveur,
+  trousseau) ne lui passe toujours pas.
 */
 describe('sans compte, pas de Pro', () => {
   const ABONNE = { produit: 'echoplan.pro.mensuel', expiration: Date.now() + 86400000 * 30, reconduit: true };
 
-  it('un abonnement sur l’identifiant Apple ne fait pas de l’invité un abonné', async () => {
+  it('l’abonnement de l’identifiant Apple fait de l’invité un abonné (5.1.1) — l’écran de connexion, personne', async () => {
     mockEcheance = ABONNE;
-    useAccountStore.setState({ compte: null, invite: true });
+    useAccountStore.setState({ compte: null, invite: false });
     await useAccountStore.getState().rafraichirEcheance();
     expect(useAccountStore.getState().pro).toBe(false);
     expect(useAccountStore.getState().proEcheance).toBeNull();
+    useAccountStore.setState({ compte: null, invite: true });
+    await useAccountStore.getState().rafraichirEcheance();
+    expect(useAccountStore.getState().pro).toBe(true);
+    expect(useAccountStore.getState().proVia).toBe('abonnement');
   });
 
-  it('l’invité qu’une ancienne version avait écrit « Pro » ne l’est plus au démarrage', async () => {
+  it('l’invité qu’une ancienne version avait écrit « Pro » par un code ne l’est plus au démarrage', async () => {
     const AsyncStorage = jest.requireMock('@react-native-async-storage/async-storage');
+    // Un Pro de CODE appartient à un compte : il ne passe jamais à l'invité.
     AsyncStorage.getItem.mockImplementationOnce(async () =>
-      JSON.stringify({ compte: null, invite: true, pro: true, proVia: 'abonnement' }),
+      JSON.stringify({ compte: null, invite: true, pro: true, proVia: 'code' }),
     );
-    mockEcheance = ABONNE;
+    mockEcheance = { aucun: true };
     await useAccountStore.getState().charger();
     expect(useAccountStore.getState().invite).toBe(true);
     expect(useAccountStore.getState().pro).toBe(false);
@@ -259,7 +268,7 @@ describe('sans compte, pas de Pro', () => {
     expect(useAccountStore.getState().pro).toBe(true);
   });
 
-  it('l’invité voit les prix, mais l’achat le mène au compte, pas à la caisse', async () => {
+  it('l’invité voit les prix, et achète sans compte (5.1.1)', async () => {
     const native = jest.requireMock('../src/native/account');
     native.acheterAbonnement.mockClear();
     useAccountStore.setState({ compte: null, invite: true });
@@ -267,12 +276,13 @@ describe('sans compte, pas de Pro', () => {
     useAccountStore.getState().ouvrirPaywall();
     expect(useAccountStore.getState().paywallVisible).toBe(true);
     useAccountStore.setState({ paywallVisible: false });
+    // Sans offre de lancement, la surprise mène droit à la page Pro.
     useAccountStore.getState().ouvrirSurprise();
     expect(useAccountStore.getState().surpriseVisible).toBeFalsy();
-    expect(useAccountStore.getState().paywallVisible).toBe(false);
+    expect(useAccountStore.getState().paywallVisible).toBe(true);
     await useAccountStore.getState().acheterPro();
-    expect(native.acheterAbonnement).not.toHaveBeenCalled();
-    expect(useAccountStore.getState().pro).toBe(false);
+    expect(native.acheterAbonnement).toHaveBeenCalledTimes(1);
+    expect(useAccountStore.getState().pro).toBe(true);
   });
 });
 

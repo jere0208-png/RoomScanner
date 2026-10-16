@@ -34,6 +34,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import {
+  resetPersistCache,
   useScanStore,
   type BrouillonScan,
   type SavedScan,
@@ -77,6 +78,10 @@ const retoucher = () =>
 beforeEach(() => {
   jest.useFakeTimers();
   mockMagasin.clear();
+  // Une bibliothèque neuve et entièrement connue : sans chargement, l'index
+  // se fusionnerait d'abord avec celui du disque (voir `gardes` dans
+  // scanStore), un aller-retour de plus que ce banc n'attend pas.
+  resetPersistCache();
   useScanStore.getState().reset();
   useScanStore.setState({ saves: [DOSSIER], brouillon: null });
   // Le palier gratuit n'est pas le sujet de ce banc.

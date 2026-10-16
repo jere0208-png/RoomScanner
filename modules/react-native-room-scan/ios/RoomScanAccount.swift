@@ -301,7 +301,13 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
         case .userCancelled:
           resolve(false)
         case .pending:
-          resolve(false)
+          /*
+            EN ATTENTE, PAS ANNULÉ — « Demander l'achat » (un parent doit
+            valider) ou une banque qui demande une confirmation. Rendre
+            `false` laissait croire à un abandon ; on le dit, et la
+            transaction arrivera plus tard par `Transaction.updates`.
+          */
+          resolve("attente")
         @unknown default:
           resolve(false)
         }
@@ -346,6 +352,10 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
     }
   }
 
+  /** Le dernier `AppStore.sync()` : le JS restaure produit par produit, et
+   *  l'App Store ne doit pas redemander l'identifiant Apple pour chacun. */
+  private var dernierSync: Date?
+
   /** « Restaurer l'achat » : l'App Store dit si ce compte Apple détient
    *  déjà l'abonnement — nouvel appareil ou réinstallation. */
   @objc func restorePro(
@@ -354,6 +364,21 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
     reject: @escaping RCTPromiseRejectBlock
   ) {
     Task {
+      /*
+        D'ABORD SE RESYNCHRONISER AVEC L'APP STORE — c'est ce qu'Apple
+        attend d'un bouton « Restaurer » : `currentEntitlements` ne lit que
+        ce que l'appareil sait déjà, et un téléphone neuf ne sait rien.
+        Une synchro refusée (annulée, hors ligne) n'empêche pas de lire ce
+        qui est déjà là.
+      */
+      if self.dernierSync.map({ Date().timeIntervalSince($0) > 60 }) ?? true {
+        do {
+          try await AppStore.sync()
+          self.dernierSync = Date()
+        } catch {
+          // On lit quand même les droits connus de l'appareil.
+        }
+      }
       for await resultat in Transaction.currentEntitlements {
         if case .verified(let transaction) = resultat,
           transaction.productID == productId

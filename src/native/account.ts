@@ -38,7 +38,7 @@ const natif = () => NativeModules.RoomScanAccount as
       accountMarker?: () => Promise<string | null>;
       setAccountMarker?: (json: string) => Promise<boolean>;
       appleSignIn?: () => Promise<AppleIdentity>;
-      purchasePro?: (productId: string) => Promise<boolean>;
+      purchasePro?: (productId: string) => Promise<boolean | 'attente'>;
       restorePro?: (productId: string) => Promise<boolean>;
       proExpiry?: (
         productIds: string[],
@@ -91,8 +91,11 @@ export async function connexionApple(): Promise<AppleIdentity> {
   return fn();
 }
 
-/** L'achat StoreKit du produit Pro ; vrai si la transaction aboutit. */
-export async function acheterAbonnement(productId: string): Promise<boolean> {
+/**
+ * L'achat StoreKit du produit Pro ; vrai si la transaction aboutit,
+ * `'attente'` quand elle attend une validation (« Demander l'achat »).
+ */
+export async function acheterAbonnement(productId: string): Promise<boolean | 'attente'> {
   const fn = natif()?.purchasePro;
   if (!fn) {
     throw new Error(

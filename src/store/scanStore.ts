@@ -1298,9 +1298,45 @@ interface Ecrit {
   empreinte: string;
 }
 const ecrits = new Map<string, Ecrit>();
-/** Remis à zéro par l'hydratation, et par les tests qui repartent à neuf. */
+/*
+  RIEN NE S'EFFACE AVANT QUE TOUT SOIT LU — revue « bibliothèque » : un seul
+  plan qui faisait lever `migrateSave` faisait tomber tout le chargement ;
+  `saves` restait vide alors qu'`ecrits` connaissait déjà chaque plan, et le
+  premier enregistrement effaçait du disque les clés de TOUS les autres. La
+  bibliothèque entière, pour un plan abîmé.
+
+  Deux garde-fous, indépendants :
+  - `bibliothequeChargee` : tant que le chargement n'a pas abouti, aucune
+    clé de plan ne s'efface et l'index ne fait que S'AGRANDIR ;
+  - `gardes` : les plans présents sur le disque mais absents de la
+    bibliothèque (illisibles, ou pas encore lus). Ils restent dans l'index
+    et sur le disque : une mise à jour qui saura les relire les rendra.
+*/
+let bibliothequeChargee = false;
+const gardes = new Set<string>();
+/**
+ * Remis à zéro par les tests qui repartent à neuf : une bibliothèque neuve
+ * est vide ET entièrement connue.
+ */
 export function resetPersistCache() {
   ecrits.clear();
+  gardes.clear();
+  bibliothequeChargee = true;
+}
+
+/**
+ * UN PLAN LU EST-IL UN PLAN ? Un objet, à son propre identifiant, aux listes
+ * qui sont des listes : le reste de l'app ne se demande plus si `walls` est
+ * un tableau. Ce qui n'y ressemble pas est GARDÉ sur le disque, pas chargé.
+ */
+function planValide(x: unknown, id: string): x is SavedScan {
+  if (!x || typeof x !== 'object') return false;
+  const p = x as Record<string, unknown>;
+  if (p.id !== id) return false;
+  for (const champ of ['walls', 'openings', 'objects', 'rooms']) {
+    if (p[champ] !== undefined && !Array.isArray(p[champ])) return false;
+  }
+  return true;
 }
 
 /** L'empreinte d'un texte : sa longueur et un hachage FNV-1a sur 32 bits. */
@@ -1378,16 +1414,29 @@ async function loadLibrary(): Promise<SavedScan[] | null> {
         .filter((k) => k.startsWith(prefixe))
         .map((k) => k.slice(prefixe.length));
     }
+    // Tout ce que l'index connaît est gardé tant qu'il n'est pas chargé.
+    for (const id of ids) gardes.add(id);
     const out: SavedScan[] = [];
     const bruts = await lireLesCles(ids.map(scanKey));
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
       const raw = bruts[i];
-      if (!raw) continue;
+      if (!raw) {
+        gardes.delete(id);
+        continue;
+      }
+      /*
+        CHAQUE PLAN DANS SA GARDE, MIGRATION COMPRISE. Un plan corrompu — ou
+        qu'une migration ne sait pas lire — est sauté et reste sur le disque ;
+        les autres se chargent. `ecrits` ne connaît que ce qui est chargé.
+      */
       try {
-        const plan = JSON.parse(raw) as SavedScan;
+        const lu: unknown = JSON.parse(raw);
+        if (!planValide(lu, id)) continue;
+        const plan = migrateSave(lu);
         out.push(plan);
-        ecrits.set(id, { ref: plan, quand: plan.updatedAt, empreinte: empreinteDe(raw) });
+        ecrits.set(id, { ref: lu, quand: lu.updatedAt, empreinte: empreinteDe(raw) });
+        gardes.delete(id);
       } catch {
         // Un scan corrompu est sauté, les autres restent lisibles — c'est
         // tout l'intérêt de ne plus tout mettre dans la même chaîne.
@@ -1398,9 +1447,10 @@ async function loadLibrary(): Promise<SavedScan[] | null> {
       // récents remontent en tête, comme partout dans la bibliothèque — et
       // l'index se réécrit pour que le prochain démarrage soit ordinaire.
       out.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
+      // Les plans illisibles restent listés, en queue : rien ne s'oublie.
       await AsyncStorage.setItem(
         INDEX_KEY,
-        JSON.stringify(out.map((x) => x.id)),
+        JSON.stringify([...out.map((x) => x.id), ...ids.filter((id) => gardes.has(id))]),
       ).catch(() => {});
     }
     return out;
@@ -1416,14 +1466,38 @@ async function loadLibrary(): Promise<SavedScan[] | null> {
     return null;
   }
   if (!Array.isArray(saves)) return null;
-  for (const s of saves) {
+  // Ce qui n'a pas d'identifiant ne peut pas avoir de clé : on n'éclate
+  // que les vrais plans, et l'ancienne clé ne part que si TOUS l'ont été.
+  const eclates = saves.filter(
+    (s): s is SavedScan => !!s && typeof s === 'object' && typeof s.id === 'string' && s.id !== '',
+  );
+  const charges: SavedScan[] = [];
+  for (const s of eclates) {
     const json = JSON.stringify(s);
     await AsyncStorage.setItem(scanKey(s.id), json);
-    ecrits.set(s.id, { ref: s, quand: s.updatedAt, empreinte: empreinteDe(json) });
+    try {
+      if (!planValide(s, s.id)) throw new Error('plan invalide');
+      charges.push(migrateSave(s));
+      ecrits.set(s.id, { ref: s, quand: s.updatedAt, empreinte: empreinteDe(json) });
+    } catch {
+      // Écrit à sa clé, gardé, mais pas chargé : voir `gardes`.
+      gardes.add(s.id);
+    }
   }
-  await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(saves.map((s) => s.id)));
-  await AsyncStorage.removeItem(STORAGE_KEY);
-  return saves;
+  await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(eclates.map((s) => s.id)));
+  if (eclates.length === saves.length) await AsyncStorage.removeItem(STORAGE_KEY);
+  return charges;
+}
+
+/**
+ * Charge la bibliothèque dans le magasin, et ne déclare la bibliothèque
+ * « entièrement chargée » — ce qui autorise enfin les effacements — que si
+ * tout s'est passé jusqu'au bout.
+ */
+async function chargerLaBibliotheque(poser: (saves: SavedScan[]) => void): Promise<void> {
+  const saves = await loadLibrary();
+  if (saves) poser(saves);
+  bibliothequeChargee = true;
 }
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1580,6 +1654,8 @@ function persistSoon(saves: SavedScan[]) {
       const vus = new Set<string>();
       for (const s of saves) {
         vus.add(s.id);
+        // Revenu dans la bibliothèque (repris du compte…) : plus à garder.
+        gardes.delete(s.id);
         const deja = ecrits.get(s.id);
         // Le même objet, à la même date : rien n'a bougé, rien à sérialiser.
         if (deja && deja.ref === s && deja.quand === s.updatedAt) continue;
@@ -1611,16 +1687,38 @@ function persistSoon(saves: SavedScan[]) {
           ),
         );
       }
-      for (const id of [...ecrits.keys()]) {
-        if (vus.has(id)) continue;
-        ecrits.delete(id);
-        AsyncStorage.removeItem(scanKey(id)).catch(() => {});
+      // Un plan disparu de la bibliothèque s'efface — mais JAMAIS avant
+      // qu'elle soit entièrement chargée, ni un plan gardé (voir `gardes`).
+      if (bibliothequeChargee) {
+        for (const id of [...ecrits.keys()]) {
+          if (vus.has(id) || gardes.has(id)) continue;
+          ecrits.delete(id);
+          AsyncStorage.removeItem(scanKey(id)).catch(() => {});
+        }
       }
+      const liste = [...saves.map((s) => s.id), ...[...gardes].filter((id) => !vus.has(id))];
+      // Pas encore tout lu : l'index sur le disque ne perd aucun de ses ids.
+      const ecrireIndex = (ids: string[]) =>
+        AsyncStorage.setItem(INDEX_KEY, JSON.stringify(ids));
+      const index = bibliothequeChargee
+        ? ecrireIndex(liste)
+        : AsyncStorage.getItem(INDEX_KEY).then(
+            (brut) => {
+              let avant: unknown = null;
+              try {
+                avant = brut ? JSON.parse(brut) : null;
+              } catch {
+                avant = null;
+              }
+              const anciens = Array.isArray(avant)
+                ? avant.filter((x): x is string => typeof x === 'string' && !liste.includes(x))
+                : [];
+              return [...liste, ...anciens];
+            },
+            () => liste,
+          ).then(ecrireIndex);
       ecritures.push(
-        AsyncStorage.setItem(
-          INDEX_KEY,
-          JSON.stringify(saves.map((s) => s.id)),
-        ).then(
+        index.then(
           () => true,
           (e) => {
             signalerPanne({
@@ -10146,6 +10244,8 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
 
     loadSaves: async () => {
+      // Une relecture commence : rien ne s'efface avant qu'elle aboutisse.
+      bibliothequeChargee = false;
       try {
         const pref = await AsyncStorage.getItem(THEME_KEY);
         if (pref === 'light' || pref === 'dark' || pref === 'system') {
@@ -10192,8 +10292,9 @@ export const useScanStore = create<ScanState>((set, get) => {
           // Des dossiers illisibles : les scans restent, le rangement se
           // refait d'un geste.
         }
-        const saves = await loadLibrary();
-        if (saves) set({ saves: saves.map(migrateSave) });
+        // Chaque plan est migré dans SA garde (voir `loadLibrary`) : un plan
+        // qui fait lever la migration ne vide plus la bibliothèque.
+        await chargerLaBibliotheque((saves) => set({ saves }));
         // Ce qui a passé ses douze heures pendant que l'app dormait s'en va.
         get().purgerLesEchus();
         /*

@@ -107,6 +107,10 @@ export const MOIS_OFFERTS = Math.round(
 );
 /** Les deux facturations, telles que la page les nomme. */
 export type Offre = 'mensuel' | 'annuel';
+/** Ce qu'a donné un appui sur « S'abonner ». */
+export type IssueAchat = 'achete' | 'annule' | 'attente' | 'en-cours';
+/** Ce qu'a donné « Restaurer l'achat ». */
+export type IssueRestauration = 'restaure' | 'aucun';
 /** Les abonnements tels que l'App Store les vend, par facturation. */
 export type OffresPro = Partial<Record<Offre, ProduitPro>>;
 
@@ -179,8 +183,9 @@ interface AccountState {
    * ON DÉCOUVRE SANS COMPTE. Le cœur de l'application est 100 % local —
    * scanner, tracer, coter, exporter — et la revue Apple (5.1.1) refuse
    * qu'on exige un compte pour ce qui n'en a pas besoin. L'invité passe la
-   * porte ; le compte reste ce qu'il est : la sauvegarde en ligne et le
-   * code promo. Et le PALIER GRATUIT NE CHANGE PAS DE RÈGLE : il se compte
+   * porte — et peut même s'abonner avec son identifiant Apple (règle
+   * 5.1.1) ; le compte reste ce qu'il est : la sauvegarde en ligne, le Pro
+   * sur un autre téléphone, la lecture de plans. Et le PALIER GRATUIT NE CHANGE PAS DE RÈGLE : il se compte
    * par appareil (le marqueur du trousseau), invité ou pas.
    */
   invite: boolean;
@@ -264,9 +269,16 @@ interface AccountState {
   supprimerCompte: () => Promise<'efface' | 'local' | 'echec'>;
   /** La feuille d'Apple des codes d'offre, puis l'échéance relue. */
   codeOffre: () => Promise<void>;
-  /** L'achat StoreKit de l'offre choisie. Mensuel par défaut. */
-  acheterPro: (offre?: Offre) => Promise<void>;
-  restaurerPro: () => Promise<boolean>;
+  /**
+   * L'achat StoreKit de l'offre choisie. Mensuel par défaut. Rend ce qui
+   * s'est passé : `achete`, `annule`, `attente` (« Demander l'achat » : un
+   * parent doit valider), ou `en-cours` quand un achat est déjà parti.
+   */
+  acheterPro: (offre?: Offre) => Promise<IssueAchat>;
+  /** Un achat est parti et n'est pas revenu : le bouton se tait. */
+  achatEnCours: boolean;
+  /** `restaure` : l'App Store a rendu l'abonnement ; `aucun` : rien à rendre. */
+  restaurerPro: () => Promise<IssueRestauration>;
   peutCreerPlan: () => boolean;
   /**
    * LA BARRIÈRE DE L'INVITÉ EST L'EXPORT — relevé du patron : « on doit
@@ -341,6 +353,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   proVia: null,
   plansUtilises: 0,
   paywallVisible: false,
+  achatEnCours: false,
   codesInternes: false,
   surpriseVisible: false,
   offres: null,
@@ -374,7 +387,18 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       Le Pro appartient au compte : l'abonnement se relit à la connexion
       (voir `connecter`), pas avant.
     */
-    if (!get().compte) {
+    /*
+      …ET L'INVITÉ QUI A PAYÉ EST PRO — revue App Store (5.1.1) : on ne peut
+      pas exiger un compte pour acheter un abonnement qui n'en a pas besoin.
+      Le relevé du patron reste vrai pour ce qu'il visait : un invité n'hérite
+      pas du Pro d'un AUTRE compte (code, serveur, trousseau). Mais
+      l'abonnement App Store appartient à l'IDENTIFIANT APPLE qui l'a payé :
+      c'est StoreKit qui le dit, pour cet identifiant-là, et c'est le droit
+      que l'invité tient. Le compte reste ce qu'il est : la sauvegarde en
+      ligne, le Pro sur un autre téléphone, la lecture de plans.
+      Personne (l'écran de connexion) : rien à relire.
+    */
+    if (!get().compte && !get().invite) {
       set({ proEcheance: null });
       return;
     }
@@ -433,12 +457,18 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       // Le choix « sans compte » survit au redémarrage : sans ça, l'invité
       // retombe sur le mur de connexion à chaque lancement.
       invite: !!local.invite,
-      // Sans compte, pas de Pro : voir `rafraichirEcheance`. Un invité que
-      // l'ancienne version avait écrit « Pro » en est quitte ici.
-      pro: !!compteLocal && (!!local.pro || !!proDuTrousseau),
+      // Le Pro d'un compte (code, serveur, trousseau) ne passe jamais à
+      // l'invité ; l'invité ne garde que l'abonnement de SON identifiant
+      // Apple — et `rafraichirEcheance`, juste après, le confirme ou le
+      // retire.
+      pro: compteLocal
+        ? !!local.pro || !!proDuTrousseau
+        : !!local.invite && !!local.pro && local.proVia === 'abonnement',
       proVia: compteLocal
         ? (local.proVia as AccountState['proVia']) ?? proDuTrousseau ?? null
-        : null,
+        : local.invite && local.pro && local.proVia === 'abonnement'
+          ? 'abonnement'
+          : null,
       plansUtilises: Math.max(
         Number(local.plansUtilises) || 0,
         marqueur?.plans ?? 0,
@@ -592,10 +622,14 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   entrerEnInvite: () => {
     set({ invite: true });
     persister(get());
+    // L'abonnement de cet identifiant Apple, s'il existe, lui revient.
+    get().rafraichirEcheance().catch(() => {});
   },
 
   quitterInvite: () => {
-    set({ invite: false });
+    // Vers l'écran de connexion : le Pro de l'invité ne s'y attarde pas ;
+    // le compte qui se connecte relira le sien.
+    set(get().compte ? { invite: false } : { invite: false, pro: false, proVia: null, proEcheance: null });
     persister(get());
   },
 
@@ -605,12 +639,20 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     // geste de compte, il en appelle un autre.
     // Le Pro part avec le compte : sans quoi l'invité qui suit en hériterait.
     // Le serveur et l'App Store le rendront au compte qui se reconnecte.
+    /*
+      LE JETON PART AVEC LE COMPTE — revue « sécurité » : il restait en
+      mémoire et dans le stockage après la déconnexion ; le compte suivant
+      partait avec le jeton du précédent. Et les codes internes, ouverts
+      par le serveur pour CE compte, se referment.
+    */
     set({
       compte: null,
       invite: false,
       pro: false,
       proVia: null,
       proEcheance: null,
+      jeton: null,
+      codesInternes: false,
     });
     persister(get());
   },
@@ -642,6 +684,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       proVia: null,
       jeton: null,
       proEcheance: null,
+      codesInternes: false,
     });
     persister(get());
     return issue;
@@ -666,44 +709,58 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 
   acheterPro: async (offre = 'mensuel') => {
-    if (demanderUnCompte()) return;
-    const ok = await acheterAbonnement(
-      offre === 'annuel' ? PRODUIT_PRO_AN : PRODUIT_PRO,
-    );
-    if (ok) {
-      set({ pro: true, proVia: 'abonnement', paywallVisible: false });
-      persister(get());
-      fusionnerMarqueur({ pro: 'abonnement' }).catch(() => {});
-      // La date vient de changer : la page profil doit la montrer JUSTE,
-      // pas au prochain lancement.
-      get().rafraichirEcheance().catch(() => {});
+    /*
+      UN SEUL ACHAT À LA FOIS — revue « double appui » : deux appuis rapides
+      sur « S'abonner » lançaient deux feuilles d'achat. Le verrou se pose
+      AVANT le premier `await` : le second appui le trouve fermé.
+    */
+    if (get().achatEnCours) return 'en-cours';
+    /*
+      L'ACHAT NE DEMANDE PLUS DE COMPTE — règle 5.1.1 d'Apple : on ne peut
+      exiger une inscription pour un achat qui n'est pas lié à un compte.
+      L'invité paie avec son identifiant Apple ; le compte lui est proposé
+      ENSUITE, pour ce qu'il apporte vraiment (la sauvegarde en ligne).
+    */
+    set({ achatEnCours: true });
+    let r: boolean | 'attente';
+    try {
+      r = await acheterAbonnement(offre === 'annuel' ? PRODUIT_PRO_AN : PRODUIT_PRO);
+    } finally {
+      set({ achatEnCours: false });
     }
+    if (r === 'attente') return 'attente';
+    if (r !== true) return 'annule';
+    set({ pro: true, proVia: 'abonnement', paywallVisible: false });
+    persister(get());
+    // Le trousseau ne retient que le Pro d'un COMPTE (voir `connecter`).
+    if (get().compte) fusionnerMarqueur({ pro: 'abonnement' }).catch(() => {});
+    // La date vient de changer : la page profil doit la montrer JUSTE,
+    // pas au prochain lancement.
+    get().rafraichirEcheance().catch(() => {});
+    if (!get().compte) proposerLeCompte();
+    return 'achete';
   },
 
   restaurerPro: async () => {
     /*
-      SANS COMPTE, PAS DE RESTAURATION — revue « Thomas » : l'invité lisait
-      « Votre Pro est de retour », et le Pro tombait au relancement. Le Pro
-      appartient au compte : c'est lui qu'on ouvre d'abord.
-    */
-    if (demanderUnCompte()) return false;
-    /*
-      LES DEUX PRODUITS, PAS UN.
+      L'INVITÉ RESTAURE AUSSI — revue App Store (3.1.1) : « Restaurer
+      l'achat » en invité répondait « Créez un compte », puis « Aucun achat
+      trouvé » — deux messages faux pour qui avait payé. L'abonnement est
+      à l'identifiant Apple : c'est lui qu'on interroge, compte ou pas.
 
-      Qui a pris l'annuel et change de téléphone ne détient PAS le mensuel :
-      ne demander que celui-là lui répondrait « aucun achat trouvé » alors
-      qu'il a payé l'année. On interroge donc les deux, et le premier qui
-      répond oui suffit.
+      LES DEUX PRODUITS, PAS UN. Qui a pris l'annuel et change de téléphone
+      ne détient PAS le mensuel : ne demander que celui-là lui répondrait
+      « aucun achat trouvé » alors qu'il a payé l'année. On interroge donc
+      les deux, et le premier qui répond oui suffit.
     */
     const ok =
       (await restaurerAbonnement(PRODUIT_PRO)) ||
       (await restaurerAbonnement(PRODUIT_PRO_AN));
-    if (ok) {
-      set({ pro: true, proVia: 'abonnement', paywallVisible: false });
-      persister(get());
-      get().rafraichirEcheance().catch(() => {});
-    }
-    return ok;
+    if (!ok) return 'aucun';
+    set({ pro: true, proVia: 'abonnement', paywallVisible: false });
+    persister(get());
+    get().rafraichirEcheance().catch(() => {});
+    return 'restaure';
   },
 
   peutCreerPlan: () => {
@@ -733,7 +790,8 @@ export const useAccountStore = create<AccountState>((set, get) => ({
 
   exportOuvert: (quoi = 'le PDF') => {
     const s = get();
-    if (s.compte && s.pro) return true;
+    // L'invité abonné par son identifiant Apple envoie, lui aussi.
+    if ((s.compte || s.invite) && s.pro) return true;
     if (s.compte) {
       /*
         LE MOMENT OÙ L'ON VEUT ENVOYER SON PLAN — c'est ce que le Pro vend.
@@ -766,8 +824,8 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       /*
         LE PRIX D'ABORD, LE COMPTE ENSUITE — revue « Yasmine » : « Créer mon
         compte » menait à l'écran de connexion, et le prix ne paraissait
-        qu'après. L'offre s'ouvre à tous ; c'est l'achat qui demande le
-        compte (`acheterPro`).
+        qu'après. L'offre s'ouvre à tous, et l'achat aussi : l'invité paie
+        avec son identifiant Apple (`acheterPro`).
       */
       [
         { label: 'Plus tard' },
@@ -802,8 +860,8 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   /*
     LES PRIX SE MONTRENT À TOUS — revue « Thomas » : l'invité qui touchait
     « Voir l'offre » recevait « Créez un compte », et ne voyait aucun prix
-    avant d'avoir donné son e-mail. La page s'ouvre ; c'est l'ACHAT qui
-    demande le compte (`acheterPro`).
+    avant d'avoir donné son e-mail. La page s'ouvre, et l'achat se fait
+    sans compte (`acheterPro`, règle 5.1.1).
   */
   ouvrirPaywall: () => {
     set({ paywallVisible: true });
@@ -832,7 +890,8 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     l'App Store ne fera pas, c'est le défaut qu'on vient de retirer.
   */
   ouvrirSurprise: () => {
-    if (demanderUnCompte()) return;
+    // Personne (ni compte ni invité) : rien à vendre depuis l'écran d'entrée.
+    if (!get().compte && !get().invite) return;
     /*
       UNE SURPRISE NE SE RÉPÈTE PAS — revues « Thomas », « Nadia » : elle
       revenait à chaque export. Montrée une fois (à l'inscription ou au
@@ -855,28 +914,24 @@ export const useAccountStore = create<AccountState>((set, get) => ({
 }));
 
 /*
-  LE PRO SE PREND AVEC UN COMPTE.
+  LE COMPTE, PROPOSÉ APRÈS L'ACHAT — jamais exigé avant.
 
-  L'invité découvre tout — scanner, tracer, coter, visiter —, et le compte
-  est ce qui ouvre le reste : l'export, la sauvegarde en ligne, le Pro. Un
-  invité qui veut passer Pro n'a donc pas de page de paiement sous les yeux,
-  mais la porte du compte : son Pro lui appartiendra, et le suivra.
-
-  Rend vrai quand il a fallu demander (l'appelant n'a plus rien à faire).
+  L'invité vient de payer avec son identifiant Apple : son Pro est là, sur
+  ce téléphone. Le compte, lui, sert à le retrouver ailleurs et à garder
+  ses plans en ligne : on le propose, une fois, sans rien bloquer.
 */
-function demanderUnCompte(): boolean {
+function proposerLeCompte(): void {
   const s = useAccountStore.getState();
-  if (s.compte) return false;
   alerte(
-    'Créez un compte pour passer en Pro',
-    'Le Pro appartient à votre compte : il vous suit sur un autre ' +
-      'téléphone et garde vos plans en ligne. La création est gratuite.',
+    'Bienvenue dans Pro',
+    'Votre abonnement est lié à votre identifiant Apple. Créez un compte ' +
+      'gratuit pour sauvegarder vos plans en ligne et les retrouver sur un ' +
+      'autre téléphone.',
     [
       { label: 'Plus tard' },
       { label: 'Créer mon compte', onPress: () => s.quitterInvite() },
     ],
   );
-  return true;
 }
 
 /*
@@ -908,11 +963,12 @@ export const identiteDuCompte = (): Identite | null => {
  * sous les yeux.
  */
 export const useDossierNet = (): boolean =>
-  useAccountStore((a) => !!(a.compte && a.pro));
+  useAccountStore((a) => !!((a.compte || a.invite) && a.pro));
 
 /**
  * L'IMAGE DU PLAN PART-ELLE SANS LE LOGO ? — revue « Inès ». Le logo signe
  * l'image gratuite ; l'abonné remet la sienne à son client. Ce n'est pas une
  * barrière (rien ne se verrouille ici), seulement une signature.
  */
-export const useImageSansLogo = (): boolean => useAccountStore((st) => !!st.compte && st.pro);
+export const useImageSansLogo = (): boolean =>
+  useAccountStore((st) => !!(st.compte || st.invite) && st.pro);

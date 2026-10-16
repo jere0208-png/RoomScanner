@@ -300,11 +300,16 @@ describe('le badge Pro', () => {
    * emprunte) : trois dégradés réglés à la main finiraient par diverger à
    * la première retouche.
    */
-  it('la carte Pro et le bouton d’abonnement portent le même contour', () => {
+  /*
+   * MIS À JOUR (revue « capture ») : le bouton d'achat contouré pesait autant
+   * qu'un bouton secondaire. Il est devenu PLEIN, à la peau du bouton
+   * primaire ; seule la carte garde le contour d'or.
+   */
+  it('la carte Pro porte le contour du badge', () => {
     const t = monter(<PaywallScreen />);
     const contours = t.root.findAllByType(ContourVif);
-    // La carte du comparatif, et le bouton « S'abonner ».
-    expect(contours).toHaveLength(2);
+    // La carte, seule : le bouton « S'abonner » est plein.
+    expect(contours).toHaveLength(1);
     for (const contour of contours) {
       // La bande ne se dessine qu'une fois la taille connue : on la donne.
       const porteur = contour.findAll(
@@ -353,11 +358,12 @@ describe('le badge Pro', () => {
    * vendent — « Pro », le prix, « S'abonner » — trouées au masque sur la
    * même bande d'ors qui glisse.
    */
-  it('le bloc Pro et le bouton sont blancs, à la typo d’or qui respire', () => {
+  it('le bloc Pro est blanc, à la typo d’or qui respire', () => {
     const t = monter(<PaywallScreen />);
-    // Les deux contours couvrent BLANC — plus de bleu plein.
+    // Le contour de la carte couvre BLANC (le bouton, lui, est plein :
+    // voir plus haut).
     const contours = t.root.findAllByType(ContourVif);
-    expect(contours).toHaveLength(2);
+    expect(contours).toHaveLength(1);
     for (const contour of contours) {
       expect(contour.props.fond).toBe('#FFFFFF');
     }
@@ -368,15 +374,16 @@ describe('le badge Pro', () => {
       .findAllByType(TexteVif)
       .filter((n) => n.props.fond === light.bg);
     expect(surFond.length).toBeGreaterThan(0);
-    // La typo d'or : « Pro », le prix, « S'abonner… » au moins.
+    // La typo d'or : « Pro » et le prix ; « S'abonner » est en blanc sur le
+    // bouton plein.
     const typos = t.root.findAllByType(TexteVif);
-    expect(typos.length).toBeGreaterThanOrEqual(3);
+    expect(typos.length).toBeGreaterThanOrEqual(2);
     const libelles = typos.map((n) => String(n.props.texte));
     // La page nomme la MARQUE entiere — « EchoPlan Pro » — la ou la carte
     // du comparatif ecrivait « Pro » tout seul en tete de colonne : le
     // titre est devenu la promesse, il n'y a plus de colonne a etiqueter.
     expect(libelles.some((l) => l.includes('Pro'))).toBe(true);
-    expect(libelles.some((l) => l.includes('S’abonner'))).toBe(true);
+    expect(libelles.some((l) => l.includes('S’abonner'))).toBe(false);
     for (const typo of typos) {
       // Le mot se mesure d'abord (une typo a la taille de son texte) : on
       // donne la mesure, comme le téléphone le ferait.
@@ -616,10 +623,10 @@ describe('la surprise Pro', () => {
    */
   it('ne montre qu’une carte, pleine largeur, cerclée d’or', () => {
     const t = monter(<PaywallScreen />);
-    // La carte et le bouton : deux contours, pas trois — il n'y a plus de
-    // colonne Gratuit à border.
+    // La carte seule : ni colonne Gratuit à border, ni bouton contouré (il
+    // est plein depuis la revue « capture »).
     const contours = t.root.findAllByType(ContourVif);
-    expect(contours).toHaveLength(2);
+    expect(contours).toHaveLength(1);
     const stCarte = StyleSheet.flatten(contours[0].props.style) as ViewStyle;
     expect(stCarte.alignSelf).toBe('stretch');
     // Et les pouces d'argile ont disparu avec la comparaison : un pouce

@@ -77,20 +77,29 @@ describe('ce qu’on paie, dit avant de payer (Thomas, Nadia, Marie)', () => {
     expect(tout).toMatch(/gratuit/i);
   });
 
-  it('l’invité voit les prix avant de donner son e-mail — l’achat, lui, demande le compte', async () => {
+  /*
+    MIS À JOUR (revue App Store, 5.1.1 et 3.1.1) : l'achat et la
+    restauration ne demandent plus de compte. L'abonnement appartient à
+    l'identifiant Apple ; le compte est proposé ENSUITE, pour la sauvegarde.
+  */
+  it('l’invité voit les prix avant de donner son e-mail — et achète sans compte', async () => {
     const native = jest.requireMock('../src/native/account');
     native.acheterAbonnement.mockClear();
     useAccountStore.getState().ouvrirPaywall();
     expect(useAccountStore.getState().paywallVisible).toBe(true);
     await useAccountStore.getState().acheterPro();
-    expect(native.acheterAbonnement).not.toHaveBeenCalled();
+    expect(native.acheterAbonnement).toHaveBeenCalledTimes(1);
+    expect(`${alerteCourante()?.message}`).toMatch(/sauvegard/i);
   });
 
-  it('« Restaurer l’achat » en invité : pas de faux succès, la porte du compte', async () => {
-    const ok = await useAccountStore.getState().restaurerPro();
-    expect(ok).toBe(false);
+  it('« Restaurer l’achat » en invité : pas de faux succès, pas de « Créez un compte »', async () => {
+    const native = jest.requireMock('../src/native/account');
+    native.restaurerAbonnement.mockImplementation(async () => false);
+    const issue = await useAccountStore.getState().restaurerPro();
+    native.restaurerAbonnement.mockImplementation(async () => true);
+    expect(issue).toBe('aucun');
     expect(useAccountStore.getState().pro).toBe(false);
-    expect(`${alerteCourante()?.titre}`).toMatch(/compte|connect/i);
+    expect(alerteCourante()).toBeNull();
   });
 
   it('la page Pro dit aussi la lecture de plans, et son plafond', () => {

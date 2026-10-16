@@ -131,13 +131,9 @@ export function ProfilScreen() {
   const nom = compte?.prenom || compte?.email || 'Invité';
 
   const restaurer = async () => {
-    // Sans compte, `restaurerPro` ouvre lui-même la porte du compte.
-    if (!useAccountStore.getState().compte) {
-      await restaurerPro();
-      return;
-    }
+    // L'invité restaure aussi : l'abonnement est à l'identifiant Apple.
     try {
-      const ok = await restaurerPro();
+      const ok = (await restaurerPro()) === 'restaure';
       alerte(
         ok ? 'Abonnement restauré' : 'Aucun achat trouvé',
         ok

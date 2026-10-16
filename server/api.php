@@ -22,7 +22,7 @@
  *
  *   supprimer  {identifiant, jeton}          → {ok}  le compte ET ses plans
  *   retirer    {identifiant, jeton, scan}    → {ok}  un plan déposé
- *   lire_plan  {identifiant, jeton, image, media, textes, abonne}
+ *   lire_plan  {identifiant, jeton, image, media, textes}
  *              → {ok, lecture, essai}  un plan papier lu par Claude
  *              (voir lecture-plan.php) — une lecture d'essai, puis le Pro.
  *
@@ -564,11 +564,17 @@ if ($action === 'retirer') {
   place de "Comment ça marche" ; réservée au Pro, avec un essai offert ».
 
   QUI A DROIT À UNE LECTURE :
-    — le Pro par code (enregistré ici) ou par abonnement (que l'app déclare :
-      le serveur ne voit pas les reçus de l'App Store) ;
+    — le Pro que la BASE connaît (`comptes.pro` : 'code' ou 'abonnement') ;
     — tout compte, une fois : la lecture d'essai.
   Et personne plus de LECTURES_PAR_JOUR fois par jour : chaque lecture coûte
-  un appel à l'IA, et une déclaration d'abonnement ne se vérifie pas ici.
+  un appel à l'IA.
+
+  LE SERVEUR NE CROIT PLUS L'APP SUR PAROLE — revue « sécurité » : le champ
+  `abonne` envoyé par l'app suffisait à passer Pro ; n'importe qui pouvait
+  l'écrire et lire des plans à volonté, aux frais de l'IA. Il est ignoré :
+  seul l'état du compte en base compte. Un abonnement App Store ne sera
+  reconnu ici que lorsque le serveur saura le VÉRIFIER (reçu signé par
+  Apple) et l'inscrire dans `comptes.pro`.
 
   Une photo qui n'est pas un plan ne consomme pas l'essai. Rien n'est gardé :
   ni l'image, ni la lecture — seulement le compte des lectures.
@@ -582,7 +588,7 @@ if ($action === 'lire_plan') {
   mysqli_stmt_bind_param($req, 'i', $compte['id']);
   mysqli_stmt_execute($req);
   $l = mysqli_fetch_assoc(mysqli_stmt_get_result($req)) ?: ['lectures' => 0, 'lectures_jour' => 0, 'jour_lecture' => null];
-  $estPro = $compte['pro'] !== '' || !empty($corps['abonne']);
+  $estPro = $compte['pro'] === 'code' || $compte['pro'] === 'abonnement';
   if (!$estPro && (int) $l['lectures'] >= 1) {
     sortir(['ok' => false, 'raison' => 'pro', 'message' => 'Votre lecture d’essai est utilisée : la lecture de plans papier est réservée au Pro.']);
   }

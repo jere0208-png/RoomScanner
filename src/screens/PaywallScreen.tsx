@@ -12,12 +12,14 @@
  * de prix qui énumère ce qu'on achète, et UN bouton, épinglé en bas, qui ne
  * quitte jamais l'écran.
  *
- * Ce qui ne bouge pas, parce que ça ne peut pas : le champ de code promo
- * (offres du patron — CARIDI12 déverrouille, FIRST20 remise) et
- * « Restaurer l'achat », qu'Apple exige dès qu'on vend un abonnement.
+ * Ce qui ne bouge pas, parce que ça ne peut pas : « J'ai un code » (la
+ * feuille des codes d'offre d'Apple ; le code interne de développement ne
+ * s'ouvre que si le serveur l'autorise) et « Restaurer l'achat », qu'Apple
+ * exige dès qu'on vend un abonnement.
  */
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Linking,
   Modal,
   Pressable,
@@ -44,6 +46,7 @@ import {
   offreDeBienvenue,
   useAccountStore,
   type Offre,
+  type OffresPro,
 } from '../store/accountStore';
 import { useScanStore } from '../store/scanStore';
 
@@ -139,6 +142,45 @@ const atoutsPour = (modeElec: boolean) =>
     ? ATOUTS
     : ATOUTS.map((a) => (a.icone === 'elec' ? LIGNE_DU_METIER : a));
 
+/*
+  LE LIBELLÉ DIT CE QUE L'APP STORE FACTURERA — revue « libellé » : « pour
+  3,92 € la première fois » était faux dès que l'offre couvrait trois mois
+  (trois prélèvements à 3,92 €), et « la première fois » ne dit pas
+  combien de temps. On suit le mode de l'offre d'Apple :
+  - remise (payée à chaque période) : le prix PAR période, et combien ;
+  - avance (payée d'un coup) : le prix, pour toute la durée ;
+  - essai : gratuit.
+*/
+const UNITES: Record<string, [string, string, 'm' | 'f']> = {
+  jour: ['jour', 'jours', 'm'],
+  semaine: ['semaine', 'semaines', 'f'],
+  mois: ['mois', 'mois', 'm'],
+  an: ['an', 'ans', 'm'],
+};
+const premiers = (unite: string, n: number) => {
+  if (unite === 'an') return n > 1 ? `les ${n} premières années` : 'la première année';
+  const [un, plusieurs, genre] = UNITES[unite] ?? UNITES.mois;
+  if (n > 1) return `les ${n} ${genre === 'f' ? 'premières' : 'premiers'} ${plusieurs}`;
+  return `${genre === 'f' ? 'la première' : 'le premier'} ${un}`;
+};
+export function libelleAchat(offres: OffresPro | null, offre: Offre, prixPlein: string): string {
+  const p = offres?.[offre];
+  const o = p?.offre;
+  const parPeriode = offre === 'annuel' ? 'an' : 'mois';
+  if (!p || !o || !o.eligible) return `S’abonner pour ${prixPlein} par ${parPeriode}`;
+  if (o.mode === 'essai') return 'Commencer l’essai gratuit';
+  const unite = o.periode.unite;
+  if (o.mode === 'remise') {
+    // Une période de facturation de plusieurs unités (« 3 mois ») se dit
+    // telle quelle ; sinon, l'unité.
+    const par = o.periode.valeur > 1 ? `${o.periode.valeur} ${(UNITES[unite] ?? UNITES.mois)[1]}` : (UNITES[unite] ?? UNITES.mois)[0];
+    if (o.nombre <= 1) return `S’abonner pour ${o.prix} ${premiers(unite, o.periode.valeur)}`;
+    return `S’abonner pour ${o.prix} par ${par} pendant ${o.nombre * o.periode.valeur} ${(UNITES[unite] ?? UNITES.mois)[1]}`;
+  }
+  if (o.mode === 'avance') return `S’abonner pour ${o.prix} ${premiers(unite, o.periode.valeur * o.nombre)}`;
+  return `S’abonner pour ${prixPlein} par ${parPeriode}`;
+}
+
 export function PaywallScreen() {
   const c = useTheme();
   const s = themed(c);
@@ -157,6 +199,7 @@ export function PaywallScreen() {
   const chargerOffres = useAccountStore((st) => st.chargerOffres);
   const acheterPro = useAccountStore((st) => st.acheterPro);
   const restaurerPro = useAccountStore((st) => st.restaurerPro);
+  const achatEnCours = useAccountStore((st) => st.achatEnCours);
   const modeElec = useModeElec();
   /* Les prix se relisent à l'App Store à chaque ouverture : ils changent
      avec le pays, avec App Store Connect, et l'offre de lancement ne vaut
@@ -193,8 +236,18 @@ export function PaywallScreen() {
       : MOIS_OFFERTS;
 
   const acheter = async () => {
+    // Le verrou vit dans le magasin (`achatEnCours`) : un second appui,
+    // même avant que le bouton ne se grise, ne relance rien.
     try {
-      await acheterPro(offre);
+      const issue = await acheterPro(offre);
+      if (issue === 'attente') {
+        alerte(
+          'Achat en attente de validation',
+          'Votre demande d’achat doit encore être acceptée (par exemple par ' +
+            'l’organisateur du partage familial). Le Pro s’activera dès ' +
+            'qu’elle le sera, au plus tard à la prochaine ouverture d’EchoPlan.',
+        );
+      }
     } catch (e) {
       alerte(expliquer('achat', e).titre, expliquer('achat', e).message);
     }
@@ -383,13 +436,23 @@ export function PaywallScreen() {
               hitSlop={8}
               onPress={async () => {
                 try {
-                  const ok = await restaurerPro();
-                  alerte(
-                    ok ? 'Abonnement restauré' : 'Aucun achat trouvé',
-                    ok
-                      ? 'Votre Pro est de retour.'
-                      : 'L’App Store ne connaît pas d’abonnement pour ce compte Apple.',
-                  );
+                  /*
+                    UNE RÉPONSE PAR CAS — revue App Store : l'invité lisait
+                    « Créez un compte » puis « Aucun achat trouvé ». La
+                    restauration se fait désormais sans compte, et ne dit
+                    « aucun » que quand l'App Store l'a dit.
+                  */
+                  const issue = await restaurerPro();
+                  if (issue === 'restaure') {
+                    alerte('Abonnement restauré', 'Votre Pro est de retour.');
+                  } else {
+                    alerte(
+                      'Aucun abonnement trouvé',
+                      'L’App Store ne connaît pas d’abonnement EchoPlan Pro pour ' +
+                        'l’identifiant Apple de ce téléphone. Si vous avez payé avec ' +
+                        'un autre identifiant, connectez-le dans les Réglages, puis réessayez.',
+                    );
+                  }
                 } catch (e) {
                   alerte(
                     expliquer('restauration', e).titre,
@@ -485,28 +548,42 @@ export function PaywallScreen() {
           {bienvenue && (
             <Text style={s.remiseNote}>{`✓ Offre de bienvenue : ${bienvenue.accroche}`}</Text>
           )}
+          {/*
+            LE BOUTON D'ACHAT EST PLEIN — revue « capture » : contouré d'or
+            sur fond blanc, il pesait autant qu'un bouton secondaire, au seul
+            endroit où l'on demande de l'argent. Il prend la peau du bouton
+            PRIMAIRE de l'app (`Bouton`, variante primaire : pilule de 56,
+            bleu de la maison, texte blanc) ; il ne passe pas par `Bouton`
+            lui-même parce que son libellé, qui dit l'offre, peut prendre
+            deux lignes là où `Bouton` coupe à une.
+
+            ET IL NE S'APPUIE QU'UNE FOIS — revue « double appui » : pendant
+            l'achat, il se grise, se tait, et le dit.
+          */}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="S’abonner"
-            style={({ pressed }) => [s.ctaCadre, pressed && s.enfonce]}
+            accessibilityState={{ disabled: achatEnCours, busy: achatEnCours }}
+            disabled={achatEnCours}
+            testID="bouton-sabonner"
+            style={({ pressed }) => [
+              s.cta,
+              achatEnCours && s.ctaEteint,
+              pressed && !achatEnCours && s.enfonce,
+            ]}
             onPress={acheter}>
-            <ContourVif rayon={18} fond={c.surface} style={s.pleine}>
-              <View style={s.ctaDedans}>
-                {/* Une PHRASE, pas une formule — relevé du patron : « trop
-                    de chiffres et de tirets ». Un seul nombre, zéro tiret. */}
-                <TexteVif
-                  texte={
-                    essai
-                      ? 'Commencer l’essai gratuit'
-                      : bienvenue
-                        ? `S’abonner pour ${prix} la première ${annuel ? 'année' : 'fois'}`
-                        : `S’abonner pour ${prix} par ${annuel ? 'an' : 'mois'}`
-                  }
-                  taille={16.5}
-                  fond={c.surface}
-                />
-              </View>
-            </ContourVif>
+            {achatEnCours ? (
+              <>
+                <ActivityIndicator color={c.inkSoft} />
+                <Text style={[s.ctaMot, s.ctaMotEteint]}>Achat en cours…</Text>
+              </>
+            ) : (
+              /* Une PHRASE, pas une formule — relevé du patron : « trop de
+                 chiffres et de tirets ». */
+              <Text style={s.ctaMot} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
+                {libelleAchat(offres, offre, prixPlein)}
+              </Text>
+            )}
           </Pressable>
         </View>
 
@@ -694,8 +771,27 @@ const themed = (c: Palette) =>
       textAlign: 'center',
       marginBottom: 8,
     },
-    ctaCadre: { height: 56 },
-    pleine: { flex: 1 },
-    ctaDedans: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    // La peau du `Bouton` primaire : voir le bouton d'achat.
+    cta: {
+      minHeight: 56,
+      borderRadius: radius.pill,
+      paddingHorizontal: 22,
+      paddingVertical: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      backgroundColor: c.blue,
+    },
+    ctaEteint: { backgroundColor: c.surfaceSunken },
+    ctaMot: {
+      color: '#FFFFFF',
+      fontSize: 17,
+      fontWeight: '600',
+      letterSpacing: -0.2,
+      textAlign: 'center',
+      flexShrink: 1,
+    },
+    ctaMotEteint: { color: c.inkFaint },
     enfonce: { transform: [{ scale: 0.97 }] },
   });
