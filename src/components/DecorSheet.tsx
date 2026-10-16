@@ -10,7 +10,7 @@
  * s'applique aussitôt — la maquette, au-dessus, se repeint sous les yeux.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Image, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import type { ObjectData } from 'react-native-room-scan';
 import { SheetShell } from './Sheet';
@@ -23,6 +23,9 @@ import { useScanStore } from '../store/scanStore';
 import { niveauDe, nomDuNiveau, roomParts } from '../geometry/floorplan';
 import { achats, nombre, travauxDesPieces } from '../geometry/travaux';
 import { useReglagesTravaux } from '../store/reglagesTravaux';
+import { useImageSansLogo } from '../store/accountStore';
+import { RAPPORT, usePriseDeVue, type FormatImage } from '../ui/partageRendu';
+import { alerte } from '../ui/alerte';
 import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from './Iso3DView';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
 
@@ -67,6 +70,14 @@ export const DEGRES_PAR_SECONDE = 24;
 const IMAGE_MIN = 50;
 const REPOS_APRES_LE_DOIGT = 2500;
 const ZOOM_DECOR = 1.3;
+/*
+  LA PHOTO, SOUS UN BEL ANGLE — revue « découvreurs » (influenceuse déco) :
+  une image partagée ne se prend pas au hasard du tour. Le temps de la
+  capture, la pièce s'arrête de tourner et se pose de trois quarts, à
+  l'angle par défaut de la maquette, recentrée ; elle repart ensuite d'où
+  elle était.
+*/
+export const VUE_PHOTO: View3DParams = { ...DEFAULT_VIEW3D, tilt: 50, zoom: ZOOM_DECOR };
 
 /** « Réduire les animations », lu au système et suivi s'il change. */
 function useMoinsDeMouvement(): boolean {
@@ -89,14 +100,19 @@ function PieceTournante({
   pieceId,
   niveau,
   repos,
+  photo = false,
 }: {
   pieceId: string | null;
   niveau?: number;
   /** L'instant du dernier toucher, sur la maquette ou dans la liste. */
   repos: React.MutableRefObject<number>;
+  /** Une photo se prend : l'angle de `VUE_PHOTO`, et le rendu que la capture sait lire. */
+  photo?: boolean;
 }) {
   const [vue, setVue] = useState<View3DParams>({ ...DEFAULT_VIEW3D, tilt: 50, zoom: ZOOM_DECOR });
   const moinsDeMouvement = useMoinsDeMouvement();
+  const enPhoto = useRef(photo);
+  enPhoto.current = photo;
   useEffect(() => {
     if (moinsDeMouvement) return;
     let id = 0;
@@ -107,7 +123,7 @@ function PieceTournante({
       // Une application revenue du fond ne fait pas un tour d'un coup.
       const dt = Math.min(maintenant - avant, 250);
       avant = maintenant;
-      if (maintenant - repos.current < REPOS_APRES_LE_DOIGT) {
+      if (enPhoto.current || maintenant - repos.current < REPOS_APRES_LE_DOIGT) {
         cumul = 0;
       } else {
         cumul += dt;
@@ -124,11 +140,15 @@ function PieceTournante({
   }, [repos, moinsDeMouvement]);
   return (
     <Iso3DView
-      value={vue}
+      value={photo ? VUE_PHOTO : vue}
       onChange={(v) => {
+        if (enPhoto.current) return;
         repos.current = Date.now();
         setVue(v);
       }}
+      // La vue native (Metal) sort noire d'une capture : le rendu en
+      // JavaScript la remplace le temps de la photo, comme sur le plan.
+      gpu={!photo}
       focusRoomId={pieceId}
       niveau={niveau}
       showMeasures={false}
@@ -272,6 +292,33 @@ export function DecorSheet({
     hauteurEcran < 700 ? Math.max(150, hauteurEcran * 0.22) : Math.min(320, Math.max(180, hauteurEcran * 0.29)),
   );
   const repos = useRef(0);
+  /*
+    PARTAGER LA PIÈCE DÉCORÉE — revue « découvreurs » : « la vue de la pièce
+    dans Décorer est la plus belle image de l'app, et elle ne peut pas
+    sortir ». La mécanique de l'image du plan (`usePriseDeVue`) : un cadre
+    carré par défaut (les réseaux), 4:3 à l'appui long (une annonce), un fond
+    propre, la pièce et son ambiance en légende, le logo sur l'image
+    gratuite — pas de barrière : c'est une signature.
+  */
+  const estPro = useImageSansLogo();
+  const { capturant, prete, prendre } = usePriseDeVue();
+  const cadre = useRef<View>(null);
+  const largeurApercu = useRef(0);
+  const partager = (format: FormatImage) => {
+    if (!piece) return;
+    prendre(cadre, format, () => {
+      const w = largeurApercu.current;
+      return w > 0 ? { w, h: w / RAPPORT[format] } : null;
+    });
+  };
+  const choisirFormat = () => {
+    if (!piece) return;
+    haptic('leger');
+    alerte('Format de l’image', undefined, [
+      { label: 'Carré · réseaux sociaux', onPress: () => partager('carre') },
+      { label: 'Paysage 4:3 · annonce', onPress: () => partager('paysage') },
+    ]);
+  };
   const [meubleId, setMeubleId] = useState<string | null>(null);
   // Une autre pièce : on repart des murs, sans meuble choisi.
   useEffect(() => {
@@ -484,6 +531,23 @@ export function DecorSheet({
     <SheetShell visible={visible} onClose={onClose} defile={false}>
       <View style={s.tete} onTouchStart={() => (repos.current = Date.now())}>
         <Text style={s.titre}>Décorer</Text>
+        {piece ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Partager une image de la pièce"
+            accessibilityHint="Appui long pour choisir carré ou paysage 4:3"
+            accessibilityActions={[{ name: 'longpress', label: 'Choisir le format' }]}
+            onAccessibilityAction={(e) => e.nativeEvent.actionName === 'longpress' && choisirFormat()}
+            accessibilityState={{ busy: !!capturant }}
+            hitSlop={8}
+            style={({ pressed }) => [s.partager, pressed && { opacity: 0.6 }]}
+            onPress={() => partager('carre')}
+            onLongPress={choisirFormat}>
+            <Svg width={17} height={17} viewBox="0 0 24 24">
+              <Path d={SOLAIRES.partage} fill={c.ink} fillRule="evenodd" />
+            </Svg>
+          </Pressable>
+        ) : null}
         {/* Annuler sans quitter : on ose essayer quand on peut revenir.
             Revue de lisibilité : une flèche seule, à 35 % quand rien n'est
             à défaire, ne se lisait pas. Le mot l'accompagne, et l'état
@@ -554,14 +618,63 @@ export function DecorSheet({
 
           {visible && piece ? (
             <View
-              style={[s.apercu, { height: hauteurApercu }]}
+              style={[s.apercu, { height: hauteurApercu }, capturant && s.apercuPhoto]}
+              onLayout={(e) => (largeurApercu.current = e.nativeEvent.layout.width)}
               // Un doigt posé, même immobile, arrête le tour (revue « Hugo »).
               onTouchStart={() => (repos.current = Date.now())}
               onTouchMove={() => (repos.current = Date.now())}>
-              <PieceTournante pieceId={piece.id} niveau={niveauDe(piece)} repos={repos} />
-              {ambianceActuelle && ambianceActuelle.cle !== 'origine' ? (
-                <View style={s.badgeAmbiance} pointerEvents="none">
-                  <Text style={s.badgeAmbianceTexte}>{ambianceActuelle.nom}</Text>
+              {/*
+                LE CADRE DE LA PHOTO — le même arbre que l'aperçu, pour que la
+                maquette ne se remonte pas : il prend, le temps de la capture,
+                la forme de l'image (carré ou 4:3, sur toute la largeur) et
+                passe par-dessus les tuiles. Rien d'autre n'y entre : ni la
+                pastille d'ambiance, ni les boutons.
+              */}
+              <View
+                ref={cadre}
+                collapsable={false}
+                testID="cadre-photo-decor"
+                style={
+                  capturant
+                    ? [
+                        s.cadrePhoto,
+                        largeurApercu.current > 0
+                          ? { height: largeurApercu.current / RAPPORT[capturant] }
+                          : { aspectRatio: RAPPORT[capturant] },
+                      ]
+                    : StyleSheet.absoluteFill
+                }>
+                <PieceTournante pieceId={piece.id} niveau={niveauDe(piece)} repos={repos} photo={!!capturant} />
+                {!capturant && ambianceActuelle && ambianceActuelle.cle !== 'origine' ? (
+                  <View style={s.badgeAmbiance} pointerEvents="none">
+                    <Text style={s.badgeAmbianceTexte}>{ambianceActuelle.nom}</Text>
+                  </View>
+                ) : null}
+                {capturant ? (
+                  <View style={s.legendePhoto} pointerEvents="none">
+                    <Text style={s.legendePhotoPiece} numberOfLines={1}>
+                      {piece.name || `Pièce ${rooms.indexOf(piece) + 1}`}
+                    </Text>
+                    {ambianceActuelle && ambianceActuelle.cle !== 'origine' ? (
+                      <Text style={s.legendePhotoAmbiance} numberOfLines={1}>
+                        {`Ambiance ${ambianceActuelle.nom}`}
+                      </Text>
+                    ) : null}
+                  </View>
+                ) : null}
+                {/* Le logo signe l'image gratuite, pas celle du Pro (revue « Inès »). */}
+                {capturant && !estPro ? (
+                  <View style={s.logoPhoto} pointerEvents="none" testID="logo-photo-decor">
+                    <Image source={require('../assets/echoplan.png')} style={s.logoPhotoImage} resizeMode="contain" />
+                  </View>
+                ) : null}
+              </View>
+              {prete && !capturant ? (
+                <View style={s.prete} pointerEvents="none" testID="image-prete" accessibilityLiveRegion="polite">
+                  <Svg width={14} height={14} viewBox="0 0 24 24">
+                    <Path d={SOLAIRES.coche} fill="none" stroke={c.blue} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                  <Text style={s.preteTexte}>Image prête</Text>
                 </View>
               ) : null}
             </View>
@@ -783,6 +896,14 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
     },
     annulerMot: { color: c.ink, fontSize: 14, fontWeight: '700' },
+    partager: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: c.surfaceSunken,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     annulerMotEteint: { color: c.inkFaint },
     pots: {
       flexDirection: 'row',
@@ -824,6 +945,44 @@ const getStyles = themedStyles((c: Palette) =>
       overflow: 'hidden',
       backgroundColor: c.surfaceSunken,
     },
+    // Le temps de la photo, le cadre déborde de l'aperçu, par-dessus les tuiles.
+    apercuPhoto: { overflow: 'visible', zIndex: 10 },
+    cadrePhoto: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      borderRadius: radius.lg,
+      overflow: 'hidden',
+      // Un fond propre et uni : rien d'autre que la pièce.
+      backgroundColor: c.surface,
+    },
+    legendePhoto: { position: 'absolute', left: 14, bottom: 12, right: 120 },
+    legendePhotoPiece: { color: c.ink, fontSize: 15, fontWeight: '800', letterSpacing: -0.2 },
+    legendePhotoAmbiance: { color: c.inkSoft, fontSize: 12.5, fontWeight: '600', marginTop: 1 },
+    logoPhoto: {
+      position: 'absolute',
+      bottom: 10,
+      right: 10,
+      backgroundColor: 'rgba(255,255,255,0.88)',
+      borderRadius: 9,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    logoPhotoImage: { width: 72, height: 46, opacity: 0.85 },
+    prete: {
+      position: 'absolute',
+      top: 10,
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: c.surfaceVoile,
+    },
+    preteTexte: { color: c.ink, fontSize: 13, fontWeight: '700' },
     badgeAmbiance: {
       position: 'absolute',
       top: 10,

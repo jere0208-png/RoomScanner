@@ -27,6 +27,7 @@
  */
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
+  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -74,6 +75,9 @@ import {
 import { haptic, releaseHaptic } from '../ui/haptic';
 import { ombreBouton, radius, themedStyles, useTheme, type Palette } from '../theme';
 import { useFigePendantLeGeste } from '../store/geste';
+import { useImageSansLogo } from '../store/accountStore';
+import { usePriseDeVue } from '../ui/partageRendu';
+import { AlerteHote } from './AlerteHote';
 
 /**
  * LE PAS — 1,65 m/s à fond de manette : celui de quelqu'un qui visite d'un
@@ -851,6 +855,36 @@ export function Exploration({
     dernieresLampes.current = '';
   }, [maille]);
 
+  /*
+    LA PHOTO DE LA VISITE — revue « découvreurs » : « impossible de faire une
+    photo pendant la visite ». Un rond en bas, et la mécanique de l'image du
+    plan (`usePriseDeVue`) : ce qu'on regarde, en pleine définition, le logo
+    sur l'image gratuite, et le partage.
+
+    LA VUE NATIVE NE SE PHOTOGRAPHIE PAS : SceneKit dessine en Metal, que
+    `captureRef` rend noir. Le temps de la capture, la vue en JavaScript —
+    celle du banc d'essai, à la même pose exacte — se pose par-dessus, sur un
+    fond opaque ; la vue native reste montée dessous, et ne reconvertit rien.
+  */
+  const estPro = useImageSansLogo();
+  const { capturant, prete, prendre } = usePriseDeVue();
+  const vueCapturee = useRef<View>(null);
+  const [posePhoto, setPosePhoto] = useState<Pose | null>(null);
+  const photographier = () => {
+    if (capturant) return;
+    arreterTout();
+    setPosePhoto({ ...pose.current });
+    // L'écran entier, tel qu'on le voit — en haute définition (voir `tailleDeCapture`).
+    prendre(vueCapturee, 'carre', () => ({ w: largeur, h: hauteur }));
+  };
+  useEffect(() => {
+    if (!capturant) setPosePhoto(null);
+  }, [capturant]);
+  const cameraPhoto = useMemo(
+    () => (posePhoto ? cameraDe(posePhoto) : null),
+    [posePhoto, ouverture], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   // La vue en JavaScript (sans natif) : sa caméra suit l'état.
   const camera = useMemo(() => cameraDe(vue), [vue, ouverture]); // eslint-disable-line react-hooks/exhaustive-deps
   // La vue native : la caméra d'entrée, puis la régie à chaque image.
@@ -868,7 +902,7 @@ export function Exploration({
       <View style={styles.fond}>
         {/* La 3D, à hauteur d'œil. Elle ne prend aucun doigt : les deux
             pouces sont pour la manette et le regard. */}
-        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <View ref={vueCapturee} collapsable={false} style={StyleSheet.absoluteFill} pointerEvents="none">
           {visible && walls.length > 0 && RoomScanVisite && maille && (
             <RoomScanVisite
               style={StyleSheet.absoluteFill}
@@ -890,6 +924,17 @@ export function Exploration({
               showMeasures={false}
               showNorth={false}
             />
+          )}
+          {/* La photo : le rendu que la capture sait lire, à la pose exacte. */}
+          {capturant && cameraPhoto && walls.length > 0 && (
+            <View testID="photo-de-secours" style={[StyleSheet.absoluteFill, { backgroundColor: fond }]}>
+              <Iso3DView pov={cameraPhoto} gpu={false} showMeasures={false} showNorth={false} />
+            </View>
+          )}
+          {capturant && !estPro && (
+            <View style={styles.logoPhoto} testID="logo-photo-visite">
+              <Image source={require('../assets/echoplan.png')} style={styles.logoPhotoImage} resizeMode="contain" />
+            </View>
           )}
         </View>
 
@@ -1025,6 +1070,35 @@ export function Exploration({
           </View>
         )}
 
+        {/*
+          L'APPAREIL PHOTO — rond, discret, au milieu du bas : entre les deux
+          pouces, là où aucun ne se pose. Il quitte l'écran le temps de la
+          photo (il n'est pas dans l'image, qui ne porte que la 3D).
+        */}
+        {!capturant && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Prendre une photo de la visite"
+            accessibilityHint="Capture la vue et ouvre le partage"
+            hitSlop={8}
+            style={({ pressed }) => [styles.photo, { bottom: marges.bottom + 30 }, pressed && styles.enfonce]}
+            onPress={photographier}>
+            <Svg width={22} height={22} viewBox="0 0 24 24">
+              <Path d={SOLAIRES.image} fill={teinte.ink} fillRule="evenodd" />
+            </Svg>
+          </Pressable>
+        )}
+        {prete && !capturant && (
+          <View
+            style={[styles.prete, { bottom: marges.bottom + 92 }]}
+            pointerEvents="none"
+            testID="image-prete"
+            accessibilityLiveRegion="polite">
+            <Text style={styles.preteTexte}>Image prête</Text>
+          </View>
+        )}
+        {/* Une capture qui échoue le dit DANS la visite, pas sous elle. */}
+        <AlerteHote imbrique actif={visible} />
       </View>
     </Modal>
   );
@@ -1073,6 +1147,38 @@ const getStyles = themedStyles((c: Palette) =>
     pieceTexte: { color: c.ink, fontSize: 12, fontWeight: '600' },
     pieceTexteIci: { color: c.surface },
     enfonce: { opacity: 0.7 },
+    photo: {
+      position: 'absolute',
+      alignSelf: 'center',
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: c.surfaceVoile,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...ombreBouton,
+    },
+    prete: {
+      position: 'absolute',
+      alignSelf: 'center',
+      paddingHorizontal: 14,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: c.surface,
+      justifyContent: 'center',
+      ...ombreBouton,
+    },
+    preteTexte: { color: c.ink, fontSize: 14, fontWeight: '700' },
+    logoPhoto: {
+      position: 'absolute',
+      bottom: 24,
+      right: 16,
+      backgroundColor: 'rgba(255,255,255,0.88)',
+      borderRadius: 9,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+    },
+    logoPhotoImage: { width: 92, height: 59, opacity: 0.85 },
     consigne: {
       position: 'absolute',
       left: 24,
