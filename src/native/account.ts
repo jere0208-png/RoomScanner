@@ -47,6 +47,7 @@ const natif = () => NativeModules.RoomScanAccount as
         expiration?: number;
         reconduit?: boolean;
         aucun?: boolean;
+        preuve?: string;
       } | null>;
       proProducts?: (productIds: string[]) => Promise<unknown[]>;
       presentOfferCode?: () => Promise<boolean>;
@@ -125,6 +126,12 @@ export interface EcheancePro {
   expiration: number;
   /** Un prélèvement suivra-t-il ? Faux si l'utilisateur a résilié. */
   reconduit: boolean;
+  /**
+   * La transaction telle qu'Apple l'a SIGNÉE (JWS de StoreKit 2) : ce que le
+   * serveur vérifie avant de reconnaître l'abonnement. Absente si le natif
+   * ne la fournit pas.
+   */
+  preuve?: string;
 }
 
 /**
@@ -247,6 +254,7 @@ export async function echeanceAbonnement(
       produit: String(r.produit ?? ''),
       expiration: r.expiration,
       reconduit: r.reconduit !== false,
+      ...(typeof r.preuve === 'string' && r.preuve ? { preuve: r.preuve } : {}),
     };
   } catch {
     return null;

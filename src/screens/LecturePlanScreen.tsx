@@ -52,7 +52,7 @@ import { roomParts, segLength } from '../geometry/floorplan';
 import { reconstruirePlan, type LectureBrute, type PlanLu } from '../geometry/lecturePlan';
 import { importerUnPlan, ouvrirUnFichier, pageDuPdf, scannerUnPlan, type PageDePlan } from '../native/lecturePlan';
 import { envoyerLePlan, type ReponseDeLecture } from '../net/lecturePlan';
-import { useAccountStore } from '../store/accountStore';
+import { preuveAbonnement, useAccountStore } from '../store/accountStore';
 import { useScanStore } from '../store/scanStore';
 import { radius, shadowCard, useTheme, type Palette } from '../theme';
 import { ENCRE_ELEC } from '../ui/encreElec';
@@ -112,7 +112,6 @@ export function LecturePlanScreen() {
   const compte = useAccountStore((st) => st.compte);
   const jeton = useAccountStore((st) => st.jeton);
   const pro = useAccountStore((st) => st.pro);
-  const proVia = useAccountStore((st) => st.proVia);
   const quitterInvite = useAccountStore((st) => st.quitterInvite);
   const [etat, setEtat] = useState<Etat>(() => {
     // De retour de la connexion : la page prise avant attend sa lecture.
@@ -136,10 +135,14 @@ export function LecturePlanScreen() {
   const lire = async (page: PageDePlan) => {
     const n = ++enCours.current;
     setEtat({ phase: 'lecture', page, etape: 1 });
+    // La preuve d'abonnement, si ce téléphone en tient une : le serveur la
+    // vérifie (il ne croit plus un simple « abonné »).
+    const preuve = compte && jeton ? await preuveAbonnement() : null;
+    if (n !== enCours.current) return;
     const r = await envoyerLePlan(
       page,
       compte && jeton ? { identifiant: compte.id, jeton } : null,
-      pro && proVia === 'abonnement',
+      preuve,
     );
     if (n !== enCours.current) return;
     if (!r.ok) {

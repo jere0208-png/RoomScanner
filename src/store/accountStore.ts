@@ -952,6 +952,21 @@ export const identiteDuCompte = (): Identite | null => {
 };
 
 /**
+ * LA PREUVE DE L'ABONNEMENT, POUR LE SERVEUR — revue « sécurité » : le
+ * serveur ne croit plus le drapeau « abonné » que l'app lui envoyait ; il
+ * veut la transaction telle qu'Apple l'a signée, et la vérifie lui-même.
+ *
+ * Demandée à l'App Store au moment d'en avoir besoin (elle se lit hors
+ * ligne), pour CE téléphone : `null` sans abonnement en cours, sans module
+ * natif, ou sans signature — la requête part alors sans preuve, et le
+ * serveur s'en tient à ce que la base sait du compte.
+ */
+export async function preuveAbonnement(): Promise<string | null> {
+  const e = await echeanceAbonnement([PRODUIT_PRO, PRODUIT_PRO_AN]);
+  return e && 'preuve' in e && e.preuve ? e.preuve : null;
+}
+
+/**
  * L'APERÇU DU DOSSIER EST-IL NET ?
  *
  * Relevé du patron : « sans abonnement, donne-lui la possibilité de voir son

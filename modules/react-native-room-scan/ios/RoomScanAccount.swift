@@ -405,6 +405,10 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
    * `reconduit` dit si un prélèvement suivra : sans lui, on écrirait
    * « renouvellement le 3 novembre » à quelqu'un qui a résilié, c'est-à-dire
    * exactement le contraire de la vérité.
+   *
+   * `preuve` : la MÊME transaction, telle qu'Apple l'a signée (JWS). Le
+   * serveur ne croit plus l'app sur parole — revue « sécurité » : il vérifie
+   * cette signature avant d'accorder la lecture de plans des abonnés.
    */
   @objc func proExpiry(
     _ productIds: [String],
@@ -414,6 +418,7 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
     Task {
       var echeance: Date?
       var produitActif: String?
+      var preuve: String?
       for await resultat in Transaction.currentEntitlements {
         guard case .verified(let transaction) = resultat,
           productIds.contains(transaction.productID),
@@ -422,6 +427,7 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
         if echeance == nil || fin > echeance! {
           echeance = fin
           produitActif = transaction.productID
+          preuve = resultat.jwsRepresentation
         }
       }
       guard let fin = echeance, let produit = produitActif else {
@@ -448,11 +454,13 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
           }
         }
       }
-      resolve([
+      var sortie: [String: Any] = [
         "produit": produit,
         "expiration": fin.timeIntervalSince1970 * 1000,
         "reconduit": reconduit,
-      ])
+      ]
+      if let preuve = preuve { sortie["preuve"] = preuve }
+      resolve(sortie)
     }
   }
 }

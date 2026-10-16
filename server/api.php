@@ -22,9 +22,11 @@
  *
  *   supprimer  {identifiant, jeton}          → {ok}  le compte ET ses plans
  *   retirer    {identifiant, jeton, scan}    → {ok}  un plan déposé
- *   lire_plan  {identifiant, jeton, image, media, textes}
+ *   lire_plan  {identifiant, jeton, image, media, textes, preuve?}
  *              → {ok, lecture, essai}  un plan papier lu par Claude
  *              (voir lecture-plan.php) — une lecture d'essai, puis le Pro.
+ *              `preuve` : la transaction d'abonnement signée par Apple,
+ *              vérifiée ici (voir preuve-apple.php).
  *
  * Le jeton est un HMAC de l'identifiant : sans état côté serveur, il prouve
  * que l'appelant est bien passé par `connecter`.
@@ -35,6 +37,7 @@
  * apporte maintenant SA preuve, vérifiée ici avant tout (`preuveRefusee`).
  */
 require __DIR__ . '/config-echoplan.php';
+require __DIR__ . '/preuve-apple.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -176,14 +179,64 @@ if ($identifiant === '' || strlen($identifiant) > 191) {
 
 $db = base();
 
-/** Le compte, s'il existe. */
+/**
+ * La requête préparée, ou `false` si la base ne la connaît pas (colonne pas
+ * encore migrée) — que mysqli le dise par `false` (PHP 7) ou par une
+ * exception (PHP 8.1 et suivants).
+ */
+function prepareTolerant(mysqli $db, string $sql) {
+  try {
+    return mysqli_prepare($db, $sql);
+  } catch (Throwable $e) {
+    return false;
+  }
+}
+
+/**
+ * Le compte, s'il existe — avec l'échéance de son abonnement quand la base
+ * la connaît (`pro_echeance`, voir migration-abonnement.sql ; sans elle,
+ * `null` : on ne sait pas, on ne retire rien).
+ */
 function compteDe(mysqli $db, string $identifiant): ?array {
-  $req = mysqli_prepare($db, 'SELECT id, pro, plans FROM comptes WHERE identifiant = ?');
+  $req = prepareTolerant($db, 'SELECT id, pro, plans, pro_echeance FROM comptes WHERE identifiant = ?');
+  if (!$req) {
+    $req = mysqli_prepare($db, 'SELECT id, pro, plans, NULL AS pro_echeance FROM comptes WHERE identifiant = ?');
+  }
   mysqli_stmt_bind_param($req, 's', $identifiant);
   mysqli_stmt_execute($req);
   $res = mysqli_stmt_get_result($req);
   $ligne = mysqli_fetch_assoc($res);
   return $ligne ?: null;
+}
+
+/**
+ * INSCRIRE L'ABONNEMENT QU'APPLE A SIGNÉ — `comptes.pro = 'abonnement'`, et
+ * son échéance si la base a la colonne. Rend `false` si la transaction est
+ * déjà attachée à UN AUTRE compte : une preuve recopiée ne fait pas autant
+ * d'abonnés qu'on veut (une transaction, un compte ; supprimer le compte la
+ * libère). Un ancien code (`pro = 'code'`) n'est jamais écrasé.
+ */
+function inscrireAbonnement(mysqli $db, array $compte, array $preuve): bool {
+  if ($preuve['transaction'] !== '') {
+    $req = prepareTolerant($db, 'SELECT id FROM comptes WHERE apple_transaction = ? AND id <> ?');
+    if ($req) {
+      mysqli_stmt_bind_param($req, 'si', $preuve['transaction'], $compte['id']);
+      mysqli_stmt_execute($req);
+      if (mysqli_fetch_assoc(mysqli_stmt_get_result($req))) {
+        return false;
+      }
+    }
+  }
+  $pro = $compte['pro'] === 'code' ? 'code' : 'abonnement';
+  $req = prepareTolerant($db, 'UPDATE comptes SET pro = ?, pro_echeance = ?, apple_transaction = ? WHERE id = ?');
+  if ($req) {
+    mysqli_stmt_bind_param($req, 'sisi', $pro, $preuve['expiration'], $preuve['transaction'], $compte['id']);
+  } else {
+    $req = mysqli_prepare($db, 'UPDATE comptes SET pro = ? WHERE id = ?');
+    mysqli_stmt_bind_param($req, 'si', $pro, $compte['id']);
+  }
+  mysqli_stmt_execute($req);
+  return true;
 }
 
 /** base64url → octets. */
@@ -401,6 +454,20 @@ if (!$compte) {
   sortir(['ok' => false, 'raison' => 'Compte inconnu.']);
 }
 
+/*
+  UN ABONNEMENT ÉCHU RETOMBE. L'échéance inscrite avec la preuve d'Apple
+  passée, le Pro par abonnement s'en va : un renouvellement le rendra, à la
+  prochaine preuve que l'app enverra. Sans échéance connue (base pas
+  migrée), on ne retire rien.
+*/
+if ($compte['pro'] === 'abonnement' && $compte['pro_echeance'] !== null
+  && (int) $compte['pro_echeance'] <= (int) floor(microtime(true) * 1000)) {
+  $req = mysqli_prepare($db, "UPDATE comptes SET pro = '' WHERE id = ?");
+  mysqli_stmt_bind_param($req, 'i', $compte['id']);
+  mysqli_stmt_execute($req);
+  $compte['pro'] = '';
+}
+
 if ($action === 'etat') {
   sortir(['ok' => true, 'pro' => $compte['pro'], 'plans' => (int) $compte['plans'], 'codes' => codesInternesOuverts()]);
 }
@@ -572,9 +639,24 @@ if ($action === 'retirer') {
   LE SERVEUR NE CROIT PLUS L'APP SUR PAROLE — revue « sécurité » : le champ
   `abonne` envoyé par l'app suffisait à passer Pro ; n'importe qui pouvait
   l'écrire et lire des plans à volonté, aux frais de l'IA. Il est ignoré :
-  seul l'état du compte en base compte. Un abonnement App Store ne sera
-  reconnu ici que lorsque le serveur saura le VÉRIFIER (reçu signé par
-  Apple) et l'inscrire dans `comptes.pro`.
+  seul l'état du compte en base compte.
+
+  L'ABONNEMENT APP STORE SE PROUVE — l'app joint `preuve`, la transaction
+  d'abonnement telle qu'Apple l'a signée (StoreKit 2). `verifierPreuveApple`
+  la vérifie (chaîne jusqu'à Apple Root CA - G3, signature, application,
+  produit Pro, échéance à venir, pas de remboursement) ; valide, elle inscrit
+  `comptes.pro = 'abonnement'` et son échéance, et la lecture passe en Pro.
+  Une preuve absente ou refusée ne bloque rien : le compte garde ses droits.
+
+  AU DÉPLOIEMENT :
+    — renseigner `const APPLE_BUNDLE_ID = 'fr.echoplan.app';` dans
+      config-echoplan.php (vide, AUCUNE preuve n'est acceptée) ;
+    — déposer preuve-apple.php à côté d'api.php ;
+    — importer migration-abonnement.sql (l'échéance, et la transaction qui
+      attache un abonnement à un seul compte). Sans elle, le Pro s'inscrit
+      quand même, mais ne retombe pas tout seul à l'échéance ;
+    — aucune clé privée, aucun secret Apple : la vérification n'utilise que
+      ce qu'Apple publie.
 
   Une photo qui n'est pas un plan ne consomme pas l'essai. Rien n'est gardé :
   ni l'image, ni la lecture — seulement le compte des lectures.
@@ -589,6 +671,12 @@ if ($action === 'lire_plan') {
   mysqli_stmt_execute($req);
   $l = mysqli_fetch_assoc(mysqli_stmt_get_result($req)) ?: ['lectures' => 0, 'lectures_jour' => 0, 'jour_lecture' => null];
   $estPro = $compte['pro'] === 'code' || $compte['pro'] === 'abonnement';
+  if (!$estPro && is_string($corps['preuve'] ?? null)) {
+    $preuve = verifierPreuveApple($corps['preuve'], (int) floor(microtime(true) * 1000));
+    if ($preuve !== null && inscrireAbonnement($db, $compte, $preuve)) {
+      $estPro = true;
+    }
+  }
   if (!$estPro && (int) $l['lectures'] >= 1) {
     sortir(['ok' => false, 'raison' => 'pro', 'message' => 'Votre lecture d’essai est utilisée : la lecture de plans papier est réservée au Pro.']);
   }

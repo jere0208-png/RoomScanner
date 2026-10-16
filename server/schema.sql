@@ -10,6 +10,9 @@ CREATE TABLE IF NOT EXISTS comptes (
   email VARCHAR(191) NULL,
   -- '' = gratuit ; 'code' ou 'abonnement' = Pro, et par quelle porte.
   pro ENUM('', 'code', 'abonnement') NOT NULL DEFAULT '',
+  -- L'abonnement prouvé par Apple : sa fin (ms) et sa transaction d'origine.
+  pro_echeance BIGINT NULL,
+  apple_transaction VARCHAR(64) NULL,
   -- Plans consommés sur le palier gratuit (le trousseau du téléphone
   -- garde le même compteur ; le serveur fait foi quand les deux divergent).
   plans INT NOT NULL DEFAULT 0,
@@ -18,7 +21,8 @@ CREATE TABLE IF NOT EXISTS comptes (
   lectures_jour INT NOT NULL DEFAULT 0,
   jour_lecture DATE NULL,
   cree_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  vu_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  vu_le DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY apple_transaction (apple_transaction)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
 -- L'ESSAI GRATUIT APPARTIENT AU TÉLÉPHONE, pas au compte : un appareil

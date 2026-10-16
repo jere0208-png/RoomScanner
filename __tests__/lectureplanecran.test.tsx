@@ -184,9 +184,10 @@ describe('la page', () => {
     // Pendant la lecture : la page, et les étapes.
     expect(t.root.findAll((n) => n.props?.testID === 'lecture-en-cours').length).toBeGreaterThan(0);
     expect(textes(t)).toContain('Lecture du plan par l’IA');
-    // Le compte part avec la page, et l'abonnement s'il y en a un.
+    // Le compte part avec la page ; la preuve d'abonnement seulement si le
+    // téléphone en tient une (ici, aucun module StoreKit : pas de preuve).
     expect(mockEnvoyer.mock.calls[0][1]).toEqual({ identifiant: 'email:a@b.fr', jeton: 'j' });
-    expect(mockEnvoyer.mock.calls[0][2]).toBe(false);
+    expect(mockEnvoyer.mock.calls[0][2]).toBeNull();
     await act(async () => finir({ ok: true, lecture: LECTURE, essai: true }));
 
     // Ce qu'on a lu : le plan dessiné, son bilan, sa confiance.

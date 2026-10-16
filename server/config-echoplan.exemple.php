@@ -31,9 +31,10 @@ const RETOUR_APP = 'echoplan://google';
 const EMAIL_EXPEDITEUR = 'no-reply@VOTRE-DOMAINE';
 
 // ---- L'identifiant de l'app (« bundle ID ») pour lequel Apple émet ses
-// jetons de connexion. Vide : on vérifie la signature d'Apple, l'utilisateur
-// et l'expiration, mais pas l'application destinataire.
-const APPLE_BUNDLE_ID = '';
+// jetons de connexion et signe ses abonnements. Vide : la connexion Apple
+// ne vérifie pas l'application destinataire, et AUCUN abonnement App Store
+// n'est reconnu (la lecture de plans des abonnés retombe sur l'essai).
+const APPLE_BUNDLE_ID = 'fr.echoplan.app';
 
 // ---- LA LECTURE DE PLANS PAPIER (Claude, d'Anthropic) — console.anthropic.com
 // → API Keys. La clé ne quitte jamais le serveur. Vide : la lecture se dit

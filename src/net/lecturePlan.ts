@@ -7,6 +7,11 @@
  * vérification de compte — et l'écran le dit pendant ce temps.
  *
  * Rien n'est gardé, ni ici ni là-bas : la page part, la lecture revient.
+ *
+ * L'ABONNEMENT PART EN PREUVE, PLUS EN DÉCLARATION — revue « sécurité » :
+ * le drapeau `abonne` que le serveur croyait est remplacé par `preuve`, la
+ * transaction signée par Apple ; jointe seulement quand le téléphone en
+ * détient une.
  */
 import type { LectureBrute } from '../geometry/lecturePlan';
 import type { PageDePlan } from '../native/lecturePlan';
@@ -27,7 +32,7 @@ export const DELAI_DE_LECTURE = 150_000;
 export async function envoyerLePlan(
   page: PageDePlan,
   qui: { identifiant: string; jeton: string } | null,
-  abonne: boolean,
+  preuve: string | null,
   delai = DELAI_DE_LECTURE,
 ): Promise<ReponseDeLecture> {
   if (!SERVEUR.url) {
@@ -49,7 +54,7 @@ export async function envoyerLePlan(
           image: page.base64,
           media: 'image/jpeg',
           textes: page.textes,
-          abonne,
+          ...(preuve ? { preuve } : {}),
         }),
       }),
       new Promise<never>((_, rej) => {
