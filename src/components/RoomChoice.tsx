@@ -37,15 +37,17 @@ function MiniPlan({
   profondeur,
   echelle,
   c,
+  W = 92,
+  H = 58,
 }: {
   largeur: number;
   profondeur: number;
   /** Points par mètre, commune à toutes les vignettes. */
   echelle: number;
   c: Palette;
+  W?: number;
+  H?: number;
 }) {
-  const W = 92;
-  const H = 58;
   const w = Math.max(10, largeur * echelle);
   const h = Math.max(10, profondeur * echelle);
   const x = (W - w) / 2;
@@ -81,11 +83,17 @@ export function RoomChoice({
   modeles,
   onChoose,
   onCustom,
+  compact = false,
 }: {
   modeles: RoomModel[];
   onChoose: (m: RoomModel) => void;
   /** « Sur mesure » : on saisit soi-même la largeur et la profondeur. */
   onCustom: () => void;
+  /**
+   * Trois par rangée, vignettes plus basses — la page du plan vierge doit
+   * tout montrer sans défiler (relevé du patron).
+   */
+  compact?: boolean;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
@@ -95,13 +103,15 @@ export function RoomChoice({
     ...modeles.map((m) => Math.max(m.largeur, m.profondeur)),
     1,
   );
-  const echelle = 46 / plusGrand;
+  const echelle = (compact ? 36 : 46) / plusGrand;
+  const W = compact ? 76 : 92;
+  const H = compact ? 44 : 58;
   return (
     <View style={styles.grille}>
       {modeles.map((m) => (
         <TouchableOpacity
           key={m.nom}
-          style={styles.carte}
+          style={[styles.carte, compact && styles.carteCompacte]}
           activeOpacity={0.85}
           accessibilityLabel={m.nom}
           onPress={() => onChoose(m)}>
@@ -110,6 +120,8 @@ export function RoomChoice({
             profondeur={m.profondeur}
             echelle={echelle}
             c={c}
+            W={W}
+            H={H}
           />
           <Text style={styles.nom} numberOfLines={1}>
             {m.nom}
@@ -125,16 +137,16 @@ export function RoomChoice({
         encore de forme, c'est à l'électricien de la donner.
       */}
       <TouchableOpacity
-        style={[styles.carte, styles.carteLibre]}
+        style={[styles.carte, compact && styles.carteCompacte, styles.carteLibre]}
         activeOpacity={0.85}
         accessibilityLabel="Sur mesure"
         onPress={onCustom}>
-        <Svg width={92} height={58}>
+        <Svg width={W} height={H}>
           <Rect
-            x={16}
-            y={9}
-            width={60}
-            height={40}
+            x={W * 0.17}
+            y={H * 0.15}
+            width={W * 0.66}
+            height={H * 0.7}
             rx={2}
             fill="none"
             stroke={c.inkFaint}
@@ -173,6 +185,8 @@ const getStyles = themedStyles((c: Palette) => ({
     borderColor: c.line,
   },
   carteLibre: { backgroundColor: c.surface },
+  // Trois par rangée quoi qu'il arrive, sans plancher de largeur.
+  carteCompacte: { width: '30%' as const, minWidth: 0, paddingVertical: 8 },
   nom: { color: c.ink, fontSize: 13.5, fontWeight: '600' as const, marginTop: 6 },
   cotes: { color: c.inkFaint, fontSize: 11.5, fontWeight: '600' as const },
 }));

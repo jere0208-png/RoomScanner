@@ -8,30 +8,16 @@
  *
  * La page montre d'emblée ce que la feuille cachait derrière un bouton : les
  * gabarits de pièce, à leurs proportions (`RoomChoice`), et « Sur mesure ».
- * L'illustration prend la place qui reste : elle rétrécit sur un petit
- * écran plutôt que de faire défiler la page.
+ *
+ * SANS ILLUSTRATION — elle dépassait sous la barre d'état et poussait
+ * « Sur mesure » hors de l'écran (relevé du patron : « l'icône dépasse,
+ * retire-la »). Les gabarits, trois par rangée, tiennent sur un écran.
  */
 import React from 'react';
-import { Image, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleSheet, Text, View } from 'react-native';
 import { RoomChoice, type RoomModel } from '../../components/RoomChoice';
 import { themedStyles, useTheme, type Palette } from '../../theme';
 import { MODELES_DE_PIECE } from './AddRoomSheet';
-
-const MAISON = require('../../../assets/illustrations/maison-verre.png');
-/** Rapport largeur / hauteur de l'illustration détourée. */
-const RAPPORT = 600 / 489;
-
-/*
-  CE QUE LE RESTE DE LA PAGE OCCUPE, en points : la barre du haut, le titre et
-  sa phrase, la grille de neuf vignettes (trois rangées) et les marges. Ce
-  qui reste revient à l'illustration, entre 84 et 210 points de haut.
-*/
-const HORS_ILLUSTRATION = 56 + 92 + 3 * 112 + 2 * 10 + 40;
-
-export function hauteurDeLIllustration(hauteurEcran: number, marges: number): number {
-  return Math.max(84, Math.min(210, hauteurEcran - marges - HORS_ILLUSTRATION));
-}
 
 export function PlanViergePage({
   onChoose,
@@ -42,18 +28,8 @@ export function PlanViergePage({
 }) {
   const c = useTheme();
   const s = getStyles(c);
-  const { height } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-  const h = hauteurDeLIllustration(height, insets.top + insets.bottom);
   return (
     <View style={s.page} testID="plan-vierge-page">
-      <Image
-        source={MAISON}
-        style={{ height: h, width: h * RAPPORT, alignSelf: 'center' }}
-        resizeMode="contain"
-        accessibilityIgnoresInvertColors
-        accessible={false}
-      />
       <Text style={s.titre} accessibilityRole="header">
         Plan vierge
       </Text>
@@ -65,6 +41,7 @@ export function PlanViergePage({
           modeles={MODELES_DE_PIECE}
           onChoose={(m) => onChoose({ ...m, profondeur: Math.min(m.largeur, m.profondeur) })}
           onCustom={onSurMesure}
+          compact
         />
       </View>
     </View>

@@ -11,18 +11,22 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { Image, ScrollView } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import { PlanViergePage, hauteurDeLIllustration } from '../src/screens/result/PlanViergePage';
+import { PlanViergePage } from '../src/screens/result/PlanViergePage';
+import { RoomChoice } from '../src/components/RoomChoice';
 import { MODELES_DE_PIECE } from '../src/screens/result/AddRoomSheet';
 
 describe('la page du plan vierge', () => {
-  it('montre la maison, le titre et tous les gabarits, sans défilement', () => {
+  it('montre le titre et tous les gabarits, sans illustration ni défilement', () => {
     const choisi = jest.fn();
     const surMesure = jest.fn();
     let t!: TestRenderer.ReactTestRenderer;
     act(() => {
       t = TestRenderer.create(<PlanViergePage onChoose={choisi} onSurMesure={surMesure} />);
     });
-    expect(t.root.findAllByType(Image)).toHaveLength(1);
+    // L'illustration dépassait sous la barre d'état : retirée (relevé du patron).
+    expect(t.root.findAllByType(Image)).toHaveLength(0);
+    // Trois gabarits par rangée : tout tient sur un écran.
+    expect(t.root.findByType(RoomChoice).props.compact).toBe(true);
     expect(t.root.findAllByType(ScrollView)).toHaveLength(0);
     for (const m of MODELES_DE_PIECE) {
       expect(t.root.findAll((n) => n.props.accessibilityLabel === m.nom && typeof n.props.onPress === 'function').length).toBeGreaterThan(0);
@@ -36,11 +40,4 @@ describe('la page du plan vierge', () => {
     act(() => t.unmount());
   });
 
-  it('l’illustration rétrécit sur un petit écran, sans jamais disparaître', () => {
-    expect(hauteurDeLIllustration(932, 93)).toBe(210); // grand iPhone
-    const se = hauteurDeLIllustration(667, 20); // iPhone SE
-    expect(se).toBeLessThan(210);
-    expect(se).toBeGreaterThanOrEqual(84);
-    expect(hauteurDeLIllustration(400, 0)).toBe(84);
-  });
 });
