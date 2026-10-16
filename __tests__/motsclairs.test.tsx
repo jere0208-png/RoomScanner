@@ -215,8 +215,10 @@ describe('le ticket dit « matériel », et il dit ce qui manque', () => {
       phrase, il ne doit pas y avoir trois paragraphes.
     */
     const lus = mots(await ouvrirLeTicket());
-    const iTotal = lus.findIndex((m) => m.includes('TOTAL'));
-    const iPose = lus.findIndex((m) => /pose [^.]* compris/i.test(m));
+    // MIS À JOUR — le total de la liste est celui du MATÉRIEL seul (relevé du
+    // patron) : la phrase juste dessous dit que la main-d'œuvre s'ajoute.
+    const iTotal = lus.findIndex((m) => m.includes('TOTAL MATÉRIEL'));
+    const iPose = lus.findIndex((m) => /main-d’œuvre/i.test(m));
     expect(iTotal).toBeGreaterThanOrEqual(0);
     expect(iPose).toBeGreaterThan(iTotal);
     expect(iPose - iTotal).toBeLessThanOrEqual(3);

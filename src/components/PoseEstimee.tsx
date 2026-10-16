@@ -157,7 +157,9 @@ export function PoseEstimee({
         <TotalQuiMonte valeur={totaux.ttc} format={euros} style={s.totalValeur} />
       </View>
       <Text style={s.mention}>
-        {`Total HT ${euros(totaux.ht)} · TVA ${pc(totaux.tauxTva)} ${euros(totaux.tva)}. Estimation à partir des points du plan, à ajuster au métré réel.`}
+        {/* Ce que le total contient : le matériel ET la main-d'œuvre (relevé du
+            patron : le total matériel, plus haut, ne compte que le matériel). */}
+        {`Matériel ${euros(totaux.fournituresHt)} HT + main-d’œuvre ${euros(totaux.poseHt + totaux.forfaitsHt)} HT = ${euros(totaux.ht)} HT · TVA ${pc(totaux.tauxTva)} ${euros(totaux.tva)}. Estimation à partir des points du plan, à ajuster au métré réel.`}
       </Text>
     </View>
   );

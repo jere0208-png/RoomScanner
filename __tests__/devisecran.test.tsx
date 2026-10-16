@@ -528,10 +528,26 @@ describe('le ticket de caisse', () => {
     const t = await auTicket();
     const lus = mots(t);
     const devis = devisAttendu();
-    expect(lus).toContain('TOTAL TTC');
+    /*
+      MIS À JOUR — relevé du patron : au bout de la liste, le MATÉRIEL seul
+      (au prix magasin, TVA 20 %) ; le total du devis, pose comprise, vient
+      ensuite dans le bloc « Pose ». Les deux ne sont plus égaux.
+    */
+    const { taux, chantier } = useReglagesPose.getState();
+    const vente = prixDuDevis(
+      chiffrerLePlan(MURS, ROOMS as never, APPAREILS, [], GAMMES[0].id, new Set(useScanStore.getState().devisEcartes)),
+      APPAREILS,
+      [],
+      { taux, chantier },
+    );
+    const materiel = Math.round(vente.totaux.fournituresHt * 1.2 * 100) / 100;
+    expect(lus).toContain('TOTAL MATÉRIEL TTC');
+    expect(lus[lus.indexOf('TOTAL MATÉRIEL TTC') + 1]).toBe(enEuros(materiel));
+    expect(lus).toContain('TOTAL DU DEVIS TTC');
     expect(lus).toContain(enEuros(totalAttendu()));
+    expect(materiel).not.toBeCloseTo(totalAttendu(), 0);
     // Le total vient APRÈS le dernier article : c'est la fin d'un ticket.
-    expect(lus.indexOf('TOTAL TTC')).toBeGreaterThan(
+    expect(lus.indexOf('TOTAL MATÉRIEL TTC')).toBeGreaterThan(
       lus.indexOf(devis.lignes[0].libelle),
     );
   });

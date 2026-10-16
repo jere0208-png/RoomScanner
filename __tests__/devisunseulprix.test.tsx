@@ -174,9 +174,13 @@ describe('le même nombre partout', () => {
       }
     });
     const { totaux } = attendu();
-    const ht = t.root.findAll((n) => n.props?.testID === 'total-ht' && n.type === Text)[0];
-    expect(ht).toBeDefined();
-    expect([ht.props.children].flat().join('')).toContain(`${fr(totaux.ht, 2)} € HT`);
+    // MIS À JOUR — le HT du devis se lit sous le TOTAL DU DEVIS (bloc « Pose ») ;
+    // le total de la liste, lui, est celui du matériel seul.
+    const tout = t.root
+      .findAllByType(Text)
+      .map((n) => [n.props.children].flat().filter((x) => typeof x === 'string').join(''))
+      .join(' | ');
+    expect(tout).toContain(`${fr(totaux.ht, 2)} € HT`);
     // Le gros total, une fois monté : le TTC pose comprise.
     const vus = t.root
       .findAllByType(Text)

@@ -205,8 +205,8 @@ describe('les heures, la TVA, l’acompte', () => {
     const t = await auTicket();
     act(() => bouton(t, 'TVA 5,5 %').props.onPress());
     expect(useScanStore.getState().devisTva).toBe(0.055);
-    const ht = t.root.findAll((n) => n.props?.testID === 'total-ht' && n.type === Text)[0];
-    expect(aPlat(ht.props.children)).toContain('TVA 5,5 %');
+    // MIS À JOUR : la TVA du devis se lit sous le TOTAL DU DEVIS (bloc « Pose »).
+    expect(mots(t).join(' | ')).toContain('TVA 5,5 %');
     expect(mots(t)).toContain(euros(attendu().totaux.ttc));
   });
 

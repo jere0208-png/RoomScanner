@@ -925,6 +925,14 @@ export function DevisScreen() {
     [devis, fixtures, ceiling, taux, chantier, tarifPro, coefficient, lignesLibres, heuresCorrigees, tvaDevis, tauxAcompte],
   );
   const { pose, totaux } = prix;
+  /*
+    LE MATÉRIEL, TTC : au prix du magasin (TVA 20 %, celle qu'on paie à la
+    caisse) quand le devis vend au prix public ; au prix de vente de
+    l'artisan, à la TVA du devis, dès qu'une ligne passe par son coefficient.
+  */
+  const auCoefficient = prix.fournitures.some((v) => v.auCoefficient);
+  const materielTtc =
+    Math.round(totaux.fournituresHt * (1 + (auCoefficient ? totaux.tauxTva : TVA_DES_PRIX_PUBLICS)) * 100) / 100;
   /** Le prix de vente HT de chaque ligne du ticket. */
   const ventes = useMemo(() => new Map(prix.fournitures.map((v) => [v.ligne, v])), [prix]);
   /** Le sous-total HT d'un rayon : ses lignes, à leur prix de vente. */
@@ -1660,41 +1668,26 @@ export function DevisScreen() {
             {/* Le trait de découpe, puis le total : la fin d'un ticket. */}
             <View style={styles.decoupe} />
             <View style={styles.rayon}>
-              <Text style={styles.totalNom}>TOTAL TTC</Text>
+              <Text style={styles.totalNom}>TOTAL MATÉRIEL TTC</Text>
               {/*
-                LE SEUL NOMBRE POUR LEQUEL ON EST VENU — il monte au lieu de
-                paraître. Voir `TotalQuiMonte` : sept dixièmes de seconde,
-                et il ralentit en arrivant pour dire qu'il est arrivé.
-
-                POSE COMPRISE — revue « Gérard » : il disait le matériel seul,
-                à 20 %, quand le PDF remis au client ajoutait la pose au taux
-                du chantier. Un seul prix : celui de `prixDuDevis`, le même
-                que la pastille du plan et que le PDF.
+                LE MATÉRIEL SEUL, AU BOUT DE SA LISTE — relevé du patron : « le
+                prix à la fin du listing matériel doit être le coût du matériel
+                uniquement, et on ajoute la main-d'œuvre ensuite ; ici les deux
+                prix sont égaux. Un particulier voudra savoir pour combien il
+                en aura à Castorama pour l'achat de tout ça, sans main-d'œuvre. »
+                Le total du devis, pose comprise, vient plus bas (« Pose
+                estimée ») : le même que la pastille du plan et que le PDF.
               */}
               <TotalQuiMonte
-                valeur={totaux.ttc}
+                valeur={materielTtc}
                 format={euros}
                 style={styles.total}
               />
             </View>
-            {/*
-              HT, TVA, ET CE QUE LE TOTAL CONTIENT — sous le chiffre, et non
-              trois paragraphes plus bas : un particulier qui lit un total
-              doit savoir tout de suite si la pose y est.
-            */}
-            <Text style={styles.sousTotal} testID="total-ht">
-              {`${euros(totaux.ht)} HT · TVA ${pourcent(totaux.tauxTva)} ${euros(totaux.tva)}`}
-            </Text>
-            <Text style={styles.sousTotal}>
-              {totaux.poseHt > 0 || totaux.forfaitsHt > 0
-                ? `${[
-                    `Matériel ${euros(totaux.fournituresHt)} HT`,
-                    totaux.poseHt > 0 && `pose ${euros(totaux.poseHt)} HT`,
-                    totaux.forfaitsHt > 0 && `forfaits ${euros(totaux.forfaitsHt)} HT`,
-                  ]
-                    .filter(Boolean)
-                    .join(', ')} compris.`
-                : 'Le matériel seul — aucun point à poser.'}
+            <Text style={styles.sousTotal} testID="total-materiel">
+              {auCoefficient
+                ? `${euros(totaux.fournituresHt)} HT · TVA ${pourcent(totaux.tauxTva)} — au prix de vente du devis.`
+                : `Ce que coûte le matériel en magasin, TVA 20 % comprise. Sans la main-d’œuvre : elle s’ajoute plus bas.`}
             </Text>
             {/*
               L'ACOMPTE, EN EUROS — relevé d'un électricien artisan : le

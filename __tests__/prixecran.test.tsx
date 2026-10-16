@@ -370,7 +370,8 @@ describe('le total suit le catalogue reçu', () => {
     // une étiquette qu'on aurait recopiée.
     const totalLu = (u: TestRenderer.ReactTestRenderer) => {
       const lus = mots(u);
-      return lus[lus.indexOf('TOTAL TTC') + 1];
+      // MIS À JOUR : le total de la liste est celui du matériel.
+      return lus[lus.indexOf('TOTAL MATÉRIEL TTC') + 1];
     };
     const horsLigne = totalLu(t);
 
