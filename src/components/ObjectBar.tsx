@@ -432,15 +432,14 @@ export function ObjectBar({
       </View>
       {/*
         « ÇA PASSE » — relevé du patron : « l'info “passe par les portes” n'est
-        pas importante ; elle l'est si un meuble ne passe PAS ». La puce
-        d'alerte reste ce qu'elle était. Mais le silence ne se lisait pas
-        comme un oui — revue des « découvreurs » (six sur huit) : on cherchait
-        la réponse, on ne la trouvait pas, on croyait que l'outil n'avait pas
-        regardé. Un meuble qui passe le DIT, discrètement, en vert.
+        pas importante ; elle l'est si un meuble ne passe PAS ». La revue des
+        « découvreurs » avait rajouté un « ✓ Passe par les portes » vert ; le
+        patron l'a retiré (« enlève le “rentre” lors de la sélection d'un
+        meuble ») : seule l'alerte s'affiche.
       */}
-      {(passage || bloque || onCaler) && (
+      {((passage && !passage.ok) || bloque || onCaler) && (
         <View style={[local.verdicts, styles.bandeauFilet]}>
-          {passage && (
+          {passage && !passage.ok && (
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Ça passe ?"
