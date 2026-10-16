@@ -170,8 +170,12 @@ describe('sur la page du devis', () => {
     act(() => {
       jest.advanceTimersByTime(400);
     });
+    /*
+      SAISI EN HT — relevé d'un électricien artisan. 12,50 € HT se garde sur
+      la base du catalogue (TTC à 20 %) : 15 €, que le devis ramène à 12,50 € HT.
+    */
     const prix = useScanStore.getState().devisPrix;
-    expect(Object.values(prix)).toEqual([12.5]);
+    expect(Object.values(prix)).toEqual([15]);
     // Le prix souligné est un texte DANS le texte de la ligne : on lit à plat.
     const aPlat = (x: unknown): string =>
       typeof x === 'string' || typeof x === 'number'
@@ -183,7 +187,7 @@ describe('sur la page du devis', () => {
             : '';
     const mots = t.root.findAllByType(Text).map((n) => aPlat(n.props.children));
     expect(mots).toContain('Prix modifié');
-    expect(mots.some((m) => m.includes('× 12,50 €'))).toBe(true);
+    expect(mots.some((m) => m.includes('× 12,50 € HT'))).toBe(true);
     expect(libelle.length).toBeGreaterThan(0);
   });
 });

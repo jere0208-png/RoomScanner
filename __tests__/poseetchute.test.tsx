@@ -31,6 +31,7 @@ import {
   enHeures,
   estimerLaPose,
   protectionsDuDevis,
+  vendreLeDevis,
 } from '../src/geometry/mainDOeuvre';
 import { PoseEstimee } from '../src/components/PoseEstimee';
 import {
@@ -99,7 +100,7 @@ describe('la pose, estimée', () => {
       t = TestRenderer.create(
         <PoseEstimee
           pose={pose}
-          materiel={1000}
+          totaux={vendreLeDevis({ lignes: [] }, pose).totaux}
           chantier="renovation"
           onChantier={(c) => chantiers.push(c)}
           onTaux={(x) => vus.push(x)}
@@ -109,7 +110,8 @@ describe('la pose, estimée', () => {
     const textes = t.root.findAllByType(Text).map((n) => String(n.props.children));
     expect(textes).toContain('La pose, estimée');
     expect(textes).toContain('45 € HT/h');
-    expect(textes).toContain('MATÉRIEL + POSE TTC');
+    // Le total du devis, celui de `prixDuDevis` : plus de calcul à part.
+    expect(textes).toContain('TOTAL DU DEVIS TTC');
     const bouton = (nom: string) => t.root.findAll((n) => n.props?.accessibilityLabel === nom && typeof n.props?.onPress === 'function')[0];
     act(() => bouton('Monter le taux horaire').props.onPress());
     act(() => bouton('Chantier neuf, TVA 20 %').props.onPress());

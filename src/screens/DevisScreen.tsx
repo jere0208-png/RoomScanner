@@ -46,7 +46,16 @@
  * Il avait raison sur le fond — on ne lit pas un prix en attendant son tour.
  */
 import { PoseEstimee } from '../components/PoseEstimee';
-import { prixDuDevis } from '../geometry/mainDOeuvre';
+import {
+  TAUX_DE_TVA,
+  TVA_DES_PRIX_PUBLICS,
+  pourcent,
+  prixDAchat,
+  prixDuDevis,
+  type LigneLibre,
+  type LigneVendue,
+  type TypeDeLigneLibre,
+} from '../geometry/mainDOeuvre';
 import { useReglagesPose } from '../store/reglagesPose';
 import { usePremieresFois } from '../store/premieresFois';
 import { useUsage } from '../store/usage';
@@ -65,7 +74,7 @@ import { PromptSheet, type PromptData } from '../components/Sheet';
 import { RoomScan } from 'react-native-room-scan';
 import { buildDevisPdf, devisFilename, toBase64 } from '../export/pdf';
 import { useAccountStore } from '../store/accountStore';
-import { entrepriseAImprimer, useEntreprise } from '../store/entreprise';
+import { PAIEMENT_MAX, entrepriseAImprimer, useEntreprise } from '../store/entreprise';
 import { alerte } from '../ui/alerte';
 import { panne as expliquer } from '../ui/panne';
 import { RetourGlisse } from '../components/RetourGlisse';
@@ -255,8 +264,18 @@ function Article({
   onPrix,
   pro,
   distributeur,
+  vente,
+  coefficient,
 }: {
   ligne: LigneDevis;
+  /**
+   * SON PRIX DE VENTE HT — relevé d'un électricien artisan : il pense en
+   * hors taxes. Celui de `prixDuDevis` : public ramené HT, ou achat ×
+   * coefficient, ou le sien.
+   */
+  vente?: LigneVendue<LigneDevis>;
+  /** Le coefficient appliqué à cette ligne, pour le dire à l'artisan seul. */
+  coefficient?: number | null;
   styles: ReturnType<typeof getStyles>;
   couleurs: Palette;
   onBasculer: () => void;
@@ -269,6 +288,7 @@ function Article({
   distributeur?: string;
 }) {
   const hors = !!ligne.ecarte;
+  const puHt = vente?.puHt ?? null;
   return (
     <TouchableOpacity
       accessibilityLabel={`${ligne.libelle}${hors ? ', écarté du devis' : ''}`}
@@ -295,17 +315,17 @@ function Article({
             hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
             onPress={onPrix}>
             <Text style={styles.articleDetail}>
-              {ligne.pu === null ? `${ligne.quantite} ${ligne.unite} — ` : `${ligne.quantite} ${ligne.unite} × `}
+              {puHt === null ? `${ligne.quantite} ${ligne.unite} — ` : `${ligne.quantite} ${ligne.unite} × `}
               <Text style={styles.articlePrixTouchable}>
-                {ligne.pu === null ? 'fixer un prix' : euros(ligne.pu)}
+                {puHt === null ? 'fixer un prix' : `${euros(puHt)} HT`}
               </Text>
             </Text>
           </TouchableOpacity>
         ) : (
           <Text style={styles.articleDetail}>
-            {ligne.pu === null
+            {puHt === null
               ? `${ligne.quantite} ${ligne.unite} — pas de prix au catalogue`
-              : `${ligne.quantite} ${ligne.unite} × ${euros(ligne.pu)}`}
+              : `${ligne.quantite} ${ligne.unite} × ${euros(puHt)} HT`}
           </Text>
         )}
         {/*
@@ -347,18 +367,22 @@ function Article({
           </Text>
         )}
         {/* SON PRIX D'ACHAT, À LUI — en plus du prix public, jamais à sa place. */}
+        {/*
+          ET, QUAND SON COEFFICIENT S'APPLIQUE, LE DIRE — à lui seul : le PDF
+          du client n'imprime que le prix de vente.
+        */}
         {!!pro && (
           <Text style={styles.articlePro}>
-            {`Achat pro ${euros(pro.pu)} HT${distributeur ? ` · ${distributeur}` : ''}`}
+            {`Achat pro ${euros(pro.pu)} HT${distributeur ? ` · ${distributeur}` : ''}${
+              vente?.auCoefficient && coefficient ? ` · vendu × ${fr(coefficient, 2)}` : ''
+            }`}
           </Text>
         )}
         {!!ligne.note && <Text style={styles.articleNote}>{ligne.note}</Text>}
       </View>
       <View style={styles.colonneDroite}>
         <Text style={[styles.articlePrix, hors && styles.barre]}>
-          {hors
-            ? euros((ligne.pu ?? 0) * ligne.quantite)
-            : euros(ligne.total)}
+          {hors ? euros(vente?.brutHt ?? 0) : euros(vente?.totalHt ?? 0)}
         </Text>
         {/*
           « − » ET « + », SUR LA LIGNE ELLE-MÊME — relevé du patron : « ajoute
@@ -410,6 +434,162 @@ function Article({
   );
 }
 
+/** « 12,5 », « 12.5 », « 1 200 » : un nombre français, ou rien. */
+function nombreSaisi(t: string): number | null {
+  const s = t.replace(/\s/g, '').replace(',', '.');
+  if (!s) return null;
+  const n = Number(s);
+  return isFinite(n) ? n : null;
+}
+
+const MOTS_DU_TYPE: Record<TypeDeLigneLibre, string> = {
+  fourniture: 'Fourniture',
+  mainDOeuvre: 'Main-d’œuvre',
+  forfait: 'Forfait',
+};
+
+/**
+ * LES LIGNES QU'UN ÉLECTRICIEN ÉCRIT À CHAQUE DEVIS — relevé de l'artisan.
+ * Un appui remplit la désignation et le type ; le prix reste le sien.
+ */
+const LIGNES_COURANTES: { designation: string; type: TypeDeLigneLibre; unite: string }[] = [
+  { designation: 'Dépose ancien tableau', type: 'forfait', unite: 'forfait' },
+  { designation: 'Déplacement', type: 'forfait', unite: 'forfait' },
+  { designation: 'Consuel', type: 'forfait', unite: 'forfait' },
+  { designation: 'Mise en service', type: 'forfait', unite: 'forfait' },
+];
+
+/**
+ * UNE LIGNE LIBRE, À ÉCRIRE OU À CORRIGER — relevé d'un électricien artisan
+ * (2 salariés, sur Obat et Batappli) : « Dépose ancien tableau »,
+ * « Déplacement », « Consuel », « Mise en service » n'avaient nulle part où
+ * aller. Désignation, quantité, unité, prix unitaire HT et type, sur la page
+ * même : une feuille par champ aurait demandé cinq allers-retours.
+ */
+function EditeurLigneLibre({
+  initiale,
+  styles,
+  onValider,
+  onAnnuler,
+  onRetirer,
+}: {
+  initiale: LigneLibre | null;
+  styles: ReturnType<typeof getStyles>;
+  onValider: (l: LigneLibre) => void;
+  onAnnuler: () => void;
+  onRetirer?: () => void;
+}) {
+  const c = useTheme();
+  const [designation, setDesignation] = useState(initiale?.designation ?? '');
+  const [quantite, setQuantite] = useState(initiale ? fr(initiale.quantite, Number.isInteger(initiale.quantite) ? 0 : 2) : '1');
+  const [unite, setUnite] = useState(initiale?.unite ?? 'u');
+  const [pu, setPu] = useState(initiale ? fr(initiale.puHt, 2) : '');
+  const [type, setType] = useState<TypeDeLigneLibre>(initiale?.type ?? 'forfait');
+  const [faute, setFaute] = useState<string | null>(null);
+  const valider = () => {
+    const q = nombreSaisi(quantite);
+    const p = nombreSaisi(pu);
+    if (!designation.trim()) return setFaute('Écrivez la désignation de la ligne.');
+    if (q === null || q <= 0) return setFaute('La quantité doit être un nombre plus grand que zéro.');
+    if (p === null || p < 0) return setFaute('Le prix unitaire HT doit être un nombre.');
+    haptic('leger');
+    onValider({
+      id: initiale?.id ?? `libre-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      designation: designation.trim(),
+      quantite: q,
+      unite: unite.trim() || 'u',
+      puHt: Math.round(p * 100) / 100,
+      type,
+    });
+  };
+  const champ = (
+    label: string,
+    value: string,
+    onChange: (t: string) => void,
+    extra: Partial<React.ComponentProps<typeof TextInput>> = {},
+  ) => (
+    <TextInput
+      accessibilityLabel={label}
+      placeholder={label}
+      placeholderTextColor={c.inkFaint}
+      style={styles.libreChamp}
+      value={value}
+      onChangeText={(t) => {
+        onChange(t);
+        setFaute(null);
+      }}
+      {...extra}
+    />
+  );
+  return (
+    <View style={styles.libreEditeur}>
+      <Text style={styles.rayonNom}>{initiale ? 'Modifier la ligne' : 'Nouvelle ligne libre'}</Text>
+      {!initiale && (
+        <View style={styles.libreCourantes}>
+          {LIGNES_COURANTES.map((x) => (
+            <TouchableOpacity
+              key={x.designation}
+              accessibilityRole="button"
+              accessibilityLabel={`Ligne courante : ${x.designation}`}
+              style={styles.triPille}
+              onPress={() => {
+                haptic('leger');
+                setDesignation(x.designation);
+                setType(x.type);
+                setUnite(x.unite);
+                setQuantite('1');
+                setFaute(null);
+              }}>
+              <Text style={styles.triTexte}>{x.designation}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+      {champ('Désignation', designation, setDesignation, { autoCorrect: false })}
+      <View style={styles.libreRangee}>
+        <View style={styles.libreCase}>{champ('Quantité', quantite, setQuantite, { keyboardType: 'decimal-pad' })}</View>
+        <View style={styles.libreCase}>{champ('Unité', unite, setUnite, { autoCorrect: false })}</View>
+        <View style={styles.libreCase}>{champ('Prix unitaire HT', pu, setPu, { keyboardType: 'decimal-pad' })}</View>
+      </View>
+      <View style={styles.tris}>
+        {(Object.keys(MOTS_DU_TYPE) as TypeDeLigneLibre[]).map((t) => (
+          <TouchableOpacity
+            key={t}
+            accessibilityRole="button"
+            accessibilityLabel={`Type : ${MOTS_DU_TYPE[t]}`}
+            accessibilityState={{ selected: type === t }}
+            style={[styles.triPille, type === t && styles.triPilleOn]}
+            onPress={() => {
+              haptic('leger');
+              setType(t);
+            }}>
+            <Text style={[styles.triTexte, type === t && styles.triTexteOn]}>{MOTS_DU_TYPE[t]}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {!!faute && <Text style={styles.libreFaute}>{faute}</Text>}
+      <View style={styles.libreRangee}>
+        {onRetirer && (
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Supprimer la ligne" style={styles.remettre} onPress={onRetirer}>
+            <Text style={[styles.remettreTexte, { color: c.danger }]}>Supprimer</Text>
+          </TouchableOpacity>
+        )}
+        <View style={styles.texts} />
+        <TouchableOpacity accessibilityRole="button" accessibilityLabel="Annuler la ligne" style={styles.remettre} onPress={onAnnuler}>
+          <Text style={styles.remettreTexte}>Annuler</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Enregistrer la ligne"
+          style={[styles.remettre, styles.triPilleOn]}
+          onPress={valider}>
+          <Text style={[styles.remettreTexte, styles.triTexteOn]}>Enregistrer</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 export function DevisScreen() {
   const c = useTheme();
   const styles = getStyles(c);
@@ -426,6 +606,18 @@ export function DevisScreen() {
   const ajouts = useScanStore((s) => s.devisAjouts);
   const prixVoulus = useScanStore((s) => s.devisPrix);
   const reglerPrixDevis = useScanStore((s) => s.reglerPrixDevis);
+  /* Les lignes libres, les heures corrigées, la TVA du devis : voir `scanStore`. */
+  const lignesLibres = useScanStore((s) => s.devisLignesLibres);
+  const heuresCorrigees = useScanStore((s) => s.devisHeures);
+  const tvaDevis = useScanStore((s) => s.devisTva);
+  /** La ligne libre qu'on écrit : `'nouvelle'`, l'id d'une ligne, ou rien. */
+  const [libreOuverte, setLibreOuverte] = useState<string | null>(null);
+  /* Les conditions de l'artisan, réglées une fois (voir `ConditionsDevis`). */
+  const coefficient = useEntreprise((e) => e.coefficient);
+  const tauxAcompte = useEntreprise((e) => e.acompte);
+  const validite = useEntreprise((e) => e.validite);
+  const paiement = useEntreprise((e) => e.paiement);
+  const [conditionsOuvertes, setConditionsOuvertes] = useState(false);
   /** La correction du prix d'une ligne, quand on l'a touchée. */
   const [prompt, setPrompt] = useState<PromptData | null>(null);
   const setDevisNumero = useScanStore((s) => s.setDevisNumero);
@@ -570,15 +762,6 @@ export function DevisScreen() {
       versionTarifs,
     ],
   );
-  /*
-    UN SEUL PRIX — revue « Gérard » : le gros total de cette page disait le
-    matériel seul à 20 %, le PDF matériel et pose au taux du chantier. Les
-    deux, et la pastille du plan, lisent `prixDuDevis`.
-  */
-  const { pose, totaux } = useMemo(
-    () => prixDuDevis(devis, fixtures, ceiling, { taux, chantier }),
-    [devis, fixtures, ceiling, taux, chantier],
-  );
 
   /*
     TRIER ET CHERCHER — « si jamais la liste est longue ».
@@ -714,6 +897,39 @@ export function DevisScreen() {
     [devis, tarifPro],
   );
   const proDe = (l: LigneDevis) => achat?.parCle[cleDuTarif(l.code, devis.gamme)];
+  /*
+    UN SEUL PRIX — revue « Gérard » : le gros total de cette page disait le
+    matériel seul à 20 %, le PDF matériel et pose au taux du chantier. Les
+    deux, et la pastille du plan, lisent `prixDuDevis`.
+
+    ET C'EST LE PRIX DE L'ARTISAN — relevé d'un électricien artisan : son
+    achat × son coefficient quand son tarif connaît l'article, ses lignes
+    libres, ses heures, la TVA qu'il choisit, son acompte.
+  */
+  const prix = useMemo(
+    () =>
+      prixDuDevis(
+        devis,
+        fixtures,
+        ceiling,
+        { taux, chantier },
+        {
+          prixAchat: prixDAchat(devis.lignes, (code) => cleDuTarif(code, devis.gamme), tarifPro),
+          coefficient,
+          lignesLibres,
+          heures: heuresCorrigees,
+          tva: tvaDevis,
+          acompte: tauxAcompte,
+        },
+      ),
+    [devis, fixtures, ceiling, taux, chantier, tarifPro, coefficient, lignesLibres, heuresCorrigees, tvaDevis, tauxAcompte],
+  );
+  const { pose, totaux } = prix;
+  /** Le prix de vente HT de chaque ligne du ticket. */
+  const ventes = useMemo(() => new Map(prix.fournitures.map((v) => [v.ligne, v])), [prix]);
+  /** Le sous-total HT d'un rayon : ses lignes, à leur prix de vente. */
+  const htDuRayon = (famille: string) =>
+    Math.round(prix.fournitures.filter((v) => v.ligne.famille === famille).reduce((t, v) => t + v.totalHt, 0) * 100) / 100;
   const importerLeTarif = async () => {
     haptic('leger');
     setImportEnCours(true);
@@ -744,27 +960,115 @@ export function DevisScreen() {
   /*
     CORRIGER LE PRIX D'UNE LIGNE — correctif de l'audit. Le champ s'ouvre sur
     le prix affiché ; le vider rend celui du catalogue.
+
+    EN HORS TAXES — relevé d'un électricien artisan : le champ demandait un
+    prix TTC, et un artisan pense en HT. Le prix voulu se garde toujours sur
+    la base du catalogue (TTC à 20 %, voir `AjustementsDevis.prix`) : les
+    plans déjà enregistrés gardent leur sens, et la pastille du plan, qui le
+    relit, retombe sur le même prix. HT → base → HT revient au centime près.
   */
   const corrigerLePrix = (l: LigneDevis) => {
     haptic('leger');
     const cle = cleDeLigne(l);
+    const puHt = ventes.get(l)?.puHt ?? null;
     setPrompt({
-      title: `Prix unitaire TTC — ${l.libelle}`,
+      title: `Prix unitaire HT — ${l.libelle}`,
       subtitle: l.prixAjuste
         ? 'Videz le champ pour revenir au prix du catalogue.'
-        : 'Votre prix remplace celui du catalogue sur ce devis.',
-      value: l.pu === null ? '' : String(l.pu).replace('.', ','),
-      unit: '€',
+        : 'Votre prix de vente hors taxes remplace celui du catalogue sur ce devis.',
+      value: puHt === null ? '' : fr(puHt, 2),
+      unit: '€ HT',
       numeric: true,
       okLabel: 'Appliquer',
       onSubmit: (v: string) => {
-        const t = v.trim();
-        if (!t) {
+        if (!v.trim()) {
           reglerPrixDevis(cle, null);
           return;
         }
-        const n = Number(t.replace(/\s/g, '').replace(',', '.'));
-        if (isFinite(n) && n >= 0) reglerPrixDevis(cle, n);
+        const n = nombreSaisi(v);
+        if (n !== null && n >= 0) reglerPrixDevis(cle, n * (1 + TVA_DES_PRIX_PUBLICS));
+      },
+    });
+  };
+
+  /*
+    CORRIGER LES HEURES D'UNE FAMILLE DE POSE — relevé d'un électricien
+    artisan : les temps du barème étaient figés. Vider rend l'estimation.
+  */
+  const corrigerLesHeures = (famille: string, heures: number) => {
+    haptic('leger');
+    setPrompt({
+      title: `Heures de pose — ${famille === 'Tableau' ? 'Tableau et câblage' : famille}`,
+      subtitle:
+        famille in heuresCorrigees
+          ? 'Videz le champ pour revenir à l’estimation.'
+          : 'Vos heures remplacent l’estimation sur ce devis (au quart d’heure).',
+      value: fr(heures, Number.isInteger(heures) ? 0 : 2),
+      unit: 'h',
+      numeric: true,
+      okLabel: 'Appliquer',
+      onSubmit: (v: string) => {
+        if (!v.trim()) {
+          useScanStore.getState().reglerHeuresDevis(famille, null);
+          return;
+        }
+        const n = nombreSaisi(v);
+        if (n !== null && n >= 0) useScanStore.getState().reglerHeuresDevis(famille, n);
+      },
+    });
+  };
+
+  /*
+    VOS CONDITIONS — coefficient, acompte, validité, paiement : réglées une
+    fois dans « Mon entreprise » (`useEntreprise`), pour tous les devis.
+  */
+  const reglerUneCondition = (quoi: 'coefficient' | 'acompte' | 'validite' | 'paiement') => {
+    haptic('leger');
+    const ent = useEntreprise.getState();
+    if (quoi === 'paiement') {
+      setPrompt({
+        title: 'Conditions de paiement',
+        subtitle: 'Une phrase, imprimée sous le total du devis.',
+        value: ent.paiement,
+        maxLength: PAIEMENT_MAX,
+        okLabel: 'Enregistrer',
+        onSubmit: (v: string) => ent.reglerConditions({ paiement: v }),
+      });
+      return;
+    }
+    const fiches = {
+      coefficient: {
+        title: 'Coefficient de vente',
+        subtitle:
+          'Prix de vente HT = prix d’achat pro × coefficient, sur les articles de votre tarif importé. Videz le champ pour vendre au prix public. Il ne paraît jamais sur le devis remis au client.',
+        value: ent.coefficient === null ? '' : fr(ent.coefficient, 2),
+        unit: '×',
+        choix: ['1,20', '1,30', '1,40', '1,50'],
+      },
+      acompte: {
+        title: 'Acompte à la commande',
+        subtitle: 'En pour cent du total TTC. Zéro : pas d’acompte.',
+        value: String(ent.acompte),
+        unit: '%',
+        choix: ['0', '30', '40', '50'],
+      },
+      validite: {
+        title: 'Validité du devis',
+        subtitle: 'En jours, à partir de la date du devis.',
+        value: String(ent.validite),
+        unit: 'jours',
+        choix: ['15', '30', '60', '90'],
+      },
+    }[quoi];
+    setPrompt({
+      ...fiches,
+      choix: fiches.choix.map((x) => ({ label: x, value: x })),
+      numeric: true,
+      okLabel: 'Enregistrer',
+      onSubmit: (v: string) => {
+        const n = nombreSaisi(v);
+        if (quoi === 'coefficient') ent.reglerConditions({ coefficient: v.trim() ? n ?? ent.coefficient : null });
+        else if (n !== null) ent.reglerConditions({ [quoi]: n });
       },
     });
   };
@@ -795,6 +1099,9 @@ export function DevisScreen() {
           gamme: nomDeLaGamme,
           devis,
           pose,
+          // Le même prix que la page, et les conditions de « Mon entreprise ».
+          prix,
+          conditions: { validite: useEntreprise.getState().validite, paiement: useEntreprise.getState().paiement },
           /*
             C'EST L'ARTISAN QUI ENVOIE — revue « Gérard » : il a vu le
             chantier, son PDF ne dit plus « à confirmer après visite ».
@@ -941,6 +1248,9 @@ export function DevisScreen() {
       <ScrollView
         style={styles.rouleau}
         contentContainerStyle={styles.rouleauFond}
+        // Les champs d'une ligne libre restent au-dessus du clavier.
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}>
         {etape === 0 && (
           /*
@@ -1147,6 +1457,37 @@ export function DevisScreen() {
               </Text>
               <Text style={styles.porteChevron}>›</Text>
             </TouchableOpacity>
+            {/*
+              ET CE QUI N'EST NI AU PLAN NI AU MAGASIN — relevé d'un
+              électricien artisan : « Dépose ancien tableau », « Déplacement »,
+              « Consuel », « Mise en service ». La même porte, juste dessous.
+            */}
+            {libreOuverte === 'nouvelle' ? (
+              <EditeurLigneLibre
+                initiale={null}
+                styles={styles}
+                onValider={(l) => {
+                  useScanStore.getState().ecrireLigneLibre(l);
+                  setLibreOuverte(null);
+                }}
+                onAnnuler={() => setLibreOuverte(null)}
+              />
+            ) : (
+              <TouchableOpacity
+                style={styles.porteMagasin}
+                accessibilityRole="button"
+                accessibilityLabel="Ajouter une ligne libre"
+                onPress={() => {
+                  haptic('leger');
+                  setLibreOuverte('nouvelle');
+                }}>
+                <Svg width={18} height={18} viewBox="0 0 24 24">
+                  <Path d="M12 5 v14 M5 12 h14" stroke={c.blue} strokeWidth={2} strokeLinecap="round" fill="none" />
+                </Svg>
+                <Text style={styles.porteMot}>Ajouter une ligne libre</Text>
+                <Text style={styles.porteChevron}>›</Text>
+              </TouchableOpacity>
+            )}
 
             {/*
               CHERCHER ET TRIER — « si jamais la liste est longue ».
@@ -1208,6 +1549,8 @@ export function DevisScreen() {
                     couleurs={c}
                     pro={proDe(l)}
                     distributeur={tarifPro?.distributeur}
+                    vente={ventes.get(l)}
+                    coefficient={coefficient}
                     onBasculer={() => {
                       haptic('leger');
                       basculer(cleDeLigne(l));
@@ -1221,7 +1564,7 @@ export function DevisScreen() {
                   <View key={f.famille}>
                     <View style={styles.rayon}>
                       <Text style={styles.rayonNom}>{f.famille}</Text>
-                      <Text style={styles.rayonPrix}>{euros(f.total)}</Text>
+                      <Text style={styles.rayonPrix}>{`${euros(htDuRayon(f.famille))} HT`}</Text>
                     </View>
                     {filtrees
                       .filter((l) => l.famille === f.famille)
@@ -1233,6 +1576,8 @@ export function DevisScreen() {
                           couleurs={c}
                           pro={proDe(l)}
                           distributeur={tarifPro?.distributeur}
+                          vente={ventes.get(l)}
+                          coefficient={coefficient}
                           onMoins={() => reglerLaQuantite(l, -1)}
                           onPlus={() => reglerLaQuantite(l, 1)}
                           onPrix={() => corrigerLePrix(l)}
@@ -1244,6 +1589,73 @@ export function DevisScreen() {
                       ))}
                   </View>
                 ))}
+
+            {/*
+              LES LIGNES LIBRES, APRÈS LES ARTICLES — modifiables d'un appui,
+              retirées d'un autre ; elles entrent au total et au PDF.
+            */}
+            {lignesLibres.length > 0 && (
+              <View style={styles.rayon}>
+                <Text style={styles.rayonNom}>Lignes libres</Text>
+                <Text style={styles.rayonPrix}>
+                  {`${euros(prix.libres.reduce((t, l) => t + l.totalHt, 0))} HT`}
+                </Text>
+              </View>
+            )}
+            {prix.libres.map((l) =>
+              libreOuverte === l.id ? (
+                <EditeurLigneLibre
+                  key={l.id}
+                  initiale={l}
+                  styles={styles}
+                  onValider={(x) => {
+                    useScanStore.getState().ecrireLigneLibre(x);
+                    setLibreOuverte(null);
+                  }}
+                  onAnnuler={() => setLibreOuverte(null)}
+                  onRetirer={() => {
+                    haptic('leger');
+                    useScanStore.getState().retirerLigneLibre(l.id);
+                    setLibreOuverte(null);
+                  }}
+                />
+              ) : (
+                <View key={l.id} style={styles.article}>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={`Modifier la ligne : ${l.designation}`}
+                    activeOpacity={0.7}
+                    style={styles.texts}
+                    onPress={() => {
+                      haptic('leger');
+                      setLibreOuverte(l.id);
+                    }}>
+                    <Text style={styles.articleNom}>{l.designation}</Text>
+                    <Text style={styles.articleDetail}>
+                      {`${fr(l.quantite, Number.isInteger(l.quantite) ? 0 : 2)} ${l.unite} × `}
+                      <Text style={styles.articlePrixTouchable}>{`${euros(l.puHt)} HT`}</Text>
+                    </Text>
+                    <Text style={styles.articleOrigine}>{MOTS_DU_TYPE[l.type]}</Text>
+                  </TouchableOpacity>
+                  <View style={styles.colonneDroite}>
+                    <Text style={styles.articlePrix}>{euros(l.totalHt)}</Text>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel={`Retirer la ligne : ${l.designation}`}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      style={[styles.pas, styles.pasRetirer]}
+                      onPress={() => {
+                        haptic('leger');
+                        useScanStore.getState().retirerLigneLibre(l.id);
+                      }}>
+                      <Svg width={12} height={12} viewBox="0 0 24 24">
+                        <Path d="M6 6 L18 18 M18 6 L6 18" stroke={c.danger} strokeWidth={2.8} strokeLinecap="round" />
+                      </Svg>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ),
+            )}
 
             {/* Le trait de découpe, puis le total : la fin d'un ticket. */}
             <View style={styles.decoupe} />
@@ -1271,13 +1683,55 @@ export function DevisScreen() {
               doit savoir tout de suite si la pose y est.
             */}
             <Text style={styles.sousTotal} testID="total-ht">
-              {`${euros(totaux.ht)} HT · TVA ${fr(totaux.tauxTva * 100, 0)} % ${euros(totaux.tva)}`}
+              {`${euros(totaux.ht)} HT · TVA ${pourcent(totaux.tauxTva)} ${euros(totaux.tva)}`}
             </Text>
             <Text style={styles.sousTotal}>
-              {totaux.poseHt > 0
-                ? `Matériel ${euros(totaux.fournituresHt)} HT et pose ${euros(totaux.poseHt)} HT compris.`
+              {totaux.poseHt > 0 || totaux.forfaitsHt > 0
+                ? `${[
+                    `Matériel ${euros(totaux.fournituresHt)} HT`,
+                    totaux.poseHt > 0 && `pose ${euros(totaux.poseHt)} HT`,
+                    totaux.forfaitsHt > 0 && `forfaits ${euros(totaux.forfaitsHt)} HT`,
+                  ]
+                    .filter(Boolean)
+                    .join(', ')} compris.`
                 : 'Le matériel seul — aucun point à poser.'}
             </Text>
+            {/*
+              L'ACOMPTE, EN EUROS — relevé d'un électricien artisan : le
+              client signe un montant. Son pourcentage se règle dans « Vos
+              conditions », plus bas.
+            */}
+            {totaux.tauxAcompte > 0 && (
+              <Text style={styles.sousTotal} testID="acompte">
+                {`Acompte ${pourcent(totaux.tauxAcompte / 100)} à la commande : ${euros(totaux.acompte)} TTC`}
+              </Text>
+            )}
+            {/*
+              LA TVA DU DEVIS — relevé du même artisan : 20 %, 10 % ou 5,5 %.
+              Par défaut, celle du chantier ; c'est lui qui sait si son client
+              y a droit, et le PDF le dit sous réserve.
+            */}
+            <View style={styles.tvaRangee}>
+              <Text style={styles.tvaNom}>TVA du devis</Text>
+              {TAUX_DE_TVA.map((t) => {
+                const actif = totaux.tauxTva === t;
+                return (
+                  <TouchableOpacity
+                    key={t}
+                    accessibilityRole="button"
+                    accessibilityLabel={`TVA ${pourcent(t)}`}
+                    accessibilityState={{ selected: actif }}
+                    style={[styles.tvaPille, actif && styles.triPilleOn]}
+                    onPress={() => {
+                      if (actif) return;
+                      haptic('leger');
+                      useScanStore.getState().reglerTvaDevis(t);
+                    }}>
+                    <Text style={[styles.triTexte, actif && styles.triTexteOn]}>{pourcent(t)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
             {/*
               LE MÊME MATÉRIEL AU PRIX PUBLIC, EN PETIT — relevé du patron :
               « donne aussi le prix total "public" sous le total ». Le devis
@@ -1328,8 +1782,11 @@ export function DevisScreen() {
               </TouchableOpacity>
             )}
             <Text style={styles.mentions}>
-              Les luminaires ne sont pas comptés. Chaque article au prix le moins
-              cher relevé entre les enseignes, à confirmer en magasin.
+              {`Les luminaires ne sont pas comptés. Chaque article au prix le moins cher relevé entre les enseignes, à confirmer en magasin${
+                prix.fournitures.some((v) => v.auCoefficient && !v.ligne.ecarte)
+                  ? ' — ou, quand votre tarif le connaît, à votre prix d’achat × votre coefficient.'
+                  : '.'
+              }`}
             </Text>
 
             {/*
@@ -1339,11 +1796,60 @@ export function DevisScreen() {
             */}
             <PoseEstimee
               pose={pose}
-              materiel={devis.total}
+              totaux={totaux}
               chantier={chantier}
-              onChantier={choisirChantier}
+              onChantier={(x) => {
+                // Changer de chantier, c'est reprendre sa TVA : le choix fait à la main s'efface.
+                choisirChantier(x);
+                useScanStore.getState().reglerTvaDevis(null);
+              }}
               onTaux={reglerTaux}
+              onHeures={corrigerLesHeures}
             />
+
+            {/*
+              VOS CONDITIONS — repliées sous une ligne : on les règle une fois,
+              on ne les relit pas à chaque devis. Le résumé suffit à voir
+              qu'elles sont là.
+            */}
+            <TouchableOpacity
+              style={styles.gammeBouton}
+              accessibilityRole="button"
+              accessibilityLabel="Vos conditions de devis"
+              activeOpacity={0.75}
+              onPress={() => {
+                haptic('leger');
+                setConditionsOuvertes((o) => !o);
+              }}>
+              <View style={styles.gammeTextes}>
+                <Text style={styles.gammeRole}>VOS CONDITIONS · MON ENTREPRISE</Text>
+                <Text style={styles.gammeNom} numberOfLines={1}>
+                  {`${coefficient ? `Coef. × ${fr(coefficient, 2)} · ` : ''}acompte ${pourcent(tauxAcompte / 100)} · ${validite} jours`}
+                </Text>
+              </View>
+              <Text style={styles.porteChevron}>{conditionsOuvertes ? '⌃' : '›'}</Text>
+            </TouchableOpacity>
+            {conditionsOuvertes &&
+              (
+                [
+                  ['coefficient', 'Coefficient de vente', coefficient ? `× ${fr(coefficient, 2)}` : 'Prix public'],
+                  ['acompte', 'Acompte à la commande', pourcent(tauxAcompte / 100)],
+                  ['validite', 'Validité du devis', `${validite} jours`],
+                  ['paiement', 'Conditions de paiement', paiement || 'À renseigner'],
+                ] as const
+              ).map(([cle, nom, valeur]) => (
+                <TouchableOpacity
+                  key={cle}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Régler : ${nom}`}
+                  style={styles.condition}
+                  onPress={() => reglerUneCondition(cle)}>
+                  <Text style={styles.conditionNom}>{nom}</Text>
+                  <Text style={styles.conditionValeur} numberOfLines={2}>
+                    {valeur}
+                  </Text>
+                </TouchableOpacity>
+              ))}
 
             {/* Le devis, numéroté, à l'en-tête de l'entreprise, prêt à signer. */}
             <TouchableOpacity
@@ -1655,6 +2161,49 @@ const getStyles = themedStyles((c: Palette) =>
       backgroundColor: c.blueSoft,
     },
     pasEteint: { backgroundColor: c.line },
+    pasRetirer: { backgroundColor: c.surface },
+    // ---------------------------------------------------- les lignes libres
+    libreEditeur: {
+      backgroundColor: c.surface,
+      borderRadius: radius.md,
+      padding: 12,
+      marginBottom: 12,
+      gap: 8,
+    },
+    libreCourantes: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    libreChamp: {
+      height: 40,
+      borderRadius: radius.sm,
+      backgroundColor: c.bg,
+      paddingHorizontal: 12,
+      color: c.ink,
+      fontSize: 14,
+    },
+    libreRangee: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    libreCase: { flex: 1 },
+    libreFaute: { color: c.danger, fontSize: 12 },
+    // ------------------------------------------------- la TVA, les conditions
+    tvaRangee: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginTop: 8 },
+    tvaNom: { color: c.inkSoft, fontSize: 12.5, marginRight: 2 },
+    tvaPille: {
+      height: 30,
+      paddingHorizontal: 11,
+      borderRadius: radius.pill,
+      backgroundColor: c.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    condition: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 4,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: c.line,
+    },
+    conditionNom: { color: c.ink, fontSize: 13.5, fontWeight: '600' },
+    conditionValeur: { flex: 1, color: c.blue, fontSize: 13.5, fontWeight: '600', textAlign: 'right' },
     porteMagasin: {
       flexDirection: 'row',
       alignItems: 'center',

@@ -102,6 +102,8 @@ export interface LigneDePose {
   famille: string;
   quantite: number;
   heures: number;
+  /** Les heures viennent de l'artisan, pas du barème (voir `OptionsDuDevis.heures`). */
+  corrigee?: boolean;
 }
 
 export interface Pose {
@@ -186,34 +188,121 @@ export function estimerLaPose(
 }
 
 /**
- * LES TOTAUX D'UN DEVIS REMIS AU CLIENT — revue « Karim » : les fournitures
- * s'additionnaient au prix public TTC (TVA 20 %) à la main-d'œuvre taxée au
+ * LES PRIX PUBLICS DU CATALOGUE SONT TTC, À 20 % — revue « Karim » : les
+ * fournitures s'additionnaient au prix public TTC à la main-d'œuvre taxée au
  * taux du chantier, sans un seul total hors taxes. Un devis d'artisan donne
  * le HT, la TVA et le TTC ; et en rénovation, le matériel fourni et posé
  * par l'entreprise suit la main-d'œuvre au taux réduit (CGI art. 279-0 bis).
- *
- * Les fournitures sont donc ramenées hors taxes, puis tout le chantier
- * prend un seul taux : celui de la pose. Sans pose chiffrée, le matériel
- * seul reste à 20 %. (Cette cuisine-là reste dans l'app : le PDF remis au
- * client ne parle ni d'enseigne ni de prix relevé — revue « Gérard ».)
+ * (Cette cuisine-là reste dans l'app : le PDF remis au client ne parle ni
+ * d'enseigne ni de prix relevé — revue « Gérard ».)
  */
 export const TVA_DES_PRIX_PUBLICS = 0.2;
 
-export function totauxDuDevis(
-  fournituresTtcPublic: number,
-  pose: Pick<Pose, 'ht' | 'tauxTva'> | null,
-): { fournituresHt: number; poseHt: number; ht: number; tauxTva: number; tva: number; ttc: number } {
-  const cents = (v: number) => Math.round(v * 100) / 100;
-  const fournituresHt = cents(fournituresTtcPublic / (1 + TVA_DES_PRIX_PUBLICS));
-  const poseHt = pose ? cents(pose.ht) : 0;
-  const ht = cents(fournituresHt + poseHt);
-  const tauxTva = pose ? pose.tauxTva : TVA_DES_PRIX_PUBLICS;
-  const tva = cents(ht * tauxTva);
-  return { fournituresHt, poseHt, ht, tauxTva, tva, ttc: cents(ht + tva) };
+/**
+ * LES TROIS TAUX QU'UN DEVIS D'ÉLECTRICIEN PEUT PORTER — relevé d'un
+ * électricien artisan : « 20 %, 10 %, 5,5 % ». Le choix se fait par devis :
+ * c'est l'artisan qui sait si son client y a droit, pas l'application.
+ */
+export const TAUX_DE_TVA = [0.2, 0.1, 0.055] as const;
+
+/** « 20 % », « 5,5 % » — un taux réduit ne s'arrondit pas à « 6 % ». */
+export function pourcent(t: number): string {
+  const p = Math.round(t * 1000) / 10;
+  return `${Number.isInteger(p) ? String(p) : String(p).replace('.', ',')} %`;
 }
 
-/** Les totaux d'un devis remis : HT, TVA, TTC (voir `totauxDuDevis`). */
-export type TotauxDuDevis = ReturnType<typeof totauxDuDevis>;
+/**
+ * LES LIGNES LIBRES — relevé d'un électricien artisan (2 salariés, sur Obat
+ * et Batappli) : « Dépose ancien tableau », « Déplacement », « Consuel »,
+ * « Mise en service » ne sont ni au plan ni au magasin, et c'est la moitié
+ * des lignes d'un vrai devis. L'artisan les écrit lui-même, en HT.
+ */
+export type TypeDeLigneLibre = 'fourniture' | 'mainDOeuvre' | 'forfait';
+
+export interface LigneLibre {
+  id: string;
+  designation: string;
+  quantite: number;
+  unite: string;
+  /** Prix unitaire de vente, HORS TAXES : c'est ainsi qu'un artisan compte. */
+  puHt: number;
+  type: TypeDeLigneLibre;
+}
+
+/**
+ * CE QUE L'ARTISAN AJOUTE AU CALCUL DU PLAN — tout est facultatif : sans
+ * rien, le devis est celui d'avant (prix public ramené HT, temps du barème,
+ * TVA du chantier).
+ */
+export interface OptionsDuDevis {
+  /**
+   * LE PRIX D'ACHAT HT de chaque article que son tarif pro reconnaît, par
+   * code d'article (voir `prixDAchat`). Il ne sort JAMAIS de l'app.
+   */
+  prixAchat?: Readonly<Record<string, number>>;
+  /** Le coefficient de vente de « Mon entreprise » ; vide = prix public. */
+  coefficient?: number | null;
+  lignesLibres?: readonly LigneLibre[];
+  /** Par famille de pose : les heures que l'artisan a corrigées. */
+  heures?: Readonly<Record<string, number>>;
+  /** Le taux du devis, quand l'artisan l'a choisi ; sinon celui du chantier. */
+  tva?: number | null;
+  /** L'acompte demandé, en pour cent du TTC (30 = 30 %). */
+  acompte?: number | null;
+}
+
+/** Ce qu'une ligne du plan ou du magasin se vend, hors taxes. */
+export interface LigneVendue<L> {
+  ligne: L;
+  /** Prix unitaire de vente HT ; `null` quand le catalogue n'en a pas. */
+  puHt: number | null;
+  /** Ce que la ligne pèserait si on la gardait (écartée ou non). */
+  brutHt: number;
+  /** Ce qu'elle pèse au total : zéro si elle est écartée. */
+  totalHt: number;
+  /** Vendue au prix d'achat × coefficient — l'écran le dit, le PDF jamais. */
+  auCoefficient: boolean;
+}
+
+export interface TotauxDuDevis {
+  /** Les fournitures du plan et du magasin, plus les fournitures libres. */
+  fournituresHt: number;
+  /** La pose estimée (si elle compte) plus la main-d'œuvre libre. */
+  poseHt: number;
+  /** Les forfaits libres : déplacement, Consuel, mise en service… */
+  forfaitsHt: number;
+  ht: number;
+  tauxTva: number;
+  tva: number;
+  ttc: number;
+  /** L'acompte, en pour cent, et son montant TTC. */
+  tauxAcompte: number;
+  acompte: number;
+}
+
+/** Ce qu'une ligne du devis doit porter pour être vendue. */
+interface LigneAVendre {
+  code: string;
+  quantite: number;
+  pu: number | null;
+  ecarte?: boolean;
+  prixAjuste?: boolean;
+}
+
+export interface PrixDuDevis<L extends LigneAVendre = LigneAVendre> {
+  /** La pose, heures corrigées comprises, à la TVA du devis. */
+  pose: Pose;
+  /** Chaque ligne du devis, dans son ordre, à son prix de vente HT. */
+  fournitures: LigneVendue<L>[];
+  /** Les lignes libres, avec leur total HT. */
+  libres: (LigneLibre & { totalHt: number })[];
+  totaux: TotauxDuDevis;
+}
+
+const cents = (v: number) => Math.round(v * 100) / 100;
+
+/** Une pose vide : le PDF d'un devis sans pose chiffrée. */
+export const POSE_VIDE: Pose = { lignes: [], heures: 0, taux: 0, ht: 0, tauxTva: TVA_DES_PRIX_PUBLICS, tva: 0, ttc: 0 };
 
 /**
  * LA POSE QUI ENTRE AU TOTAL : celle qui compte au moins un quart d'heure.
@@ -225,23 +314,133 @@ export function poseComptee<P extends Pick<Pose, 'heures' | 'ht' | 'tauxTva'>>(p
 }
 
 /**
+ * LE PRIX D'ACHAT DE CHAQUE ARTICLE, lu dans le tarif pro importé (voir
+ * `geometry/tarifPro`). `cleDe` est la clé du tarif d'un code d'article —
+ * `cleDuTarif(code, gamme)`.
+ */
+export function prixDAchat(
+  lignes: readonly { code: string }[],
+  cleDe: (code: string) => string,
+  tarif: { prix: Readonly<Record<string, { pu: number }>> } | null | undefined,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!tarif) return out;
+  for (const l of lignes) {
+    const p = tarif.prix[cleDe(l.code)];
+    if (p && isFinite(p.pu) && p.pu > 0) out[l.code] = p.pu;
+  }
+  return out;
+}
+
+/**
+ * VENDRE LE DEVIS — le prix de vente de chaque ligne, puis UN total.
+ *
+ * PRIX DE VENTE = PRIX D'ACHAT × COEFFICIENT — relevé d'un électricien
+ * artisan : « je paierais pour de vrai si… ». Le devis vendait au prix
+ * public relevé, ramené HT ; son tarif pro ne servait qu'à afficher « Achat
+ * pro … HT ». Un artisan, lui, vend son achat multiplié par SON coefficient.
+ * Trois cas, dans cet ordre :
+ *   — un prix qu'il a tapé lui-même sur la ligne gagne toujours ;
+ *   — sinon, un prix d'achat ET un coefficient : achat × coefficient ;
+ *   — sinon, le prix public ramené hors taxes, comme avant.
+ * Chaque ligne s'arrondit au centime, puis son total = PU HT × quantité : le
+ * client qui refait la multiplication du PDF retombe sur le même chiffre.
+ *
+ * Les lignes libres s'ajoutent selon leur type, les heures corrigées
+ * remplacent celles du barème, et une seule TVA s'applique : celle choisie
+ * pour le devis, à défaut celle du chantier dès qu'il y a de la
+ * main-d'œuvre, à défaut 20 %.
+ */
+export function vendreLeDevis<L extends LigneAVendre>(
+  devis: { lignes: readonly L[] },
+  poseEstimee: Pose,
+  options: OptionsDuDevis = {},
+): PrixDuDevis<L> {
+  const k = options.coefficient && isFinite(options.coefficient) && options.coefficient > 0 ? options.coefficient : null;
+  const fournitures = devis.lignes.map((l): LigneVendue<L> => {
+    if (l.pu === null) return { ligne: l, puHt: null, brutHt: 0, totalHt: 0, auCoefficient: false };
+    const achat = options.prixAchat?.[l.code];
+    const auCoefficient = !l.prixAjuste && k !== null && achat !== undefined && achat > 0;
+    const puHt = cents(auCoefficient ? achat * k : l.pu / (1 + TVA_DES_PRIX_PUBLICS));
+    const brutHt = cents(puHt * l.quantite);
+    return { ligne: l, puHt, brutHt, totalHt: l.ecarte ? 0 : brutHt, auCoefficient };
+  });
+
+  const libres = (options.lignesLibres ?? []).map((l) => ({ ...l, totalHt: cents(l.puHt * l.quantite) }));
+  const deType = (t: TypeDeLigneLibre) => libres.filter((l) => l.type === t).reduce((s, l) => s + l.totalHt, 0);
+
+  /*
+    LES HEURES DE L'ARTISAN — relevé du même électricien : les temps du
+    barème étaient figés. Une famille corrigée prend ses heures à lui ; le
+    reste garde l'estimation.
+  */
+  const corrections = options.heures ?? {};
+  const lignesPose = poseEstimee.lignes.map((l) => {
+    const h = corrections[l.famille];
+    return h !== undefined && isFinite(h) && h >= 0 ? { ...l, heures: auQuart(h), corrigee: true } : l;
+  });
+  const heures = lignesPose.reduce((t, l) => t + l.heures, 0);
+  const poseHtBrut = cents(heures * poseEstimee.taux);
+  const compte = heures > 0;
+
+  const fournituresHt = cents(fournitures.reduce((s, f) => s + f.totalHt, 0) + deType('fourniture'));
+  const poseHt = cents((compte ? poseHtBrut : 0) + deType('mainDOeuvre'));
+  const forfaitsHt = cents(deType('forfait'));
+  const ht = cents(fournituresHt + poseHt + forfaitsHt);
+  const travaux = compte || deType('mainDOeuvre') > 0 || forfaitsHt > 0;
+  const choisi = TAUX_DE_TVA.find((t) => t === options.tva);
+  const tauxTva = choisi ?? (travaux ? poseEstimee.tauxTva : TVA_DES_PRIX_PUBLICS);
+  const tva = cents(ht * tauxTva);
+  const ttc = cents(ht + tva);
+  const a = options.acompte;
+  const tauxAcompte = a !== null && a !== undefined && isFinite(a) ? Math.max(0, Math.min(100, a)) : 0;
+
+  const tvaPose = cents(poseHtBrut * tauxTva);
+  return {
+    pose: {
+      ...poseEstimee,
+      lignes: lignesPose,
+      heures,
+      ht: poseHtBrut,
+      tauxTva,
+      tva: tvaPose,
+      ttc: cents(poseHtBrut + tvaPose),
+    },
+    fournitures,
+    libres,
+    totaux: {
+      fournituresHt,
+      poseHt,
+      forfaitsHt,
+      ht,
+      tauxTva,
+      tva,
+      ttc,
+      tauxAcompte,
+      acompte: cents((ttc * tauxAcompte) / 100),
+    },
+  };
+}
+
+/**
  * LE PRIX DU DEVIS, UN SEUL — revue « Gérard » : trois totaux pour un même
  * chantier. La pastille du plan annonçait le matériel seul (1,5 k€), le gros
  * TOTAL TTC de la page aussi, à 20 % ; le PDF, matériel ET pose à 10 %. Le
  * client voyait trois prix, et l'artisan ne savait plus lequel il avait dit.
  *
- * Tous lisent maintenant cette fonction : le matériel du devis, la pose
- * estimée au taux de l'artisan, ramenés hors taxes, puis UNE TVA — celle du
- * chantier (`totauxDuDevis`).
+ * Tous lisent maintenant cette fonction : la pose estimée au taux de
+ * l'artisan, puis `vendreLeDevis` — coefficient, lignes libres, heures
+ * corrigées, TVA et acompte compris.
  */
-export function prixDuDevis(
-  devis: { total: number; lignes: readonly { code: string; quantite: number; ecarte?: boolean }[] },
+export function prixDuDevis<L extends LigneAVendre>(
+  devis: { lignes: readonly L[] },
   fixtures: readonly Fixture[],
   ceiling: readonly CeilingFixture[],
   reglages: { taux: number; chantier: NatureDeChantier },
-): { pose: Pose; totaux: TotauxDuDevis } {
+  options: OptionsDuDevis = {},
+): PrixDuDevis<L> {
   const pose = estimerLaPose(fixtures, ceiling, protectionsDuDevis(devis.lignes), reglages);
-  return { pose, totaux: totauxDuDevis(devis.total, poseComptee(pose)) };
+  return vendreLeDevis(devis, pose, options);
 }
 
 /** « 23 h 30 », « 45 min ». */

@@ -24,7 +24,7 @@ import React from 'react';
 import { Text, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { RoomScan } from 'react-native-room-scan';
-import { prixDuDevis, totauxDuDevis } from '../src/geometry/mainDOeuvre';
+import { prixDuDevis, vendreLeDevis } from '../src/geometry/mainDOeuvre';
 import { chiffrerLePlan } from '../src/geometry/devisplan';
 import { DevisScreen } from '../src/screens/DevisScreen';
 import { ResultScreen } from '../src/screens/ResultScreen';
@@ -97,7 +97,11 @@ describe('prixDuDevis', () => {
     expect(pose.heures).toBeGreaterThan(0);
     expect(totaux.poseHt).toBe(pose.ht);
     expect(totaux.tauxTva).toBe(pose.tauxTva);
-    expect(totaux).toEqual(totauxDuDevis(devis.total, pose));
+    // Le même calcul que `vendreLeDevis` sur la pose estimée : rien n'est recompté ailleurs.
+    expect(totaux).toEqual(vendreLeDevis(devis, pose).totaux);
+    // Les fournitures, ligne à ligne HT, font le total des fournitures au centime.
+    const somme = Math.round(prixDuDevis(devis, PLAN.fixtures, [], { taux: 45, chantier: 'renovation' }).fournitures.reduce((t, v) => t + v.totalHt, 0) * 100) / 100;
+    expect(totaux.fournituresHt).toBe(somme);
     // Plus cher que le matériel seul : la pose y est.
     expect(totaux.ttc).toBeGreaterThan(devis.total);
   });

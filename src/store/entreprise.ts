@@ -30,6 +30,53 @@ export interface Entreprise {
 
 export const ENTREPRISE_VIDE: Entreprise = { nom: '', adresse: '', telephone: '', email: '', siret: '', decennale: '' };
 
+/**
+ * LES CONDITIONS DE SES DEVIS — relevé d'un électricien artisan (2 salariés,
+ * sur Obat et Batappli) : « je paierais pour de vrai si… » le devis vendait
+ * à SON coefficient, demandait SON acompte, avec SA validité et SES
+ * conditions de paiement. Comme le nom de l'entreprise, ce sont des
+ * habitudes de l'artisan, pas d'un chantier : réglées une fois.
+ */
+export interface ConditionsDevis {
+  /**
+   * PRIX DE VENTE HT = PRIX D'ACHAT × COEFFICIENT, sur les articles que son
+   * tarif pro reconnaît (voir `vendreLeDevis`). Vide : le prix public.
+   * Jamais imprimé.
+   */
+  coefficient: number | null;
+  /** L'acompte à la commande, en pour cent du TTC. */
+  acompte: number;
+  /** La validité du devis, en jours. */
+  validite: number;
+  /** Les conditions de paiement, en une phrase. */
+  paiement: string;
+}
+
+export const CONDITIONS_PAR_DEFAUT: ConditionsDevis = {
+  coefficient: null,
+  acompte: 30,
+  validite: 30,
+  paiement: 'Acompte à la signature, solde à la fin des travaux.',
+};
+
+/** Bornes : un coefficient sous 1 vend à perte, au-delà de 5 c'est une faute de frappe. */
+export const COEF_MIN = 1;
+export const COEF_MAX = 5;
+export const PAIEMENT_MAX = 160;
+
+/** Des conditions lisibles, quoi qu'on ait tapé ou lu sur le disque. */
+export function conditionsPropres(c: Partial<Record<keyof ConditionsDevis, unknown>>, avant: ConditionsDevis): ConditionsDevis {
+  const out = { ...avant };
+  if (c.coefficient === null) out.coefficient = null;
+  else if (typeof c.coefficient === 'number' && isFinite(c.coefficient)) {
+    out.coefficient = Math.round(Math.max(COEF_MIN, Math.min(COEF_MAX, c.coefficient)) * 100) / 100;
+  }
+  if (typeof c.acompte === 'number' && isFinite(c.acompte)) out.acompte = Math.round(Math.max(0, Math.min(100, c.acompte)));
+  if (typeof c.validite === 'number' && isFinite(c.validite)) out.validite = Math.round(Math.max(1, Math.min(365, c.validite)));
+  if (typeof c.paiement === 'string') out.paiement = c.paiement.trim().slice(0, PAIEMENT_MAX);
+  return out;
+}
+
 function disque(): {
   getItem: (k: string) => Promise<string | null>;
   setItem: (k: string, v: string) => Promise<void>;
@@ -45,8 +92,10 @@ export interface DernierDevis {
   rang: number;
 }
 
-interface Etat extends Entreprise {
+interface Etat extends Entreprise, ConditionsDevis {
   charge: boolean;
+  /** Corrige une ou plusieurs conditions des devis (bornées, voir `conditionsPropres`). */
+  reglerConditions: (c: Partial<ConditionsDevis>) => void;
   /** Voir `numeroterUnDevis`. */
   dernierDevis: DernierDevis | null;
   charger: () => Promise<void>;
@@ -70,10 +119,17 @@ const champsDe = (e: Entreprise): Entreprise => ({
   decennale: e.decennale ?? '',
 });
 
-function ecrire(e: Entreprise & { dernierDevis: DernierDevis | null }): void {
+const conditionsDe = (e: ConditionsDevis): ConditionsDevis => ({
+  coefficient: e.coefficient,
+  acompte: e.acompte,
+  validite: e.validite,
+  paiement: e.paiement,
+});
+
+function ecrire(e: Entreprise & ConditionsDevis & { dernierDevis: DernierDevis | null }): void {
   try {
     disque()
-      .setItem(CLE_ENTREPRISE, JSON.stringify({ ...champsDe(e), dernierDevis: e.dernierDevis }))
+      .setItem(CLE_ENTREPRISE, JSON.stringify({ ...champsDe(e), ...conditionsDe(e), dernierDevis: e.dernierDevis }))
       .catch(() => {});
   } catch {
     // Pas de disque : l'entreprise vit le temps de la session.
@@ -83,6 +139,7 @@ function ecrire(e: Entreprise & { dernierDevis: DernierDevis | null }): void {
 export const useEntreprise = create<Etat>((set, get) => ({
   charge: false,
   ...ENTREPRISE_VIDE,
+  ...CONDITIONS_PAR_DEFAUT,
   dernierDevis: null,
 
   charger: async () => {
@@ -100,7 +157,9 @@ export const useEntreprise = create<Etat>((set, get) => ({
     }
     const out: Partial<Entreprise> = {};
     let dernierDevis: DernierDevis | null = get().dernierDevis;
+    let conditions = conditionsDe(get());
     if (lu && typeof lu === 'object') {
+      conditions = conditionsPropres(lu, conditions);
       for (const k of Object.keys(ENTREPRISE_VIDE) as (keyof Entreprise)[]) {
         if (typeof lu[k] === 'string') out[k] = lu[k] as string;
       }
@@ -109,7 +168,7 @@ export const useEntreprise = create<Etat>((set, get) => ({
         dernierDevis = { annee: d.annee as number, rang: d.rang as number };
       }
     }
-    set({ charge: true, ...out, dernierDevis });
+    set({ charge: true, ...out, ...conditions, dernierDevis });
   },
 
   regler: (champs) => {
@@ -118,6 +177,11 @@ export const useEntreprise = create<Etat>((set, get) => ({
       if (typeof v === 'string') propres[k] = v.trim();
     }
     set(propres);
+    ecrire(get());
+  },
+
+  reglerConditions: (c) => {
+    set(conditionsPropres(c, conditionsDe(get())));
     ecrire(get());
   },
 

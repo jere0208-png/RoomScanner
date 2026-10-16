@@ -146,8 +146,17 @@ import { ecarterLesGaines } from '../geometry/routing';
 import { matieresDesSols } from '../ui/maquette';
 import { accentsDesPieces, peinturesDesPieces, solsDesPieces } from '../ui/habillage';
 import { cotesExterieures, ECART_DE_COTE } from '../geometry/cotes3d';
-import type { Devis } from '../geometry/devis';
-import { enHeures, poseComptee, totauxDuDevis, TVA_DES_PRIX_PUBLICS, type Pose } from '../geometry/mainDOeuvre';
+import type { Devis, LigneDevis } from '../geometry/devis';
+import {
+  enHeures,
+  poseComptee,
+  pourcent,
+  POSE_VIDE,
+  TVA_DES_PRIX_PUBLICS,
+  vendreLeDevis,
+  type Pose,
+  type PrixDuDevis,
+} from '../geometry/mainDOeuvre';
 import { nomDeTeinte } from '../ui/peintures';
 
 const PAGE_W = 595;
@@ -7262,6 +7271,21 @@ export interface DevisPourPdf {
    * a vu le chantier, sa main-d'œuvre n'est plus « à confirmer après visite ».
    */
   parLArtisan?: boolean;
+  /**
+   * LE PRIX DU DEVIS, CELUI DE L'ÉCRAN — `prixDuDevis`, avec le coefficient,
+   * les lignes libres, les heures corrigées, la TVA et l'acompte. Sans lui,
+   * le PDF revend le devis et la pose au prix public (`vendreLeDevis`).
+   *
+   * Le PDF n'en lit que les prix de VENTE : ni le prix d'achat ni le
+   * coefficient n'y entrent, ni n'en sortent.
+   */
+  prix?: PrixDuDevis<LigneDevis>;
+  /**
+   * LES CONDITIONS DE L'ENTREPRISE — relevé d'un électricien artisan : la
+   * validité était figée (« Valable un mois »), les conditions de paiement
+   * absentes. Réglées dans « Mon entreprise ».
+   */
+  conditions?: { validite?: number; paiement?: string };
 }
 
 /** « 1 234,50 € » — l'espace des milliers, la virgule, les centimes. */
@@ -7275,9 +7299,6 @@ export function devisFilename(numero: string, chantier: string): string {
   return `Devis ${numero}${nom ? ` — ${nom}` : ''}.pdf`;
 }
 
-/** Un prix public TTC (TVA 20 %), ramené hors taxes au centime. */
-const horsTaxes = (ttc: number) => Math.round((ttc / (1 + TVA_DES_PRIX_PUBLICS)) * 100) / 100;
-
 export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   const X0 = 40;
   const X1 = PAGE_W - 40;
@@ -7285,7 +7306,16 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   const COL_PU = 468;
   const BAS = 78;
   const two = (v: number) => String(v).padStart(2, '0');
-  const date = `${two(e.date.getDate())}/${two(e.date.getMonth() + 1)}/${e.date.getFullYear()}`;
+  const jj = (x: Date) => `${two(x.getDate())}/${two(x.getMonth() + 1)}/${x.getFullYear()}`;
+  const date = jj(e.date);
+  /*
+    UN SEUL PRIX, CELUI DE L'ÉCRAN — voir `prixDuDevis`. Le PDF ne recompte
+    rien : il imprime des prix de vente HT déjà arrêtés.
+  */
+  const prix = e.prix ?? vendreLeDevis(e.devis, e.pose ?? POSE_VIDE);
+  const t = prix.totaux;
+  const validite = Math.max(1, Math.round(e.conditions?.validite ?? 30));
+  const finDeValidite = new Date(e.date.getFullYear(), e.date.getMonth(), e.date.getDate() + validite);
   const feuilles: Draw[] = [];
   let d = new Draw();
   let y = 0;
@@ -7335,7 +7365,7 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   d.text('DEVIS', X1, y - 4, 24, INK, { bold: true, align: 'right' });
   d.text(`N° ${e.numero}`, X1, y - 24, 10.5, INK, { align: 'right' });
   d.text(`Date : ${date}`, X1, y - 38, 9.5, INK, { align: 'right' });
-  d.text('Valable un mois', X1, y - 51, 8, GREY, { align: 'right' });
+  d.text(`Valable ${validite} jours, jusqu’au ${jj(finDeValidite)}`, X1, y - 51, 8, GREY, { align: 'right' });
 
   // Le client et le chantier, dans leur cadre.
   y -= 84;
@@ -7353,85 +7383,119 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
 
   // ------------------------------------------------------- les fournitures
   enTeteDuTableau();
-  const lignes = e.devis.lignes.filter((l) => !l.ecarte);
-  const familles: string[] = [];
-  for (const l of lignes) if (!familles.includes(l.famille)) familles.push(l.famille);
-  for (const f of familles) {
-    place(36);
-    d.text(f.toUpperCase(), X0 + 8, y, 7.5, GREY, { bold: true, align: 'left' });
+  /** Une ligne du tableau : désignation, quantité, PU HT, total HT. */
+  const ligneDuTableau = (nom: string, qte: string, pu: string, total: string, gris = false) => {
+    place(16);
+    d.text(fitText(nom, 9.5, COL_QTE - X0 - 60), X0 + 8, y, 9.5, INK, { align: 'left' });
+    d.text(qte, COL_QTE, y, 9, INK, { align: 'right' });
+    d.text(pu, COL_PU, y, 9, gris ? GREY : INK, { align: 'right' });
+    d.text(total, X1 - 6, y, 9, gris ? GREY : INK, { align: 'right' });
+    d.line(X0, y - 5, X1, y - 5, 0.3, '#E3E7ED');
     y -= 16;
-    for (const l of lignes.filter((x) => x.famille === f)) {
-      place(16);
-      d.text(fitText(l.libelle, 9.5, COL_QTE - X0 - 60), X0 + 8, y, 9.5, INK, { align: 'left' });
-      d.text(`${String(l.quantite).replace('.', ',')} ${l.unite}`, COL_QTE, y, 9, INK, { align: 'right' });
+  };
+  const quantite = (q: number, unite: string) => `${String(q).replace('.', ',')} ${unite}`;
+  const titreDeRayon = (mot: string) => {
+    place(36);
+    d.text(mot.toUpperCase(), X0 + 8, y, 7.5, GREY, { bold: true, align: 'left' });
+    y -= 16;
+  };
+  const sousTotal = (mot: string, v: number, taille = 9.5) => {
+    place(24);
+    d.line(X0, y + 8, X1, y + 8, 0.8, INK);
+    d.text(mot, X0 + 8, y - 6, taille, INK, { bold: true, align: 'left' });
+    d.text(enEuros(v), X1 - 6, y - 6, taille, INK, { bold: true, align: 'right' });
+    y -= 29;
+  };
+  const gardees = prix.fournitures.filter((v) => !v.ligne.ecarte);
+  const familles: string[] = [];
+  for (const v of gardees) if (!familles.includes(v.ligne.famille)) familles.push(v.ligne.famille);
+  for (const f of familles) {
+    titreDeRayon(f);
+    for (const v of gardees.filter((x) => x.ligne.famille === f)) {
+      const l = v.ligne;
+      const qte = quantite(l.quantite, l.unite);
       /*
         CE QUI NE SE FACTURE PAS NE S'ÉCRIT PAS « 0,00 € » : un luminaire
         n'est pas compté (cela dépend des envies), le support du tableau est
         compris dans le coffret. Un zéro sur un devis se lit comme un oubli.
       */
       if (l.pu === 0 && l.total === 0) {
-        d.text('—', COL_PU, y, 9, GREY, { align: 'right' });
-        d.text(/non compt/i.test(l.note ?? '') ? 'non compté' : 'compris', X1 - 6, y, 9, GREY, { align: 'right' });
+        ligneDuTableau(l.libelle, qte, '—', /non compt/i.test(l.note ?? '') ? 'non compté' : 'compris', true);
+      } else if (v.puHt === null) {
+        ligneDuTableau(l.libelle, qte, 'à chiffrer', '—', true);
       } else {
         /*
           HORS TAXES, LIGNE À LIGNE — revue « Nadia » : un devis d'artisan
-          se lit en prix unitaires HT, la TVA du chantier vient au total.
-          Les prix du catalogue sont TTC à 20 % : on les ramène.
+          se lit en prix unitaires HT, la TVA du chantier vient au total. Le
+          prix de VENTE seulement : public ramené HT, ou achat × coefficient
+          — le client ne lit ni l'un ni l'autre, il lit un prix.
         */
-        d.text(l.pu === null ? 'à chiffrer' : enEuros(horsTaxes(l.pu)), COL_PU, y, 9, l.pu === null ? GREY : INK, { align: 'right' });
-        d.text(l.pu === null ? '—' : enEuros(horsTaxes(l.total)), X1 - 6, y, 9, INK, { align: 'right' });
+        ligneDuTableau(l.libelle, qte, enEuros(v.puHt), enEuros(v.totalHt));
       }
-      d.line(X0, y - 5, X1, y - 5, 0.3, '#E3E7ED');
-      y -= 16;
     }
+    y -= 4;
+  }
+  /* LES LIGNES LIBRES, CHACUNE DANS SA PARTIE — relevé d'un électricien artisan. */
+  const libresDe = (type: 'fourniture' | 'mainDOeuvre' | 'forfait') => prix.libres.filter((l) => l.type === type);
+  const ecrireLibres = (type: 'fourniture' | 'mainDOeuvre' | 'forfait') => {
+    for (const l of libresDe(type)) {
+      ligneDuTableau(l.designation || 'Ligne sans désignation', quantite(l.quantite, l.unite), enEuros(l.puHt), enEuros(l.totalHt));
+    }
+  };
+  if (libresDe('fourniture').length > 0) {
+    titreDeRayon('Autres fournitures');
+    ecrireLibres('fourniture');
     y -= 4;
   }
   place(24);
   d.line(X0, y + 8, X1, y + 8, 0.8, INK);
   d.text('Total fournitures HT', X0 + 8, y - 6, 10, INK, { bold: true, align: 'left' });
-  d.text(enEuros(totauxDuDevis(e.devis.total, null).fournituresHt), X1 - 6, y - 6, 10, INK, { bold: true, align: 'right' });
+  d.text(enEuros(t.fournituresHt), X1 - 6, y - 6, 10, INK, { bold: true, align: 'right' });
   y -= 32;
 
-  // ------------------------------------------------- la pose, estimée
+  // ------------------------------------------------- la main-d'œuvre
   // La même règle que l'écran et la pastille : voir `prixDuDevis`.
-  const pose = poseComptee(e.pose);
-  if (pose) {
+  const pose = poseComptee(prix.pose);
+  if (pose || libresDe('mainDOeuvre').length > 0) {
     place(60);
-    d.text(e.parLArtisan ? 'MAIN-D’ŒUVRE' : 'MAIN-D’ŒUVRE (ESTIMÉE)', X0 + 8, y, 7.5, GREY, { bold: true, align: 'left' });
+    d.text(e.parLArtisan || !pose ? 'MAIN-D’ŒUVRE' : 'MAIN-D’ŒUVRE (ESTIMÉE)', X0 + 8, y, 7.5, GREY, { bold: true, align: 'left' });
     y -= 16;
-    for (const l of pose.lignes) {
-      place(16);
-      d.text(fitText(`Pose — ${l.famille} (${l.quantite} point${l.quantite > 1 ? 's' : ''})`, 9.5, COL_QTE - X0 - 60), X0 + 8, y, 9.5, INK, {
-        align: 'left',
-      });
-      d.text(enHeures(l.heures), COL_QTE, y, 9, INK, { align: 'right' });
-      d.text(`${enEuros(pose.taux)} HT/h`, COL_PU, y, 8.5, INK, { align: 'right' });
-      d.text(`${enEuros(Math.round(l.heures * pose.taux * 100) / 100)} HT`, X1 - 6, y, 9, INK, { align: 'right' });
-      d.line(X0, y - 5, X1, y - 5, 0.3, '#E3E7ED');
-      y -= 16;
+    for (const l of pose?.lignes ?? []) {
+      if (l.heures <= 0) continue;
+      ligneDuTableau(
+        `Pose — ${l.famille} (${l.quantite} point${l.quantite > 1 ? 's' : ''})`,
+        enHeures(l.heures),
+        `${enEuros(pose!.taux)} HT/h`,
+        `${enEuros(Math.round(l.heures * pose!.taux * 100) / 100)} HT`,
+      );
     }
-    place(24);
-    d.line(X0, y + 8, X1, y + 8, 0.8, INK);
-    d.text('Total main-d’œuvre HT', X0 + 8, y - 6, 9.5, INK, { bold: true, align: 'left' });
-    d.text(enEuros(pose.ht), X1 - 6, y - 6, 9.5, INK, { bold: true, align: 'right' });
-    y -= 29;
+    ecrireLibres('mainDOeuvre');
+    sousTotal('Total main-d’œuvre HT', t.poseHt);
+  }
+  if (libresDe('forfait').length > 0) {
+    titreDeRayon('Forfaits');
+    ecrireLibres('forfait');
+    sousTotal('Total forfaits HT', t.forfaitsHt);
   }
 
   // ------------------------------------------------------------ le total
-  /*
-    HT, TVA, TTC — voir `totauxDuDevis` : les fournitures ramenées hors
-    taxes, puis un seul taux pour tout le chantier.
-  */
-  const t = totauxDuDevis(e.devis.total, pose);
   /*
     PAS UN MOT D'ENSEIGNE NI DE « PRIX RELEVÉ » — revue « Gérard » : « prix
     relevés TTC en enseigne, ramenés HT » se lisait, côté client, comme un
     artisan qui revend au prix de la grande surface. D'où viennent les prix
     est l'affaire de l'artisan, dans l'app ; le client lit des prix HT.
+
+    LA TVA RÉDUITE, PRUDEMMENT — relevé d'un électricien artisan : la
+    mention affirmait « attestation du client requise », une règle qui a
+    bougé et que l'app n'a pas vérifiée. Elle dit désormais la condition
+    connue, sous réserve, et rien de plus.
   */
+  const paiement = e.conditions?.paiement?.trim();
   const mentions = [
-    ...(pose && t.tauxTva < TVA_DES_PRIX_PUBLICS
-      ? ['TVA au taux réduit des travaux de rénovation d’un logement de plus de deux ans, fournitures posées comprises (attestation du client requise).']
+    ...(t.tauxTva < TVA_DES_PRIX_PUBLICS
+      ? [
+          `TVA à taux réduit (${pourcent(t.tauxTva)}) sous réserve des conditions d’éligibilité — logement achevé depuis plus de 2 ans.`,
+        ]
       : []),
     ...(pose
       ? [
@@ -7440,25 +7504,27 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
             : 'Main-d’œuvre estimée au temps de pose de chaque point, à confirmer après visite.',
         ]
       : []),
-    ...e.devis.exclusions.filter((x) => !(pose && /^Main-d/.test(x))),
+    ...(paiement ? [`Conditions de paiement : ${paiement}`] : []),
+    ...e.devis.exclusions.filter((x) => !(t.poseHt > 0 && /^Main-d/.test(x))),
   ];
   const lignesMentions = mentions.map((m) => wrapText(m, 7.5, X1 - X0));
+  const bx = 300;
+  const lignesTotal: [string, number][] = [
+    ['Fournitures HT', t.fournituresHt],
+    ...(t.poseHt > 0 ? ([['Main-d’œuvre HT', t.poseHt]] as [string, number][]) : []),
+    ...(t.forfaitsHt > 0 ? ([['Forfaits HT', t.forfaitsHt]] as [string, number][]) : []),
+    ['Total HT', t.ht],
+    [`TVA ${pourcent(t.tauxTva)}`, t.tva],
+  ];
+  const acompte = t.tauxAcompte > 0 && t.acompte > 0;
+  const hauteurTotal = lignesTotal.length * 14 + 30 + (acompte ? 16 : 0);
   /*
     LE TOTAL, LES MENTIONS ET LE BON POUR ACCORD TIENNENT ENSEMBLE — revue
     « Karim » : le cadre de signature partait seul en page 3. On réserve
     leur place d'un coup ; s'ils ne tiennent pas, ils passent ensemble.
   */
-  const hauteurFin =
-    (pose ? 4 : 3) * 14 + 48 + lignesMentions.reduce((h, ls) => h + ls.length * 10 + 2, 0) + 10 + 84;
+  const hauteurFin = hauteurTotal + 18 + lignesMentions.reduce((h, ls) => h + ls.length * 10 + 2, 0) + 10 + 84;
   place(Math.min(hauteurFin, 560), false);
-  const bx = 300;
-  const lignesTotal: [string, number][] = [
-    ['Fournitures HT', t.fournituresHt],
-    ...(pose ? ([['Main-d’œuvre HT', t.poseHt]] as [string, number][]) : []),
-    ['Total HT', t.ht],
-    [`TVA ${String(Math.round(t.tauxTva * 1000) / 10).replace('.', ',')} %`, t.tva],
-  ];
-  const hauteurTotal = lignesTotal.length * 14 + 30;
   d.rect(bx, y - hauteurTotal + 10, X1 - bx, hauteurTotal, '#F4F6FA', null, 0);
   let yt = y - 4;
   for (const [mot, v] of lignesTotal) {
@@ -7470,6 +7536,15 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   yt -= 6;
   d.text('TOTAL TTC', bx + 10, yt, 12, INK, { bold: true, align: 'left' });
   d.text(enEuros(t.ttc), X1 - 10, yt, 13, INK, { bold: true, align: 'right' });
+  /*
+    L'ACOMPTE, EN POUR CENT ET EN EUROS — relevé d'un électricien artisan :
+    le client signe un montant, pas un pourcentage.
+  */
+  if (acompte) {
+    yt -= 16;
+    d.text(`Acompte ${pourcent(t.tauxAcompte / 100)} à la commande`, bx + 10, yt, 9, INK, { align: 'left' });
+    d.text(`${enEuros(t.acompte)} TTC`, X1 - 10, yt, 9, INK, { align: 'right', bold: true });
+  }
   y -= hauteurTotal + 18;
 
   // ------------------------------------------------------- les mentions

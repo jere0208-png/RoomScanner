@@ -28,7 +28,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { RoomScan } from 'react-native-room-scan';
 import { buildDevisPdf } from '../src/export/pdf';
 import type { Devis, LigneDevis } from '../src/geometry/devis';
-import { estimerLaPose, totauxDuDevis } from '../src/geometry/mainDOeuvre';
+import { estimerLaPose, vendreLeDevis } from '../src/geometry/mainDOeuvre';
 import { DevisScreen } from '../src/screens/DevisScreen';
 import { ATTENTE_MIN } from '../src/components/PrixQuiSActualisent';
 import type { Fixture, FixtureKind } from '../src/geometry/electrical';
@@ -102,8 +102,10 @@ describe('le document', () => {
     devis — fournitures ramenées hors taxes.
   */
   it('donne le HT, la TVA du chantier et le TTC', () => {
-    const t = totauxDuDevis(devisDe(lignes).total, pose);
-    expect(t.fournituresHt).toBeCloseTo(devisDe(lignes).total / 1.2, 2);
+    const t = vendreLeDevis(devisDe(lignes), pose).totaux;
+    // Chaque ligne au PU HT arrondi × quantité (8,33 × 2), puis la somme :
+    // le client qui refait la multiplication retombe sur le total.
+    expect(t.fournituresHt).toBe(2 * 16.66);
     expect(t.tauxTva).toBe(pose.tauxTva);
     expect(t.ttc).toBeCloseTo((t.fournituresHt + pose.ht) * (1 + pose.tauxTva), 1);
     expect(src).toContain('(Total HT) Tj');
@@ -119,8 +121,10 @@ describe('le document', () => {
     const e = String.fromCharCode(0x80);
     expect(src).toContain('(PU HT) Tj');
     expect(src).not.toContain('(PU TTC) Tj');
-    // 20,00 € TTC au rayon : 16,67 € HT.
-    expect(src).toContain(`(16,67 ${e}) Tj`);
+    // 10,00 € TTC au catalogue : 8,33 € HT l'unité, 16,66 € HT les deux —
+    // le total de la ligne est son PU HT × sa quantité, vérifiable par le client.
+    expect(src).toContain(`(8,33 ${e}) Tj`);
+    expect(src).toContain(`(16,66 ${e}) Tj`);
     expect(src).toContain('(Total fournitures HT) Tj');
     expect(src).toContain('Assurance décennale : MAAF n° 123456, France entière');
   });

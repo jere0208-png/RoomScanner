@@ -16,32 +16,40 @@ import {
   TAUX_MAX,
   TAUX_MIN,
   enHeures,
-  totauxDuDevis,
+  pourcent,
   type NatureDeChantier,
   type Pose,
+  type TotauxDuDevis,
 } from '../geometry/mainDOeuvre';
 import { TotalQuiMonte } from './TotalQuiMonte';
 
 const euros = (v: number) => `${fr(v, 2)} €`;
-const pc = (x: number) => `${Math.round(x * 100)} %`;
+// « 5,5 % » ne s'arrondit pas à « 6 % » : voir `pourcent`.
+const pc = pourcent;
 
 export function PoseEstimee({
   pose,
-  materiel,
+  totaux,
   chantier,
   onChantier,
   onTaux,
+  onHeures,
 }: {
   pose: Pose;
-  /** Le total du matériel, TTC : il s'ajoute à la pose. */
-  materiel: number;
+  /**
+   * LES TOTAUX DU DEVIS, TELS QUE `prixDuDevis` LES DONNE — relevé d'un
+   * électricien artisan : coefficient, lignes libres, TVA du devis. Ce bloc
+   * ne recompte plus rien de son côté : un seul total.
+   */
+  totaux: TotauxDuDevis;
   chantier: NatureDeChantier;
   onChantier: (c: NatureDeChantier) => void;
   onTaux: (taux: number) => void;
+  /** Corriger les heures d'une famille (relevé du même artisan : temps figés). */
+  onHeures?: (famille: string, heures: number) => void;
 }) {
   const c = useTheme();
   const s = getStyles(c);
-  const totaux = totauxDuDevis(materiel, pose);
   const pas = (sens: 1 | -1) => {
     const t = pose.taux + sens * PAS_DU_TAUX;
     if (t < TAUX_MIN || t > TAUX_MAX) return;
@@ -107,14 +115,23 @@ export function PoseEstimee({
         </View>
       </View>
 
-      {pose.lignes.map((l) => (
-        <View key={l.famille} style={s.ligne}>
-          <Text style={s.ligneNom} numberOfLines={1}>
-            {l.famille === 'Tableau' ? 'Tableau et câblage' : `${l.famille} · ${l.quantite}`}
-          </Text>
-          <Text style={s.ligneHeures}>{enHeures(l.heures)}</Text>
-        </View>
-      ))}
+      {pose.lignes.map((l) => {
+        const nom = l.famille === 'Tableau' ? 'Tableau et câblage' : `${l.famille} · ${l.quantite}`;
+        return (
+          <Pressable
+            key={l.famille}
+            disabled={!onHeures}
+            accessibilityRole={onHeures ? 'button' : undefined}
+            accessibilityLabel={onHeures ? `Corriger les heures : ${nom}` : undefined}
+            style={s.ligne}
+            onPress={() => onHeures?.(l.famille, l.heures)}>
+            <Text style={s.ligneNom} numberOfLines={1}>
+              {l.corrigee ? `${nom} · corrigé` : nom}
+            </Text>
+            <Text style={[s.ligneHeures, !!onHeures && s.ligneHeuresTouchable]}>{enHeures(l.heures)}</Text>
+          </Pressable>
+        );
+      })}
 
       <View style={s.sous}>
         <Text style={s.sousNom}>{`Pose · ${enHeures(pose.heures)}`}</Text>
@@ -136,7 +153,7 @@ export function PoseEstimee({
         d'écart entre l'écran et le papier. Un seul calcul : `totauxDuDevis`.
       */}
       <View style={s.total}>
-        <Text style={s.totalNom}>MATÉRIEL + POSE TTC</Text>
+        <Text style={s.totalNom}>TOTAL DU DEVIS TTC</Text>
         <TotalQuiMonte valeur={totaux.ttc} format={euros} style={s.totalValeur} />
       </View>
       <Text style={s.mention}>
@@ -200,6 +217,8 @@ const getStyles = themedStyles((c: Palette) =>
     },
     ligneNom: { color: c.inkSoft, fontSize: 13, flexShrink: 1 },
     ligneHeures: { color: c.ink, fontSize: 13, fontWeight: '600' },
+    /* Les heures se touchent pour se corriger : soulignées, comme le prix d'une ligne. */
+    ligneHeuresTouchable: { color: c.blue, textDecorationLine: 'underline' },
     sous: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
     sousNom: { color: c.inkSoft, fontSize: 13 },
     sousValeur: { color: c.ink, fontSize: 13, fontWeight: '600' },

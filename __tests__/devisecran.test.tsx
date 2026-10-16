@@ -230,6 +230,12 @@ const totalAttendu = () => {
   return prixDuDevis(devis, APPAREILS, [], { taux, chantier }).totaux.ttc;
 };
 const enEuros = (v: number) => `${v.toFixed(2).replace('.', ',')} €`;
+/*
+  LE TICKET EST EN HORS TAXES — relevé d'un électricien artisan : il pense
+  en HT. Chaque ligne s'y lit à son prix de VENTE HT, celui de
+  `prixDuDevis` ; le gros total, lui, reste TTC.
+*/
+const ventesAttendues = () => prixDuDevis(devisAttendu(), APPAREILS, [], { taux: 45, chantier: 'renovation' }).fournitures;
 
 /*
   ON MESURE APRÈS CHAQUE ÉTAPE, ET PAS SEULEMENT À L'OUVERTURE.
@@ -484,14 +490,12 @@ describe('les deux étapes', () => {
 describe('le ticket de caisse', () => {
   it('porte une ligne par article, avec son compte et son prix', async () => {
     const t = await auTicket();
-    const devis = devisAttendu();
+    const ventes = ventesAttendues();
     const lus = mots(t);
-    expect(devis.lignes.length).toBeGreaterThan(5);
-    for (const l of devis.lignes) {
+    expect(ventes.length).toBeGreaterThan(5);
+    for (const { ligne: l, puHt } of ventes) {
       expect(lus).toContain(l.libelle);
-      expect(lus).toContain(
-        `${l.quantite} ${l.unite} × ${l.pu!.toFixed(2).replace('.', ',')} €`,
-      );
+      expect(lus).toContain(`${l.quantite} ${l.unite} × ${enEuros(puHt!)} HT`);
     }
   });
 
@@ -535,12 +539,15 @@ describe('le ticket de caisse', () => {
   it('et chaque rayon dit son sous-total', async () => {
     const t = await auTicket();
     const lus = mots(t);
+    const ventes = ventesAttendues();
     for (const f of devisAttendu().parFamille) {
       // `textTransform` met la majuscule au DESSIN : le texte, lui, garde sa
       // casse. Un banc qui chercherait la version en capitales chercherait
       // une chaîne qui n'existe nulle part.
       expect(lus).toContain(f.famille);
-      expect(lus).toContain(`${f.total.toFixed(2).replace('.', ',')} €`);
+      // Le sous-total du rayon, en HT : ses lignes à leur prix de vente.
+      const ht = ventes.filter((v) => v.ligne.famille === f.famille).reduce((x, v) => x + v.totalHt, 0);
+      expect(lus).toContain(`${enEuros(Math.round(ht * 100) / 100)} HT`);
     }
   });
 });
@@ -881,7 +888,9 @@ describe('écarter un article', () => {
     act(() => ligne(t, cher.libelle).props.onPress());
     const lus = mots(t);
     expect(lus).toContain(cher.libelle);
-    expect(lus).toContain(`${cher.total.toFixed(2).replace('.', ',')} €`);
+    // Son prix HT, barré, toujours lisible.
+    const vente = ventesAttendues().find((v) => v.ligne.libelle === cher.libelle)!;
+    expect(lus).toContain(enEuros(vente.brutHt));
     expect(ligne(t, `${cher.libelle}, écarté du devis`)).toBeDefined();
   });
 

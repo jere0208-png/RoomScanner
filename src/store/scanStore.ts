@@ -141,6 +141,7 @@ import {
   type FixtureKind,
 } from '../geometry/electrical';
 import { GAMMES, type GammeId } from '../geometry/prix';
+import { TAUX_DE_TVA, type LigneLibre } from '../geometry/mainDOeuvre';
 import { equilibrerLaScene, pointInPolygon } from '../geometry/appearance';
 import { ancrerElec } from '../geometry/viseur';
 import { poserLibre } from '../geometry/poser';
@@ -447,6 +448,35 @@ export interface DevisEnregistre {
   prix?: Record<string, number>;
   /** Le numéro donné au devis à son premier envoi (voir `numeroterUnDevis`). */
   numero?: string;
+  /** Les lignes libres de l'artisan (voir `LigneLibre`). */
+  libres?: LigneLibre[];
+  /** Les heures de pose corrigées, par famille. */
+  heures?: Record<string, number>;
+  /** Le taux de TVA choisi pour ce devis ; absent = celui du chantier. */
+  tva?: number;
+}
+
+/**
+ * UNE LIGNE LIBRE LUE SUR LE DISQUE, OU RIEN — un dossier abîmé ou d'une
+ * autre version ne doit pas glisser un prix illisible dans un total.
+ */
+function ligneLibrePropre(x: unknown): LigneLibre | null {
+  if (!x || typeof x !== 'object') return null;
+  const l = x as Record<string, unknown>;
+  if (typeof l.id !== 'string' || typeof l.designation !== 'string') return null;
+  const nombre = (v: unknown) => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : null);
+  const quantite = nombre(l.quantite);
+  const puHt = nombre(l.puHt);
+  if (quantite === null || puHt === null) return null;
+  const type = l.type === 'mainDOeuvre' || l.type === 'forfait' ? l.type : 'fourniture';
+  return {
+    id: l.id,
+    designation: l.designation,
+    quantite,
+    unite: typeof l.unite === 'string' ? l.unite : 'u',
+    puHt: Math.round(puHt * 100) / 100,
+    type,
+  };
 }
 
 /**
@@ -2591,6 +2621,24 @@ interface ScanState {
   devisNumero: string | null;
   setDevisNumero: (numero: string | null) => void;
   retirerDuDevis: (code: string) => void;
+  /**
+   * LES LIGNES LIBRES — relevé d'un électricien artisan : « Dépose ancien
+   * tableau », « Déplacement », « Consuel », « Mise en service ». Ni au plan
+   * ni au magasin : l'artisan les écrit, les corrige, les retire.
+   */
+  devisLignesLibres: LigneLibre[];
+  /** Ajoute la ligne, ou remplace celle qui porte le même `id`. */
+  ecrireLigneLibre: (l: LigneLibre) => void;
+  retirerLigneLibre: (id: string) => void;
+  /**
+   * LES HEURES DE POSE CORRIGÉES, par famille — le barème est une
+   * estimation, l'artisan connaît son chantier. `null` rend l'estimation.
+   */
+  devisHeures: Record<string, number>;
+  reglerHeuresDevis: (famille: string, heures: number | null) => void;
+  /** Le taux de TVA du devis (20 %, 10 %, 5,5 %) ; `null` = celui du chantier. */
+  devisTva: number | null;
+  reglerTvaDevis: (taux: number | null) => void;
 
   // Surface au sol : fond pointillé + valeur en m². Activée par défaut.
   showSurfaces: boolean;
@@ -3162,6 +3210,9 @@ export const useScanStore = create<ScanState>((set, get) => {
     devisAjouts: { code: string; quantite: number }[];
     devisPrix: Record<string, number>;
     devisNumero: string | null;
+    devisLignesLibres?: LigneLibre[];
+    devisHeures?: Record<string, number>;
+    devisTva?: number | null;
   }): DevisEnregistre => ({
     gamme: st.gammeDevis,
     ecartes: st.devisEcartes,
@@ -3169,6 +3220,9 @@ export const useScanStore = create<ScanState>((set, get) => {
     ajouts: st.devisAjouts,
     ...(Object.keys(st.devisPrix).length > 0 ? { prix: st.devisPrix } : {}),
     ...(st.devisNumero ? { numero: st.devisNumero } : {}),
+    ...(st.devisLignesLibres && st.devisLignesLibres.length > 0 ? { libres: st.devisLignesLibres } : {}),
+    ...(st.devisHeures && Object.keys(st.devisHeures).length > 0 ? { heures: st.devisHeures } : {}),
+    ...(typeof st.devisTva === 'number' ? { tva: st.devisTva } : {}),
   });
 
   /**
@@ -3185,6 +3239,11 @@ export const useScanStore = create<ScanState>((set, get) => {
     devisAjouts: devis?.ajouts ?? [],
     devisPrix: devis?.prix ?? {},
     devisNumero: devis?.numero ?? null,
+    devisLignesLibres: Array.isArray(devis?.libres)
+      ? devis.libres.map(ligneLibrePropre).filter((l): l is LigneLibre => l !== null)
+      : [],
+    devisHeures: devis?.heures ?? {},
+    devisTva: TAUX_DE_TVA.find((t) => t === devis?.tva) ?? null,
     // Un dossier qu'on ouvre n'a pas lu l'avertissement du devis.
     etapeDevis: 0,
   });
@@ -4317,6 +4376,32 @@ export const useScanStore = create<ScanState>((set, get) => {
           : [...e.devisEcartes, cle],
       })),
     remettreLesArticlesDevis: () => set({ devisEcartes: [], dirty: true }),
+
+    devisLignesLibres: [],
+    ecrireLigneLibre: (l) =>
+      set((e) => {
+        const propre = ligneLibrePropre(l);
+        if (!propre) return {};
+        const deja = e.devisLignesLibres.some((x) => x.id === propre.id);
+        return {
+          dirty: true,
+          devisLignesLibres: deja
+            ? e.devisLignesLibres.map((x) => (x.id === propre.id ? propre : x))
+            : [...e.devisLignesLibres, propre],
+        };
+      }),
+    retirerLigneLibre: (id) =>
+      set((e) => ({ dirty: true, devisLignesLibres: e.devisLignesLibres.filter((x) => x.id !== id) })),
+    devisHeures: {},
+    reglerHeuresDevis: (famille, heures) =>
+      set((e) => {
+        const devisHeures = { ...e.devisHeures };
+        if (heures === null || !isFinite(heures) || heures < 0) delete devisHeures[famille];
+        else devisHeures[famille] = Math.round(heures * 4) / 4;
+        return { dirty: true, devisHeures };
+      }),
+    devisTva: null,
+    reglerTvaDevis: (taux) => set({ dirty: true, devisTva: TAUX_DE_TVA.find((t) => t === taux) ?? null }),
 
     /*
       LE MODÈLE S'OUVRE SUR LE BÂTI — relevé du patron : « sur la vue 3D de
