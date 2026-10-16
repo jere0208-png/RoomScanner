@@ -9,9 +9,13 @@
  *
  * Il ne lui reste donc que ce qu'un « ⋯ » doit contenir : les deux gestes
  * qu'on ne pose pas par mégarde. Se déconnecter, et supprimer son compte —
- * ce dernier en rouge, et confirmé par une Alert système : pour un geste
- * destructif, la feuille austère du système est un avertissement en soi,
- * la déguiser en jolie carte l'affaiblirait.
+ * ce dernier en rouge, et confirmé par une alerte de l'app.
+ *
+ * CETTE ALERTE S'OUVRE DANS LE MENU — relevé de la revue App Review : «
+ * Supprimer mon compte » ne montrait RIEN. L'alerte racine se présentait
+ * depuis la vue de l'app, qui présentait déjà ce menu : iOS refusait en
+ * silence. Le menu monte donc son propre hôte d'alerte (voir la pile
+ * d'hôtes de `src/ui/alerte.ts`).
  */
 import React from 'react';
 import {
@@ -25,6 +29,7 @@ import {
 import { useAccountStore } from '../store/accountStore';
 import { radius, shadowCard, useTheme, type Palette } from '../theme';
 import { alerte } from '../ui/alerte';
+import { AlerteHote } from './AlerteHote';
 
 export function MenuCompte({
   visible,
@@ -94,14 +99,23 @@ export function MenuCompte({
       transparent
       animationType="fade"
       onRequestClose={fermer}>
-      {/* Le voile referme : c'est le geste que tout le monde essaie. */}
-      <Pressable testID="voile-compte" style={s.voile} onPress={fermer}>
+      {/* Le voile referme : c'est le geste que tout le monde essaie. Il est
+          posé À CÔTÉ du menu et non autour : iOS cache au lecteur d'écran ce
+          que contient un élément accessible. */}
+      <View style={s.voile}>
+        <Pressable
+          testID="voile-compte"
+          accessibilityRole="button"
+          accessibilityLabel="Fermer le menu"
+          style={StyleSheet.absoluteFill}
+          onPress={fermer}
+        />
         {/*
           LE MENU TOMBE SOUS SON BOUTON, en haut à droite. Un menu de « ⋯ »
           centré au milieu de l'écran perd le lien avec ce qui l'a ouvert :
           on le cherche des yeux là où le doigt vient d'appuyer.
         */}
-        <Pressable style={s.carte} onPress={() => {}}>
+        <View style={s.carte} accessibilityViewIsModal>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Se déconnecter"
@@ -120,8 +134,9 @@ export function MenuCompte({
             onPress={confirmerSuppression}>
             <Text style={[s.entreeTexte, s.danger]}>Supprimer mon compte</Text>
           </Pressable>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
+      <AlerteHote imbrique actif={visible} />
     </Modal>
   );
 }

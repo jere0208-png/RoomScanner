@@ -47,7 +47,9 @@ describe('le formulaire du service client', () => {
     const t = monter();
     // La coquille commune porte le décalage du clavier : sans elle, le
     // formulaire flotte au centre et le bouton passe dessous.
-    expect(t.root.findAllByType(SheetShell)).toHaveLength(1);
+    // (La feuille de l'alerte imbriquée, `sansHoteAlerte`, ne compte pas :
+    // voir `alertesurmodal.test.tsx`.)
+    expect(t.root.findAllByType(SheetShell).filter((n) => !n.props.sansHoteAlerte)).toHaveLength(1);
     act(() => t.unmount());
   });
 

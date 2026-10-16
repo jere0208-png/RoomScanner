@@ -30,6 +30,7 @@ import {
 } from '../../geometry/electrical';
 import { getStyles } from './styles';
 import { VignetteAppareil } from '../../components/VignetteAppareil';
+import { AlerteHote } from '../../components/AlerteHote';
 
 export function ElecSheet({
   visible,
@@ -196,6 +197,9 @@ export function ElecSheet({
         </KeyboardAvoidingView>
         <ActionSheet data={demande} onClose={() => setDemande(null)} />
       </View>
+      {/* Les alertes du mur (WallElevation) s'affichent dans cette
+          fenêtre : voir la pile d'hôtes de `src/ui/alerte.ts`. */}
+      <AlerteHote imbrique actif={visible} />
     </Modal>
   );
 }

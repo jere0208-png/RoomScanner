@@ -21,6 +21,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
+  PanResponder,
   useWindowDimensions,
   Easing,
   Keyboard,
@@ -36,6 +37,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { CloseCross } from './CloseCross';
+import { AlerteHote } from './AlerteHote';
 import { SOLAIRES } from '../ui/solaires';
 import { haptic } from '../ui/haptic';
 import type { FauteDeCote } from '../ui/saisieCote';
@@ -202,15 +204,34 @@ export function useKeyboardInset(): number {
   return inset;
 }
 
+/**
+ * LE GESTE QUI REFERME : assez loin, ou assez vite.
+ *
+ * Au-delà de 30 % de la hauteur de la feuille, ou lâchée à plus de
+ * 0,8 point par milliseconde vers le bas, elle part ; sinon elle revient.
+ * Les mêmes seuils que les feuilles d'iOS, à l'œil : une pichenette suffit,
+ * un doigt qui hésite ne ferme rien.
+ */
+export function glisserFerme(dy: number, vy: number, hauteur: number): boolean {
+  if (dy <= 0) return false;
+  return dy > Math.max(1, hauteur) * 0.3 || vy > 0.8;
+}
+
 export function SheetShell({
   visible,
   onClose,
   onClosed,
   defile = true,
+  sansHoteAlerte = false,
   children,
 }: {
   visible: boolean;
   onClose: () => void;
+  /**
+   * Pas d'hôte d'alerte dans cette feuille : c'est celle de l'alerte
+   * elle-même (`AlerteHote`), qui s'y monterait sans fin.
+   */
+  sansHoteAlerte?: boolean;
   /**
    * La feuille défile-t-elle d'elle-même quand la place manque ? Oui, sauf
    * pour celles qui portent déjà leur propre liste défilante (contrôle,
@@ -257,6 +278,39 @@ export function SheetShell({
   const marges = useSafeAreaInsets();
   const hauteurMax = Math.max(220, hauteurEcran - clavier - marges.top - 10);
   const monte = useRef(new Animated.Value(0)).current;
+  /*
+    LA POIGNÉE SE TIRE — relevé de la revue : « la barre en haut des
+    feuilles ne fait rien ». Elle était un dessin ; toutes les feuilles
+    d'iOS se referment en la tirant vers le bas, et c'est le premier geste
+    qu'on tente. Le décalage du doigt s'ajoute au glissement d'entrée, sur
+    la poignée seulement : le défilement de la feuille garde le sien.
+  */
+  const glisse = useRef(new Animated.Value(0)).current;
+  const hauteurFeuille = useRef(0);
+  const fermerRef = useRef(onClose);
+  fermerRef.current = onClose;
+  const tirer = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_e, g) => g.dy > 4 && Math.abs(g.dy) > Math.abs(g.dx),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderMove: (_e, g) => glisse.setValue(Math.max(0, g.dy)),
+      onPanResponderRelease: (_e, g) => {
+        if (glisserFerme(g.dy, g.vy, hauteurFeuille.current)) {
+          fermerRef.current();
+          return;
+        }
+        Animated.spring(glisse, {
+          toValue: 0,
+          useNativeDriver: true,
+          bounciness: 0,
+        }).start();
+      },
+      onPanResponderTerminate: () => {
+        Animated.spring(glisse, { toValue: 0, useNativeDriver: true, bounciness: 0 }).start();
+      },
+    }),
+  ).current;
   /**
    * La feuille survit à sa fermeture, le temps de descendre.
    *
@@ -268,7 +322,12 @@ export function SheetShell({
    */
   const [rendu, setRendu] = useState(visible);
   useEffect(() => {
-    if (visible) setRendu(true);
+    if (visible) {
+      setRendu(true);
+      // Rouverte, elle repart d'en haut : le décalage du dernier geste ne
+      // la suit pas.
+      glisse.setValue(0);
+    }
     Animated.timing(monte, {
       toValue: visible ? 1 : 0,
       duration: visible ? 220 : 160,
@@ -277,7 +336,7 @@ export function SheetShell({
     }).start(({ finished }) => {
       if (finished && !visible) setRendu(false);
     });
-  }, [visible, monte]);
+  }, [visible, monte, glisse]);
   // Le démontage de la fenêtre native se fait au rendu suivant : on prévient
   // à ce moment-là, pas à la fin de l'animation.
   const partie = useRef(true);
@@ -292,29 +351,53 @@ export function SheetShell({
   }, [rendu, onClosed]);
   return (
     <Modal visible={rendu} transparent animationType="none" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        {/* Le voile s'allume et s'éteint avec la feuille. Posé en fond et
-            transparent au doigt : c'est le `Pressable` du dessous qui ferme,
-            sinon l'appui « à côté » ne fonctionnerait plus. */}
-        <Animated.View
-          pointerEvents="none"
-          style={[StyleSheet.absoluteFill, styles.veil, { opacity: monte }]}
-        />
+      {/*
+        LE VOILE EST UN FRÈRE DE LA FEUILLE, PAS SON PARENT — relevé de la
+        revue VoiceOver : la feuille vivait DANS le Pressable du voile. Or,
+        sur iOS, un élément accessible cache tout ce qu'il contient : le
+        lecteur d'écran ne voyait qu'un grand bouton sans nom, et rien de ce
+        qu'il y avait dessus — choix, champs, alertes — n'était activable.
+        Le voile est posé derrière, il ne reçoit que l'appui qui manque la
+        feuille ; la feuille, elle, se déclare modale pour VoiceOver.
+      */}
+      <View style={styles.backdrop}>
+        <Pressable
+          testID="voile-feuille"
+          accessibilityRole="button"
+          accessibilityLabel="Fermer"
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}>
+          {/* Le voile s'allume et s'éteint avec la feuille. */}
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, styles.veil, { opacity: monte }]}
+          />
+        </Pressable>
         {/* La feuille se pose SUR le clavier, jamais dessous. */}
-        <View style={[styles.avoider, { paddingBottom: clavier }]}>
+        <View
+          pointerEvents="box-none"
+          style={[styles.avoider, { paddingBottom: clavier }]}>
           <Animated.View
             style={{
               opacity: monte,
               transform: [
                 {
-                  translateY: monte.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [40, 0],
-                  }),
+                  translateY: Animated.add(
+                    monte.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [40, 0],
+                    }),
+                    glisse,
+                  ),
                 },
               ],
             }}>
-            <Pressable
+            <View
+              testID="carte-feuille"
+              accessibilityViewIsModal
+              onLayout={(e) => {
+                hauteurFeuille.current = e.nativeEvent.layout.height;
+              }}
               style={[
                 styles.sheet,
                 carte && styles.sheetCarte,
@@ -322,9 +405,10 @@ export function SheetShell({
                 // Clavier ouvert, la barre d'accueil est dessous : sa marge
                 // ne sert plus à rien, et elle coûte une ligne.
                 clavier > 0 && styles.sheetSurClavier,
-              ]}
-              onPress={() => {}}>
-              <View style={styles.grip} />
+              ]}>
+              <View testID="poignee-feuille" style={styles.poignee} {...tirer.panHandlers}>
+                <View style={styles.grip} />
+              </View>
               {/*
                 LA CROIX VIT ICI, POUR TOUTES LES FEUILLES.
 
@@ -360,10 +444,13 @@ export function SheetShell({
               ) : (
                 children
               )}
-            </Pressable>
+            </View>
           </Animated.View>
         </View>
-      </Pressable>
+      </View>
+      {/* Une alerte levée pendant que la feuille est ouverte s'affiche
+          DANS sa fenêtre : voir la pile d'hôtes de `src/ui/alerte.ts`. */}
+      {!sansHoteAlerte && <AlerteHote imbrique actif={visible} />}
     </Modal>
   );
 }
@@ -386,13 +473,31 @@ function useDernier<T>(data: T | null): T | null {
 export function ActionSheet({
   data,
   onClose,
+  onClosed,
+  sansHoteAlerte,
 }: {
   data: ActionData | null;
   onClose: () => void;
+  /** Appelé une fois la feuille partie ET le geste choisi joué. */
+  onClosed?: () => void;
+  /** Voir `SheetShell` : réservé à la feuille de l'alerte elle-même. */
+  sansHoteAlerte?: boolean;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
   const vu = useDernier(data);
+  /*
+    UN SEUL CHOIX PAR OUVERTURE — relevé de la revue : pendant les 160 ms
+    de descente, un second appui sur une autre ligne REMPLAÇAIT l'action
+    choisie ; on touchait « Renommer », le doigt glissait sur « Supprimer »,
+    et c'est la suppression qui partait. Le premier choix est le bon ; les
+    suivants sont ignorés jusqu'à la prochaine ouverture.
+  */
+  const ouverte = !!data;
+  const choisi = useRef(false);
+  useEffect(() => {
+    if (ouverte) choisi.current = false;
+  }, [ouverte]);
   /**
    * L'action attend que la feuille soit PARTIE.
    *
@@ -407,10 +512,12 @@ export function ActionSheet({
     <SheetShell
       visible={!!data}
       onClose={onClose}
+      sansHoteAlerte={sansHoteAlerte}
       onClosed={() => {
         const suite = attente.current;
         attente.current = null;
         suite?.();
+        onClosed?.();
       }}>
       {vu && (
         <>
@@ -449,6 +556,8 @@ export function ActionSheet({
                 pressed && styles.rowPressed,
               ]}
               onPress={() => {
+                if (choisi.current) return;
+                choisi.current = true;
                 attente.current = a.onPress;
                 onClose();
               }}>
@@ -662,7 +771,7 @@ const getStyles = themedStyles((c: Palette) =>
       borderTopLeftRadius: 26,
       borderTopRightRadius: 26,
       paddingHorizontal: 18,
-      paddingTop: 10,
+      paddingTop: 0,
       paddingBottom: 34,
       ...shadowCard,
     },
@@ -676,13 +785,20 @@ const getStyles = themedStyles((c: Palette) =>
       marginBottom: 26,
       paddingBottom: 22,
     },
+    /* La zone qu'on tire : toute la largeur du haut de la feuille, pas
+       les quatre points du trait — un doigt ne vise pas si fin. */
+    poignee: {
+      alignSelf: 'stretch',
+      marginHorizontal: -18,
+      paddingTop: 10,
+      paddingBottom: 12,
+    },
     grip: {
       alignSelf: 'center',
       width: 38,
       height: 4,
       borderRadius: 2,
       backgroundColor: c.lineStrong,
-      marginBottom: 12,
     },
     /*
       LA CROIX DE LA COQUILLE : posée en absolu, au-dessus du contenu, elle

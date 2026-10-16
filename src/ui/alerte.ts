@@ -25,6 +25,18 @@
  * ELLE NE FAIT QU'UNE CHOSE À LA FOIS. Deux alertes empilées, c'est une
  * fenêtre qui en cache une autre : la seconde attend que la première soit
  * refermée. iOS le faisait déjà ; on ne fait pas moins bien.
+ *
+ * ET ELLE S'AFFICHE LÀ OÙ ON LA VOIT — relevé de la revue App Review : «
+ * Supprimer mon compte » et « S'abonner » ne montraient RIEN. L'hôte unique,
+ * monté en bas d'`App`, présente sa fenêtre depuis la vue de l'application
+ * — or celle-ci présente déjà le menu du compte, ou la page Pro. iOS refuse
+ * une seconde fenêtre présentée par le même parent, en silence ; pire, React
+ * Native se croit présenté quand même et toutes les alertes suivantes
+ * restaient muettes jusqu'au redémarrage. Une fenêtre ouverte DANS une
+ * fenêtre, elle, se présente très bien. D'où la PILE D'HÔTES : chaque
+ * fenêtre qui peut lever une alerte monte le sien (`<AlerteHote imbrique />`),
+ * qui s'inscrit ici ; seul le plus haut affiche l'alerte, et l'hôte racine
+ * ne sert que quand plus aucune fenêtre n'est ouverte.
  */
 import { create } from 'zustand';
 
@@ -45,13 +57,23 @@ interface EtatAlerte {
   /** L'alerte à l'écran, et celles qui attendent leur tour. */
   courante: DonneesAlerte | null;
   file: DonneesAlerte[];
+  /**
+   * Les hôtes imbriqués, du plus bas au plus haut. Vide : c'est l'hôte
+   * racine qui affiche. Voir `inscrire`.
+   */
+  hotes: number[];
   poser: (a: DonneesAlerte) => void;
   fermer: () => void;
+  /** Un hôte imbriqué entre en scène : il passe en haut de la pile. */
+  inscrire: (id: number) => void;
+  /** Sa fenêtre se ferme : l'alerte en cours redescend à l'hôte d'en dessous. */
+  desinscrire: (id: number) => void;
 }
 
 export const useAlerte = create<EtatAlerte>((set, get) => ({
   courante: null,
   file: [],
+  hotes: [],
   poser: (a) => {
     const st = get();
     if (st.courante) {
@@ -65,7 +87,26 @@ export const useAlerte = create<EtatAlerte>((set, get) => ({
     const [suivante, ...reste] = st.file;
     set({ courante: suivante ?? null, file: reste });
   },
+  inscrire: (id) => {
+    set({ hotes: [...get().hotes.filter((h) => h !== id), id] });
+  },
+  desinscrire: (id) => {
+    const hotes = get().hotes;
+    if (hotes.includes(id)) set({ hotes: hotes.filter((h) => h !== id) });
+  },
 }));
+
+/**
+ * LE TEMPS QU'UNE FENÊTRE FINISSE D'ENTRER OU DE SORTIR.
+ *
+ * Un hôte qui devient le plus haut — parce que sa fenêtre vient de s'ouvrir,
+ * ou parce que celle du dessus vient de se fermer — attend ce délai avant
+ * d'afficher : iOS refuse aussi une présentation pendant qu'une autre glisse
+ * encore (la page Pro monte du bas, le menu du compte s'efface en fondu).
+ * L'alerte n'est pas perdue pour autant : elle reste `courante` et paraît
+ * une demi-seconde plus tard.
+ */
+export const DELAI_RELAIS = 500;
 
 /**
  * Pose une alerte, de n'importe où.

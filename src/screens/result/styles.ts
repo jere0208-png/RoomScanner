@@ -1121,8 +1121,23 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   exportAutresTexte: { color: c.ink, fontSize: 15, fontWeight: '700' },
   exportAutresDetail: { color: c.inkSoft, fontSize: 13, marginTop: 2 },
+  /* L'en-tête porte la croix, à droite du titre, comme les autres feuilles. */
+  exportEntete: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  exportEnteteTextes: { flex: 1, minWidth: 0 },
+  // Quarante-quatre points sous le doigt, le dessin en fait vingt.
+  exportCroix: {
+    width: 44,
+    height: 44,
+    marginTop: -10,
+    marginRight: -10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  /* Une hauteur MINIMALE : le texte fait grandir la carte, il n'est plus
+     coupé (« à envoyer… »). Le rembourrage garde l'air quand il grandit. */
   exportCarte: {
-    height: 92,
+    minHeight: 92,
+    paddingVertical: 12,
     borderRadius: 18,
     overflow: 'hidden',
     justifyContent: 'center',
@@ -1133,7 +1148,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   exportCarteTextes: { paddingHorizontal: 18, width: '58%' },
   exportCarteTitre: { color: c.ink, fontSize: 17, fontWeight: '600', letterSpacing: -0.2 },
   exportCarteTitreClair: { color: '#FFFFFF' },
-  exportCarteLigne: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  exportCarteLigne: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   exportBadgePro: {
     backgroundColor: c.blue,
     borderRadius: 6,

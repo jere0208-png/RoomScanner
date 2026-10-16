@@ -18,7 +18,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 import React from 'react';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Animated, Modal, StyleSheet, Switch, Text } from 'react-native';
+import { Animated, Modal, Switch, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { Toolbar2D, Toolbar3D } from '../src/screens/result/ResultToolbar';
 import { ToolPill } from '../src/components/ToolPill';
@@ -267,7 +267,9 @@ describe('le menu se valide, ou se quitte sans rien changer', () => {
     const t = rangee2D(false);
     appuyer(t, 'Autres');
     expect(textes(t)).not.toContain('OK');
-    const fermer = t.root.findAll((n) => n.props.accessibilityLabel === 'Fermer' && typeof n.props.onPress === 'function', { deep: false });
+    // Le voile se nomme aussi « Fermer » pour VoiceOver (voir
+    // `feuilleaccessible.test.tsx`) : on compte les croix, pas lui.
+    const fermer = t.root.findAll((n) => n.props.accessibilityLabel === 'Fermer' && typeof n.props.onPress === 'function' && n.props.testID !== 'voile-feuille', { deep: false });
     expect(fermer).toHaveLength(1);
     const valider = t.root.findAll((n) => n.props.accessibilityLabel === 'Valider' && typeof n.props.onPress === 'function', { deep: false });
     expect(valider).toHaveLength(1);
@@ -293,11 +295,11 @@ describe('le menu se valide, ou se quitte sans rien changer', () => {
     // « Cotes » est aussi une pastille de la rangée : on vise la LIGNE du menu.
     act(() => ligne(t, 'Cotes').props.onPress());
     expect(ligne(t, 'Cotes').props.accessibilityState.checked).toBe(true);
-    // Le voile : ce qui reçoit l'appui autour de la feuille, posée au fond.
+    // Le voile : ce qui reçoit l'appui autour de la feuille. Il est
+    // désormais posé À CÔTÉ de la feuille, plus autour (revue VoiceOver,
+    // voir `feuilleaccessible.test.tsx`).
     const voile = t.root.findByType(Modal).findAll(
-      (x) =>
-        typeof x.props.onPress === 'function' &&
-        (StyleSheet.flatten(x.props.style) as { justifyContent?: string } | undefined)?.justifyContent === 'flex-end',
+      (x) => typeof x.props.onPress === 'function' && x.props.testID === 'voile-feuille',
       { deep: false },
     )[0];
     expect(voile).toBeDefined();

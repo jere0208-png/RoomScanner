@@ -25,6 +25,7 @@ import { radius, shadowCard, useTheme, type Palette } from '../../theme';
 import { SOLAIRES } from '../../ui/solaires';
 import { haptic } from '../../ui/haptic';
 import { useModeElec } from '../../store/usage';
+import { AlerteHote } from '../../components/AlerteHote';
 
 const fr = (v: number, d = 2) => v.toFixed(d).replace('.', ',');
 const CHECK = 'M9.5 16.2 5.8 12.5l-1.4 1.4 5.1 5.1 10.6-10.6-1.4-1.4z';
@@ -49,8 +50,21 @@ export function FichePieceSheet({
   const aPoser = fiche ?fiche.circuits.filter((k) => !k.deja && k.pose) : [];
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={s.fond} onPress={onClose}>
-        <Pressable style={s.carte} onPress={() => {}}>
+      {/*
+        LE VOILE À CÔTÉ DE LA FICHE, PAS AUTOUR — revue VoiceOver : la fiche
+        vivait dans le Pressable du voile, et iOS cache au lecteur d'écran
+        ce que contient un élément accessible : ni la croix ni « Tout poser »
+        n'étaient activables. L'appui hors de la fiche ferme toujours.
+      */}
+      <View style={s.fond}>
+        <Pressable
+          testID="voile-fiche"
+          accessibilityRole="button"
+          accessibilityLabel="Fermer"
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+        />
+        <View style={s.carte} accessibilityViewIsModal>
           <View style={s.tete}>
             <View style={s.teteTexte}>
               <Text style={s.titre} numberOfLines={1}>
@@ -58,7 +72,7 @@ export function FichePieceSheet({
               </Text>
               <Text style={s.sousTitre}>Ce que le scan en a appris</Text>
             </View>
-            <TouchableOpacity accessibilityLabel="Fermer" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} onPress={onClose}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Fermer" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }} onPress={onClose}>
               <Text style={s.croix}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -217,8 +231,11 @@ export function FichePieceSheet({
               )}
             </ScrollView>
           )}
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
+      {/* Une alerte levée la fiche ouverte s'affiche dans sa fenêtre :
+          voir la pile d'hôtes de `src/ui/alerte.ts`. */}
+      <AlerteHote imbrique actif={visible} />
     </Modal>
   );
 }

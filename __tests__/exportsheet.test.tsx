@@ -78,10 +78,14 @@ describe('les sorties offertes', () => {
     const liste = tuiles(t);
     expect(liste).toHaveLength(6);
     for (const x of liste) {
-      const st = StyleSheet.flatten(x.props.style) as { width?: unknown; height?: number };
+      const st = StyleSheet.flatten(x.props.style) as { width?: unknown; height?: number; minHeight?: number };
       // Pleine largeur : aucune demi-largeur ne traine.
       expect(st.width).toBeUndefined();
-      expect(st.height).toBe(HAUTEUR_CARTE);
+      // Une hauteur MINIMALE, plus une hauteur fixe : la revue de lancement
+      // a vu « a envoyer… » coupe dans une carte de 92 points (voir
+      // `exportsanstroncature.test.tsx`).
+      expect(st.height).toBeUndefined();
+      expect(st.minHeight).toBe(HAUTEUR_CARTE);
     }
     // Toutes dans la meme liste qui defile, sans grille qui passe a la ligne.
     const defile = t.root.findAllByType(ScrollView);
@@ -139,7 +143,8 @@ describe('les sorties offertes', () => {
 
   it('chaque carte se dit au lecteur d ecran : son nom, et ce qu elle donne', () => {
     const t = monter();
-    const pdf = tuiles(t).find((x) => x.props.accessibilityLabel === 'Plan PDF')!;
+    // Le nom, suivi de ce qu'il coute : voir `exportsanstroncature.test.tsx`.
+    const pdf = tuiles(t).find((x) => String(x.props.accessibilityLabel).startsWith('Plan PDF'))!;
     expect(pdf.props.accessibilityRole).toBe('button');
     expect(pdf.props.accessibilityHint).toMatch(/Cot/);
     act(() => t.unmount());
@@ -235,5 +240,6 @@ describe('pour le particulier', () => {
     const autres = t.root.findAllByType(TouchableOpacity).find((n) => n.props.accessibilityLabel === 'Autres formats')!;
     act(() => autres.props.onPress());
     expect(titres()).toContain('Plan DXF');
+    act(() => t.unmount());
   });
 });

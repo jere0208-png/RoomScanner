@@ -10,6 +10,7 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -24,8 +25,15 @@ import {
 } from '../../components/ExportFond';
 import { getStyles } from './styles';
 import { useAccountStore } from '../../store/accountStore';
+import { AlerteHote } from '../../components/AlerteHote';
+import { CloseCross } from '../../components/CloseCross';
 
-/** La hauteur d'une carte : assez pour que l'image se lise, pas plus. */
+/**
+ * La hauteur d'une carte : assez pour que l'image se lise. C'est un
+ * MINIMUM — revue de lancement : « En calques, pour AutoCAD. À envoyer à
+ * l'architecte » se coupait en « à envoyer… » dans une carte de 92 points
+ * fixes, et plus encore en grand texte. La carte grandit avec son texte.
+ */
 export const HAUTEUR_CARTE = 92;
 
 export function ExportSheet({
@@ -159,6 +167,9 @@ export function ExportSheet({
   */
   const ecran = useWindowDimensions();
   const [largeur, setLargeur] = useState(Math.max(200, ecran.width - 96));
+  /* La hauteur réelle de chaque carte, pour que l'image de fond la couvre
+     entière quand le texte l'a fait grandir. */
+  const [hauteurs, setHauteurs] = useState<Record<string, number>>({});
 
   return (
     <Modal
@@ -167,12 +178,38 @@ export function ExportSheet({
       animationType="fade"
       onDismiss={onDismiss}
       onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose}>
-        <Pressable style={styles.modalCard} onPress={() => {}}>
-          <Text style={styles.modalTitle}>Exporter</Text>
-          <Text style={styles.modalSubtitle}>
-            Un document à remettre, ou un fichier à envoyer.
-          </Text>
+      {/*
+        LE VOILE À CÔTÉ DE LA CARTE, PAS AUTOUR — revue VoiceOver : la carte
+        vivait dans le Pressable du voile, et iOS cache au lecteur d'écran
+        tout ce que contient un élément accessible. Aucune sortie n'était
+        activable. Même geste au doigt : l'appui hors de la carte ferme.
+      */}
+      <View style={styles.modalBackdrop}>
+        <Pressable
+          testID="voile-export"
+          accessibilityRole="button"
+          accessibilityLabel="Fermer"
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+        />
+        <View style={styles.modalCard} accessibilityViewIsModal>
+          <View style={styles.exportEntete}>
+            <View style={styles.exportEnteteTextes}>
+              <Text style={styles.modalTitle}>Exporter</Text>
+              <Text style={styles.modalSubtitle}>
+                Un document à remettre, ou un fichier à envoyer.
+              </Text>
+            </View>
+            {/* La croix des autres feuilles — on ne sortait qu'en visant
+                le voile, invisible sous une carte qui remplit l'écran. */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Fermer"
+              style={styles.exportCroix}
+              onPress={onClose}>
+              <CloseCross size={20} color={teinte.inkSoft} />
+            </Pressable>
+          </View>
           {/*
             UNE SORTIE PAR LIGNE, ET CHACUNE MONTRE CE QU'ELLE DONNE.
 
@@ -196,29 +233,35 @@ export function ExportSheet({
             }}>
             {[...principales, ...(autres ? secondaires : [])].map(([art, titre, detail, action]) => {
               const sombre = FOND_SOMBRE(art, teinte);
+              /* Le badge se voit, il doit aussi se dire : « PRO » posé sur
+                 la carte n'était pas lu par VoiceOver. */
+              const statut = pro ? '' : art === 'image' ? ', gratuit' : ', réservé à l’abonnement Pro';
               return (
                 <TouchableOpacity
                   key={titre}
                   style={styles.exportCarte}
                   activeOpacity={0.85}
                   accessibilityRole="button"
-                  accessibilityLabel={titre}
+                  accessibilityLabel={`${titre}${statut}`}
                   accessibilityHint={detail}
+                  onLayout={(e) => {
+                    const h = Math.round(e.nativeEvent.layout.height);
+                    if (h > 0 && hauteurs[art] !== h) setHauteurs((x) => ({ ...x, [art]: h }));
+                  }}
                   onPress={action}>
                   <View style={styles.exportCarteFond} pointerEvents="none">
                     <ExportFond
                       kind={art}
                       c={teinte}
                       largeur={largeur}
-                      hauteur={HAUTEUR_CARTE}
+                      hauteur={Math.max(HAUTEUR_CARTE, hauteurs[art] ?? 0)}
                       murs={murs}
                     />
                   </View>
                   <View style={styles.exportCarteTextes} pointerEvents="none">
                     <View style={styles.exportCarteLigne}>
                       <Text
-                        style={[styles.exportCarteTitre, sombre && styles.exportCarteTitreClair]}
-                        numberOfLines={1}>
+                        style={[styles.exportCarteTitre, sombre && styles.exportCarteTitreClair]}>
                         {titre}
                       </Text>
                       {!pro && art !== 'image' && (
@@ -232,9 +275,7 @@ export function ExportSheet({
                         </View>
                       )}
                     </View>
-                    <Text
-                      style={[styles.exportCarteDetail, sombre && styles.exportCarteDetailClair]}
-                      numberOfLines={2}>
+                    <Text style={[styles.exportCarteDetail, sombre && styles.exportCarteDetailClair]}>
                       {detail}
                     </Text>
                   </View>
@@ -253,8 +294,11 @@ export function ExportSheet({
               </TouchableOpacity>
             )}
           </ScrollView>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
+      {/* Une alerte levée la feuille ouverte s'affiche dans sa fenêtre :
+          voir la pile d'hôtes de `src/ui/alerte.ts`. */}
+      <AlerteHote imbrique actif={visible} />
     </Modal>
   );
 }

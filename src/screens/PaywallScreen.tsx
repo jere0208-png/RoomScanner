@@ -61,6 +61,7 @@ import { useScanStore } from '../store/scanStore';
 export const URL_CONDITIONS = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
 import { dark, radius, shadowCard, useTheme, type Palette } from '../theme';
 import { alerte } from '../ui/alerte';
+import { AlerteHote } from '../components/AlerteHote';
 import { panne as expliquer } from '../ui/panne';
 
 /**
@@ -591,6 +592,11 @@ export function PaywallScreen() {
       {/* La saisie du code interne vit DANS la fenêtre de la page Pro : iOS ne
           présente pas une feuille de l'app par-dessus une fenêtre ouverte. */}
       <PromptSheet data={demandeDeCode} onClose={() => setDemandeDeCode(null)} />
+      {/* « Achat impossible », « Aucun achat à restaurer », « Créez d'abord
+          un compte » : levées page ouverte, elles s'affichent DANS sa
+          fenêtre — iOS ne présente pas l'alerte racine par-dessus. Voir la
+          pile d'hôtes de `src/ui/alerte.ts`. */}
+      <AlerteHote imbrique actif={visible} />
     </Modal>
   );
 }
