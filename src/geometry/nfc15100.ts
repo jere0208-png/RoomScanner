@@ -2181,6 +2181,11 @@ export function circuitsDuDifferentiel(d: Differential, circuits: Circuit[]): Ci
  * Sans surface connue, on s'en tient au nombre de circuits (huit au plus
  * derrière chacun). Les circuits se RÉPARTISSENT entre les AC, au lieu de
  * remplir le premier.
+ *
+ * LE TYPE AC RESTE ADMIS — question soulevée par deux revues (« Gérard »,
+ * « Marc ») : l'édition 2024 de la NF C 15-100 l'aurait-elle supprimé ? Le
+ * patron, électricien, l'a confirmé : non, il reste admis pour les circuits
+ * qui n'exigent pas de type A. Ne pas le « corriger » sans nouvel avis.
  */
 export function minimumAC(surface: number | undefined): { nombre: number; calibre: number } {
   if (surface === undefined || !(surface > 0)) return { nombre: 1, calibre: 40 };
