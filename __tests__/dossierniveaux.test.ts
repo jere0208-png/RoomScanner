@@ -78,7 +78,7 @@ describe('un dossier pour toute la maison', () => {
     const garde = src.slice(src.indexOf('stream'), src.indexOf('endstream'));
     // Deux pièces, 42 m² sur les deux niveaux.
     expect(garde).toContain('(2) Tj');
-    expect(garde).toContain('42,0 m²');
+    expect(garde).toContain('42,00 m²');
     expect(garde).toContain('Rez-de-chaussée');
     expect(garde).toContain('1er étage');
   });

@@ -65,8 +65,8 @@ describe('dans la perspective du dossier', () => {
     const perspective = src.split('endstream').find((s) => s.includes('(Perspective) Tj'))!;
     expect(perspective).toContain('(Chambre) Tj');
     expect(perspective).toContain('(Séjour) Tj');
-    expect(perspective).toContain('(12,0 m²) Tj');
+    expect(perspective).toContain('(12,00 m²) Tj');
     // Plus de cartouche « Nom · surface » posé sur le dessin.
-    expect(perspective).not.toMatch(/\((Chambre|Séjour) . 12,0 m²\) Tj/);
+    expect(perspective).not.toMatch(/\((Chambre|Séjour) . 12,00? m²\) Tj/);
   });
 });

@@ -78,6 +78,6 @@ describe('la page de garde', () => {
   });
 
   it('approche la surface au sol quand une pièce reste ouverte', () => {
-    expect(pdf).toContain("['Surface au sol', `${toutFerme ? '' : '≈ '}${fr1(sol)} m²`]");
+    expect(pdf).toContain("['Surface au sol', `${toutFerme ? '' : '≈ '}${frM2(sol)} m²`]");
   });
 });

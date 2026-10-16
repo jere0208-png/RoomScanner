@@ -2724,7 +2724,11 @@ interface ScanState {
    * l'accroche, une seule fois, sur l'angle voulu.
    */
   setWallAngle: (id: string, deg: number) => void;
-  /** `auNu` : la longueur tapée est de nu à nu (un mur dessiné). */
+  /**
+   * Avec `opts` (quelle que soit la valeur d'`auNu`) : la longueur tapée se
+   * lit sur la cote que l'écran affiche (`longueurCotee`) — intérieure, de nu
+   * à nu, quand le plan la donne ainsi. Sans `opts` : la longueur à l'axe.
+   */
   setWallLength: (id: string, length: number, opts?: { auNu?: boolean }) => void;
   renameCurrent: (name: string) => void;
   saveAsCopy: (name: string) => void;
@@ -8503,8 +8507,16 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       const wall = st.walls.find((w) => w.id === id);
       if (!wall || length <= 0) return;
-      // De nu à nu, sur un mur dessiné : l'axe a en plus le demi-mur qui le ferme à chaque bout.
-      if (opts?.auNu && wall.auNu) {
+      /*
+        LA COTE TAPÉE SE LIT SUR LA COTE AFFICHÉE — revue « Nadia » : le
+        champ se pré-remplit de `longueurCotee` (intérieure sur un mur
+        dessiné, ET sur un mur scanné dont la pièce se compte au nu), mais
+        l'écart n'était repris que pour un mur dessiné. Sur un mur scanné,
+        4,93 lu à l'intérieur s'appliquait comme 4,93 à l'axe : sept
+        centimètres de faux. Quel que soit le mur, la différence entre l'axe
+        et la cote affichée s'ajoute à ce qu'on a tapé.
+      */
+      if (opts) {
         const jeu = jeuDuNiveau(st, niveauDe(wall));
         length += segLength(wall) - longueurCotee(jeu.walls, wall, roomParts(jeu.walls, jeu.rooms));
       }
@@ -8558,8 +8570,89 @@ export const useScanStore = create<ScanState>((set, get) => {
         // Un prolongement dans l'alignement n'est pas un mur d'en bout.
         return Math.abs(u.x * v.z - u.z * v.x) > 0.5;
       });
+      /*
+        TOUTE LA LIGNE DU MUR D'EN BOUT SE DÉCALE — revue « Nadia » : sur
+        l'exemple, 4,93 tapé au mur nord du séjour ne poussait que le premier
+        tronçon du refend (de 0 à 3,60) ; le suivant partait en oblique de
+        (4,93 ; 3,60) à (5,00 ; 4,20), la chambre s'élargissait en trapèze et
+        un bout de mur de 7 cm naissait au pied. Un refend coupé aux
+        jonctions reste UN mur : ses tronçons alignés et reliés bout à bout
+        glissent ensemble, et chaque mur accroché à l'un de leurs bouts suit
+        le long de sa propre ligne.
+      */
       if (auBout) {
-        get().moveWall(auBout.id, u.x * delta, u.z * delta, false);
+        const lb = segLength(auBout) || 1;
+        const ub = { x: (auBout.b.x - auBout.a.x) / lb, z: (auBout.b.z - auBout.a.z) / lb };
+        const surLaLigne = (q: Pt) => Math.abs((q.x - auBout.a.x) * ub.z - (q.z - auBout.a.z) * ub.x) < 1e-3;
+        const memeBout = (p: Pt, q: Pt) => Math.hypot(p.x - q.x, p.z - q.z) < 1e-3;
+        // Les tronçons alignés, reliés de proche en proche au mur d'en bout.
+        const ligne = new Map<string, WallSeg>([[auBout.id, auBout]]);
+        for (let grandit = true; grandit; ) {
+          grandit = false;
+          for (const w of st.walls) {
+            if (ligne.has(w.id) || w.type !== 'wall' || niveauDe(w) !== n) continue;
+            if (!surLaLigne(w.a) || !surLaLigne(w.b)) continue;
+            const relie = [...ligne.values()].some(
+              (l) => memeBout(w.a, l.a) || memeBout(w.a, l.b) || memeBout(w.b, l.a) || memeBout(w.b, l.b),
+            );
+            if (!relie) continue;
+            ligne.set(w.id, w);
+            grandit = true;
+          }
+        }
+        if (ligne.size <= 1) {
+          get().moveWall(auBout.id, u.x * delta, u.z * delta, false);
+          return;
+        }
+        const dx = u.x * delta;
+        const dz = u.z * delta;
+        const bouts = [...ligne.values()].flatMap((l) => [l.a, l.b]);
+        const surUnBout = (p: Pt) => bouts.some((q) => memeBout(p, q));
+        const glisse = (p: Pt) => ({ x: p.x + dx, z: p.z + dz });
+        // Le mur accroché glisse le long de SA ligne jusqu'à la nouvelle
+        // ligne du refend (même règle que `moveWall`, revue « Karim »).
+        const versLaLigne = (w: WallSeg, p: Pt): Pt => {
+          const q = memeBout(w.a, p) ? w.b : w.a;
+          const d1 = { x: p.x - q.x, z: p.z - q.z };
+          const den = d1.x * ub.z - d1.z * ub.x;
+          const l1 = Math.hypot(d1.x, d1.z);
+          if (l1 < 1e-9 || Math.abs(den) < 1e-6 * l1) return glisse(p);
+          const o = glisse(auBout.a);
+          const t = ((o.x - q.x) * ub.z - (o.z - q.z) * ub.x) / den;
+          return { x: q.x + d1.x * t, z: q.z + d1.z * t };
+        };
+        // Les pièces de la ligne : un mur d'une autre pièce qui ne fait que
+        // toucher un bout ne suit pas (revue « Sophie », `moveWall`).
+        const pieces = new Set(
+          st.rooms
+            .filter((r) => niveauDe(r) === n && (r.wallIds ?? []).some((x) => ligne.has(x)))
+            .map((r) => r.id),
+        );
+        const desPieces = (wid: string) => st.rooms.filter((r) => niveauDe(r) === n && (r.wallIds ?? []).includes(wid));
+        pushHistory(`setWallLength:${id}`);
+        set({
+          walls: st.walls.map((w) => {
+            if (ligne.has(w.id)) return { ...w, a: glisse(w.a), b: glisse(w.b) };
+            if (niveauDe(w) !== n) return w;
+            const aSuit = surUnBout(w.a);
+            const bSuit = surUnBout(w.b);
+            if (!aSuit && !bSuit) return w;
+            const siennes = desPieces(w.id);
+            if (pieces.size > 0 && siennes.length > 0 && !siennes.some((r) => pieces.has(r.id))) return w;
+            if (aSuit && bSuit) return { ...w, a: glisse(w.a), b: glisse(w.b) };
+            return aSuit ? { ...w, a: versLaLigne(w, w.a) } : { ...w, b: versLaLigne(w, w.b) };
+          }),
+          // Les baies percées dans la ligne voyagent avec elle.
+          openings: st.openings.map((o) => {
+            if (niveauDe(o) !== n) return o;
+            const lo = segLength(o) || 1;
+            const parallele = Math.abs(((o.b.x - o.a.x) * ub.z - (o.b.z - o.a.z) * ub.x) / lo) < 0.05;
+            const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+            const dedans = [...ligne.values()].some((l) => pointOnSeg(mid, l.a, l.b).dist < 0.4);
+            return parallele && dedans ? { ...o, a: glisse(o.a), b: glisse(o.b) } : o;
+          }),
+          dirty: true,
+        });
         return;
       }
       pushHistory(`setWallLength:${id}`);

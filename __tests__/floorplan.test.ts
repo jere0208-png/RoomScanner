@@ -1712,7 +1712,7 @@ describe('buildScanPdf', () => {
 
   it('porte la surface au sol, et la retire quand on la décoche', () => {
     expect(latin1String(buildScanPdf(scan, false))).toContain('surface au sol');
-    expect(latin1String(buildScanPdf(scan, false))).toContain('12,0 m');
+    expect(latin1String(buildScanPdf(scan, false))).toContain('12,00 m');
     const sans = latin1String(
       buildScanPdf(scan, false, { surfaces: false, metre: false }),
     );
@@ -1775,8 +1775,8 @@ describe('buildScanPdf', () => {
     expect(s).toContain('Salon');
     expect(s).toContain('Chambre');
     // Deux surfaces distinctes, pas une seule agrégée.
-    expect(s).toContain('12,0 m');
-    expect(s).toContain('9,0 m');
+    expect(s).toContain('12,00 m');
+    expect(s).toContain('9,00 m');
   });
 });
 

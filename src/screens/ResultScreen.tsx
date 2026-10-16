@@ -3334,12 +3334,24 @@ export function ResultScreen() {
     if (!w) return;
     // Un mur dessiné se cote de nu à nu, comme au mètre.
     const auNu = !!w.auNu;
+    /*
+      LE CHAMP DIT SUR QUOI IL SE LIT — revue « Nadia » : la valeur
+      proposée est la cote du plan, intérieure ou à l'axe selon le mur, et
+      ce qu'on tape se lit sur la même (`setWallLength`). Intérieure sur un
+      mur dessiné, sur un mur dont une pièce se compte au nu (la cote est
+      le côté de ce contour), et sur un trait relevé d'un seul côté (le
+      trait est la face) ; à l'axe sinon.
+    */
+    const cote = longueurCotee(walls, w, parts);
+    const traitSurLaFace = w.type === 'wall' && !w.auNu && !w.deuxFaces;
+    const auNuDUnePiece = parts.some((p) => !!p.surface?.nu && p.walls.some((x) => x.id === w.id));
+    const interieure = auNu || traitSurLaFace || auNuDUnePiece;
     setPrompt({
       title: 'Longueur du mur',
-      subtitle: auNu
-        ? 'De nu à nu. Le bout de gauche (ou du haut) reste ; le mur d’en bout se décale, d’équerre.'
-        : 'Le bout de gauche (ou du haut) reste ; le mur d’en bout se décale, d’équerre.',
-      value: longueurCotee(walls, w, parts).toFixed(2).replace('.', ','),
+      subtitle: interieure
+        ? 'Cote intérieure, de nu à nu. Le bout de gauche (ou du haut) reste ; le mur d’en bout se décale, d’équerre.'
+        : 'Cote à l’axe du mur. Le bout de gauche (ou du haut) reste ; le mur d’en bout se décale, d’équerre.',
+      value: cote.toFixed(2).replace('.', ','),
       unit: 'm',
       numeric: true,
       verifier: verifierMetres('Longueur', BORNES_MUR),
@@ -3675,7 +3687,11 @@ export function ResultScreen() {
           },
         ]
       : []),
-    { value: fr(perimeter), label: 'm périmètre' },
+    // LE TOUR DES PIÈCES, pas le contour du logement — revue « Nadia » :
+    // « périmètre » annonçait 59,6 m, chaque cloison comptée une fois par
+    // pièce qu'elle borde. C'est le métré des plinthes et des murs à
+    // peindre : il se nomme pour ce qu'il est.
+    { value: fr(perimeter), label: 'm tour des pièces' },
     ...(objects.length > 0
       ? [{ value: `${objects.length}`, label: 'meubles' }]
       : []),

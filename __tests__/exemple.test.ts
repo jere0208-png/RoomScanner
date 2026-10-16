@@ -36,12 +36,14 @@ describe('l’appartement d’exemple', () => {
     expect(NOM_EXEMPLE).toBe('Appartement exemple');
   });
 
-  it('a ses cinq pièces, nommées, et ses 48 m²', () => {
+  // 48 m² d'enveloppe, 45,82 au nu des refends (revue « Nadia ») : c'est
+  // l'intérieur que l'exemple annonce.
+  it('a ses cinq pièces, nommées, et ses 45,8 m² au nu', () => {
     expect(ex.rooms.map((r) => r.name).sort()).toEqual(
       ['Bureau', 'Chambre', 'Entrée', 'Salle d’eau', 'Séjour'].sort(),
     );
     expect(parts.every((p) => p.surface?.exact)).toBe(true);
-    expect(Math.round(totalArea(parts)!.area)).toBe(48);
+    expect(totalArea(parts)!.area).toBeCloseTo(45.82, 2);
   });
 
   it('chaque meuble est dans une pièce, et aucun ne mord dans un mur', () => {

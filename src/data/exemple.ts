@@ -58,15 +58,29 @@ const mur = (id: string, ax: number, az: number, bx: number, bz: number): WallSe
          │  Bureau  │  Entrée   │            │
    6     └──────────┴───────────┴────────────┘
 */
+/*
+  LES REFENDS SONT À LEUR AXE, ET LE PLAN LE SAIT — revue « Nadia »,
+  métreuse : sans marque, un refend se comptait à son trait des deux côtés,
+  et l'exemple annonçait 48,00 m² « habitables », l'enveloppe 8 × 6, pour un
+  intérieur de 45,8 (le bureau 4,68 pour 4,38, l'entrée 4,32 pour 3,91). Ses
+  cloisons sont tracées à l'axe — les meubles s'y posent à « l'axe moins une
+  demi-épaisseur » (`NU`) : elles sont marquées comme un refend relevé de ses
+  deux faces (`deuxFaces`), et chaque pièce se compte à son nu. Les façades,
+  elles, restent un trait qui est leur face intérieure.
+*/
+const refend = (id: string, ax: number, az: number, bx: number, bz: number): WallSeg => ({
+  ...mur(id, ax, az, bx, bz),
+  deuxFaces: true,
+});
 const BRUTS: WallSeg[] = [
   mur('nord', 0, 0, 8, 0),
   mur('est', 8, 0, 8, 6),
   mur('sud', 8, 6, 0, 6),
   mur('ouest', 0, 6, 0, 0),
-  mur('refend', 5, 0, 5, 6),
-  mur('sejour-sud', 0, 4.2, 5, 4.2),
-  mur('bureau-est', 2.6, 4.2, 2.6, 6),
-  mur('chambre-sud', 5, 3.6, 8, 3.6),
+  refend('refend', 5, 0, 5, 6),
+  refend('sejour-sud', 0, 4.2, 5, 4.2),
+  refend('bureau-est', 2.6, 4.2, 2.6, 6),
+  refend('chambre-sud', 5, 3.6, 8, 3.6),
 ];
 
 const WALLS = mergeColinear(splitAtJunctions(weldCorners(BRUTS)));

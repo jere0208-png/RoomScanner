@@ -86,7 +86,7 @@ describe('la page de garde', () => {
     expect(garde).toContain('8 rue Pasteur, Lyon');
     // Deux pièces, 36 m² au sol.
     expect(garde).toContain('(2) Tj');
-    expect(garde).toContain('36,0 m²');
+    expect(garde).toContain('36,00 m²');
     // Le sommaire, avec le numéro de chaque feuille.
     expect(garde).toContain('Contenu du dossier');
     expect(garde).toContain('(Plan coté) Tj');

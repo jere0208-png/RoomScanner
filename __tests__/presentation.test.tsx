@@ -357,7 +357,8 @@ describe('l’écran du scan, refondu', () => {
     const vu = textes(monter('scan'));
     // Les libellés sont mis en capitales par le style, pas par le texte.
     expect(vu).toContain('m² sol');
-    expect(vu).toContain('m périmètre');
+    // « tour des pièces » : la somme des contours, pas le périmètre du logement (revue « Nadia »).
+    expect(vu).toContain('m tour des pièces');
   });
 
   it('et n’offre plus de les masquer', () => {

@@ -2257,6 +2257,14 @@ function makePart(roomId: string, items: WallSeg[]): RoomPart {
       ET LE REFEND VU D'UN SEUL CÔTÉ (D7) : sa face vue est le trait, la
       pièce de ce côté s'y compte ; celle d'en face se compte à l'autre
       face, une épaisseur plus loin — comme le plan le dessine.
+
+      LE REFEND DONT LE CÔTÉ N'EST PAS ÉTABLI RESTE À SON TRAIT — revue
+      « Nadia » : retirer une demi-épaisseur de chaque côté a été essayé.
+      C'est revenir sur la décision « un plan scanné se compte au trait
+      tant que le mètre n'a pas dit axe ou face » (README), et toutes les
+      cotes exactes d'un relevé sans bruit (5,00 d'un séjour mesuré face à
+      face) devenaient fausses de 7 cm. Un plan dont on SAIT les refends à
+      l'axe le dit par `deuxFaces` — l'appartement d'exemple le fait.
     */
     const pts = surface.pts;
     const nu = contourAuNu(pts, items, (mur) => {

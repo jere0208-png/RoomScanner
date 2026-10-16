@@ -141,11 +141,15 @@ export function lireCote(texte: string): { valeur: number; unite: 'm' | 'cm' | '
     .replace(/\s+/g, ' ')
     .replace(/[≈~]/g, '')
     .trim();
-  // « 3m20 », « 3 m 20 » : des mètres, puis des centimètres.
-  const mEtCm = /^(\d+)\s*m\s*(\d{1,2})$/.exec(t);
+  /*
+    « 3m20 », « 3 m 20 » : des mètres, puis leur fraction. Et « 3m405 » —
+    revue « Nadia » : le laser donne le millimètre, et la cote recopiée
+    telle quelle était refusée. Ce qui suit le « m » se lit comme des
+    décimales : « 3m2 » 3,20, « 3m05 » 3,05, « 3m405 » 3,405.
+  */
+  const mEtCm = /^(\d+)\s*m\s*(\d{1,3})$/.exec(t);
   if (mEtCm) {
-    const cm = mEtCm[2].length === 1 ? Number(mEtCm[2]) * 10 : Number(mEtCm[2]);
-    return { valeur: Number(mEtCm[1]) + cm / 100, unite: 'm', decimal: true };
+    return { valeur: Number(`${mEtCm[1]}.${mEtCm[2]}`), unite: 'm', decimal: true };
   }
   const m = /^(\d+(?:[.,]\d+)?)\s*(mm|cm|m)?\.?$/.exec(t.replace(/(\d) (\d{3})\b/, '$1$2'));
   if (!m) return null;

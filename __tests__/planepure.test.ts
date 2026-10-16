@@ -33,7 +33,7 @@ import {
   SNAPSHOT_ROOMS,
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
-import { segLength, type WallSeg } from '../src/geometry/floorplan';
+import { etendueDeLaPiece, longueurCotee, roomParts, segLength, type WallSeg } from '../src/geometry/floorplan';
 import type { Fixture, FixtureKind } from '../src/geometry/electrical';
 
 // ------------------------------------------------------------------ lecture
@@ -424,13 +424,22 @@ describe('chaque mot se lit sur du blanc', () => {
 });
 
 describe('rien ne s’achète en effaçant', () => {
-  it('chaque mur garde sa cote', () => {
+  /*
+    Au nu depuis que les refends de l'exemple sont marqués à leur axe (revue
+    « Nadia ») : les cloisons se cotent par la chaîne au nu de chaque pièce,
+    plus mur par mur à l'axe. Ce qui ne doit pas se perdre : la largeur et
+    la profondeur intérieures de chaque pièce, et chaque façade.
+  */
+  it('chaque pièce garde ses cotes intérieures, chaque façade la sienne', () => {
     const vus = ecrits(exemple());
-    const voulus = (ex.walls as WallSeg[]).map((w) => `${frLen(segLength(w))} m`);
-    // Chaque longueur autant de fois qu'il y a de murs qui la portent.
-    const compte = (l: string[]) => l.reduce((m, t) => m.set(t, (m.get(t) ?? 0) + 1), new Map<string, number>());
-    const manque = [...compte(voulus)].filter(([t, n]) => (compte(vus).get(t) ?? 0) < n);
-    expect(manque).toEqual([]);
+    const parts = roomParts(ex.walls as WallSeg[], ex.rooms as never);
+    for (const p of parts) {
+      const e = etendueDeLaPiece(p.surface!);
+      expect(vus).toContain(`${frLen(e.width)} m`);
+      expect(vus).toContain(`${frLen(e.depth)} m`);
+    }
+    const facades = (ex.walls as WallSeg[]).filter((w) => !w.deuxFaces);
+    for (const w of facades) expect(vus).toContain(`${frLen(longueurCotee(ex.walls as WallSeg[], w, parts))} m`);
   });
 
   it('chaque baie garde sa largeur', () => {

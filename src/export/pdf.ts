@@ -1436,7 +1436,7 @@ function draw3DView(
       return {
         monde: { x: room.labelAt.x, y: 0, z: room.labelAt.z },
         nom: opts.roomNames?.[room.roomId] ?? '',
-        aire: `${room.surface!.exact ? '' : '≈ '}${fr1(room.surface!.area)} m²`,
+        aire: `${room.surface!.exact ? '' : '≈ '}${frM2(room.surface!.area)} m²`,
         gauche: x * ct - z * st < 0,
       };
     });
@@ -1665,12 +1665,48 @@ function draw3DView(
 // -------------------------------------------------------------- pages
 
 const fr1 = (v: number) => v.toFixed(1).replace('.', ',');
+
+/** Les abréviations d'usage sur un plan de logement. */
+const ABREVIATIONS: [RegExp, string][] = [
+  [/^s[ée]jour/i, 'Séj.'],
+  [/^salle de bains?/i, 'SdB'],
+  [/^salle d.eau/i, 'SdE'],
+  [/^chambre/i, 'Ch.'],
+  [/^cuisine/i, 'Cuis.'],
+  [/^entr[ée]e/i, 'Entr.'],
+  [/^d[ée]gagement/i, 'Dgt'],
+  [/^bureau/i, 'Bur.'],
+  [/^buanderie/i, 'Buand.'],
+  [/^dressing/i, 'Dress.'],
+];
+
+/**
+ * LE NOM D'UNE PIÈCE, ABRÉGÉ — pour le cartouche qui manque de place
+ * (revue « Nadia ») : « Chambre 2 » → « Ch. 2 », « Séjour – cuisine » →
+ * « Séj. – cuisine » ; un mot inconnu de plus de six lettres garde ses
+ * quatre premières et un point.
+ */
+export function nomAbrege(nom: string): string {
+  for (const [motif, court] of ABREVIATIONS) {
+    const m = motif.exec(nom);
+    if (m) return `${court}${nom.slice(m[0].length)}`.replace(/\s+/g, ' ').trim();
+  }
+  return nom.replace(/[A-Za-zÀ-ÖØ-öø-ÿŒœ’']{7,}/g, (mot) => `${mot.slice(0, 4)}.`);
+}
 /**
  * DEUX DÉCIMALES AU MÉTRÉ — revue « Sébastien » : 22,9 au PDF, 22,95 à
- * l'écran de la fiche et au tableur. Le plan garde une décimale (c'est un
- * dessin) ; le tableau des surfaces, qui se recopie, en porte deux.
+ * l'écran de la fiche et au tableur.
+ *
+ * ET PARTOUT DANS LE DOSSIER — revue « Nadia », métreuse : le plan écrivait
+ * 0,1 m², le métré 0,01, la page de garde 0,1 ; trois chiffres pour une
+ * même pièce, et des totaux qui ne tombaient pas juste. Toute surface
+ * s'écrit maintenant à deux décimales (`frM2`), et un total est la somme
+ * des valeurs ÉCRITES (`sommeEcrite`) : on le refait à la calculette.
  */
 const fr2 = (v: number) => v.toFixed(2).replace('.', ',');
+const arrondiM2 = (v: number) => Math.round(v * 100) / 100;
+const frM2 = (v: number) => fr2(arrondiM2(v));
+const sommeEcrite = (valeurs: number[]) => arrondiM2(valeurs.reduce((t, v) => t + arrondiM2(v), 0));
 const frLen = (v: number) => v.toFixed(2).replace('.', ',');
 
 /** Ce qui est commun à toutes les feuilles d'un même export. */
@@ -2878,9 +2914,12 @@ function planPage(
      *
      * DEUX LIBERTÉS, ET DANS CET ORDRE. Il se décale d'abord — en hauteur,
      * puis de côté, sans quitter sa pièce. Et s'il ne trouve toujours rien,
-     * IL ABANDONNE SA SURFACE : le nom seul tient dans dix-huit points de
-     * haut là où l'ensemble en demande trente. Le nom est ce qu'on cherche
-     * en premier sur un plan, la surface se relit au métré.
+     * il se fait plus petit : le nom ABRÉGÉ, la surface en dessous.
+     *
+     * JAMAIS SANS SA SURFACE — revue « Nadia », métreuse : le repli était le
+     * nom seul, et le séjour et l'entrée de l'exemple sortaient sans leurs
+     * m². Un plan de logement sans surface oblige à chercher la feuille du
+     * métré pour chaque pièce ; un nom abrégé (« Séj. ») se lit toujours.
      */
     const cartouchesPose = new Map<
       string,
@@ -2939,7 +2978,7 @@ function planPage(
         if (!part.surface) continue;
         const cp = px(part.labelAt);
         const label = roomNames[part.roomId] ?? '';
-        const area = `${part.surface.exact ? '' : '≈ '}${fr1(part.surface.area)} m²`;
+        const area = `${part.surface.exact ? '' : '≈ '}${frM2(part.surface.area)} m²`;
         /**
          * L'emprise du cartouche, avec ou sans sa ligne de surface — À LA
          * LARGEUR DE CE QUI S'ÉCRIT. Sans nom, la pièce dit « 21,0 m² » en
@@ -2948,6 +2987,12 @@ function planPage(
          * barrer « surface au sol » à l'endroit même que la réserve disait
          * libre. On mesure maintenant chaque ligne dessinée.
          */
+        /*
+          `avecAire` : le cartouche complet. Sans lui, le cartouche COMPACT —
+          le nom abrégé et la surface, plus petits ; sans nom, la surface
+          sans « surface au sol ». La surface ne cède jamais.
+        */
+        const abrege = nomAbrege(label);
         const emprise = (avecAire: boolean, cx: number, cy: number) => {
           const lignes: [string, number][] = label
             ? avecAire
@@ -2955,7 +3000,10 @@ function planPage(
                   [label, gros * 1.05],
                   [area, petit],
                 ]
-              : [[label, gros * 1.05]]
+              : [
+                  [abrege, petit * 1.05],
+                  [area, petit],
+                ]
             : avecAire
               ? [
                   [area, (parts.length === 1 ? 12 : 9) * 1.05],
@@ -2964,10 +3012,10 @@ function planPage(
               : [[area, (parts.length === 1 ? 12 : 9) * 1.05]];
           const larg =
             Math.max(...lignes.map(([t, z]) => latin1(t).length * z)) * 0.52 + 8;
-          const haut = avecAire ? (label ? 23 : 25) : 14;
+          const haut = label ? (avecAire ? 23 : 19) : avecAire ? 25 : 14;
           return {
             x: cx - larg / 2,
-            y: cy - (avecAire ? (label ? 11.5 : 12.5) : 7),
+            y: cy - (label ? (avecAire ? 11.5 : 9.5) : avecAire ? 12.5 : 7),
             w: larg,
             h: haut,
             cx,
@@ -2976,8 +3024,9 @@ function planPage(
           };
         };
         /*
-          CE QUI SE CÈDE : la surface quand il y a un nom ; et sans nom, la
-          ligne « surface au sol » — la surface reste, c'est l'information.
+          CE QUI SE CÈDE : la place du nom entier quand il y a un nom (il
+          s'abrège, la surface reste) ; et sans nom, la ligne « surface au
+          sol » — la surface reste, c'est l'information.
           Dans une entrée d'un mètre quatre-vingts, le cartouche complet ne
           trouvait de place que sur l'arc de la porte, et son fond blanc
           masquait ensuite la cote de la cloison.
@@ -2991,7 +3040,8 @@ function planPage(
           pièce la plus chargée du plan — celle qui n'a justement pas de
           place — écopait de la plus grosse boîte. « 9,0 m² » s'écrivait
           alors par-dessus le sigle d'un spot. Le repli, c'est la dernière
-          variante, pas la première : le nom seul.
+          variante, pas la première : le cartouche compact, nom abrégé et
+          surface.
         */
         let choisi = emprise(variantes[variantes.length - 1], cp.x, cp.y);
         let gene = true;
@@ -4098,7 +4148,7 @@ function planPage(
       for (const part of parts) {
         if (!part.surface) continue;
         const label = roomNames[part.roomId] ?? '';
-        const area = `${part.surface.exact ? '' : '≈ '}${fr1(part.surface.area)} m²`;
+        const area = `${part.surface.exact ? '' : '≈ '}${frM2(part.surface.area)} m²`;
         /*
           LE CARTOUCHE POSE SON PROPRE FOND.
 
@@ -4135,8 +4185,10 @@ function planPage(
           d.text(label, pose.cx, pose.cy + 2.2, gros, INK, { bold: true });
           d.text(area, pose.cx, pose.cy - 7.2, big ? 8.5 : 7, GREY);
         } else if (label) {
-          // La surface a cédé la place : il ne reste que le nom, centré.
-          d.text(label, pose.cx, pose.cy - 0.36 * gros, gros, INK, { bold: true });
+          // Le cartouche compact : le nom abrégé, la surface toujours.
+          const petit = big ? 8.5 : 7;
+          d.text(nomAbrege(label), pose.cx, pose.cy + 1.6, petit * 1.05, INK, { bold: true });
+          d.text(area, pose.cx, pose.cy - 6.4, petit, GREY);
         } else if (pose.avecAire) {
           d.text(area, pose.cx, pose.cy + 3, big ? 12 : 9, INK, { bold: true });
           d.text('surface au sol', pose.cx, pose.cy - 8, 6.5, GREY);
@@ -4268,13 +4320,12 @@ function planPage(
     pi\u00e8ce n'est pas relev\u00e9e en boucle ferm\u00e9e, comme partout ailleurs.
   */
   const surfaces = parts.filter((p) => p.surface);
-  const totalM2 = surfaces.reduce((t, p) => t + (p.surface?.area ?? 0), 0);
+  // La somme des surfaces que le plan écrit, pièce par pièce (revue « Nadia »).
+  const totalM2 = sommeEcrite(surfaces.map((p) => p.surface?.area ?? 0));
   const exact = surfaces.every((p) => p.surface?.exact);
   const mentionSurface =
     totalM2 > 0
-      ? ` \u00b7 Surface ${estDessine(walls) ? 'au nu' : 'relev\u00e9e'} : ${exact ? '' : '\u2248 '}${totalM2
-          .toFixed(1)
-          .replace('.', ',')} m\u00b2`
+      ? ` \u00b7 Surface ${estDessine(walls) ? 'au nu' : 'relev\u00e9e'} : ${exact ? '' : '\u2248 '}${frM2(totalM2)} m\u00b2`
       : '';
   const sous =
     (extra?.sub ??
@@ -4488,8 +4539,9 @@ function metrePage(
     const nets = tourInterieur
       ? mursNetsDe(tourInterieur, h, baiesDeLaPiece(part, ctx.openings), part.walls)
       : wallAreaM2(part.walls, ctx.openings);
-    totalArea2 += part.surface?.area ?? 0;
-    totalWalls += nets;
+    // Le total additionne ce que la ligne ÉCRIT (revue « Nadia »).
+    totalArea2 = sommeEcrite([totalArea2, part.surface?.area ?? 0]);
+    totalWalls = sommeEcrite([totalWalls, nets]);
     totalPoints += eclairage.get(part.roomId)?.points ?? 0;
     if (!dessinee) return;
     const lum = eclairage.get(part.roomId);
@@ -4503,10 +4555,10 @@ function metrePage(
       part.surface && Math.abs(ext.width * ext.depth - part.surface.area) <= 0.03 * Math.max(part.surface.area, 0.01)
         ? `${frLen(ext.width)} × ${frLen(ext.depth)}`
         : 'forme libre',
-      part.surface ? `${part.surface.exact ? '' : '≈ '}${fr2(part.surface.area)}` : '—',
+      part.surface ? `${part.surface.exact ? '' : '≈ '}${frM2(part.surface.area)}` : '—',
       fr2(perim),
       frLen(h),
-      fr2(nets),
+      frM2(nets),
       ...(avecEclairage
         ? [
             lum && lum.points > 0
@@ -4556,8 +4608,8 @@ function metrePage(
   y -= 26;
   d.line(x0, y + 12, x0 + w, y + 12, 0.8, INK);
   d.text('Total', cols[0], y, 10, INK, { align: 'left', bold: true });
-  d.text(fr2(totalArea2), cols[2], y, 10, INK, { align: 'left', bold: true });
-  d.text(fr2(totalWalls), cols[5], y, 10, INK, { align: 'left', bold: true });
+  d.text(frM2(totalArea2), cols[2], y, 10, INK, { align: 'left', bold: true });
+  d.text(frM2(totalWalls), cols[5], y, 10, INK, { align: 'left', bold: true });
   if (avecEclairage && totalPoints > 0) {
     d.text(
       `${totalPoints} point${totalPoints > 1 ? 's' : ''}`,
@@ -4584,7 +4636,7 @@ function metrePage(
   );
   if (hab.pieces.length > 0) {
     y -= 22;
-    d.text(`Surface habitable estimée : ${fr2(hab.total)} m²`, x0, y, 10, INK, { align: 'left', bold: true });
+    d.text(`Surface habitable estimée : ${frM2(hab.total)} m²`, x0, y, 10, INK, { align: 'left', bold: true });
     const exclues = hab.pieces.filter((p) => p.raison).length;
     y -= 13;
     d.text(
@@ -4764,7 +4816,8 @@ function achatsPage(
   for (const p of pieces) {
     if (y < FRAME.y + 90) break;
     y -= 19;
-    const cells = [p.nom, nombre(p.sol), nombre(p.murs), nombre(p.plafond), nombre(p.plinthes), String(p.portes + p.fenetres)];
+    // Les surfaces à deux décimales, comme au métré (revue « Nadia »).
+    const cells = [p.nom, frM2(p.sol), frM2(p.murs), frM2(p.plafond), nombre(p.plinthes), String(p.portes + p.fenetres)];
     for (let i = 0; i < cells.length; i++) {
       d.text(i === 0 ? fitText(cells[i], 10, pc[1] - pc[0] - 6) : cells[i], pc[i], y, i === 0 ? 10 : 9.5, i === 0 ? INK : '#2A3340', {
         align: 'left',
@@ -6870,7 +6923,7 @@ export function buildMaterialPdf(
       côté du nom du client, sur le document qu'il lit avant les chiffres.
       Il se tait aussi, et la surface reste : c'est elle qu'on vient lire.
     */
-    const surface = `${room.area.toFixed(1).replace('.', ',')} m²`;
+    const surface = `${frM2(room.area)} m²`;
     const usageParlant =
       !!room.use && room.use !== room.room && room.use !== USE_LABEL.autre;
     d.text(
@@ -7598,7 +7651,8 @@ function gardePage(
     const parts = roomParts(c.walls, c.rooms);
     nPieces += parts.length;
     toutFerme = toutFerme && parts.every((p) => !!p.surface?.exact);
-    sol += parts.reduce((t, p) => t + (p.surface?.area ?? 0), 0);
+    // La somme des surfaces écrites au métré, à deux décimales (revue « Nadia »).
+    sol = sommeEcrite([sol, ...parts.map((p) => p.surface?.area ?? 0)]);
     const hab = surfacesHabitables(
       (c.rooms ?? []).map((r) => ({
         id: r.id,
@@ -7608,7 +7662,7 @@ function gardePage(
       parts,
       c.objects,
     );
-    habitable += hab.total;
+    habitable = sommeEcrite([habitable, hab.total]);
     avecHabitable = avecHabitable || hab.pieces.length > 0;
     aVerifier += hab.aVerifier;
   }
@@ -7616,14 +7670,14 @@ function gardePage(
     ['Pièces', String(nPieces)],
     // Une pièce restée ouverte : la surface est approchée, et elle le dit
     // (revue « Malik » : « 129,4 m² » sous une mezzanine ouverte).
-    ['Surface au sol', `${toutFerme ? '' : '≈ '}${fr1(sol)} m²`],
+    ['Surface au sol', `${toutFerme ? '' : '≈ '}${frM2(sol)} m²`],
     // Seulement quand elle dit AUTRE CHOSE que la surface au sol : deux
     // cases au même chiffre se lisaient comme une erreur (revues du dossier).
     // « À vérifier » dans l'intitulé : dans le chiffre, il débordait de sa
     // case (revues « Léon » et « Malik »).
     ...(avecHabitable && (Math.abs(habitable - sol) >= 0.05 || aVerifier > 0)
       ? ([
-          [aVerifier > 0 ? 'Habitable estimée · à vérifier' : 'Habitable estimée', `≈ ${fr1(habitable)} m²`],
+          [aVerifier > 0 ? 'Habitable estimée · à vérifier' : 'Habitable estimée', `≈ ${frM2(habitable)} m²`],
         ] as [string, string][])
       : []),
   ];

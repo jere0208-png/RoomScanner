@@ -306,7 +306,7 @@ describe('le cartouche de pièce', () => {
     const src = doc({});
     // « Séjour » est aussi le nom du projet, écrit dans le cartouche de la
     // feuille : c'est l'occurrence SUIVIE de la surface qui nous intéresse.
-    const i = src.indexOf('(20,0 m²) Tj');
+    const i = src.indexOf('(20,00 m²) Tj');
     expect(i).toBeGreaterThan(0);
     // Le fond est posé avant le nom et la surface : blanc, et rempli.
     const avant = src.slice(Math.max(0, i - 1500), i);

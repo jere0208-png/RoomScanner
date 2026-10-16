@@ -9,8 +9,9 @@
  * location) qu'on écrit dans une annonce.
  *
  * Pièce par pièce, ce qui ne compte pas :
- *   — ce qui n'est pas un logement : garage, cave, cellier, local
- *     technique, balcon, terrasse, loggia, véranda, combles non aménagés ;
+ *   — ce qui n'est pas un logement : garage, cave, cellier extérieur,
+ *     local technique, balcon, terrasse, loggia, véranda, combles non
+ *     aménagés (un cellier DANS le logement compte) ;
  *   — sous 1,80 m de hauteur : la part d'un rampant relevée au LiDAR, ou la
  *     pièce entière quand ses murs sont plus bas.
  *
@@ -80,9 +81,17 @@ function aireCommune(rect: PtSol[], contour: PtSol[]): number {
 /** Sous cette part de plafond vu, la part debout d'un rampant est à vérifier. */
 const COUVERTURE_SURE = 0.8;
 
-/** Ce qui ne compte pas, d'après le nom qu'on a donné à la pièce. */
+/**
+ * Ce qui ne compte pas, d'après le nom qu'on a donné à la pièce.
+ *
+ * LE CELLIER INTÉRIEUR COMPTE, CELUI DU DEHORS NON — revue « Nadia » : l'en-
+ * tête le disait exclu, le code le comptait. C'est le code qui a raison
+ * (revues « Gérard » et « Bérénice » : dans le logement, il est de la
+ * surface habitable) ; l'en-tête est corrigé, et le cellier extérieur, une
+ * dépendance, sort comme la buanderie extérieure.
+ */
 const HORS_LOGEMENT =
-  /garage|cave|local|chaufferie|buanderie ext|balcon|terrasse|loggia|v[ée]randa|jardin d.hiver|remise|sous-sol|combles?|grenier|abri|atelier ext/i;
+  /garage|cave|cellier ext|local|chaufferie|buanderie ext|balcon|terrasse|loggia|v[ée]randa|jardin d.hiver|remise|sous-sol|combles?|grenier|abri|atelier ext/i;
 /*
   MAIS UNE PIÈCE HABITÉE LE RESTE — revue « Sébastien » : « Chambre sous
   combles », « Combles aménagés », « Grenier aménagé », « Bureau (ancien
