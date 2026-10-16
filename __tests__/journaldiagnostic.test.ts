@@ -77,12 +77,35 @@ describe('le singleton', () => {
     expect(envoi[0].t).toBe(112_000);
   });
 
-  it('reste borne a une minute dans le tampon', () => {
+  it('reste borne a sa fenetre dans le tampon', () => {
     jest.setSystemTime(0);
     noter('a');
-    jest.setSystemTime(61_000);
+    jest.setSystemTime(FENETRE_JOURNAL_MS + 1_000);
     noter('b');
-    // L'evenement d'il y a soixante-et-une secondes est tombe a l'ajout.
+    // L'evenement plus vieux que la fenetre est tombe a l'ajout.
     expect(tamponBrut().map((e) => e.type)).toEqual(['b']);
+  });
+});
+
+/*
+  LA FENÊTRE FINIT À L'APPUI — premiers diagnostics du patron : « Évènements
+  app : 0 », parce que la fenêtre était comptée depuis « Envoyer », après le
+  temps de taper le message.
+*/
+describe('la fenêtre des dix secondes finit à l’appui, pas à l’envoi', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('un changement fait juste avant l’appui part, même envoyé 40 s plus tard', () => {
+    viderJournal();
+    const t0 = 1_800_000_000_000;
+    jest.setSystemTime(t0);
+    noter('plan', { rooms: 5 });
+    jest.setSystemTime(t0 + 2_000);
+    noter('astuce', { texte: 'après l’appui' });
+    // L'envoi part 40 s après l'appui (t0 + 1 s).
+    jest.setSystemTime(t0 + 41_000);
+    expect(evenementsAEnvoyer()).toEqual([]);
+    expect(evenementsAEnvoyer(t0 + 1_000).map((e) => e.type)).toEqual(['plan']);
   });
 });

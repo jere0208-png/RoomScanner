@@ -33,6 +33,7 @@ import {
   construireFormData,
   construireJournal,
   envoyerDiagnostic,
+  instantDeLAppui,
 } from '../src/diagnostic/envoi';
 import { useAccountStore } from '../src/store/accountStore';
 import { useAlerte } from '../src/ui/alerte';
@@ -155,5 +156,18 @@ describe('envoyerDiagnostic', () => {
     const a = useAlerte.getState().courante;
     expect(a?.titre).toBe('Envoi impossible');
     expect(a?.actions?.some((x) => x.label === 'Partager le fichier')).toBe(true);
+  });
+});
+
+describe('l’instant de l’appui', () => {
+  it('celui du natif d’abord', () => {
+    expect(instantDeLAppui({ instant: 1234, gestes: [] })).toBe(1234);
+  });
+  it('sinon le dernier toucher du bouton rouge', () => {
+    const gestes = [
+      { phase: 'fin' as const, x: 1, y: 1, at: 100, cible: 'Marcher et regarder' },
+      { phase: 'debut' as const, x: 1, y: 1, at: 200, cible: 'Diagnostic : envoyer au développeur' },
+    ];
+    expect(instantDeLAppui({ gestes })).toBe(200);
   });
 });

@@ -76,6 +76,9 @@ final class RoomScanDiagnostic: RCTEventEmitter {
   private struct Fige {
     let video: String?
     let gestes: [[String: Any]]
+    /// L'instant de l'appui, en ms depuis 1970 : le JavaScript y arrête la
+    /// fenêtre de ses évènements (on tape le message APRÈS l'appui).
+    let at: Double
   }
 
   override init() {
@@ -113,7 +116,7 @@ final class RoomScanDiagnostic: RCTEventEmitter {
   @objc func figer(_ resolve: @escaping RCTPromiseResolveBlock,
                    reject: @escaping RCTPromiseRejectBlock) {
     figerInterne { f in
-      resolve(["video": f.video.map { $0 as Any } ?? NSNull(), "gestes": f.gestes])
+      resolve(["video": f.video.map { $0 as Any } ?? NSNull(), "gestes": f.gestes, "instant": f.at])
     }
   }
 
@@ -308,19 +311,20 @@ final class RoomScanDiagnostic: RCTEventEmitter {
 
   private func figerInterne(_ completion: @escaping (Fige) -> Void) {
     let gestes = gestesRecents()
+    let at = Date().timeIntervalSince1970 * 1000
     guard capture else {
-      completion(Fige(video: nil, gestes: gestes))
+      completion(Fige(video: nil, gestes: gestes, at: at))
       return
     }
     fileVideo.async {
       self.terminerSegmentCourant {
         let liste = self.segments
         guard !liste.isEmpty else {
-          completion(Fige(video: nil, gestes: gestes))
+          completion(Fige(video: nil, gestes: gestes, at: at))
           return
         }
         self.assembler(liste) { url in
-          completion(Fige(video: url?.path, gestes: gestes))
+          completion(Fige(video: url?.path, gestes: gestes, at: at))
         }
       }
     }
@@ -484,6 +488,7 @@ final class RoomScanDiagnostic: RCTEventEmitter {
         "message": message,
         "video": fige.video.map { $0 as Any } ?? NSNull(),
         "gestes": fige.gestes,
+        "instant": fige.at,
       ])
   }
 

@@ -543,6 +543,8 @@ export interface GesteDiagnostic {
 
 /** Ce que `figer()` fige : la vidéo (ou rien) et les gestes des 10 s. */
 export interface FigeDiagnostic {
+  /** L'instant de l'appui (ms depuis 1970) : la fenêtre des dix secondes finit là. */
+  instant?: number;
   /** Chemin du fichier mp4 assemblé, ou `null` si ReplayKit n'a rien donné. */
   video: string | null;
   gestes: GesteDiagnostic[];

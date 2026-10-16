@@ -104,6 +104,18 @@ export function construireFormData(
   return fd;
 }
 
+/**
+ * L'INSTANT DE L'APPUI : celui que le natif a figé ; à défaut (binaire plus
+ * ancien), le dernier toucher du bouton rouge ; à défaut, maintenant.
+ */
+export function instantDeLAppui(envoi: Pick<EnvoiDiagnostic, 'instant' | 'gestes'>): number {
+  if (typeof envoi.instant === 'number' && Number.isFinite(envoi.instant)) return envoi.instant;
+  const bouton = [...(envoi.gestes ?? [])]
+    .reverse()
+    .find((g) => typeof g.cible === 'string' && g.cible.startsWith('Diagnostic'));
+  return bouton?.at ?? Date.now();
+}
+
 export type IssueEnvoi = 'envoye' | 'partage' | 'echec';
 
 /**
@@ -119,7 +131,7 @@ export async function envoyerDiagnostic(envoi: EnvoiDiagnostic): Promise<IssueEn
     await instantané(),
     planCourant(),
     envoi.gestes,
-    evenementsAEnvoyer(),
+    evenementsAEnvoyer(instantDeLAppui(envoi)),
   );
   const fd = construireFormData(qui, envoi.message, journal, envoi.video);
   try {
@@ -156,7 +168,7 @@ async function proposerLePartage(envoi: EnvoiDiagnostic, pourquoi: string): Prom
         await instantané(),
         planCourant(),
         envoi.gestes,
-        evenementsAEnvoyer(),
+        evenementsAEnvoyer(instantDeLAppui(envoi)),
       );
       await RoomScan.shareText(journal, 'diagnostic.json');
     } catch {
@@ -180,6 +192,7 @@ export function demarrerEnvoi(): void {
       message: typeof e?.message === 'string' ? e.message : '',
       video: typeof e?.video === 'string' ? e.video : null,
       gestes: Array.isArray(e?.gestes) ? e.gestes : [],
+      instant: typeof e?.instant === 'number' ? e.instant : undefined,
     }).catch(() => {});
   });
   desabonner = () => abonne.remove();

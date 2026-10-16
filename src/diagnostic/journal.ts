@@ -31,7 +31,9 @@ export interface EvenementJournal {
 }
 
 /** La fenêtre gardée (une minute) et le plafond d'évènements. */
-export const FENETRE_JOURNAL_MS = 60_000;
+// Trois minutes : le temps de taper son message après l'appui sans que les
+// dix secondes d'avant l'appui soient déjà élaguées.
+export const FENETRE_JOURNAL_MS = 180_000;
 export const PLAFOND_JOURNAL = 3000;
 /** Ce que l'appui envoie : les dix dernières secondes. */
 export const FENETRE_ENVOI_MS = 10_000;
@@ -54,14 +56,14 @@ export function elaguer(
     : dansLaFenetre;
 }
 
-/** Les évènements des `fenetreMs` dernières millisecondes, dans l'ordre. */
+/** Les évènements des `fenetreMs` millisecondes qui précèdent `maintenant`, dans l'ordre. */
 export function recents(
   evs: EvenementJournal[],
   maintenant: number,
   fenetreMs: number = FENETRE_ENVOI_MS,
 ): EvenementJournal[] {
   const depuis = maintenant - fenetreMs;
-  return evs.filter((e) => e.t >= depuis);
+  return evs.filter((e) => e.t >= depuis && e.t <= maintenant);
 }
 
 /* ---- LE SINGLETON : un tampon, et deux gestes dessus. ---- */
@@ -78,9 +80,17 @@ export function noter(type: string, donnees?: Record<string, unknown>): void {
   tampon = elaguer(tampon, t);
 }
 
-/** Les évènements des dix dernières secondes — ce que l'appui envoie. */
-export function evenementsAEnvoyer(): EvenementJournal[] {
-  return recents(tampon, Date.now());
+/*
+  LES DIX SECONDES D'AVANT L'APPUI, PAS D'AVANT L'ENVOI — vu sur les premiers
+  diagnostics du patron : « Évènements app : 0 » à chaque fois, alors qu'il
+  venait de changer la teinte d'un mur. La fenêtre était comptée depuis
+  « Envoyer », donc APRÈS le temps de taper le message : tout ce qui
+  précédait l'appui sur le bouton rouge était déjà hors champ. Elle finit
+  maintenant à l'instant de l'appui, comme la vidéo et les gestes.
+*/
+/** Les évènements des dix secondes qui précèdent `instant` (l'appui) — ce que l'appui envoie. */
+export function evenementsAEnvoyer(instant: number = Date.now()): EvenementJournal[] {
+  return recents(tampon, instant);
 }
 
 /** Vide le fil — à l'arrêt du mode : rien ne traîne entre deux sessions. */
