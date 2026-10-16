@@ -23,7 +23,7 @@ import { getStyles } from './styles';
 import { BORNES_PIECE, fauteDeMetres, lireMetres, type FauteDeCote } from '../../ui/saisieCote';
 
 /** Les gabarits proposés : des pièces qu'on rencontre, aux cotes usuelles. */
-const MODELES = [
+export const MODELES_DE_PIECE = [
   { nom: 'Chambre', largeur: 3.4, profondeur: 3 },
   { nom: 'Séjour', largeur: 5, profondeur: 4 },
   { nom: 'Cuisine', largeur: 3.2, profondeur: 2.6 },
@@ -47,6 +47,7 @@ export function AddRoomSheet({
   visible,
   accolee,
   planVide = false,
+  surMesureDabord = false,
   onClose,
   onChoose,
 }: {
@@ -55,6 +56,8 @@ export function AddRoomSheet({
   accolee: boolean;
   /** Rien n'est encore dessiné : la feuille ne parle pas d'un plan absent. */
   planVide?: boolean;
+  /** S'ouvre directement sur la saisie « Sur mesure » (page du plan vierge). */
+  surMesureDabord?: boolean;
   onClose: () => void;
   onChoose: (largeur: number, profondeur: number, nom: string) => void;
 }) {
@@ -78,14 +81,17 @@ export function AddRoomSheet({
     la profondeur de la précédente (2 × 5,20 au lieu de 2 × 1,90).
   */
   useEffect(() => {
-    if (visible) return;
+    if (visible) {
+      if (surMesureDabord) setSurMesure(true);
+      return;
+    }
     setSurMesure(false);
     setFaute(null);
     setDouteDit(null);
     setNom('');
     setLargeur('');
     setProfondeur('');
-  }, [visible]);
+  }, [visible, surMesureDabord]);
 
   const ajouter = (l: string = largeur, pr: string = profondeur) => {
     const fl = fauteDeMetres(l, 'Largeur', BORNES_PIECE);
@@ -203,6 +209,12 @@ export function AddRoomSheet({
                   accessibilityRole="button"
                   accessibilityLabel="Retour aux gabarits"
                   onPress={() => {
+                    // Ouverte depuis la page du plan vierge : les gabarits sont
+                    // sur la page, dessous — on y revient en refermant.
+                    if (surMesureDabord) {
+                      onClose();
+                      return;
+                    }
                     setSurMesure(false);
                     setFaute(null);
                   }}>
@@ -221,7 +233,7 @@ export function AddRoomSheet({
             <>
               <ScrollView style={styles.nameScroll}>
                 <RoomChoice
-                  modeles={MODELES}
+                  modeles={MODELES_DE_PIECE}
                   onChoose={(m) =>
                     onChoose(m.largeur, Math.min(m.largeur, m.profondeur), m.nom)
                   }
