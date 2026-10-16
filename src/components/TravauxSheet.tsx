@@ -178,7 +178,7 @@ export function TravauxSheet({
 
   return (
     <SheetShell visible={visible} onClose={onClose}>
-      <Text style={s.titre}>Ce qu’il faut acheter</Text>
+      <Text style={s.titre}>Liste d’achats</Text>
       <Text style={s.sous}>
         {tout
           ? niveau

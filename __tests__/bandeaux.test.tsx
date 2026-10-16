@@ -1197,8 +1197,8 @@ describe('les feuilles de l’écran des résultats', () => {
   it('ouvre le renommage du scan, avec sa copie', () => {
     const tree = monter();
     act(() => bouton(tree, 'Plus')!.props.onPress());
-    expect(textes(tree)).toContain('Renommer le scan');
-    actionDuMenu(tree, 'Renommer le scan');
+    expect(textes(tree)).toContain('Renommer le plan');
+    actionDuMenu(tree, 'Renommer le plan');
     const vu = textes(tree);
     expect(vu).toContain('Nom du scan');
     expect(vu).toContain('Enregistrer comme nouvelle copie');
@@ -1751,14 +1751,14 @@ describe('le menu du scan', () => {
       return i;
     };
     const ordre = [
-      'Ce qu’il faut acheter',
+      'Liste d’achats',
       'Scanner une autre pièce',
       'Scanner un étage',
       'Scanner un sous-sol',
       'Dessiner une pièce à la main',
       'Ajouter un mur',
       'Redétecter les pièces',
-      'Renommer le scan',
+      'Renommer le plan',
       'Nouveau scan',
     ].map(rang);
     expect(ordre).toEqual([...ordre].sort((x, y) => x - y));

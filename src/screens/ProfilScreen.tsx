@@ -537,7 +537,7 @@ export function ProfilScreen() {
           s={s}
           c={c}
           icone="rooms"
-          label="Mes scans"
+          label="Mes plans"
           note={saves.length ? String(saves.length) : undefined}
           onPress={() => setScreen('library')}
         />

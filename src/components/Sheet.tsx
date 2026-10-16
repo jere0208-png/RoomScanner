@@ -85,6 +85,19 @@ const ICONS = {
   rouleau: SOLAIRES.rouleau,
   tableau: SOLAIRES.tableau,
   diagnostic: SOLAIRES.sirene,
+  /*
+    UNE ICÔNE PAR ENTRÉE DU MENU DU PLAN — revue de lisibilité : la liste
+    d'achats portait le rouleau de « Décorer », « Dessiner un étage » la
+    flèche de « Scanner un étage ». Chacune a maintenant la sienne.
+  */
+  panier: SOLAIRES.panier,
+  crayon: SOLAIRES.crayon,
+  crayonCadre: SOLAIRES.renommer,
+  etiquette: SOLAIRES.etiquette,
+  prise: SOLAIRES.prise,
+  dupliquer: SOLAIRES.dupliquer,
+  revenir: SOLAIRES.undo,
+  nouveau: SOLAIRES.plus,
 } satisfies { [cle: string]: string };
 
 export interface SheetAction {
@@ -101,6 +114,13 @@ export interface SheetAction {
    */
   node?: React.ReactNode;
   danger?: boolean;
+  /**
+   * LE TITRE DE LA SECTION — un menu de douze entrées à plat ne se lit pas
+   * (revue de lisibilité, menu du plan). Les entrées consécutives qui
+   * portent le même titre forment un bloc, coiffé de ce titre. Sans titre,
+   * rien ne change.
+   */
+  section?: string;
   onPress: () => void;
 }
 
@@ -546,8 +566,18 @@ export function ActionSheet({
             Le bloc porte la forme, les rangées ne sont que ses lignes — et
             l'on gagne un tiers de la hauteur sans rien retirer.
           */}
+          {/* Les entrées se rangent en blocs : un par section, un seul sans. */}
+          {enSections(vu.actions).map((groupe, g) => (
+          <React.Fragment key={`${groupe.titre ?? ''}-${g}`}>
+          {groupe.titre ? (
+            <Text style={[styles.sectionTitre, g === 0 && styles.sectionTitrePremier]} accessibilityRole="header">
+              {groupe.titre}
+            </Text>
+          ) : g > 0 ? (
+            <View style={styles.sectionEcart} />
+          ) : null}
           <View style={styles.bloc}>
-          {vu.actions.map((a, i) => (
+          {groupe.actions.map((a, i) => (
             <Pressable
               key={a.label}
               style={({ pressed }) => [
@@ -594,10 +624,23 @@ export function ActionSheet({
             </Pressable>
           ))}
           </View>
+          </React.Fragment>
+          ))}
         </>
       )}
     </SheetShell>
   );
+}
+
+/** Les entrées consécutives d'une même section, ensemble. */
+export function enSections(actions: SheetAction[]): { titre?: string; actions: SheetAction[] }[] {
+  const out: { titre?: string; actions: SheetAction[] }[] = [];
+  for (const a of actions) {
+    const der = out[out.length - 1];
+    if (der && der.titre === a.section) der.actions.push(a);
+    else out.push({ titre: a.section, actions: [a] });
+  }
+  return out;
 }
 
 /** Une valeur à saisir. Le champ prend le focus, et le clavier le pousse. */
@@ -845,6 +888,18 @@ const getStyles = themedStyles((c: Palette) =>
       backgroundColor: c.surfaceSunken,
       overflow: 'hidden',
     },
+    sectionTitre: {
+      color: c.inkSoft,
+      fontSize: 12.5,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+      marginTop: 18,
+      marginBottom: 7,
+      marginLeft: 4,
+    },
+    sectionTitrePremier: { marginTop: 2 },
+    sectionEcart: { height: 14 },
     row: {
       flexDirection: 'row',
       alignItems: 'center',

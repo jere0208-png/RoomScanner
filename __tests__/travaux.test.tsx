@@ -441,7 +441,7 @@ describe('dans l’écran du plan', () => {
     return arbre!;
   };
   const pastille = (t: TestRenderer.ReactTestRenderer) =>
-    t.root.findAllByType(TouchableOpacity).find((x) => x.props.accessibilityLabel === 'Achats');
+    t.root.findAllByType(TouchableOpacity).find((x) => x.props.accessibilityLabel === 'Liste d’achats');
 
   it('le grand public a sa pastille « Travaux », qui ouvre la feuille avec ses pièces', () => {
     const t = monter(false);
@@ -463,6 +463,6 @@ describe('dans l’écran du plan', () => {
     const src = readFileSync(join(__dirname, '..', 'src/screens/ResultScreen.tsx'), 'utf8');
     const a = src.indexOf('actions: [', src.indexOf('title: scanName'));
     const premier = src.slice(a, src.indexOf('label:', a) + 60);
-    expect(premier).toContain('Ce qu’il faut acheter');
+    expect(premier).toContain('Liste d’achats');
   });
 });

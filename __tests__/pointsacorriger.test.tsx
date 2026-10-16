@@ -55,7 +55,10 @@ describe('le nord à orienter se dit en clair', () => {
     expect(ecran).toContain('return total > winLargeur - 2 * 16 - 20;');
     // « Explorer » garde son mot (revue « Chloé ») : serré, il se dit « Visite ».
     expect(ecran).toContain("<Text style={styles.explorerPastilleTexte}>{explorerCourt ? 'Visite' : 'Explorer'}</Text>");
-    expect(ecran).toContain('{!rangeeSerree && <Text style={styles.vuePastilleTexte}>Achats</Text>}');
+    // La liste d'achats, elle, garde son mot même serrée (revue de
+    // lisibilité : en 3D on la confondait avec Décorer) — voir
+    // `listedachats.test.tsx`.
+    expect(ecran).toMatch(/<Text style=\{styles\.vuePastilleTexte\} numberOfLines=\{1\}>\s*Liste d’achats/);
   });
 });
 

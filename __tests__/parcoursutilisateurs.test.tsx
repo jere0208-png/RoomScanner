@@ -289,6 +289,8 @@ describe('les petits pièges (Marie, Nadia, Sophie, Karim)', () => {
   });
 
   it('la tuile de lecture dit qu’elle prend un PDF', () => {
-    expect(lire('src', 'screens', 'HomeScreen.tsx')).toContain('Photo ou PDF de l’architecte');
+    // « … de l'architecte » se coupait sur la tuile (revue de lisibilité) :
+    // le PDF reste dit, plus court.
+    expect(lire('src', 'screens', 'HomeScreen.tsx')).toContain('sous="Photo ou PDF"');
   });
 });

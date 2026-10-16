@@ -49,7 +49,10 @@ export const light: Palette = {
   inkSoft: '#5A6472',
   // Revue « Bernard » : #98A1AE faisait 2,6:1 sur blanc, illisible en
   // petits caractères. 4,5:1 désormais (le seuil WCAG du texte courant).
-  inkFaint: '#6E7783',
+  // Revue de lisibilité : #6E7783 ne tenait 4,5:1 que sur le BLANC — 4,2 sur
+  // le fond de page, 4,0 sur une surface creusée, 3,7 sur une tuile pastel.
+  // #5F6873 tient 4,5:1 partout où il se pose (5,0 sur la surface creusée).
+  inkFaint: '#5F6873',
   line: '#E7EAF0',
   lineStrong: '#D6DBE3',
   blue: '#1F5BFF',
@@ -71,7 +74,9 @@ export const dark: Palette = {
   surfaceSunken: '#1D2530',
   ink: '#F2F5F9',
   inkSoft: '#A6B0BD',
-  inkFaint: '#808A97',
+  // Même revue : #808A97 tombait à 4,1:1 sur un bouton rehaussé et 3,5 sur
+  // une tuile de l'accueil. #949EAB tient 4,5:1 sur toutes les surfaces.
+  inkFaint: '#949EAB',
   line: '#242C37',
   lineStrong: '#35404E',
   blue: '#3D77FF',

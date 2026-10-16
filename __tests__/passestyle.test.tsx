@@ -139,7 +139,8 @@ describe('2 — du blanc net sur les pages claires', () => {
     expect(lire('modules/react-native-room-scan/src/index.ts')).not.toContain('RoomScanVerre');
     // La tuile porte sa couleur elle-même.
     expect(lire('src/screens/HomeScreen.tsx')).toContain(
-      '{ backgroundColor: fond, height: hauteur, transform: [{ scale: appui }] },',
+      // Hauteur minimale désormais : le texte peut la faire grandir.
+      '{ backgroundColor: fond, minHeight: hauteur, transform: [{ scale: appui }] },',
     );
   });
 

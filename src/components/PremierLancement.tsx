@@ -16,6 +16,7 @@ import { FilmTutoriel } from './FilmTutoriel';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 import { haptic } from '../ui/haptic';
 import { useUsage } from '../store/usage';
+import { useScanStore } from '../store/scanStore';
 
 /*
   LA QUESTION, APRÈS LE FILM — et seulement si personne n'y a répondu.
@@ -50,6 +51,14 @@ export function PremierLancement({ onFini }: { onFini: () => void }) {
   const aRepondu = useUsage((u) => u.choisi);
   const choisir = useUsage((u) => u.choisir);
   const [question, setQuestion] = useState(false);
+  /*
+    LE CAPTEUR, DIT DÈS LA PREMIÈRE MINUTE — revue de lisibilité : sur un
+    iPhone sans LiDAR, on n'apprenait qu'à l'accueil, devant une tuile
+    grisée, que le scan était hors de portée. On le dit ici, gentiment et
+    sans rien bloquer : ce qu'on peut faire d'abord, ce qui manque ensuite.
+    (L'accueil, dessous, a déjà posé la réponse du téléphone.)
+  */
+  const sansLidar = useScanStore((st) => st.supported) === false;
 
   const repondre = (elec: boolean) => {
     haptic('succes');
@@ -71,6 +80,14 @@ export function PremierLancement({ onFini }: { onFini: () => void }) {
             <Text style={styles.questionPhrase}>
               Vous pourrez changer d’avis à tout moment, dans votre profil.
             </Text>
+            {sansLidar && (
+              <View style={styles.avis} testID="avis-lidar-premier">
+                <Text style={styles.avisTexte}>
+                  Sur ce téléphone, vous dessinerez votre plan avec vos mesures : le scan demande un
+                  iPhone ou iPad avec capteur LiDAR. Tout le reste fonctionne.
+                </Text>
+              </View>
+            )}
             {CHOIX.map((x) => (
               <Pressable
                 key={x.titre}
@@ -79,7 +96,9 @@ export function PremierLancement({ onFini }: { onFini: () => void }) {
                 style={({ pressed }) => [styles.choix, pressed && styles.choixEnfonce]}
                 onPress={() => repondre(x.elec)}>
                 <Text style={styles.choixTitre}>{x.titre}</Text>
-                <Text style={styles.choixPhrase}>{x.phrase}</Text>
+                <Text style={styles.choixPhrase}>
+                  {sansLidar && !x.elec ? x.phrase.replace('Scanner son logement', 'Dessiner son logement') : x.phrase}
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -133,6 +152,15 @@ const getStyles = themedStyles((c: Palette) =>
       ...shadowCard,
       shadowOpacity: 0.07,
     },
+    avis: {
+      alignSelf: 'stretch',
+      backgroundColor: c.surfaceSunken,
+      borderRadius: radius.md,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      marginBottom: 4,
+    },
+    avisTexte: { color: c.inkSoft, fontSize: 14, lineHeight: 19, textAlign: 'center' },
     choixEnfonce: { opacity: 0.85, transform: [{ scale: 0.985 }] },
     choixTitre: { color: c.ink, fontSize: 17, fontWeight: '800' },
     choixPhrase: { color: c.inkSoft, fontSize: 14, lineHeight: 19, marginTop: 4 },

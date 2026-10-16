@@ -1034,7 +1034,7 @@ export function LibraryScreen() {
         },
         {
           label: 'Supprimer le dossier',
-          hint: 'Les scans qu’il contient reviennent à la racine.',
+          hint: 'Les plans qu’il contient reviennent à la racine.',
           icon: 'supprimer',
           danger: true,
           onPress: () => {
@@ -1084,7 +1084,7 @@ export function LibraryScreen() {
           icon: 'renommer',
           onPress: () =>
             setPrompt({
-              title: 'Nom du scan',
+              title: 'Nom du plan',
               value: item.name,
               onSubmit: (t) => renameSave(item.id, t),
             }),
@@ -1107,7 +1107,7 @@ export function LibraryScreen() {
           ? [
               {
                 label: 'Sortir du dossier',
-                hint: 'Le scan revient à la racine de la bibliothèque.',
+                hint: 'Le plan revient à la racine de la bibliothèque.',
                 icon: 'sortir' as const,
                 onPress: () => moveToFolder(item.id, null),
               },
@@ -1189,7 +1189,8 @@ export function LibraryScreen() {
           demandait ce centrage, et lui seul.
         */}
         <Text style={styles.title} numberOfLines={1}>
-          {dossierOuvert ? dossierOuvert.name : 'Mes scans'}
+          {/* « Mes plans » : le même nom que sur l'accueil qui y mène. */}
+          {dossierOuvert ? dossierOuvert.name : 'Mes plans'}
         </Text>
         <View style={styles.countPill}>
           <Text style={styles.countText}>{liste.length}</Text>
@@ -1331,8 +1332,8 @@ export function LibraryScreen() {
                 ? 'Relâchez pour le sortir du dossier'
                 : 'Relâchez pour ranger ici'
               : dossierOuvert
-              ? 'Remontez le scan sur le titre pour l’en sortir'
-              : 'Amenez le scan sur un dossier'}
+              ? 'Remontez le plan sur le titre pour l’en sortir'
+              : 'Amenez le plan sur un dossier'}
           </Text>
         </View>
       )}
@@ -1396,8 +1397,8 @@ export function LibraryScreen() {
               <EmptyPlanArt c={palette} />
               <Text style={styles.emptyFolder}>
                 {dossierOuvert
-                  ? 'Ce dossier est vide. Revenez en arrière et amenez-y un scan.'
-                  : 'Tous vos scans sont rangés dans des dossiers.'}
+                  ? 'Ce dossier est vide. Revenez en arrière et amenez-y un plan.'
+                  : 'Tous vos plans sont rangés dans des dossiers.'}
               </Text>
             </View>
           )}

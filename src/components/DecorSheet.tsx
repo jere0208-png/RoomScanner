@@ -10,7 +10,7 @@
  * s'applique aussitôt — la maquette, au-dessus, se repeint sous les yeux.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import type { ObjectData } from 'react-native-room-scan';
 import { SheetShell } from './Sheet';
@@ -20,7 +20,9 @@ import { PEINTURES, type Peinture } from '../ui/peintures';
 import { SOLS, SOL_DEFAUT, TEINTES_MEUBLES, TEINTE_ORIGINE, cleDeTeinte, hexDeTeinte } from '../ui/habillage';
 import { nomDuMeuble } from '../geometry/furniture';
 import { useScanStore } from '../store/scanStore';
-import { niveauDe, nomDuNiveau } from '../geometry/floorplan';
+import { niveauDe, nomDuNiveau, roomParts } from '../geometry/floorplan';
+import { achats, nombre, travauxDesPieces } from '../geometry/travaux';
+import { useReglagesTravaux } from '../store/reglagesTravaux';
 import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from './Iso3DView';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
 
@@ -52,9 +54,36 @@ export { nomDuMeuble };
   maquette est en écorché, quoi qu'on ait réglé ailleurs, et cadrée plus
   serré (« modèle trop petit »).
 */
-const PAS_DU_TOUR = 1.2;
+/*
+  AU TEMPS, PLUS À LA MINUTERIE — revue de lisibilité : un `setInterval` de
+  50 ms avançait d'un pas FIXE ; le fil occupé, les pas se perdaient et la
+  pièce saccadait. Elle tourne maintenant à l'image (`requestAnimationFrame`)
+  d'un angle proportionnel au temps écoulé — 24° par seconde, le même tour
+  lent qu'avant —, et ne se redessine qu'une fois le vingtième de seconde
+  passé : le coût de la maquette reste celui qu'il était (voir plus haut).
+  Et « Réduire les animations » l'arrête tout à fait : on la tourne au doigt.
+*/
+export const DEGRES_PAR_SECONDE = 24;
+const IMAGE_MIN = 50;
 const REPOS_APRES_LE_DOIGT = 2500;
 const ZOOM_DECOR = 1.3;
+
+/** « Réduire les animations », lu au système et suivi s'il change. */
+function useMoinsDeMouvement(): boolean {
+  const [moins, setMoins] = useState(false);
+  useEffect(() => {
+    let vivant = true;
+    AccessibilityInfo.isReduceMotionEnabled?.()
+      .then((v) => vivant && setMoins(!!v))
+      .catch(() => {});
+    const abo = AccessibilityInfo.addEventListener?.('reduceMotionChanged', (v: boolean) => setMoins(!!v));
+    return () => {
+      vivant = false;
+      abo?.remove?.();
+    };
+  }, []);
+  return moins;
+}
 
 function PieceTournante({
   pieceId,
@@ -67,13 +96,32 @@ function PieceTournante({
   repos: React.MutableRefObject<number>;
 }) {
   const [vue, setVue] = useState<View3DParams>({ ...DEFAULT_VIEW3D, tilt: 50, zoom: ZOOM_DECOR });
+  const moinsDeMouvement = useMoinsDeMouvement();
   useEffect(() => {
-    const id = setInterval(() => {
-      if (Date.now() - repos.current < REPOS_APRES_LE_DOIGT) return;
-      setVue((v) => ({ ...v, theta: (v.theta + PAS_DU_TOUR) % 360 }));
-    }, 50);
-    return () => clearInterval(id);
-  }, [repos]);
+    if (moinsDeMouvement) return;
+    let id = 0;
+    let avant = Date.now();
+    let cumul = 0;
+    const image = () => {
+      const maintenant = Date.now();
+      // Une application revenue du fond ne fait pas un tour d'un coup.
+      const dt = Math.min(maintenant - avant, 250);
+      avant = maintenant;
+      if (maintenant - repos.current < REPOS_APRES_LE_DOIGT) {
+        cumul = 0;
+      } else {
+        cumul += dt;
+        if (cumul >= IMAGE_MIN) {
+          const pas = (DEGRES_PAR_SECONDE * cumul) / 1000;
+          cumul = 0;
+          setVue((v) => ({ ...v, theta: (v.theta + pas) % 360 }));
+        }
+      }
+      id = requestAnimationFrame(image);
+    };
+    id = requestAnimationFrame(image);
+    return () => cancelAnimationFrame(id);
+  }, [repos, moinsDeMouvement]);
   return (
     <Iso3DView
       value={vue}
@@ -283,6 +331,35 @@ export function DecorSheet({
       sol: sols[Math.floor(Math.random() * sols.length)].cle,
     });
   };
+  /*
+    LES POTS, LÀ OÙ L'ON CHOISIT LA TEINTE — revue de lisibilité : la
+    quantité vivait derrière « Voir ma liste d'achats », sous treize
+    pastilles, hors de l'écran. Elle se lit en tête de l'onglet Murs dès
+    qu'une teinte est posée — le calcul de la liste d'achats (`travaux`),
+    pas un second : mêmes murs nets, mêmes couches, même pot.
+  */
+  const walls = useScanStore((st) => st.walls);
+  const openings = useScanStore((st) => st.openings);
+  const hypotheses = useReglagesTravaux((r) => r.hypotheses);
+  const teintePosee = piece?.peinture && piece.peinture !== ORIGINE ? piece.peinture : null;
+  const potsDeLaPiece = useMemo(() => {
+    if (!piece || !teintePosee) return null;
+    const n = niveauDe(piece);
+    const part = roomParts(
+      walls.filter((w) => niveauDe(w) === n),
+      rooms.filter((r) => niveauDe(r) === n),
+    ).find((p) => p.roomId === piece.id);
+    if (!part) return null;
+    const pieces = travauxDesPieces(
+      [part],
+      openings.filter((o) => niveauDe(o) === n),
+      () => piece.name || 'Pièce',
+      (id) => rooms.find((r) => r.id === id),
+    );
+    const a = achats(pieces, hypotheses);
+    const pots = a.murs.parTeinte?.find((x) => x.cle === teintePosee)?.pots ?? 0;
+    return pots > 0 ? { pots, pot: hypotheses.pot } : null;
+  }, [piece, teintePosee, walls, openings, rooms, hypotheses]);
   const ambianceActuelle = piece
     ? AMBIANCES.find((a) => a.peinture === (piece.peinture ?? ORIGINE) && a.sol === (piece.sol ?? SOL_DEFAUT))
     : undefined;
@@ -407,22 +484,26 @@ export function DecorSheet({
     <SheetShell visible={visible} onClose={onClose} defile={false}>
       <View style={s.tete} onTouchStart={() => (repos.current = Date.now())}>
         <Text style={s.titre}>Décorer</Text>
-        {/* Annuler sans quitter : on ose essayer quand on peut revenir. */}
+        {/* Annuler sans quitter : on ose essayer quand on peut revenir.
+            Revue de lisibilité : une flèche seule, à 35 % quand rien n'est
+            à défaire, ne se lisait pas. Le mot l'accompagne, et l'état
+            éteint passe par la couleur (`inkFaint`, 4,5:1), pas l'opacité. */}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Annuler le dernier changement"
           accessibilityState={{ disabled: !peutAnnuler }}
           disabled={!peutAnnuler}
           hitSlop={8}
-          style={({ pressed }) => [s.annuler, !peutAnnuler && { opacity: 0.35 }, pressed && { opacity: 0.6 }]}
+          style={({ pressed }) => [s.annuler, pressed && { opacity: 0.6 }]}
           onPress={() => {
             haptic('leger');
             st().undo();
             setFaits((n) => Math.max(0, n - 1));
           }}>
-          <Svg width={18} height={18} viewBox="0 0 24 24">
-            <Path d={SOLAIRES.undo} fill={c.ink} fillRule="evenodd" />
+          <Svg width={16} height={16} viewBox="0 0 24 24">
+            <Path d={SOLAIRES.undo} fill={peutAnnuler ? c.ink : c.inkFaint} fillRule="evenodd" />
           </Svg>
+          <Text style={[s.annulerMot, !peutAnnuler && s.annulerMotEteint]}>Annuler</Text>
         </Pressable>
       </View>
 
@@ -565,6 +646,24 @@ export function DecorSheet({
             )}
             {piece && onglet === 'murs' && (
               <>
+                {potsDeLaPiece ? (
+                  <View style={s.pots} testID="pots-de-la-piece">
+                    <Text
+                      style={s.potsTexte}
+                      accessibilityLabel={`Environ ${potsDeLaPiece.pots} pot${potsDeLaPiece.pots > 1 ? 's' : ''} de ${nombre(potsDeLaPiece.pot)} litres pour les murs de cette pièce`}>
+                      {`≈ ${potsDeLaPiece.pots} pot${potsDeLaPiece.pots > 1 ? 's' : ''} de ${nombre(potsDeLaPiece.pot)}\u00A0L`}
+                    </Text>
+                    {onAchats ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Voir la liste d’achats"
+                        hitSlop={10}
+                        onPress={onAchats}>
+                        <Text style={s.potsLien}>· Voir la liste</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                ) : null}
                 <Text style={s.section}>{nbsp(`Les murs : ${peinture?.nom ?? ''}`)}</Text>
                 {nuancier(
                   [MUR_RELEVE, ...PEINTURES],
@@ -674,13 +773,30 @@ const getStyles = themedStyles((c: Palette) =>
     tete: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 48, paddingLeft: 2, flexShrink: 0 },
     titre: { color: c.ink, fontSize: 24, fontWeight: '800', letterSpacing: -0.5, flex: 1 },
     annuler: {
-      width: 36,
+      flexDirection: 'row',
+      gap: 6,
       height: 36,
+      paddingHorizontal: 12,
       borderRadius: 18,
       backgroundColor: c.surfaceSunken,
       alignItems: 'center',
       justifyContent: 'center',
     },
+    annulerMot: { color: c.ink, fontSize: 14, fontWeight: '700' },
+    annulerMotEteint: { color: c.inkFaint },
+    pots: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      borderRadius: 12,
+      backgroundColor: c.blueSoft,
+    },
+    potsTexte: { color: c.ink, fontSize: 14, fontWeight: '700' },
+    potsLien: { color: c.blue, fontSize: 14, fontWeight: '700' },
     pucesBande: { flexGrow: 0, flexShrink: 0, height: 48, marginTop: 10 },
     puces: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 8 },
     puce: {

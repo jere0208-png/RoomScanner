@@ -40,6 +40,16 @@ jest.mock('react-native-room-scan', () => ({
     removeAllListeners: jest.fn(),
   },
 }));
+/*
+  UN TÉLÉPHONE À TAILLE DE TEXTE ORDINAIRE — le doublet de React Native
+  annonce un grossissement de 2, et au-delà de 1,35 le moulinet se déplie en
+  une colonne (voir `tuilesentieres.test.tsx`). Ce banc-ci regarde le
+  moulinet lui-même.
+*/
+jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
+  __esModule: true,
+  default: () => ({ width: 390, height: 844, scale: 3, fontScale: 1 }),
+}));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
   setItem: jest.fn(async () => undefined),
@@ -245,14 +255,17 @@ describe('le moulinet', () => {
     'Voir un exemple',
     'Lire un plan papier',
   ];
-  /** La carte colorée d'une tuile : la vue qui porte son fond. */
+  /** La carte colorée d'une tuile : la vue qui porte son fond. Sa hauteur
+      est MINIMALE désormais (revue de lisibilité : le texte la fait grandir). */
   const carte = (t: TestRenderer.ReactTestRenderer, label: string) =>
     bouton(t, label).findAll((n) => {
-      const st = StyleSheet.flatten(n.props?.style) as { backgroundColor?: string; height?: number } | undefined;
-      return typeof st?.height === 'number' && typeof st?.backgroundColor === 'string';
+      const st = StyleSheet.flatten(n.props?.style) as { backgroundColor?: string; minHeight?: number } | undefined;
+      return typeof st?.minHeight === 'number' && typeof st?.backgroundColor === 'string';
     })[0];
-  const style = (n: TestRenderer.ReactTestInstance) =>
-    StyleSheet.flatten(n.props.style) as { backgroundColor: string; height: number };
+  const style = (n: TestRenderer.ReactTestInstance) => {
+    const st = StyleSheet.flatten(n.props.style) as { backgroundColor: string; minHeight: number };
+    return { backgroundColor: st.backgroundColor, height: st.minHeight };
+  };
 
   it('porte quatre gestes, chacun sa couleur', () => {
     const t = monter();
@@ -362,7 +375,7 @@ describe('sur un appareil sans LiDAR', () => {
     expect(bouton(t, 'Commencer le scan')).toBeUndefined();
     expect(bouton(t, 'Scan indisponible sur cet appareil')).toBeDefined();
     const vu = textes(t);
-    expect(vu).toContain('pas compatible');
+    expect(vu).toContain('Le scan demande un iPhone ou iPad');
     expect(vu).toContain('capteur LiDAR');
     expect(bouton(t, 'Dessiner un plan sans scanner')).toBeDefined();
     expect(bouton(t, 'Voir un exemple')).toBeDefined();
@@ -382,16 +395,16 @@ describe('vos plans', () => {
 
   it('pour qui n’a encore rien : une carte dit où ils apparaîtront — plus de tracé au doigt', () => {
     const t = monter();
-    expect(textes(t)).toContain('Vos plans');
+    expect(textes(t)).toContain('Mes plans');
     expect(textes(t)).toContain('Ils apparaîtront ici');
     expect(t.root.findAll((n) => n.props?.testID === 'plans-vide').length).toBeGreaterThan(0);
-    expect(bouton(t, 'Mes scans')).toBeUndefined();
+    expect(bouton(t, 'Mes plans')).toBeUndefined();
   });
 
   it('les trois derniers touchés, dans l’ordre, sur l’accueil même', () => {
     quatre();
     const t = monter();
-    expect(textes(t)).toContain('Vos plans');
+    expect(textes(t)).toContain('Mes plans');
     const cartes = t.root
       .findAll((n) => typeof n.props?.onPress === 'function' && String(n.props?.accessibilityLabel ?? '').startsWith('Ouvrir '))
       .map((n) => n.props.accessibilityLabel);
@@ -415,9 +428,9 @@ describe('vos plans', () => {
   it('la bibliothèque est au bout du titre, avec son compte', () => {
     quatre();
     const t = monter();
-    const lien = bouton(t, 'Mes scans');
+    const lien = bouton(t, 'Mes plans');
     expect(lien).toBeDefined();
-    const badge = lien.findAll((n) => n.props?.accessibilityLabel === 'Nombre de scans')[0];
+    const badge = lien.findAll((n) => n.props?.accessibilityLabel === 'Nombre de plans')[0];
     expect(badge.findAllByType(Text).map((n) => String(n.props.children))).toContain('4');
     act(() => lien.props.onPress());
     expect(useScanStore.getState().screen).toBe('library');

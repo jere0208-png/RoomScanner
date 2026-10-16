@@ -328,9 +328,14 @@ export function SignInScreen() {
         <Text style={s.sansCompteTexte}>Découvrir sans compte</Text>
       </Pressable>
 
+      {/* Revue de lisibilité : « DXF » ne parle qu'au dessinateur — le
+          grand public lit ici la règle du jeu, pas un format de fichier.
+          Et le capteur se dit dès cet écran : on ne découvre pas à
+          l'accueil que son téléphone ne scanne pas. */}
       <Text style={s.mentions}>
-        Scanner est gratuit et sans limite ; le Pro envoie vos plans en PDF,
-        DXF ou 3D, et les garde en ligne.
+        Scanner est gratuit et sans limite (iPhone ou iPad avec capteur
+        LiDAR) ; le Pro envoie vos plans en PDF ou en 3D, et les garde en
+        ligne.
       </Text>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -3562,7 +3562,7 @@ export function ResultScreen() {
   */
   const estimeSerree = (() => {
     const largeurs = [
-      !modeElec && piecesTravaux.length > 0 ? 104 : 0,
+      !modeElec && piecesTravaux.length > 0 ? 136 : 0,
       modeElec && totalDevis !== null && totalDevis > 0 ? 96 : 0,
       modeElec ? 34 : 0,
       !modeElec && alertesDePlan > 0 ? 34 : 0,
@@ -3586,7 +3586,8 @@ export function ResultScreen() {
     estimeSerree &&
     (() => {
       const largeurs = [
-        !modeElec && piecesTravaux.length > 0 ? 34 : 0,
+        // « Liste d'achats » garde son mot, même serrée : voir la pastille.
+        !modeElec && piecesTravaux.length > 0 ? 136 : 0,
         modeElec && totalDevis !== null && totalDevis > 0 ? 96 : 0,
         modeElec ? 34 : 0,
         !modeElec && alertesDePlan > 0 ? 34 : 0,
@@ -3624,7 +3625,8 @@ export function ResultScreen() {
     estimeCourt ? 2 : estimeSerree ? 1 : 0,
     mesureRangee.cle === cleRangee ? mesureRangee.cran : 0,
   );
-  const rangeeSerree = cranRangee >= 1;
+  // Cran 1 : la liste d'achats perdait son mot ; elle le garde désormais
+  // (revue de lisibilité), les crans suivants serrent le reste.
   const explorerCourt = cranRangee >= 2;
   const rangeeEnIcones = cranRangee >= 3;
   const explorerIcone = cranRangee >= 4;
@@ -3931,15 +3933,24 @@ export function ResultScreen() {
                     offerte au particulier qui n'a jamais vu la norme. On lit
                     maintenant de haut en bas : acheter, RELEVER, DESSINER,
                     corriger, le métier, puis le dossier lui-même.
+
+                    ET EN SECTIONS TITRÉES — revue de lisibilité : douze
+                    entrées à plat, et deux paires qui portaient la même
+                    icône (le rouleau pour les achats et Décorer, la même
+                    flèche pour scanner et dessiner un étage). Quatre blocs
+                    — Votre projet, Ajouter, Modifier, Version —, et une
+                    icône par entrée. Aucune entrée retirée.
                   */
                   {
                     /*
-                      CE QU'IL FAUT ACHETER — en tête du menu, pour tout le
+                      LA LISTE D'ACHATS — en tête du menu, pour tout le
                       monde. C'est la question qu'un particulier se pose
-                      devant le plan de son salon.
+                      devant le plan de son salon. Un seul nom, celui de la
+                      pastille : « Liste d'achats ».
                     */
-                    label: 'Ce qu’il faut acheter',
-                    icon: 'rouleau' as const,
+                    section: 'Votre projet',
+                    label: 'Liste d’achats',
+                    icon: 'panier' as const,
                     hint: 'Peinture, sol, plinthes : les quantités, pièce par pièce.',
                     onPress: () => setTravauxOuvert(true),
                   },
@@ -3948,6 +3959,7 @@ export function ResultScreen() {
                       DÉCORER — les couleurs des murs, le sol, les meubles. On
                       passe en 3D : c'est là qu'on voit ce qu'on change.
                     */
+                    section: 'Votre projet',
                     label: 'Décorer',
                     icon: 'rouleau' as const,
                     hint: 'Murs, sol et couleur des meubles, vus en 3D.',
@@ -3969,6 +3981,7 @@ export function ResultScreen() {
                      */
                     // Revue « Léa » : « Scanner une pièce » à côté de
                     // « Ajouter une pièce », deux gestes, un même mot.
+                    section: 'Ajouter',
                     label: 'Scanner une autre pièce',
                     icon: 'scanner' as const,
                     hint: 'La chambre, la salle de bains… réunie à ce plan.',
@@ -3998,6 +4011,7 @@ export function ResultScreen() {
                       le pose d'aplomb, cage d'escalier contre cage
                       d'escalier.
                     */
+                    section: 'Ajouter',
                     label: 'Scanner un étage',
                     icon: 'etage' as const,
                     hint:
@@ -4009,6 +4023,7 @@ export function ResultScreen() {
                     },
                   },
                   {
+                    section: 'Ajouter',
                     label: 'Scanner un sous-sol',
                     icon: 'soussol' as const,
                     hint: 'Cave, garage : il se range sous le plan.',
@@ -4023,8 +4038,10 @@ export function ResultScreen() {
                       feuille « Ajouter une pièce » avec lui, et la première
                       pièce se pose d'aplomb sur le niveau d'à côté.
                     */
+                    section: 'Ajouter',
                     label: 'Dessiner un étage',
-                    icon: 'etage' as const,
+                    // Le crayon : on DESSINE, la flèche double reste au scan.
+                    icon: 'crayon' as const,
                     hint: 'Un niveau vide au-dessus : ses pièces se posent aux cotes, d’aplomb.',
                     onPress: () => {
                       useScanStore.getState().allerAuNiveau(Math.max(...niveaux) + 1);
@@ -4033,8 +4050,9 @@ export function ResultScreen() {
                     },
                   },
                   {
+                    section: 'Ajouter',
                     label: 'Dessiner un sous-sol',
-                    icon: 'soussol' as const,
+                    icon: 'crayonCadre' as const,
                     hint: 'Un niveau vide en dessous, dessiné de la même façon.',
                     onPress: () => {
                       useScanStore.getState().allerAuNiveau(Math.min(...niveaux) - 1);
@@ -4061,6 +4079,7 @@ export function ResultScreen() {
                      * pièce aux cotes qu'on donne, en pointillés, et tout
                      * ce qui reste à faire se lit sur elle.
                      */
+                    section: 'Ajouter',
                     label: 'Dessiner une pièce à la main',
                     icon: 'piece' as const,
                     hint: 'Elle se pose devant vous : poussez-la, étirez ses côtés.',
@@ -4070,6 +4089,7 @@ export function ResultScreen() {
                     },
                   },
                   {
+                    section: 'Ajouter',
                     label: 'Ajouter un mur',
                     icon: 'regle' as const,
                     hint: 'Aux cotes du mètre. En T : touchez un mur, puis « Cloison ».',
@@ -4141,6 +4161,7 @@ export function ResultScreen() {
                      * déclenchait qu'en passant par « Redresser », qui bouge
                      * la géométrie des murs par-dessus le marché.
                      */
+                    section: 'Modifier',
                     label: 'Redétecter les pièces',
                     icon: 'redetecter' as const,
                     // Une ligne, pas un mode d'emploi : ce que la fonction
@@ -4164,6 +4185,7 @@ export function ResultScreen() {
                           Les applications de plan dessinent du neuf ; celle-ci
                           sait aussi lire ce qui est déjà là.
                         */
+                        section: 'Modifier',
                         label: 'Relever le tableau existant',
                         icon: 'tableau' as const,
                         hint: existant?.departs.length
@@ -4180,6 +4202,7 @@ export function ResultScreen() {
                           elle le DIT — un outil qui ne répond rien laisse croire
                           qu'il n'a pas compris la demande.
                         */
+                        section: 'Modifier',
                         label: 'Normes auto',
                         // Le bouclier de la pastille de contrôle — relevé du
                         // patron : c'est le même sujet, c'est le même dessin.
@@ -4216,8 +4239,9 @@ export function ResultScreen() {
                             croire au particulier que l'app ne savait pas
                             poser une prise.
                           */
+                          section: 'Modifier',
                           label: 'Placer prises et interrupteurs',
-                          icon: 'tableau' as const,
+                          icon: 'prise' as const,
                           hint:
                             'Prises, éclairage, normes NF C 15-100 et devis — ' +
                             'pour prévoir l’électricité de votre logement.',
@@ -4238,8 +4262,9 @@ export function ResultScreen() {
                       l'enregistrait par-dessus. On range la version
                       actuelle telle qu'elle est, puis on ouvre sa copie.
                     */
+                    section: 'Version',
                     label: 'Dupliquer pour essayer une autre version',
-                    icon: 'sauver' as const,
+                    icon: 'dupliquer' as const,
                     hint: 'Le plan actuel reste intact.',
                     /*
                       INTACT, VRAIMENT — revue « Fatou » : les modifications
@@ -4264,8 +4289,11 @@ export function ResultScreen() {
                       }),
                   },
                   {
-                    label: 'Renommer le scan',
-                    icon: 'renommer' as const,
+                    section: 'Version',
+                    // « le plan », comme « Mes plans » ; l'étiquette : on
+                    // change le nom écrit dessus.
+                    label: 'Renommer le plan',
+                    icon: 'etiquette' as const,
                     onPress: () => {
                       setNameInput(scanName);
                       setRenaming(true);
@@ -4289,8 +4317,9 @@ export function ResultScreen() {
                   ...(dirty && currentSaveId
                     ? [
                         {
+                          section: 'Version',
                           label: 'Revenir à la version enregistrée',
-                          icon: 'supprimer' as const,
+                          icon: 'revenir' as const,
                           hint: 'Jette tout depuis le dernier enregistrement.',
                           onPress: () => {
                             alerte(
@@ -4314,8 +4343,10 @@ export function ResultScreen() {
                       ]
                     : []),
                   {
+                    section: 'Version',
                     label: 'Nouveau scan',
-                    icon: 'scanner' as const,
+                    // Le scanner est déjà à « Scanner une autre pièce ».
+                    icon: 'nouveau' as const,
                     onPress: nouveauScan,
                   },
                 ],
@@ -5226,31 +5257,31 @@ export function ResultScreen() {
             */}
             {!modeElec && piecesTravaux.length > 0 && (
               <TouchableOpacity
-                style={[styles.vuePastille, rangeeSerree && styles.pastilleIcone]}
+                style={styles.vuePastille}
                 // Revue « Bernard » : « Travaux » ici, « Ce qu'il faut
                 // acheter » au menu — deux noms pour une feuille. Et 34 pt
                 // de haut : la zone de toucher déborde jusqu'à 44.
-                accessibilityLabel="Achats"
-                accessibilityHint="Ce qu’il faut acheter : peinture, sol, plinthes"
+                /*
+                  UN PANIER, PAS UN ROULEAU — revue de lisibilité : la liste
+                  et « Décorer » portaient le même rouleau, à deux pouces
+                  l'un de l'autre. Le rouleau reste à Décorer ; la liste
+                  prend le panier, et un seul nom partout : « Liste
+                  d'achats ». Le mot reste aussi en 3D, où la rangée serrée
+                  ne laissait qu'une icône qu'on confondait.
+                */
+                accessibilityLabel="Liste d’achats"
+                accessibilityHint="Peinture, sol, plinthes : les quantités"
                 hitSlop={{ top: 5, bottom: 5, left: 4, right: 4 }}
                 onPress={() => {
                   haptic('leger');
                   setTravauxOuvert(true);
                 }}>
                 <Svg width={16} height={16} viewBox="0 0 24 24">
-                  {['M4 4 h13 v5 h-13 z', 'M17 6.5 h2.5 v5 h-7.5 v3', 'M12 14.5 v6'].map((d) => (
-                    <Trace
-                      key={d}
-                      d={d}
-                      stroke={teinte.blue}
-                      strokeWidth={2}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      fill="none"
-                    />
-                  ))}
+                  <Trace d={SOLAIRES.panier} fill={teinte.blue} fillRule="evenodd" />
                 </Svg>
-                {!rangeeSerree && <Text style={styles.vuePastilleTexte}>Achats</Text>}
+                <Text style={styles.vuePastilleTexte} numberOfLines={1}>
+                  Liste d’achats
+                </Text>
               </TouchableOpacity>
             )}
             {modeElec && (

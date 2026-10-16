@@ -64,9 +64,14 @@ export const PEIGNE_TOTAL = PEIGNE_BAS + PEIGNE_H + 2 + 14;
   opacité au texte et aux lignes ». Ce peigne explique la rangée ; il ne
   doit pas se disputer le regard avec elle, ni avec le plan qui est le sujet
   de l'écran.
+
+  LES TRAITS SEULS — revue de lisibilité : l'opacité de 0,55 portait aussi
+  le mot, et « Afficher » / « Ajouter » tombait à 2,1:1. Le retrait du mot
+  passe désormais par sa couleur (`inkSoft`, 12 pt, voir `peigneMot`), qui
+  tient le contraste ; seuls les traits gardent leur voile.
 */
 const TRAIT_PEIGNE = '#B6BECB';
-const PEIGNE_OPACITE = 0.55;
+export const PEIGNE_OPACITE = 0.55;
 
 export function RangeeOutils({
   elements,
@@ -271,7 +276,9 @@ export function RangeeOutils({
               // Le peigne part du même bord que la ligne ; il s'étend
               // seulement plus loin quand il doit rejoindre la pile.
               right: colonne.length > 0 ? 4 : bordDroit,
-              opacity: Animated.multiply(anim, PEIGNE_OPACITE),
+              // Le fondu suit les pastilles ; le voile, lui, ne touche que
+              // les traits (plus bas) — le mot reste lisible.
+              opacity: anim,
             },
           ]}
           pointerEvents="none">
@@ -299,7 +306,7 @@ export function RangeeOutils({
             ]}>
             {peigneDemande?.mot}
           </Text>
-          <Svg width={largeurPeigne} height={hauteurSvg}>
+          <Svg width={largeurPeigne} height={hauteurSvg} opacity={PEIGNE_OPACITE}>
             {/* La barre ne court que d'une descente à l'autre : débordante,
                 elle ferait un cadre, et l'on annoterait la carte entière. */}
             <Line

@@ -277,7 +277,7 @@ describe('les rangées de réglages', () => {
     useScanStore.setState({ saves: [] });
     const a = rendre(<ProfilScreen />);
     act(() => {
-      parLabel(a, 'Mes scans')?.props.onPress();
+      parLabel(a, 'Mes plans')?.props.onPress();
     });
     expect(useScanStore.getState().screen).toBe('library');
   });

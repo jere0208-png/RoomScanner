@@ -419,11 +419,14 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     avec lui, loin de la rangée qu'il nomme. Sa hauteur et sa largeur —
     celle de la ligne — viennent du peigne, qui seul les connaît.
   */
+  /* Revue de lisibilité : 11 pt d'`inkFaint` sous un voile de 0,55 faisait
+     2,1:1. Le mot passe en `inkSoft`, 12,5 pt, sans voile : il reste en
+     retrait par sa couleur, et il se lit. */
   peigneMot: {
     position: 'absolute',
     textAlign: 'center',
-    color: c.inkFaint,
-    fontSize: 11,
+    color: c.inkSoft,
+    fontSize: 12.5,
     fontWeight: '700',
   },
   wallStrip: {

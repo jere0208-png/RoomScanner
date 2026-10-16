@@ -228,11 +228,11 @@ describe('la bibliothèque des relevés', () => {
       });
     });
     // Avant l'échéance, rien n'est décollé : un appui bref reste un appui.
-    expect(dits(tree)).not.toContain('Amenez le scan');
+    expect(dits(tree)).not.toContain('Amenez le plan');
     act(() => {
       jest.advanceTimersByTime(HOLD_MS + 120);
     });
-    expect(dits(tree)).toContain('Amenez le scan sur un dossier');
+    expect(dits(tree)).toContain('Amenez le plan sur un dossier');
     /*
       ET LE GLISSEMENT LUI REVIENT : sans ça la bulle reste collée au doigt
       sans jamais bouger, c'est la liste qui défile sous elle.
@@ -314,7 +314,7 @@ describe('la bibliothèque des relevés', () => {
     });
     // Un appui long qui ne produit rien se lit comme une panne. Dedans, la
     // destination n'est pas un autre dossier : c'est la sortie.
-    expect(dits(tree)).toContain('Remontez le scan');
+    expect(dits(tree)).toContain('Remontez le plan');
   });
 
   it('propose de sortir un relevé quand on est dans un dossier', () => {

@@ -19,7 +19,7 @@
  *     exemple, comprendre — les quatre portes d'une application qu'on
  *     découvre, et le moulinet est ce qu'on reconnaît d'un coup d'œil. La
  *     marque n'apparaît qu'une fois, là, en noir, et elle « écoute » ;
- *   — VOS PLANS : les trois derniers, avec leur vignette, ouverts d'un
+ *   — MES PLANS : les trois derniers, avec leur vignette, ouverts d'un
  *     appui. Le relevé interrompu passe en tête. Pour qui n'a encore rien,
  *     une carte dit où ils apparaîtront.
  *
@@ -37,6 +37,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -114,11 +115,26 @@ export const RECHERCHE_DES = 6;
 export const PLANS_A_LACCUEIL = 3;
 
 /* Hauteurs du moulinet : chaque colonne fait la même hauteur totale, mais
-   pas au même endroit — c'est ce décalage qui fait tourner l'ensemble. */
-const HAUTE = 152;
-const BASSE = 126;
+   pas au même endroit — c'est ce décalage qui fait tourner l'ensemble.
+   Ce sont des hauteurs MINIMALES (revue de lisibilité : à hauteur fixe, les
+   sous-titres se coupaient en « Avec vos mesures, san… ») : une tuile dont
+   le texte grandit grandit avec lui, et le moyeu suit la coupe mesurée. */
+export const HAUTE = 152;
+export const BASSE = 126;
 const ECART = 12;
 const MOYEU = 56;
+/**
+ * Au-delà de ce grossissement du texte (réglage « Taille du texte » d'iOS),
+ * deux tuiles côte à côte ne laissent plus qu'un mot par ligne : le
+ * moulinet se déplie en une colonne.
+ */
+export const GRAND_TEXTE = 1.35;
+
+/**
+ * LE SCAN DEMANDE LE CAPTEUR — dit avec les mots de l'Apple Store, pas
+ * « iPhone Pro » : l'iPad Pro en a un aussi, et l'iPhone 15 n'en a pas.
+ */
+export const PHRASE_LIDAR = 'iPhone ou iPad avec capteur LiDAR';
 
 export function HomeScreen() {
   const supported = useScanStore((s) => s.supported);
@@ -143,6 +159,15 @@ export function HomeScreen() {
   const styles = getStyles(c);
   const insets = useSafeAreaInsets();
   const teintes = sombre ? TEINTES_TUILES.sombre : TEINTES_TUILES.clair;
+  const { fontScale } = useWindowDimensions();
+  const uneColonne = fontScale > GRAND_TEXTE;
+  /*
+    LE MOYEU SE POSE SUR LA COUPE MESURÉE — les tuiles ont une hauteur
+    minimale, plus une hauteur fixe : il suit donc la hauteur réelle des
+    deux tuiles du haut, et non plus deux constantes.
+  */
+  const [hautGauche, setHautGauche] = useState(HAUTE);
+  const [hautDroite, setHautDroite] = useState(BASSE);
 
   useEffect(() => {
     RoomScan.isSupported().then(setSupported);
@@ -351,23 +376,33 @@ export function HomeScreen() {
               cerné du fond de la page — il « mord » dans les quatre coins
               intérieurs, comme un rivet.
             */}
-            <View style={styles.moulinet}>
-              <View style={styles.colonne}>
+            <View style={[styles.moulinet, uneColonne && styles.moulinetColonne]}>
+              <View style={[styles.colonne, uneColonne && styles.colonneEntiere]}>
                 <Animated.View style={fadeIn(3, true)}>
                   {scanIndisponible ? (
+                    /*
+                      LA TUILE ÉTEINTE SE LIT — revue de lisibilité : grisée à
+                      50 %, elle tombait à 2:1, et seule une phrase plus bas
+                      disait pourquoi. Elle garde son opacité, prend un fond
+                      neutre et un cadenas qui dit « Indisponible » ; plus de
+                      flèche, puisqu'elle n'ouvre rien ; et son appui propose
+                      le dessin, la porte qui reste.
+                    */
                     <Tuile
                       c={c}
-                      fond={teintes.scan}
+                      fond={c.surfaceSunken}
                       hauteur={HAUTE}
                       icone={SOLAIRES.scanner}
                       titre={'Scanner\nmon logement'}
-                      sous="Demande un iPhone Pro"
+                      sous={PHRASE_LIDAR}
                       label="Scan indisponible sur cet appareil"
                       eteinte
+                      onLayout={setHautGauche}
                       onPress={() =>
                         alerte(
-                          'Scan indisponible',
-                          'Le scan demande un iPhone Pro (capteur LiDAR). Tout le reste fonctionne : dessinez votre plan aux cotes, ou ouvrez l’exemple.',
+                          'Scan indisponible ici',
+                          `Le scan demande un ${PHRASE_LIDAR}. Tout le reste fonctionne : dessinez le plan avec vos mesures, ou ouvrez l’exemple.`,
+                          [{ label: 'Plus tard' }, { label: 'Dessiner le plan', onPress: dessiner }],
                         )
                       }
                     />
@@ -378,9 +413,10 @@ export function HomeScreen() {
                       hauteur={HAUTE}
                       icone={SOLAIRES.scanner}
                       titre={'Scanner\nmon logement'}
-                      sous={supported === null ? 'Vérification…' : 'De pièce en pièce, sans arrêter'}
+                      sous={supported === null ? 'Vérification…' : 'Pièce après pièce'}
                       label="Commencer le scan"
                       desactivee={supported !== true}
+                      onLayout={setHautGauche}
                       onPress={scanner}
                     />
                   )}
@@ -398,7 +434,7 @@ export function HomeScreen() {
                   />
                 </Animated.View>
               </View>
-              <View style={styles.colonne}>
+              <View style={[styles.colonne, uneColonne && styles.colonneEntiere]}>
                 <Animated.View style={fadeIn(4, true)}>
                   <Tuile
                     c={c}
@@ -406,8 +442,10 @@ export function HomeScreen() {
                     hauteur={BASSE}
                     icone={SOLAIRES.crayon}
                     titre={'Dessiner\nun plan'}
-                    sous="Avec vos mesures, sans scanner"
+                    // Plus court : il se coupait en « Avec vos mesures, san… ».
+                    sous="Avec vos mesures"
                     label="Dessiner un plan sans scanner"
+                    onLayout={setHautDroite}
                     onPress={dessiner}
                   />
                 </Animated.View>
@@ -424,8 +462,8 @@ export function HomeScreen() {
                     icone={SOLAIRES.planPapier}
                     titre={'Lire un\nplan papier'}
                     // Revue « Sophie » : avec un PDF en main, « une photo »
-                    // faisait hésiter.
-                    sous="Photo ou PDF de l’architecte"
+                    // faisait hésiter. Et « … de l'architecte » se coupait.
+                    sous="Photo ou PDF"
                     label="Lire un plan papier"
                     onPress={lirePlanPapier}
                   />
@@ -437,16 +475,29 @@ export function HomeScreen() {
                 après l'autre, comme un écho, et l'angle des murs s'éclaire
                 quand l'onde l'atteint — un mur détecté. Voir `LogoEcho`.
               */}
-              <View pointerEvents="none" style={styles.moyeu}>
-                <LogoEcho size={34} teinte={c.ink} />
-              </View>
+              {/* En une colonne, il n'y a plus de croisement où le poser. */}
+              {!uneColonne && (
+                <View
+                  pointerEvents="none"
+                  style={[styles.moyeu, { top: (hautGauche + hautDroite + ECART) / 2 }]}>
+                  <LogoEcho size={34} teinte={c.ink} />
+                </View>
+              )}
             </View>
 
             {scanIndisponible && (
-              <Text style={styles.avis}>
-                Cet appareil n’est pas compatible avec le scan (il faut un iPhone Pro,
-                capteur LiDAR). Dessinez votre plan aux cotes : tout le reste fonctionne.
-              </Text>
+              <View style={styles.avisBloc} testID="avis-lidar">
+                <Text style={styles.avis}>
+                  {`Le scan demande un ${PHRASE_LIDAR}. Pas de souci : dessinez le plan avec vos mesures, tout le reste fonctionne.`}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Dessiner le plan"
+                  hitSlop={10}
+                  onPress={dessiner}>
+                  <Text style={styles.avisLien}>Dessiner le plan</Text>
+                </Pressable>
+              </View>
             )}
           </>
         )}
@@ -458,22 +509,24 @@ export function HomeScreen() {
         )}
 
         {/*
-          VOS PLANS — les derniers touchés, sur l'accueil même. L'en-tête
+          MES PLANS — les derniers touchés, sur l'accueil même. L'en-tête
           porte la porte de la bibliothèque, avec son compte.
         */}
         {(saves.length > 0 || brouillon) && (
           <Animated.View style={fadeIn(7)}>
             <View style={styles.sectionLigne}>
-              <Text style={styles.sectionTitre}>{cherche ? 'Résultats' : 'Vos plans'}</Text>
+              {/* « Mes plans », comme la bibliothèque qu'il ouvre (c'était
+                  « Vos plans » ici, « Mes scans » là-bas). */}
+              <Text style={styles.sectionTitre}>{cherche ? 'Résultats' : 'Mes plans'}</Text>
               {saves.length > 0 && (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Mes scans"
+                  accessibilityLabel="Mes plans"
                   hitSlop={10}
                   style={styles.toutVoir}
                   onPress={() => setScreen('library')}>
                   <Text style={styles.toutVoirTexte}>Tout voir</Text>
-                  <View accessibilityLabel="Nombre de scans" style={styles.compteur}>
+                  <View accessibilityLabel="Nombre de plans" style={styles.compteur}>
                     <Text style={styles.compteurTexte}>{saves.length}</Text>
                   </View>
                 </Pressable>
@@ -547,12 +600,12 @@ export function HomeScreen() {
         )}
 
         {/*
-          VOS PLANS, AVANT LE PREMIER — la place ne reste pas vide : une
+          MES PLANS, AVANT LE PREMIER — la place ne reste pas vide : une
           carte dit ce qui viendra s'y ranger, et comment l'y faire venir.
         */}
         {saves.length === 0 && !brouillon && (
           <Animated.View style={fadeIn(7)}>
-            <Text style={[styles.sectionTitre, styles.sectionSeule]}>Vos plans</Text>
+            <Text style={[styles.sectionTitre, styles.sectionSeule]}>Mes plans</Text>
             <View style={styles.videCarte} testID="plans-vide">
               <View style={styles.videVignette}>
                 <Svg width={44} height={34} viewBox="0 0 44 34">
@@ -608,9 +661,11 @@ function Tuile({
   onPress,
   desactivee,
   eteinte,
+  onLayout,
 }: {
   c: Palette;
   fond: string;
+  /** La hauteur MINIMALE : le texte peut la faire grandir. */
   hauteur: number;
   icone: string;
   titre: string;
@@ -618,7 +673,10 @@ function Tuile({
   label: string;
   onPress: () => void;
   desactivee?: boolean;
+  /** Indisponible sur cet appareil : neutre, lisible, un cadenas, pas de flèche. */
   eteinte?: boolean;
+  /** La hauteur réelle, pour poser le moyeu sur la coupe. */
+  onLayout?: (hauteur: number) => void;
 }) {
   const styles = getStyles(c);
   const appui = useRef(new Animated.Value(1)).current;
@@ -639,10 +697,11 @@ function Tuile({
         onPress();
       }}>
       <Animated.View
+        onLayout={onLayout ? (e) => onLayout(e.nativeEvent.layout.height) : undefined}
         style={[
           styles.tuile,
-          { backgroundColor: fond, height: hauteur, transform: [{ scale: appui }] },
-          (desactivee || eteinte) && styles.tuileEteinte,
+          { backgroundColor: fond, minHeight: hauteur, transform: [{ scale: appui }] },
+          eteinte && styles.tuileEteinte,
         ]}>
         {/*
           LE ROND DE L'ICÔNE SE RESSERRE, PAS L'ICÔNE ; LA FLÈCHE SE FAIT
@@ -657,20 +716,34 @@ function Tuile({
               <Path d={icone} fill={c.ink} fillRule="evenodd" />
             </Svg>
           </View>
-          <View style={[styles.rondFleche, { backgroundColor: pastille }]}>
-            <Svg width={12} height={12} viewBox="0 0 24 24">
-              <Path d="M7 17 17 7M9 7h8v8" stroke={c.ink} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            </Svg>
-          </View>
+          {eteinte ? (
+            <View style={styles.cadenas} testID="cadenas-scan">
+              <Svg width={11} height={11} viewBox="0 0 24 24">
+                <Path d={CADENAS} fill={c.inkSoft} fillRule="evenodd" />
+              </Svg>
+              <Text style={styles.cadenasMot}>Indisponible</Text>
+            </View>
+          ) : desactivee ? null : (
+            <View style={[styles.rondFleche, { backgroundColor: pastille }]} testID="fleche-tuile">
+              <Svg width={12} height={12} viewBox="0 0 24 24">
+                <Path d="M7 17 17 7M9 7h8v8" stroke={c.ink} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </Svg>
+            </View>
+          )}
         </View>
-        <View>
-          <Text style={styles.tuileTitre}>{titre}</Text>
-          <Text style={styles.tuileSous} numberOfLines={1}>{sous}</Text>
+        <View style={styles.tuileBas}>
+          <Text style={[styles.tuileTitre, eteinte && styles.tuileTitreEteint]}>{titre}</Text>
+          {/* Deux lignes : un sous-titre coupé ne dit plus rien. */}
+          <Text style={styles.tuileSous} numberOfLines={2}>{sous}</Text>
         </View>
       </Animated.View>
     </Pressable>
   );
 }
+
+/** Un petit cadenas plein : l'anse et le corps. */
+const CADENAS =
+  'M12 2.5a5 5 0 0 0-5 5V10H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8a2 2 0 0 0-2-2h-1V7.5a5 5 0 0 0-5-5Zm3 7.5V7.5a3 3 0 1 0-6 0V10h6Z';
 
 /** Un plan de l'accueil : sa vignette, son nom, ce qu'il contient, quand. */
 function CartePlan({
@@ -798,13 +871,28 @@ const getStyles = themedStyles((c: Palette) => {
       marginBottom: 12,
     },
     moulinet: { flexDirection: 'row', gap: ECART },
+    moulinetColonne: { flexDirection: 'column' },
     colonne: { flex: 1, gap: ECART },
+    colonneEntiere: { flex: 0 },
     tuile: {
       borderRadius: 26,
       padding: 14,
       justifyContent: 'space-between',
     },
-    tuileEteinte: { opacity: 0.5 },
+    /* Pleine opacité : le fond neutre et le cadenas disent « éteinte ». */
+    tuileEteinte: { borderWidth: StyleSheet.hairlineWidth, borderColor: c.lineStrong },
+    tuileTitreEteint: { color: c.inkSoft },
+    tuileBas: { marginTop: 10 },
+    cadenas: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: c.surface,
+    },
+    cadenasMot: { color: c.inkSoft, fontSize: 12, fontWeight: '600' },
     tuileHaut: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
     rondIcone: {
       width: 32,
@@ -839,7 +927,9 @@ const getStyles = themedStyles((c: Palette) => {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avis: { color: c.inkSoft, fontSize: 13, lineHeight: 18, marginTop: 12 },
+    avisBloc: { marginTop: 12, gap: 6 },
+    avis: { color: c.inkSoft, fontSize: 13, lineHeight: 18 },
+    avisLien: { color: c.blue, fontSize: 14, fontWeight: '600' },
     erreur: {
       backgroundColor: c === dark ? '#3A1517' : '#FDECEC',
       borderRadius: radius.md,
