@@ -498,15 +498,18 @@ export function HomeScreen() {
         </Animated.View>
 
         {/*
-          LE MOT D'ACCUEIL — une ligne de salut à l'encre, une ligne de
-          question en retrait, plus petite : on lit qui l'on est, puis ce
-          qu'on vient faire, et les tuiles restent au-dessus du pli.
+          LE MOT D'ACCUEIL — un grand titre en deux tons : le salut à
+          l'encre, la question en retrait, À LA MÊME TAILLE. La revue des
+          découvreurs l'avait réduite en petit sous-titre ; le patron l'a
+          remise en grand (« remets-le comme avant, plus grand, plus
+          moderne »). Chacun sur sa ligne : les tuiles restent au-dessus du
+          pli.
         */}
         <Animated.View style={fadeIn(1)}>
           <Text style={styles.salut} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit>
             {`${salutation()}${prenom ? `, ${prenom}` : ''}.`}
           </Text>
-          <Text style={styles.question} numberOfLines={1} testID="question-du-jour">
+          <Text style={styles.question} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85} testID="question-du-jour">
             {question}
           </Text>
         </Animated.View>
@@ -915,13 +918,20 @@ const getStyles = themedStyles((c: Palette) => {
     profilBloc: { padding: 2 },
     salut: {
       color: c.ink,
-      fontSize: 28,
-      lineHeight: 34,
+      fontSize: 30,
+      lineHeight: 36,
       fontWeight: '700',
       letterSpacing: -0.8,
-      marginTop: 14,
+      marginTop: 18,
     },
-    question: { color: c.inkSoft, fontSize: 16, lineHeight: 21, fontWeight: '500', marginTop: 2 },
+    // Le second ton du titre : même corps, même graisse, la couleur en retrait.
+    question: {
+      color: c.inkFaint,
+      fontSize: 30,
+      lineHeight: 36,
+      fontWeight: '700',
+      letterSpacing: -0.8,
+    },
     recherche: {
       marginTop: 18,
       height: 46,

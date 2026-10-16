@@ -138,17 +138,22 @@ describe('la question d’usage parle au particulier', () => {
 });
 
 describe('l’en-tête tient en deux lignes', () => {
-  it('une ligne de salut, une ligne de question plus petite, séparées', () => {
+  /*
+    MIS À JOUR — le patron : « le sous-titre est devenu tout petit, remets-le
+    comme avant, plus grand, plus moderne ». Un grand titre en deux tons : la
+    question à la même taille que le salut, en retrait de couleur.
+  */
+  it('un salut et une question au même grand corps, deux tons, chacun sa ligne', () => {
     const t = monter();
     const salut = t.root.findAll((n) => n.type === Text && n.props.accessibilityRole === 'header')[0];
     expect(salut.props.numberOfLines).toBe(1);
-    // Le salut ne porte plus la question dans le même bloc de 30 points.
     expect([].concat(salut.props.children).join('')).not.toContain('?');
     const question = t.root.findAll((n) => n.type === Text && n.props.testID === 'question-du-jour')[0];
-    expect(question.props.numberOfLines).toBe(1);
-    const tailleSalut = (StyleSheet.flatten(salut.props.style) as { fontSize: number }).fontSize;
-    const tailleQuestion = (StyleSheet.flatten(question.props.style) as { fontSize: number }).fontSize;
-    expect(tailleQuestion).toBeLessThan(tailleSalut * 0.7);
+    const st = StyleSheet.flatten(salut.props.style) as { fontSize: number; color: string };
+    const qt = StyleSheet.flatten(question.props.style) as { fontSize: number; color: string };
+    expect(qt.fontSize).toBe(st.fontSize);
+    expect(qt.fontSize).toBeGreaterThanOrEqual(28);
+    expect(qt.color).not.toBe(st.color);
     expect(String(question.props.children).length).toBeLessThanOrEqual(30);
   });
 });
