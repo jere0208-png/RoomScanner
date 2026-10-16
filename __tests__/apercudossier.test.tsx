@@ -141,6 +141,20 @@ const bâtir = async () => {
   });
 };
 
+/*
+  L'ENVOI ATTEND UNE IMAGE — revue I5 : l'export pose « Préparation… » et
+  laisse passer une image avant le calcul (synchrone), pour que le bouton
+  éteint se voie. Sous horloge simulée, il faut donc la faire avancer.
+*/
+const laisserPartir = async () => {
+  await act(async () => {
+    jest.advanceTimersByTime(50);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+};
+
 const textes = (t: TestRenderer.ReactTestRenderer) =>
   t.root
     .findAllByType(Text)
@@ -196,6 +210,7 @@ describe('abonné : le dossier net, et il part', () => {
     await act(async () => {
       await b.props.onPress();
     });
+    await laisserPartir();
     expect(partager).toHaveBeenCalledTimes(1);
   });
 
@@ -219,9 +234,10 @@ describe('abonné : le dossier net, et il part', () => {
     const a = useAlerte.getState().courante;
     expect(a?.titre).toBe('Le client n’est pas renseigné');
     expect(partager).not.toHaveBeenCalled();
-    await act(async () => {
-      await a.actions.find((x: { label: string }) => x.label === 'Exporter quand même').onPress();
+    act(() => {
+      a.actions.find((x: { label: string }) => x.label === 'Exporter quand même').onPress();
     });
+    await laisserPartir();
     expect(partager).toHaveBeenCalledTimes(1);
   });
 });

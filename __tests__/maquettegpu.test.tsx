@@ -206,6 +206,11 @@ describe('la vue 3D', () => {
     expect(vue.props.orientes.length).toBeGreaterThan(1000);
     expect(vue.props.orbite).toHaveLength(10);
     expect(t.root.findAll((n) => Array.isArray(n.props?.formes))).toHaveLength(0);
+    // La silhouette d'attente (revue I5) porte des tracés jusqu'à la première
+    // image native : on la laisse s'effacer, comme sur l'appareil.
+    act(() => {
+      vue.props.onPremiereImage();
+    });
     // Aucun tracé de géométrie ne reste à peindre en JavaScript.
     expect(t.root.findAll((n) => typeof n.props?.d === 'string' && n.props.d.length > 2)).toHaveLength(0);
   });

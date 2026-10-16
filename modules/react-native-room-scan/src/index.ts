@@ -415,6 +415,12 @@ export const RoomScanVisite = UIManager.getViewManagerConfig?.(
         texturees?: number[];
         /* La clé par laquelle `poserCameraDeVisite` retrouve la vue. */
         cle?: string;
+        /*
+          LA PREMIÈRE IMAGE RENDUE avec le bâti posé : l'écran retire alors
+          sa silhouette d'attente (voir `Iso3DView`). Un binaire antérieur ne
+          l'émet pas ; l'appelant prévoit un délai de secours.
+        */
+        onPremiereImage?: () => void;
       }
     >('RoomScanVisite')
   : undefined;

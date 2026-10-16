@@ -26,6 +26,7 @@ import { ombreBouton, themedStyles, useTheme, type Palette } from '../theme';
 import { useGeste } from '../store/geste';
 import { haptic } from '../ui/haptic';
 import { useBulle } from '../ui/bulle';
+import { useReduceMotion } from '../ui/useReduceMotion';
 
 export type ToolIcon =
   /* La nuit de la maquette : on éteint pour voir les lumières s'allumer. */
@@ -256,8 +257,16 @@ export function ToolPill({
     JavaScript, à chaque image — le fil même qui suit le doigt quand on tire
     un mur. Un instant immobiles pendant le geste, elles repartent au lâcher.
   */
+  /*
+    ET PAS DU TOUT SI L'ON A DEMANDÉ MOINS D'ANIMATIONS — revue I5. La boucle
+    reste sur le fil JavaScript (le décalage d'un pointillé SVG n'a pas
+    d'équivalent natif, et la retirer reviendrait sur la demande du patron),
+    mais « Réduire les animations » la fige : le contour reste pointillé,
+    immobile, et dit toujours « vous modifiez ».
+  */
   const enGeste = useGeste((s) => s.enCours);
-  const tourne = halo && active && !enGeste;
+  const reduit = useReduceMotion();
+  const tourne = halo && active && !enGeste && !reduit;
   useEffect(() => {
     if (!tourne) return;
     fourmis.setValue(0);
@@ -274,15 +283,14 @@ export function ToolPill({
   }, [tourne, fourmis]);
   // Icône noire sur fond blanc ; blanche sur bleu quand l'outil est actif.
   const stroke = eteint ? c.inkFaint : plein ? '#FFFFFF' : active ? c.blue : c.ink;
-  /**
-   * Actif = un contour, POSÉ. Il ne respire plus.
-   *
-   * Il est passé par un arc tournant, puis par un liséré en fondu. Les deux
-   * attiraient l'œil en permanence : quelque chose qui bouge dans un coin
-   * de l'écran se lit comme une attente, et il n'y a rien à attendre — le
-   * bouton dit seulement « vous êtes en train de modifier ». Un contour
-   * franc le dit une fois, et se tait.
-   */
+  /*
+    Actif = un contour pointillé qui défile, LE TEMPS DE L'ÉDITION seulement
+    (voir « Les fourmis » plus haut). Il a été un arc tournant, puis un
+    liseré en fondu qui respirait en permanence : écartés tous deux. Le
+    commentaire qui disait « il ne respire plus » datait de cette époque —
+    revue I5 : il décrivait un contour immobile pendant que la boucle
+    tournait.
+  */
   return (
     <View style={styles.toolCell} ref={cellule}>
       <TouchableOpacity

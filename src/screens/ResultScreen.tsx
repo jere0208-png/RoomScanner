@@ -12,6 +12,7 @@ import {
   pastilles,
 } from '../ui/cotesCourantes';
 import {
+  ActivityIndicator,
   Animated,
   Image,
   Easing,
@@ -1612,7 +1613,31 @@ export function ResultScreen() {
   const [capturing, setCapturing] = useState(false);
   const exportOuvert = useAccountStore((st) => st.exportOuvert);
 
+  /*
+    UNE IMAGE À LA FOIS, PRISE QUAND ELLE EST PRÊTE — revue I5.
+
+    Trois défauts dans la même fonction : aucun verrou (deux appuis, deux
+    captures, deux feuilles de partage) ; l'interface se vidait sans un mot
+    le temps de la capture ; et la capture partait après un délai FIXE de 60
+    ou 160 ms, qu'un téléphone occupé dépasse — l'image sortait alors sans
+    ses cotes, ou sans le filigrane. On attend désormais le rendu RÉEL :
+    l'effet qui suit la mise à l'écran de l'état de capture, puis deux
+    images (la première pose, la seconde est affichée). Un garde-fou d'une
+    seconde évite qu'une capture reste suspendue si l'effet ne venait pas.
+  */
+  const captureEnCours = useRef(false);
+  const captureRendue = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (!capturing || !captureRendue.current) return;
+    const pret = captureRendue.current;
+    captureRendue.current = null;
+    requestAnimationFrame(() => requestAnimationFrame(() => pret()));
+  }, [capturing, showMeasures]);
+
   const shareImage = async () => {
+    if (captureEnCours.current) return;
+    captureEnCours.current = true;
+    haptic('leger');
     /*
       LES COTES PARTENT AVEC L'IMAGE — revue « Marie » : le plan rouvert
       avait ses cotes éteintes, et l'image partait sans une seule mesure.
@@ -1620,10 +1645,15 @@ export function ResultScreen() {
       l'état où on les avait laissées.
     */
     const cotesAvant = showMeasures;
-    if (vue === '2d' && !cotesAvant) setShowMeasures(true);
+    let garde: ReturnType<typeof setTimeout> | null = null;
     try {
+      const rendue = new Promise<void>((r) => {
+        captureRendue.current = r;
+        garde = setTimeout(r, 1000);
+      });
+      if (vue === '2d' && !cotesAvant) setShowMeasures(true);
       setCapturing(true);
-      await new Promise<void>((r) => setTimeout(() => r(), cotesAvant ? 60 : 160)); // rendu du watermark et des cotes
+      await rendue;
       const uri = await captureRef(canvasRef, {
         format: 'png',
         quality: 1,
@@ -1636,6 +1666,10 @@ export function ResultScreen() {
       setCapturing(false);
       if (!cotesAvant) setShowMeasures(false);
       alerte(expliquer('capture', e).titre, expliquer('capture', e).message);
+    } finally {
+      if (garde) clearTimeout(garde);
+      captureRendue.current = null;
+      captureEnCours.current = false;
     }
   };
 
@@ -2505,7 +2539,32 @@ export function ResultScreen() {
     D'UNE FENÊTRE À L'AUTRE — iOS refuse d'en présenter une pendant qu'une
     autre se retire : on laisse la première partir.
   */
-  const ouvrirApres = (ouvrir: () => void) => setTimeout(ouvrir, 450);
+  /*
+    ET LE DÉLAI NE SURVIT PAS À L'ÉCRAN — revue I5 : quitter le plan pendant
+    ces quatre cents millisecondes laissait la minuterie ouvrir une feuille
+    sur un écran démonté. Les suites en attente sont rangées, et levées au
+    démontage.
+
+    Le délai reste un délai : la bonne attente serait la fermeture EFFECTIVE
+    (`onClosed` de la coquille, comme le font les menus), mais les feuilles
+    d'où partent ces suites — le tableau existant, le tableau fini,
+    « Décorer » — ne l'exposent pas encore.
+  */
+  const suitesEnAttente = useRef(new Set<ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const suites = suitesEnAttente.current;
+    return () => {
+      suites.forEach((h) => clearTimeout(h));
+      suites.clear();
+    };
+  }, []);
+  const ouvrirApres = (ouvrir: () => void, delai = 450) => {
+    const h = setTimeout(() => {
+      suitesEnAttente.current.delete(h);
+      ouvrir();
+    }, delai);
+    suitesEnAttente.current.add(h);
+  };
 
   /**
    * Volumes de salle d'eau : le seul contrôle où une erreur est dangereuse.
@@ -4981,6 +5040,9 @@ export function ResultScreen() {
             circuits={circuitsDuPlan}
             // L'image partagée sort du rendu que la capture sait lire.
             gpu={!capturing}
+            /* « Décorer » ouvert par-dessus : la maquette du plan, cachée
+               derrière, ne rebâtit pas son logement à chaque teinte. */
+            enPause={decorant}
             value={view3d}
             onChange={setView3d}
             focusRoomId={rooms[focusIdx]?.id ?? null}
@@ -6812,6 +6874,34 @@ export function ResultScreen() {
         )}
 
       </Animated.View>
+      {/*
+        L'ÉCRAN DIT CE QU'IL FAIT PENDANT LA CAPTURE — revue I5 : les
+        boutons disparaissaient d'un coup, sans un mot. Hors du cadre capturé
+        (frère, pas enfant) : la pastille se voit, l'image ne la porte pas.
+      */}
+      {capturing && (
+        <View
+          testID="capture-en-cours"
+          pointerEvents="none"
+          accessibilityLiveRegion="polite"
+          style={{
+            position: 'absolute',
+            top: 12,
+            alignSelf: 'center',
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            borderRadius: 16,
+            backgroundColor: teinte.surface,
+          }}>
+          <ActivityIndicator size="small" color={teinte.inkSoft} />
+          <Text style={{ color: teinte.inkSoft, fontSize: 13, fontWeight: '600' }}>
+            Préparation de l’image…
+          </Text>
+        </View>
+      )}
 
 
       {/*
@@ -7266,7 +7356,7 @@ export function ResultScreen() {
           setDecorant(false);
           // Une feuille à la fois : iOS refuse d'en présenter une pendant
           // que l'autre se retire.
-          setTimeout(() => setTravauxOuvert(true), 400);
+          ouvrirApres(() => setTravauxOuvert(true), 400);
         }}
       />
 

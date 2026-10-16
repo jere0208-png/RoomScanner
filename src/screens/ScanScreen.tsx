@@ -379,6 +379,8 @@ export function ScanScreen() {
     retouche au bureau.
   */
   const terminer = () => {
+    // Déjà en train d'assembler : un second appui ne relance rien (revue I5).
+    if (useScanStore.getState().processing) return;
     if (wallCount < 3 || !(trouContour >= 0.3)) {
       stop();
       return;
@@ -703,7 +705,13 @@ export function ScanScreen() {
             )}
           </Svg>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.stopButton} onPress={terminer}>
+        {/* Pendant l'assemblage, « Terminer » s'efface et ne répond plus. */}
+        <TouchableOpacity
+          style={[styles.stopButton, processing && styles.cacheEnAssemblage]}
+          accessibilityLabel="Terminer"
+          accessibilityState={{ disabled: processing }}
+          disabled={processing}
+          onPress={terminer}>
           <Text style={styles.stopText}>Terminer</Text>
         </TouchableOpacity>
       </View>

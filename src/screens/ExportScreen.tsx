@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import {
+  ActivityIndicator,
   Animated,
   InteractionManager,
   Easing,
@@ -597,7 +598,19 @@ const styles = getStyles(c);
     ainsi. On le rappelle une fois, au moment d'envoyer ; « Exporter quand
     même » reste possible.
   */
+  /*
+    UN SEUL DOSSIER À LA FOIS — revue I5 : deux appuis rapprochés sur
+    « Exporter le PDF » fabriquaient deux documents et ouvraient deux
+    feuilles de partage, sans que rien n'ait bougé à l'écran entre les deux.
+    Le verrou est une RÉFÉRENCE (deux appuis tombent dans le même rendu,
+    un état n'aurait pas encore changé) ; l'état ne sert qu'à le montrer :
+    bouton éteint, « Préparation… ». Il se libère en `finally`, quoi qu'il
+    arrive — échec, annulation du partage.
+  */
+  const exportEnCours = useRef(false);
+  const [preparation, setPreparation] = useState(false);
   const doExport = () => {
+    if (exportEnCours.current) return;
     if (!particulier && !client.trim() && net) {
       alerte('Le client n’est pas renseigné', 'Son nom et l’adresse du chantier s’impriment sur chaque feuille.', [
         { label: 'Le renseigner' },
@@ -612,7 +625,13 @@ const styles = getStyles(c);
     /* L'aperçu est libre, l'export est Pro : la barrière est ici — voir
        `exportOuvert`. */
     if (!exportOuvert('le dossier PDF')) return;
+    if (exportEnCours.current) return;
+    exportEnCours.current = true;
+    setPreparation(true);
     try {
+      // Une image pour que « Préparation… » paraisse avant le calcul, qui
+      // est synchrone et tiendrait le fil jusqu'au partage.
+      await new Promise<void>((r) => requestAnimationFrame(() => r()));
       /**
        * Les photos, relues et réduites AVANT de bâtir le document.
        *
@@ -646,6 +665,9 @@ const styles = getStyles(c);
       await RoomScan.sharePDF(toBase64(bytes), pdfFilename(titreDuDossier));
     } catch (e: any) {
       alerte(expliquer('export', e).titre, expliquer('export', e).message);
+    } finally {
+      exportEnCours.current = false;
+      setPreparation(false);
     }
   };
 
@@ -1330,16 +1352,23 @@ const styles = getStyles(c);
           yeux.
         */}
         <TouchableOpacity
-          style={styles.exportButton}
-          accessibilityLabel={net ? 'Exporter le PDF' : 'Déflouter et télécharger'}
+          style={[styles.exportButton, preparation && styles.exportButtonOccupe]}
+          accessibilityLabel={
+            preparation ? 'Préparation du PDF' : net ? 'Exporter le PDF' : 'Déflouter et télécharger'
+          }
+          accessibilityState={{ disabled: preparation, busy: preparation }}
+          disabled={preparation}
           onPress={doExport}>
-          {!net && (
+          {preparation && <ActivityIndicator testID="export-preparation" color="#FFFFFF" />}
+          {!net && !preparation && (
             <Svg width={16} height={16} viewBox="0 0 24 24">
               <Path d={CADENAS} fill="#FFFFFF" />
             </Svg>
           )}
           <Text style={styles.exportText}>
-            {net
+            {preparation
+              ? 'Préparation…'
+              : net
               ? `Exporter le PDF · ${sommaire.length} feuille${sommaire.length > 1 ? 's' : ''}`
               : 'Déflouter et télécharger'}
           </Text>
@@ -1549,4 +1578,5 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     ...ombreAction,
   },
   exportText: { color: '#FFFFFF', fontSize: 15.5, fontWeight: '700' },
+  exportButtonOccupe: { opacity: 0.7 },
 }));

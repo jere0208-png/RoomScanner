@@ -292,6 +292,14 @@ function resumerLeReleve() {
      * murs puis nommées d'après le mobilier (`finalize`).
      */
     stop: async () => {
+      /*
+        UN SEUL ARRÊT — revue I5 : deux appuis sur « Terminer » dans la même
+        image appelaient deux fois `RoomScan.stop`, et le second tombait sur
+        une session déjà en train de s'assembler (au mieux une erreur, au
+        pire un second dossier). Le drapeau est lu AU MAGASIN, pas dans une
+        fermeture : il est vrai dès le premier appel, de façon synchrone.
+      */
+      if (useScanStore.getState().processing) return;
       store.setProcessing(true);
       const complement = useScanStore.getState().complementEnCours;
       const etage = useScanStore.getState().etageEnCours;

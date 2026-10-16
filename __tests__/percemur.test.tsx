@@ -468,6 +468,20 @@ describe('la vue 3D reclasse des qu’elle se pose', () => {
       zone.props.onStartShouldSetResponder?.(toucher);
       zone.props.onResponderGrant?.(toucher);
     });
+    /*
+      LE GESTE COMMENCE AU PREMIER VRAI MOUVEMENT (revue I5) : un simple
+      contact n'est plus un geste — un tap ne doit pas éteindre les cotes.
+      Le doigt glisse donc de trente points avant qu'on mesure.
+    */
+    const glisse = JSON.parse(JSON.stringify(toucher));
+    glisse.nativeEvent.touches[0].pageX = 40;
+    glisse.touchHistory.touchBank[1].currentPageX = 40;
+    glisse.touchHistory.touchBank[1].previousPageX = 10;
+    glisse.touchHistory.touchBank[1].currentTimeStamp = 16;
+    glisse.touchHistory.mostRecentTimeStamp = 16;
+    act(() => {
+      zone.props.onResponderMove?.(glisse);
+    });
     const avant = comptes();
     act(() => t.update(vue(36)));
     // Un degre en plein geste : on repeint avec l'ordre deja calcule.

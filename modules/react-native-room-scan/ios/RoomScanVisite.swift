@@ -58,7 +58,7 @@ import simd
  * voile doux sous chaque meuble posé au sol.
  */
 @objc(RoomScanVisite)
-final class RoomScanVisite: UIView {
+final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   private let vue = SCNView(frame: .zero)
   private let scene = SCNScene()
   private let oeil = SCNNode()
@@ -622,6 +622,7 @@ final class RoomScanVisite: UIView {
     vue.contentScaleFactor = min(2, UIScreen.main.scale)
     vue.autoenablesDefaultLighting = false
     vue.allowsCameraControl = false
+    vue.delegate = self
     addSubview(vue)
 
     // L'ŒIL. L'ouverture est VERTICALE, comme celle que le JavaScript
@@ -707,11 +708,57 @@ final class RoomScanVisite: UIView {
     changement. Une demi-seconde de rendu continu à chaque mise en place, puis
     on rend la main au rendu à la demande.
   */
-  private func reveiller() {
+  /*
+    ET CHAQUE CHANGEMENT RÉVEILLE LE RENDU — revue I5 : la demi-seconde ne
+    couvrait que la mise en place. Un logement meublé se bâtit en plus de
+    temps que ça, et la caméra en trois quarts arrive par la régie après le
+    montage : l'un et l'autre tombaient hors de la fenêtre, la vue restait
+    sur l'image d'avant (blanche, ou de face) jusqu'au premier glissement.
+    Le bâti, la caméra et la levée réveillent donc le rendu à leur tour, et
+    le réveil se PROLONGE au lieu d'être coupé par le minuteur du précédent.
+  */
+  private var finDuReveil = DispatchTime.now()
+  private var sommeilPrevu = false
+
+  private func reveiller(_ duree: Double = 0.6) {
     vue.isPlaying = true
     vue.setNeedsDisplay()
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
-      self?.vue.isPlaying = false
+    let fin = DispatchTime.now() + duree
+    if fin > finDuReveil { finDuReveil = fin }
+    guard !sommeilPrevu else { return }
+    sommeilPrevu = true
+    planifierSommeil()
+  }
+
+  private func planifierSommeil() {
+    DispatchQueue.main.asyncAfter(deadline: finDuReveil) { [weak self] in
+      guard let self = self else { return }
+      if DispatchTime.now() < self.finDuReveil {
+        self.planifierSommeil()
+        return
+      }
+      self.sommeilPrevu = false
+      self.vue.isPlaying = false
+    }
+  }
+
+  /*
+    LA PREMIÈRE IMAGE, ANNONCÉE — pour que l'écran retire sa silhouette
+    d'attente au moment où la maquette est réellement à l'écran, ni avant
+    (un trou blanc), ni après (une attente pour rien).
+  */
+  @objc var onPremiereImage: RCTDirectEventBlock?
+  /// Écrit sur le fil principal, lu sur celui du rendu : un simple drapeau.
+  private var guetteLaPremiere = false
+  private var premiereAnnoncee = false
+
+  func renderer(_ renderer: SCNSceneRenderer, didRenderScene scene: SCNScene, atTime time: TimeInterval) {
+    guard guetteLaPremiere else { return }
+    guetteLaPremiere = false
+    DispatchQueue.main.async { [weak self] in
+      guard let self = self, !self.premiereAnnoncee else { return }
+      self.premiereAnnoncee = true
+      self.onPremiereImage?([:])
     }
   }
 
@@ -818,6 +865,7 @@ final class RoomScanVisite: UIView {
       x: cible.x + vers.x * recul, y: cible.y + vers.y * recul, z: cible.z + vers.z * recul)
     oeil.look(at: cible, up: haut, localFront: SCNVector3(x: 0, y: 0, z: -1))
     SCNTransaction.commit()
+    reveiller(0.2)
     // Quatre cinquièmes de point d'écran, en mètres, au zoom de cette image.
     let hauteur = Float(max(1, bounds.height))
     regleLeContour(o[9] * 2 / hauteur * 0.8)
@@ -837,6 +885,7 @@ final class RoomScanVisite: UIView {
     bati.scale = SCNVector3(x: 1, y: k, z: 1)
     bati.position = SCNVector3(x: 0, y: y0 * (1 - k), z: 0)
     SCNTransaction.commit()
+    reveiller(0.2)
   }
 
   // --------------------------------------------------------------- bâti
@@ -902,6 +951,8 @@ final class RoomScanVisite: UIView {
         gMeubles.addChildNode(n)
       }
     }
+    if !premiereAnnoncee && !gBati.childNodes.isEmpty { guetteLaPremiere = true }
+    reveiller()
   }
 
   /*

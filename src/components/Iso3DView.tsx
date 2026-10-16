@@ -21,7 +21,7 @@ import {
   poserLeveeDeMaquette,
   poserOrbiteDeMaquette,
 } from 'react-native-room-scan';
-import { cameraOrbite, maillageDeLaMaquette } from '../geometry/maquette3d';
+import { cameraOrbite, maillageDeLaMaquette, projeterParLaCamera } from '../geometry/maquette3d';
 import { maillageDesMeubles } from '../geometry/modeles3d';
 import { groupesDesAppareils, habillerLesTableaux } from '../geometry/appareils3d';
 import { RAIL_VIDE, railDuReleve } from '../geometry/existant';
@@ -75,6 +75,7 @@ import {
   type WetZone,
 } from '../geometry/volumes';
 import { DUREE_LEVEE, hauteurLevee } from '../ui/levee';
+import { reduireLesAnimations, useReduceMotion } from '../ui/useReduceMotion';
 import { DESCENTE_DE_LA_LUMIERE } from '../geometry/appareils3d';
 import { jalonsDuRuban } from '../geometry/ruban';
 import { ECLAT_LAMPE,
@@ -454,6 +455,14 @@ interface Props {
    * celui que la capture a toujours su lire.
    */
   gpu?: boolean;
+  /**
+   * LA SCÈNE EN PAUSE — revue I5 : pendant que la feuille « Décorer » est
+   * ouverte, la maquette de l'écran du plan, montée DERRIÈRE elle, rebâtissait
+   * tout son logement à chaque teinte essayée — le calcul le plus lourd de la
+   * vue, pour une maquette que personne ne voit. Vraie, la scène garde la
+   * dernière construction ; à la reprise, elle se rebâtit UNE fois.
+   */
+  enPause?: boolean;
 }
 
 /**
@@ -512,6 +521,7 @@ export function Iso3DView({
   circuits,
   sansElectricite = false,
   decor = false,
+  enPause = false,
 }: Props) {
   /*
     LE MODE ÉLECTRICITÉ, LU À LA SOURCE — comme pour le plan (voir
@@ -774,6 +784,13 @@ export function Iso3DView({
   // Pendant un geste, les cotes sont masquées : c'est leur recalcul à
   // chaque frame qui faisait ramer les mouvements.
   const [interacting, setInteracting] = useState(false);
+  /** Le geste a-t-il réellement commencé ? Voir `onPanResponderMove`. */
+  const enGeste = useRef(false);
+  const finirLeGeste = () => {
+    if (!enGeste.current) return;
+    enGeste.current = false;
+    setInteracting(false);
+  };
   /**
    * Le classement du dernier calcul : l'angle où il a été fait, la scène à
    * laquelle il appartient, et la profondeur de chaque pan.
@@ -808,21 +825,46 @@ export function Iso3DView({
    * seul endroit de l'app où l'on assume une horloge JS, parce qu'elle dure
    * une seconde et ne se rejoue pas.
    */
-  const [leve, setLeve] = useState(leveeAuMontage ? 0 : 1);
+  /*
+    AU BATTEMENT DE L'ÉCRAN, ET PAS DU TOUT SI L'ON N'EN VEUT PAS — revue
+    I5. L'horloge était un `setInterval` à 33 ms : trente images par seconde
+    sur un écran qui en affiche cent vingt, décalées de lui, donc des
+    saccades sur le moment même qu'on montre. Elle suit maintenant
+    `requestAnimationFrame`.
+
+    Et elle se SAUTE : « Réduire les animations » actif, le logement est
+    d'aplomb d'entrée ; un doigt posé pendant la levée la termine sur-le-champ
+    — on ne fait pas attendre une seconde quelqu'un qui veut déjà tourner.
+  */
+  const reduitAnimations = useReduceMotion();
+  const [leve, setLeve] = useState(leveeAuMontage && !reduireLesAnimations() ? 0 : 1);
+  const finirLaLevee = useRef<() => void>(() => undefined);
   useEffect(() => {
-    if (!leveeAuMontage) {
+    if (!leveeAuMontage || reduitAnimations) {
       setLeve(1);
       return;
     }
-    const depart = Date.now();
-    setLeve(hauteurLevee(0));
-    const h = setInterval(() => {
-      const t = Date.now() - depart;
+    let jeton: number | null = null;
+    let depart: number | null = null;
+    const finir = () => {
+      if (jeton !== null) cancelAnimationFrame(jeton);
+      jeton = null;
+      setLeve(1);
+    };
+    finirLaLevee.current = finir;
+    const image = (maintenant: number) => {
+      if (depart === null) depart = maintenant;
+      const t = maintenant - depart;
       setLeve(hauteurLevee(t));
-      if (t >= DUREE_LEVEE) clearInterval(h);
-    }, 33);
-    return () => clearInterval(h);
-  }, [leveeAuMontage]);
+      jeton = t >= DUREE_LEVEE ? null : requestAnimationFrame(image);
+    };
+    setLeve(hauteurLevee(0));
+    jeton = requestAnimationFrame(image);
+    return () => {
+      if (jeton !== null) cancelAnimationFrame(jeton);
+      finirLaLevee.current = () => undefined;
+    };
+  }, [leveeAuMontage, reduitAnimations]);
   /**
    * LE DÉPART D'UN APPAREIL — index dressé une fois pour toutes.
    *
@@ -962,7 +1004,8 @@ export function Iso3DView({
       onMoveShouldSetPanResponder: (_e, g) => estUnGlissement(g.dx, g.dy),
       onPanResponderGrant: (e, g) => {
         const t = e.nativeEvent.touches;
-        setInteracting(true);
+        // Un doigt posé pendant la levée : le logement est d'aplomb, tout de suite.
+        finirLaLevee.current();
         tapRef.current = {
           x: e.nativeEvent.locationX,
           y: e.nativeEvent.locationY,
@@ -993,6 +1036,16 @@ export function Iso3DView({
       },
       onPanResponderMove: (e, g) => {
         const t = e.nativeEvent.touches;
+        /*
+          LE GESTE COMMENCE AU PREMIER VRAI MOUVEMENT — revue I5. L'état
+          « en geste » se posait dès le contact : un simple tap (allumer une
+          lampe) éteignait les cotes, les étiquettes et les surfaces, puis
+          les rallumait au lâcher — deux rendus complets pour un appui.
+        */
+        if (!enGeste.current && (t.length >= 2 || estUnGlissement(g.dx, g.dy))) {
+          enGeste.current = true;
+          setInteracting(true);
+        }
         const mode = t.length >= 2 ? 'pinch' : 'rotate';
         // Un second doigt, meme une fraction de seconde, ote au geste tout
         // droit a etre lu comme un tap au relachement.
@@ -1040,7 +1093,7 @@ export function Iso3DView({
         }
       },
       onPanResponderRelease: (e, g) => {
-        setInteracting(false);
+        finirLeGeste();
         rendreLaVue();
         // Tap simple (sans glisser) : cadrer la vue sur le mur touché.
         //
@@ -1060,7 +1113,7 @@ export function Iso3DView({
         }
       },
       onPanResponderTerminate: () => {
-        setInteracting(false);
+        finirLeGeste();
         rendreLaVue();
       },
     }),
@@ -1244,10 +1297,20 @@ export function Iso3DView({
     for (const id of prebuildRooms) batir(id);
   }, [prebuildRooms, batir]);
 
+  /*
+    EN PAUSE, LA SCÈNE NE SE REBÂTIT PAS — voir `enPause`. La dernière
+    construction est gardée ; le mémo se rejoue bien à chaque teinte (ses
+    entrées changent), mais il rend la scène gelée sans rien calculer. À la
+    reprise, `enPause` repasse à faux : c'est une entrée du mémo, il rebâtit
+    une fois, avec tout ce qui a changé entre-temps.
+  */
+  const sceneGelee = useRef<Scene | null>(null);
   // Scène partagée avec le PDF : mêmes onglets, mêmes bandes, mêmes couleurs.
   const scene = useMemo(
     () =>
-      light
+      enPause && sceneGelee.current
+        ? sceneGelee.current
+        : light
         ? batir(focusRoomId ?? null)
         : buildScene(keptWalls, keptOpenings, keptObjects, {
             palette,
@@ -1326,8 +1389,10 @@ export function Iso3DView({
       fixtures,
       batir,
       focusRoomId,
+      enPause,
     ],
   );
+  sceneGelee.current = scene;
   const faces = scene.faces;
 
   // Centre pris sur la BOÎTE ENGLOBANTE, jamais sur la moyenne des points :
@@ -1422,20 +1487,39 @@ export function Iso3DView({
     };
   }, [vueNativeMontee, cleMaquette]);
   const orbite = cameraOrbite(view, center, radius3d, layout);
+  /*
+    L'ORBITE D'ENTRÉE ATTEND LA TAILLE DE LA VUE — revue I5, trois testeurs :
+    « la 3D s'affiche de face (ou blanche), lisible seulement après un
+    glissement ».
+
+    L'orbite d'entrée était saisie au PREMIER rendu, avant `onLayout` : la
+    vue mesurait 0 × 0, l'échelle valait zéro, et `cameraOrbite` rendait des
+    NaN (0/0 pour la cible et la demi-hauteur). Le natif refuse une caméra
+    non finie — il gardait donc la sienne, celle de SceneKit par défaut :
+    l'œil à l'origine du relevé, à hauteur d'appareil, regardant droit
+    devant. C'est l'élévation frontale des captures. Seule la régie pouvait
+    rattraper le coup, et elle court sur un autre chemin que le montage de la
+    vue : quand elle passait avant, son orbite était perdue derrière le NaN.
+
+    L'entrée n'est donc prise que sur une orbite FINIE — la vue native n'est
+    de toute façon montée qu'une fois la taille connue —, et l'orbite est
+    reposée par la régie juste après le montage (voir plus bas).
+  */
+  const orbiteFinie = layout.w > 0 && layout.h > 0 && orbite.every(Number.isFinite);
   const entreeOrbite = useRef<number[] | null>(null);
   const entreeLevee = useRef<{ k: number; solY: number } | null>(null);
   if (!vueNativeMontee) {
     entreeOrbite.current = null;
     entreeLevee.current = null;
   } else {
-    if (!entreeOrbite.current) entreeOrbite.current = orbite;
+    if (!entreeOrbite.current && orbiteFinie) entreeOrbite.current = orbite;
     if (!entreeLevee.current) entreeLevee.current = { k: leve, solY: scene.floorY };
   }
   const [secoursOrbite, setSecoursOrbite] = useState<number[] | null>(null);
   const [secoursLevee, setSecoursLevee] = useState<{ k: number; solY: number } | null>(null);
   const cleOrbite = orbite.join(',');
   useLayoutEffect(() => {
-    if (!vueNativeMontee) return;
+    if (!vueNativeMontee || !orbiteFinie) return;
     const pose =
       typeof poserOrbiteDeMaquette === 'function' && poserOrbiteDeMaquette(cleMaquette, orbite);
     if (!pose) setSecoursOrbite(orbite);
@@ -1443,6 +1527,50 @@ export function Iso3DView({
     // pose rien.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vueNativeMontee, cleOrbite, cleMaquette]);
+  /*
+    ET UNE FOIS LA VUE MONTÉE, L'ORBITE ET LA LEVÉE COURANTES SONT REPOSÉES —
+    à l'image suivante, quand la vue native a reçu sa clé. Deux nombres de
+    trop sur le pont, une fois ; c'est le prix d'une maquette qui arrive en
+    trois quarts sans qu'on la touche.
+  */
+  const viveRef = useRef({ orbite, leve, solY: scene.floorY });
+  viveRef.current = { orbite, leve, solY: scene.floorY };
+  const vueNativeAffichee = vueNativeMontee && orbiteFinie;
+  useEffect(() => {
+    if (!vueNativeAffichee) return;
+    const jeton = requestAnimationFrame(() => {
+      const v = viveRef.current;
+      if (v.orbite.every(Number.isFinite) && typeof poserOrbiteDeMaquette === 'function') {
+        poserOrbiteDeMaquette(cleMaquette, v.orbite);
+      }
+      if (typeof poserLeveeDeMaquette === 'function') {
+        poserLeveeDeMaquette(cleMaquette, v.leve, v.solY);
+      }
+    });
+    return () => cancelAnimationFrame(jeton);
+  }, [vueNativeAffichee, cleMaquette]);
+  /*
+    LA PREMIÈRE IMAGE — revue I5 : « Passer en 3D », et 2,7 secondes de
+    blanc (capture clair-14). Le maillage d'un logement meublé part en une
+    fois vers SceneKit, qui le bâtit au tour suivant ; pendant ce temps,
+    rien ne disait que quelque chose venait. Une silhouette douce du plan —
+    les sols, projetés par la MÊME caméra que la maquette — tient la place
+    jusqu'à ce que la vue native annonce sa première image
+    (`onPremiereImage`). Un binaire qui ne l'annonce pas (antérieur) la
+    retire au bout d'une seconde et demie : la silhouette ne doit jamais
+    masquer une maquette qui serait déjà là.
+  */
+  const [premiereImage, setPremiereImage] = useState(false);
+  useEffect(() => {
+    if (!vueNativeAffichee) {
+      setPremiereImage(false);
+      return;
+    }
+    const h = setTimeout(() => setPremiereImage(true), 1500);
+    return () => clearTimeout(h);
+  }, [vueNativeAffichee]);
+  const surPremiereImage = useCallback(() => setPremiereImage(true), []);
+  const attenteNative = vueNativeAffichee && !premiereImage;
   useLayoutEffect(() => {
     if (!vueNativeMontee) return;
     const pose =
@@ -1451,6 +1579,23 @@ export function Iso3DView({
     if (!pose) setSecoursLevee({ k: leve, solY: scene.floorY });
   }, [vueNativeMontee, leve, scene.floorY, cleMaquette]);
   const orbiteDeLaVue = secoursOrbite ?? entreeOrbite.current ?? orbite;
+  const silhouette = useMemo(() => {
+    if (!attenteNative) return null;
+    // L'orbite COURANTE : la silhouette suit le relèvement du plan en volume.
+    const cam = orbiteFinie ? orbite : orbiteDeLaVue;
+    let d = '';
+    for (const f of faces) {
+      if (!f.isFloor || !f.fill || f.pts.length < 3) continue;
+      f.pts.forEach((p, i) => {
+        const q = projeterParLaCamera(cam, p, layout);
+        d += `${i === 0 ? 'M' : 'L'}${q.sx.toFixed(1)} ${q.sy.toFixed(1)}`;
+      });
+      d += 'Z';
+    }
+    return d || null;
+    // L'orbite est lue par sa valeur (`cleOrbite`), comme pour la régie.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attenteNative, cleOrbite, orbiteDeLaVue, faces, layout]);
   const leveeDeLaVue = secoursLevee ?? entreeLevee.current ?? { k: leve, solY: scene.floorY };
 
   /**
@@ -2800,6 +2945,8 @@ export function Iso3DView({
               solY={leveeDeLaVue.solY}
               cle={cleMaquette}
               fond={c.surface}
+              /* Étalé : un module natif d'avant ne déclare pas l'annonce. */
+              {...({ onPremiereImage: surPremiereImage } as object)}
             />
           ) : (
             !!RoomScanCanvas && (
@@ -3409,6 +3556,25 @@ export function Iso3DView({
               />
             )}
           </Svg>
+          {attenteNative && (
+            <View
+              testID="maquette-attente"
+              accessible
+              accessibilityLabel="Préparation de la vue 3D"
+              style={[StyleSheet.absoluteFill, styles.attente]}>
+              {silhouette && (
+                <Svg width={layout.w} height={layout.h}>
+                  <Path
+                    d={silhouette}
+                    fill={c.surfaceSunken}
+                    stroke={c.line}
+                    strokeWidth={1}
+                    strokeLinejoin="round"
+                  />
+                </Svg>
+              )}
+            </View>
+          )}
         </View>
       )}
     </View>
@@ -3422,4 +3588,6 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden',
   },
+  // Le fond de la carte, pour couvrir l'image par défaut de SceneKit.
+  attente: { backgroundColor: c.surface },
 }));

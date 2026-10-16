@@ -176,6 +176,7 @@ RCT_EXPORT_VIEW_PROPERTY(solY, NSNumber)
 RCT_EXPORT_VIEW_PROPERTY(meubles, NSArray)
 RCT_EXPORT_VIEW_PROPERTY(textures, NSArray)
 RCT_EXPORT_VIEW_PROPERTY(texturees, NSArray)
+RCT_EXPORT_VIEW_PROPERTY(onPremiereImage, RCTDirectEventBlock)
 @end
 
 
