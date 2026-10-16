@@ -71,7 +71,10 @@ import { calerDansLaNiche } from '../geometry/niche';
 import { completerAuxNormes, corrigerConstat, poserAuxNormes } from '../geometry/auto';
 import { ControlePastille } from '../components/ControlePastille';
 import { DevisPastille, prixCourt } from '../components/DevisPastille';
-import { prixDuDevis } from '../geometry/mainDOeuvre';
+import { prixDAchat, prixDuDevis } from '../geometry/mainDOeuvre';
+import { cleDuTarif } from '../geometry/prix';
+import { useEntreprise } from '../store/entreprise';
+import { usePrixPro } from '../store/prixPro';
 import { useReglagesPose } from '../store/reglagesPose';
 import { ChoixScan } from '../components/ChoixScan';
 import { RoomBar } from '../components/RoomBar';
@@ -509,6 +512,11 @@ export function ResultScreen() {
   const devisQuantites = useScanStore((s) => s.devisQuantites);
   const devisAjouts = useScanStore((s) => s.devisAjouts);
   const devisPrix = useScanStore((s) => s.devisPrix);
+  const devisLignesLibres = useScanStore((s) => s.devisLignesLibres);
+  const devisHeures = useScanStore((s) => s.devisHeures);
+  const devisTva = useScanStore((s) => s.devisTva);
+  const coefficientVente = useEntreprise((e) => e.coefficient);
+  const tarifPro = usePrixPro((p) => p.tarif);
   const reset = useScanStore((s) => s.reset);
   const teinte = useTheme();
   const styles = getStyles(teinte);
@@ -2472,7 +2480,22 @@ export function ResultScreen() {
       seul (« Devis 1,5 k€ ») quand le PDF ajoutait la pose. `prixDuDevis`,
       comme la page et le PDF : un seul prix.
     */
-    return prixDuDevis(devis, tout.fixtures, tout.ceiling, { taux: tauxPose, chantier: chantierPose }).totaux.ttc;
+    // Et LE PRIX DE L'ARTISAN, comme la page : coefficient, lignes libres,
+    // heures corrigées, TVA choisie. Sans eux, la pastille et la page se
+    // contredisaient dès qu'un réglage du devis était touché.
+    return prixDuDevis(
+      devis,
+      tout.fixtures,
+      tout.ceiling,
+      { taux: tauxPose, chantier: chantierPose },
+      {
+        prixAchat: prixDAchat(devis.lignes, (code) => cleDuTarif(code, devis.gamme), tarifPro),
+        coefficient: coefficientVente,
+        lignesLibres: tout.devisLignesLibres,
+        heures: tout.devisHeures,
+        tva: tout.devisTva,
+      },
+    ).totaux.ttc;
     // Le plan figé du niveau sert de signal : le calcul lit la maison entière.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -2488,6 +2511,11 @@ export function ResultScreen() {
     devisPrix,
     tauxPose,
     chantierPose,
+    tarifPro,
+    coefficientVente,
+    devisLignesLibres,
+    devisHeures,
+    devisTva,
   ]);
 
   /**

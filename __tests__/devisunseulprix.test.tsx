@@ -124,6 +124,27 @@ describe('le même nombre partout', () => {
     );
   });
 
+  it('la pastille suit aussi les lignes libres de l’artisan', () => {
+    const libre = { id: 'l1', designation: 'Déplacement', quantite: 1, unite: 'forfait', puHt: 100, type: 'forfait' as const };
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      useScanStore.getState().reset();
+      useScanStore.setState({ ...PLAN, devisLignesLibres: [libre], screen: 'result' } as never);
+      t = TestRenderer.create(<ResultScreen />);
+    });
+    arbre = t;
+    act(() => jest.advanceTimersByTime(400));
+    const st = useScanStore.getState();
+    const { devis } = attendu();
+    const avecLibre = prixDuDevis(devis, st.fixtures, st.ceiling, { taux: 45, chantier: 'renovation' }, { lignesLibres: [libre] });
+    expect(avecLibre.totaux.ttc).toBeGreaterThan(attendu().totaux.ttc);
+    const pastille = t.root.findAll((n) => /^Devis — environ/.test(String(n.props?.accessibilityLabel ?? '')))[0];
+    expect(pastille.props.accessibilityLabel).toBe(
+      `Devis — environ ${Math.round(avecLibre.totaux.ttc)} euros TTC, pose comprise`,
+    );
+    act(() => useScanStore.setState({ devisLignesLibres: [] } as never));
+  });
+
   it('la page affiche ce total en HT et TTC, et le PDF le reprend au centime', async () => {
     useAccountStore.setState({ compte: { id: 'x', email: 'a@b.c' }, pro: true } as never);
     useEntreprise.setState({
