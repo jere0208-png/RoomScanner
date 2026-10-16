@@ -160,6 +160,52 @@ function streamToSvg(stream) {
         lastRect = operands.slice(-4).map(Number);
         operands.length = 0;
         break;
+      /*
+        LES CHEMINS À PLUSIEURS CONTOURS — `x y … h x y … h f*` (le poché des
+        murs, en pair-impair) et `… h W* n` (la découpe au poché de la nature
+        des murs). Les `m`/`l` ne laissent que leurs nombres ; les `h`
+        séparent les contours.
+      */
+      case 'h':
+        operands.push('h');
+        break;
+      case 'f*':
+      case 'W*': {
+        const d = [];
+        let cur = [];
+        const fermer = () => {
+          if (cur.length >= 2) d.push('M' + cur.join(' L') + ' Z');
+          cur = [];
+        };
+        for (let i = 0; i < operands.length; ) {
+          if (operands[i] === 'h') {
+            fermer();
+            i += 1;
+            continue;
+          }
+          const x = parseFloat(operands[i]);
+          const y = parseFloat(operands[i + 1]);
+          if (Number.isNaN(x) || Number.isNaN(y)) {
+            i += 1;
+            continue;
+          }
+          cur.push(`${x},${Y(y)}`);
+          i += 2;
+        }
+        fermer();
+        if (t === 'f*') {
+          parts.push(`<path d="${d.join(' ')}" fill="${fill}" fill-rule="evenodd"/>`);
+        } else {
+          clipId += 1;
+          parts.push(
+            `<clipPath id="c${clipId}"><path d="${d.join(' ')}" clip-rule="evenodd"/></clipPath>` +
+              `<g clip-path="url(#c${clipId})">`,
+          );
+          open.groups += 1;
+        }
+        operands.length = 0;
+        break;
+      }
       case 'W':
         pendingClip = true;
         break;

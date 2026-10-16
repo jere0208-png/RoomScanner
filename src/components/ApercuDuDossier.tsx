@@ -59,6 +59,7 @@ export function resumeDuDossier(sommaire: FeuilleDuDossier[]): string {
   dire(n('plan'), 'plan', 'plans');
   // Un métré sur deux feuilles reste UN métré.
   dire(Math.min(1, n('metre')), 'métré', 'métrés');
+  dire(Math.min(1, n('menuiseries')), 'carnet des menuiseries', 'carnets des menuiseries');
   dire(n('achats'), 'liste d’achats', 'listes d’achats');
   dire(n('perspective'), 'vue 3D', 'vues 3D');
   dire(n('elevation'), 'mur de face', 'murs de face');

@@ -6,6 +6,16 @@
  * de vues 3D avec les mesures portées sur les murs.
  * PDF 1.4 non compressé, A4, polices Helvetica (WinAnsi).
  */
+import {
+  bouclesDuDoublage,
+  dessinDesNatures,
+  libelleNature,
+  naturesPresentes,
+  renduNature,
+  type NatureMur,
+} from '../geometry/natureMurs';
+import { jonctionsDetaillees, wallQuadsOf as quadsDesMursNature } from '../geometry/floorplan';
+import { carnetDesMenuiseries } from '../geometry/menuiseries';
 import { BLEU_FENETRE, ENCRE_ELEC } from '../ui/encreElec';
 import { dansLeBati, pocheDesMurs, SUREPAISSEUR_FACADE } from '../geometry/poche';
 import { cotesExterieurs } from '../geometry/cibleMur';
@@ -733,6 +743,21 @@ class Draw {
     this.ops.push(`${n2(x)} ${n2(y)} ${n2(w)} ${n2(h)} re W n`);
   }
 
+  /**
+   * Découpe à des contours, en pair-impair — le poché des murs, pour que la
+   * nature d'un mur (voir `natureMurs`) ne remplisse jamais une baie. Entre
+   * `save()` et `restore()`, comme `clip`.
+   */
+  clipContours(contours: Pt[][]) {
+    const valides = contours.filter((c) => c.length >= 3);
+    if (valides.length === 0) return;
+    this.ops.push(
+      valides
+        .map((c) => c.map((p, i) => `${n2(p.x)} ${n2(p.y)} ${i === 0 ? 'm' : 'l'}`).join(' ') + ' h')
+        .join(' ') + ' W* n',
+    );
+  }
+
   circle(cx: number, cy: number, r: number, fill: string) {
     const pts: Pt[] = [];
     for (let i = 0; i < 20; i++) {
@@ -892,6 +917,8 @@ interface LegendLine {
   fois?: number;
   /** Le mot écrit dans son rond (« VP », « 20A ») : voir `motDansLeRond`. */
   mot?: { texte: string; x: number; y: number; taille: number };
+  /** Ou un tronçon de mur, rendu selon sa nature (voir `natureMurs`). */
+  nature?: NatureMur;
 }
 
 interface LegendSection {
@@ -1054,6 +1081,24 @@ function drawLegendBox(
               align: 'left',
               bold: true,
             });
+          }
+        } else if (ligne.nature) {
+          // Un tronçon de mur, tel que le plan le dessine.
+          const r = renduNature(ligne.nature, INK, '#FFFFFF');
+          const x0 = tx;
+          const y0 = base - 0.5;
+          const w0 = CADRE_PUCE - 5;
+          const h0 = 6;
+          const cadre = [
+            { x: x0, y: y0 },
+            { x: x0 + w0, y: y0 },
+            { x: x0 + w0, y: y0 + h0 },
+            { x: x0, y: y0 + h0 },
+          ];
+          d.poly(cadre, r.fond, ligne.nature === 'porteur' ? null : r.contour, 0.5, r.tirets);
+          if (r.boucles) {
+            const b = bouclesDuDoublage({ a1: cadre[3], b1: cadre[2], b2: cadre[1], a2: cadre[0] } as never);
+            d.path(b.map((p) => ({ x: p.x, y: (p as unknown as { z: number }).z })), 0.35, r.contour);
           }
         } else if (ligne.couleur) {
           const trait = [
@@ -2048,6 +2093,19 @@ function planPage(
   }
   {
     const seconde: LegendSection[] = [];
+    /*
+      LES MURS, QUAND ON A DIT DE QUOI ILS SONT FAITS — comme la légende d'un
+      plan d'architecte : seulement les natures présentes (voir
+      `natureMurs`). Un plan sans nature marquée n'a pas cette section.
+    */
+    const naturesDuPlan = naturesPresentes(walls);
+    if (naturesDuPlan.length > 0) {
+      seconde.push({
+        titre: 'MURS',
+        teinte: INK,
+        lignes: naturesDuPlan.map((n) => ({ texte: libelleNature(n), nature: n })),
+      });
+    }
     if (plafondLegende.length > 0) {
       seconde.push({
         titre: 'PLAFOND',
@@ -3146,6 +3204,31 @@ function planPage(
       prennent leur épaisseur vers le dehors, les baies sont des vides.
     */
     d.contoursPleins(poche.contours.map((c) => c.map(px)), INK);
+    /*
+      LA NATURE DES MURS, PAR-DESSUS LE POCHÉ — comme à l'écran : cloison en
+      gris cerné, doublage en boucles, à démolir en jaune, à créer en rouge.
+      Découpée au poché : une baie reste un vide.
+    */
+    {
+      const dessin = dessinDesNatures(walls, quadsDesMursNature(walls), jonctionsDetaillees(walls));
+      if (dessin) {
+        d.save();
+        d.clipContours(poche.contours.map((c) => c.map(px)));
+        for (const j of dessin.coeurs) d.poly(j.poly.map(px), renduNature(j.nature, INK, '#FFFFFF').fond, null);
+        for (const m of dessin.corps) {
+          const r = renduNature(m.nature, INK, '#FFFFFF');
+          d.poly(m.contour.map(px), r.fond, null);
+          for (const f of m.filets) {
+            if (r.tirets) d.dashedPath(f.map(px), 0.6, r.contour, [2.5, 1.5]);
+            else d.path(f.map(px), 0.6, r.contour);
+          }
+          if (m.boucles) d.path(m.boucles.map(px), 0.3, r.contour);
+        }
+        // La maçonnerie reprend la main aux butées : voir `dessinDesNatures`.
+        for (const poly of dessin.maconnerie) d.poly(poly.map(px), INK, null);
+        d.restore();
+      }
+    }
 
     /*
       LES RECOINS TECHNIQUES, POCHÉS COMME LA MAÇONNERIE — la même encre
@@ -4442,6 +4525,80 @@ const LIGNES_DU_METRE = 24;
 /** Combien de feuilles le métré de ce logement demande. */
 function feuillesDuMetre(walls: WallSeg[], rooms: RoomShape[] | undefined): number {
   return Math.max(1, Math.ceil(roomParts(walls, rooms).length / LIGNES_DU_METRE));
+}
+
+/** Lignes du carnet des menuiseries par feuille. */
+const LIGNES_DES_MENUISERIES = 28;
+
+function feuillesDesMenuiseries(ctx: Pick<SheetContext, 'walls' | 'openings' | 'rooms' | 'roomNames'>): number {
+  const n = carnetDesMenuiseries(ctx.walls, ctx.openings, ctx.rooms, ctx.roomNames).length;
+  return n === 0 ? 0 : Math.ceil(n / LIGNES_DES_MENUISERIES);
+}
+
+/**
+ * LE CARNET DES MENUISERIES — voir `geometry/menuiseries`. Le tableau que
+ * l'architecte joint à son dossier (« MEX ») : repère, pièce, type,
+ * largeur × hauteur, allège. Ce qu'on envoie au menuisier pour un devis.
+ */
+function menuiseriesPage(
+  ctx: SheetContext,
+  sheet: string,
+  tranche: { page: number; pages: number },
+): string {
+  const d = new Draw();
+  const lignes = carnetDesMenuiseries(ctx.walls, ctx.openings, ctx.rooms, ctx.roomNames);
+  const x0 = FRAME.x + 24;
+  const w = FRAME.w - 48;
+  const cols = [0, 0.1, 0.42, 0.66, 0.84].map((f) => x0 + f * w);
+  const heads = ['Repère', 'Pièce', 'Type', 'L × H (m)', 'Allège (m)'];
+  let y = TETE - 22;
+  const titre = avecNiveau(tranche.page > 1 ? 'Menuiseries, suite' : 'Menuiseries', ctx);
+  d.text(titre, x0, y + 24, 13, INK, { bold: true, align: 'left' });
+  for (let i = 0; i < heads.length; i++) d.text(heads[i], cols[i], y, 8.5, GREY, { align: 'left' });
+  y -= 6;
+  d.line(x0, y, x0 + w, y, 0.8, INK);
+  const debut = (tranche.page - 1) * LIGNES_DES_MENUISERIES;
+  for (const l of lignes.slice(debut, debut + LIGNES_DES_MENUISERIES)) {
+    y -= 20;
+    const cells = [
+      l.repere,
+      fitText(l.pieces, 9.5, cols[2] - cols[1] - 6),
+      fitText(l.type, 9.5, cols[3] - cols[2] - 6),
+      `${frLen(l.largeur)} × ${frLen(l.hauteur)}`,
+      l.allege === null ? '—' : frLen(l.allege),
+    ];
+    for (let i = 0; i < cells.length; i++) {
+      d.text(cells[i], cols[i], y, i === 0 ? 10 : 9.5, i === 0 ? INK : '#2A3340', { align: 'left', bold: i === 0 });
+    }
+    d.line(x0, y - 7, x0 + w, y - 7, 0.4, GREY_LIGHT);
+  }
+  if (tranche.page >= tranche.pages) {
+    y -= 22;
+    const n = (t: string) => lignes.filter((l) => l.repere.startsWith(t)).length;
+    d.text(
+      `${n('P')} porte${n('P') > 1 ? 's' : ''} · ${n('F')} fenêtre${n('F') > 1 ? 's' : ''} · ${n('B')} passage${n('B') > 1 ? 's' : ''} libre${n('B') > 1 ? 's' : ''}. Cotes de tableau relevées au scan — à confirmer sur place avant commande.`,
+      x0,
+      y,
+      8,
+      GREY,
+      { align: 'left' },
+    );
+  } else {
+    y -= 22;
+    d.text('Suite sur la feuille suivante.', x0, y, 8.5, GREY, { align: 'left' });
+  }
+  drawSheetChrome(d, {
+    project: ctx.name,
+    filename: ctx.filename,
+    client: ctx.client,
+    particulier: ctx.particulier,
+    entreprise: ctx.entreprise,
+    address: ctx.address,
+    sheetTitle: avecNiveau('Menuiseries', ctx),
+    sheet,
+    scaleLabel: null,
+  });
+  return d.stream();
 }
 
 function metrePage(
@@ -7653,6 +7810,7 @@ const GENRE_EN_CLAIR: Record<FeuilleDuDossier['genre'], string> = {
   garde: 'Page de garde',
   plan: 'Plan coté',
   metre: 'Métré',
+  menuiseries: 'Menuiseries',
   achats: 'Liste d’achats',
   existant: 'Tableau existant',
   gaines: 'Plan des gaines',
@@ -7848,6 +8006,7 @@ export interface FeuilleDuDossier {
     | 'garde'
     | 'plan'
     | 'metre'
+    | 'menuiseries'
     | 'achats'
     | 'existant'
     | 'gaines'
@@ -7978,6 +8137,15 @@ function planifierUnNiveau(
         genre: 'metre',
         titre: page > 1 ? 'Métré (suite)' : 'Métré',
         fabriquer: (n) => metrePage(ctx, n, { page, pages }),
+      });
+    }
+    // Les menuiseries suivent le métré : les baies de chaque pièce, cotées.
+    const pagesMenuiseries = feuillesDesMenuiseries(ctx);
+    for (let page = 1; page <= pagesMenuiseries; page++) {
+      feuilles.push({
+        genre: 'menuiseries',
+        titre: page > 1 ? 'Menuiseries (suite)' : 'Menuiseries',
+        fabriquer: (n) => menuiseriesPage(ctx, n, { page, pages: pagesMenuiseries }),
       });
     }
   }

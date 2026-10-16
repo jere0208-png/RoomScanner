@@ -204,7 +204,7 @@ describe('le nord dans le dossier', () => {
     // et pour quoi faire.
     const lu = textes(monter('export'));
     expect(lu).toMatch(/Plan coté/);
-    expect(lu).toMatch(/de quoi chiffrer sols et peinture/);
+    expect(lu).toMatch(/de quoi chiffrer sols, peinture et menuiseries/);
     expect(lu).toMatch(/le client s’y projette/);
     expect(lu).toMatch(/là où l’on perce/);
   });

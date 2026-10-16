@@ -812,7 +812,8 @@ describe('l’écran des résultats', () => {
     const gestes = carte
       .findAll((n) => typeof n.props?.onPress === 'function' && typeof n.props?.accessibilityLabel === 'string')
       .map((n) => n.props.accessibilityLabel as string);
-    for (const g of ['Mesures', 'Laser', 'Épaisseur', 'Cloison en T', 'Ouvrir le mur', 'Retirer']) {
+    // « Nature » : porteur, placo, doublage… (dossier d'architecte du patron).
+    for (const g of ['Mesures', 'Laser', 'Épaisseur', 'Nature', 'Cloison en T', 'Ouvrir le mur', 'Retirer']) {
       expect(gestes).toContain(g);
     }
     // Une ligne qui glisse, pas deux rangées empilées sur le plan.

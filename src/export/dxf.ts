@@ -22,6 +22,7 @@
  * qu'une fois le mobilier commandé.
  */
 import { dansLeBati, pocheDesMurs } from '../geometry/poche';
+import { contourDuQuad, seDistingue, type NatureMur } from '../geometry/natureMurs';
 import {
   arcDuBattant,
   demiFacesDe,
@@ -73,6 +74,15 @@ export const DXF_CALQUES: CalqueDxf[] = [
   */
   { nom: 'ECHOPLAN-PORTES', couleur: 5 },
   { nom: 'ECHOPLAN-FENETRES', couleur: 4 },
+  /*
+    UN CALQUE PAR NATURE DE MUR (voir `natureMurs`) : le contour de chaque
+    cloison, doublage, mur à démolir ou à créer, par-dessus la maçonnerie —
+    l'architecte hachure ou éteint chaque famille à sa guise.
+  */
+  { nom: 'ECHOPLAN-CLOISONS', couleur: 8 },
+  { nom: 'ECHOPLAN-DOUBLAGES', couleur: 9 },
+  { nom: 'ECHOPLAN-A-DEMOLIR', couleur: 2 },
+  { nom: 'ECHOPLAN-A-CREER', couleur: 1 },
   { nom: 'ECHOPLAN-MEUBLES', couleur: 8 },
   { nom: 'ECHOPLAN-ELEC', couleur: 1 },
   // Le plafond : points lumineux et rubans LED (revue « Claire »).
@@ -322,6 +332,16 @@ export function buildDxf(plan: PlanPourDxf): string {
   const quads = wallQuadsOf(plan.walls);
   for (const w of plan.walls) {
     if (!quads.get(w.id)) out += ligne(CALQUE.murs, w.a, w.b);
+  }
+  const CALQUE_NATURE: Record<Exclude<NatureMur, 'porteur'>, string> = {
+    cloison: 'ECHOPLAN-CLOISONS',
+    doublage: 'ECHOPLAN-DOUBLAGES',
+    demolir: 'ECHOPLAN-A-DEMOLIR',
+    creer: 'ECHOPLAN-A-CREER',
+  };
+  for (const w of plan.walls.filter(seDistingue)) {
+    const q = quads.get(w.id);
+    if (q) out += polyligne(CALQUE_NATURE[w.nature as Exclude<NatureMur, 'porteur'>], contourDuQuad(q));
   }
 
   /*

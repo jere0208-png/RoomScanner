@@ -1,4 +1,5 @@
 import type { OrthoDeFace } from './habillage';
+import type { NatureMur } from './natureMurs';
 import type { ObjectData, SurfaceData, SurfaceTexture } from 'react-native-room-scan';
 
 /** Épaisseur d'un mur dont personne n'a dit l'épaisseur (m). */
@@ -216,6 +217,12 @@ export interface WallSeg {
    * « Sandrine », D7).
    */
   vu?: { x: number; z: number };
+  /**
+   * DE QUOI IL EST FAIT — maçonnerie, cloison en plaque de plâtre, doublage,
+   * à démolir, à créer (voir `natureMurs`). Absente sur tout ce que RoomPlan
+   * relève : le mur se dessine alors en noir, comme avant.
+   */
+  nature?: NatureMur;
 }
 
 /** Pièce d'un élément, valeur par défaut comprise. */
@@ -875,21 +882,35 @@ export function wallQuadsOf(
  * angulaire autour de lui. Chaque rendu le peint avec les murs.
  */
 export function jonctionsDeMurs(walls: WallSeg[], t?: number): Pt[][] {
+  return jonctionsDetaillees(walls, t).map((j) => j.poly);
+}
+
+/**
+ * LES JONCTIONS, AVEC LA NATURE DE LEURS MURS — `nature` n'est donnée que si
+ * tous les murs du nœud partagent la même (voir `natureMurs`) : le cœur d'un
+ * T de trois cloisons est de la cloison, celui d'une cloison qui tombe sur
+ * un porteur reste de la maçonnerie.
+ */
+export function jonctionsDetaillees(
+  walls: WallSeg[],
+  t?: number,
+): { poly: Pt[]; nature: NatureMur | null; p: Pt }[] {
   const quads = wallQuadsOf(walls, t);
-  const noeuds = new Map<string, { p: Pt; coins: Pt[]; bras: number }>();
+  const noeuds = new Map<string, { p: Pt; coins: Pt[]; bras: number; natures: Set<NatureMur | null> }>();
   for (const w of walls) {
     if (Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z) < 1e-6) continue;
     const q = quads.get(w.id);
     if (!q) continue;
     for (const end of ['a', 'b'] as const) {
       const k = `${roomOf(w)}|${nodeKey(w[end])}`;
-      const n = noeuds.get(k) ?? { p: w[end], coins: [], bras: 0 };
+      const n = noeuds.get(k) ?? { p: w[end], coins: [], bras: 0, natures: new Set<NatureMur | null>() };
       n.bras++;
+      n.natures.add(w.nature ?? null);
       n.coins.push(...(end === 'a' ? [q.a1, q.a2] : [q.b1, q.b2]));
       noeuds.set(k, n);
     }
   }
-  const out: Pt[][] = [];
+  const out: { poly: Pt[]; nature: NatureMur | null; p: Pt }[] = [];
   for (const n of noeuds.values()) {
     if (n.bras < 3) continue;
     const tries = n.coins
@@ -899,7 +920,7 @@ export function jonctionsDeMurs(walls: WallSeg[], t?: number): Pt[][] {
     for (const { c } of tries) {
       if (!poly.some((d) => Math.hypot(d.x - c.x, d.z - c.z) < 1e-6)) poly.push(c);
     }
-    if (poly.length >= 3) out.push(poly);
+    if (poly.length >= 3) out.push({ poly, nature: n.natures.size === 1 ? [...n.natures][0] : null, p: n.p });
   }
   return out;
 }
@@ -5905,6 +5926,9 @@ export function mergeColinear(
       */
       if (Math.abs(epaisseurDe(other.wall) - epaisseurDe(w)) > 1e-6) return null;
       if (!!other.wall.auNu !== !!w.auNu) return null;
+      // Une cloison prolongée d'un porteur reste deux murs : leur nature
+      // se dessine et se légende chacune pour soi (voir `natureMurs`).
+      if ((other.wall.nature ?? null) !== (w.nature ?? null)) return null;
       if (Math.abs(other.wall.height - w.height) > heightTol) return null;
       const u = unit(w);
       const v = unit(other.wall);

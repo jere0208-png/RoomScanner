@@ -91,6 +91,8 @@ import {
 import ChevronsUpDown from 'lucide-react-native/icons/chevrons-up-down';
 import Svg, { Path as Trace } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
+import { NATURES_MUR, libelleNature, natureDe } from '../geometry/natureMurs';
+import { PastilleNature } from '../components/PastilleNature';
 import {
   DEFAULT_VIEW3D,
   Iso3DView,
@@ -6649,7 +6651,10 @@ export function ResultScreen() {
               selectedWall.height,
               2,
             )} m`}
-            note={`mur · ${Math.round(epaisseurDe(selectedWall) * 100)} cm d’épaisseur`}
+            note={`${(() => {
+              const n = natureDe(selectedWall);
+              return n ? libelleNature(n).toLowerCase() : 'mur';
+            })()} · ${Math.round(epaisseurDe(selectedWall) * 100)} cm d’épaisseur`}
             onFermer={fermerLaCarte}
             actions={[
               /*
@@ -6747,6 +6752,46 @@ export function ResultScreen() {
                         haptic('succes');
                       },
                     })),
+                  });
+                },
+              },
+              /*
+                LA NATURE DU MUR — relevé du patron, plan d'architecte à
+                l'appui : « marquer la nature des murs, comme les murs
+                intérieurs en placo ; ces murs changeront de visuel sur le
+                plan ». Chaque choix montre le rendu qu'il prendra.
+              */
+              {
+                label: 'Nature',
+                icone: SOLAIRES.murs,
+                sansMot: true,
+                onPress: () => {
+                  const id = selectedWall.id;
+                  const actuelle = natureDe(selectedWall);
+                  setMenu({
+                    title: 'Nature du mur',
+                    subtitle: 'Le plan et le PDF le dessinent comme un plan d’architecte, avec sa légende.',
+                    actions: [
+                      ...NATURES_MUR.map((n) => ({
+                        label: n.libelle,
+                        hint: n.cle === actuelle ? 'Nature actuelle' : n.aide,
+                        node: <PastilleNature nature={n.cle} />,
+                        onPress: () => {
+                          useScanStore.getState().setNatureMur(id, n.cle);
+                          haptic('succes');
+                        },
+                      })),
+                      ...(actuelle
+                        ? [{
+                            label: 'Non précisée',
+                            hint: 'Le mur redevient comme relevé, en noir, sans légende.',
+                            onPress: () => {
+                              useScanStore.getState().setNatureMur(id, null);
+                              haptic('leger');
+                            },
+                          }]
+                        : []),
+                    ],
                   });
                 },
               },

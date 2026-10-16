@@ -1144,8 +1144,8 @@ const styles = getStyles(c);
           <Carte
             icone={EXPORT_ICONS.metre}
             titre="Métré"
-            dit="Surfaces, périmètres, plinthes et ouvertures : de quoi chiffrer sols et peinture."
-            pages={pagesDe(includeMetre, combien(sommaire, 'metre'), combien(avecTout, 'metre'))}
+            dit="Surfaces et périmètres par pièce, et le carnet des portes et fenêtres cotées : de quoi chiffrer sols, peinture et menuiseries."
+            pages={pagesDe(includeMetre, combien(sommaire, 'metre', 'menuiseries'), combien(avecTout, 'metre', 'menuiseries'))}
             actif={includeMetre}
             label="Métré"
             onChange={(v) => basculer(() => setIncludeMetre(v))}

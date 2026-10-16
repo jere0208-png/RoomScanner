@@ -244,14 +244,15 @@ describe('abonné : le dossier net, et il part', () => {
 });
 
 describe('chaque réglage change le dossier sous les yeux', () => {
-  it('retirer le métré retire une feuille', async () => {
+  // Le métré emmène le carnet des menuiseries qui le suit : deux feuilles.
+  it('retirer le métré retire ses feuilles', async () => {
     const t = monter(true);
     await bâtir();
     const compte = () => Number(/Exporter le PDF · (\d+) feuilles?/.exec(textes(t))?.[1] ?? 'NaN');
     const avant = compte();
     const metre = t.root.findAllByType(Switch).find((s) => s.props.accessibilityLabel === 'Métré')!;
     act(() => metre.props.onValueChange(false));
-    expect(compte()).toBe(avant - 1);
+    expect(compte()).toBe(avant - 2);
   });
 
   it('un calque touché dit ce qu’il montre', async () => {

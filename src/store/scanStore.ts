@@ -146,6 +146,7 @@ import { equilibrerLaScene, pointInPolygon } from '../geometry/appearance';
 import { ancrerElec } from '../geometry/viseur';
 import { poserLibre } from '../geometry/poser';
 import { orienterLesSieges } from '../geometry/sieges';
+import type { NatureMur } from '../geometry/natureMurs';
 import type { SurfaceTexture } from 'react-native-room-scan';
 import {
   deduceRoomKind, deduireLaPiece,
@@ -2360,6 +2361,11 @@ interface ScanState {
    * `EPAISSEURS` et `WallSeg.epaisseur`.
    */
   setEpaisseurMur: (id: string, epaisseur: number) => void;
+  /**
+   * LA NATURE D'UN MUR — porteur, cloison en plaque de plâtre, doublage, à
+   * démolir, à créer ; `null` la retire. Voir `natureMurs`.
+   */
+  setNatureMur: (id: string, nature: NatureMur | null) => void;
   /**
    * COMBLE UN TROU DU RELEVÉ — le mur manquant, et la porte avec.
    *
@@ -5721,6 +5727,24 @@ export const useScanStore = create<ScanState>((set, get) => {
           get().moveWall(id, u.z * dedans * recul, -u.x * dedans * recul, false, `epaisseur:${id}`);
         }
       }
+    },
+
+    setNatureMur: (id, nature) => {
+      const st = get();
+      const w = st.walls.find((x) => x.id === id);
+      if (!w || w.type !== 'wall') return;
+      if ((w.nature ?? null) === nature) return;
+      // Un geste discret : chaque choix s'annule pour lui-même.
+      pushHistory('natureMur');
+      set({
+        walls: st.walls.map((x) => {
+          if (x.id !== id) return x;
+          const reste: WallSeg = { ...x };
+          delete reste.nature;
+          return nature ? { ...reste, nature } : reste;
+        }),
+        dirty: true,
+      });
     },
 
     declarerRecoin: (at, nom = 'Placard') => {

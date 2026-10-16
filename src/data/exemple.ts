@@ -72,15 +72,23 @@ const refend = (id: string, ax: number, az: number, bx: number, bz: number): Wal
   ...mur(id, ax, az, bx, bz),
   deuxFaces: true,
 });
+/*
+  LA NATURE DES MURS, COMME SUR UN PLAN D'ARCHITECTE (voir `natureMurs`) :
+  l'enveloppe et le refend en maçonnerie, les cloisons du bureau, de
+  l'entrée et de la salle d'eau en plaque de plâtre — en gris sur le plan,
+  et la légende du PDF le dit.
+*/
+const porteur = (w: WallSeg): WallSeg => ({ ...w, nature: 'porteur' });
+const placo = (w: WallSeg): WallSeg => ({ ...w, nature: 'cloison' });
 const BRUTS: WallSeg[] = [
-  mur('nord', 0, 0, 8, 0),
-  mur('est', 8, 0, 8, 6),
-  mur('sud', 8, 6, 0, 6),
-  mur('ouest', 0, 6, 0, 0),
-  refend('refend', 5, 0, 5, 6),
-  refend('sejour-sud', 0, 4.2, 5, 4.2),
-  refend('bureau-est', 2.6, 4.2, 2.6, 6),
-  refend('chambre-sud', 5, 3.6, 8, 3.6),
+  porteur(mur('nord', 0, 0, 8, 0)),
+  porteur(mur('est', 8, 0, 8, 6)),
+  porteur(mur('sud', 8, 6, 0, 6)),
+  porteur(mur('ouest', 0, 6, 0, 0)),
+  porteur(refend('refend', 5, 0, 5, 6)),
+  placo(refend('sejour-sud', 0, 4.2, 5, 4.2)),
+  placo(refend('bureau-est', 2.6, 4.2, 2.6, 6)),
+  placo(refend('chambre-sud', 5, 3.6, 8, 3.6)),
 ];
 
 const WALLS = mergeColinear(splitAtJunctions(weldCorners(BRUTS)));

@@ -64,7 +64,10 @@ import {
   etendueDeLaPiece,
   longueurCotee,
   nomAbrege,
+  wallQuadsOf,
+  jonctionsDetaillees,
 } from '../geometry/floorplan';
+import { dessinDesNatures, renduNature } from '../geometry/natureMurs';
 import type { ObjectData } from 'react-native-room-scan';
 import {
   faceX,
@@ -1660,6 +1663,18 @@ export function FloorplanEditor({
     [mursDifferes, baiesDifferees, rooms],
   );
   const baieDuPoche = useMemo(() => new Map(poche.baies.map((b) => [b.id, b])), [poche]);
+  /*
+    LA NATURE DES MURS, PAR-DESSUS LE POCHÉ — relevé du patron, plan
+    d'architecte à l'appui : la cloison en plaque de plâtre en gris cerné, le
+    doublage en boucles, le mur à démolir en jaune, celui à créer en rouge
+    (voir `natureMurs`). Le poché noir reste le fond : chaque corps de mur
+    marqué s'y peint, découpé au poché pour que les baies restent des vides,
+    et le cœur d'un nœud prend la nature de ses murs quand ils la partagent.
+  */
+  const corpsDeNature = useMemo(
+    () => dessinDesNatures(mursDifferes, wallQuadsOf(mursDifferes), jonctionsDetaillees(mursDifferes)),
+    [mursDifferes],
+  );
   // Le sol garde sa teinte neutre. Les couleurs relevées au scan ne servent
   // qu'à la vue 3D : sur un plan vu de dessus, sous le poché des murs et le
   // semis des points, elles ne se lisaient pas.
@@ -3294,6 +3309,65 @@ export function FloorplanEditor({
               fill={c.ink}
               fillRule="evenodd"
             />
+            {corpsDeNature ? (
+              <G testID="nature-des-murs" pointerEvents="none">
+                <Defs>
+                  <ClipPath id="clip-poche-nature">
+                    <Path d={cheminDuPoche(poche.contours, mapping.toPx)} clipRule="evenodd" />
+                  </ClipPath>
+                </Defs>
+                <G clipPath="url(#clip-poche-nature)">
+                  {corpsDeNature.coeurs.map((j, i) => (
+                    <Polygon
+                      key={`coeur-${i}`}
+                      points={j.poly.map((p) => mapping.toPx(p)).map((p) => `${p.x},${p.y}`).join(' ')}
+                      fill={renduNature(j.nature, c.ink, c.surface).fond}
+                    />
+                  ))}
+                  {corpsDeNature.corps.map((m) => {
+                    const r = renduNature(m.nature, c.ink, c.surface);
+                    // Le trait est coupé de moitié par le poché : on le
+                    // double pour garder le filet fin du plan d'architecte.
+                    const trait = Math.min(2.4, Math.max(1.2, mapping.scale * 0.02));
+                    return (
+                      <G key={`nature-${m.id}`}>
+                        <Polygon
+                          testID={`nature-${m.nature}`}
+                          points={m.contour.map((p) => mapping.toPx(p)).map((p) => `${p.x},${p.y}`).join(' ')}
+                          fill={r.fond}
+                        />
+                        {m.filets.map((f, k) => (
+                          <Polyline
+                            key={k}
+                            points={f.map((p) => mapping.toPx(p)).map((p) => `${p.x},${p.y}`).join(' ')}
+                            fill="none"
+                            stroke={r.contour}
+                            strokeWidth={trait}
+                            strokeDasharray={r.tirets ? [5, 3] : undefined}
+                          />
+                        ))}
+                        {m.boucles ? (
+                          <Polyline
+                            points={m.boucles.map((p) => mapping.toPx(p)).map((p) => `${p.x},${p.y}`).join(' ')}
+                            fill="none"
+                            stroke={r.contour}
+                            strokeWidth={Math.max(0.6, trait * 0.45)}
+                          />
+                        ) : null}
+                      </G>
+                    );
+                  })}
+                  {/* La maçonnerie reprend la main aux butées : voir `dessinDesNatures`. */}
+                  {corpsDeNature.maconnerie.map((poly, i) => (
+                    <Polygon
+                      key={`macon-${i}`}
+                      points={poly.map((p) => mapping.toPx(p)).map((p) => `${p.x},${p.y}`).join(' ')}
+                      fill={c.ink}
+                    />
+                  ))}
+                </G>
+              </G>
+            ) : null}
 
             {/* Murs : leur corps ne se dessine plus (le poché le fait) ; il
                 garde le toucher, la cote, et le bleu de la sélection. Leur
