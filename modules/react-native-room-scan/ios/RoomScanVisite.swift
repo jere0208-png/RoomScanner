@@ -467,12 +467,23 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   private static let MASQUE_PIECE = 1
   private static let MASQUE_MEUBLE = 2
 
-  /** La part des meubles : une lueur sans faisceau, qui les réchauffe sans les blanchir. */
+  /**
+   * La part des meubles : une lueur sans faisceau, qui les réchauffe sans les blanchir.
+   *
+   * UN QUART DE CE QU'ELLE ÉTAIT — relevé du patron, après le correctif de
+   * l'ambiance des meubles : « en visite, les meubles sont encore blancs
+   * lorsque la lumière de la pièce est active ; la lumière doit avoir un
+   * faible impact sur ceux-ci ». Éteints, ils gardaient leur couleur ;
+   * allumés, cette lueur suffisait encore à pousser un tissu clair au
+   * blanc (la matière physique d'un meuble reçoit déjà l'ambiance, le jour
+   * et le contre-jour). Elle se devine à peine : c'est le halo et la nappe
+   * sur les murs qui disent qu'une lampe est allumée.
+   */
   private func lueurDesMeubles(genre: Int, a p: SCNVector3, nx: Float, nz: Float) -> SCNNode {
     let l = SCNLight()
     l.type = .omni
     l.color = UIColor(red: 1.0, green: 0.95, blue: 0.88, alpha: 1)
-    l.intensity = 60
+    l.intensity = 15
     l.attenuationStartDistance = 0.2
     l.attenuationEndDistance = 3.2
     l.attenuationFalloffExponent = 2

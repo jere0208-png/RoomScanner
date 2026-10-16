@@ -29,3 +29,13 @@ describe('la lumière des meubles, en visite', () => {
     expect(nombre(/scene\.lightingEnvironment\.intensity = ([\d.]+)/)).toBeLessThanOrEqual(0.25);
   });
 });
+
+describe('la lampe allumée, sur les meubles', () => {
+  it('sa lueur ne fait qu’effleurer les meubles (relevé du patron : « faible impact »)', () => {
+    const bloc = swift.slice(swift.indexOf('private func lueurDesMeubles'));
+    const intensite = Number((bloc.match(/l\.intensity = (\d+)/) ?? [])[1]);
+    expect(intensite).toBeLessThanOrEqual(20);
+    // Et les faisceaux des lampes ne touchent que le bâti.
+    expect(swift).toMatch(/l\.categoryBitMask = Self\.MASQUE_PIECE/);
+  });
+});
