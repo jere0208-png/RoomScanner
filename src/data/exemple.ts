@@ -125,6 +125,26 @@ const OPENINGS: WallSeg[] = [
   baie('fenetre-sde', 'window', 8, 4.5, 8, 5.1, 0.6, 1.55),
 ];
 
+/*
+  LES PORTES BATTENT — revue des six testeurs : l'exemple montrait ses portes
+  comme de simples trous, sans battant ni arc, alors que le plan sait les
+  dessiner. Il ne lui manquait que de savoir DE QUELLE PIÈCE chacune est la
+  porte (le battant s'ouvre vers elle) : un vrai relevé le dit, l'exemple ne
+  le disait pas. Et le bord qui pivote, posé comme le menuisier l'aurait
+  fait — les paumelles à l'opposé de l'interrupteur, qui est du côté de la
+  poignée, et le battant rangé contre le mur sans balayer un meuble.
+*/
+const PORTES: Record<string, { dans: string; pivot: 'a' | 'b' }> = {
+  // L'interrupteur de l'entrée est côté bureau (x = 2,6) : poignée en a.
+  'porte-entree': { dans: 'Entrée', pivot: 'b' },
+  // Celui du bureau est vers le sud (z = 5,75) : poignée en b.
+  'porte-bureau': { dans: 'Bureau', pivot: 'a' },
+  // Celui de la chambre est au nord de la porte (z = 2,3) : poignée en a.
+  'porte-chambre': { dans: 'Chambre', pivot: 'b' },
+  // Celui de la salle d'eau est au sud de la porte (z = 5,55) : poignée en b.
+  'porte-sde': { dans: 'Salle d’eau', pivot: 'a' },
+};
+
 /** Le nom et la nature de chaque pièce, retrouvée par un point qui y est. */
 const PIECES: { nom: string; kind?: RoomKind; ici: { x: number; z: number } }[] = [
   /*
@@ -411,5 +431,11 @@ export function appartementExemple() {
       },
     ];
   });
-  return { walls: WALLS, openings: OPENINGS, rooms, objects, fixtures: FIXTURES_EXEMPLE, ceiling };
+  // Chaque porte connaît sa pièce — c'est vers elle que bat son vantail.
+  const openings: WallSeg[] = OPENINGS.map((o) => {
+    const porte = PORTES[o.id];
+    const piece = porte ? rooms.find((r) => r.name === porte.dans) : undefined;
+    return piece ? { ...o, roomId: piece.id, pivot: porte.pivot } : o;
+  });
+  return { walls: WALLS, openings, rooms, objects, fixtures: FIXTURES_EXEMPLE, ceiling };
 }

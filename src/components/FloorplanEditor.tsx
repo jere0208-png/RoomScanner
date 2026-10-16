@@ -63,6 +63,7 @@ import {
   type DemiFaces,
   etendueDeLaPiece,
   longueurCotee,
+  nomAbrege,
 } from '../geometry/floorplan';
 import type { ObjectData } from 'react-native-room-scan';
 import {
@@ -74,7 +75,7 @@ import {
 import { frCategory, furnKind, furnitureStrokes, meridienneDe } from '../geometry/furniture';
 import { markColor } from '../geometry/schema';
 import { bleuFenetre, encreElectrique } from '../ui/encreElec';
-import { cheminDuPoche, pocheDesMurs } from '../geometry/poche';
+import { cheminDuPoche, pocheDesMurs, SUREPAISSEUR_FACADE } from '../geometry/poche';
 import { cibleDeFacade, cotesExterieurs } from '../geometry/cibleMur';
 import { CeilingLayer, LARGEUR_CIBLE_RUBAN, rayonDuPointLumineux } from './CeilingLayer';
 import { CeilingIcon } from './CeilingIcon';
@@ -261,11 +262,15 @@ import { RoomScan } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
 import type { PlanNote } from '../store/scanStore';
 import {
+  boiteDePoints,
   encombrement,
   milieuVisible,
+  PETITE_COTE,
+  petiteCoteLisible,
   placerEtiquettes,
   plaqueDeCote,
   type EtiquetteMobile,
+  type Place,
 } from '../geometry/cotes';
 import { haptic, releaseHaptic } from '../ui/haptic';
 import { creerSeuil, estUnGlissement, estUnTap } from '../ui/geste';
@@ -704,12 +709,6 @@ function ChoixSousLeDoigt({
       </View>
     </>
   );
-}
-
-/** Un nom de pièce raccourci pour un cartouche serré : huit lettres et « … ». */
-function couperNom(nom: string): string {
-  const lettres = Array.from(nom);
-  return lettres.length <= 9 ? nom : `${lettres.slice(0, 8).join('').trimEnd()}…`;
 }
 
 export function FloorplanEditor({
@@ -1417,157 +1416,6 @@ export function FloorplanEditor({
     ? Math.min(1, Math.max(0, (mapping.scale - 60) / 40))
     : 0;
 
-  /**
-   * OÙ S'ÉCRIT CHAQUE COTE, ET LAQUELLE ON SACRIFIE.
-   *
-   * Deux défauts relevés sur le chantier, une seule cause : personne ne
-   * regardait où tombaient les chiffres.
-   *
-   * 1. **Elles se superposaient.** Sur un mur en dents de scie — des retours
-   *    de vingt centimètres —, trois valeurs s'écrivaient au même endroit et
-   *    formaient une tache grise. Un chiffre illisible est pire qu'un
-   *    chiffre absent : absent, on va le chercher ; empilé, on croit
-   *    l'avoir lu. Les grandes cotes passent donc d'abord, et ce qui
-   *    viendrait les recouvrir renonce — la valeur reste au métré.
-   *
-   * 2. **Elles s'en allaient au zoom.** Une cote se pose au milieu de son
-   *    mur ; zoomé sur un angle, ce milieu est à deux écrans de là. On
-   *    croyait l'app incapable de coter de près, alors que c'est justement
-   *    de près qu'on lit les cotes. Chaque valeur se recale donc au milieu
-   *    de la PORTION VISIBLE de son mur.
-   *
-   * Les deux familles — la cote globale d'un mur et celles de ses tronçons —
-   * s'arbitrent ENSEMBLE, mais seulement quand elles sont réellement à
-   * l'écran : pendant la bascule du zoom, l'une s'efface tandis que l'autre
-   * paraît, et une cote invisible ne doit pas voler la place d'une autre.
-   */
-  const placementCotes = useMemo(() => {
-    const vide = {
-      murs: new Map<string, { x: number; y: number }>(),
-      runs: new Map<string, { x: number; y: number }>(),
-      items: [] as EtiquetteMobile[],
-    };
-    if (!showMeasures || !mapping || layout.w === 0) return vide;
-    const items: EtiquetteMobile[] = [];
-    const murs = new Map<string, { x: number; y: number }>();
-    const runs = new Map<string, { x: number; y: number }>();
-    const bodyPx = WALL_T * mapping.scale;
-    for (const w of walls) {
-      const a = mapping.toPx(w.a);
-      const b = mapping.toPx(w.b);
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const norm = Math.hypot(dx, dy) || 1;
-      let n = { x: -dy / norm, y: dx / norm };
-      if (n.y > 0) n = { x: -n.x, y: -n.y };
-      let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-      if (angle > 90) angle -= 180;
-      if (angle < -90) angle += 180;
-      if (1 - detail > 0.02) {
-        const mil = milieuVisible(a, b, layout);
-        if (mil) {
-          /*
-            ELLE PEUT GLISSER LE LONG DE SON MUR — relevé du patron : « le
-            placement intelligent des cotes SUR TOUTE LONGUEUR ».
-
-            Elle se posait au milieu, un point et pas deux : quand ce point
-            était pris, elle n'avait qu'un recours, disparaître. Or une cote
-            glisse le long de ce qu'elle mesure sans rien perdre — elle reste
-            sur le même mur, elle dit la même chose. C'est ce que fait un
-            dessinateur, et c'est ce que fait déjà le dossier imprimé.
-
-            Les places vont de la meilleure à la moins bonne : le milieu
-            visible d'abord, puis de part et d'autre le long du mur, puis
-            l'AUTRE CÔTÉ du mur — un dernier recours, parce qu'une cote lue
-            du mauvais côté oblige à chercher à quel mur elle appartient.
-          */
-          const leLong = { x: dx / norm, y: dy / norm };
-          const places: { x: number; y: number }[] = [];
-          for (const cote of [1, -1]) {
-            for (const d of [0, 0.18, -0.18, 0.34, -0.34]) {
-              const glisse = d * norm;
-              places.push({
-                x: mil.x + n.x * cote * (bodyPx / 2 + 9) + leLong.x * glisse,
-                y: mil.y + n.y * cote * (bodyPx / 2 + 9) + leLong.y * glisse,
-              });
-            }
-          }
-          murs.set(w.id, places[0]);
-          items.push({
-            id: `w:${w.id}`,
-            places,
-            taille: encombrement(
-              `${segLength(w).toFixed(2)} m`.replace('.', ','),
-              10,
-              angle,
-            ),
-            // La longueur du mur départage : c'est la grande cote qu'on lit.
-            poids: 1000 + segLength(w),
-          });
-        }
-      }
-      if (detail > 0.02) {
-        const off = bodyPx + 9;
-        wallRuns(w, openings).forEach((run, ri) => {
-          if ((run.t1 - run.t0) * norm < 26) return;
-          const t = (run.t0 + run.t1) / 2;
-          const brut = { x: a.x + dx * t, y: a.y + dy * t };
-          // Le tronçon a ses propres bouts : c'est SA portion visible qui
-          // compte, pas celle du mur entier.
-          const p0 = { x: a.x + dx * run.t0, y: a.y + dy * run.t0 };
-          const p1 = { x: a.x + dx * run.t1, y: a.y + dy * run.t1 };
-          const mil = milieuVisible(p0, p1, layout) ?? brut;
-          const cle = `${w.id}#${ri}`;
-          /*
-            UN TRONÇON GLISSE MOINS LOIN QU'UN MUR : il est plus court, et
-            une cote poussée à son bout ne dit plus de quel morceau elle
-            parle. Un peu plus d'un quart de sa longueur de chaque côté, pas
-            davantage — et l'autre côté du mur en dernier recours, comme pour
-            les murs entiers.
-
-            Mesuré : à trois places seulement, un « 0,90 » de menuiserie ne
-            trouvait plus où aller sur le plan de référence et renonçait. Un
-            chiffre absent vaut mieux qu'un chiffre illisible, mais un chiffre
-            LISIBLE vaut mieux que les deux.
-          */
-          const leLongR = { x: dx / norm, y: dy / norm };
-          const longueurPx = (run.t1 - run.t0) * norm;
-          const places: { x: number; y: number }[] = [];
-          for (const cote of [1, -1]) {
-            for (const d of [0, 0.14, -0.14, 0.28, -0.28]) {
-              places.push({
-                x: mil.x + n.x * cote * off + leLongR.x * d * longueurPx,
-                y: mil.y + n.y * cote * off + leLongR.y * d * longueurPx,
-              });
-            }
-          }
-          runs.set(cle, places[0]);
-          items.push({
-            id: `r:${cle}`,
-            places,
-            taille: encombrement(
-              run.length.toFixed(2).replace('.', ','),
-              9.5,
-              angle,
-            ),
-            poids: run.length,
-          });
-        });
-      }
-    }
-    /*
-      L'ARBITRAGE NE SE FAIT PLUS ICI — il se fait plus bas, sur TOUT.
-
-      Ce mémo ne connaît que les murs. Il rendait donc son verdict entre
-      cotes de mur, et les écarts d'une ligne de spots s'écrivaient de leur
-      côté sans regarder personne : deux arbitres qui ne se parlaient pas.
-      Mesuré sur le plan de référence à seize cadrages, 28 chevauchements sur
-      478 étiquettes.
-
-      Il rend maintenant ses CANDIDATS. Voir `cotesArbitrees`.
-    */
-    return { murs, runs, items };
-  }, [walls, openings, mapping, layout, showMeasures, detail]);
 
   /**
    * Retour de mur sélectionné : `{ mur, index du tronçon }`.
@@ -1860,17 +1708,28 @@ export function FloorplanEditor({
         wpx: number;
         hpx: number;
         gene: boolean;
+        /** Posé HORS de sa pièce : le point de la pièce où mène son trait de rappel. */
+        rappel?: Pt;
       }
     >();
     if (!mapping || !showSurfaces || layout.w === 0) return out;
     const foots = objects.map((o) => footprintOf(o, partOf, facesPlan));
     const obstacles = [
-      ...foots.map((f) => ({
-        x: f.cx,
-        z: f.cz,
-        rx: f.width / 2,
-        rz: f.depth / 2,
-      })),
+      /*
+        UN MEUBLE TOURNÉ ÉCHANGE SA LARGEUR ET SA PROFONDEUR — le canapé dos
+        au refend de l'exemple est tourné d'un quart de tour : réservé à plat,
+        il laissait le cartouche se poser sur son assise.
+      */
+      ...foots.map((f) => {
+        const co = Math.abs(Math.cos(f.yaw));
+        const si = Math.abs(Math.sin(f.yaw));
+        return {
+          x: f.cx,
+          z: f.cz,
+          rx: (f.width / 2) * co + (f.depth / 2) * si,
+          rz: (f.width / 2) * si + (f.depth / 2) * co,
+        };
+      }),
       ...(showCeiling ? ceiling ?? [] : []).map((sp) => ({
         x: sp.at.x,
         z: sp.at.z,
@@ -1910,6 +1769,59 @@ export function FloorplanEditor({
         anneaux.push([Math.cos(a) * r, Math.sin(a) * r]);
       }
     }
+    /** Les cartouches déjà posés, à l'écran : un cartouche sorti ne s'y pose pas. */
+    const placesHors: Boite[] = [];
+    const contoursPx = parts
+      .map((p) => (p.surface?.pts ?? []).map((q) => {
+        const e = mapping.toPx(q);
+        return { x: e.x, z: e.y };
+      }))
+      .filter((cp) => cp.length >= 3);
+    /**
+     * UNE PLACE HORS DES PIÈCES, et le point de la pièce où mène le rappel.
+     *
+     * Hors de TOUTES les pièces — un cartouche posé dans la pièce voisine se
+     * lirait comme le sien —, à distance de la façade et de la bande où
+     * s'écrivent ses cotes, dans le cadre, et sans toucher un autre cartouche.
+     */
+    const horsDesPieces = (part: RoomPart, w: number, h: number, deja: Boite[]) => {
+      const contour = part.surface?.pts;
+      if (!contour || contour.length < 3) return null;
+      const marge = 0.2 * mapping.scale + 22;
+      for (const r of [1, 1.5, 2, 2.5, 3, 3.5, 4, 5, 6]) {
+        for (let k = 0; k < 16; k++) {
+          const a = (k * Math.PI) / 8;
+          const cand = { x: part.labelAt.x + Math.cos(a) * r, z: part.labelAt.z + Math.sin(a) * r };
+          const q = mapping.toPx(cand);
+          const b = { x: q.x - w / 2, y: q.y - h / 2, w, h };
+          if (b.x < 4 || b.y < 4 || b.x + b.w > layout.w - 4 || b.y + b.h > layout.h - 4) continue;
+          const x0 = b.x - marge;
+          const y0 = b.y - marge;
+          const lx = b.w + 2 * marge;
+          const ly = b.h + 2 * marge;
+          const echantillons: Pt[] = [];
+          for (let i = 0; i <= 4; i++) {
+            for (let j = 0; j <= 4; j++) echantillons.push({ x: x0 + (lx * i) / 4, z: y0 + (ly * j) / 4 });
+          }
+          if (echantillons.some((e) => contoursPx.some((cp) => insidePoly(e, cp)))) continue;
+          if (contoursPx.some((cp) => cp.some((e) => e.x > x0 && e.x < x0 + lx && e.z > y0 && e.z < y0 + ly))) continue;
+          if (deja.some((o) => !(b.x > o.x + o.w + 3 || o.x > b.x + b.w + 3 || b.y > o.y + o.h + 3 || o.y > b.y + b.h + 3))) continue;
+          // Le rappel mène juste en deçà du mur, du côté du cartouche.
+          let dedans = part.labelAt;
+          for (let t = 0; t <= 1; t += 0.02) {
+            const e = { x: part.labelAt.x + (cand.x - part.labelAt.x) * t, z: part.labelAt.z + (cand.z - part.labelAt.z) * t };
+            if (!insidePoly(e, contour)) break;
+            dedans = e;
+          }
+          const ux = cand.x - part.labelAt.x;
+          const uz = cand.z - part.labelAt.z;
+          const l = Math.hypot(ux, uz) || 1;
+          const recul = Math.min(0.25, Math.hypot(dedans.x - part.labelAt.x, dedans.z - part.labelAt.z));
+          return { pos: cand, rappel: { x: dedans.x - (ux / l) * recul, z: dedans.z - (uz / l) * recul } };
+        }
+      }
+      return null;
+    };
     for (const part of parts) {
       const roomName = roomById.get(part.roomId)?.name ?? '';
       const areaText = part.surface
@@ -1951,24 +1863,44 @@ export function FloorplanEditor({
         mettre. C'est la règle du dossier imprimé, appliquée à l'écran :
         quand rien n'est libre, la valeur cède la place.
       */
+      /*
+        UNE SURFACE NE DISPARAÎT JAMAIS — revue des six testeurs (captures
+        clair-11 et clair-23) : « Salle d'eau » sans ses m² à l'écran,
+        « Entrée » sans les siens dans l'aperçu du PDF.
+
+        Le cartouche cédait ligne par ligne jusqu'au NOM SEUL, et ce nom
+        seul, vingt pixels de haut, trouvait sa place entre deux meubles
+        AVANT que le repli « surface par-dessus un meuble » ne soit essayé :
+        la surface partait alors qu'elle aurait tenu. La règle s'inverse — la
+        surface passe avant le nom. Dans l'ordre, et la première qui tient
+        gagne :
+          1. le cartouche entier, puis sans hors-tout, puis au nom abrégé
+             (« SdE », « Ch. 2 » : `nomAbrege`, la règle du dossier —
+             plus de « Séjour-c… ») — sur le blanc de la pièce ;
+          2. les mêmes, posés par-dessus un meuble (voir `gene`) ;
+          3. le cartouche abrégé HORS de la pièce, relié à elle par un trait
+             de rappel, comme sur un plan d'architecte ;
+          4. faute de mieux, au milieu de la pièce, même s'il en déborde.
+        Le nom seul ne reste que pour une pièce sans surface connue.
+      */
       const variantes = [textes];
       if (textes.length > 2) variantes.push(textes.slice(0, 2));
-      /*
-        LE NOM S'ABRÈGE AVANT QUE LA SURFACE NE PARTE — revue « Hugo » : sur
-        un iPhone SE, une seule pièce sur neuf gardait ses m², et c'est eux
-        qu'une colocation compare. « Chambre Léa » devient « Chambre… », et
-        la surface reste ; elle ne cède qu'en dernier.
-      */
-      const nomCourt = couperNom(roomName);
-      if (textes.length > 1 && textes[0].role === 'nom' && textes[1].role === 'aire' && nomCourt !== roomName) {
+      const nomCourt = nomAbrege(roomName);
+      const avecAire = textes.some((l) => l.role === 'aire');
+      if (roomName !== '' && avecAire && nomCourt !== roomName) {
         variantes.push([{ t: nomCourt, role: 'nom' }, textes[1]]);
       }
-      if (textes.length > 1) variantes.push(textes.slice(0, 1));
+      // Sans nom, la surface seule ; sans surface, le nom seul.
+      if ((!avecAire || roomName === '') && textes.length > 1) variantes.push(textes.slice(0, 1));
+      if (!avecAire && roomName !== '' && nomCourt !== roomName) {
+        variantes.push([{ t: nomCourt, role: 'nom' }]);
+      }
       const dernier = variantes[variantes.length - 1];
       let retenues = dernier;
       let boite = emprise(dernier);
       let pos = part.labelAt;
       let gene = true;
+      let rappel: Pt | undefined;
       const contour = part.surface?.pts;
       const chercher = (essai: typeof textes, garde: (cand: Pt, lw: number, lh: number) => boolean) => {
         const box = emprise(essai);
@@ -2020,23 +1952,53 @@ export function FloorplanEditor({
         n'est libre, le cartouche à surface se pose PAR-DESSUS un meuble
         (fond presque plein, voir `gene`) plutôt que de la retirer.
       */
-      if (gene) {
+      let place = !gene;
+      if (!place) {
         for (const essai of variantes) {
-          if (!essai.some((l) => l.role === 'aire')) continue;
+          if (avecAire && !essai.some((l) => l.role === 'aire')) continue;
           const trouve = chercher(essai, () => true);
           if (!trouve) continue;
           pos = trouve.cand;
           retenues = essai;
           boite = trouve.box;
+          place = true;
           break;
         }
       }
+      /*
+        ET SI LA PIÈCE EST TROP PETITE POUR LUI, IL SORT — avec un trait de
+        rappel. Un WC d'un mètre, dessiné à quarante pixels le mètre, n'a pas
+        la place d'un cartouche de deux lignes : on l'écrit à côté, sur le
+        blanc du dehors, et un trait fin le relie à sa pièce.
+      */
+      if (!place && avecAire) {
+        const compact = variantes[variantes.length - 1];
+        const box = emprise(compact);
+        const dehors = horsDesPieces(part, box.w, box.h, placesHors);
+        if (dehors) {
+          pos = dehors.pos;
+          rappel = dehors.rappel;
+          retenues = compact;
+          boite = box;
+          gene = false;
+          place = true;
+        }
+      }
+      if (!place && avecAire) {
+        // Le dernier recours : au milieu, débordant s'il le faut — mais avec
+        // sa surface.
+        retenues = variantes[variantes.length - 1];
+        boite = emprise(retenues);
+      }
+      const q = mapping.toPx(pos);
+      placesHors.push({ x: q.x - boite.w / 2, y: q.y - boite.h / 2, w: boite.w, h: boite.h });
       out.set(part.roomId, {
         pos,
         textes: retenues,
         wpx: boite.w,
         hpx: boite.h,
         gene,
+        ...(rappel ? { rappel } : {}),
       });
     }
     return out;
@@ -2055,6 +2017,201 @@ export function FloorplanEditor({
     mapping,
     layout,
   ]);
+
+  /**
+   * OÙ S'ÉCRIT CHAQUE COTE, ET LAQUELLE ON SACRIFIE.
+   *
+   * Deux défauts relevés sur le chantier, une seule cause : personne ne
+   * regardait où tombaient les chiffres.
+   *
+   * 1. **Elles se superposaient.** Sur un mur en dents de scie — des retours
+   *    de vingt centimètres —, trois valeurs s'écrivaient au même endroit et
+   *    formaient une tache grise. Un chiffre illisible est pire qu'un
+   *    chiffre absent : absent, on va le chercher ; empilé, on croit
+   *    l'avoir lu. Les grandes cotes passent donc d'abord, et ce qui
+   *    viendrait les recouvrir renonce — la valeur reste au métré.
+   *
+   * 2. **Elles s'en allaient au zoom.** Une cote se pose au milieu de son
+   *    mur ; zoomé sur un angle, ce milieu est à deux écrans de là. On
+   *    croyait l'app incapable de coter de près, alors que c'est justement
+   *    de près qu'on lit les cotes. Chaque valeur se recale donc au milieu
+   *    de la PORTION VISIBLE de son mur.
+   *
+   * Les deux familles — la cote globale d'un mur et celles de ses tronçons —
+   * s'arbitrent ENSEMBLE, mais seulement quand elles sont réellement à
+   * l'écran : pendant la bascule du zoom, l'une s'efface tandis que l'autre
+   * paraît, et une cote invisible ne doit pas voler la place d'une autre.
+   */
+  const placementCotes = useMemo(() => {
+    const vide = {
+      murs: new Map<string, { x: number; y: number }>(),
+      runs: new Map<string, { x: number; y: number }>(),
+      items: [] as EtiquetteMobile[],
+    };
+    if (!showMeasures || !mapping || layout.w === 0) return vide;
+    const items: EtiquetteMobile[] = [];
+    const murs = new Map<string, { x: number; y: number }>();
+    const runs = new Map<string, { x: number; y: number }>();
+    const bodyPx = WALL_T * mapping.scale;
+    for (const w of walls) {
+      const a = mapping.toPx(w.a);
+      const b = mapping.toPx(w.b);
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const norm = Math.hypot(dx, dy) || 1;
+      let n = { x: -dy / norm, y: dx / norm };
+      if (n.y > 0) n = { x: -n.x, y: -n.y };
+      let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+      if (angle > 90) angle -= 180;
+      if (angle < -90) angle += 180;
+      const leLong = { x: dx / norm, y: dy / norm };
+      /*
+        DE QUEL CÔTÉ, ET À QUELLE DISTANCE — revue des six testeurs (capture
+        clair-11) : « 2,93 m » écrit sur les WC, « 4,93 m » sur le trait des
+        fenêtres.
+
+        Le côté préféré était « le haut de l'écran », quel que soit le mur :
+        la cote d'une façade sud tombait DANS la pièce, sur ses meubles. Une
+        façade se cote maintenant du côté du DEHORS (`cotesExterieurs`), où
+        rien ne l'encombre ; un refend garde le haut de l'écran.
+
+        Et la distance se compte depuis la FACE réelle du mur, surépaisseur
+        de façade comprise (`facesDesMurs`, `SUREPAISSEUR_FACADE`) — plus
+        depuis une demi-épaisseur théorique : le chiffre se posait sur la
+        maçonnerie et sur les dormants des fenêtres qu'elle loge.
+      */
+      const L = segLength(w) || 1;
+      const perpW = { x: -(w.b.z - w.a.z) / L, z: (w.b.x - w.a.x) / L };
+      const milW = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+      const p0 = mapping.toPx(milW);
+      const p1 = mapping.toPx({ x: milW.x + perpW.x, z: milW.z + perpW.z });
+      const lp = Math.hypot(p1.x - p0.x, p1.y - p0.y) || 1;
+      const perpS = { x: (p1.x - p0.x) / lp, y: (p1.y - p0.y) / lp };
+      const ext = dehorsDesMurs.get(w.id);
+      const premier = ext ? { x: perpS.x * ext, y: perpS.y * ext } : n;
+      const cotes = [premier, { x: -premier.x, y: -premier.y }];
+      const demi = facesPlan.get(w.id) ?? { plus: epaisseurDe(w) / 2, moins: epaisseurDe(w) / 2 };
+      /** Du trait à la face du côté `sens` (écran), en pixels. */
+      const face = (sens: { x: number; y: number }) => {
+        const s = sens.x * perpS.x + sens.y * perpS.y >= 0 ? 1 : -1;
+        return ((s > 0 ? demi.plus : demi.moins) + (ext === s ? SUREPAISSEUR_FACADE : 0)) * mapping.scale;
+      };
+      /*
+        LES PLACES, DE LA MEILLEURE À LA MOINS BONNE : contre le mur et
+        glissées le long de lui, puis DÉCALÉES d'un ou deux crans avec un
+        trait d'attache. Une façade se décale au-dehors et jamais dans la
+        pièce ; un refend essaie ses deux côtés avant de se décaler.
+      */
+      const placesDe = (
+        mil: { x: number; y: number },
+        ecart: number,
+        glisses: number[],
+        longueurPx: number,
+        decales: number,
+      ): Place[] => {
+        const pres = (sens: { x: number; y: number }) =>
+          glisses.map((d) => ({
+            x: mil.x + sens.x * (face(sens) + ecart) + leLong.x * d * longueurPx,
+            y: mil.y + sens.y * (face(sens) + ecart) + leLong.y * d * longueurPx,
+          }));
+        const loin = (sens: { x: number; y: number }) =>
+          Array.from({ length: decales }, (_, k) => ({
+            x: mil.x + sens.x * (face(sens) + ecart + 13 * (k + 1)),
+            y: mil.y + sens.y * (face(sens) + ecart + 13 * (k + 1)),
+            attache: { x: mil.x + sens.x * face(sens), y: mil.y + sens.y * face(sens) },
+          }));
+        return ext
+          ? [...pres(cotes[0]), ...loin(cotes[0]), ...pres(cotes[1])]
+          : [...pres(cotes[0]), ...pres(cotes[1]), ...loin(cotes[0]), ...loin(cotes[1])];
+      };
+      if (1 - detail > 0.02) {
+        const mil = milieuVisible(a, b, layout);
+        const longueur = longueurCotee(walls, w, parts);
+        const texte = `${longueur.toFixed(2)} m`.replace('.', ',');
+        const lePx = texte.length * 10 * 0.55;
+        if (mil && petiteCoteLisible(longueur, norm, lePx)) {
+          /*
+            ELLE PEUT GLISSER LE LONG DE SON MUR — relevé du patron : « le
+            placement intelligent des cotes SUR TOUTE LONGUEUR ».
+
+            Elle se posait au milieu, un point et pas deux : quand ce point
+            était pris, elle n'avait qu'un recours, disparaître. Or une cote
+            glisse le long de ce qu'elle mesure sans rien perdre — elle reste
+            sur le même mur, elle dit la même chose. C'est ce que fait un
+            dessinateur, et c'est ce que fait déjà le dossier imprimé.
+
+            Une PETITE cote, elle, ne glisse ni ne se décale : loin de son
+            bout de mur, on ne saurait plus ce qu'elle mesure.
+          */
+          const petite = longueur < PETITE_COTE;
+          const places = placesDe(mil, 9, petite ? [0] : [0, 0.18, -0.18, 0.34, -0.34], norm, petite ? 0 : 2);
+          murs.set(w.id, places[0]);
+          items.push({
+            id: `w:${w.id}`,
+            places,
+            taille: encombrement(texte, 10, angle),
+            // La longueur du mur départage : c'est la grande cote qu'on lit.
+            poids: 1000 + longueur,
+          });
+        }
+      }
+      if (detail > 0.02) {
+        wallRuns(w, openings).forEach((run, ri) => {
+          if ((run.t1 - run.t0) * norm < 26) return;
+          const t = (run.t0 + run.t1) / 2;
+          const brut = { x: a.x + dx * t, y: a.y + dy * t };
+          // Le tronçon a ses propres bouts : c'est SA portion visible qui
+          // compte, pas celle du mur entier.
+          const q0 = { x: a.x + dx * run.t0, y: a.y + dy * run.t0 };
+          const q1 = { x: a.x + dx * run.t1, y: a.y + dy * run.t1 };
+          const mil = milieuVisible(q0, q1, layout) ?? brut;
+          const cle = `${w.id}#${ri}`;
+          const texte = run.length.toFixed(2).replace('.', ',');
+          const longueurPx = (run.t1 - run.t0) * norm;
+          if (!petiteCoteLisible(run.length, longueurPx, texte.length * 9.5 * 0.55)) return;
+          /*
+            UN TRONÇON GLISSE MOINS LOIN QU'UN MUR : il est plus court, et
+            une cote poussée à son bout ne dit plus de quel morceau elle
+            parle. Un peu plus d'un quart de sa longueur de chaque côté, pas
+            davantage — et l'autre côté du mur en dernier recours, comme pour
+            les murs entiers.
+
+            Mesuré : à trois places seulement, un « 0,90 » de menuiserie ne
+            trouvait plus où aller sur le plan de référence et renonçait. Un
+            chiffre absent vaut mieux qu'un chiffre illisible, mais un chiffre
+            LISIBLE vaut mieux que les deux.
+          */
+          const petite = run.length < PETITE_COTE;
+          const places = placesDe(
+            mil,
+            bodyPx / 2 + 9,
+            petite ? [0] : [0, 0.14, -0.14, 0.28, -0.28],
+            longueurPx,
+            petite ? 0 : 1,
+          );
+          runs.set(cle, places[0]);
+          items.push({
+            id: `r:${cle}`,
+            places,
+            taille: encombrement(texte, 9.5, angle),
+            poids: run.length,
+          });
+        });
+      }
+    }
+    /*
+      L'ARBITRAGE NE SE FAIT PLUS ICI — il se fait plus bas, sur TOUT.
+
+      Ce mémo ne connaît que les murs. Il rendait donc son verdict entre
+      cotes de mur, et les écarts d'une ligne de spots s'écrivaient de leur
+      côté sans regarder personne : deux arbitres qui ne se parlaient pas.
+      Mesuré sur le plan de référence à seize cadrages, 28 chevauchements sur
+      478 étiquettes.
+
+      Il rend maintenant ses CANDIDATS. Voir `cotesArbitrees`.
+    */
+    return { murs, runs, items };
+  }, [walls, openings, mapping, layout, showMeasures, detail, dehorsDesMurs, facesPlan, parts]);
 
   /**
    * TOUTES LES ÉTIQUETTES DU PLAN, ARBITRÉES ENSEMBLE.
@@ -2086,7 +2243,7 @@ export function FloorplanEditor({
    */
   const cotesArbitrees = useMemo(() => {
     const vide = {
-      poses: new Map<string, { x: number; y: number }>(),
+      poses: new Map<string, Place>(),
       gardees: new Set<string>(),
       ecarts: new Map<string, { x: number; y: number }>(),
       boites: [] as Boite[],
@@ -2130,8 +2287,72 @@ export function FloorplanEditor({
         h: car.hpx,
       });
     }
+    /*
+      LES MEUBLES ET LES MENUISERIES RÉSERVENT LEUR PLACE — revue des six
+      testeurs (capture clair-11) : « 3,60 m » en travers du canapé,
+      « 2,93 m » sur les WC et le lavabo, « 4,93 m » et « 3,00 m » sur le
+      trait des fenêtres. L'arbitre ne connaissait que les étiquettes ; une
+      cote se posait sur tout le reste. Un tapis, lui, est sous les meubles :
+      on écrit dessus comme sur le sol.
+    */
+    const encombrants: Boite[] = [];
+    for (const o of objects) {
+      if (o.category === 'tapis') continue;
+      const f = footprintOf(o, partOf, facesPlan);
+      const u = { x: (Math.cos(f.yaw) * f.width) / 2, z: (Math.sin(f.yaw) * f.width) / 2 };
+      const v = { x: (-Math.sin(f.yaw) * f.depth) / 2, z: (Math.cos(f.yaw) * f.depth) / 2 };
+      encombrants.push(
+        boiteDePoints(
+          [
+            [1, 1],
+            [1, -1],
+            [-1, -1],
+            [-1, 1],
+          ].map(([i, j]) => mapping.toPx({ x: f.cx + u.x * i + v.x * j, z: f.cz + u.z * i + v.z * j })),
+        ),
+      );
+    }
+    for (const o of openings) {
+      const baie = baieDuPoche.get(o.id);
+      // La baie dans toute l'épaisseur de son mur, façade comprise.
+      const coins = baie
+        ? [baie.a, baie.b].flatMap((p) => [
+            { x: p.x + baie.n.x * baie.plus, z: p.z + baie.n.z * baie.plus },
+            { x: p.x - baie.n.x * baie.moins, z: p.z - baie.n.z * baie.moins },
+          ])
+        : [o.a, o.b];
+      encombrants.push(boiteDePoints(coins.map((p) => mapping.toPx(p))));
+      // Et le quart de cercle du battant, du côté où il s'ouvre.
+      if (o.type !== 'door' || o.garage || o.placard) continue;
+      const ancre = partOf.get(roomOf(o))?.labelAt;
+      if (!ancre) continue;
+      const lx = o.b.x - o.a.x;
+      const lz = o.b.z - o.a.z;
+      const l = Math.hypot(lx, lz);
+      if (l < 0.05) continue;
+      let nx = -lz / l;
+      let nz = lx / l;
+      const mx = (o.a.x + o.b.x) / 2;
+      const mz = (o.a.z + o.b.z) / 2;
+      if ((ancre.x - mx) * nx + (ancre.z - mz) * nz < 0) {
+        nx = -nx;
+        nz = -nz;
+      }
+      if (o.versExterieur) {
+        nx = -nx;
+        nz = -nz;
+      }
+      const r = o.vantaux === 2 ? l / 2 : l;
+      encombrants.push(
+        boiteDePoints(
+          [o.a, o.b, { x: o.a.x + nx * r, z: o.a.z + nz * r }, { x: o.b.x + nx * r, z: o.b.z + nz * r }].map((p) =>
+            mapping.toPx(p),
+          ),
+        ),
+      );
+    }
     // Trois points de jeu : deux plaques ne se touchent pas (captures du simulateur).
-    const poses = placerEtiquettes(items, prises, 3);
+    const poses = placerEtiquettes(items, prises, 3, encombrants);
     const boites = [...poses.entries()].map(([id, p]) => {
       const e = items.find((x) => x.id === id)!;
       return {
@@ -2152,6 +2373,10 @@ export function FloorplanEditor({
   }, [
     placementCotes,
     cartouches,
+    objects,
+    openings,
+    baieDuPoche,
+    facesPlan,
     ceiling,
     showCeiling,
     partOf,
@@ -2559,7 +2784,7 @@ export function FloorplanEditor({
                     width={dots.size}
                     height={dots.size}
                     patternUnits="userSpaceOnUse">
-                    <Circle cx={1.1} cy={1.1} r={1.1} fill={c.inkFaint} />
+                    <Circle cx={1.1} cy={1.1} r={0.9} fill={c.inkFaint} opacity={0.55} />
                   </Pattern>
                 </Defs>
                 {parts.map((part) => {
@@ -2617,7 +2842,15 @@ export function FloorplanEditor({
                         fill={fillOf(part.roomId)}
                         stroke="none"
                       />
-                      <Polygon points={poly} fill="url(#floorDots)" stroke="none" />
+                      {/*
+                        LE SEMIS N'EST QU'UN OUTIL D'ÉDITION — revue de Léa,
+                        Sophie et Chloé : la grille de points sur les sols
+                        « fait brouillon / debug ». Elle sert à s'aligner en
+                        posant ; en lecture, à l'aperçu du dossier, le sol
+                        est un aplat net, comme sur le PDF. Et même en
+                        édition elle se fait plus discrète.
+                      */}
+                      {editable ? <Polygon points={poly} fill="url(#floorDots)" stroke="none" /> : null}
                       {!planElec && mapping && decorDesMurs(part, poly, mapping.scale)}
                     </G>
                   );
@@ -2668,6 +2901,7 @@ export function FloorplanEditor({
               return (
                 <G
                   key={f.id}
+                  testID={`meuble-${f.id}`}
                   transform={`translate(${ctr.x}, ${ctr.y}) rotate(${((f.yaw + view.rot) * 180) / Math.PI})`}>
                   {/*
                     ROUGE QUAND ON NE PEUT PAS POSER LÀ — relevé du patron.
@@ -3331,6 +3565,17 @@ export function FloorplanEditor({
                   const p = plaqueDeCote(texte, 9.5);
                   return (
                     <G key={`run-${w.id}-${ri}`} opacity={detail}>
+                      {pose.attache ? (
+                        <Line
+                          testID="attache-cote"
+                          x1={pose.attache.x}
+                          y1={pose.attache.y}
+                          x2={px}
+                          y2={py}
+                          stroke={c.inkFaint}
+                          strokeWidth={0.8}
+                        />
+                      ) : null}
                       <Rect
                         x={px - p.w / 2}
                         y={py - p.h / 2}
@@ -3441,6 +3686,7 @@ export function FloorplanEditor({
               return (
                 <G
                   key={o.id}
+                  testID={`baie-${o.id}`}
                   onPress={
                     editable && onSelectOpening
                       ? () => toucher(cibleDeLaBaie(o.id), () => onSelectOpening(choisie ? null : o.id))
@@ -3812,6 +4058,23 @@ export function FloorplanEditor({
                         }
                       : undefined
                   }>
+                  {/*
+                    LE TRAIT DE RAPPEL d'un cartouche sorti de sa pièce trop
+                    petite : du bord de la boîte à un point dans la pièce.
+                  */}
+                  {car.rappel
+                    ? (() => {
+                        const r = mapping.toPx(car.rappel);
+                        const bx = Math.max(p.x - wpx / 2, Math.min(p.x + wpx / 2, r.x));
+                        const by = Math.max(p.y - hpx / 2, Math.min(p.y + hpx / 2, r.y));
+                        return (
+                          <G testID={`rappel-${part.roomId}`}>
+                            <Line x1={bx} y1={by} x2={r.x} y2={r.y} stroke={c.inkSoft} strokeWidth={0.8} />
+                            <Circle cx={r.x} cy={r.y} r={1.8} fill={c.inkSoft} />
+                          </G>
+                        );
+                      })()
+                    : null}
                   <Rect
                     x={p.x - wpx / 2}
                     y={p.y - hpx / 2}
@@ -4603,7 +4866,7 @@ function WallBody({
    * savoir laquelle recouvre laquelle, et une cote se recale dans la portion
    * visible de son mur — deux choses qu'un mur, seul, ne peut pas savoir.
    */
-  measureAt?: { x: number; y: number };
+  measureAt?: Place;
   /** Les cotes globales s'effacent quand les cotes de détail arrivent. */
   measureOpacity?: number;
   /** La cote à écrire : au nu pour un mur dessiné (voir `longueurCotee`). */
@@ -4789,6 +5052,18 @@ function WallBody({
       )}
       {showMeasure && measureOpacity > 0.02 && (
         <G opacity={measureOpacity}>
+          {/* Décalée faute de place : un trait l'attache au nu de son mur. */}
+          {measureAt?.attache ? (
+            <Line
+              testID="attache-cote"
+              x1={measureAt.attache.x}
+              y1={measureAt.attache.y}
+              x2={mid.x}
+              y2={mid.y}
+              stroke={c.inkFaint}
+              strokeWidth={0.8}
+            />
+          ) : null}
           {/*
             LA PLAQUE SOUS LE CHIFFRE — vu sur les captures du simulateur :
             le semis du sol et les meubles passaient à travers les cotes

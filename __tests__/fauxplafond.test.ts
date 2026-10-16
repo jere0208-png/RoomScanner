@@ -79,7 +79,9 @@ describe('le faux plafond', () => {
 describe('le cartouche sur un petit écran', () => {
   it('abrège le nom avant de taire la surface', () => {
     const plan = readFileSync(join(__dirname, '..', 'src', 'components', 'FloorplanEditor.tsx'), 'utf8');
-    const i = plan.indexOf('const nomCourt = couperNom(roomName);');
+    // L'abrégé est celui du dossier (`nomAbrege`) depuis la revue des six
+    // testeurs : plus de « Salle d'… » coupé au huitième signe.
+    const i = plan.indexOf('const nomCourt = nomAbrege(roomName);');
     const j = plan.indexOf('variantes.push(textes.slice(0, 1));');
     expect(i).toBeGreaterThan(0);
     // La variante « nom abrégé + surface » passe AVANT celle du nom seul.

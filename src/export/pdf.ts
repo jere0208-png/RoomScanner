@@ -113,7 +113,7 @@ import {
   linkCurve,
   type CeilingFixture,
 } from '../geometry/ceiling';
-import { planFrameAngle } from '../geometry/floorplan';
+import { nomAbrege, planFrameAngle } from '../geometry/floorplan';
 import { assignOpenings } from '../geometry/scene3d';
 import {
   demiFacesDe,
@@ -1675,33 +1675,12 @@ function draw3DView(
 
 const fr1 = (v: number) => v.toFixed(1).replace('.', ',');
 
-/** Les abréviations d'usage sur un plan de logement. */
-const ABREVIATIONS: [RegExp, string][] = [
-  [/^s[ée]jour/i, 'Séj.'],
-  [/^salle de bains?/i, 'SdB'],
-  [/^salle d.eau/i, 'SdE'],
-  [/^chambre/i, 'Ch.'],
-  [/^cuisine/i, 'Cuis.'],
-  [/^entr[ée]e/i, 'Entr.'],
-  [/^d[ée]gagement/i, 'Dgt'],
-  [/^bureau/i, 'Bur.'],
-  [/^buanderie/i, 'Buand.'],
-  [/^dressing/i, 'Dress.'],
-];
-
-/**
- * LE NOM D'UNE PIÈCE, ABRÉGÉ — pour le cartouche qui manque de place
- * (revue « Nadia ») : « Chambre 2 » → « Ch. 2 », « Séjour – cuisine » →
- * « Séj. – cuisine » ; un mot inconnu de plus de six lettres garde ses
- * quatre premières et un point.
- */
-export function nomAbrege(nom: string): string {
-  for (const [motif, court] of ABREVIATIONS) {
-    const m = motif.exec(nom);
-    if (m) return `${court}${nom.slice(m[0].length)}`.replace(/\s+/g, ' ').trim();
-  }
-  return nom.replace(/[A-Za-zÀ-ÖØ-öø-ÿŒœ’']{7,}/g, (mot) => `${mot.slice(0, 4)}.`);
-}
+/*
+  LE NOM ABRÉGÉ VIT AVEC LA GÉOMÉTRIE DU PLAN — l'écran s'en sert aussi
+  (revue des six testeurs : l'écran coupait « Salle d'… » quand le dossier
+  écrivait « SdE »). Une seule règle, réexportée ici pour qui l'importait.
+*/
+export { nomAbrege };
 /**
  * DEUX DÉCIMALES AU MÉTRÉ — revue « Sébastien » : 22,9 au PDF, 22,95 à
  * l'écran de la fiche et au tableur.

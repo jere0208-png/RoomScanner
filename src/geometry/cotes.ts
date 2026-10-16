@@ -110,7 +110,65 @@ export interface Etiquette {
  */
 export interface EtiquetteMobile extends Omit<Etiquette, 'at'> {
   /** Où elle voudrait se poser, par ordre de préférence. */
-  places: Px[];
+  places: Place[];
+}
+
+/**
+ * UNE PLACE, ET CE À QUOI ELLE SE RATTACHE QUAND ELLE S'EN ÉLOIGNE.
+ *
+ * Revue des six testeurs (capture clair-11) : « 4,93 m » posé sur le trait
+ * des fenêtres, « 3,60 m » en travers du canapé. Quand la place contre le
+ * mur est prise par une menuiserie ou un meuble, la cote se DÉCALE — hors de
+ * la pièce pour une façade —, et un trait d'attache la relie au nu de ce
+ * qu'elle mesure : on ne se demande pas de quel mur elle parle.
+ */
+export interface Place extends Px {
+  /** Le point du mur où mène le trait d'attache ; absent, la cote est contre lui. */
+  attache?: Px;
+}
+
+/** Un rectangle à l'écran, en pixels, aligné sur les axes. */
+export interface Boite {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * La boîte qui enveloppe des points — un meuble tourné, une baie dans
+ * l'épaisseur de sa façade, le quart de cercle d'une porte.
+ *
+ * Enveloppante, donc un peu plus grande que le dessin quand il est en biais :
+ * une cote qui renonce à un coin vide coûte moins qu'une cote posée sur un lit.
+ */
+export function boiteDePoints(pts: Px[]): Boite {
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+
+/**
+ * EN DESSOUS DE SOIXANTE CENTIMÈTRES, UNE COTE DOIT SE MÉRITER.
+ *
+ * Revue des six testeurs : « 0,53 m » flottait au milieu d'une cloison sans
+ * qu'on sache ce qu'il mesurait — le bout de refend entre deux jonctions,
+ * que rien ne distingue à l'œil du mur qui le prolonge. Une si petite cote ne
+ * se montre que si elle tient DANS la longueur de ce qu'elle mesure (elle y
+ * est alors visiblement attachée) ; sinon elle attend qu'on zoome, et la
+ * valeur reste au métré.
+ */
+export const PETITE_COTE = 0.6;
+
+/** Une petite cote se lit-elle contre ce qu'elle mesure ? Longueurs en pixels. */
+export function petiteCoteLisible(
+  longueurM: number,
+  longueurPx: number,
+  etiquetteLePx: number,
+): boolean {
+  return longueurM >= PETITE_COTE || etiquetteLePx <= longueurPx;
 }
 
 /**
@@ -129,11 +187,19 @@ export interface EtiquetteMobile extends Omit<Etiquette, 'at'> {
  */
 export function placerEtiquettes(
   list: EtiquetteMobile[],
-  prises: { x: number; y: number; w: number; h: number }[] = [],
+  prises: Boite[] = [],
   jeu = 2,
-): Map<string, Px> {
-  const occupees = [...prises];
-  const out = new Map<string, Px>();
+  /**
+   * CE QUE LA COTE NE DOIT PAS RECOUVRIR, sans être une étiquette : les
+   * meubles, les menuiseries et le battant des portes (revue des six
+   * testeurs — « 2,93 m » sur les WC, « 3,00 m » sur une fenêtre). Elles
+   * réservent leur place comme un cartouche ; seules les étiquettes en ont
+   * une, elles, à se disputer.
+   */
+  encombrants: Boite[] = [],
+): Map<string, Place> {
+  const occupees = [...prises, ...encombrants];
+  const out = new Map<string, Place>();
   for (const e of [...list].sort((u, v) => v.poids - u.poids)) {
     for (const p of e.places) {
       const b = {

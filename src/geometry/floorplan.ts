@@ -6991,3 +6991,39 @@ export function abregerNiveau(n: number): string {
   if (n < -1) return `SS${-n}`;
   return `R+${n}`;
 }
+
+/** Les abréviations d'usage sur un plan de logement. */
+const ABREVIATIONS_PIECES: [RegExp, string][] = [
+  [/^s[ée]jour/i, 'Séj.'],
+  [/^salle de bains?/i, 'SdB'],
+  [/^salle d.eau/i, 'SdE'],
+  [/^chambre/i, 'Ch.'],
+  [/^cuisine/i, 'Cuis.'],
+  [/^entr[ée]e/i, 'Entr.'],
+  [/^d[ée]gagement/i, 'Dgt'],
+  [/^bureau/i, 'Bur.'],
+  [/^buanderie/i, 'Buand.'],
+  [/^dressing/i, 'Dress.'],
+];
+
+/**
+ * LE NOM D'UNE PIÈCE, ABRÉGÉ — pour le cartouche qui manque de place
+ * (revue « Nadia ») : « Chambre 2 » → « Ch. 2 », « Salle d'eau » → « SdE » ;
+ * un mot de plus de six lettres garde ses quatre premières et un point.
+ *
+ * UNE SEULE RÈGLE POUR L'ÉCRAN ET LE PAPIER — revue des six testeurs
+ * (captures clair-11 et clair-23) : le dossier abrégeait proprement, l'écran
+ * coupait au huitième signe (« Séjour-c… », « Salle d'… ») et, faute de
+ * place, retirait la surface. Le reste du nom s'abrège lui aussi : « Séjour-
+ * cuisine » devient « Séj.-cuis. », pas « Séj.-cuisine », qui ne gagnait
+ * presque rien.
+ */
+export function nomAbrege(nom: string): string {
+  const court = (s: string) =>
+    s.replace(/[A-Za-zÀ-ÖØ-öø-ÿŒœ’']{7,}/g, (mot) => `${mot.slice(0, 4)}.`);
+  for (const [motif, abr] of ABREVIATIONS_PIECES) {
+    const m = motif.exec(nom);
+    if (m) return `${abr}${court(nom.slice(m[0].length))}`.replace(/\s+/g, ' ').trim();
+  }
+  return court(nom);
+}
