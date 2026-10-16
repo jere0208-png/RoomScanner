@@ -225,8 +225,15 @@ describe("l'échéance de l'abonnement", () => {
 });
 
 describe("l'apparence a quitté l'accueil", () => {
+  /* Repliée par défaut (revue des découvreurs) : on l'ouvre d'abord. */
+  const ouvrir = (a: TestRenderer.ReactTestRenderer) =>
+    act(() => {
+      parLabel(a, 'Apparence')?.props.onPress();
+    });
+
   it('offre les trois choix, celui du moment marqué', () => {
     const a = rendre(<ProfilScreen />);
+    ouvrir(a);
     for (const l of ['Thème système', 'Thème clair', 'Thème sombre']) {
       expect(parLabel(a, l)).toBeDefined();
     }
@@ -241,6 +248,7 @@ describe("l'apparence a quitté l'accueil", () => {
 
   it('chaque rond pose sa préférence', () => {
     const a = rendre(<ProfilScreen />);
+    ouvrir(a);
     act(() => {
       parLabel(a, 'Thème sombre')?.props.onPress();
     });

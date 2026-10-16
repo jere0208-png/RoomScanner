@@ -291,6 +291,8 @@ describe('les petits pièges (Marie, Nadia, Sophie, Karim)', () => {
   it('la tuile de lecture dit qu’elle prend un PDF', () => {
     // « … de l'architecte » se coupait sur la tuile (revue de lisibilité) :
     // le PDF reste dit, plus court.
-    expect(lire('src', 'screens', 'HomeScreen.tsx')).toContain('sous="Photo ou PDF"');
+    // Le sous-titre se compose désormais (`sousLecture`) : il dit aussi la
+    // lecture offerte hors Pro (revue des découvreurs).
+    expect(lire('src', 'screens', 'HomeScreen.tsx')).toContain("pro ? 'Photo ou PDF' : 'Photo ou PDF · 1 lecture offerte'");
   });
 });

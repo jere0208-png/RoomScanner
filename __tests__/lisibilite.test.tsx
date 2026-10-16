@@ -82,9 +82,9 @@ describe('les boutons font ce qu’ils disent', () => {
     act(() => {
       t = TestRenderer.create(<HomeScreen />);
     });
-    const jeter = t.root.findAll((n) => n.props.accessibilityLabel === 'Jeter le relevé interrompu' && typeof n.props.onPress === 'function', { deep: false })[0];
+    const jeter = t.root.findAll((n) => n.props.accessibilityLabel === 'Jeter le plan en cours' && typeof n.props.onPress === 'function', { deep: false })[0];
     act(() => jeter.props.onPress());
-    expect(useAlerte.getState().courante?.titre).toMatch(/Jeter le relevé interrompu/);
+    expect(useAlerte.getState().courante?.titre).toMatch(/Jeter le plan en cours/);
     // Rien n'est jeté avant la confirmation.
     expect(useScanStore.getState().brouillon).not.toBeNull();
     act(() => useAlerte.getState().courante?.actions?.find((a) => a.danger)?.onPress?.());

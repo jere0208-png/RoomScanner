@@ -90,6 +90,16 @@ const APPARENCES: { cle: ThemePref; mot: string; label: string }[] = [
   { cle: 'dark', mot: 'Sombre', label: 'Thème sombre' },
 ];
 
+/** Ce que dit la carte d'abonnement hors Pro : ce que le Pro ajoute. */
+export const PHRASE_GRATUIT = 'Passer en Pro pour exporter vos plans';
+
+/** Ce qui est choisi, dit sur la rangée repliée : « Système · Bleu ». */
+export function resumeApparence(theme: ThemePref, accent: string): string {
+  const t = APPARENCES.find((a) => a.cle === theme)?.mot ?? 'Système';
+  const a = ACCENTS.find((x) => x.cle === accent)?.nom;
+  return a ? `${t} · ${a}` : t;
+}
+
 export function ProfilScreen() {
   const modeElec = useUsage((u) => u.modeElec);
   const choisirUsage = useUsage((u) => u.choisir);
@@ -128,6 +138,14 @@ export function ProfilScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [prompt, setPrompt] = useState<PromptData | null>(null);
+  /*
+    L'APPARENCE SE REPLIE — revue des découvreurs (clair-31/32) : le thème,
+    la teinte et l'icône prenaient un écran et demi entre l'abonnement et
+    « Mes plans », pour des réglages qu'on touche une fois. Ils tiennent
+    derrière une rangée « Apparence » qui dit ce qui est choisi, et
+    s'ouvrent d'un appui. Rien n'est retiré.
+  */
+  const [apparenceOuverte, setApparenceOuverte] = useState(false);
 
   const quitterInvite = useAccountStore((st) => st.quitterInvite);
   // L'invité s'appelle par son état, pas par un « Mon compte » qui promet
@@ -273,15 +291,22 @@ export function ProfilScreen() {
             </Svg>
           </View>
           <View style={s.aboTextes}>
+            {/*
+              L'ÉTAT D'ABORD, L'OFFRE ENSUITE — revue des découvreurs :
+              « Passer en Pro · Gratuit · scans illimités » mêlait le titre
+              d'une offre et l'état du compte ; on ne savait pas si l'on
+              était gratuit ou déjà Pro. Le titre dit ce qu'on a, la ligne
+              dessous ce que le Pro ajoute.
+            */}
             <Text style={s.aboTitre}>
-              {pro ? 'EchoPlan Pro' : 'Passer en Pro'}
+              {pro ? 'EchoPlan Pro' : 'Gratuit'}
             </Text>
             <Text style={s.aboSous} numberOfLines={2}>
               {pro
                 ? proVia === 'code'
                   ? 'Débloqué par code · exports et sauvegarde en ligne'
                   : 'Abonnement actif · exports et sauvegarde en ligne'
-                : 'Gratuit · scans illimités, exports en Pro'}
+                : PHRASE_GRATUIT}
             </Text>
             {/*
               JUSQU'À QUAND — relevé du patron : « sur le profil on doit voir
@@ -306,13 +331,21 @@ export function ProfilScreen() {
               </Text>
             )}
           </View>
+          {/*
+            UNE SEULE ACTION PRINCIPALE — revue des découvreurs : chez
+            l'invité, « Créer un compte » et « Voir l'offre » étaient deux
+            boutons noirs pleins l'un sous l'autre ; aucun ne l'emportait.
+            Sans compte, c'est la connexion qui ouvre tout le reste : l'offre
+            passe en bouton cerclé. Avec un compte, elle redevient pleine.
+          */}
           {!pro && (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Voir l’offre Pro"
-              style={({ pressed }) => [s.boutonAbo, pressed && s.enfonce]}
+              testID="bouton-offre"
+              style={({ pressed }) => [compte ? s.boutonAbo : s.boutonAboSecondaire, pressed && s.enfonce]}
               onPress={ouvrirPaywall}>
-              <Text style={s.boutonAboTexte}>Voir l’offre</Text>
+              <Text style={compte ? s.boutonAboTexte : s.boutonAboSecondaireTexte}>Voir l’offre</Text>
             </Pressable>
           )}
           {/*
@@ -435,143 +468,189 @@ export function ProfilScreen() {
                 trackColor={{ true: c.blue, false: c.line }}
               />
             </View>
+            {/*
+              LE DIAGNOSTIC — ce qui s'est passé quand l'application s'est
+              arrêtée. Relevé du patron : « l'app a quitté plusieurs fois
+              après des clics sur des meubles. Fais en sorte qu'on ait un
+              diagnostic d'erreurs. »
+
+              RÉSERVÉ À L'ADMINISTRATEUR — revue des découvreurs (clair-32) :
+              une rangée « Diagnostic » à l'icône de gyrophare, chez un
+              particulier, se lisait comme une alarme. C'est un outil de
+              développeur : il vit avec le mode diagnostic. Le compte écrit à
+              côté dit qu'il y a quelque chose à lire.
+            */}
+            <View style={s.espaceAdmin} />
+            <Rangee
+              s={s}
+              c={c}
+              icone="sirene"
+              label="Diagnostic"
+              note={incidents.length ? String(incidents.length) : undefined}
+              onPress={() => setJournal(true)}
+            />
           </>
         )}
 
-        <Text style={s.section}>Apparence</Text>
-        {/*
-          TROIS RONDS, PAS UNE LISTE — c'est le design du patron, et c'est
-          le bon geste : trois choix exclusifs se comparent d'un coup d'œil
-          quand ils sont côte à côte, alors qu'une liste les fait lire un
-          par un. Le choix du moment porte l'anneau bleu ; sans marque, on
-          ne sait pas d'où l'on part.
-        */}
-        <View style={s.apparences}>
-          {APPARENCES.map((a) => {
-            const actif = themePref === a.cle;
-            return (
-              <Pressable
-                key={a.cle}
-                accessibilityRole="button"
-                accessibilityLabel={a.label}
-                accessibilityState={{ selected: actif }}
-                style={s.apparence}
-                onPress={() => setThemePref(a.cle)}>
-                <View style={[s.apparenceRond, actif && s.apparenceRondActif]}>
-                  {a.cle === 'system' ? (
-                    <Svg width={24} height={24} viewBox="0 0 24 24">
-                      <Path
-                        d={SOLAIRES.telephone}
-                        fill={actif ? c.blue : c.inkSoft}
-                        fillRule="evenodd"
-                      />
-                    </Svg>
-                  ) : (
-                    <ThemeGlyph
-                      quoi={a.cle === 'dark' ? 'lune' : 'soleil'}
-                      size={24}
-                      color={actif ? c.blue : c.inkSoft}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Apparence"
+          accessibilityHint={apparenceOuverte ? 'Replier les réglages d’apparence' : 'Afficher les réglages d’apparence'}
+          accessibilityState={{ expanded: apparenceOuverte }}
+          testID="section-apparence"
+          style={({ pressed }) => [s.rangee, s.rangeeApparence, pressed && s.rangeeEnfoncee]}
+          onPress={() => {
+            haptic('leger');
+            setApparenceOuverte((v) => !v);
+          }}>
+          <Svg width={20} height={20} viewBox="0 0 24 24">
+            <Path d={SOLAIRES.couleurs} fill={c.inkSoft} fillRule="evenodd" />
+          </Svg>
+          <Text style={s.rangeeMot}>Apparence</Text>
+          <Text style={s.rangeeValeur} numberOfLines={1}>
+            {resumeApparence(themePref, accentPref)}
+          </Text>
+          <View style={apparenceOuverte ? s.chevronOuvert : s.chevronFerme}>
+            <BackChevron color={c.inkFaint} size={20} weight={2.2} />
+          </View>
+        </Pressable>
+        {apparenceOuverte && (
+          <View testID="reglages-apparence" style={s.reglagesApparence}>
+            {/*
+              TROIS RONDS, PAS UNE LISTE — c'est le design du patron, et c'est
+              le bon geste : trois choix exclusifs se comparent d'un coup d'œil
+              quand ils sont côte à côte, alors qu'une liste les fait lire un
+              par un. Le choix du moment porte l'anneau bleu ; sans marque, on
+              ne sait pas d'où l'on part.
+            */}
+            <View style={s.apparences}>
+              {APPARENCES.map((a) => {
+                const actif = themePref === a.cle;
+                return (
+                  <Pressable
+                    key={a.cle}
+                    accessibilityRole="button"
+                    accessibilityLabel={a.label}
+                    accessibilityState={{ selected: actif }}
+                    style={s.apparence}
+                    onPress={() => setThemePref(a.cle)}>
+                    <View style={[s.apparenceRond, actif && s.apparenceRondActif]}>
+                      {a.cle === 'system' ? (
+                        <Svg width={24} height={24} viewBox="0 0 24 24">
+                          <Path
+                            d={SOLAIRES.telephone}
+                            fill={actif ? c.blue : c.inkSoft}
+                            fillRule="evenodd"
+                          />
+                        </Svg>
+                      ) : (
+                        <ThemeGlyph
+                          quoi={a.cle === 'dark' ? 'lune' : 'soleil'}
+                          size={24}
+                          color={actif ? c.blue : c.inkSoft}
+                        />
+                      )}
+                    </View>
+                    <Text style={[s.apparenceMot, actif && s.apparenceMotActif]}>
+                      {a.mot}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {/*
+              LA TEINTE D'ACCENT — neuvième des dix améliorations.
+
+              Elle est POSÉE SOUS le clair et le sombre, dans la même section :
+              les trois règlent la même chose, l'allure de l'application. Une
+              section « Couleurs » à part ferait chercher à deux endroits ce qui
+              se décide d'un seul coup d'œil.
+
+              QUATRE PASTILLES DE LA COULEUR QU'ELLES POSENT — pas de mots, sinon
+              celui de la teinte. On choisit une couleur en la voyant ; « Prune »
+              écrit en gris ne dit rien à personne.
+            */}
+            <View style={s.teintes}>
+              {ACCENTS.map((a) => {
+                const actif = accentPref === a.cle;
+                const teinte = c === dark ? a.sombre.blue : a.clair.blue;
+                return (
+                  <Pressable
+                    key={a.cle}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Teinte ${a.nom}`}
+                    accessibilityState={{ selected: actif }}
+                    style={s.teinte}
+                    onPress={() => {
+                      setAccentPref(a.cle);
+                      haptic('leger');
+                    }}>
+                    <View
+                      style={[
+                        s.teinteRond,
+                        { backgroundColor: teinte },
+                        actif && { borderColor: c.ink },
+                      ]}
                     />
-                  )}
-                </View>
-                <Text style={[s.apparenceMot, actif && s.apparenceMotActif]}>
-                  {a.mot}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+                    <Text style={[s.teinteMot, actif && s.apparenceMotActif]}>
+                      {a.nom}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
-        {/*
-          LA TEINTE D'ACCENT — neuvième des dix améliorations.
+            {/*
+              L'ICÔNE DE L'APPLICATION — sous les teintes, et à PART d'elles.
 
-          Elle est POSÉE SOUS le clair et le sombre, dans la même section :
-          les trois règlent la même chose, l'allure de l'application. Une
-          section « Couleurs » à part ferait chercher à deux endroits ce qui
-          se décide d'un seul coup d'œil.
-
-          QUATRE PASTILLES DE LA COULEUR QU'ELLES POSENT — pas de mots, sinon
-          celui de la teinte. On choisit une couleur en la voyant ; « Prune »
-          écrit en gris ne dit rien à personne.
-        */}
-        <View style={s.teintes}>
-          {ACCENTS.map((a) => {
-            const actif = accentPref === a.cle;
-            const teinte = c === dark ? a.sombre.blue : a.clair.blue;
-            return (
-              <Pressable
-                key={a.cle}
-                accessibilityRole="button"
-                accessibilityLabel={`Teinte ${a.nom}`}
-                accessibilityState={{ selected: actif }}
-                style={s.teinte}
-                onPress={() => {
-                  setAccentPref(a.cle);
-                  haptic('leger');
-                }}>
-                <View
-                  style={[
-                    s.teinteRond,
-                    { backgroundColor: teinte },
-                    actif && { borderColor: c.ink },
-                  ]}
-                />
-                <Text style={[s.teinteMot, actif && s.apparenceMotActif]}>
-                  {a.nom}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {/*
-          L'ICÔNE DE L'APPLICATION — sous les teintes, et à PART d'elles.
-
-          Elles vont ensemble, mais changer d'icône fait apparaître une
-          alerte du système qu'aucune application ne peut supprimer : les
-          lier ferait surgir cette alerte à chaque essai de teinte. La ligne
-          le dit, plutôt que de laisser la surprise arriver.
-        */}
-        <Text style={s.teinteTitre}>Icône de l’application</Text>
-        <View style={s.teintes}>
-          {ICONES.map((i) => {
-            const actif = iconePref === i.cle;
-            const habit = ACCENTS.find((a) => a.cle === i.cle);
-            const teinte = i.natif
-              ? habit?.clair.blueDark ?? c.ink
-              : c.surface;
-            return (
-              <Pressable
-                key={i.cle}
-                accessibilityRole="button"
-                accessibilityLabel={`Icône ${i.nom}`}
-                accessibilityState={{ selected: actif }}
-                style={s.teinte}
-                onPress={() => {
-                  setIconePref(i.cle);
-                  haptic('leger');
-                }}>
-                <View
-                  style={[
-                    s.iconeCarre,
-                    { backgroundColor: teinte },
-                    actif && { borderColor: c.ink },
-                  ]}>
-                  <Svg width={22} height={22} viewBox="0 0 24 24">
-                    <Path
-                      d={SOLAIRES.rooms}
-                      fill={i.natif ? '#FFFFFF' : c.ink}
-                      fillRule="evenodd"
-                    />
-                  </Svg>
-                </View>
-                <Text style={[s.teinteMot, actif && s.apparenceMotActif]}>
-                  {i.nom}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+              Elles vont ensemble, mais changer d'icône fait apparaître une
+              alerte du système qu'aucune application ne peut supprimer : les
+              lier ferait surgir cette alerte à chaque essai de teinte. La ligne
+              le dit, plutôt que de laisser la surprise arriver.
+            */}
+            <Text style={s.teinteTitre}>Icône de l’application</Text>
+            <View style={s.teintes}>
+              {ICONES.map((i) => {
+                const actif = iconePref === i.cle;
+                const habit = ACCENTS.find((a) => a.cle === i.cle);
+                const teinte = i.natif
+                  ? habit?.clair.blueDark ?? c.ink
+                  : c.surface;
+                return (
+                  <Pressable
+                    key={i.cle}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Icône ${i.nom}`}
+                    accessibilityState={{ selected: actif }}
+                    style={s.teinte}
+                    onPress={() => {
+                      setIconePref(i.cle);
+                      haptic('leger');
+                    }}>
+                    <View
+                      style={[
+                        s.iconeCarre,
+                        { backgroundColor: teinte },
+                        actif && { borderColor: c.ink },
+                      ]}>
+                      <Svg width={22} height={22} viewBox="0 0 24 24">
+                        <Path
+                          d={SOLAIRES.rooms}
+                          fill={i.natif ? '#FFFFFF' : c.ink}
+                          fillRule="evenodd"
+                        />
+                      </Svg>
+                    </View>
+                    <Text style={[s.teinteMot, actif && s.apparenceMotActif]}>
+                      {i.nom}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         <Text style={s.section}>Données et compte</Text>
         <Rangee
@@ -610,28 +689,6 @@ export function ProfilScreen() {
             revoir('accueil');
             setScreen('home');
           }}
-        />
-        {/*
-          LE DIAGNOSTIC — ce qui s'est passé quand l'application s'est arrêtée.
-
-          Relevé du patron : « l'app a quitté plusieurs fois après des clics
-          sur des meubles. Fais en sorte qu'on ait un diagnostic d'erreurs. »
-
-          IL VIT ICI, ET SEULEMENT ICI. Ce n'est pas un réglage et ça n'a rien
-          à faire dans un écran de travail : on ne va le chercher que quand
-          quelque chose s'est mal passé — et c'est là qu'on va chercher.
-
-          LE COMPTE EST ÉCRIT À CÔTÉ. Un « 3 » discret dit qu'il y a quelque
-          chose à lire ; sans lui, personne n'ouvrirait jamais cette page, et
-          le journal ne servirait qu'à ceux qui savent qu'il existe.
-        */}
-        <Rangee
-          s={s}
-          c={c}
-          icone="sirene"
-          label="Diagnostic"
-          note={incidents.length ? String(incidents.length) : undefined}
-          onPress={() => setJournal(true)}
         />
       </ScrollView>
 
@@ -810,6 +867,21 @@ const themed = (c: Palette) =>
       paddingVertical: 9,
     },
     boutonAboTexte: { color: c.bg, fontSize: 13, fontWeight: '600' },
+    // Le même bouton, cerclé : quand une autre action est la principale.
+    boutonAboSecondaire: {
+      borderRadius: radius.pill,
+      paddingHorizontal: 15,
+      paddingVertical: 8,
+      borderWidth: 1.5,
+      borderColor: c.lineStrong,
+    },
+    boutonAboSecondaireTexte: { color: c.ink, fontSize: 13, fontWeight: '600' },
+    espaceAdmin: { height: 10 },
+    reglagesApparence: { marginTop: 6, marginBottom: 4 },
+    rangeeApparence: { marginTop: 26 },
+    // Le chevron du repli : vers le bas fermé, vers le haut ouvert.
+    chevronFerme: { transform: [{ rotate: '-90deg' }] },
+    chevronOuvert: { transform: [{ rotate: '90deg' }] },
     apparences: { flexDirection: 'row', gap: 12 },
     apparence: { flex: 1, alignItems: 'center', gap: 7 },
     apparenceRond: {

@@ -15,13 +15,13 @@
  *     puis un mot d'accueil à l'heure qu'il est, au prénom — deux tons, la
  *     question en retrait ;
  *   — PAR OÙ COMMENCER : quatre tuiles en moulinet autour de la marque,
- *     chacune sa couleur, son geste et sa flèche. Scanner, dessiner, voir un
+ *     chacune sa couleur et son geste. Scanner, dessiner, voir un
  *     exemple, comprendre — les quatre portes d'une application qu'on
  *     découvre, et le moulinet est ce qu'on reconnaît d'un coup d'œil. La
  *     marque n'apparaît qu'une fois, là, en noir, et elle « écoute » ;
  *   — MES PLANS : les trois derniers, avec leur vignette, ouverts d'un
- *     appui. Le relevé interrompu passe en tête. Pour qui n'a encore rien,
- *     une carte dit où ils apparaîtront.
+ *     appui. Le plan en cours passe en tête. Pour qui n'a encore rien,
+ *     une carte dit où ils apparaîtront, et ouvre l'exemple.
  *
  * Relevé du patron, sur la première version : « ne mets pas la date et le
  * logo en haut, le logo est déjà au centre, évitons la répétition abusive » ;
@@ -49,7 +49,7 @@ import { Avatar } from '../components/Avatar';
 import { LogoEcho } from '../components/LogoMark';
 import { horsCorbeille, useScanStore, type SavedScan } from '../store/scanStore';
 import { useAccountStore } from '../store/accountStore';
-import { nombreNonLus, useNotifications } from '../store/notifications';
+import { nombreDeLaPastille, useNotifications } from '../store/notifications';
 import { CLOCHE } from './NotificationsScreen';
 import { useRoomScan } from '../native/useRoomScan';
 import { SOLAIRES } from '../ui/solaires';
@@ -59,6 +59,7 @@ import { sansPerdreLeReleve } from '../ui/releveInterrompu';
 import { pourChercher } from '../ui/mots';
 import { PlanThumb, detailsDuScan } from './LibraryScreen';
 import { etatDAttente, useMaintenant } from '../ui/miseDeCote';
+import { NOM_EXEMPLE, appartementExemple } from '../data/exemple';
 
 /**
  * « il y a un quart d'heure » plutôt qu'une date.
@@ -79,6 +80,20 @@ export function quand(at: number, maintenant = Date.now()): string {
 
 
 
+/**
+ * CE QUE PORTE LE PLAN EN COURS — en mots qui valent pour un scan comme pour
+ * un dessin : « 12 murs · Salon · il y a 5 min ». « murs relevés » mentait
+ * pour un plan tracé au clavier.
+ */
+export function metaDuBrouillon(
+  b: { walls: { type?: string }[]; name?: string; at: number },
+  maintenant = Date.now(),
+): string {
+  const n = b.walls.filter((w) => (w.type ?? 'wall') === 'wall').length;
+  const murs = n === 0 ? 'Pas encore de mur' : `${n} mur${n > 1 ? 's' : ''}`;
+  return `${murs}${b.name ? ` · ${b.name}` : ''} · ${quand(b.at, maintenant)}`;
+}
+
 /** Le mot d'accueil qui va avec l'heure. */
 export function salutation(heure = new Date().getHours()): string {
   if (heure >= 5 && heure < 12) return 'Bonjour';
@@ -89,13 +104,18 @@ export function salutation(heure = new Date().getHours()): string {
 /**
  * LA QUESTION SOUS LE SALUT — elle dit où l'on en est.
  *
- * Un relevé interrompu passe avant tout : c'est du travail en danger. Puis
+ * Un plan en cours passe avant tout : c'est du travail en danger. Puis
  * celui qui n'a encore rien fait, à qui l'on propose le premier plan ; puis
  * l'habitué, à qui l'on demande ce qu'on mesure aujourd'hui.
+ *
+ * Revue des découvreurs (clair-05) : en titre de 30 points, « Prêt pour
+ * votre premier plan ? » tenait trois lignes avec le salut et poussait
+ * « Mes plans » sous le pli. La question est devenue un sous-titre court,
+ * d'une ligne, sous un salut d'une ligne.
  */
 export function questionDuJour(x: { brouillon: boolean; plans: number }): string {
-  if (x.brouillon) return 'Un relevé vous attend.';
-  if (x.plans === 0) return 'Prêt pour votre premier plan ?';
+  if (x.brouillon) return 'Un plan en cours vous attend.';
+  if (x.plans === 0) return 'Prêt pour un premier plan ?';
   return 'Que mesure-t-on aujourd’hui ?';
 }
 
@@ -136,6 +156,35 @@ export const GRAND_TEXTE = 1.35;
  */
 export const PHRASE_LIDAR = 'iPhone ou iPad avec capteur LiDAR';
 
+type CleTuile = 'scan' | 'dessin' | 'exemple' | 'lecture';
+
+/**
+ * L'ORDRE DES QUATRE PLACES : haut gauche, haut droite, bas gauche, bas
+ * droite (en une colonne : haut gauche, bas gauche, haut droite, bas droite).
+ *
+ * Revue des découvreurs (clair-05) : sans capteur, la tuile éteinte du scan
+ * occupait la meilleure place, en haut à gauche — la première qu'on lit,
+ * pour une porte fermée. Elle passe en dernier, et le dessin, la porte qui
+ * reste, prend sa place.
+ */
+export function ordreDesTuiles<T>(scanIndisponible: boolean, t: Record<CleTuile, T>): [T, T, T, T] {
+  return scanIndisponible
+    ? [t.dessin, t.lecture, t.exemple, t.scan]
+    : [t.scan, t.dessin, t.exemple, t.lecture];
+}
+
+/**
+ * LE SOUS-TITRE DE « LIRE UN PLAN PAPIER » — il dit la règle avant l'appui.
+ *
+ * La règle est au serveur (`server/api.php`, action `lire_plan`) : hors Pro,
+ * UNE lecture d'essai par compte, puis la lecture est réservée au Pro. On
+ * l'apprenait sur l'écran de lecture ; la tuile le dit. Le Pro n'a pas de
+ * compte à rebours à lire.
+ */
+export function sousLecture(pro: boolean): string {
+  return pro ? 'Photo ou PDF' : 'Photo ou PDF · 1 lecture offerte';
+}
+
 export function HomeScreen() {
   const supported = useScanStore((s) => s.supported);
   const raccourciEnAttente = useScanStore((s) => s.raccourciEnAttente);
@@ -154,6 +203,7 @@ export function HomeScreen() {
   const peutCreerPlan = useAccountStore((s) => s.peutCreerPlan);
   const ouvrirSurprise = useAccountStore((s) => s.ouvrirSurprise);
   const compte = useAccountStore((s) => s.compte);
+  const pro = useAccountStore((s) => s.pro);
   const c = useTheme();
   const sombre = c === dark;
   const styles = getStyles(c);
@@ -227,11 +277,11 @@ export function HomeScreen() {
     */
     sansPerdreLeReleve(start, 'Un nouveau scan', 'Nouveau scan');
   };
-  /** Jeter un relevé interrompu se confirme : il ne revient pas. */
+  /** Jeter un plan en cours se confirme : il ne revient pas. */
   const jeterLeBrouillon = () =>
     alerte(
-      'Jeter le relevé interrompu ?',
-      'Les murs déjà relevés seront perdus.',
+      'Jeter le plan en cours ?',
+      'Ce qui a déjà été relevé ou dessiné sera perdu.',
       [
         { label: 'Garder' },
         { label: 'Jeter', danger: true, onPress: oublierBrouillon },
@@ -278,13 +328,123 @@ export function HomeScreen() {
     return vivants.filter((s) => pourChercher(s.name ?? '').includes(q)).slice(0, 8);
   }, [recents, cherche, suppression.masque]);
 
+  /* L'exemple, en vignette, tant que « Mes plans » est vide — et alors seulement. */
+  const sansPlan = saves.length === 0 && !brouillon;
+  const exemple = useMemo<SavedScan | null>(
+    () =>
+      sansPlan
+        ? { id: 'exemple', name: NOM_EXEMPLE, createdAt: 0, updatedAt: 0, modelPath: null, ...appartementExemple() }
+        : null,
+    [sansPlan],
+  );
+
   const prenom = compte?.prenom?.trim().split(/\s+/)[0];
   const question = questionDuJour({ brouillon: !!brouillon, plans: recents.length });
 
 
   const scanIndisponible = supported === false;
-  /* Le nombre de la pastille : ce qu'on n'a pas encore lu. */
-  const nonLus = useNotifications((n) => nombreNonLus(n));
+
+  /*
+    LES QUATRE TUILES, POSÉES DANS QUATRE PLACES — chacune se dessine à la
+    hauteur de la place qu'elle prend (haute ou basse), et la tuile du haut
+    de chaque colonne rend sa hauteur réelle au moyeu.
+  */
+  type FaireTuile = (hauteur: number, onLayout?: (h: number) => void) => React.ReactElement;
+  const tuileScan: FaireTuile = (hauteur, onLayout) =>
+    scanIndisponible ? (
+      /*
+        LA TUILE ÉTEINTE SE LIT — revue de lisibilité : grisée à 50 %, elle
+        tombait à 2:1. Elle garde son opacité, prend un fond neutre et un
+        cadenas qui dit « Indisponible » ; son appui propose le dessin, la
+        porte qui reste. C'est désormais le SEUL endroit de l'accueil qui
+        parle du capteur (revue des découvreurs : le LiDAR était dit trois
+        ou quatre fois, de la connexion au paragraphe sous les tuiles).
+      */
+      <Tuile
+        c={c}
+        fond={c.surfaceSunken}
+        hauteur={hauteur}
+        icone={SOLAIRES.scanner}
+        titre={'Scanner\nmon logement'}
+        sous={PHRASE_LIDAR}
+        label="Scan indisponible sur cet appareil"
+        eteinte
+        onLayout={onLayout}
+        onPress={() =>
+          alerte(
+            'Scan indisponible ici',
+            `Le scan demande un ${PHRASE_LIDAR}. Tout le reste fonctionne : dessinez le plan avec vos mesures, ou ouvrez l’exemple.`,
+            [{ label: 'Plus tard' }, { label: 'Dessiner le plan', onPress: dessiner }],
+          )
+        }
+      />
+    ) : (
+      <Tuile
+        c={c}
+        fond={teintes.scan}
+        hauteur={hauteur}
+        icone={SOLAIRES.scanner}
+        titre={'Scanner\nmon logement'}
+        sous={supported === null ? 'Vérification…' : 'Pièce après pièce'}
+        label="Commencer le scan"
+        desactivee={supported !== true}
+        onLayout={onLayout}
+        onPress={scanner}
+      />
+    );
+  const tuileDessin: FaireTuile = (hauteur, onLayout) => (
+    <Tuile
+      c={c}
+      fond={teintes.dessin}
+      hauteur={hauteur}
+      icone={SOLAIRES.crayon}
+      titre={'Dessiner\nun plan'}
+      // Plus court : il se coupait en « Avec vos mesures, san… ».
+      sous="Avec vos mesures"
+      label="Dessiner un plan sans scanner"
+      onLayout={onLayout}
+      onPress={dessiner}
+    />
+  );
+  const tuileExemple: FaireTuile = (hauteur, onLayout) => (
+    <Tuile
+      c={c}
+      fond={teintes.exemple}
+      hauteur={hauteur}
+      icone={SOLAIRES.maison}
+      titre={'Voir un\nexemple'}
+      sous="Un T2 de 46 m² à visiter"
+      label="Voir un exemple"
+      onLayout={onLayout}
+      onPress={voirLExemple}
+    />
+  );
+  /*
+    LIRE UN PLAN PAPIER — relevé du patron : « à la place de "Comment ça
+    marche" ». La feuille d'un architecte devient un plan coté ; le film,
+    lui, se revoit depuis le profil.
+  */
+  const tuileLecture: FaireTuile = (hauteur, onLayout) => (
+    <Tuile
+      c={c}
+      fond={teintes.guide}
+      hauteur={hauteur}
+      icone={SOLAIRES.planPapier}
+      titre={'Lire un\nplan papier'}
+      sous={sousLecture(pro)}
+      label="Lire un plan papier"
+      onLayout={onLayout}
+      onPress={lirePlanPapier}
+    />
+  );
+  const tuiles = ordreDesTuiles(scanIndisponible, {
+    scan: tuileScan,
+    dessin: tuileDessin,
+    exemple: tuileExemple,
+    lecture: tuileLecture,
+  });
+  /* Le nombre de la pastille : ce qu'on n'a pas encore lu, hors bienvenue. */
+  const nonLus = useNotifications((n) => nombreDeLaPastille(n));
 
   return (
     <View style={styles.container}>
@@ -335,14 +495,18 @@ export function HomeScreen() {
         </Animated.View>
 
         {/*
-          LE MOT D'ACCUEIL — deux tons. Le salut à l'encre, la question en
-          retrait : on lit qui l'on est, puis ce qu'on vient faire.
+          LE MOT D'ACCUEIL — une ligne de salut à l'encre, une ligne de
+          question en retrait, plus petite : on lit qui l'on est, puis ce
+          qu'on vient faire, et les tuiles restent au-dessus du pli.
         */}
-        <Animated.Text style={[styles.salut, fadeIn(1)]} accessibilityRole="header">
-          {`${salutation()}${prenom ? `, ${prenom}` : ''}.`}
-          {'\n'}
-          <Text style={styles.question}>{question}</Text>
-        </Animated.Text>
+        <Animated.View style={fadeIn(1)}>
+          <Text style={styles.salut} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit>
+            {`${salutation()}${prenom ? `, ${prenom}` : ''}.`}
+          </Text>
+          <Text style={styles.question} numberOfLines={1} testID="question-du-jour">
+            {question}
+          </Text>
+        </Animated.View>
 
         {saves.length >= RECHERCHE_DES && (
           <Animated.View style={[styles.recherche, fadeIn(2)]}>
@@ -378,96 +542,12 @@ export function HomeScreen() {
             */}
             <View style={[styles.moulinet, uneColonne && styles.moulinetColonne]}>
               <View style={[styles.colonne, uneColonne && styles.colonneEntiere]}>
-                <Animated.View style={fadeIn(3, true)}>
-                  {scanIndisponible ? (
-                    /*
-                      LA TUILE ÉTEINTE SE LIT — revue de lisibilité : grisée à
-                      50 %, elle tombait à 2:1, et seule une phrase plus bas
-                      disait pourquoi. Elle garde son opacité, prend un fond
-                      neutre et un cadenas qui dit « Indisponible » ; plus de
-                      flèche, puisqu'elle n'ouvre rien ; et son appui propose
-                      le dessin, la porte qui reste.
-                    */
-                    <Tuile
-                      c={c}
-                      fond={c.surfaceSunken}
-                      hauteur={HAUTE}
-                      icone={SOLAIRES.scanner}
-                      titre={'Scanner\nmon logement'}
-                      sous={PHRASE_LIDAR}
-                      label="Scan indisponible sur cet appareil"
-                      eteinte
-                      onLayout={setHautGauche}
-                      onPress={() =>
-                        alerte(
-                          'Scan indisponible ici',
-                          `Le scan demande un ${PHRASE_LIDAR}. Tout le reste fonctionne : dessinez le plan avec vos mesures, ou ouvrez l’exemple.`,
-                          [{ label: 'Plus tard' }, { label: 'Dessiner le plan', onPress: dessiner }],
-                        )
-                      }
-                    />
-                  ) : (
-                    <Tuile
-                      c={c}
-                      fond={teintes.scan}
-                      hauteur={HAUTE}
-                      icone={SOLAIRES.scanner}
-                      titre={'Scanner\nmon logement'}
-                      sous={supported === null ? 'Vérification…' : 'Pièce après pièce'}
-                      label="Commencer le scan"
-                      desactivee={supported !== true}
-                      onLayout={setHautGauche}
-                      onPress={scanner}
-                    />
-                  )}
-                </Animated.View>
-                <Animated.View style={fadeIn(5, true)}>
-                  <Tuile
-                    c={c}
-                    fond={teintes.exemple}
-                    hauteur={BASSE}
-                    icone={SOLAIRES.maison}
-                    titre={'Voir un\nexemple'}
-                    sous="Un T2 de 46 m² à visiter"
-                    label="Voir un exemple"
-                    onPress={voirLExemple}
-                  />
-                </Animated.View>
+                <Animated.View style={fadeIn(3, true)}>{tuiles[0](HAUTE, setHautGauche)}</Animated.View>
+                <Animated.View style={fadeIn(5, true)}>{tuiles[2](BASSE)}</Animated.View>
               </View>
               <View style={[styles.colonne, uneColonne && styles.colonneEntiere]}>
-                <Animated.View style={fadeIn(4, true)}>
-                  <Tuile
-                    c={c}
-                    fond={teintes.dessin}
-                    hauteur={BASSE}
-                    icone={SOLAIRES.crayon}
-                    titre={'Dessiner\nun plan'}
-                    // Plus court : il se coupait en « Avec vos mesures, san… ».
-                    sous="Avec vos mesures"
-                    label="Dessiner un plan sans scanner"
-                    onLayout={setHautDroite}
-                    onPress={dessiner}
-                  />
-                </Animated.View>
-                <Animated.View style={fadeIn(6, true)}>
-                  {/*
-                    LIRE UN PLAN PAPIER — relevé du patron : « à la place de
-                    "Comment ça marche" ». La feuille d'un architecte devient
-                    un plan coté ; le film, lui, se revoit depuis le profil.
-                  */}
-                  <Tuile
-                    c={c}
-                    fond={teintes.guide}
-                    hauteur={HAUTE}
-                    icone={SOLAIRES.planPapier}
-                    titre={'Lire un\nplan papier'}
-                    // Revue « Sophie » : avec un PDF en main, « une photo »
-                    // faisait hésiter. Et « … de l'architecte » se coupait.
-                    sous="Photo ou PDF"
-                    label="Lire un plan papier"
-                    onPress={lirePlanPapier}
-                  />
-                </Animated.View>
+                <Animated.View style={fadeIn(4, true)}>{tuiles[1](BASSE, setHautDroite)}</Animated.View>
+                <Animated.View style={fadeIn(6, true)}>{tuiles[3](HAUTE)}</Animated.View>
               </View>
               {/*
                 LE MOYEU ÉCOUTE — le glyphe à l'encre, noir sur blanc : la
@@ -484,21 +564,6 @@ export function HomeScreen() {
                 </View>
               )}
             </View>
-
-            {scanIndisponible && (
-              <View style={styles.avisBloc} testID="avis-lidar">
-                <Text style={styles.avis}>
-                  {`Le scan demande un ${PHRASE_LIDAR}. Pas de souci : dessinez le plan avec vos mesures, tout le reste fonctionne.`}
-                </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Dessiner le plan"
-                  hitSlop={10}
-                  onPress={dessiner}>
-                  <Text style={styles.avisLien}>Dessiner le plan</Text>
-                </Pressable>
-              </View>
-            )}
           </>
         )}
 
@@ -534,8 +599,15 @@ export function HomeScreen() {
             </View>
 
             {/*
-              LE RELEVÉ INTERROMPU — proposé, jamais imposé, et en tête :
-              c'est du travail qu'on peut encore perdre.
+              LE PLAN EN COURS — proposé, jamais imposé, et en tête : c'est
+              du travail qu'on peut encore perdre.
+
+              Revue des découvreurs : « Relevé interrompu · 12 murs relevés »
+              se lisait mal pour un plan DESSINÉ, qu'on n'a jamais « relevé » ;
+              et « Jeter », collé sous « Reprendre », se touchait du même
+              pouce. Le titre dit « Plan en cours » dans les deux cas ;
+              « Reprendre » est le seul bouton plein, à droite ; « Jeter » est
+              un mot discret, à gauche sous le texte, et se confirme.
             */}
             {brouillon && !cherche && (
               <View style={[styles.carte, styles.carteSeule]}>
@@ -546,29 +618,26 @@ export function HomeScreen() {
                   </Svg>
                 </View>
                 <View style={styles.carteTextes}>
-                  <Text style={styles.carteNom} numberOfLines={1}>Relevé interrompu</Text>
+                  <Text style={styles.carteNom} numberOfLines={1}>Plan en cours</Text>
                   <Text style={styles.carteMeta} numberOfLines={2}>
-                    {`${brouillon.walls.length} mur${brouillon.walls.length > 1 ? 's' : ''} relevés${
-                      brouillon.name ? ` · ${brouillon.name}` : ''
-                    }, ${quand(brouillon.at)}.`}
+                    {metaDuBrouillon(brouillon)}
                   </Text>
-                </View>
-                <View style={styles.brouillonGestes}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Reprendre le relevé"
-                    style={styles.reprendre}
-                    onPress={reprendreBrouillon}>
-                    <Text style={styles.reprendreTexte}>Reprendre</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Jeter le relevé interrompu"
-                    hitSlop={8}
+                    accessibilityLabel="Jeter le plan en cours"
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 16 }}
+                    style={styles.jeterBloc}
                     onPress={jeterLeBrouillon}>
                     <Text style={styles.jeter}>Jeter</Text>
                   </Pressable>
                 </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Reprendre le plan en cours"
+                  style={({ pressed }) => [styles.reprendre, pressed && styles.cartePressee]}
+                  onPress={reprendreBrouillon}>
+                  <Text style={styles.reprendreTexte}>Reprendre</Text>
+                </Pressable>
               </View>
             )}
 
@@ -601,31 +670,35 @@ export function HomeScreen() {
 
         {/*
           MES PLANS, AVANT LE PREMIER — la place ne reste pas vide : une
-          carte dit ce qui viendra s'y ranger, et comment l'y faire venir.
+          carte dit ce qui viendra s'y ranger.
+
+          Revue des découvreurs (clair-05) : un cadre en pointillés autour
+          d'un plan en pointillés, c'était une place vide de plus. La carte
+          montre maintenant la vignette de l'exemple, et s'ouvre d'un appui
+          sur lui : à quoi ressemblera un plan rangé ici, et de quoi s'en
+          faire une idée tout de suite.
         */}
-        {saves.length === 0 && !brouillon && (
+        {exemple && (
           <Animated.View style={fadeIn(7)}>
             <Text style={[styles.sectionTitre, styles.sectionSeule]}>Mes plans</Text>
-            <View style={styles.videCarte} testID="plans-vide">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ouvrir l’exemple"
+              accessibilityHint="Vos plans apparaîtront ici"
+              testID="plans-vide"
+              style={({ pressed }) => [styles.videCarte, pressed && styles.cartePressee]}
+              onPress={voirLExemple}>
               <View style={styles.videVignette}>
-                <Svg width={44} height={34} viewBox="0 0 44 34">
-                  <Path
-                    d="M3 3H41V31H3Z M26 3V31 M3 19H26 M14 19V31 M26 17H41"
-                    stroke={c.inkFaint}
-                    strokeWidth={2}
-                    strokeLinejoin="round"
-                    strokeDasharray="4 3"
-                    fill="none"
-                  />
-                </Svg>
+                <PlanThumb scan={exemple} c={c} />
               </View>
               <View style={styles.carteTextes}>
                 <Text style={styles.carteNom}>Ils apparaîtront ici</Text>
-                <Text style={styles.carteMeta}>
-                  Vos relevés et vos dessins se rangeront ici, prêts à reprendre.
-                </Text>
+                <Text style={styles.carteMeta}>En attendant, ouvrez l’exemple.</Text>
               </View>
-            </View>
+              <Svg width={14} height={14} viewBox="0 0 24 24">
+                <Path d="m9 6 6 6-6 6" stroke={c.inkFaint} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </Svg>
+            </Pressable>
           </Animated.View>
         )}
 
@@ -646,9 +719,14 @@ export function HomeScreen() {
 }
 
 /**
- * UNE TUILE DU MOULINET — son pictogramme dans une pastille, sa flèche en
- * haut à droite, son titre en bas. Elle s'enfonce d'un rien sous le doigt,
- * au ressort, et revient quand on la lâche.
+ * UNE TUILE DU MOULINET — son pictogramme dans une pastille, son titre en
+ * bas. Elle s'enfonce d'un rien sous le doigt, au ressort, et revient quand
+ * on la lâche.
+ *
+ * PLUS DE FLÈCHE « ↗ » — revue des découvreurs (clair-05) : en haut à
+ * droite d'une tuile, c'est le signe d'un lien qui quitte l'application ;
+ * quatre testeurs ont cru ouvrir un site. Une tuile se touche parce qu'elle
+ * a l'air d'un bouton, pas parce qu'une flèche le promet.
  */
 function Tuile({
   c,
@@ -673,7 +751,7 @@ function Tuile({
   label: string;
   onPress: () => void;
   desactivee?: boolean;
-  /** Indisponible sur cet appareil : neutre, lisible, un cadenas, pas de flèche. */
+  /** Indisponible sur cet appareil : neutre, lisible, un cadenas. */
   eteinte?: boolean;
   /** La hauteur réelle, pour poser le moyeu sur la coupe. */
   onLayout?: (hauteur: number) => void;
@@ -704,11 +782,9 @@ function Tuile({
           eteinte && styles.tuileEteinte,
         ]}>
         {/*
-          LE ROND DE L'ICÔNE SE RESSERRE, PAS L'ICÔNE ; LA FLÈCHE SE FAIT
-          DISCRÈTE — relevé du patron : « réduis les flèches et leur bloc
-          arrière arrondi des quatre bulles ; réduis très légèrement le bloc
-          blanc rond des icônes, sans réduire les icônes ». L'icône dit ce que
-          fait la bulle ; la flèche dit seulement qu'elle s'ouvre.
+          LE ROND DE L'ICÔNE SE RESSERRE, PAS L'ICÔNE — relevé du patron :
+          « réduis très légèrement le bloc blanc rond des icônes, sans réduire
+          les icônes ». L'icône dit ce que fait la bulle.
         */}
         <View style={styles.tuileHaut}>
           <View style={[styles.rondIcone, { backgroundColor: pastille }]}>
@@ -716,18 +792,12 @@ function Tuile({
               <Path d={icone} fill={c.ink} fillRule="evenodd" />
             </Svg>
           </View>
-          {eteinte ? (
+          {eteinte && (
             <View style={styles.cadenas} testID="cadenas-scan">
               <Svg width={11} height={11} viewBox="0 0 24 24">
                 <Path d={CADENAS} fill={c.inkSoft} fillRule="evenodd" />
               </Svg>
               <Text style={styles.cadenasMot}>Indisponible</Text>
-            </View>
-          ) : desactivee ? null : (
-            <View style={[styles.rondFleche, { backgroundColor: pastille }]} testID="fleche-tuile">
-              <Svg width={12} height={12} viewBox="0 0 24 24">
-                <Path d="M7 17 17 7M9 7h8v8" stroke={c.ink} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              </Svg>
             </View>
           )}
         </View>
@@ -842,13 +912,13 @@ const getStyles = themedStyles((c: Palette) => {
     profilBloc: { padding: 2 },
     salut: {
       color: c.ink,
-      fontSize: 30,
-      lineHeight: 36,
+      fontSize: 28,
+      lineHeight: 34,
       fontWeight: '700',
       letterSpacing: -0.8,
-      marginTop: 22,
+      marginTop: 14,
     },
-    question: { color: c.inkFaint },
+    question: { color: c.inkSoft, fontSize: 16, lineHeight: 21, fontWeight: '500', marginTop: 2 },
     recherche: {
       marginTop: 18,
       height: 46,
@@ -901,13 +971,6 @@ const getStyles = themedStyles((c: Palette) => {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    rondFleche: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
     tuileTitre: { color: c.ink, fontSize: 17, lineHeight: 20, fontWeight: '700', letterSpacing: -0.3 },
     tuileSous: { color: c.inkSoft, fontSize: 12.5, fontWeight: '500', marginTop: 4 },
     /* Le moyeu se pose au croisement des deux coupes — la moyenne des deux
@@ -927,9 +990,6 @@ const getStyles = themedStyles((c: Palette) => {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    avisBloc: { marginTop: 12, gap: 6 },
-    avis: { color: c.inkSoft, fontSize: 13, lineHeight: 18 },
-    avisLien: { color: c.blue, fontSize: 14, fontWeight: '600' },
     erreur: {
       backgroundColor: c === dark ? '#3A1517' : '#FDECEC',
       borderRadius: radius.md,
@@ -986,14 +1046,16 @@ const getStyles = themedStyles((c: Palette) => {
     carteGlissante: { marginBottom: 10 },
     /* Une carte hors du cadre de balayage porte elle-même son écart. */
     carteSeule: { marginBottom: 10 },
-    brouillonGestes: { alignItems: 'center', gap: 6 },
     reprendre: {
       backgroundColor: c.blue,
       borderRadius: radius.pill,
-      paddingHorizontal: 13,
-      paddingVertical: 8,
+      paddingHorizontal: 18,
+      minHeight: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-    reprendreTexte: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
+    reprendreTexte: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+    jeterBloc: { alignSelf: 'flex-start', marginTop: 6 },
     jeter: { color: c.inkFaint, fontSize: 12.5, fontWeight: '600' },
     rien: { color: c.inkFaint, fontSize: 14, marginTop: 6 },
     sectionSeule: { marginTop: 26, marginBottom: 10 },
@@ -1016,6 +1078,7 @@ const getStyles = themedStyles((c: Palette) => {
       backgroundColor: c.surfaceSunken,
       alignItems: 'center',
       justifyContent: 'center',
+      overflow: 'hidden',
     },
     promesse: {
       color: c.inkFaint,

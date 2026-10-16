@@ -553,8 +553,10 @@ function FolderTile({
           activeOpacity={0.8}
           // Le dossier s'annonce AVEC SON COMPTE : un lecteur d'écran qui
           // énumère le contenu de la tuile dit « Chantier, 3 » sans qu'on
-          // sache si trois est un nombre de scans ou un rang.
-          accessibilityLabel={`Dossier ${folder.name}, ${count} scan${
+          // sache si trois est un nombre de plans ou un rang. « plans »,
+          // comme le titre « Mes plans » (revue des découvreurs : un plan
+          // dessiné n'est pas un scan).
+          accessibilityLabel={`Dossier ${folder.name}, ${count} plan${
             count > 1 ? 's' : ''
           }`}
           onPress={onOpen}
@@ -1017,7 +1019,7 @@ export function LibraryScreen() {
   const folderMenu = (f: ScanFolder) =>
     setMenu({
       title: f.name,
-      subtitle: `${(byFolder.get(f.id) ?? []).length} scan${
+      subtitle: `${(byFolder.get(f.id) ?? []).length} plan${
         (byFolder.get(f.id) ?? []).length > 1 ? 's' : ''
       } rangés ici.`,
       actions: [

@@ -6,8 +6,14 @@
  * scan demandait « un iPhone Pro » — ce qui est faux pour l'iPad Pro et
  * trompeur pour l'iPhone 15. On le dit maintenant dès le premier lancement,
  * sans rien bloquer ; et sur l'accueil la tuile éteinte reste lisible :
- * opacité pleine, fond neutre, cadenas libellé, plus de flèche, et une
- * phrase qui oriente vers le dessin.
+ * opacité pleine, fond neutre, cadenas libellé, plus de flèche, et son
+ * appui oriente vers le dessin.
+ *
+ * Revue des découvreurs : le capteur était dit trois ou quatre fois (pied
+ * de la connexion, carte de la question, tuile, paragraphe sous les tuiles
+ * et lien « Dessiner le plan » qui doublait la tuile voisine). Il se dit
+ * UNE fois par écran : une ligne sur la question, la tuile sur l'accueil —
+ * et la tuile éteinte passe en dernière place.
  */
 const mockDisque = new Map<string, string>();
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -24,7 +30,8 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { HomeScreen, PHRASE_LIDAR } from '../src/screens/HomeScreen';
-import { PremierLancement } from '../src/components/PremierLancement';
+import { AVIS_SANS_LIDAR, PremierLancement } from '../src/components/PremierLancement';
+import { useAlerte } from '../src/ui/alerte';
 import { useScanStore } from '../src/store/scanStore';
 import { useAccountStore } from '../src/store/accountStore';
 import { useUsage } from '../src/store/usage';
@@ -70,11 +77,22 @@ describe('au premier lancement', () => {
     const t = question(false);
     expect(t.root.findAll((n) => n.props.testID === 'avis-lidar-premier').length).toBeGreaterThan(0);
     const vu = mots(t);
-    expect(vu).toContain('iPhone ou iPad avec capteur LiDAR');
+    expect(vu).toContain(AVIS_SANS_LIDAR);
     expect(vu).not.toContain('iPhone Pro');
     // Rien n'est bloqué : les deux choix restent.
     expect(t.root.findAll((n) => n.props.accessibilityLabel === 'Mesurer et aménager' && n.props.onPress).length).toBeGreaterThan(0);
     expect(vu).toContain('Dessiner son logement');
+  });
+
+  it('sans LiDAR, la carte tient en une ligne', () => {
+    const t = question(false);
+    const carte = t.root.findAll((n) => n.props.testID === 'avis-lidar-premier')[0];
+    const texte = carte.findByType(Text);
+    expect(texte.props.numberOfLines).toBe(1);
+    // Une ligne courte : au-delà, même réduite, elle ne se lirait plus.
+    expect(AVIS_SANS_LIDAR.length).toBeLessThanOrEqual(55);
+    // Et le capteur n'est dit qu'une fois sur l'écran.
+    expect(mots(t).split('LiDAR').length - 1).toBe(1);
   });
 
   it('avec LiDAR, pas un mot de trop', () => {
@@ -108,24 +126,62 @@ describe('sur l’accueil', () => {
     expect(vu).toContain(PHRASE_LIDAR);
   });
 
-  it('la phrase dit « iPhone ou iPad avec capteur LiDAR » et mène au dessin', () => {
+  it('le capteur n’est dit qu’une fois : sur la tuile, sans paragraphe ni lien en double', () => {
+    const t = monter();
+    const vu = mots(t);
+    expect(vu.split('LiDAR').length - 1).toBe(1);
+    expect(vu).not.toContain('iPhone Pro');
+    expect(t.root.findAll((n) => n.props.testID === 'avis-lidar')).toHaveLength(0);
+    // Plus de lien « Dessiner le plan » qui doublait la tuile « Dessiner un plan ».
+    expect(
+      t.root.findAll((n) => n.props.accessibilityLabel === 'Dessiner le plan' && typeof n.props.onPress === 'function'),
+    ).toHaveLength(0);
+  });
+
+  it('l’appui sur la tuile éteinte mène au dessin', () => {
     const avant = useScanStore.getState().commencerAuClavier;
     const dessine = jest.fn();
     useScanStore.setState({ commencerAuClavier: dessine } as never);
     const t = monter();
-    const vu = mots(t);
-    expect(vu).toContain('iPhone ou iPad avec capteur LiDAR');
-    expect(vu).not.toContain('iPhone Pro');
-    const lien = t.root.findAll((n) => n.props.accessibilityLabel === 'Dessiner le plan' && typeof n.props.onPress === 'function')[0];
-    expect(lien).toBeDefined();
-    act(() => lien.props.onPress());
+    act(() => tuileScan(t).props.onPress());
+    const alerte = useAlerte.getState().courante;
+    expect(alerte?.message).toContain(PHRASE_LIDAR);
+    const dessiner = alerte?.actions?.find((a) => a.label === 'Dessiner le plan');
+    expect(dessiner).toBeDefined();
+    act(() => dessiner!.onPress?.());
     expect(dessine).toHaveBeenCalled();
+    act(() => useAlerte.setState({ courante: null } as never));
     useScanStore.setState({ commencerAuClavier: avant } as never);
   });
 
-  it('les tuiles actives gardent leur flèche', () => {
+  it('sans capteur, la tuile du scan passe en dernier ; le dessin prend la première place', () => {
+    const libelles = (t: TestRenderer.ReactTestRenderer) =>
+      t.root
+        .findAll(
+          (n) =>
+            typeof n.props.onPress === 'function' &&
+            typeof n.props.accessibilityHint === 'string' &&
+            ['Commencer le scan', 'Scan indisponible sur cet appareil', 'Dessiner un plan sans scanner', 'Voir un exemple', 'Lire un plan papier'].includes(
+              n.props.accessibilityLabel,
+            ),
+          { deep: false },
+        )
+        .map((n) => n.props.accessibilityLabel as string);
+    // Ordre de l'arbre : colonne gauche (haut, bas), puis colonne droite (haut, bas).
+    const sans = libelles(monter());
+    expect(sans).toEqual(['Dessiner un plan sans scanner', 'Voir un exemple', 'Lire un plan papier', 'Scan indisponible sur cet appareil']);
+    act(() => arbre?.unmount());
+    useScanStore.setState({ supported: true });
+    const avec = libelles(monter());
+    expect(avec).toEqual(['Commencer le scan', 'Voir un exemple', 'Dessiner un plan sans scanner', 'Lire un plan papier']);
+  });
+
+  it('plus aucune flèche « ↗ » sur les tuiles : elles faisaient croire à des liens externes', () => {
     useScanStore.setState({ supported: true });
     const t = monter();
-    expect(t.root.findAll((n) => n.props.testID === 'fleche-tuile', { deep: false }).length).toBe(4);
+    expect(t.root.findAll((n) => n.props.testID === 'fleche-tuile')).toHaveLength(0);
+    // Aucun tracé de flèche oblique non plus, sous un autre nom.
+    const traces = t.root.findAll((n) => typeof n.props.d === 'string').map((n) => n.props.d as string);
+    expect(traces.some((d) => d.includes('M7 17 17 7'))).toBe(false);
   });
 });

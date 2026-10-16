@@ -121,7 +121,16 @@ export function NotificationsScreen() {
 
   const visibles = useMemo(() => messagesVisibles({ recus, supprimes }), [recus, supprimes]);
   const nonLus = visibles.filter((m) => !lus.includes(m.id)).length;
-  const montres = filtre === 'nonlues' ? visibles.filter((m) => !lus.includes(m.id)) : visibles;
+  /*
+    PAS DE FILTRE POUR UN SEUL MESSAGE — revue des découvreurs (clair-30) :
+    « Toutes / Non lues » au-dessus de la seule bienvenue, c'est un outil de
+    tri sans rien à trier. Les filtres paraissent à partir de deux messages ;
+    en dessous, on montre tout (un filtre resté sur « Non lues » ne cache
+    pas le dernier message lu).
+  */
+  const avecFiltres = visibles.length > 1;
+  const filtreVu = avecFiltres ? filtre : 'toutes';
+  const montres = filtreVu === 'nonlues' ? visibles.filter((m) => !lus.includes(m.id)) : visibles;
   const rayons = useMemo(() => {
     const out: { titre: string; messages: Message[] }[] = [];
     for (const m of montres) {
@@ -205,28 +214,30 @@ export function NotificationsScreen() {
         </View>
       </View>
 
-      {/* Toutes, ou seulement ce qu'on n'a pas lu. */}
-      <View style={s.filtres}>
-        {(
-          [
-            ['toutes', 'Toutes'],
-            ['nonlues', nonLus > 0 ? `Non lues · ${nonLus}` : 'Non lues'],
-          ] as const
-        ).map(([cle, mot]) => {
-          const actif = filtre === cle;
-          return (
-            <Pressable
-              key={cle}
-              accessibilityRole="button"
-              accessibilityLabel={cle === 'toutes' ? 'Toutes les notifications' : 'Notifications non lues'}
-              accessibilityState={{ selected: actif }}
-              style={[s.filtre, actif && s.filtreActif]}
-              onPress={() => setFiltre(cle)}>
-              <Text style={[s.filtreMot, actif && s.filtreMotActif]}>{mot}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      {/* Toutes, ou seulement ce qu'on n'a pas lu — dès qu'il y a de quoi trier. */}
+      {avecFiltres && (
+        <View style={s.filtres} testID="filtres-notifications">
+          {(
+            [
+              ['toutes', 'Toutes'],
+              ['nonlues', nonLus > 0 ? `Non lues · ${nonLus}` : 'Non lues'],
+            ] as const
+          ).map(([cle, mot]) => {
+            const actif = filtre === cle;
+            return (
+              <Pressable
+                key={cle}
+                accessibilityRole="button"
+                accessibilityLabel={cle === 'toutes' ? 'Toutes les notifications' : 'Notifications non lues'}
+                accessibilityState={{ selected: actif }}
+                style={[s.filtre, actif && s.filtreActif]}
+                onPress={() => setFiltre(cle)}>
+                <Text style={[s.filtreMot, actif && s.filtreMotActif]}>{mot}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
 
       <ScrollView
         contentContainerStyle={[s.liste, { paddingBottom: insets.bottom + 90 }]}
@@ -241,9 +252,9 @@ export function NotificationsScreen() {
                 <Path d={CLOCHE} fill={c.inkFaint} fillRule="evenodd" />
               </Svg>
             </View>
-            <Text style={s.videTitre}>{filtre === 'nonlues' ? 'Tout est lu' : 'Aucune notification'}</Text>
+            <Text style={s.videTitre}>{filtreVu === 'nonlues' ? 'Tout est lu' : 'Aucune notification'}</Text>
             <Text style={s.videTexte}>
-              {filtre === 'nonlues'
+              {filtreVu === 'nonlues'
                 ? 'Vous êtes à jour. Les prochaines nouveautés arriveront ici.'
                 : 'Les nouveautés et les annonces d’EchoPlan arriveront ici.'}
             </Text>

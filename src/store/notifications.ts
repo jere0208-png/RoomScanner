@@ -14,7 +14,7 @@
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-import { MESSAGES_EMBARQUES, NOUVEAUTES } from '../data/nouveautes';
+import { BIENVENUE, MESSAGES_EMBARQUES, NOUVEAUTES } from '../data/nouveautes';
 import { demanderLesMessages, lireMessages, type Message } from '../net/messages';
 
 const CLE = 'roomscanner.notifications.v1';
@@ -50,9 +50,23 @@ export function messagesVisibles(s: Pick<Etat, 'recus' | 'supprimes'>): Message[
   return tous.sort((a, b) => b.date - a.date);
 }
 
-/** Le nombre que porte la pastille de la cloche. */
+/** Le nombre de messages non lus — celui du filtre « Non lues ». */
 export function nombreNonLus(s: Pick<Etat, 'recus' | 'supprimes' | 'lus'>): number {
   return messagesVisibles(s).filter((m) => !s.lus.includes(m.id)).length;
+}
+
+/*
+  LA PASTILLE ROUGE NE SONNE PAS POUR LA BIENVENUE — revue des découvreurs
+  (clair-30) : au premier lancement, la cloche portait un « 1 » rouge pour
+  le seul mot d'accueil. Une fausse urgence, la première chose qu'on voit.
+  La bienvenue reste dans la boîte, en gras tant qu'on ne l'a pas ouverte ;
+  elle ne compte simplement pas dans la pastille.
+*/
+const SANS_PASTILLE = new Set([BIENVENUE.id]);
+
+/** Le nombre que porte la pastille de la cloche. */
+export function nombreDeLaPastille(s: Pick<Etat, 'recus' | 'supprimes' | 'lus'>): number {
+  return messagesVisibles(s).filter((m) => !s.lus.includes(m.id) && !SANS_PASTILLE.has(m.id)).length;
 }
 
 const ecrire = (s: Pick<Etat, 'recus' | 'lus' | 'supprimes'>) =>

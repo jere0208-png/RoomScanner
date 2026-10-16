@@ -330,12 +330,12 @@ export function SignInScreen() {
 
       {/* Revue de lisibilité : « DXF » ne parle qu'au dessinateur — le
           grand public lit ici la règle du jeu, pas un format de fichier.
-          Et le capteur se dit dès cet écran : on ne découvre pas à
-          l'accueil que son téléphone ne scanne pas. */}
+          Revue des découvreurs : le capteur ne se dit plus ici. Il était
+          répété de la connexion à l'accueil ; l'accueil le dit, une fois,
+          sur la tuile du scan — à l'appareil qui n'en a pas, et à lui seul. */}
       <Text style={s.mentions}>
-        Scanner est gratuit et sans limite (iPhone ou iPad avec capteur
-        LiDAR) ; le Pro envoie vos plans en PDF ou en 3D, et les garde en
-        ligne.
+        Scanner et dessiner vos plans, c’est gratuit et sans limite ; le Pro
+        les envoie en PDF ou en 3D, et les garde en ligne.
       </Text>
       </KeyboardAvoidingView>
     </SafeAreaView>

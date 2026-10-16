@@ -272,7 +272,7 @@ describe('l’accueil et le relevé interrompu', () => {
     act(() => {
       arbre = monter();
     });
-    expect(textes(arbre)).not.toContain('Relevé interrompu');
+    expect(textes(arbre)).not.toContain('Plan en cours');
     act(() => arbre.unmount());
   });
 
@@ -298,15 +298,17 @@ describe('l’accueil et le relevé interrompu', () => {
       arbre = monter();
     });
     const vu = textes(arbre);
-    expect(vu).toContain('Relevé interrompu');
+    // « Plan en cours » : le même titre pour un relevé et pour un dessin
+    // (revue des découvreurs ; c'était « Relevé interrompu »).
+    expect(vu).toContain('Plan en cours');
     // Ce qu'il contient : c'est à ça qu'on reconnaît SON relevé.
     expect(vu).toContain('4 murs');
     expect(vu).toContain('Visite du 12');
     // Et quand : un quart d'heure ou trois semaines, ce n'est pas le même
     // geste.
     expect(vu).toContain('il y a 12 min');
-    expect(bouton(arbre, 'Reprendre le relevé')).toBeDefined();
-    expect(bouton(arbre, 'Jeter le relevé interrompu')).toBeDefined();
+    expect(bouton(arbre, 'Reprendre le plan en cours')).toBeDefined();
+    expect(bouton(arbre, 'Jeter le plan en cours')).toBeDefined();
     act(() => arbre.unmount());
   });
 
@@ -333,7 +335,7 @@ describe('l’accueil et le relevé interrompu', () => {
     act(() => {
       arbre = monter();
     });
-    act(() => bouton(arbre, 'Reprendre le relevé')!.props.onPress());
+    act(() => bouton(arbre, 'Reprendre le plan en cours')!.props.onPress());
     expect(useScanStore.getState().screen).toBe('result');
     expect(useScanStore.getState().walls).toHaveLength(4);
     act(() => arbre.unmount());

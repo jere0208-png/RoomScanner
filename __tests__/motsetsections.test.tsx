@@ -38,7 +38,10 @@ describe('la connexion grand public', () => {
   it('ne parle plus de DXF', () => {
     const src = lire('src/screens/SignInScreen.tsx');
     const mentions = src.slice(src.indexOf('<Text style={s.mentions}>'), src.indexOf('</Text>', src.indexOf('<Text style={s.mentions}>')));
-    expect(mentions).toContain('Scanner est gratuit et sans limite');
+    // La règle du jeu, sans le capteur (revue des découvreurs : il se dit
+    // une fois, sur la tuile de l'accueil).
+    expect(mentions).toContain('gratuit et sans limite');
+    expect(mentions).not.toContain('LiDAR');
     expect(mentions).not.toContain('DXF');
   });
 });

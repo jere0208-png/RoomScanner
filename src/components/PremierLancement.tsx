@@ -36,13 +36,21 @@ const CHOIX: { elec: boolean; titre: string; phrase: string }[] = [
     « Sophie » et « Paul » : « Je suis électricien » éloignait le particulier
     qui voulait placer ses prises ; il découvrait ensuite qu'il les avait
     cachées dans toute l'app.
+
+    SANS LE NOM DE LA NORME — revue des découvreurs (clair-04) : « NF C
+    15-100 » ne dit rien au particulier qui hésite entre les deux cartes ;
+    il choisit sur ce qu'il fera, pas sur une référence. La norme reste
+    nommée là où l'on s'en sert (le contrôle, le dossier).
   */
   {
     elec: true,
     titre: 'Prévoir l’électricité',
-    phrase: 'En plus : prises et éclairage sur le plan, normes NF C 15-100 et devis — électriciens comme particuliers.',
+    phrase: 'En plus : placer prises et lumières sur le plan, vérifier que tout est aux normes et chiffrer les travaux.',
   },
 ];
+
+/** Sans capteur : ce qu'on fera, en une ligne. */
+export const AVIS_SANS_LIDAR = 'Sans capteur LiDAR ici : vous dessinerez le plan.';
 
 export function PremierLancement({ onFini }: { onFini: () => void }) {
   const c = useTheme();
@@ -54,9 +62,12 @@ export function PremierLancement({ onFini }: { onFini: () => void }) {
   /*
     LE CAPTEUR, DIT DÈS LA PREMIÈRE MINUTE — revue de lisibilité : sur un
     iPhone sans LiDAR, on n'apprenait qu'à l'accueil, devant une tuile
-    grisée, que le scan était hors de portée. On le dit ici, gentiment et
-    sans rien bloquer : ce qu'on peut faire d'abord, ce qui manque ensuite.
-    (L'accueil, dessous, a déjà posé la réponse du téléphone.)
+    grisée, que le scan était hors de portée. On le dit ici, sans rien
+    bloquer. (L'accueil, dessous, a déjà posé la réponse du téléphone.)
+
+    EN UNE LIGNE — revue des découvreurs : le LiDAR était expliqué trois
+    ou quatre fois du lancement à l'accueil. Ici, une ligne ; à l'accueil,
+    la tuile éteinte ; nulle part ailleurs.
   */
   const sansLidar = useScanStore((st) => st.supported) === false;
 
@@ -82,9 +93,8 @@ export function PremierLancement({ onFini }: { onFini: () => void }) {
             </Text>
             {sansLidar && (
               <View style={styles.avis} testID="avis-lidar-premier">
-                <Text style={styles.avisTexte}>
-                  Sur ce téléphone, vous dessinerez votre plan avec vos mesures : le scan demande un
-                  iPhone ou iPad avec capteur LiDAR. Tout le reste fonctionne.
+                <Text style={styles.avisTexte} numberOfLines={1} adjustsFontSizeToFit>
+                  {AVIS_SANS_LIDAR}
                 </Text>
               </View>
             )}

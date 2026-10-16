@@ -165,9 +165,10 @@ describe('qui et quand', () => {
     expect(salutation(2)).toBe('Bonsoir');
   });
 
-  it('pose la question qui va avec ce qu’on a — le relevé en danger d’abord', () => {
-    expect(questionDuJour({ brouillon: true, plans: 4 })).toBe('Un relevé vous attend.');
-    expect(questionDuJour({ brouillon: false, plans: 0 })).toBe('Prêt pour votre premier plan ?');
+  // Revue des découvreurs : des questions plus courtes, en sous-titre d'une ligne.
+  it('pose la question qui va avec ce qu’on a — le plan en danger d’abord', () => {
+    expect(questionDuJour({ brouillon: true, plans: 4 })).toBe('Un plan en cours vous attend.');
+    expect(questionDuJour({ brouillon: false, plans: 0 })).toBe('Prêt pour un premier plan ?');
     expect(questionDuJour({ brouillon: false, plans: 3 })).toBe('Que mesure-t-on aujourd’hui ?');
   });
 
@@ -190,7 +191,7 @@ describe('qui et quand', () => {
   it('sans compte, un salut sans nom', () => {
     const vu = textes(monter());
     expect(vu).toContain(`${salutation()}.`);
-    expect(vu).toContain('Prêt pour votre premier plan ?');
+    expect(vu).toContain('Prêt pour un premier plan ?');
   });
 });
 
@@ -370,14 +371,14 @@ describe('le moulinet', () => {
 });
 
 describe('sur un appareil sans LiDAR', () => {
+  // Le « pourquoi » est sur la tuile, et seulement là (revue des découvreurs).
   it('n’offre plus le scan, dit pourquoi, et garde le reste', () => {
     useScanStore.setState({ supported: false });
     const t = monter();
     expect(bouton(t, 'Commencer le scan')).toBeUndefined();
     expect(bouton(t, 'Scan indisponible sur cet appareil')).toBeDefined();
     const vu = textes(t);
-    expect(vu).toContain('Le scan demande un iPhone ou iPad');
-    expect(vu).toContain('capteur LiDAR');
+    expect(vu).toContain('iPhone ou iPad avec capteur LiDAR');
     expect(bouton(t, 'Dessiner un plan sans scanner')).toBeDefined();
     expect(bouton(t, 'Voir un exemple')).toBeDefined();
   });
@@ -461,7 +462,7 @@ describe('vos plans', () => {
     expect(textes(t)).toContain('Aucun plan ne porte ce nom.');
   });
 
-  it('le relevé interrompu passe en tête des plans', () => {
+  it('le plan en cours passe en tête des plans', () => {
     quatre();
     useScanStore.setState({
       brouillon: {
@@ -479,8 +480,8 @@ describe('vos plans', () => {
     });
     const t = monter();
     const vu = textes(t);
-    expect(vu.indexOf('Relevé interrompu')).toBeLessThan(vu.indexOf('Appartement Dupont'));
-    expect(vu).toContain('Un relevé vous attend.');
+    expect(vu.indexOf('Plan en cours')).toBeLessThan(vu.indexOf('Appartement Dupont'));
+    expect(vu).toContain('Un plan en cours vous attend.');
   });
 });
 
@@ -508,10 +509,11 @@ describe('la cloche', () => {
     expect(cloche(t).props.accessibilityLabel).toBe('Notifications');
   });
 
+  // La bienvenue ne compte pas dans la pastille (voir `notificationsepurees.test.tsx`).
   it('la pastille compte ce qu’on n’a pas lu — et s’arrête à « 9+ »', () => {
     useNotifications.setState({ lus: [] });
     let t = monter();
-    const n = MESSAGES_EMBARQUES.length;
+    const n = MESSAGES_EMBARQUES.filter((m) => m.id !== 'bienvenue').length;
     expect(pastille(t).findByType(Text).props.children).toBe(String(n));
     expect(cloche(t).props.accessibilityLabel).toBe(`Notifications, ${n} non lue${n > 1 ? 's' : ''}`);
     act(() => t.unmount());
@@ -584,6 +586,7 @@ describe('la promesse', () => {
   LES BULLES SE RESSERRENT, PAS LEURS ICÔNES — relevé du patron : « réduis les
   flèches et leur bloc arrière arrondi des quatre bulles ; réduis très
   légèrement le bloc arrière blanc rond des icônes, sans réduire les icônes ».
+  (Les flèches sont depuis parties tout à fait : revue des découvreurs.)
 */
 describe('les quatre bulles', () => {
   const ronds = (t: TestRenderer.ReactTestRenderer) =>
@@ -601,11 +604,14 @@ describe('les quatre bulles', () => {
     for (const r of icones.slice(0, 4)) expect(svgDe(r.n).props.width).toBe(19);
   });
 
-  it('la flèche et son rond se font discrets', () => {
+  /*
+    PLUS DE FLÈCHE DU TOUT — revue des découvreurs : la flèche « ↗ », même
+    discrète, faisait croire à un lien qui quitte l'application (voir
+    `lidartot.test.tsx`). Son rond de 26 a disparu avec elle.
+  */
+  it('la flèche et son rond ont disparu', () => {
     const t = monter();
-    const fleches = ronds(t).filter((x) => x.st.width === 26);
-    expect(fleches.length).toBeGreaterThanOrEqual(4);
-    for (const r of fleches.slice(0, 4)) expect(svgDe(r.n).props.width).toBe(12);
+    expect(ronds(t).filter((x) => x.st.width === 26 && svgDe(x.n)?.props.width === 12)).toHaveLength(0);
     // Plus aucun rond de 36 dans les bulles.
     expect(ronds(t).filter((x) => x.st.width === 36 && svgDe(x.n)?.props.width === 16)).toHaveLength(0);
   });
