@@ -14451,6 +14451,58 @@ avec l'enregistrement de mon écran », avec un message en plus.
   - à défaut, dans `server/diagnostics/`, fermé par `.htaccess` ;
   - en cas d'échec réseau, l'app propose de partager le fichier.
 
+## Huit découvreurs : épurer, rendre cohérent, partager
+
+Huit personnes ont découvert l'app et donné un avis sincère : une agente
+immobilière, un designer produit, un retraité bricoleur, un électricien
+concurrent, une influenceuse déco, une maman qui déménage, un plombier et une
+étudiante en architecture intérieure. Leurs notes allaient de 5 à 6/10, et un
+constat revenait chez tous : l'interface s'était construite par empilement.
+- **Écran du plan** :
+  - Le bandeau ne garde que les pièces et les m² habitables, plus le nombre
+    d'appareils en mode électricité.
+  - Une seule barre, identique en 2D, en 3D et en mode électricité. Le
+    « peigne » disparaît et « + Meuble » devient une action.
+  - « Visite » passe en bouton secondaire.
+  - Le menu propose « Ajouter une pièce » et « Ajouter un niveau » ; le choix
+    entre scan et dessin vient ensuite. Le scan est masqué sans LiDAR, et
+    l'électricité n'apparaît plus hors de son mode.
+  - Onglets de niveaux ; mur de face ouvert à tous ; « ✓ Passe par N portes ».
+- **Dessin du plan** :
+  - Une surface ne disparaît plus jamais : le nom s'abrège, ou l'étiquette
+    sort de la pièce avec un trait de rappel.
+  - Les cotes évitent les meubles et les menuiseries ; un mur extérieur se
+    cote dehors.
+  - Les portes de l'exemple ont leur arc ; la grille de points n'apparaît
+    qu'en mode Édition.
+- **Accueil, profil, notifications** :
+  - Le LiDAR n'est mentionné qu'une fois, et la tuile morte passe en dernier.
+  - « Plan en cours » : « Reprendre » est mis en avant, « Jeter » est
+    confirmé.
+  - Le profil range l'apparence dans une section repliée, et « Diagnostic »
+    passe chez l'administrateur.
+  - Le message de bienvenue n'allume plus de pastille rouge.
+- **Export** : l'aperçu n'est jamais vide (miniature fidèle de chaque feuille),
+  « Débloquer le PDF », les cartes ont un seul traitement, les réglages fins
+  sont repliés, et le devis passe en tête en mode électricité.
+- **Liste d'achats** :
+  - Les pièces d'abord, puis les quantités en cartes ; les teintes en entier.
+  - Les règles de calcul sont repliées et « Estimer le prix » est recentré.
+  - Faïence murale des pièces d'eau (la peinture baisse d'autant), sol en
+    cartons.
+- **Partager** : la pièce décorée sort en image (carrée, ou 4:3 par appui
+  long), et la visite a son appareil photo. Le rendu se fait par la voie
+  JavaScript pendant la capture.
+- **Devis d'artisan** :
+  - Coefficient de vente appliqué au prix d'achat pro.
+  - Lignes libres (déplacement, Consuel…), saisie en HT, heures corrigeables.
+  - Acompte, validité et conditions de paiement ; TVA à 5,5 %.
+  - Un seul prix, de la pastille jusqu'au PDF.
+- **Maquette 3D** : le trou d'un ouvrant était percé en fraction de chaque face
+  du mur, et non de son axe, d'où une fente de 5 à 12 cm. Les embrasures sont
+  maintenant fermées, et les porte-fenêtres ont leur seuil (diagnostic du
+  patron).
+
 ## Vu sur les vraies captures du simulateur
 
 Premier passage de l'app réelle, compilée et parcourue sur un iPhone
