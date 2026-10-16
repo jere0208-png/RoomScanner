@@ -2867,7 +2867,7 @@ export function ResultScreen() {
     Il demande d'abord : le plan ouvert est rangé, pas perdu, mais on quitte.
   */
   const nouveauScan = () =>
-    alerte('Commencer un nouveau scan ?', 'Ce plan est rangé dans Mes scans : vous le retrouverez tel quel.', [
+    alerte('Commencer un nouveau scan ?', 'Ce plan est rangé dans Mes plans : vous le retrouverez tel quel.', [
       { label: 'Annuler' },
       {
         label: 'Scanner',

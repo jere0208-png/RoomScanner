@@ -428,7 +428,7 @@ export function HomeScreen() {
                     hauteur={BASSE}
                     icone={SOLAIRES.maison}
                     titre={'Voir un\nexemple'}
-                    sous="Un T2 de 48 m² à visiter"
+                    sous="Un T2 de 46 m² à visiter"
                     label="Voir un exemple"
                     onPress={voirLExemple}
                   />

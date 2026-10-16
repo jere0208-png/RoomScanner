@@ -10,7 +10,7 @@
  * tourne en 3D, on s'y promène, on regarde ce qu'il faut acheter, et l'on
  * comprend en trente secondes ce qu'un scan donnera chez soi.
  *
- * Un T2 de 48 m² comme il y en a partout : séjour avec cuisine ouverte,
+ * Un T2 de 46 m² (48 d’enveloppe) comme il y en a partout : séjour avec cuisine ouverte,
  * chambre, salle d'eau, entrée et un petit bureau. Meublé avec le catalogue
  * de l'application, chaque meuble posé contre la FACE de son mur — le trait
  * d'une façade, l'axe d'un refend moins une demi-épaisseur —, comme le

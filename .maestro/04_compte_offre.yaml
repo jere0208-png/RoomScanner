@@ -51,12 +51,12 @@ name: Compte et offre
 
 # La bibliothèque (vide sur un simulateur neuf : c'est aussi un écran).
 - scrollUntilVisible:
-    element: "Mes scans"
+    element: "Mes plans"
     direction: DOWN
     timeout: 10000
     optional: true
 - tapOn:
-    text: "Mes scans"
+    text: "Mes plans"
     optional: true
 - waitForAnimationToEnd:
     timeout: 5000
