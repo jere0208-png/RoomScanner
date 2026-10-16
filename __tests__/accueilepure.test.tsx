@@ -252,3 +252,13 @@ describe('la bibliothèque compte des plans', () => {
     expect(src).toContain("'Mes plans'");
   });
 });
+
+describe('les quatre tuiles restent symétriques', () => {
+  it('les sous-titres tiennent sur une ligne (le violet dépassait)', () => {
+    const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'src/screens/HomeScreen.tsx'), 'utf8') as string;
+    const sous = [...src.matchAll(/\bsous="([^"]+)"/g)].map((m) => m[1]);
+    expect(sous).toContain('Un T2 de 46 m²');
+    // Pas plus long que le plus long des autres (« Avec vos mesures ») : une ligne.
+    for (const x of sous) expect(x.length).toBeLessThanOrEqual(18);
+  });
+});

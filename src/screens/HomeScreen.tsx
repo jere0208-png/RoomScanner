@@ -413,7 +413,10 @@ export function HomeScreen() {
       hauteur={hauteur}
       icone={SOLAIRES.maison}
       titre={'Voir un\nexemple'}
-      sous="Un T2 de 46 m² à visiter"
+      // Une ligne, comme « Photo ou PDF » en face : sur deux lignes, la tuile
+      // grandissait et les deux colonnes ne finissaient plus à la même hauteur
+      // (relevé du patron, capture à l’appui).
+      sous="Un T2 de 46 m²"
       label="Voir un exemple"
       onLayout={onLayout}
       onPress={voirLExemple}
