@@ -191,7 +191,13 @@ describe('le ticket dit « matériel », et il dit ce qui manque', () => {
     expect(lus).not.toContain('FOURNITURE');
   });
 
-  it('et sous le total, une phrase dit que la POSE n’est pas comprise', async () => {
+  /*
+    LA POSE EST COMPRISE, ET C'EST ÉCRIT — revue « Gérard » : le total ne dit
+    plus le matériel seul (trois prix différents entre la pastille, la page
+    et le PDF). Le malentendu à éviter reste le même — savoir, sous le
+    chiffre, si la pose y est — mais la réponse est désormais « oui ».
+  */
+  it('et sous le total, une phrase dit que la POSE est comprise', async () => {
     /*
       C'EST LE SEUL MALENTENDU QUI PUISSE COÛTER CHER À QUELQU'UN. Le total
       s'écrit en gros ; la mise en garde était en pied de ticket, en petit, et
@@ -199,7 +205,7 @@ describe('le ticket dit « matériel », et il dit ce qui manque', () => {
     */
     const lus = prose(await ouvrirLeTicket()).toLowerCase();
     expect(lus).toContain('pose');
-    expect(lus).toMatch(/pas comprise|non comprise/);
+    expect(lus).toMatch(/pose [^.]* compris/);
   });
 
   it('la mise en garde est PRÈS du total, pas reléguée en pied de page', async () => {
@@ -210,7 +216,7 @@ describe('le ticket dit « matériel », et il dit ce qui manque', () => {
     */
     const lus = mots(await ouvrirLeTicket());
     const iTotal = lus.findIndex((m) => m.includes('TOTAL'));
-    const iPose = lus.findIndex((m) => /pas comprise|non comprise/i.test(m));
+    const iPose = lus.findIndex((m) => /pose [^.]* compris/i.test(m));
     expect(iTotal).toBeGreaterThanOrEqual(0);
     expect(iPose).toBeGreaterThan(iTotal);
     expect(iPose - iTotal).toBeLessThanOrEqual(3);

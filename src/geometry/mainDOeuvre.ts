@@ -194,7 +194,8 @@ export function estimerLaPose(
  *
  * Les fournitures sont donc ramenées hors taxes, puis tout le chantier
  * prend un seul taux : celui de la pose. Sans pose chiffrée, le matériel
- * seul reste à 20 %.
+ * seul reste à 20 %. (Cette cuisine-là reste dans l'app : le PDF remis au
+ * client ne parle ni d'enseigne ni de prix relevé — revue « Gérard ».)
  */
 export const TVA_DES_PRIX_PUBLICS = 0.2;
 
@@ -209,6 +210,38 @@ export function totauxDuDevis(
   const tauxTva = pose ? pose.tauxTva : TVA_DES_PRIX_PUBLICS;
   const tva = cents(ht * tauxTva);
   return { fournituresHt, poseHt, ht, tauxTva, tva, ttc: cents(ht + tva) };
+}
+
+/** Les totaux d'un devis remis : HT, TVA, TTC (voir `totauxDuDevis`). */
+export type TotauxDuDevis = ReturnType<typeof totauxDuDevis>;
+
+/**
+ * LA POSE QUI ENTRE AU TOTAL : celle qui compte au moins un quart d'heure.
+ * Sans point à poser, le matériel seul reste à 20 % — le PDF le lisait
+ * ainsi, l'écran et la pastille aussi désormais.
+ */
+export function poseComptee<P extends Pick<Pose, 'heures' | 'ht' | 'tauxTva'>>(pose: P | null | undefined): P | null {
+  return pose && pose.heures > 0 ? pose : null;
+}
+
+/**
+ * LE PRIX DU DEVIS, UN SEUL — revue « Gérard » : trois totaux pour un même
+ * chantier. La pastille du plan annonçait le matériel seul (1,5 k€), le gros
+ * TOTAL TTC de la page aussi, à 20 % ; le PDF, matériel ET pose à 10 %. Le
+ * client voyait trois prix, et l'artisan ne savait plus lequel il avait dit.
+ *
+ * Tous lisent maintenant cette fonction : le matériel du devis, la pose
+ * estimée au taux de l'artisan, ramenés hors taxes, puis UNE TVA — celle du
+ * chantier (`totauxDuDevis`).
+ */
+export function prixDuDevis(
+  devis: { total: number; lignes: readonly { code: string; quantite: number; ecarte?: boolean }[] },
+  fixtures: readonly Fixture[],
+  ceiling: readonly CeilingFixture[],
+  reglages: { taux: number; chantier: NatureDeChantier },
+): { pose: Pose; totaux: TotauxDuDevis } {
+  const pose = estimerLaPose(fixtures, ceiling, protectionsDuDevis(devis.lignes), reglages);
+  return { pose, totaux: totauxDuDevis(devis.total, poseComptee(pose)) };
 }
 
 /** « 23 h 30 », « 45 min ». */

@@ -1344,6 +1344,35 @@ const styles = getStyles(c);
               pages="Inclus d’office"
             />
           )}
+
+          {/*
+            LE DEVIS, LÀ OÙ L'ON EXPORTE — revue « Gérard » : il ne
+            s'ouvrait que par la pastille du prix, sur le plan. Celui qui
+            vient envoyer ses documents le cherche ici. Pas un second PDF :
+            la page du devis, et son export, numéroté, à l'en-tête.
+          */}
+          {modeElec && (
+            <TouchableOpacity
+              accessibilityLabel="Devis"
+              accessibilityRole="button"
+              activeOpacity={0.8}
+              onPress={() => {
+                haptic('leger');
+                // Comme la pastille du plan : le devis détaillé est Pro.
+                if (!useAccountStore.getState().pro) {
+                  useAccountStore.getState().ouvrirSurprise();
+                  return;
+                }
+                setScreen('devis');
+              }}>
+              <Carte
+                icone={SOLAIRES.panier}
+                titre="Devis"
+                dit="Le devis numéroté, à votre en-tête, matériel et pose compris : ouvrez-le pour l’exporter en PDF."
+                pages="Ouvrir ›"
+              />
+            </TouchableOpacity>
+          )}
         </ScrollView>
 
         {/*

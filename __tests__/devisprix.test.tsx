@@ -102,7 +102,11 @@ describe('le magasin du plan', () => {
 
   it('le bouton du plan additionne les mêmes corrections que la page', () => {
     const src = readFileSync(join(__dirname, '..', 'src', 'screens', 'ResultScreen.tsx'), 'utf8');
-    const appel = src.slice(src.indexOf('return chiffrerLePlan('), src.indexOf('return chiffrerLePlan(') + 500);
+    // Le devis du bouton passe ensuite par `prixDuDevis` (revue « Gérard ») :
+    // l'appel se lit à `const devis = chiffrerLePlan(`.
+    const debut = src.indexOf('const devis = chiffrerLePlan(');
+    expect(debut).toBeGreaterThan(0);
+    const appel = src.slice(debut, debut + 500);
     expect(appel).toMatch(/prix: devisPrix/);
     expect(appel).toMatch(/quantites: devisQuantites/);
   });

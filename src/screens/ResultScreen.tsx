@@ -71,6 +71,8 @@ import { calerDansLaNiche } from '../geometry/niche';
 import { completerAuxNormes, corrigerConstat, poserAuxNormes } from '../geometry/auto';
 import { ControlePastille } from '../components/ControlePastille';
 import { DevisPastille, prixCourt } from '../components/DevisPastille';
+import { prixDuDevis } from '../geometry/mainDOeuvre';
+import { useReglagesPose } from '../store/reglagesPose';
 import { ChoixScan } from '../components/ChoixScan';
 import { RoomBar } from '../components/RoomBar';
 import { StripBar } from '../components/StripBar';
@@ -2434,6 +2436,12 @@ export function ResultScreen() {
    * bouton reste alors muet, comme celui des normes devant une installation
    * qui n'a pas commencé.
    */
+  /* Le taux de l'artisan et la nature du chantier : la pose entre au total. */
+  const tauxPose = useReglagesPose((r) => r.taux);
+  const chantierPose = useReglagesPose((r) => r.chantier);
+  useEffect(() => {
+    useReglagesPose.getState().charger().catch(() => {});
+  }, []);
   const totalDevis = useMemo(() => {
     /*
       LA MAISON ENTIÈRE, COMME LA PAGE DU DEVIS — revue « Mehdi » : sur un
@@ -2444,7 +2452,7 @@ export function ResultScreen() {
     */
     const tout = useScanStore.getState();
     if (tout.fixtures.length === 0 && tout.ceiling.length === 0) return null;
-    return chiffrerLePlan(
+    const devis = chiffrerLePlan(
       tout.walls,
       tout.rooms,
       tout.fixtures,
@@ -2454,7 +2462,13 @@ export function ResultScreen() {
       tout.openings,
       // Les mêmes corrections que la page du devis : quantités, caddie, prix.
       { quantites: devisQuantites, ajouts: devisAjouts, prix: devisPrix },
-    ).total;
+    );
+    /*
+      POSE COMPRISE, TTC — revue « Gérard » : la pastille disait le matériel
+      seul (« Devis 1,5 k€ ») quand le PDF ajoutait la pose. `prixDuDevis`,
+      comme la page et le PDF : un seul prix.
+    */
+    return prixDuDevis(devis, tout.fixtures, tout.ceiling, { taux: tauxPose, chantier: chantierPose }).totaux.ttc;
     // Le plan figé du niveau sert de signal : le calcul lit la maison entière.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -2468,6 +2482,8 @@ export function ResultScreen() {
     devisQuantites,
     devisAjouts,
     devisPrix,
+    tauxPose,
+    chantierPose,
   ]);
 
   /**
@@ -4258,15 +4274,32 @@ export function ResultScreen() {
                           section: 'Modifier',
                           label: 'Placer prises et interrupteurs',
                           icon: 'prise' as const,
-                          hint:
-                            'Prises, éclairage, normes NF C 15-100 et devis — ' +
-                            'pour prévoir l’électricité de votre logement.',
+                          /*
+                            SANS SIGLE, ET SANS BASCULE D'UN COUP — revue
+                            « Gérard » : « NF C 15-100 » ne dit rien à un
+                            particulier, et un appui changeait toute
+                            l'application (pastilles, contrôle, devis) sans
+                            prévenir. On dit ce que ça fait, puis on demande.
+                          */
+                          hint: 'Prises, éclairage et prix du matériel — pour prévoir l’électricité de votre logement.',
                           onPress: () => {
-                            useUsage.getState().choisir(true);
-                            haptic('succes');
-                            astuce('Mode Électricité activé : touchez « Édition », puis « Appareil ».', {
-                              icone: 'elec',
-                            });
+                            alerte(
+                              'Passer en mode Électricité ?',
+                              'Le plan montrera les prises, l’éclairage, le contrôle des règles électriques et le prix. Vous pourrez revenir en arrière au profil, rubrique « Mon usage ».',
+                              [
+                                { label: 'Annuler' },
+                                {
+                                  label: 'Activer',
+                                  onPress: () => {
+                                    useUsage.getState().choisir(true);
+                                    haptic('succes');
+                                    astuce('Mode Électricité activé : touchez « Édition », puis « Appareil ».', {
+                                      icone: 'elec',
+                                    });
+                                  },
+                                },
+                              ],
+                            );
                           },
                         },
                       ]),

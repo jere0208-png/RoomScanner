@@ -16,7 +16,7 @@
  * geste rare — et le popup ne revient jamais : un choix de fin de scan se
  * fait une fois.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SheetShell } from './Sheet';
@@ -112,8 +112,18 @@ export function ChoixScan({
     Ce n'est pas un retrait du métier — la ligne reste là, en tête de liste,
     la norme écrite en toutes lettres, à UN appui. On la propose, on ne
     l'impose plus.
+
+    COCHÉE QUAND LE MODE ÉLECTRICITÉ EST ALLUMÉ — revue « Gérard » : la
+    ligne ne paraît QU'EN mode Électricité ; le particulier ne la voit pas.
+    Celui qui la voit est donc l'électricien qui a allumé le mode, et il
+    devait la cocher à chaque relevé. Elle suit le mode : cochée avec lui,
+    absente (donc jamais posée) sans lui.
   */
-  const [choix, setChoix] = useState<ChoixDuScan>({ meubles: true, elec: false });
+  const [choix, setChoix] = useState<ChoixDuScan>({ meubles: true, elec });
+  // À chaque ouverture, la case repart du mode courant.
+  useEffect(() => {
+    if (visible) setChoix((v) => ({ ...v, elec }));
+  }, [visible, elec]);
 
   const bascule = (cle: keyof ChoixDuScan) => {
     haptic('leger');

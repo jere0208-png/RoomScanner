@@ -5,7 +5,7 @@
  * le reste. Ce banc tient qu'il est propre, comme le serait un vrai relevé.
  */
 import { appartementExemple, NOM_EXEMPLE } from '../src/data/exemple';
-import { murDeLOuverture, roomOf, roomParts, solDesMurs, totalArea, wallQuadsOf } from '../src/geometry/floorplan';
+import { murDeLOuverture, roomParts, solDesMurs, totalArea, wallQuadsOf } from '../src/geometry/floorplan';
 import {
   COMMANDES_MURALES,
   facePoint,
@@ -18,11 +18,10 @@ import {
 import {
   checkElectrical,
   fixturePlacement,
+  estCuisine,
+  plansDeTravailParMur,
   roomInputsOf,
-  roomUse,
   wallToRooms,
-  worktopsOnWall,
-  type Worktop,
 } from '../src/geometry/nfc15100';
 import { volumeAt, volumeVerdict, wetZones, type VolumeVerdict } from '../src/geometry/volumes';
 import { poserLibre } from '../src/geometry/poser';
@@ -40,7 +39,8 @@ describe('l’appartement d’exemple', () => {
   // l'intérieur que l'exemple annonce.
   it('a ses cinq pièces, nommées, et ses 45,8 m² au nu', () => {
     expect(ex.rooms.map((r) => r.name).sort()).toEqual(
-      ['Bureau', 'Chambre', 'Entrée', 'Salle d’eau', 'Séjour'].sort(),
+      // « Séjour-cuisine » : la cuisine ouverte se nomme (revue « Gérard »).
+      ['Bureau', 'Chambre', 'Entrée', 'Salle d’eau', 'Séjour-cuisine'].sort(),
     );
     expect(parts.every((p) => p.surface?.exact)).toBe(true);
     expect(totalArea(parts)!.area).toBeCloseTo(45.82, 2);
@@ -122,7 +122,9 @@ describe('l’installation électrique de l’exemple', () => {
 
   it('chaque appareil ménager est alimenté par-derrière', () => {
     expect(derriere('frigo', ['prise'])).toHaveLength(1);
-    expect(derriere('plaque', ['sortieCable'])).toHaveLength(1);
+    // Le four sous plaque : la sortie de câble de la cuisson et le 20 A du four.
+    expect(derriere('fourEtPlaque', ['sortieCable'])).toHaveLength(1);
+    expect(derriere('fourEtPlaque', ['prise20'])).toHaveLength(1);
     expect(derriere('ll', ['prise20'])).toHaveLength(1);
   });
 
@@ -190,19 +192,12 @@ describe('l’installation électrique de l’exemple', () => {
       const v = volumeAt({ x: p.x, z: p.z }, f.height, zones);
       if (v !== null) volumes.set(f.id, volumeVerdict(f.kind, v));
     }
-    // Les plans de travail, comme l'écran les calcule.
-    const worktops = new Map<string, { x: (f: Fixture) => number; plans: Worktop[] }>();
-    for (const w of ex.walls) {
-      const piece = ex.rooms.find((r) => r.id === roomOf(w));
-      const cuisine = roomUse(piece?.name ?? '', piece?.kind) === 'cuisine';
-      for (const side of [1, -1] as const) {
-        const face = wallFace(w, quads.get(w.id), side);
-        const plans = worktopsOnWall(face, ex.objects, cuisine, solDesMurs(ex.walls));
-        if (plans.length === 0) continue;
-        worktops.set(w.id, { x: (f: Fixture) => faceX(face, f.along), plans });
-        break;
-      }
-    }
+    /*
+      Les plans de travail, comme l'écran les calcule — `plansDeTravailParMur`,
+      la recette de l'écran, et non plus une copie : la copie ne voyait pas
+      les caissons de la cuisine ouverte (revue « Gérard »).
+    */
+    const worktops = plansDeTravailParMur(ex.walls, ex.rooms, ex.objects);
     const issues = checkElectrical(
       inputs,
       ex.fixtures,
@@ -214,6 +209,15 @@ describe('l’installation électrique de l’exemple', () => {
       { walls: ex.walls, openings: ex.openings },
     );
     expect(issues.filter((i) => i.severity === 'alerte').map((i) => i.message)).toEqual([]);
+    /*
+      VERT, MAIS HONNÊTEMENT — revue « Gérard » : la cuisine ouverte est
+      reconnue, et ses règles sont donc contrôlées (six socles dont quatre au
+      plan, trois spécialisés, la cuisson) — pas tues.
+    */
+    const sejour = inputs.find((r) => r.name === 'Séjour-cuisine')!;
+    expect(estCuisine(sejour.name, sejour.kind)).toBe(true);
+    // Le plan du caisson de 60 est bien relevé, hors fenêtre.
+    expect([...worktops.values()].some((e) => e.plans.some((p) => !p.nature))).toBe(true);
     // Ni appareil mal posé, ni hauteurs presque alignées : une pose soignée.
     expect(issues.filter((i) => i.code === 'pose' || i.code === 'alignement').map((i) => i.message)).toEqual([]);
   });

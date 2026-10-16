@@ -127,7 +127,14 @@ const OPENINGS: WallSeg[] = [
 
 /** Le nom et la nature de chaque pièce, retrouvée par un point qui y est. */
 const PIECES: { nom: string; kind?: RoomKind; ici: { x: number; z: number } }[] = [
-  { nom: 'Séjour', kind: 'living', ici: { x: 2.5, z: 2 } },
+  /*
+    UNE CUISINE OUVERTE SE NOMME — revue « Gérard » : « Séjour », type séjour,
+    avec frigo, meuble bas et plaque : le contrôle n'y voyait pas de cuisine,
+    et l'exemple se disait conforme sans ses six socles, ses spécialisés ni
+    son 32 A. Elle porte maintenant son nom et son type, et l'installation
+    qui va avec.
+  */
+  { nom: 'Séjour-cuisine', kind: 'sejourCuisine', ici: { x: 2.5, z: 2 } },
   { nom: 'Chambre', kind: 'bedroom', ici: { x: 6.5, z: 1.8 } },
   { nom: 'Salle d’eau', kind: 'bathroom', ici: { x: 6.5, z: 4.8 } },
   { nom: 'Bureau', ici: { x: 1.3, z: 5.1 } },
@@ -187,9 +194,17 @@ const OBJECTS: ObjectData[] = [
   // Séjour — la cuisine ouverte le long du mur nord, façades vers la pièce.
   // Deux millimètres de jeu au mur : retourné d'un demi-tour, un meuble posé
   // pile au nu le « mordrait » d'une erreur d'arrondi.
+  /*
+    UN PLAN DE TRAVAIL HORS DE LA FENÊTRE — revue « Gérard » : tout le plan
+    passait sous la fenêtre du séjour, et aucun socle ne pouvait le
+    surplomber. Le meuble bas sous la fenêtre (le coin évier), puis le four
+    sous plaque, puis un caisson de 60 jusqu'au tableau de la porte-fenêtre :
+    c'est lui qui porte les prises du plan.
+  */
   meuble('frigo', 0.07 + 0.3, 0.332, 2),
-  meuble('meubleBas120', 1.38, 0.302, 2),
-  meuble('plaque', 2.28, 0.262, 2),
+  meuble('meubleBas120', 1.272, 0.302, 2),
+  meuble('fourEtPlaque', 2.174, 0.302, 2),
+  meuble('meubleBas', 2.776, 0.302, 2),
   // La table, ses quatre chaises tournées vers elle.
   meuble('tableRepas', 1.3, 2.1),
   meuble('chaise', 0.85, 1.4, 2),
@@ -204,7 +219,7 @@ const OBJECTS: ObjectData[] = [
   // Le fauteuil face au canapé, de l'autre côté de la table basse ; le
   // passage vers l'entrée reste libre derrière lui.
   meuble('fauteuil', 3.75, 2.95),
-  meuble('plante', 2.95, 0.3),
+  meuble('plante', 0.3, 3.85),
   // Chambre — le lit, tête au mur est, entre ses deux chevets.
   meuble('lit140', 8 - 0.995, 1.8, 3),
   meuble('chevet', 8 - 0.175, 0.82, 3),
@@ -265,6 +280,7 @@ const appareil = (
   vers: keyof typeof VERS,
   hauteur: number = FIXTURES[kind].std,
   commands?: string[],
+  usage?: string,
 ): Fixture => {
   for (const w of WALLS) {
     const len = segLength(w);
@@ -284,17 +300,26 @@ const appareil = (
       height: hauteur,
       side,
       ...(commands ? { commands: commands.map((c) => `exemple-${c}`) } : {}),
+      ...(usage ? { usage } : {}),
     };
   }
   throw new Error(`Aucun mur sous l'appareil d'exemple ${id}`);
 };
 
 const FIXTURES_EXEMPLE: Fixture[] = [
-  // ── Séjour — la cuisine ouverte d'abord.
-  // Derrière le frigo, sa prise ; derrière le caisson de la plaque, sa
-  // sortie de câble — décalée hors de l'aplomb de la fenêtre.
+  // ── Séjour-cuisine — la cuisine ouverte d'abord.
+  // Derrière le frigo, sa prise ; derrière le four sous plaque, la sortie
+  // de câble de la cuisson (32 A, « PL ») et le 20 A du four.
   appareil('prise-frigo', 'prise', 0.44, 0, 'sud', 0.25),
-  appareil('sortie-plaque', 'sortieCable', 2.4, 0, 'sud', 0.25),
+  appareil('sortie-plaque', 'sortieCable', 2.05, 0, 'sud', 0.25, undefined, 'PL'),
+  appareil('prise-four', 'prise20', 2.3, 0, 'sud', 0.25, undefined, 'FO'),
+  // Sous le coin évier, l'attente 20 A du lave-vaisselle : les trois
+  // spécialisés du logement (lave-linge, lave-vaisselle, four) sont posés.
+  appareil('prise-lave-vaisselle', 'prise20', 1.5, 0, 'sud', 0.25, undefined, 'LV'),
+  // Au-dessus du caisson de 60 : deux triples, quatre socles sur le plan,
+  // ni au droit des feux, ni sous la fenêtre.
+  appareil('plan-gauche', 'prise3', 2.68, 0, 'sud', 1.1),
+  appareil('plan-droite', 'prise3', 2.91, 0, 'sud', 1.1),
   // Le coin repas : une double au mur, entre les chaises.
   appareil('prises-repas', 'prise2', 0, 2.1, 'est', 0.25),
   // Le bout du canapé : la box internet et la lampe.

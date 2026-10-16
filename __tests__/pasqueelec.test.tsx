@@ -136,19 +136,26 @@ describe('la fin du scan ne pose pas d’électricité sans qu’on la demande',
     act(() => b.props.onPress());
   };
 
-  it('coche les meubles, laisse l’électricité décochée', () => {
+  /*
+    LA LIGNE ÉLEC NE PARAÎT QU'EN MODE ÉLECTRICITÉ — et elle y arrive cochée
+    (revue « Gérard » : l'électricien qui a allumé le mode la cochait à
+    chaque relevé). Le particulier, lui, ne la voit pas : rien d'électrique
+    n'arrive tout seul sur son plan, c'est ce que mesure ce banc.
+  */
+  it('coche les meubles ; l’électricité suit le mode', () => {
     const t = monter(
       <ChoixScan visible meubles={3} onValider={jest.fn()} onClose={jest.fn()} />,
     );
     expect(caseMeubles(t).props.accessibilityState.checked).toBe(true);
-    expect(caseElec(t).props.accessibilityState.checked).toBe(false);
+    expect(caseElec(t).props.accessibilityState.checked).toBe(true);
   });
 
-  it('valide sans rien poser d’électrique quand on ne touche à rien', () => {
+  it('valide sans rien poser d’électrique pour le grand public', () => {
     const onValider = jest.fn();
     const t = monter(
-      <ChoixScan visible meubles={2} onValider={onValider} onClose={jest.fn()} />,
+      <ChoixScan visible meubles={2} elec={false} onValider={onValider} onClose={jest.fn()} />,
     );
+    expect(caseElec(t)).toBeUndefined();
     valider(t);
     expect(onValider).toHaveBeenCalledWith({ meubles: true, elec: false });
   });
@@ -163,6 +170,9 @@ describe('la fin du scan ne pose pas d’électricité sans qu’on la demande',
     const t = monter(
       <ChoixScan visible meubles={2} onValider={onValider} onClose={jest.fn()} />,
     );
+    // Décochée d'un appui, puis remise d'un autre : la case commande la ligne.
+    act(() => caseElec(t).props.onPress());
+    expect(caseElec(t).props.accessibilityState.checked).toBe(false);
     act(() => caseElec(t).props.onPress());
     expect(caseElec(t).props.accessibilityState.checked).toBe(true);
     valider(t);

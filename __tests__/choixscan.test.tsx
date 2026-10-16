@@ -175,13 +175,14 @@ describe('le popup du choix', () => {
           .find((n) => n.props.accessibilityLabel === 'C’est bon')!
           .props.onPress(),
       );
-    // Sans geste : les meubles détectés, et rien d'électrique.
-    valider();
-    expect(onValider).toHaveBeenLastCalledWith({ meubles: true, elec: false });
-    // Un appui, et la norme s'ajoute — le métier reste à un geste.
-    act(() => ligneElec.props.onPress());
+    // Sans geste, en mode Électricité (revue « Gérard ») : la norme est
+    // cochée — la ligne n'existe pas hors du mode.
     valider();
     expect(onValider).toHaveBeenLastCalledWith({ meubles: true, elec: true });
+    // Un appui, et elle se retire — le choix reste à un geste.
+    act(() => ligneElec.props.onPress());
+    valider();
+    expect(onValider).toHaveBeenLastCalledWith({ meubles: true, elec: false });
   });
 
   it('sans meuble détecté, la ligne des meubles ne paraît pas', () => {

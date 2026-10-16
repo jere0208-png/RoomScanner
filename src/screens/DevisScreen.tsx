@@ -46,8 +46,10 @@
  * Il avait raison sur le fond — on ne lit pas un prix en attendant son tour.
  */
 import { PoseEstimee } from '../components/PoseEstimee';
-import { estimerLaPose, protectionsDuDevis } from '../geometry/mainDOeuvre';
+import { prixDuDevis } from '../geometry/mainDOeuvre';
 import { useReglagesPose } from '../store/reglagesPose';
+import { usePremieresFois } from '../store/premieresFois';
+import { useUsage } from '../store/usage';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ScrollView,
@@ -568,13 +570,14 @@ export function DevisScreen() {
       versionTarifs,
     ],
   );
-  const pose = useMemo(
-    () =>
-      estimerLaPose(fixtures, ceiling, protectionsDuDevis(devis.lignes), {
-        taux,
-        chantier,
-      }),
-    [fixtures, ceiling, devis.lignes, taux, chantier],
+  /*
+    UN SEUL PRIX — revue « Gérard » : le gros total de cette page disait le
+    matériel seul à 20 %, le PDF matériel et pose au taux du chantier. Les
+    deux, et la pastille du plan, lisent `prixDuDevis`.
+  */
+  const { pose, totaux } = useMemo(
+    () => prixDuDevis(devis, fixtures, ceiling, { taux, chantier }),
+    [devis, fixtures, ceiling, taux, chantier],
   );
 
   /*
@@ -792,6 +795,11 @@ export function DevisScreen() {
           gamme: nomDeLaGamme,
           devis,
           pose,
+          /*
+            C'EST L'ARTISAN QUI ENVOIE — revue « Gérard » : il a vu le
+            chantier, son PDF ne dit plus « à confirmer après visite ».
+          */
+          parLArtisan: useUsage.getState().modeElec,
         });
         await RoomScan.sharePDF(toBase64(bytes), devisFilename(numero, st.scanName));
       } catch (e) {
@@ -840,8 +848,23 @@ export function DevisScreen() {
 
   const avancer = (n: number) => {
     haptic('leger');
+    // « À savoir » est lu : on ne le remontre plus (revue « Gérard »).
+    if (etape === 0 && n > 0) usePremieresFois.getState().marquer('devisASavoir');
     setEtape(n);
   };
+
+  /*
+    « À SAVOIR AVANT LE PRIX », UNE FOIS — revue « Gérard » : l'électricien
+    qui rouvre son devis dix fois dans la journée relisait dix fois la même
+    page avant son prix. Lue une fois, elle reste au fil des étapes — on y
+    revient d'un appui — mais on arrive sur le prix.
+  */
+  useEffect(() => {
+    const pf = usePremieresFois.getState();
+    if (etape === 0 && pf.charge && !pf.estNeuve('devisASavoir')) setEtape(ETAPE_PRIX);
+    // À l'ouverture seulement : revenir à « À savoir » d'un appui doit y rester.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <RetourGlisse onRetour={() => setScreen('result')} style={styles.container}>
@@ -1230,43 +1253,43 @@ export function DevisScreen() {
                 LE SEUL NOMBRE POUR LEQUEL ON EST VENU — il monte au lieu de
                 paraître. Voir `TotalQuiMonte` : sept dixièmes de seconde,
                 et il ralentit en arrivant pour dire qu'il est arrivé.
+
+                POSE COMPRISE — revue « Gérard » : il disait le matériel seul,
+                à 20 %, quand le PDF remis au client ajoutait la pose au taux
+                du chantier. Un seul prix : celui de `prixDuDevis`, le même
+                que la pastille du plan et que le PDF.
               */}
               <TotalQuiMonte
-                valeur={devis.total}
+                valeur={totaux.ttc}
                 format={euros}
                 style={styles.total}
               />
             </View>
             {/*
-              LE SEUL MALENTENDU QUI PUISSE COÛTER CHER À QUELQU'UN.
-
-              Le total s'écrit en gros, et il ne dit QUE le matériel. Un
-              professionnel lit « estimation de fourniture » et comprend sans
-              la pose ; un particulier lit le prix de ses travaux, et il se
-              trompe d'un facteur deux ou trois.
-
-              LA MISE EN GARDE EXISTAIT DÉJÀ — en pied de ticket, en petit, et
-              dans la langue du métier : « Fourniture seule, hors
-              main-d'œuvre ». Personne ne lit trois paragraphes plus bas ce
-              qui contredit le chiffre qu'il vient de lire en gros. Elle se
-              pose donc SOUS le total, en français de tout le monde, et le
-              banc mesure cette distance-là.
+              HT, TVA, ET CE QUE LE TOTAL CONTIENT — sous le chiffre, et non
+              trois paragraphes plus bas : un particulier qui lit un total
+              doit savoir tout de suite si la pose y est.
             */}
+            <Text style={styles.sousTotal} testID="total-ht">
+              {`${euros(totaux.ht)} HT · TVA ${fr(totaux.tauxTva * 100, 0)} % ${euros(totaux.tva)}`}
+            </Text>
+            <Text style={styles.sousTotal}>
+              {totaux.poseHt > 0
+                ? `Matériel ${euros(totaux.fournituresHt)} HT et pose ${euros(totaux.poseHt)} HT compris.`
+                : 'Le matériel seul — aucun point à poser.'}
+            </Text>
             {/*
-              LE MÊME DEVIS AU PRIX PUBLIC, EN PETIT — relevé du patron : « donne
-              aussi le prix total "public" sous le total ». Le total retient le
-              magasin le moins cher, article par article ; celui-ci, l'enseigne
-              de référence partout : l'écart entre les deux, c'est ce que le
-              « moins cher » fait gagner.
+              LE MÊME MATÉRIEL AU PRIX PUBLIC, EN PETIT — relevé du patron :
+              « donne aussi le prix total "public" sous le total ». Le devis
+              retient le magasin le moins cher, article par article ; celui-ci,
+              l'enseigne de référence partout : l'écart entre les deux, c'est
+              ce que le « moins cher » fait gagner.
             */}
             {devis.totalPublic > 0 && (
               <Text style={styles.sousTotal} testID="total-public">
-                {`Prix public (${ENSEIGNE_PUBLIQUE}) : ${euros(devis.totalPublic)}`}
+                {`Matériel au prix public (${ENSEIGNE_PUBLIQUE}) : ${euros(devis.totalPublic)} TTC`}
               </Text>
             )}
-            <Text style={styles.sousTotal}>
-              Le matériel seul — la pose n’est pas comprise.
-            </Text>
             {/*
               CE QUE L'ÉLECTRICIEN, LUI, PAIERA — sur les articles que son tarif
               reconnaît, et seulement eux : la comparaison porte sur les mêmes

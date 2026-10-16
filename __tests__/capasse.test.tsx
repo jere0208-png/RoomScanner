@@ -102,7 +102,8 @@ describe('le meuble passe-t-il jusqu’à sa pièce ?', () => {
   const contexte = { walls: ex.walls, openings: ex.openings, rooms: ex.rooms };
 
   it('le canapé passe jusqu’au séjour : l’entrée, puis le passage', () => {
-    const canape = meuble('k', 'sofa', 4, 2, 1.8, 0.88, 0.8, salle('Séjour'));
+    // « Séjour-cuisine » : la cuisine ouverte de l'exemple se nomme (revue « Gérard »).
+    const canape = meuble('k', 'sofa', 4, 2, 1.8, 0.88, 0.8, salle('Séjour-cuisine'));
     const v = passageDuMeuble(canape, contexte)!;
     expect(v.ok).toBe(true);
     expect(v.court).toMatch(/passe/i);

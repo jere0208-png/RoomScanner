@@ -115,8 +115,38 @@ export function roomUse(name: string, kind?: RoomKind | null): RoomUse {
  * de travail, et les prises du plan de travail sur le circuit d'une chambre.
  * Le séjour garde son compte de socles ; la cuisine y ajoute ses règles.
  */
-export function estCuisine(name: string, kind?: RoomKind | null): boolean {
-  return roomUse(name, kind) === 'cuisine' || /cuisine|kitchenette/.test(sansAccent(name));
+export function estCuisine(name: string, kind?: RoomKind | null, equipee = false): boolean {
+  const use = roomUse(name, kind);
+  if (use === 'cuisine' || /cuisine|kitchenette/.test(sansAccent(name))) return true;
+  /*
+    LE NOM NE SUFFIT PAS — revue « Gérard » : l'exemple se disait conforme
+    avec une cuisine ouverte (frigo, meuble bas, plaque) dans une pièce
+    nommée « Séjour », type séjour. Reconnue au seul nom, elle échappait aux
+    six socles dont quatre au-dessus du plan, aux trois spécialisés 20 A et
+    au 32 A de cuisson — et le bouclier restait vert. Un séjour est aussi une
+    cuisine quand le scan l'a vu ouvert sur elle (`sejourCuisine`), ou quand
+    une plaque, un évier ou un plan de travail y est posé (`equipee`).
+  */
+  return use === 'sejour' && (kind === 'sejourCuisine' || kind === 'kitchen' || equipee);
+}
+
+/** Ce qui fait une cuisine, où qu'on le pose : la plaque, le four, l'évier, le plan. */
+const EQUIPEMENT_DE_CUISINE = /stove|cooktop|oven|sink|counter/i;
+
+/**
+ * UNE PIÈCE ÉQUIPÉE EN CUISINE : un de ses meubles (au centre dans son
+ * contour) est une plaque, un four, un évier ou un plan de travail.
+ */
+export function equipeeEnCuisine(
+  outline: Pt[] | undefined,
+  objets: readonly { category?: string; transform: number[] }[],
+): boolean {
+  if (!outline || outline.length < 3) return false;
+  return objets.some(
+    (o) =>
+      EQUIPEMENT_DE_CUISINE.test(o.category ?? '') &&
+      pointInPolygon({ x: o.transform[12], z: o.transform[14] }, outline),
+  );
 }
 
 /**
@@ -126,12 +156,12 @@ export function estCuisine(name: string, kind?: RoomKind | null): boolean {
  */
 export function priseDeCuisine(
   f: { height: number },
-  piece: { name?: string; kind?: RoomKind | null } | undefined,
+  piece: { name?: string; kind?: RoomKind | null; equipeeCuisine?: boolean } | undefined,
 ): boolean {
   if (!piece) return false;
   const nom = piece.name ?? '';
   if (roomUse(nom, piece.kind) === 'cuisine') return true;
-  return estCuisine(nom, piece.kind) && f.height >= PLAN_TRAVAIL - 1e-6;
+  return estCuisine(nom, piece.kind, !!piece.equipeeCuisine) && f.height >= PLAN_TRAVAIL - 1e-6;
 }
 
 /**
@@ -273,6 +303,24 @@ export function requirementFor(use: RoomUse, area: number): RoomRequirement {
   }
 }
 
+/**
+ * CE QU'UNE PIÈCE DOIT PORTER, CUISINE OUVERTE COMPRISE — le contrôle et
+ * « Normes auto » lisent la même règle (revue « Gérard » : l'auto posait
+ * les socles d'un séjour dans un séjour-cuisine, et le contrôle en
+ * réclamait quatre au-dessus du plan).
+ */
+export function exigencesDeLaPiece(use: RoomUse, area: number, cuisineOuverte: boolean): RoomRequirement {
+  const base = requirementFor(use, area);
+  return cuisineOuverte && area >= 4
+    ? {
+        ...base,
+        socles: Math.max(base.socles, 6),
+        surPlan: 4,
+        regle: base.regle + ' Cuisine ouverte : six socles au moins, dont quatre au-dessus du plan de travail.',
+      }
+    : base;
+}
+
 // ------------------------------------------------------- hauteurs de pose
 
 /** Plage de hauteur d'axe admise, quand la norme en fixe une. */
@@ -396,18 +444,31 @@ export function plansDeTravailParMur(
   walls: WallSeg[],
   rooms: { id: string; name?: string; kind?: RoomKind | null }[],
   objects: Parameters<typeof worktopsOnWall>[1],
-): Map<string, { x: (f: { along: number }) => number; plans: Worktop[] }> {
+): Map<string, { x: (f: { along: number }) => number; plans: Worktop[]; devant?: Pt }> {
   const quads = wallQuadsOf(walls);
   const sol = solDesMurs(walls);
-  const m = new Map<string, { x: (f: { along: number }) => number; plans: Worktop[] }>();
+  const m = new Map<string, { x: (f: { along: number }) => number; plans: Worktop[]; devant?: Pt }>();
   for (const w of walls) {
     const piece = rooms.find((r) => r.id === roomOf(w));
-    const cuisine = estCuisine(piece?.name ?? '', piece?.kind);
+    const nommee = estCuisine(piece?.name ?? '', piece?.kind);
     for (const side of [1, -1] as const) {
       const face = wallFace(w, quads.get(w.id), side);
-      const plans = worktopsOnWall(face, objects, cuisine, sol);
+      /*
+        LA FACE QUI PORTE LA PLAQUE OU L'ÉVIER EST UNE CUISINE — revue
+        « Gérard » : la pièce d'un mur se lit à `roomId`, que seul un scan
+        multi-pièces renseigne ; ailleurs, les caissons d'une cuisine ouverte
+        ne faisaient pas plan de travail, et aucun socle ne le surplombait.
+      */
+      const nus = worktopsOnWall(face, objects, false, sol);
+      const equipee = nus.find((p) => p.nature);
+      // La plaque seule décide des caissons : un évier se trouve aussi en salle d'eau.
+      const plans = worktopsOnWall(face, objects, nommee || nus.some((p) => p.nature === 'cuisson'), sol);
       if (plans.length === 0) continue;
-      m.set(w.id, { x: (f) => faceX(face, f.along), plans });
+      // Un point devant la plaque ou l'évier : il dit QUELLE pièce est équipée.
+      const devant = equipee
+        ? facePoint(face, (equipee.from + equipee.to) / 2, 0.3)
+        : undefined;
+      m.set(w.id, { x: (f) => faceX(face, f.along), plans, ...(devant ? { devant } : {}) });
       break;
     }
   }
@@ -697,6 +758,8 @@ export interface RoomInput {
   wallIds: string[];
   /** Contour au sol : c'est lui qui dit dans quelle pièce tombe un appareil. */
   outline?: Pt[];
+  /** Une plaque, un évier ou un plan de travail y est posé (`equipeeEnCuisine`). */
+  equipeeCuisine?: boolean;
 }
 
 /**
@@ -839,7 +902,7 @@ export function checkElectrical(
    * n'est pas celle d'un mur nu, et la signaler en défaut reviendrait à
    * crier au loup sur toute une cuisine.
    */
-  worktops?: Map<string, { x: (f: Fixture) => number; plans: Worktop[] }>,
+  worktops?: Map<string, { x: (f: Fixture) => number; plans: Worktop[]; devant?: Pt }>,
   /** Ce qui est posé au plafond : points lumineux, détection, ventilation. */
   ceiling: CeilingFixture[] = [],
   /**
@@ -865,6 +928,18 @@ export function checkElectrical(
   }
   const roomOfFixture = (f: Fixture): string | undefined =>
     placement?.get(f.id) ?? roomOfWall.get(f.wallId)?.[0];
+  /*
+    LES PIÈCES ÉQUIPÉES EN CUISINE — revue « Gérard » : ce que l'appelant
+    sait des meubles (`equipeeCuisine`), et la pièce devant chaque plaque ou
+    évier relevé au mur (`plansDeTravailParMur`).
+  */
+  const equipees = new Set(rooms.filter((r) => r.equipeeCuisine).map((r) => r.id));
+  for (const e of worktops?.values() ?? []) {
+    if (!e.devant) continue;
+    const ici = rooms.find((r) => (r.outline?.length ?? 0) >= 3 && pointInPolygon(e.devant!, r.outline!));
+    if (ici) equipees.add(ici.id);
+  }
+  const cuisineIci = (r: RoomInput) => estCuisine(r.name, r.kind, equipees.has(r.id));
 
   // -------------------------------------------------- hauteurs de pose
   for (const f of fixtures) {
@@ -919,19 +994,7 @@ export function checkElectrical(
   // ------------------------------------------------ équipement par pièce
   for (const room of rooms) {
     const use = roomUse(room.name, room.kind);
-    const cuisineOuverte = use !== 'cuisine' && estCuisine(room.name, room.kind);
-    const base = requirementFor(use, room.area);
-    const req =
-      cuisineOuverte && room.area >= 4
-        ? {
-            ...base,
-            socles: Math.max(base.socles, 6),
-            surPlan: 4,
-            regle:
-              base.regle +
-              ' Cuisine ouverte : six socles au moins, dont quatre au-dessus du plan de travail.',
-          }
-        : base;
+    const req = exigencesDeLaPiece(use, room.area, use !== 'cuisine' && cuisineIci(room));
     // Un appareil ne compte QUE pour la pièce où il donne.
     const mine = fixtures.filter((f) => roomOfFixture(f) === room.id);
     // Des SOCLES, pas des plaques : un ensemble double en porte un, un
@@ -1060,7 +1123,7 @@ export function checkElectrical(
 
     // Une prise de cuisson ailleurs qu'en cuisine mérite une question.
     const cuisson = mine.filter((f) => f.kind === 'prise32').length;
-    if (cuisson > 0 && !estCuisine(room.name, room.kind)) {
+    if (cuisson > 0 && !cuisineIci(room)) {
       out.push({
         roomId: room.id,
         severity: 'alerte',
@@ -1102,7 +1165,7 @@ export function checkElectrical(
    * cuisine. Et elle ne dit rien tant qu'aucune cuisine n'est nommée :
    * sans cuisine, il n'y a pas de logement à recevoir.
    */
-  const cuisines = rooms.filter((r) => estCuisine(r.name, r.kind));
+  const cuisines = rooms.filter(cuisineIci);
   if (cuisines.length > 0) {
     /*
       Une sortie de câble ne compte que si elle peut servir de spécialisé :
@@ -1452,16 +1515,20 @@ export function roomInputsOf(
     surface: { area: number; pts: Pt[] } | null;
     walls: { id: string }[];
   }[],
+  /** Les meubles, quand on les a : ils disent quelle pièce est équipée en cuisine. */
+  objects?: readonly { category?: string; transform: number[] }[],
 ): RoomInput[] {
   return rooms.map((r) => {
     const part = parts.find((p) => p.roomId === r.id);
+    const outline = part?.surface?.pts;
     return {
       id: r.id,
       name: r.name,
       kind: r.kind ?? null,
       area: part?.surface?.area ?? 0,
       wallIds: r.wallIds ?? part?.walls.map((w) => w.id) ?? [],
-      outline: part?.surface?.pts,
+      outline,
+      ...(objects && equipeeEnCuisine(outline, objects) ? { equipeeCuisine: true } : {}),
     };
   });
 }

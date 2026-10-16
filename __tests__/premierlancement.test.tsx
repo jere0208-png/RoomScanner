@@ -214,7 +214,8 @@ describe('un film réaliste', () => {
     expect(humide('Salle d’eau')).toBe(true);
     // « Bur-eau » contient « eau » : c'est le MOT qui compte.
     expect(humide('Bureau')).toBe(false);
-    expect(humide('Séjour')).toBe(false);
+    // L'exemple nomme sa cuisine ouverte (revue « Gérard ») : parquet quand même.
+    expect(humide('Séjour-cuisine')).toBe(false);
   });
 
   it('le plan du film est le poché de l’app, portes comprises', () => {

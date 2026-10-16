@@ -43,6 +43,8 @@ export const PREMIERES = [
   'allumer',
   /** Le premier plan enregistré : le seul moment où l'app doit se réjouir. */
   'planGarde',
+  /** « À savoir avant le prix », au devis : lu une fois, on arrive au prix. */
+  'devisASavoir',
 ] as const;
 
 export type PremiereFois = (typeof PREMIERES)[number];

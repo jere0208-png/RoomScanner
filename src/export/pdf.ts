@@ -147,7 +147,7 @@ import { matieresDesSols } from '../ui/maquette';
 import { accentsDesPieces, peinturesDesPieces, solsDesPieces } from '../ui/habillage';
 import { cotesExterieures, ECART_DE_COTE } from '../geometry/cotes3d';
 import type { Devis } from '../geometry/devis';
-import { enHeures, totauxDuDevis, TVA_DES_PRIX_PUBLICS, type Pose } from '../geometry/mainDOeuvre';
+import { enHeures, poseComptee, totauxDuDevis, TVA_DES_PRIX_PUBLICS, type Pose } from '../geometry/mainDOeuvre';
 import { nomDeTeinte } from '../ui/peintures';
 
 const PAGE_W = 595;
@@ -7255,6 +7255,11 @@ export interface DevisPourPdf {
   devis: Devis;
   /** La pose estimée, quand on la compte. */
   pose?: Pose | null;
+  /**
+   * C'EST L'ARTISAN QUI L'ENVOIE (mode électricité) — revue « Gérard » : il
+   * a vu le chantier, sa main-d'œuvre n'est plus « à confirmer après visite ».
+   */
+  parLArtisan?: boolean;
 }
 
 /** « 1 234,50 € » — l'espace des milliers, la virgule, les centimes. */
@@ -7369,7 +7374,7 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
         /*
           HORS TAXES, LIGNE À LIGNE — revue « Nadia » : un devis d'artisan
           se lit en prix unitaires HT, la TVA du chantier vient au total.
-          Les prix relevés en enseigne sont TTC à 20 % : on les ramène.
+          Les prix du catalogue sont TTC à 20 % : on les ramène.
         */
         d.text(l.pu === null ? 'à chiffrer' : enEuros(horsTaxes(l.pu)), COL_PU, y, 9, l.pu === null ? GREY : INK, { align: 'right' });
         d.text(l.pu === null ? '—' : enEuros(horsTaxes(l.total)), X1 - 6, y, 9, INK, { align: 'right' });
@@ -7386,10 +7391,11 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   y -= 32;
 
   // ------------------------------------------------- la pose, estimée
-  const pose = e.pose && e.pose.heures > 0 ? e.pose : null;
+  // La même règle que l'écran et la pastille : voir `prixDuDevis`.
+  const pose = poseComptee(e.pose);
   if (pose) {
     place(60);
-    d.text('MAIN-D’ŒUVRE (ESTIMÉE)', X0 + 8, y, 7.5, GREY, { bold: true, align: 'left' });
+    d.text(e.parLArtisan ? 'MAIN-D’ŒUVRE' : 'MAIN-D’ŒUVRE (ESTIMÉE)', X0 + 8, y, 7.5, GREY, { bold: true, align: 'left' });
     y -= 16;
     for (const l of pose.lignes) {
       place(16);
@@ -7415,12 +7421,23 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
     taxes, puis un seul taux pour tout le chantier.
   */
   const t = totauxDuDevis(e.devis.total, pose);
+  /*
+    PAS UN MOT D'ENSEIGNE NI DE « PRIX RELEVÉ » — revue « Gérard » : « prix
+    relevés TTC en enseigne, ramenés HT » se lisait, côté client, comme un
+    artisan qui revend au prix de la grande surface. D'où viennent les prix
+    est l'affaire de l'artisan, dans l'app ; le client lit des prix HT.
+  */
   const mentions = [
-    'Prix des fournitures relevés TTC en enseigne (TVA 20 %), ramenés hors taxes, à confirmer à la commande.',
     ...(pose && t.tauxTva < TVA_DES_PRIX_PUBLICS
       ? ['TVA au taux réduit des travaux de rénovation d’un logement de plus de deux ans, fournitures posées comprises (attestation du client requise).']
       : []),
-    ...(pose ? ['Main-d’œuvre estimée au temps de pose de chaque point, à confirmer après visite.'] : []),
+    ...(pose
+      ? [
+          e.parLArtisan
+            ? 'Main-d’œuvre comptée au temps de pose de chaque point.'
+            : 'Main-d’œuvre estimée au temps de pose de chaque point, à confirmer après visite.',
+        ]
+      : []),
     ...e.devis.exclusions.filter((x) => !(pose && /^Main-d/.test(x))),
   ];
   const lignesMentions = mentions.map((m) => wrapText(m, 7.5, X1 - X0));

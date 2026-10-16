@@ -29,8 +29,9 @@ import type { Pt, WallSeg } from './floorplan';
 import { pointOnSeg, segLength, perpOf, solDesMurs } from './floorplan';
 import { volumeAt, volumeVerdict, wetZones } from './volumes';
 import {
+  equipeeEnCuisine,
   estCuisine,
-  requirementFor,
+  exigencesDeLaPiece,
   roomUse,
   socleFaceAuPlan,
   USE_LABEL,
@@ -276,7 +277,6 @@ export function poserAuxNormes(input: {
 
   for (const room of input.rooms) {
     const use = roomUse(room.name, room.kind);
-    const besoin = requirementFor(use, room.area);
     const dedans = input.fixtures.filter(
       (f) => input.placement.get(f.id) === room.id,
     );
@@ -354,7 +354,10 @@ export function poserAuxNormes(input: {
       return fait;
     };
 
-    const cuisine = estCuisine(room.name, room.kind);
+    // Équipée d'une plaque, d'un évier ou d'un plan : une cuisine (revue « Gérard »).
+    const cuisine = estCuisine(room.name, room.kind, !!room.equipeeCuisine || equipeeEnCuisine(room.outline, objets));
+    // Les mêmes exigences que le contrôle : un séjour-cuisine compte ses six socles.
+    const besoin = exigencesDeLaPiece(use, room.area, use !== 'cuisine' && cuisine);
     const plans = new Map<string, Worktop[]>();
     if (cuisine) {
       for (const w of murs) {
@@ -622,7 +625,11 @@ export function corrigerConstat(
       solDesMurs(ctx.walls),
     );
     // « Poser PC 110 » en cuisine : au-dessus du plan relevé, s'il y en a un.
-    if (fix.kind === 'prise' && hauteur >= 0.9 && estCuisine(room.name, room.kind)) {
+    if (
+      fix.kind === 'prise' &&
+      hauteur >= 0.9 &&
+      estCuisine(room.name, room.kind, !!room.equipeeCuisine || equipeeEnCuisine(room.outline, objets))
+    ) {
       const plans = new Map<string, Worktop[]>();
       for (const w of murs) {
         const p = plansDuMur(w, room.interieur, objets, true, solDesMurs(ctx.walls));

@@ -347,7 +347,8 @@ describe('le moulinet', () => {
     expect(st.screen).toBe('result');
     expect(st.scanName).toBe(NOM_EXEMPLE);
     expect(st.rooms.map((r) => r.name)).toEqual(
-      expect.arrayContaining(['Séjour', 'Chambre', 'Salle d’eau', 'Entrée', 'Bureau']),
+      // « Séjour-cuisine » : la cuisine ouverte se nomme (revue « Gérard »).
+      expect.arrayContaining(['Séjour-cuisine', 'Chambre', 'Salle d’eau', 'Entrée', 'Bureau']),
     );
     expect(st.objects.length).toBeGreaterThan(10);
     expect(st.currentSaveId).toBeNull();

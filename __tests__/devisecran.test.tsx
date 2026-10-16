@@ -46,6 +46,8 @@ import { DevisScreen } from '../src/screens/DevisScreen';
 import { FloorplanEditor } from '../src/components/FloorplanEditor';
 import { CardinalRing, NorthBadge } from '../src/components/CardinalRing';
 import { chiffrerLePlan } from '../src/geometry/devisplan';
+import { prixDuDevis } from '../src/geometry/mainDOeuvre';
+import { useReglagesPose } from '../src/store/reglagesPose';
 import { postsSymbol, type Fixture, type FixtureKind } from '../src/geometry/electrical';
 import { GAMMES } from '../src/geometry/prix';
 import { WIRE_COLORS, roleDuFil } from '../src/geometry/schema';
@@ -208,6 +210,26 @@ const ROOMS = [{ id: 'r1', name: 'Séjour', floor: null }];
 
 const devisAttendu = () =>
   chiffrerLePlan(MURS, ROOMS as never, APPAREILS, [], GAMMES[0].id);
+
+/*
+  LE TOTAL DE LA PAGE EST POSE COMPRISE — revue « Gérard » : il disait le
+  matériel seul quand le PDF ajoutait la pose. Le banc lit donc le prix de
+  `prixDuDevis`, celui de la page, de la pastille et du PDF, sur les
+  articles qui restent au devis.
+*/
+const totalAttendu = () => {
+  const devis = chiffrerLePlan(
+    MURS,
+    ROOMS as never,
+    APPAREILS,
+    [],
+    GAMMES[0].id,
+    new Set(useScanStore.getState().devisEcartes),
+  );
+  const { taux, chantier } = useReglagesPose.getState();
+  return prixDuDevis(devis, APPAREILS, [], { taux, chantier }).totaux.ttc;
+};
+const enEuros = (v: number) => `${v.toFixed(2).replace('.', ',')} €`;
 
 /*
   ON MESURE APRÈS CHAQUE ÉTAPE, ET PAS SEULEMENT À L'OUVERTURE.
@@ -503,7 +525,7 @@ describe('le ticket de caisse', () => {
     const lus = mots(t);
     const devis = devisAttendu();
     expect(lus).toContain('TOTAL TTC');
-    expect(lus).toContain(`${devis.total.toFixed(2).replace('.', ',')} €`);
+    expect(lus).toContain(enEuros(totalAttendu()));
     // Le total vient APRÈS le dernier article : c'est la fin d'un ticket.
     expect(lus.indexOf('TOTAL TTC')).toBeGreaterThan(
       lus.indexOf(devis.lignes[0].libelle),
@@ -840,11 +862,12 @@ describe('écarter un article', () => {
 
   it('le retire du total, et le prix suit', async () => {
     const t = await auTicket();
-    const devis = devisAttendu();
+    const avant = totalAttendu();
     const cher = plusCher();
     act(() => ligne(t, cher.libelle).props.onPress());
-    const attendu = (devis.total - cher.total).toFixed(2).replace('.', ',');
-    expect(mots(t)).toContain(`${attendu} €`);
+    const apres = totalAttendu();
+    expect(apres).toBeLessThan(avant);
+    expect(mots(t)).toContain(enEuros(apres));
   });
 
   it('mais la ligne reste au ticket, barrée, avec son prix', async () => {
@@ -864,10 +887,10 @@ describe('écarter un article', () => {
 
   it('et on remet tout d’un appui', async () => {
     const t = await auTicket();
-    const devis = devisAttendu();
+    const complet = totalAttendu();
     act(() => ligne(t, plusCher().libelle).props.onPress());
     act(() => bouton(t, 'Tout remettre').props.onPress());
-    expect(mots(t)).toContain(`${devis.total.toFixed(2).replace('.', ',')} €`);
+    expect(mots(t)).toContain(enEuros(complet));
   });
 
   it('et le bouton du plan annonce le MÊME prix que la page', async () => {
@@ -878,14 +901,7 @@ describe('écarter un article', () => {
     */
     const t = await auTicket();
     act(() => ligne(t, plusCher().libelle).props.onPress());
-    const duBouton = chiffrerLePlan(
-      MURS,
-      ROOMS as never,
-      APPAREILS,
-      [],
-      GAMMES[0].id,
-      new Set(useScanStore.getState().devisEcartes),
-    ).total;
-    expect(mots(t)).toContain(`${duBouton.toFixed(2).replace('.', ',')} €`);
+    // Le bouton du plan passe par `prixDuDevis`, comme la page.
+    expect(mots(t)).toContain(enEuros(totalAttendu()));
   });
 });

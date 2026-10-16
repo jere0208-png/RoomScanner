@@ -52,7 +52,9 @@ export function prixCourt(total: number): string {
 
 export function DevisPastille({
   /**
-   * Le total du devis, TTC. `null` quand il n'y a rien à chiffrer.
+   * Le total du devis, TTC, POSE COMPRISE — celui de `prixDuDevis`, le même
+   * que la page et le PDF (revue « Gérard » : il disait le matériel seul).
+   * `null` quand il n'y a rien à chiffrer.
    *
    * Un logement sans un seul appareil posé n'a pas de prix — il a un plan.
    * Le bouton reste alors gris et muet, comme celui des normes devant une
@@ -74,7 +76,7 @@ export function DevisPastille({
     <TouchableOpacity
       accessibilityLabel={
         actif
-          ? `Devis — environ ${Math.round(total)} euros de fourniture`
+          ? `Devis — environ ${Math.round(total)} euros TTC, pose comprise`
           : 'Devis — rien de posé à chiffrer'
       }
       accessibilityRole="button"
