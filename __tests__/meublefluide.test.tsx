@@ -386,32 +386,28 @@ describe('pivoter et étirer un meuble', () => {
 });
 
 describe('ce qui suit le meuble tenu, sans l’écran', () => {
-  it('« Rentre ✓ · … cm du mur » se met à jour sous le doigt', () => {
+  /*
+    MIS À JOUR — le patron : « enlève le “rentre” lors de la sélection d'un
+    meuble ». Un meuble qui tient dans sa pièce ne dit plus rien ; celui
+    qu'on sort de la pièce dit de combien il dépasse, en direct, sans que
+    l'écran se redessine.
+  */
+  it('plus de « Rentre ✓ » ; « Dépasse de … cm » suit le meuble tenu, sans l’écran', () => {
     const tree = monter();
-    const { h, x, y } = prendre(tree, 'meuble');
-    const puce = () =>
+    const st = useScanStore.getState();
+    const meuble = st.objects.find((o) => o.category === 'table')!;
+    act(() => editeur(tree).props.onSelectObject(meuble.id));
+    const textes = () =>
       tree.root
-        .findAll((n) => n.props?.accessibilityRole === 'text' && typeof n.props?.accessibilityLabel === 'string')
-        .map((n) => n.props.accessibilityLabel as string)
-        .concat(
-          tree.root
-            .findAll((n) => typeof n.props?.children === 'string')
-            .map((n) => n.props.children as string)
-            .filter((t) => t.startsWith('Rentre') || t.startsWith('Dépasse')),
-        )
-        .find((t) => t.includes('cm'));
-    const avant = puce();
-    expect(avant).toBeDefined();
-    const m = doigt();
-    act(() => {
-      h.onStartShouldSetResponder(m.poser(x, y));
-      h.onResponderGrant(m.poser(x, y));
-    });
-    const r = compter(() => {
-      for (let i = 1; i <= 8; i++) act(() => h.onResponderMove(m.bouger(x, y - 12 - i * 5)));
-    });
+        .findAll((n) => typeof n.props?.children === 'string')
+        .map((n) => n.props.children as string);
+    expect(textes().some((t) => t.startsWith('Rentre'))).toBe(false);
+    // Étiré bien plus large que sa pièce : la puce d'alerte apparaît, et
+    // l'écran ne bouge pas.
+    const r = compter(() => act(() => mettreEnVol({ ...meuble, width: meuble.width + 20 })));
+    expect(textes().some((x) => x.startsWith('Dépasse de'))).toBe(true);
     expect(r.de('ResultScreen')).toBe(0);
-    expect(puce()).not.toBe(avant);
+    act(() => mettreEnVol(null));
   });
 
   it('la porte rougit dès que le meuble tenu entre dans son battant', () => {

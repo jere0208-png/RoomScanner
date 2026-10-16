@@ -28,6 +28,8 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     contenté de la hauteur de son texte, tout en haut de l'écran. Il prend
     donc le reste de la page et centre ce qu'il porte.
   */
+  // La page du plan vierge : toute la place, sans les marges de l'état vide.
+  pleinePage: { flex: 1 },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',

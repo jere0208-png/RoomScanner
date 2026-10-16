@@ -73,7 +73,7 @@ export function PlanViergePage({
 
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
-    page: { flex: 1, paddingHorizontal: 20, paddingTop: 4, justifyContent: 'center' },
+    page: { flex: 1, alignSelf: 'stretch', paddingHorizontal: 20, paddingTop: 4, justifyContent: 'center' },
     titre: {
       color: c.ink,
       fontSize: 28,

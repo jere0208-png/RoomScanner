@@ -66,20 +66,20 @@ describe('un plan ouvert au clavier', () => {
     act(() => t.unmount());
   });
 
-  it('offre d’ajouter une pièce, et l’ajoute vraiment', () => {
+  /*
+    MIS À JOUR — relevé du patron : « un petit pop-up alors que la page
+    entière est dispo ». Les gabarits sont sur la page même : un appui pose
+    la pièce, sans fenêtre intermédiaire.
+  */
+  it('montre les gabarits sur la page, et en pose un vraiment', () => {
     vider(true);
     const t = monter();
-    const ajouter = bouton(t, 'Ajouter une pièce');
-    expect(ajouter).toBeTruthy();
-    act(() => ajouter?.props.onPress());
-    // La feuille de choix s'ouvre ICI aussi : sans elle, le bouton
-    // n'ouvrirait rien tant qu'il n'y a pas un seul mur au plan.
-    const carre = t.root
-      .findAllByType(TouchableOpacity)
-      .find((n) =>
-        String(n.props.accessibilityLabel ?? '').startsWith('Ajouter '),
-      );
-    expect(carre).toBeTruthy();
+    expect(t.root.findAll((n) => n.props.testID === 'plan-vierge-page').length).toBeGreaterThan(0);
+    const chambre = t.root.findAll((n) => n.props.accessibilityLabel === 'Chambre' && typeof n.props.onPress === 'function')[0];
+    expect(chambre).toBeTruthy();
+    act(() => chambre.props.onPress());
+    expect(useScanStore.getState().rooms.length).toBe(1);
+    expect(useScanStore.getState().walls.length).toBeGreaterThanOrEqual(4);
     act(() => t.unmount());
   });
 });
@@ -120,7 +120,9 @@ describe('un scan qui n’a rien donné', () => {
  */
 describe('la mise en page de l’état vide', () => {
   it('ne laisse pas le bouton prendre toute la hauteur', () => {
-    vider(true);
+    // MIS À JOUR : le plan vierge est une page de gabarits ; le bouton vit
+    // dans l'autre état vide, « Aucun mur détecté ».
+    vider(false);
     const t = monter();
     const ajouter = bouton(t, 'Ajouter une pièce');
     const style = StyleSheet.flatten(ajouter?.props.style ?? {});

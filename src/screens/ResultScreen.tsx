@@ -28,6 +28,7 @@ import { useTheme } from '../theme';
 import { getStyles } from './result/styles';
 import { fr } from './result/format';
 import { AddRoomSheet } from './result/AddRoomSheet';
+import { PlanViergePage } from './result/PlanViergePage';
 import { ElecSheet } from './result/ElecSheet';
 import { ExistantSheet } from './result/ExistantSheet';
 import { FichePieceSheet } from './result/FichePieceSheet';
@@ -676,6 +677,8 @@ export function ResultScreen() {
   const [exporting, setExporting] = useState(false);
   /** La feuille « Ajouter une pièce » : nom, largeur, profondeur. */
   const [ajoutPiece, setAjoutPiece] = useState(false);
+  // La page du plan vierge ouvre directement « Sur mesure » (voir `PlanViergePage`).
+  const [surMesureDabord, setSurMesureDabord] = useState(false);
   /*
     LE RECTANGLE QU'ON TIRAIT DANS LE VIDE — geste retire de l'ecran.
 
@@ -3575,7 +3578,7 @@ export function ResultScreen() {
             <BackChevron color={teinte.ink} />
           </TouchableOpacity>
         </View>
-        <View style={styles.emptyContainer}>
+        <View style={planVierge && !niveauVideAilleurs ? styles.pleinePage : styles.emptyContainer}>
         {/*
           UN NIVEAU VIDE N'EST PAS UN PLAN VIDE — revue « Hugo » : après
           « Dessiner un étage » puis Annuler, le niveau neuf s'affichait
@@ -3597,6 +3600,25 @@ export function ResultScreen() {
             </TouchableOpacity>
           </>
         ) : null}
+        {/*
+          LE PLAN VIERGE EST UNE PAGE, PAS UNE FENÊTRE — relevé du patron :
+          « un petit pop-up alors que la page entière est dispo ». Les
+          gabarits y sont d'emblée, sous la maison de verre (`PlanViergePage`).
+        */}
+        {planVierge && !niveauVideAilleurs ? (
+          <PlanViergePage
+            onChoose={(m) => {
+              setSelectedRoomId(addRoomLibre(m.largeur, m.profondeur, m.nom, { auNu: true }));
+              setEditMode(true);
+              haptic('succes');
+            }}
+            onSurMesure={() => {
+              setSurMesureDabord(true);
+              setAjoutPiece(true);
+            }}
+          />
+        ) : (
+          <>
         {!niveauVideAilleurs && (
         <Text style={styles.emptyTitle}>
           {planVierge ? 'Plan vierge' : 'Aucun mur détecté'}
@@ -3628,6 +3650,8 @@ export function ResultScreen() {
           onPress={() => setAjoutPiece(true)}>
           <Text style={niveauVideAilleurs ? styles.emptyGhostText : styles.primaryText}>Ajouter une pièce</Text>
         </TouchableOpacity>
+          </>
+        )}
         {!planVierge && !niveauVideAilleurs && (
           <TouchableOpacity
             style={styles.emptyGhost}
@@ -3652,13 +3676,18 @@ export function ResultScreen() {
           visible={ajoutPiece}
           accolee={false}
           planVide
-          onClose={() => setAjoutPiece(false)}
+          surMesureDabord={surMesureDabord}
+          onClose={() => {
+            setAjoutPiece(false);
+            setSurMesureDabord(false);
+          }}
           onChoose={(largeur, profondeur, nom) => {
             // Rien au plan : elle se pose à l'origine, et elle est CHOISIE
             // — sans quoi ni ses poignées ni son glissement n'existeraient.
             // Des cotes intérieures : voir `AddRoomSheet`.
             setSelectedRoomId(addRoomLibre(largeur, profondeur, nom, { auNu: true }));
             setAjoutPiece(false);
+            setSurMesureDabord(false);
             setEditMode(true);
             haptic('succes');
           }}
@@ -5671,19 +5700,21 @@ export function ResultScreen() {
             render={(enMain) => {
               const v = verdictsDe(enMain);
               const verdict = v.passage;
-              if (!((verdict && !verdict.ok && !objDims) || v.calage || v.dansLaPiece)) return null;
+              // « Rentre ✓ » ne se dit plus — demande du patron : « enlève le
+              // “rentre” lors de la sélection d'un meuble ». Seul le dépassement
+              // s'affiche, comme le « ne passe pas ».
+              const depasse = v.dansLaPiece && !v.dansLaPiece.dedans ? v.dansLaPiece : null;
+              if (!((verdict && !verdict.ok && !objDims) || v.calage || depasse)) return null;
               return (
                 <View style={[styles.pucesDuMeuble, { bottom: etageCommandes }]} pointerEvents="box-none">
-                  {/* « Ça rentre ? » — la première question, sa réponse d'abord. */}
-                  {v.dansLaPiece ? (
+                  {/* Il dépasse de la pièce : la première alerte. */}
+                  {depasse ? (
                     <View
                       accessibilityRole="text"
-                      accessibilityLabel={v.dansLaPiece.dedans ? 'Rentre dans la pièce' : `Dépasse de ${Math.round(v.dansLaPiece.depasse * 100)} cm`}
-                      style={[styles.puceDuMeuble, { borderColor: v.dansLaPiece.dedans ? teinte.green : teinte.danger }]}>
+                      accessibilityLabel={`Dépasse de ${Math.round(depasse.depasse * 100)} cm`}
+                      style={[styles.puceDuMeuble, { borderColor: teinte.danger }]}>
                       <Text style={styles.puceDuMeubleTexte} numberOfLines={1}>
-                        {v.dansLaPiece.dedans
-                          ? `Rentre ✓${Number.isFinite(v.dansLaPiece.reste) ? ` · ${Math.round(v.dansLaPiece.reste * 100)} cm du mur` : ''}`
-                          : `Dépasse de ${Math.round(v.dansLaPiece.depasse * 100)} cm`}
+                        {`Dépasse de ${Math.round(depasse.depasse * 100)} cm`}
                       </Text>
                     </View>
                   ) : null}
