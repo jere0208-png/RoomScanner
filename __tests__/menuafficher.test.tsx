@@ -129,13 +129,13 @@ describe('le plan 2D', () => {
   /*
     MIS À JOUR — revue des « découvreurs » : « Dimensions » partout (plus de
     « Cotes » en mode électricité), et la barre est STABLE — les deux actions
-    (« + Meuble », « Décorer ») suivent les calques dans les deux vues et les
+    (« Meubler », « Décorer ») suivent les calques dans les deux vues et les
     deux modes, grisées quand elles n'ont rien à faire plutôt que retirées.
   */
   it('la rangée garde l’essentiel — dimensions, meubles, surfaces, appareils —, les actions, et « Autres » au bout', () => {
     const t = rangee2D(false);
     const ordre = libelles(t);
-    expect(ordre).toEqual(['Dimensions', 'Meubles', 'Surfaces', 'Appareils', '+ Meuble', 'Décorer', 'Autres']);
+    expect(ordre).toEqual(['Dimensions', 'Meubles', 'Surfaces', 'Appareils', 'Meubler', 'Décorer', 'Autres']);
   });
 
   it('« Autres » ouvre le menu Afficher : grille, couleurs des ouvertures, notes, photos', () => {
@@ -204,7 +204,7 @@ describe('la maquette 3D', () => {
   it('la rangée : dimensions, meubles, surfaces — et « Autres » à la place de « Pièces »', () => {
     const t = rangee3D();
     const ordre = libelles(t);
-    expect(ordre).toEqual(['Dimensions', 'Meubles', 'Surfaces', 'Repères', '+ Meuble', 'Décorer', 'Autres']);
+    expect(ordre).toEqual(['Dimensions', 'Meubles', 'Surfaces', 'Repères', 'Meubler', 'Décorer', 'Autres']);
     for (const parti of ['Pièces', 'Volumes', 'Nuit', 'Murs', 'Nord']) expect(ordre).not.toContain(parti);
   });
 

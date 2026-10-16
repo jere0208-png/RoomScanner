@@ -41,6 +41,8 @@ export type ToolIcon =
   | 'surface'
   | 'elec'
   | 'furniture'
+  /* « Meubler » : un autre meuble que le fauteuil du calque — on en pose un. */
+  | 'meubler'
   | 'colors'
   | 'room'
   | 'image'

@@ -106,20 +106,22 @@ const allume = (t: TestRenderer.ReactTestRenderer, label: string) => {
 };
 
 describe('la vue 3D à l’ouverture d’un scan', () => {
-  // Les murs pleins et le sol sont passés au menu « Afficher » : ils
-  // partent allumés, dans le magasin.
+  // Les murs pleins et le sol sont passés au menu « Afficher » : le sol part
+  // allumé ; les murs, en écorché.
   const ALLUMES = ['Meubles'];
   // « Dimensions » partout, même en mode électricité (revue des
   // « découvreurs » : « Cotes » ici, « Dimensions » là).
   const ETEINTS = ['Dimensions', 'Surfaces', 'Repères'];
 
-  it('n’allume que les meubles, les murs et le sol', () => {
+  it('n’allume que les meubles et le sol, murs de face effacés', () => {
     const t = monter();
     presser(t, 'Passer en 3D');
     for (const nom of ALLUMES) {
       expect({ [nom]: allume(t, nom) }).toEqual({ [nom]: true });
     }
-    expect(useScanStore.getState().solidWalls).toBe(true);
+    // Relevé du patron : « la vue 3D doit par défaut ne pas afficher les
+    // murs en face » — l'écorché d'office.
+    expect(useScanStore.getState().solidWalls).toBe(false);
     expect(useScanStore.getState().showSol).toBe(true);
     for (const nom of ETEINTS) {
       const etat = allume(t, nom);
@@ -132,7 +134,7 @@ describe('la vue 3D à l’ouverture d’un scan', () => {
 /*
   LE PEIGNE « AFFICHER » EST PARTI — revue des « découvreurs » : des traits
   qui ne faisaient que décorer, et un mot qui coiffait aussi des actions
-  (« + Meuble », « Décorer »). Ses tests (descentes, équerre vers la pile,
+  (« Meubler », « Décorer »). Ses tests (descentes, équerre vers la pile,
   axe du mot) sont retirés avec lui ; `afficher.test.tsx` vérifie qu'il ne
   revient pas.
 */

@@ -2834,8 +2834,9 @@ interface ScanState {
    * Murs pleins en 3D, ou écorché.
    *
    * L'écorché efface le mur qui nous fait face pour montrer la pièce ; c'est
-   * le bon réglage neuf fois sur dix, mais pas quand on veut juger un volume
-   * bâti ou montrer une façade. Le choix reste donc à l'utilisateur.
+   * le bon réglage neuf fois sur dix — c'est donc celui d'ouverture — mais
+   * pas quand on veut juger un volume bâti ou montrer une façade. Le choix
+   * reste à l'utilisateur.
    */
   solidWalls: boolean;
   toggleSolidWalls: () => void;
@@ -3244,7 +3245,12 @@ const solDe = (walls: WallSeg[]) =>
  */
 const CALQUES_DE_BASE = {
   showFurniture: true,
-  solidWalls: true,
+  /*
+    L'ÉCORCHÉ D'OFFICE — relevé du patron : « la vue 3D doit par défaut ne
+    pas afficher les murs en face ». On ouvre la maquette pour voir DEDANS ;
+    les murs pleins restent à un appui, dans « Autres ».
+  */
+  solidWalls: false,
   /*
     LE PLAN PARLE DÈS L'OUVERTURE — correctif de l'audit : il s'ouvrait sans
     un nom de pièce ni un mètre carré, parce que le calque des surfaces était
@@ -4588,9 +4594,9 @@ export const useScanStore = create<ScanState>((set, get) => {
     setShowGrille: (showGrille) => set({ showGrille }),
 
     showTextures: false,
-    // Murs pleins d'office : c'est le bâti qu'on regarde en ouvrant un
-    // relevé. L'écorché reste à un appui, pour voir dedans.
-    solidWalls: true,
+    // L'écorché d'office (voir `CALQUES_DE_BASE`) : les murs qui font face
+    // s'effacent. Les murs pleins restent à un appui, pour juger le bâti.
+    solidWalls: false,
     toggleSolidWalls: () => set({ solidWalls: !get().solidWalls }),
     setShowTextures: (showTextures) => {
       set({ showTextures });

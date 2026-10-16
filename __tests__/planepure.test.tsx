@@ -153,7 +153,7 @@ describe('2. une barre stable et des boutons hiérarchisés', () => {
   it('les mêmes pastilles, aux mêmes places, en 2D et en 3D', () => {
     const t = monter(false);
     const en2D = barre(t);
-    expect(en2D.map((p) => p.mot)).toEqual(['Dimensions', 'Meubles', 'Surfaces', '+ Meuble', 'Décorer', 'Autres']);
+    expect(en2D.map((p) => p.mot)).toEqual(['Dimensions', 'Meubles', 'Surfaces', 'Meubler', 'Décorer', 'Autres']);
     presser(t, 'Passer en 3D');
     const en3D = barre(t);
     expect(en3D).toEqual(en2D);
@@ -162,21 +162,21 @@ describe('2. une barre stable et des boutons hiérarchisés', () => {
   it('en mode électricité : « Dimensions » aussi, et les repères à la place des appareils', () => {
     const t = monter(true);
     const en2D = barre(t).map((p) => p.mot);
-    expect(en2D).toEqual(['Dimensions', 'Meubles', 'Surfaces', 'Appareils', '+ Meuble', 'Décorer', 'Autres']);
+    expect(en2D).toEqual(['Dimensions', 'Meubles', 'Surfaces', 'Appareils', 'Meubler', 'Décorer', 'Autres']);
     expect(en2D).not.toContain('Cotes');
     presser(t, 'Passer en 3D');
     const en3D = barre(t).map((p) => p.mot);
-    expect(en3D).toEqual(['Dimensions', 'Meubles', 'Surfaces', 'Repères', '+ Meuble', 'Décorer', 'Autres']);
+    expect(en3D).toEqual(['Dimensions', 'Meubles', 'Surfaces', 'Repères', 'Meubler', 'Décorer', 'Autres']);
   });
 
-  it('les icônes : Surfaces la même partout ; le calque Meubles n’est pas l’action + Meuble', () => {
+  it('les icônes : Surfaces la même partout ; le calque Meubles n’est pas l’action Meubler', () => {
     const t = monter(false);
     const icone = (mot: string) => barre(t).find((p) => p.mot === mot)!.icone;
     const surfaces2D = icone('Surfaces');
-    expect(icone('Meubles')).not.toBe(icone('+ Meuble'));
+    expect(icone('Meubles')).not.toBe(icone('Meubler'));
     presser(t, 'Passer en 3D');
     expect(icone('Surfaces')).toBe(surfaces2D);
-    expect(icone('Meubles')).not.toBe(icone('+ Meuble'));
+    expect(icone('Meubles')).not.toBe(icone('Meubler'));
   });
 
   it('plus de peigne : ni « Afficher », ni traits en arbre au-dessus de la barre', () => {
@@ -207,13 +207,13 @@ describe('2. une barre stable et des boutons hiérarchisés', () => {
     expect(lignes).toContain('Grille');
   });
 
-  it('« + Meuble » depuis la 3D revient au plan et ouvre le catalogue', () => {
+  it('« Meubler » depuis la 3D revient au plan et ouvre le catalogue', () => {
     const t = monter(false);
     presser(t, 'Passer en 3D');
     // La maquette se relève : on attend la fin du mouvement.
     act(() => jest.advanceTimersByTime(3000));
     expect(t.root.findByType(FurnitureSheet).props.visible).toBe(false);
-    presser(t, '+ Meuble');
+    presser(t, 'Meubler');
     act(() => jest.advanceTimersByTime(3000));
     expect(bouton(t, 'Passer en 3D')).toBeDefined();
     expect(t.root.findByType(FurnitureSheet).props.visible).toBe(true);

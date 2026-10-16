@@ -151,7 +151,7 @@ export const SURFACE_BOUTON_SOMBRE = '#232B37';
 
 /*
   EN SOMBRE, UN BOUTON NE SE DÉTACHE PAS PAR SON OMBRE — vu sur les vraies
-  captures du simulateur : les pastilles « Achats », « 2D », « + Meuble »,
+  captures du simulateur : les pastilles « Achats », « 2D », « Meubler »,
   « Édition » avaient le fond exact de la carte du plan, et l'ombre portée,
   noire sur du noir, ne se voit pas. Ce qui porte une ombre de bouton
   (rayon de 12 au plus : pas les cartes) prend, en sombre, une surface un

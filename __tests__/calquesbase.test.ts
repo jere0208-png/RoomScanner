@@ -36,7 +36,7 @@ const salir = () =>
     showFurniture: false,
     showSurfaces: true,
     showTextures: true,
-    solidWalls: false,
+    solidWalls: true,
   });
 
 const calques = () => ({
@@ -49,7 +49,8 @@ const calques = () => ({
 
 const DE_BASE = {
   meubles: true,
-  murs: true,
+  // L'écorché d'office : les murs qui font face s'effacent (relevé du patron).
+  murs: false,
   // Le plan s'ouvre avec ses pièces nommées (correctif de l'audit) ; la
   // maquette, elle, reste sur ses meubles et ses murs.
   surfaces: true,

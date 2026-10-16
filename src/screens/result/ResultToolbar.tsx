@@ -105,8 +105,10 @@ const RIEN = {
   que soit la vue : on les retrouve sous le même pouce.
 
   L'ICÔNE DE L'ACTION N'EST PAS CELLE DU CALQUE : le fauteuil, c'est le
-  calque « Meubles » (les montrer, les cacher) ; « + Meuble » prend le
-  « + » — on ajoute.
+  calque « Meubles » (les montrer, les cacher). L'action s'appelle
+  « Meubler » — relevé du patron : « le “+ Meuble” me dérange » — et prend
+  un autre meuble, la commode et sa lampe, avec le petit « + » au coin comme
+  les poses de l'édition.
 */
 function actionsDeLaBarre({
   onAjouterMeuble,
@@ -126,9 +128,10 @@ function actionsDeLaBarre({
   return [
     <ToolPill
       key="ajoutMeuble"
-      icon="plus"
-      label="+ Meuble"
+      icon="meubler"
+      label="Meubler"
       active={false}
+      ajout
       vide={onAjouterMeuble ? null : 'Ouvrez le plan pour ajouter un meuble.'}
       onPress={onAjouterMeuble ?? rien}
     />,
@@ -502,7 +505,7 @@ export function Toolbar2D({
           UNE BARRE STABLE — revue des « découvreurs » : les pastilles
           changeaient de place, de mot et d'icône selon la vue et le mode.
           L'ordre est désormais le même en 2D et en 3D (`actionsDeLaBarre`) :
-          les calques d'abord, puis les deux ACTIONS (« + Meuble »,
+          les calques d'abord, puis les deux ACTIONS (« Meubler »,
           « Décorer »), puis « Autres ». Ce qui n'a rien à faire est grisé,
           avec sa phrase, plutôt que retiré : la pastille garde sa place.
         */

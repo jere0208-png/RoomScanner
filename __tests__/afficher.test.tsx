@@ -6,7 +6,7 @@
  * vérifiaient le mot, les traits et leur fondu.
  *
  * MIS À JOUR — revue des « découvreurs » (six testeurs sur huit) : les traits
- * en arbre se lisaient comme une décoration, et le mot mentait : « + Meuble »,
+ * en arbre se lisaient comme une décoration, et le mot mentait : « Meubler »,
  * « Décorer » et « Autres » sont des ACTIONS, rangées sous « Afficher ».
  * Chaque pastille porte déjà son mot. Le peigne est retiré ; ce banc vérifie
  * désormais qu'il ne revient pas, et que la rangée garde tous ses boutons.

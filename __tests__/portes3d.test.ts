@@ -405,8 +405,9 @@ describe('les sièges regardent la pièce, pas le mur', () => {
     expect(orienterLesSieges([bureau, chaise], PIECE)[1]).toBe(chaise);
   });
 
-  it('le reste du mobilier n’est jamais retourné', () => {
-    const lit = boite('lit', 'bed', 2, 0.4, 1.6, 2);
-    expect(orienterLesSieges([lit], PIECE)[0]).toBe(lit);
+  it('une table n’est jamais retournée', () => {
+    // Le lit, lui, pose désormais sa tête au mur : voir litaumur.test.ts.
+    const table = boite('t', 'table', 2, 0.4, 1.6, 0.8);
+    expect(orienterLesSieges([table], PIECE)[0]).toBe(table);
   });
 });

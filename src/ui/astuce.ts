@@ -53,11 +53,27 @@ interface EtatAstuce {
   fermer: () => void;
   /** Retire les « Annuler » en attente : hors du plan, ils ne valent plus. */
   oublierLesAnnulations: () => void;
+  /**
+   * OÙ SE POSER, EN HAUT — le bas de la rangée « Explorer · 2D » du plan,
+   * mesuré dans la fenêtre. `null` : l'écran n'a rien déclaré, l'astuce
+   * passe en bas comme partout ailleurs.
+   *
+   * Relevé du patron : « les messages comme “le plan était déjà d'équerre”
+   * gâchent la vue des boutons, mets-les centrés mais en haut, sous les
+   * boutons Explorer ». En bas, sur le plan, ils couvraient la barre
+   * d'outils — précisément là où l'on venait d'appuyer.
+   */
+  ancreHaute: number | null;
+  ancrer: (y: number | null) => void;
 }
 
 export const useAstuce = create<EtatAstuce>((set, get) => ({
   courante: null,
   file: [],
+  ancreHaute: null,
+  ancrer: (y) => {
+    if (get().ancreHaute !== y) set({ ancreHaute: y });
+  },
   poser: (a) => {
     const st = get();
     /*

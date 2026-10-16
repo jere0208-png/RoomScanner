@@ -2927,6 +2927,37 @@ export function ResultScreen() {
     neuf entre dans la liste pour douze heures, les modifications d'un plan
     enregistré attendent à côté de lui — voir `ui/miseDeCote`.
   */
+  /*
+    LES ASTUCES SE POSENT SOUS LA RANGÉE DU HAUT — relevé du patron : en bas,
+    « le plan était déjà d'équerre » et les autres couvraient la barre
+    d'outils. Le plan déclare où finit sa rangée « Explorer · 2D » (et ses
+    onglets de niveaux, s'il y en a) ; l'hôte des astuces s'y accroche. En
+    quittant le plan, ou pendant un relevé qui masque la rangée, elles
+    retournent en bas.
+  */
+  const rangeeDuHaut = useRef<View>(null);
+  const ongletsDuHaut = useRef<View>(null);
+  const ancrerLesAstuces = useCallback(() => {
+    let bas = 0;
+    let restants = 0;
+    const lire = (v: View | null) => {
+      if (!v) return;
+      restants += 1;
+      v.measureInWindow((_x, y, _l, h) => {
+        if (h > 0) bas = Math.max(bas, y + h);
+        restants -= 1;
+        if (restants === 0 && bas > 0) useAstuce.getState().ancrer(bas);
+      });
+    };
+    lire(rangeeDuHaut.current);
+    lire(ongletsDuHaut.current);
+  }, []);
+  useEffect(() => {
+    if (capturing) useAstuce.getState().ancrer(null);
+    else ancrerLesAstuces();
+  }, [capturing, ancrerLesAstuces]);
+  useEffect(() => () => useAstuce.getState().ancrer(null), []);
+
   const sortirDuPlan = () => {
     rangerLeTravail();
     // Hors du plan, un « Annuler » ne vaut plus (revue « Paul »).
@@ -4060,7 +4091,7 @@ export function ResultScreen() {
   };
 
   /*
-    « + MEUBLE », DANS LES DEUX VUES — revue des « découvreurs » : la barre
+    « MEUBLER », DANS LES DEUX VUES — revue des « découvreurs » : la barre
     garde ses pastilles aux mêmes places en 2D et en 3D. Le meuble se pose
     sur le plan : depuis la maquette, on y revient d'abord, en édition, et le
     catalogue s'ouvre une fois le plan à l'écran.
@@ -5368,8 +5399,10 @@ export function ResultScreen() {
         */}
         {!capturing && (
           <View
+            ref={rangeeDuHaut}
             style={styles.vueRangee}
             onLayout={(e) => {
+              ancrerLesAstuces();
               // Elle dépasse la carte (dix points de bord de chaque côté) : un cran de plus.
               if (e.nativeEvent.layout.width > carteW - 20 + 0.5 && cranRangee < 4) {
                 setMesureRangee({ cle: cleRangee, cran: cranRangee + 1 });
@@ -5565,7 +5598,7 @@ export function ResultScreen() {
           plan — on ne part pas scanner un étage par mégarde.
         */}
         {!capturing && niveaux.length > 1 && (
-          <View style={styles.ongletsNiveaux} accessibilityRole="tablist">
+          <View ref={ongletsDuHaut} onLayout={ancrerLesAstuces} style={styles.ongletsNiveaux} accessibilityRole="tablist">
             {[...niveaux].sort((x, y) => x - y).map((n) => {
               const actif = n === niveauCourant;
               return (

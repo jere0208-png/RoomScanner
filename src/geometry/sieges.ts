@@ -23,6 +23,20 @@
  *
  * L'avant d'un meuble est son côté −z local, comme partout dans l'app
  * (`furnitureParts`, `modeles3d`).
+ *
+ * LE LIT POSE SA TÊTE AU MUR — relevé du patron : « un lit scanné doit avoir
+ * la partie coussins vers le mur, par logique, après un scan ». La tête est
+ * son côté +z local, ses oreillers côte à côte sur sa largeur. RoomPlan ne
+ * sait ni où est la tête ni même, parfois, dans quel sens court le lit : il
+ * rendait un 140 × 190 en « 190 de large », la tête sur le grand côté. On
+ * choisit donc la tête parmi les PETITS côtés (les quatre pour un lit carré),
+ * celle qui touche le mur le plus près. Un quart de tour échange largeur et
+ * profondeur : la boîte mesurée reste exactement la même.
+ *
+ * LES MEUBLES ADOSSÉS (rangements, électroménager, WC, lavabo, cheminée,
+ * télé) ne regardent pas le mur non plus : le nez contre une cloison, la
+ * place dans le dos, ils font demi-tour — personne n'ouvre un tiroir dans du
+ * plâtre.
  */
 import type { ObjectData } from 'react-native-room-scan';
 import type { Pt, WallSeg } from './floorplan';
@@ -30,6 +44,8 @@ import type { Pt, WallSeg } from './floorplan';
 const SIEGE = /chair|sofa|couch|armchair/i;
 const ECRAN = /television|\btv\b/i;
 const PLAN = /table|desk/i;
+const LIT = /\bbed\b/i;
+const ADOSSE = /storage|refrigerator|stove|oven|washer|dryer|dishwasher|toilet|sink|fireplace|television|\btv\b/i;
 
 /** Jusqu'où un rayon parti de `p` dans la direction `d` va avant de toucher un mur. */
 function distanceAuMur(p: Pt, d: Pt, walls: readonly WallSeg[]): number {
@@ -57,6 +73,52 @@ function demiTour<O extends ObjectData>(o: O): O {
   return { ...o, transform: m };
 }
 
+/**
+ * LE LIT, LA TÊTE AU MUR LE PLUS PROCHE.
+ *
+ * Les têtes possibles : les deux bouts d'un lit nettement plus long que
+ * large, ses quatre côtés s'il est presque carré. Pour chacune, l'écart
+ * entre ce bout et le mur qu'il regarde ; le plus petit l'emporte.
+ */
+export function orienterLeLit<O extends ObjectData>(o: O, walls: readonly WallSeg[]): O {
+  const t = o.transform;
+  const p = { x: t[12], z: t[14] };
+  const lx = Math.hypot(t[0], t[2]) || 1;
+  const lz = Math.hypot(t[8], t[10]) || 1;
+  const ax = { x: t[0] / lx, z: t[2] / lx };
+  const az = { x: t[8] / lz, z: t[10] / lz };
+  const w = o.width ?? 1.4;
+  const d = o.depth ?? 1.9;
+  // Chaque tête possible : sa direction, et la demi-cote du lit dans ce sens.
+  const candidats: { dir: Pt; demi: number; travers: number; long: number }[] = [];
+  const presqueCarre = Math.abs(w - d) < 0.12;
+  if (presqueCarre || d >= w) {
+    candidats.push({ dir: az, demi: d / 2, travers: w, long: d }, { dir: { x: -az.x, z: -az.z }, demi: d / 2, travers: w, long: d });
+  }
+  if (presqueCarre || w > d) {
+    candidats.push({ dir: ax, demi: w / 2, travers: d, long: w }, { dir: { x: -ax.x, z: -ax.z }, demi: w / 2, travers: d, long: w });
+  }
+  let best: { dir: Pt; travers: number; long: number; ecart: number } | null = null;
+  for (const c of candidats) {
+    const ecart = distanceAuMur(p, c.dir, walls) - c.demi;
+    if (!Number.isFinite(ecart)) continue;
+    if (!best || ecart < best.ecart - 1e-6) best = { dir: c.dir, travers: c.travers, long: c.long, ecart };
+  }
+  // Aucun mur en vue : on ne sait rien de plus que RoomPlan.
+  if (!best) return o;
+  // Déjà la tête (+z) de ce côté, et la bonne largeur : rien à faire.
+  if (best.dir.x * az.x + best.dir.z * az.z > 0.99) return o;
+  // L'axe +z vers la tête ; l'axe x s'en déduit (repère direct, y en haut).
+  const m = [...t];
+  m[8] = best.dir.x * lz;
+  m[9] = 0;
+  m[10] = best.dir.z * lz;
+  m[0] = best.dir.z * lx;
+  m[1] = 0;
+  m[2] = -best.dir.x * lx;
+  return { ...o, transform: m, width: best.travers, depth: best.long };
+}
+
 export function orienterLesSieges<O extends ObjectData>(
   objects: O[],
   walls: readonly WallSeg[],
@@ -64,6 +126,18 @@ export function orienterLesSieges<O extends ObjectData>(
   if (walls.length === 0) return objects;
   return objects.map(o => {
     const cat = o.category ?? '';
+    if (LIT.test(cat)) return orienterLeLit(o, walls);
+    if (ADOSSE.test(cat)) {
+      const t = o.transform;
+      const p = { x: t[12], z: t[14] };
+      const l = Math.hypot(t[8], t[10]) || 1;
+      const avant = { x: -t[8] / l, z: -t[10] / l };
+      const demi = (o.depth ?? 0.6) / 2;
+      const dAvant = distanceAuMur(p, avant, walls);
+      const dArriere = distanceAuMur(p, { x: -avant.x, z: -avant.z }, walls);
+      // Le nez contre un mur proche, la place dans le dos : demi-tour.
+      return dAvant <= demi + 0.3 && dArriere > dAvant + 0.3 ? demiTour(o) : o;
+    }
     if (!SIEGE.test(cat)) return o;
     /*
       UN CANAPÉ D'ANGLE RÉUNI SAIT OÙ EST SON AVANT : du côté de sa

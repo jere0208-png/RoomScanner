@@ -21,7 +21,7 @@ import { PILL_GAP, PillSlot, repartirOutils } from './ToolPill';
   PLUS DE PEIGNE — revue des huit « découvreurs » (six sur huit) : les
   traits en arbre qui reliaient les pastilles sous un mot (« Afficher »,
   « Ajouter ») se lisaient comme une décoration, et le mot finissait par
-  mentir : « + Meuble », « Décorer » et « Autres » sont des ACTIONS, rangées
+  mentir : « Meubler », « Décorer » et « Autres » sont des ACTIONS, rangées
   sous « Afficher ». Chaque pastille porte déjà son mot ; la rangée n'a plus
   besoin d'être annotée. Le bandeau contextuel se pose désormais juste
   au-dessus des pastilles (voir `ligneBandeau` dans l'écran).
