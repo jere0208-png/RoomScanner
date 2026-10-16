@@ -522,6 +522,78 @@ export const laserEvents = new NativeEventEmitter(
   Platform.OS === 'ios' ? NativeModules.RoomScanLaser : undefined,
 );
 
+/**
+ * UN GESTE RELEVÉ PAR LE MODE DIAGNOSTIC — un toucher, où et sur quoi.
+ *
+ * `cible` est l'`accessibilityLabel` (ou l'identifiant) de la vue touchée, en
+ * remontant les superviews jusqu'à en trouver un : c'est ce qui dit « il a
+ * appuyé sur Terminer », pas « il a appuyé à (184, 642) ».
+ */
+export interface GesteDiagnostic {
+  /** `debut`, `fin` ou `annule` — la phase du toucher. */
+  phase: 'debut' | 'fin' | 'annule';
+  /** Position en points, dans la fenêtre. */
+  x: number;
+  y: number;
+  /** Ce qui a été touché, si une vue portait un libellé d'accessibilité. */
+  cible?: string;
+  /** Millisecondes depuis 1970. */
+  at: number;
+}
+
+/** Ce que `figer()` fige : la vidéo (ou rien) et les gestes des 10 s. */
+export interface FigeDiagnostic {
+  /** Chemin du fichier mp4 assemblé, ou `null` si ReplayKit n'a rien donné. */
+  video: string | null;
+  gestes: GesteDiagnostic[];
+}
+
+/**
+ * CE QUE L'ÉVÉNEMENT `envoyer` PORTE — l'appui sur le bouton a déjà figé
+ * l'instant : le message tapé, la vidéo et les gestes voyagent ensemble, pour
+ * qu'il n'y ait pas de course entre l'appui et un second appel.
+ */
+export interface EnvoiDiagnostic extends FigeDiagnostic {
+  message: string;
+}
+
+/**
+ * LE MODE DIAGNOSTIC — réservé à l'administrateur (voir
+ * `RoomScanDiagnostic.swift` et `src/diagnostic/`).
+ *
+ * `demarrer` arme la surveillance (écran en boucle, gestes, bouton flottant) ;
+ * `arreter` la range ; `figer` rend les dix dernières secondes. L'événement
+ * `envoyer` (voir `diagnosticEvents`) part de l'appui sur le bouton visible.
+ *
+ * Sans module natif (Android, banc d'essai), tout répond « rien » sans lever :
+ * le mode n'existe que sur iPhone.
+ */
+export const Diagnostic = {
+  demarrer: (): Promise<boolean> =>
+    Platform.OS === 'ios' && NativeModules.RoomScanDiagnostic?.demarrer
+      ? NativeModules.RoomScanDiagnostic.demarrer()
+      : Promise.resolve(false),
+
+  arreter: (): Promise<boolean> =>
+    Platform.OS === 'ios' && NativeModules.RoomScanDiagnostic?.arreter
+      ? NativeModules.RoomScanDiagnostic.arreter()
+      : Promise.resolve(false),
+
+  figer: (): Promise<FigeDiagnostic> =>
+    Platform.OS === 'ios' && NativeModules.RoomScanDiagnostic?.figer
+      ? NativeModules.RoomScanDiagnostic.figer()
+      : Promise.resolve({ video: null, gestes: [] }),
+};
+
+/**
+ * L'ÉMETTEUR DU MODE DIAGNOSTIC — son seul événement est `envoyer`
+ * (voir `EnvoiDiagnostic`). Émetteur à part, comme le télémètre : un module
+ * d'événements n'émet que pour lui-même.
+ */
+export const diagnosticEvents = new NativeEventEmitter(
+  Platform.OS === 'ios' ? NativeModules.RoomScanDiagnostic : undefined,
+);
+
 export const RoomScan = {
   /** false = pas de LiDAR (iOS) ou pas d'ARCore (Android). */
   isSupported: (): Promise<boolean> =>

@@ -1,0 +1,4 @@
+# Les diagnostics déposés ici (repli quand GitHub n’est pas configuré) ne
+# sont jamais servis par le web : ils contiennent une vidéo de l’écran de
+# l’administrateur et ses gestes. On les récupère par SFTP, jamais par URL.
+Require all denied

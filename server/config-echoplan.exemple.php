@@ -50,3 +50,31 @@ const LECTURES_PAR_JOUR = 20;
 // pour donner le Pro sans l'App Store ; false AVANT la publication — la
 // règle 3.1.1 d'Apple interdit un code maison dans l'app publiée.
 const CODES_INTERNES = false;
+
+// ---- LE MODE DIAGNOSTIC — réservé à l'administrateur.
+//
+// L'app est un dépôt PUBLIC : aucune adresse d'administrateur n'y figure en
+// dur. C'est le serveur qui sait qui est administrateur, par cette liste. Le
+// compte dont l'e-mail (en base) y figure reçoit `admin: true` dans les
+// réponses de connexion et d'état ; lui seul voit le réglage « Mode
+// diagnostic » dans l'app, et lui seul peut déposer un diagnostic — le
+// serveur le revérifie à chaque envoi. Laisser VIDE désactive tout.
+// Comparaison insensible à la casse, adresses en minuscules.
+//   const ADMIN_EMAILS = ['prenom.nom@example.com'];
+const ADMIN_EMAILS = [];
+
+// ---- OÙ ATTERRISSENT LES DIAGNOSTICS — un dépôt GitHub PRIVÉ.
+//
+// Quand l'administrateur appuie sur le bouton diagnostic, l'app envoie au
+// serveur les dix dernières secondes de son écran et de ses gestes, le plan
+// courant et un message ; le serveur les dépose dans ce dépôt (un dossier
+// horodaté par rapport : message.md, journal.json, ecran.mp4).
+//
+// DIAG_GITHUB_DEPOT : « proprietaire/depot », un dépôt PRIVÉ créé pour ça.
+// DIAG_GITHUB_JETON : un jeton GitHub à PORTÉE FINE (fine-grained), avec la
+//   seule permission « Contents: Read and write » sur CE dépôt-là. Il ne
+//   vit QUE dans cette configuration serveur, jamais dans l'app.
+// Vides : le serveur range les diagnostics dans un dossier `diagnostics/`
+// protégé à côté d'api.php, et répond `range: 'serveur'`.
+const DIAG_GITHUB_DEPOT = '';
+const DIAG_GITHUB_JETON = '';

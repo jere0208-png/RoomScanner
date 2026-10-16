@@ -194,6 +194,13 @@ interface AccountState {
   quitterInvite: () => void;
   pro: boolean;
   proVia: 'abonnement' | 'code' | null;
+  /**
+   * CE COMPTE EST-IL ADMINISTRATEUR ? — décidé par le SERVEUR (sa liste
+   * `ADMIN_EMAILS`), jamais par l'app : le dépôt est public, aucune adresse
+   * n'y figure. Le drapeau n'ouvre qu'un affichage (le réglage du mode
+   * diagnostic, réservé au patron) ; le serveur le revérifie à chaque dépôt.
+   */
+  admin: boolean;
   plansUtilises: number;
   paywallVisible: boolean;
   /**
@@ -351,6 +358,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   invite: false,
   pro: false,
   proVia: null,
+  admin: false,
   plansUtilises: 0,
   paywallVisible: false,
   achatEnCours: false,
@@ -490,6 +498,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       if (etat?.ok) {
         set({
           codesInternes: etat.codes === true,
+          admin: etat.admin === true,
           pro: s.pro || etat.pro === 'code' || etat.pro === 'abonnement',
           proVia:
             s.proVia ??
@@ -549,6 +558,8 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       compte,
       jeton: reponse?.ok ? String(reponse.jeton ?? '') : null,
       codesInternes: reponse?.ok ? reponse.codes === true : false,
+      // L'admin vient du serveur, et de lui seul (sa liste `ADMIN_EMAILS`).
+      admin: reponse?.ok ? reponse.admin === true : false,
       plansUtilises: Math.max(get().plansUtilises, marqueur?.plans ?? 0),
     });
     if (reponse?.ok) {
@@ -653,6 +664,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       proEcheance: null,
       jeton: null,
       codesInternes: false,
+      admin: false,
     });
     persister(get());
   },
@@ -685,6 +697,7 @@ export const useAccountStore = create<AccountState>((set, get) => ({
       jeton: null,
       proEcheance: null,
       codesInternes: false,
+      admin: false,
     });
     persister(get());
     return issue;

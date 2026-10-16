@@ -39,6 +39,7 @@ import { ThemeGlyph } from '../components/ThemeGlyph';
 import { ContourVif, TexteVif } from '../components/ContourVif';
 import { SOLAIRES } from '../ui/solaires';
 import { useAccountStore } from '../store/accountStore';
+import { useModeDiagnostic } from '../diagnostic/mode';
 import { usePremieresFois } from '../store/premieresFois';
 import { useScanStore, type ThemePref } from '../store/scanStore';
 import { ombreBouton, dark, radius, shadowCard, useTheme, type Palette } from '../theme';
@@ -107,6 +108,9 @@ export function ProfilScreen() {
   const saves = useScanStore((st) => st.saves).filter((x) => !x.corbeille);
   const compte = useAccountStore((st) => st.compte);
   const pro = useAccountStore((st) => st.pro);
+  const admin = useAccountStore((st) => st.admin);
+  const diagActif = useModeDiagnostic((st) => st.actif);
+  const reglerDiag = useModeDiagnostic((st) => st.regler);
   const [journal, setJournal] = useState(false);
   const incidents = usePannes((x) => x.incidents);
   const proVia = useAccountStore((st) => st.proVia);
@@ -397,6 +401,43 @@ export function ProfilScreen() {
             ))}
           </>
         ) : null}
+        {/*
+          ADMINISTRATEUR — le mode diagnostic, et rien que pour le patron.
+
+          Relevé du patron : « fais-moi un bouton admin […] un mode
+          diagnostique […] au clic sur un bouton visible, les 10 dernières
+          secondes de mes faits et gestes te seront envoyés, écran compris ».
+          La section n'existe QUE si le serveur dit `admin` (sa liste
+          `ADMIN_EMAILS`) : le dépôt est public, aucune adresse n'y figure.
+
+          L'interrupteur se lit avant de s'allumer : la phrase dit exactement
+          ce qui est gardé, pour que rien ne se capte en douce.
+        */}
+        {admin && (
+          <>
+            <Text style={s.section}>Administrateur</Text>
+            <View style={s.carteAbo}>
+              <View style={s.aboTextes}>
+                <Text style={s.aboTitre}>Mode diagnostic</Text>
+                <Text style={s.aboSous}>
+                  Garde en mémoire vos 10 dernières secondes — gestes, écran,
+                  état du plan — pour les envoyer au développeur d’un appui.
+                </Text>
+              </View>
+              <Switch
+                testID="interrupteur-diagnostic"
+                accessibilityLabel="Mode diagnostic"
+                value={diagActif}
+                onValueChange={(v) => {
+                  haptic('leger');
+                  reglerDiag(v);
+                }}
+                trackColor={{ true: c.blue, false: c.line }}
+              />
+            </View>
+          </>
+        )}
+
         <Text style={s.section}>Apparence</Text>
         {/*
           TROIS RONDS, PAS UNE LISTE — c'est le design du patron, et c'est

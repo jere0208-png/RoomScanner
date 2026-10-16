@@ -223,6 +223,21 @@ RCT_EXTERN_METHOD(infos:(RCTPromiseResolveBlock)resolve
 @end
 
 /*
+  LE MODE DIAGNOSTIC — reserve a l'administrateur. L'ecran en boucle, les
+  gestes de partout, et le bouton visible qui emet « envoyer ». C'est un
+  emetteur (RCTEventEmitter), comme le telemetre : il emet pour lui-meme.
+  Voir RoomScanDiagnostic.swift et src/diagnostic/.
+*/
+@interface RCT_EXTERN_MODULE(RoomScanDiagnostic, RCTEventEmitter)
+RCT_EXTERN_METHOD(demarrer:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(arreter:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(figer:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
+@end
+
+/*
   LE TARIF DU DISTRIBUTEUR — le fichier exporté de l'espace client (Rexel,
   Sonepar, Yesss, Balitrand, CGED...), choisi dans Fichiers et lu sur place.
 */

@@ -68,6 +68,17 @@ jest.mock('react-native-room-scan', () => ({
   poserOrbiteDeMaquette: jest.fn(() => false),
   poserLeveeDeMaquette: jest.fn(() => false),
   poserLampesDeVisite: jest.fn(() => false),
+  // Le mode diagnostic : muet au banc. Un test qui le vérifie fournit son
+  // propre doublet (voir `__tests__/diagnostic*`).
+  Diagnostic: {
+    demarrer: jest.fn(async () => false),
+    arreter: jest.fn(async () => false),
+    figer: jest.fn(async () => ({ video: null, gestes: [] })),
+  },
+  diagnosticEvents: {
+    addListener: jest.fn(() => ({ remove: jest.fn() })),
+    removeAllListeners: jest.fn(),
+  },
 }));
 
 /**

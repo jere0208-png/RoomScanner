@@ -38,12 +38,107 @@
  */
 require __DIR__ . '/config-echoplan.php';
 require __DIR__ . '/preuve-apple.php';
+require __DIR__ . '/diagnostic-depot.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
 function sortir(array $reponse): void {
   echo json_encode($reponse, JSON_UNESCAPED_UNICODE);
   exit;
+}
+
+/**
+ * EST-CE UN ADMINISTRATEUR ? — l'e-mail du compte (en base), comparé à la
+ * liste `ADMIN_EMAILS` de la config. Jamais l'e-mail reçu de l'app : un
+ * compte prend l'e-mail qu'il prouve posséder (`preuveRefusee`), pas celui
+ * qu'il déclare. Liste vide ou non définie : personne ne l'est.
+ */
+function estAdmin(?array $compte): bool {
+  if (!defined('ADMIN_EMAILS') || !is_array(ADMIN_EMAILS) || !ADMIN_EMAILS) {
+    return false;
+  }
+  $email = strtolower(trim((string) ($compte['email'] ?? '')));
+  if ($email === '') {
+    return false;
+  }
+  foreach (ADMIN_EMAILS as $admin) {
+    if (hash_equals(strtolower(trim((string) $admin)), $email)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/*
+  LE DIAGNOSTIC ARRIVE EN MULTIPART, PAS EN JSON.
+
+  Tout le reste de l'API parle JSON (lu depuis php://input) ; le diagnostic,
+  lui, porte un fichier vidéo — il vient donc en multipart/form-data, que PHP
+  range dans $_POST et $_FILES et qui laisse php://input VIDE. On l'attrape
+  AVANT la lecture JSON, qui sans cela répondrait « Requête vide ».
+
+  La vidéo est facultative (ReplayKit a pu être refusé) ; le journal, non. Le
+  compte s'authentifie comme partout (identifiant + jeton), et on REVÉRIFIE
+  qu'il est administrateur : le réglage côté app ne suffit pas, le dépôt est
+  réservé au patron.
+*/
+if (($_POST['action'] ?? '') === 'diagnostic') {
+  $identifiant = trim((string) ($_POST['identifiant'] ?? ''));
+  if ($identifiant === '' || strlen($identifiant) > 191) {
+    sortir(['ok' => false, 'raison' => 'Identifiant manquant.']);
+  }
+  $db = base();
+  if (!hash_equals(jeton($identifiant), (string) ($_POST['jeton'] ?? ''))) {
+    sortir(['ok' => false, 'raison' => 'Jeton invalide.']);
+  }
+  $compte = compteDe($db, $identifiant);
+  if (!$compte) {
+    sortir(['ok' => false, 'raison' => 'Compte inconnu.']);
+  }
+  if (!estAdmin($compte)) {
+    sortir(['ok' => false, 'raison' => 'Réservé à l’administrateur.']);
+  }
+
+  // Le journal est du texte JSON ; on le garde tel quel (il se rejoue au
+  // banc) mais on borne sa taille : cinq mégaoctets de journal, c'est déjà
+  // bien plus que dix secondes d'évènements.
+  $journal = (string) ($_POST['journal'] ?? '');
+  if (strlen($journal) > 5 * 1024 * 1024) {
+    sortir(['ok' => false, 'raison' => 'Journal trop lourd.']);
+  }
+  $message = (string) ($_POST['message'] ?? '');
+
+  // L'instantané (version, appareil, écran, résumé du plan) voyage dans le
+  // journal ; on le relit pour écrire le message.md, sans jamais échouer
+  // dessus — un journal illisible donne un résumé maigre, pas une erreur.
+  $decode = json_decode($journal, true);
+  $instant = is_array($decode['instant'] ?? null) ? $decode['instant'] : [];
+  $gestes = is_array($decode['gestes'] ?? null) ? count($decode['gestes']) : 0;
+  $evenements = is_array($decode['evenements'] ?? null) ? count($decode['evenements']) : 0;
+
+  $fichiers = [];
+  $avecVideo = false;
+  $video = $_FILES['video'] ?? null;
+  if (is_array($video) && (int) ($video['error'] ?? 1) === UPLOAD_ERR_OK) {
+    if ((int) ($video['size'] ?? 0) > 25 * 1024 * 1024) {
+      sortir(['ok' => false, 'raison' => 'Vidéo trop lourde.']);
+    }
+    $brut = @file_get_contents((string) $video['tmp_name']);
+    if ($brut !== false && $brut !== '') {
+      $fichiers['ecran.mp4'] = $brut;
+      $avecVideo = true;
+    }
+  }
+
+  $maintenant = time();
+  $fichiers['journal.json'] = $journal;
+  $fichiers['message.md'] = diagResume($message, $instant, $avecVideo, $gestes, $evenements, $maintenant);
+
+  $r = diagDeposer(diagCheminDossier($maintenant), $fichiers);
+  if (!$r['ok']) {
+    sortir(['ok' => false, 'raison' => 'Le dépôt du diagnostic a échoué.']);
+  }
+  sortir(['ok' => true, 'range' => $r['range']]);
 }
 
 /**
@@ -198,9 +293,9 @@ function prepareTolerant(mysqli $db, string $sql) {
  * `null` : on ne sait pas, on ne retire rien).
  */
 function compteDe(mysqli $db, string $identifiant): ?array {
-  $req = prepareTolerant($db, 'SELECT id, pro, plans, pro_echeance FROM comptes WHERE identifiant = ?');
+  $req = prepareTolerant($db, 'SELECT id, email, pro, plans, pro_echeance FROM comptes WHERE identifiant = ?');
   if (!$req) {
-    $req = mysqli_prepare($db, 'SELECT id, pro, plans, NULL AS pro_echeance FROM comptes WHERE identifiant = ?');
+    $req = mysqli_prepare($db, 'SELECT id, email, pro, plans, NULL AS pro_echeance FROM comptes WHERE identifiant = ?');
   }
   mysqli_stmt_bind_param($req, 's', $identifiant);
   mysqli_stmt_execute($req);
@@ -442,6 +537,10 @@ if ($action === 'connecter') {
     'pro' => $compte['pro'],
     'plans' => max((int) $compte['plans'], $duTelephone),
     'codes' => codesInternesOuverts(),
+    // L'app garde ce drapeau pour montrer, au seul administrateur, le réglage
+    // du mode diagnostic. Le serveur le revérifie à chaque dépôt : c'est ici
+    // un affichage, pas un droit.
+    'admin' => estAdmin($compte),
   ]);
 }
 
@@ -469,7 +568,7 @@ if ($compte['pro'] === 'abonnement' && $compte['pro_echeance'] !== null
 }
 
 if ($action === 'etat') {
-  sortir(['ok' => true, 'pro' => $compte['pro'], 'plans' => (int) $compte['plans'], 'codes' => codesInternesOuverts()]);
+  sortir(['ok' => true, 'pro' => $compte['pro'], 'plans' => (int) $compte['plans'], 'codes' => codesInternesOuverts(), 'admin' => estAdmin($compte)]);
 }
 
 if ($action === 'plan') {

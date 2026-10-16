@@ -36,6 +36,8 @@ import { prendreLaDemande, suiteDuRaccourci } from './src/ui/raccourci';
 import { indexerLesPlans } from './src/ui/spotlight';
 import { astuce } from './src/ui/astuce';
 import { useAccountStore } from './src/store/accountStore';
+import { useModeDiagnostic } from './src/diagnostic/mode';
+import { activerDiagnostic, desactiverDiagnostic } from './src/diagnostic/controleur';
 
 /**
  * LE GARDE-FOU ENVELOPPE TOUT — voir `src/components/GardeFou.tsx`.
@@ -70,6 +72,11 @@ function Application() {
   const invite = useAccountStore((s) => s.invite);
   const compteCharge = useAccountStore((s) => s.charge);
   const chargerCompte = useAccountStore((s) => s.charger);
+  const admin = useAccountStore((s) => s.admin);
+  const diagActif = useModeDiagnostic((s) => s.actif);
+  const diagCharge = useModeDiagnostic((s) => s.charge);
+  const chargerDiag = useModeDiagnostic((s) => s.charger);
+  const reglerDiag = useModeDiagnostic((s) => s.regler);
   const c = useTheme();
   const darkContent = screen !== 'scan' && c.bg === '#F6F7F9';
 
@@ -105,6 +112,11 @@ function Application() {
     */
     chargerLesPannes();
     /*
+      LE RÉGLAGE DU MODE DIAGNOSTIC — lu du disque. Il ne s'allumera que si le
+      serveur confirme aussi que ce compte est administrateur (voir plus bas).
+    */
+    chargerDiag();
+    /*
       LA BOÎTE DES NOTIFICATIONS — relue du disque, puis demandée au serveur.
       La pastille de la cloche doit être juste dès l'accueil : c'est elle qui
       dit qu'il y a du nouveau, et personne n'ouvre une boîte pour vérifier.
@@ -133,7 +145,26 @@ function Application() {
     chargerLesPremieresFois,
     chargerLesPannes,
     chargerUsage,
+    chargerDiag,
   ]);
+
+  /*
+    LE MODE DIAGNOSTIC NE S'ALLUME QUE POUR L'ADMINISTRATEUR, ET S'IL L'A VOULU.
+
+    Deux conditions, pas une : le serveur dit `admin` (sa liste `ADMIN_EMAILS`)
+    ET le réglage local est allumé. Dès que l'une tombe, tout s'éteint — et si
+    c'est l'admin qui tombe (compte changé, liste mise à jour), le réglage
+    retombe POUR DE BON, pour ne pas se rallumer tout seul au prochain compte.
+  */
+  useEffect(() => {
+    if (!compteCharge || !diagCharge) return;
+    if (admin && diagActif) {
+      activerDiagnostic();
+      return;
+    }
+    desactiverDiagnostic();
+    if (!admin && diagActif) reglerDiag(false);
+  }, [admin, diagActif, compteCharge, diagCharge, reglerDiag]);
 
   /*
     CEUX QUI ÉTAIENT LÀ AVANT GARDENT LEURS OUTILS.
