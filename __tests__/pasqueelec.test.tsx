@@ -258,9 +258,10 @@ describe('la rangée d’édition met le meuble avant l’appareil', () => {
     const ordre = rang(rangeeEnEdition());
     expect(ordre.indexOf('Appareil')).toBeLessThan(ordre.indexOf('Plafond'));
     expect(ordre.indexOf('Appareil')).toBeLessThan(ordre.indexOf('Note'));
-    // « Redresser » ouvre toujours la rangée : il ne pose rien, il remet le
-    // fond d'équerre avant qu'on place quoi que ce soit.
-    expect(ordre.indexOf('Redresser')).toBe(0);
+    // « Aligner » (ex-« Redresser », revue des « découvreurs ») ouvre
+    // toujours la rangée : il ne pose rien, il remet le fond d'équerre
+    // avant qu'on place quoi que ce soit.
+    expect(ordre.indexOf('Aligner')).toBe(0);
   });
 });
 

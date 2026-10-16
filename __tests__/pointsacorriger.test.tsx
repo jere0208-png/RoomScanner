@@ -53,12 +53,13 @@ describe('le nord à orienter se dit en clair', () => {
   it('le prix du devis ne sort plus de l’écran : la rangée se serre quand elle déborde', () => {
     const ecran = lire('src/screens/ResultScreen.tsx');
     expect(ecran).toContain('return total > winLargeur - 2 * 16 - 20;');
-    // « Explorer » garde son mot (revue « Chloé ») : serré, il se dit « Visite ».
-    expect(ecran).toContain("<Text style={styles.explorerPastilleTexte}>{explorerCourt ? 'Visite' : 'Explorer'}</Text>");
-    // La liste d'achats, elle, garde son mot même serrée (revue de
-    // lisibilité : en 3D on la confondait avec Décorer) — voir
-    // `listedachats.test.tsx`.
-    expect(ecran).toMatch(/<Text style=\{styles\.vuePastilleTexte\} numberOfLines=\{1\}>\s*Liste d’achats/);
+    // « Explorer » garde son mot (revue « Chloé ») : serré, il se dit
+    // « Visite » — dans le style des autres pastilles, plus en bleu plein
+    // (revue des « découvreurs »).
+    expect(ecran).toContain("<Text style={styles.vuePastilleTexte}>{explorerCourt ? 'Visite' : 'Explorer'}</Text>");
+    // La liste d'achats a quitté cette rangée (revue des « découvreurs ») :
+    // voir `listedachats.test.tsx`.
+    expect(ecran).not.toContain('accessibilityLabel="Liste d’achats"');
   });
 });
 

@@ -459,12 +459,28 @@ describe('dans l’écran du plan', () => {
   const pastille = (t: TestRenderer.ReactTestRenderer) =>
     t.root.findAllByType(TouchableOpacity).find((x) => x.props.accessibilityLabel === 'Liste d’achats');
 
-  it('le grand public a sa pastille « Travaux », qui ouvre la feuille avec ses pièces', () => {
+  /*
+    MIS À JOUR — revue des « découvreurs » : la pastille « Liste d'achats »
+    a quitté la rangée du haut (deux appels s'y disputaient le regard). La
+    liste s'ouvre depuis le menu du plan — et depuis « Décorer ».
+  */
+  const ligneDuMenu = (t: TestRenderer.ReactTestRenderer, mot: string) =>
+    t.root
+      .findAll((n) => typeof n.props?.onPress === 'function')
+      .filter((n) => n.findAllByType(Text).some((x) => x.props.children === mot))
+      .pop();
+
+  it('le grand public ouvre la liste depuis le menu du plan, avec ses pièces', () => {
     const t = monter(false);
-    const p = pastille(t);
-    expect(p).toBeDefined();
+    expect(pastille(t)).toBeUndefined();
+    const plus = t.root.findAllByType(TouchableOpacity).find((x) => x.props.accessibilityLabel === 'Plus')!;
+    act(() => plus.props.onPress());
+    act(() => jest.advanceTimersByTime(400));
     expect(t.root.findAllByType(TravauxSheet)[0].props.visible).toBe(false);
-    act(() => p!.props.onPress());
+    const ligne = ligneDuMenu(t, 'Liste d’achats');
+    expect(ligne).toBeDefined();
+    act(() => ligne!.props.onPress());
+    act(() => jest.advanceTimersByTime(600));
     const feuille = t.root.findAllByType(TravauxSheet)[0];
     expect(feuille.props.visible).toBe(true);
     expect(feuille.props.pieces.length).toBeGreaterThan(0);
@@ -475,10 +491,18 @@ describe('dans l’écran du plan', () => {
     expect(pastille(t)).toBeUndefined();
   });
 
-  it('et tout le monde la trouve en tête du menu « Plus »', () => {
-    const src = readFileSync(join(__dirname, '..', 'src/screens/ResultScreen.tsx'), 'utf8');
-    const a = src.indexOf('actions: [', src.indexOf('title: scanName'));
-    const premier = src.slice(a, src.indexOf('label:', a) + 60);
-    expect(premier).toContain('Liste d’achats');
+  /*
+    MIS À JOUR : en tête du menu pour le grand public ; l'électricien voit
+    d'abord son métier (revue des « découvreurs »), la liste juste après.
+  */
+  it('et le grand public la trouve en tête du menu « Plus »', () => {
+    const t = monter(false);
+    const plus = t.root.findAllByType(TouchableOpacity).find((x) => x.props.accessibilityLabel === 'Plus')!;
+    act(() => plus.props.onPress());
+    act(() => jest.advanceTimersByTime(400));
+    const mots = t.root.findAllByType(Text).map((x) => [].concat(x.props.children ?? []).join(''));
+    const premiere = mots.findIndex((m) => m === 'Votre projet');
+    expect(premiere).toBeGreaterThanOrEqual(0);
+    expect(mots.slice(premiere + 1).find((m) => m.length > 0)).toBe('Liste d’achats');
   });
 });

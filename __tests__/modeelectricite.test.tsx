@@ -271,10 +271,16 @@ describe('les données ne bougent pas', () => {
 });
 
 describe('la proposition', () => {
-  it('sans le mode, le menu du plan offre de le passer', () => {
+  /*
+    MIS À JOUR — revue des « découvreurs » : l'électricité s'imposait aux
+    non-électriciens jusque dans le menu du plan. Le mode s'active au profil
+    (« Mon usage », voir plus bas) ; le menu ne le propose plus.
+  */
+  it('sans le mode, le menu du plan ne le propose plus', () => {
     const t = monter(false);
     presser(t, 'Plus');
-    expect(textes(t)).toContain('Placer prises et interrupteurs');
+    expect(textes(t)).not.toContain('Placer prises et interrupteurs');
+    expect(textes(t)).not.toContain('Normes auto');
   });
 
   it('avec le mode, tout est là — et la proposition se tait', () => {

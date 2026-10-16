@@ -38,21 +38,26 @@ describe('le panier', () => {
     expect(SOLAIRES.panier.length).toBeGreaterThan(60);
   });
 
-  it('le menu : « Liste d’achats » au panier, « Décorer » au rouleau', () => {
+  /*
+    MIS À JOUR — revue des « découvreurs » : « Décorer » a quitté le menu du
+    plan (il est sur la barre du bas, au rouleau — voir `decorer.test.tsx`),
+    et la pastille « Liste d'achats » a quitté la rangée du haut. La liste
+    garde son panier et son nom, au menu du plan et dans « Décorer ».
+  */
+  it('le menu : « Liste d’achats » au panier ; « Décorer » n’y est plus en double', () => {
     expect(entree('Liste d’achats')).toContain("icon: 'panier'");
-    expect(entree('Décorer')).toContain("icon: 'rouleau'");
+    const menu = RESULT.slice(RESULT.indexOf('const menuDuScan'), RESULT.indexOf('  return (', RESULT.indexOf('const menuDuScan')));
+    expect(menu).not.toContain("label: 'Décorer'");
     expect(RESULT).not.toContain("label: 'Ce qu’il faut acheter'");
+    const barre = lire('src/screens/result/ResultToolbar.tsx');
+    expect(barre).toMatch(/key="decorer"\s+icon="rouleau"/);
   });
 
-  it('la pastille de la barre : le panier, le nom, et le mot même serrée (vue 3D)', () => {
-    const i = RESULT.indexOf('accessibilityLabel="Liste d’achats"');
-    expect(i).toBeGreaterThan(0);
-    const bloc = RESULT.slice(i, RESULT.indexOf('</TouchableOpacity>', i));
-    expect(bloc).toContain('SOLAIRES.panier');
-    expect(bloc).toContain('Liste d’achats');
-    // Le mot n'est plus conditionné à la place disponible.
-    expect(bloc).not.toMatch(/!rangeeSerree &&/);
+  it('plus de pastille « Liste d’achats » dans la rangée du haut', () => {
+    expect(RESULT).not.toContain('accessibilityLabel="Liste d’achats"');
     expect(RESULT).not.toContain('accessibilityLabel="Achats"');
+    // Elle reste à portée dans « Décorer ».
+    expect(lire('src/components/DecorSheet.tsx')).toContain('accessibilityLabel="Voir la liste d’achats"');
   });
 
   it('le menu dessine bien le panier (la clé existe dans la feuille)', () => {

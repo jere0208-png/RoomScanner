@@ -157,6 +157,8 @@ export interface VerdictDePassage {
   ok: boolean;
   court: string;
   detail: string;
+  /** Le nombre de portes et de passages franchis, quand il passe monté. */
+  portes?: number;
 }
 
 const DEHORS = '__dehors__';
@@ -322,6 +324,7 @@ export function passageDuMeuble(
     return {
       ok: true,
       court: 'Passe par les portes',
+      portes: bon.length,
       detail:
         `${nom} (${taille}) : il passe jusqu’${aLaPiece(nomDe(cible))}` +
         (etapes.length > 0 ? ` — ${etapes.join(', ')}.` : '.') +

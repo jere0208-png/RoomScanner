@@ -1,5 +1,15 @@
 /**
- * LA RANGÉE DE CALQUES : ce qu'elle annonce, et ce qu'elle laisse entrer.
+ * LA RANGÉE DE CALQUES : plus de peigne.
+ *
+ * Elle a porté un « peigne » — un mot (« Afficher », « Ajouter »), une
+ * barre et une descente par bouton (croquis Paint du patron). Ces tests
+ * vérifiaient le mot, les traits et leur fondu.
+ *
+ * MIS À JOUR — revue des « découvreurs » (six testeurs sur huit) : les traits
+ * en arbre se lisaient comme une décoration, et le mot mentait : « + Meuble »,
+ * « Décorer » et « Autres » sont des ACTIONS, rangées sous « Afficher ».
+ * Chaque pastille porte déjà son mot. Le peigne est retiré ; ce banc vérifie
+ * désormais qu'il ne revient pas, et que la rangée garde tous ses boutons.
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -8,7 +18,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Text, View } from 'react-native';
 import { Line } from 'react-native-svg';
 import TestRenderer, { act } from 'react-test-renderer';
 import { RangeeOutils } from '../src/components/RangeeOutils';
@@ -17,41 +27,20 @@ import { light } from '../src/theme';
 
 const STYLES = getStyles(light) as unknown as Record<string, object>;
 
-/**
- * HORS ÉDITION, LA RANGÉE DIT CE QU'ELLE FAIT : « Afficher ».
- *
- * Relevé du patron, croquis Paint à l'appui : « lorsqu'on n'est pas en
- * édition, l'utilisateur doit comprendre que les boutons sont des
- * "Afficher" — texte Afficher + lignes vers les boutons ».
- *
- * Rien ne le disait. « Meubles », « Appareils », « Surfaces », « Nord » :
- * quatre mots qui NOMMENT une chose sans dire ce qu'on en fait — on peut
- * aussi bien croire qu'on va en ajouter un. Or ce sont des interrupteurs de
- * calque, et le seul geste possible est de les allumer ou de les éteindre.
- *
- * Le peigne le dit d'un dessin : un mot, une barre, et une descente par
- * bouton — la manière dont on annote un plan, justement, et que
- * l'électricien lit tous les jours sur ses schémas.
- *
- * EN ÉDITION, RIEN DE TOUT ÇA : les boutons y font des choses différentes
- * (poser un appareil, redresser, ouvrir le catalogue), et un titre commun
- * mentirait sur trois d'entre eux.
- */
-describe('le peigne « Afficher »', () => {
-  const monter = (edition: boolean) => {
+describe('la rangée sans peigne', () => {
+  const monter = (n: number, largeur = 390, dessus = 0) => {
     let t!: TestRenderer.ReactTestRenderer;
     act(() => {
       t = TestRenderer.create(
         <RangeeOutils
           styles={STYLES}
           anim={new Animated.Value(1)}
-          largeur={390}
+          largeur={largeur}
           reserve={62}
           bas={10}
-          dessus={0}
-          peigne={edition ? { mot: 'Ajouter', depuis: 1 } : { mot: 'Afficher' }}
-          elements={['a', 'b', 'c', 'd'].map((k) => (
-            <View key={k} />
+          dessus={dessus}
+          elements={Array.from({ length: n }, (_, i) => (
+            <View key={`o${i}`} testID={`o${i}`} />
           ))}
         />,
       );
@@ -59,102 +48,30 @@ describe('le peigne « Afficher »', () => {
     return t;
   };
 
-  it('coiffe les calques d’un mot et d’une descente par bouton', () => {
-    const t = monter(false);
-    const mots = t.root
-      .findAllByType(Text)
-      .map((n) => String(n.props.children));
-    expect(mots).toContain('Afficher');
-    // Une descente par bouton, plus la barre qui les réunit : sans les
-    // traits, le mot flotterait au-dessus de rien.
-    const traits = t.root.findAll(
-      (n) => typeof n.props?.x1 === 'number' || typeof n.props?.y1 === 'number',
-    );
-    expect(traits.length).toBeGreaterThanOrEqual(5);
-    act(() => t.unmount());
-  });
-
-  /*
-    IL PART COMME LES PASTILLES, pas avant, pas après.
-
-    Relevé du patron : « donne-lui la même animation que les boutons lors
-    du clic sur Édition, il doit disparaître sans coupure nette ». Il
-    s'éteignait d'un coup pendant que la rangée se retirait en fondu : deux
-    temps pour un seul geste, et l'œil voit le raccord.
-  */
-  it('s’efface avec la rangée, à la même horloge', () => {
-    const horloge = new Animated.Value(1);
-    let t!: TestRenderer.ReactTestRenderer;
-    act(() => {
-      t = TestRenderer.create(
-        <RangeeOutils
-          styles={STYLES}
-          anim={horloge}
-          largeur={390}
-          reserve={62}
-          bas={10}
-          dessus={0}
-          peigne={{ mot: 'Afficher' }}
-          elements={['a', 'b', 'c'].map((k) => (
-            <View key={k} />
-          ))}
-        />,
-      );
-    });
-    const bloc = t.root
-      .findAll((n) => {
-        const st = StyleSheet.flatten(n.props?.style) as
-          | { opacity?: unknown }
-          | undefined;
-        return (
-          !!st &&
-          typeof st.opacity === 'object' &&
-          n.findAllByType(Text).some((x) => x.props.children === 'Afficher')
-        );
-      })
-      .pop();
-    // Son opacité est une valeur ANIMÉE, dérivée de l'horloge de la rangée :
-    // un nombre en dur voudrait dire qu'il s'éteint tout seul.
-    expect(bloc).toBeDefined();
-    act(() => t.unmount());
-  });
-
-  /*
-    EN ÉDITION, IL CHANGE DE MOT — il ne disparaît plus.
-
-    Il s'est effacé le temps de deux versions : hors édition les boutons
-    montrent ou cachent, en édition ils font chacun autre chose, et un
-    « Afficher » sur des outils de pose aurait menti. Relevé du patron :
-    « dans l'édition fais le même système que le "Afficher" et ses lignes,
-    mais cette fois "Ajouter" et on cible appareil, meuble, plafond, note ».
-
-    Ils ne font pas « chacun autre chose », en effet : quatre des cinq
-    POSENT quelque chose sur le plan, et c'est le même geste. Le cinquième —
-    « Redresser » — ne pose rien : il remet tout le plan d'équerre. Il ouvre
-    la rangée, et le peigne commence après lui.
-  */
-  it('change de mot en édition, et annonce « Ajouter »', () => {
-    const t = monter(true);
-    const mots = t.root
-      .findAllByType(Text)
-      .map((n) => String(n.props.children));
-    expect(mots).toContain('Ajouter');
+  it('ne dessine ni mot ni trait au-dessus des pastilles', () => {
+    const t = monter(4);
+    const mots = t.root.findAllByType(Text).map((n) => String(n.props.children));
     expect(mots).not.toContain('Afficher');
+    expect(mots).not.toContain('Ajouter');
+    expect(t.root.findAllByType(Line)).toHaveLength(0);
     act(() => t.unmount());
   });
 
-  it('et laisse « Redresser » hors du peigne', () => {
-    const t = monter(true);
-    const traits = t.root
-      .findAllByType(Line)
-      .filter((x) => x.props.stroke === '#B6BECB');
-    const descentes = traits.filter((n) => n.props.x1 === n.props.x2);
-    // Quatre boutons, trois annotés : le premier reste dehors.
-    expect(descentes).toHaveLength(3);
-    const barre = traits.find((n) => n.props.y1 === n.props.y2)!;
-    const part = (390 - 62 - 20) / 4;
-    // La barre part du DEUXIÈME bouton, pas du bord de la rangée.
-    expect(Number(barre.props.x1)).toBeCloseTo(10 + part * 1.5, 3);
+  it('garde tous ses boutons, sur la ligne puis dans la pile de droite', () => {
+    // Sept outils sur un téléphone : quatre sur la ligne, trois en pile.
+    const t = monter(7, 390, 66);
+    for (let i = 0; i < 7; i++) {
+      expect(t.root.findAll((n) => n.props.testID === `o${i}`, { deep: false })).toHaveLength(1);
+    }
     act(() => t.unmount());
+  });
+
+  it('n’exporte plus l’encombrement du peigne', () => {
+    // L'écran posait son bandeau au-dessus du peigne (`PEIGNE_TOTAL`) ; il
+    // se pose maintenant au-dessus des pastilles seules.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require('../src/components/RangeeOutils');
+    expect(mod.PEIGNE_TOTAL).toBeUndefined();
+    expect(mod.PEIGNE_OPACITE).toBeUndefined();
   });
 });

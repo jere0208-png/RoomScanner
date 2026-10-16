@@ -234,7 +234,10 @@ describe('l’électricité sans faux-semblant (Paul, Sophie, Karim)', () => {
   it('le menu ne réserve plus les prises « aux électriciens »', () => {
     const ecran = lire('src', 'screens', 'ResultScreen.tsx');
     expect(ecran).not.toMatch(/'Pour les électriciens\.'/);
-    expect(ecran).toContain('Placer prises et interrupteurs');
+    // MIS À JOUR — revue des « découvreurs » : la proposition du mode a
+    // quitté le menu du plan (elle s'imposait aux non-électriciens) ; le mode
+    // s'active au profil.
+    expect(ecran).not.toContain("label: 'Placer prises et interrupteurs'");
   });
 
   it('« Passer » le film ne fait plus sauter la question de l’usage', () => {

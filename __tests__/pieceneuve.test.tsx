@@ -183,19 +183,23 @@ describe('deux poses de suite, depuis l’ecran', () => {
 
   const poser = (t: TestRenderer.ReactTestRenderer) => {
     // Le menu « Plus », puis l'action, puis un gabarit du catalogue.
+    // Le menu est regroupé (revue des « découvreurs ») : « Ajouter une
+    // pièce » d'abord, puis la façon — scanner ou dessiner.
     const plus = t.root
       .findAllByType(TouchableOpacity)
       .find((n) => n.props.accessibilityLabel === 'Plus')!;
     act(() => plus.props.onPress());
     act(() => jest.advanceTimersByTime(600));
-    const item = t.root
-      .findAll((n) => typeof n.props?.onPress === 'function')
-      .filter((n) =>
-        n.findAllByType(Text).some((x) => x.props.children === 'Dessiner une pièce à la main'),
-      )
-      .pop()!;
-    act(() => item.props.onPress());
-    act(() => jest.advanceTimersByTime(600));
+    const choisir = (mot: string) => {
+      const item = t.root
+        .findAll((n) => typeof n.props?.onPress === 'function')
+        .filter((n) => n.findAllByType(Text).some((x) => x.props.children === mot))
+        .pop()!;
+      act(() => item.props.onPress());
+      act(() => jest.advanceTimersByTime(600));
+    };
+    choisir('Ajouter une pièce');
+    choisir('Dessiner une pièce à la main');
     const wc = t.root
       .findAll((n) => n.props?.accessibilityLabel === 'WC' && typeof n.props?.onPress === 'function')[0];
     act(() => wc.props.onPress());

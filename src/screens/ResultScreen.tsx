@@ -81,7 +81,6 @@ import {
   PILL_GAP,
   ToolPill,
 } from '../components/ToolPill';
-import { PEIGNE_TOTAL } from '../components/RangeeOutils';
 // Une icône, un module : l'import groupé de Lucide faisait entrer ses
 // quelque 1 770 icônes dans l'application, évaluées à l'ouverture du plan.
 import ChevronsUpDown from 'lucide-react-native/icons/chevrons-up-down';
@@ -128,7 +127,6 @@ import {
   meublesQuiSeChevauchent,
   type RoomPart,
   solDesMurs,
-  perimetreDesPieces,
   niveauDeReference,
   etendueDeLaPiece,
   estDessine,
@@ -259,6 +257,16 @@ const ENREGISTREMENT_AUTO_MS = 1500;
  *  (revue « Bernard »). */
 const HIT_PASTILLE = { top: 5, bottom: 5, left: 4, right: 4 };
 
+/**
+ * Le nom d'un niveau sur son onglet : « RDC », « 1er étage », « Sous-sol ».
+ * Le rez-de-chaussée s'abrège (le mot entier ne tient pas à côté de deux
+ * autres) ; les étages se disent en clair — « R+1 » ne se lit que quand on
+ * sait déjà.
+ */
+export function nomCourtDuNiveau(n: number): string {
+  return n === 0 ? 'RDC' : nomDuNiveau(n);
+}
+
 /** Les pastilles du haut et la rangée d’outils du bas, posées sur le plan (pt). */
 const MARGES_DU_PLAN = { haut: 48, bas: 170 };
 
@@ -327,19 +335,18 @@ export function ResultScreen() {
    */
   const ligneOutils = basSysteme + 8;
   /*
-    LE BANDEAU SE POSE AU-DESSUS DU PEIGNE, PAS DESSUS.
-
-    Relevé du patron, capture à l'appui : « le bloc en bas cache le
-    "Afficher" ». Il montait d'une cellule au-dessus de la rangée — la
-    hauteur des pastilles — sans compter le peigne, qui vit là lui aussi :
-    sa barre, ses descentes et son mot. C'est le peigne qui dit ce qu'il
-    prend (`PEIGNE_TOTAL`) ; l'écran ne le devine plus.
+    LE BANDEAU SE POSE AU-DESSUS DE LA RANGÉE, une cellule et un écart plus
+    haut. Il comptait aussi le peigne « Afficher » (relevé du patron : « le
+    bloc en bas cache le "Afficher" ») ; le peigne est parti (revue des
+    « découvreurs » : des traits qui ne faisaient que décorer), sa place
+    avec lui.
   */
-  const ligneBandeau =
-    ligneOutils + Math.max(PILL_CELL_H + PILL_GAP, PEIGNE_TOTAL + 8);
+  const ligneBandeau = ligneOutils + PILL_CELL_H + PILL_GAP;
   const tousLesMurs = useScanStore((s) => s.walls);
   const tousLesMeubles = useScanStore((s) => s.objects);
   const scanName = useScanStore((s) => s.scanName);
+  /** L'appareil sait-il scanner ? `null` tant que l'accueil n'a pas vérifié. */
+  const scanSupporte = useScanStore((s) => s.supported);
   const saves = useScanStore((s) => s.saves);
   const toutesLesPhotos = useScanStore((s) => s.photos);
   const removePhoto = useScanStore((s) => s.removePhoto);
@@ -2200,11 +2207,6 @@ export function ResultScreen() {
   */
   const parts = useMemo(() => roomParts(walls, rooms), [walls, rooms]);
   /*
-    « m périm. » — LE TOUR DES PIÈCES, pas la somme de tous les murs : une
-    cloison comptait comme un périmètre (correctif de l'audit).
-  */
-  const perimeter = useMemo(() => perimetreDesPieces(parts), [parts]);
-  /*
     LES TRAVAUX, PIÈCE PAR PIÈCE — peinture, sol, plinthes. Calculés sur le
     niveau affiché, comme tout l'écran : on refait un étage à la fois.
   */
@@ -2227,9 +2229,6 @@ export function ResultScreen() {
     réflexion « grand public » : le chiffre qu'on écrit dans une annonce.
   */
   const habitable = useMemo(() => surfacesHabitables(rooms, parts, objects), [rooms, parts, objects]);
-  /** Le sol et l'habitable se valent : l'en-tête ne les répète pas. */
-  const solCommeHabitable =
-    !!surface && habitable.pieces.length > 0 && Math.abs(habitable.total - surface.area) < 0.05;
   /** La liste des surfaces que l'image partagée emporte (voir plus bas, `legendeImage`). */
   const legendeSurfaces = useMemo(() => {
     const virgule = (v: number) => v.toFixed(2).replace('.', ',');
@@ -3333,10 +3332,18 @@ export function ResultScreen() {
     haptic('succes');
   };
 
-  /** Ouvre un mur vu de face, sans rien y poser. */
+  /**
+   * Ouvre un mur vu de face, sans rien y poser.
+   *
+   * POUR TOUT LE MONDE — revue des « découvreurs » : le bricoleur veut sa
+   * faïence, le plombier ses arrivées d'eau, et la vue de face n'ouvrait
+   * qu'à l'électricien. Hors mode électricité, elle montre le mur coté, ses
+   * ouvertures et ses meubles, sans les outils d'appareillage (voir
+   * `WallElevation`) — et rien n'y est tenu d'avance.
+   */
   const openWallElevation = (wallId: string) => {
     setElecWallId(wallId);
-    setElecSel(fixtures.find((f) => f.wallId === wallId)?.id ?? null);
+    setElecSel(modeElec ? fixtures.find((f) => f.wallId === wallId)?.id ?? null : null);
     setElecView('mur');
     setElecOpen(true);
   };
@@ -3595,14 +3602,12 @@ export function ResultScreen() {
   */
   const estimeSerree = (() => {
     const largeurs = [
-      !modeElec && piecesTravaux.length > 0 ? 136 : 0,
       modeElec && totalDevis !== null && totalDevis > 0 ? 96 : 0,
       modeElec ? 34 : 0,
       !modeElec && alertesDePlan > 0 ? 34 : 0,
       walls.length > 0 && tab === '2d' ? 34 : 0,
       walls.length > 0 ? 118 : 0,
       walls.length > 0 && tab === '3d' ? 66 : 0,
-      niveaux.length > 1 ? 74 : 0,
       70,
     ].filter((l) => l > 0);
     const total = largeurs.reduce((t, l) => t + l, 0) + 8 * (largeurs.length - 1);
@@ -3619,15 +3624,12 @@ export function ResultScreen() {
     estimeSerree &&
     (() => {
       const largeurs = [
-        // « Liste d'achats » garde son mot, même serrée : voir la pastille.
-        !modeElec && piecesTravaux.length > 0 ? 136 : 0,
         modeElec && totalDevis !== null && totalDevis > 0 ? 96 : 0,
         modeElec ? 34 : 0,
         !modeElec && alertesDePlan > 0 ? 34 : 0,
         walls.length > 0 && tab === '2d' ? 34 : 0,
         walls.length > 0 ? 118 : 0,
         walls.length > 0 && tab === '3d' ? 66 : 0,
-        niveaux.length > 1 ? 74 : 0,
         70,
       ].filter((l) => l > 0);
       const total = largeurs.reduce((t, l) => t + l, 0) + 8 * (largeurs.length - 1);
@@ -3646,12 +3648,10 @@ export function ResultScreen() {
   */
   const cleRangee = [
     modeElec,
-    piecesTravaux.length > 0,
     totalDevis !== null && totalDevis > 0 ? prixCourt(totalDevis) : '',
     alertesDePlan > 0,
     walls.length > 0,
     tab,
-    niveaux.length,
     winLargeur,
   ].join('|');
   const cranRangee = Math.max(
@@ -3664,30 +3664,24 @@ export function ResultScreen() {
   const rangeeEnIcones = cranRangee >= 3;
   const explorerIcone = cranRangee >= 4;
 
+  /*
+    LE BANDEAU NE GARDE QUE L'UTILE — revue des « découvreurs » (six sur
+    huit) : « 5 pièces · 16 murs · 45,8 m² habitables · 58,1 m tour des
+    pièces · 26 meubles », cinq chiffres en corps 9 dont trois ne servaient
+    à personne au premier regard. Il reste les pièces et les m² habitables —
+    le chiffre d'une annonce, le même mot dans les deux modes (l'électricien
+    lisait « m² sol », le particulier « m² habitables ») — et, pour
+    l'électricien, le nombre d'appareils posés.
+
+    RIEN N'EST PERDU : les murs et le tour des pièces (le métré des
+    plinthes) sont sur la fiche de chaque pièce et dans la liste d'achats,
+    les meubles dans la liste d'achats et sur le plan.
+  */
   const metrics = [
-    ...(rooms.length > 1
-      ? [{ value: `${rooms.length}`, label: 'pièces' }]
+    ...(rooms.length > 0
+      ? [{ value: `${rooms.length}`, label: rooms.length > 1 ? 'pièces' : 'pièce' }]
       : []),
-    { value: `${walls.length}`, label: 'murs' },
-    /*
-      UN CHIFFRE, PAS DEUX FOIS LE MÊME — revue « Bernard » : « 20,0 m² sol »
-      et « 20,0 m² hab. » côte à côte, il cherchait la différence. Quand le
-      sol et l'habitable se valent, le particulier ne lit que l'habitable.
-    */
-    ...(surface && !(solCommeHabitable && !modeElec)
-      ? [
-          {
-            value: `${surface.exact ? '' : '≈ '}${fr(surface.area)}`,
-            label: 'm² sol',
-          },
-        ]
-      : []),
-    /*
-      LE CHIFFRE D'UNE ANNONCE, À CÔTÉ DU SOL — toujours pour le particulier,
-      et pour l'électricien dès qu'il diffère (un rampant, un garage).
-    */
-    ...(habitable.pieces.length > 0 &&
-    (!modeElec || Math.abs(habitable.total - habitable.sol) >= 0.5)
+    ...(habitable.pieces.length > 0
       ? [
           {
             // « À vérifier » sur la fiche et au PDF : l'en-tête, que l'on lit
@@ -3696,25 +3690,28 @@ export function ResultScreen() {
             label: 'm² habitables',
           },
         ]
-      : []),
+      : surface
+        ? [
+            /* Pas de pièce refermée : pas d'habitable à compter. Le sol
+               relevé dit au moins la taille du logement. */
+            {
+              value: `${surface.exact ? '' : '≈ '}${fr(surface.area)}`,
+              label: 'm² au sol',
+            },
+          ]
+        : []),
+    /*
+      LE TOTAL DE LA MAISON — revue « Léa » : l'en-tête ne disait que le
+      niveau affiché. Avec deux niveaux ou plus, l'habitable de toute la
+      maison s'ajoute.
+    */
     ...(surfaceMaison
-      ? [{ value: `${surfaceMaison.exact ? '' : '≈ '}${fr(surfaceMaison.area)}`, label: 'm² maison' }]
-      : []),
-    ...(surfaceMaison && (!modeElec || Math.abs(surfaceMaison.habitable - surfaceMaison.area) >= 0.5)
       ? [
           {
             value: `${!surfaceMaison.exact || surfaceMaison.aVerifier > 0 ? '≈ ' : ''}${fr(surfaceMaison.habitable)}`,
             label: 'm² hab. maison',
           },
         ]
-      : []),
-    // LE TOUR DES PIÈCES, pas le contour du logement — revue « Nadia » :
-    // « périmètre » annonçait 59,6 m, chaque cloison comptée une fois par
-    // pièce qu'elle borde. C'est le métré des plinthes et des murs à
-    // peindre : il se nomme pour ce qu'il est.
-    { value: fr(perimeter), label: 'm tour des pièces' },
-    ...(objects.length > 0
-      ? [{ value: `${objects.length}`, label: 'meubles' }]
       : []),
     // L'appareillage ne se compte que pour l'électricien : le particulier
     // ouvrant l'exemple lisait « 23 élec. » sans savoir de quoi.
@@ -3956,6 +3953,60 @@ export function ResultScreen() {
     useScanStore.getState().poserDAuto(res.fixtures, []);
   };
 
+  /*
+    « + MEUBLE », DANS LES DEUX VUES — revue des « découvreurs » : la barre
+    garde ses pastilles aux mêmes places en 2D et en 3D. Le meuble se pose
+    sur le plan : depuis la maquette, on y revient d'abord, en édition, et le
+    catalogue s'ouvre une fois le plan à l'écran.
+  */
+  const ajouterUnMeuble = () => {
+    const ouvrir = () => {
+      setEditMode(true);
+      seulGeste();
+      setShowFurniture(true);
+      setCatalogue(true);
+    };
+    if (vue === '3d') {
+      basculerVue();
+      ouvrirApres(ouvrir);
+      return;
+    }
+    ouvrir();
+  };
+
+  /*
+    LE SCAN N'EST PROPOSÉ QU'À UN APPAREIL QUI SAIT SCANNER — revue des
+    « découvreurs » : sans LiDAR, le menu offrait trois « Scanner… » qui ne
+    menaient qu'à un refus. Même détection que l'accueil (`supported`, que
+    l'accueil remplit au lancement) ; tant qu'on ne sait pas, on propose.
+  */
+  const scanPossible = scanSupporte !== false;
+  const scannerUnePiece = () => {
+    demarrerComplement().catch((e: any) =>
+      alerte(
+        expliquer('releve', e).titre,
+        expliquer(
+          'releve',
+          e?.message ?? 'La réunion de plusieurs relevés demande iOS 17.',
+        ).message,
+      ),
+    );
+  };
+  /**
+   * DESSINER UNE PIÈCE, sans tout recommencer — elle se POSE aux cotes qu'on
+   * donne, en pointillés (relevé du patron : tirer un rectangle dans le vide
+   * s'annulait avec le déplacement du plan).
+   */
+  const dessinerUnePiece = () => {
+    seulGeste();
+    setAjoutPiece(true);
+  };
+  const dessinerUnNiveau = (n: number) => {
+    useScanStore.getState().allerAuNiveau(n);
+    haptic('leger');
+    ouvrirApres(() => setAjoutPiece(true));
+  };
+
   const menuDuScan = () =>
     setMenu({
                 title: scanName,
@@ -3974,16 +4025,81 @@ export function ResultScreen() {
                     ET EN SECTIONS TITRÉES — revue de lisibilité : douze
                     entrées à plat, et deux paires qui portaient la même
                     icône (le rouleau pour les achats et Décorer, la même
-                    flèche pour scanner et dessiner un étage). Quatre blocs
-                    — Votre projet, Ajouter, Modifier, Version —, et une
-                    icône par entrée. Aucune entrée retirée.
+                    flèche pour scanner et dessiner un étage). Une icône
+                    par entrée.
                   */
+                  /*
+                    LE MENU REGROUPÉ — revue des « découvreurs » (six sur
+                    huit) : dix-sept entrées, dont sept « Ajouter » qui se
+                    répétaient à un mot près (scanner ou dessiner, une
+                    pièce, un étage, un sous-sol). Il dit d'abord QUOI —
+                    une pièce, un niveau, un mur —, et la façon (scan ou
+                    dessin) se choisit ensuite, dans une seconde feuille.
+                    Sans LiDAR, il n'y a pas de choix à faire : on dessine
+                    (même détection que l'accueil, `supported` du magasin).
+
+                    En mode électricité, le métier passe EN PREMIER ; pour
+                    les autres, l'électricité ne s'invite plus ici — elle
+                    s'active au profil, rubrique « Mon usage ».
+
+                    « Décorer » a quitté le menu : il est dans la barre du
+                    bas, à un geste. La liste d'achats y reste (elle a quitté
+                    la rangée du haut) : une fois chacun.
+                  */
+                  ...(modeElec
+                    ? [
+                      {
+                        /*
+                          LE TABLEAU QU'ON TROUVE EN ARRIVANT.
+
+                          La moitié des chantiers est de la rénovation, et elle
+                          commence toujours pareil : on ouvre le tableau, on note
+                          ce qu'il y a, on dit au client ce qu'il faut reprendre.
+                          Les applications de plan dessinent du neuf ; celle-ci
+                          sait aussi lire ce qui est déjà là.
+                        */
+                        section: 'Électricité',
+                        label: 'Relever le tableau existant',
+                        icon: 'tableau' as const,
+                        hint: existant?.departs.length
+                          ? `${existant.departs.length} organe(s) relevé(s) — le même tableau qu’au mur.`
+                          : 'Rénovation : un coffret vide, que vous remplissez organe par organe ; l’app dit ce qui bloque.',
+                        onPress: () => ouvrirLeTableau(),
+                      },
+                      {
+                        /*
+                          NORMES AUTO — l'installation qui se pose toute seule.
+
+                          Elle COMPLÈTE ce qui existe : on ne touche à rien de ce
+                          que l'électricien a placé. Et si tout est déjà conforme,
+                          elle le DIT — un outil qui ne répond rien laisse croire
+                          qu'il n'a pas compris la demande.
+                        */
+                        section: 'Électricité',
+                        label: 'Normes auto',
+                        // Le bouclier de la pastille de contrôle — relevé du
+                        // patron : c'est le même sujet, c'est le même dessin.
+                        node: (
+                          <Svg width={20} height={20} viewBox="0 0 24 24">
+                            <Trace
+                              d={SOLAIRES.bouclier}
+                              fill={teinte.ink}
+                              fillRule="evenodd"
+                            />
+                          </Svg>
+                        ),
+                        // Une ligne : le détail de ce qui se pose est le sujet
+                        // de l'écran de contrôle, pas du menu qui y mène.
+                        hint: 'Pose ce qui manque pour la NF C 15-100.',
+                        onPress: poserNormes,
+                      },
+                      ]
+                    : []),
                   {
                     /*
-                      LA LISTE D'ACHATS — en tête du menu, pour tout le
-                      monde. C'est la question qu'un particulier se pose
-                      devant le plan de son salon. Un seul nom, celui de la
-                      pastille : « Liste d'achats ».
+                      LA LISTE D'ACHATS — pour tout le monde. C'est la
+                      question qu'un particulier se pose devant le plan de son
+                      salon. Un seul nom partout : « Liste d'achats ».
                     */
                     section: 'Votre projet',
                     label: 'Liste d’achats',
@@ -3993,137 +4109,109 @@ export function ResultScreen() {
                   },
                   {
                     /*
-                      DÉCORER — les couleurs des murs, le sol, les meubles. On
-                      passe en 3D : c'est là qu'on voit ce qu'on change.
+                      AJOUTER UNE PIÈCE — la relever (iOS 17 l'aligne sur ce
+                      qui existe, l'appareillage posé survit) ou la dessiner
+                      aux cotes qu'on donne. Sans LiDAR, on dessine tout de
+                      suite : une feuille à un seul choix est un détour.
                     */
-                    section: 'Votre projet',
-                    label: 'Décorer',
-                    icon: 'rouleau' as const,
-                    hint: 'Murs, sol et couleur des meubles, vus en 3D.',
-                    onPress: () => {
-                      if (vue === '2d') basculerVue();
-                      setDecorant(true);
-                    },
-                  },
-                  {
-                    /**
-                     * SCANNER UNE PIÈCE DE PLUS — la vraie version.
-                     *
-                     * « Ajouter une pièce » pose un rectangle aux cotes
-                     * qu'on donne : c'est du dépannage. Ici on RELÈVE la
-                     * pièce, et `StructureBuilder` (iOS 17) l'aligne sur ce
-                     * qui existe déjà. L'appareillage posé survit, reprojeté
-                     * sur les murs neufs — sans quoi ajouter une chambre
-                     * coûterait vingt prises.
-                     */
-                    // Revue « Léa » : « Scanner une pièce » à côté de
-                    // « Ajouter une pièce », deux gestes, un même mot.
                     section: 'Ajouter',
-                    label: 'Scanner une autre pièce',
-                    icon: 'scanner' as const,
-                    hint: 'La chambre, la salle de bains… réunie à ce plan.',
+                    label: 'Ajouter une pièce',
+                    icon: 'piece' as const,
+                    hint: scanPossible
+                      ? 'La scanner ou la dessiner : elle rejoint ce plan.'
+                      : 'Elle se pose devant vous : poussez-la, étirez ses côtés.',
                     onPress: () => {
-                      demarrerComplement().catch((e: any) =>
-                        alerte(
-                          expliquer('releve', e).titre,
-                          expliquer(
-                            'releve',
-                            e?.message ??
-                              'La réunion de plusieurs relevés demande iOS 17.',
-                          ).message,
-                        ),
-                      );
+                      if (!scanPossible) {
+                        dessinerUnePiece();
+                        return;
+                      }
+                      setMenu({
+                        title: 'Ajouter une pièce',
+                        subtitle: 'Elle rejoint ce plan, à côté des autres.',
+                        actions: [
+                          {
+                            // Revue « Léa » : « Scanner une pièce » à côté de
+                            // « Ajouter une pièce », deux gestes, un même mot.
+                            label: 'Scanner une autre pièce',
+                            icon: 'scanner' as const,
+                            hint: 'La chambre, la salle de bains… réunie à ce plan.',
+                            onPress: scannerUnePiece,
+                          },
+                          {
+                            label: 'Dessiner une pièce à la main',
+                            icon: 'crayon' as const,
+                            hint: 'Elle se pose devant vous : poussez-la, étirez ses côtés.',
+                            onPress: dessinerUnePiece,
+                          },
+                        ],
+                      });
                     },
                   },
                   {
                     /*
-                      SCANNER UN NIVEAU DE PLUS.
-
-                      Une maison, c'est un rez-de-chaussée ET un étage —
-                      parfois un sous-sol. Le relevé du haut s'ajoute à CE
-                      dossier : un seul plan, un seul métré, un seul devis.
-
-                      L'étage arrive pré-calé au-dessus de celui du dessous,
-                      qui reste visible en filigrane : c'est là-dessus qu'on
-                      le pose d'aplomb, cage d'escalier contre cage
-                      d'escalier.
+                      AJOUTER UN NIVEAU — un étage au-dessus, un sous-sol en
+                      dessous ; relevé au scan, ou dessiné (revue « Léa » :
+                      sans LiDAR, aucun chemin ne menait à un étage). Le
+                      niveau dessiné s'ouvre vide, la feuille « Ajouter une
+                      pièce » avec lui.
                     */
                     section: 'Ajouter',
-                    label: 'Scanner un étage',
-                    icon: 'etage' as const,
+                    label: 'Ajouter un niveau',
+                    // Les deux flèches : on monte ou on descend. La flèche
+                    // simple reste au scan d'un étage, dans la feuille suivante.
+                    icon: 'hauteur' as const,
                     hint:
                       niveaux.length > 1
-                        ? `Le dossier en compte ${niveaux.length}.`
-                        : 'Il s’ajoute au-dessus de ce plan.',
-                    onPress: () => {
-                      demarrerEtage(Math.max(...niveaux) + 1).catch(refusDuScan);
-                    },
-                  },
-                  {
-                    section: 'Ajouter',
-                    label: 'Scanner un sous-sol',
-                    icon: 'soussol' as const,
-                    hint: 'Cave, garage : il se range sous le plan.',
-                    onPress: () => {
-                      demarrerEtage(Math.min(...niveaux) - 1).catch(refusDuScan);
-                    },
-                  },
-                  {
-                    /*
-                      DESSINER UN NIVEAU — revue « Léa » : sans LiDAR, aucun
-                      chemin ne menait à un étage. Le niveau s'ouvre vide, la
-                      feuille « Ajouter une pièce » avec lui, et la première
-                      pièce se pose d'aplomb sur le niveau d'à côté.
-                    */
-                    section: 'Ajouter',
-                    label: 'Dessiner un étage',
-                    // Le crayon : on DESSINE, la flèche double reste au scan.
-                    icon: 'crayon' as const,
-                    hint: 'Un niveau vide au-dessus : ses pièces se posent aux cotes, d’aplomb.',
-                    onPress: () => {
-                      useScanStore.getState().allerAuNiveau(Math.max(...niveaux) + 1);
-                      haptic('leger');
-                      ouvrirApres(() => setAjoutPiece(true));
-                    },
-                  },
-                  {
-                    section: 'Ajouter',
-                    label: 'Dessiner un sous-sol',
-                    icon: 'crayonCadre' as const,
-                    hint: 'Un niveau vide en dessous, dessiné de la même façon.',
-                    onPress: () => {
-                      useScanStore.getState().allerAuNiveau(Math.min(...niveaux) - 1);
-                      haptic('leger');
-                      ouvrirApres(() => setAjoutPiece(true));
-                    },
-                  },
-                  {
-                    /**
-                     * AJOUTER UNE PIÈCE, sans tout recommencer.
-                     *
-                     * Un logement ne se relève pas toujours d'un trait : on
-                     * scanne le séjour, on est appelé ailleurs, on revient
-                     * pour la chambre. La seule porte de sortie était
-                     * « Nouveau scan » — qui efface tout.
-                     *
-                     * ELLE SE POSE, ON NE LA TIRE PAS. Le geste précédent
-                     * demandait de tirer un rectangle dans le vide : relevé
-                     * du patron, « le "ajouter une pièce" ne montre pas
-                     * qu'il faut créer la pièce, et de plus au glissement,
-                     * ça s'annule tout seul avec le déplacement du plan ».
-                     * Un écran qui attend un geste qu'il n'annonce pas est
-                     * un écran où il ne se passe rien. On pose donc la
-                     * pièce aux cotes qu'on donne, en pointillés, et tout
-                     * ce qui reste à faire se lit sur elle.
-                     */
-                    section: 'Ajouter',
-                    label: 'Dessiner une pièce à la main',
-                    icon: 'piece' as const,
-                    hint: 'Elle se pose devant vous : poussez-la, étirez ses côtés.',
-                    onPress: () => {
-                      seulGeste();
-                      setAjoutPiece(true);
-                    },
+                        ? `Un étage ou un sous-sol. Le dossier en compte ${niveaux.length}.`
+                        : 'Un étage ou un sous-sol, dans ce même dossier.',
+                    onPress: () =>
+                      setMenu({
+                        title: 'Ajouter un niveau',
+                        subtitle: 'Un seul dossier : un plan, un métré, un devis. Les onglets passent de l’un à l’autre.',
+                        actions: [
+                          ...(scanPossible
+                            ? [
+                                {
+                                  section: 'Au-dessus',
+                                  label: 'Scanner un étage',
+                                  icon: 'etage' as const,
+                                  hint: 'Il arrive calé sur le plan du dessous, visible en filigrane.',
+                                  onPress: () => {
+                                    demarrerEtage(Math.max(...niveaux) + 1).catch(refusDuScan);
+                                  },
+                                },
+                              ]
+                            : []),
+                          {
+                            section: 'Au-dessus',
+                            label: 'Dessiner un étage',
+                            // Le crayon : on DESSINE, la flèche double reste au scan.
+                            icon: 'crayon' as const,
+                            hint: 'Un niveau vide au-dessus : ses pièces se posent aux cotes, d’aplomb.',
+                            onPress: () => dessinerUnNiveau(Math.max(...niveaux) + 1),
+                          },
+                          ...(scanPossible
+                            ? [
+                                {
+                                  section: 'En dessous',
+                                  label: 'Scanner un sous-sol',
+                                  icon: 'soussol' as const,
+                                  hint: 'Cave, garage : il se range sous le plan.',
+                                  onPress: () => {
+                                    demarrerEtage(Math.min(...niveaux) - 1).catch(refusDuScan);
+                                  },
+                                },
+                              ]
+                            : []),
+                          {
+                            section: 'En dessous',
+                            label: 'Dessiner un sous-sol',
+                            icon: 'crayonCadre' as const,
+                            hint: 'Un niveau vide en dessous, dessiné de la même façon.',
+                            onPress: () => dessinerUnNiveau(Math.min(...niveaux) - 1),
+                          },
+                        ],
+                      }),
                   },
                   {
                     section: 'Ajouter',
@@ -4189,17 +4277,17 @@ export function ResultScreen() {
                   },
                   {
                     /**
-                     * REDÉTECTER LES PIÈCES — sur un plan déjà relevé.
+                     * RECALCULER LES PIÈCES — sur un plan déjà relevé.
                      *
                      * Sans ce geste, un correctif de détection ne profite
                      * qu'aux scans À VENIR : les dossiers déjà faits gardent
-                     * leurs pièces manquantes pour toujours. La fonction
-                     * existait, mais aucun bouton n'y menait — elle ne se
-                     * déclenchait qu'en passant par « Redresser », qui bouge
-                     * la géométrie des murs par-dessus le marché.
+                     * leurs pièces manquantes pour toujours. Il s'appelait
+                     * « Redétecter » : un mot d'informaticien (revue des
+                     * « découvreurs »). Il RECALCULE les pièces à partir des
+                     * murs, et le dit.
                      */
                     section: 'Modifier',
-                    label: 'Redétecter les pièces',
+                    label: 'Recalculer les pièces',
                     icon: 'redetecter' as const,
                     // Une ligne, pas un mode d'emploi : ce que la fonction
                     // garde (les noms donnés à la main) se voit en la
@@ -4210,104 +4298,6 @@ export function ResultScreen() {
                       haptic('succes');
                     },
                   },
-                  ...(modeElec
-                    ? [
-                      {
-                        /*
-                          LE TABLEAU QU'ON TROUVE EN ARRIVANT.
-
-                          La moitié des chantiers est de la rénovation, et elle
-                          commence toujours pareil : on ouvre le tableau, on note
-                          ce qu'il y a, on dit au client ce qu'il faut reprendre.
-                          Les applications de plan dessinent du neuf ; celle-ci
-                          sait aussi lire ce qui est déjà là.
-                        */
-                        section: 'Modifier',
-                        label: 'Relever le tableau existant',
-                        icon: 'tableau' as const,
-                        hint: existant?.departs.length
-                          ? `${existant.departs.length} organe(s) relevé(s) — le même tableau qu’au mur.`
-                          : 'Rénovation : un coffret vide, que vous remplissez organe par organe ; l’app dit ce qui bloque.',
-                        onPress: () => ouvrirLeTableau(),
-                      },
-                      {
-                        /*
-                          NORMES AUTO — l'installation qui se pose toute seule.
-
-                          Elle COMPLÈTE ce qui existe : on ne touche à rien de ce
-                          que l'électricien a placé. Et si tout est déjà conforme,
-                          elle le DIT — un outil qui ne répond rien laisse croire
-                          qu'il n'a pas compris la demande.
-                        */
-                        section: 'Modifier',
-                        label: 'Normes auto',
-                        // Le bouclier de la pastille de contrôle — relevé du
-                        // patron : c'est le même sujet, c'est le même dessin.
-                        node: (
-                          <Svg width={20} height={20} viewBox="0 0 24 24">
-                            <Trace
-                              d={SOLAIRES.bouclier}
-                              fill={teinte.ink}
-                              fillRule="evenodd"
-                            />
-                          </Svg>
-                        ),
-                        // Une ligne : le détail de ce qui se pose est le sujet
-                        // de l'écran de contrôle, pas du menu qui y mène.
-                        hint: 'Pose ce qui manque pour la NF C 15-100.',
-                        onPress: poserNormes,
-                      },
-                      ]
-                    : [
-                        {
-                          /*
-                            LA PROPOSITION — relevé du patron : « une
-                            proposition pour passer à un mode "Électricité" ».
-
-                            C'est la porte d'entrée de l'électricien qui
-                            découvre l'application par l'App Store, en
-                            particulier : il ne fouille pas les réglages, il
-                            cherche dans le menu du plan qu'il a sous les
-                            yeux. Elle se tait dès que le mode est allumé.
-                          */
-                          /*
-                            POUR TOUT LE MONDE — revues « Sophie » et
-                            « Paul » : « Pour les électriciens » faisait
-                            croire au particulier que l'app ne savait pas
-                            poser une prise.
-                          */
-                          section: 'Modifier',
-                          label: 'Placer prises et interrupteurs',
-                          icon: 'prise' as const,
-                          /*
-                            SANS SIGLE, ET SANS BASCULE D'UN COUP — revue
-                            « Gérard » : « NF C 15-100 » ne dit rien à un
-                            particulier, et un appui changeait toute
-                            l'application (pastilles, contrôle, devis) sans
-                            prévenir. On dit ce que ça fait, puis on demande.
-                          */
-                          hint: 'Prises, éclairage et prix du matériel — pour prévoir l’électricité de votre logement.',
-                          onPress: () => {
-                            alerte(
-                              'Passer en mode Électricité ?',
-                              'Le plan montrera les prises, l’éclairage, le contrôle des règles électriques et le prix. Vous pourrez revenir en arrière au profil, rubrique « Mon usage ».',
-                              [
-                                { label: 'Annuler' },
-                                {
-                                  label: 'Activer',
-                                  onPress: () => {
-                                    useUsage.getState().choisir(true);
-                                    haptic('succes');
-                                    astuce('Mode Électricité activé : touchez « Édition », puis « Appareil ».', {
-                                      icone: 'elec',
-                                    });
-                                  },
-                                },
-                              ],
-                            );
-                          },
-                        },
-                      ]),
                   {
                     /*
                       UNE AUTRE VERSION, SANS PERDRE CELLE-CI — revue
@@ -4506,7 +4496,7 @@ export function ResultScreen() {
             </Text>
             {/* Revue « Yasmine » : « M² … » — le libellé du chiffre qui
                 compte était coupé ; il cède un peu de taille plutôt. */}
-            <Text style={styles.metricLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+            <Text style={styles.metricLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.92}>
               {m.label}
             </Text>
           </View>
@@ -5231,12 +5221,7 @@ export function ResultScreen() {
               basculerVue();
               setDecorant(true);
             }}
-            onAjouterMeuble={() => {
-              setEditMode(true);
-              seulGeste();
-              setShowFurniture(true);
-              setCatalogue(true);
-            }}
+            onAjouterMeuble={ajouterUnMeuble}
           />
           </View>
         ) : (
@@ -5260,6 +5245,7 @@ export function ResultScreen() {
             focusIdx={focusIdx}
             setFocusIdx={setFocusIdx}
             onDecorer={() => setDecorant(true)}
+            onAjouterMeuble={ajouterUnMeuble}
           />
         )}
 
@@ -5309,35 +5295,12 @@ export function ResultScreen() {
               question que se pose un particulier : combien de peinture,
               de sol, de plinthes.
             */}
-            {!modeElec && piecesTravaux.length > 0 && (
-              <TouchableOpacity
-                style={styles.vuePastille}
-                // Revue « Bernard » : « Travaux » ici, « Ce qu'il faut
-                // acheter » au menu — deux noms pour une feuille. Et 34 pt
-                // de haut : la zone de toucher déborde jusqu'à 44.
-                /*
-                  UN PANIER, PAS UN ROULEAU — revue de lisibilité : la liste
-                  et « Décorer » portaient le même rouleau, à deux pouces
-                  l'un de l'autre. Le rouleau reste à Décorer ; la liste
-                  prend le panier, et un seul nom partout : « Liste
-                  d'achats ». Le mot reste aussi en 3D, où la rangée serrée
-                  ne laissait qu'une icône qu'on confondait.
-                */
-                accessibilityLabel="Liste d’achats"
-                accessibilityHint="Peinture, sol, plinthes : les quantités"
-                hitSlop={{ top: 5, bottom: 5, left: 4, right: 4 }}
-                onPress={() => {
-                  haptic('leger');
-                  setTravauxOuvert(true);
-                }}>
-                <Svg width={16} height={16} viewBox="0 0 24 24">
-                  <Trace d={SOLAIRES.panier} fill={teinte.blue} fillRule="evenodd" />
-                </Svg>
-                <Text style={styles.vuePastilleTexte} numberOfLines={1}>
-                  Liste d’achats
-                </Text>
-              </TouchableOpacity>
-            )}
+            {/*
+              PLUS DE « LISTE D'ACHATS » ICI — revue des « découvreurs » : la
+              rangée du haut alignait quatre pastilles, dont deux appels
+              (la liste, la visite) qui se disputaient le regard. La liste
+              reste à portée : dans le menu du plan et dans « Décorer ».
+            */}
             {modeElec && (
               <>
               {/*
@@ -5395,15 +5358,6 @@ export function ResultScreen() {
               <ControlePastille releve alertes={alertesDePlan} onPress={() => setChecking(true)} />
             )}
             {/*
-              L'ÉTAGE, contre le contrôle et le 2D/3D.
-
-              La pastille n'apparaît QUE s'il y a plusieurs niveaux : un
-              appartement de plain-pied n'a pas à porter un sélecteur qui
-              n'aurait jamais qu'un choix. Le geste d'AJOUT, lui, vit dans
-              le menu « … » avec les autres actions du plan — on ne part pas
-              scanner un étage par mégarde en visant le sélecteur.
-            */}
-            {/*
               EXPLORER — ENTRER DANS LA PIÈCE.
 
               Relevé du patron : « un vrai mode où l'on rentre dans la pièce
@@ -5434,9 +5388,15 @@ export function ResultScreen() {
                 </Svg>
               </TouchableOpacity>
             )}
+            {/*
+              « VISITE » N'EST PLUS EN BLEU PLEIN — revue des « découvreurs » :
+              c'est un regard de plus sur le plan, pas l'action de l'écran.
+              Elle prend le style de ses voisines : une pastille blanche,
+              l'icône en bleu.
+            */}
             {walls.length > 0 && (
               <TouchableOpacity
-                style={[styles.vuePastille, styles.explorerPastille, explorerIcone && styles.pastilleIcone]}
+                style={[styles.vuePastille, explorerIcone && styles.pastilleIcone]}
                 hitSlop={HIT_PASTILLE}
                 accessibilityLabel="Explorer"
                 accessibilityHint="Entrer dans la pièce et s’y promener"
@@ -5445,10 +5405,10 @@ export function ResultScreen() {
                   setExplorant(true);
                 }}>
                 <Svg width={16} height={16} viewBox="0 0 24 24">
-                  <Trace d={SOLAIRES.marcher} fill="#FFFFFF" fillRule="evenodd" />
+                  <Trace d={SOLAIRES.marcher} fill={teinte.blue} fillRule="evenodd" />
                 </Svg>
                 {!explorerIcone && (
-                  <Text style={styles.explorerPastilleTexte}>{explorerCourt ? 'Visite' : 'Explorer'}</Text>
+                  <Text style={styles.vuePastilleTexte}>{explorerCourt ? 'Visite' : 'Explorer'}</Text>
                 )}
               </TouchableOpacity>
             )}
@@ -5470,22 +5430,6 @@ export function ResultScreen() {
                 {!rangeeEnIcones && <Text style={styles.vuePastilleTexte}>RA</Text>}
               </TouchableOpacity>
             )}
-            {niveaux.length > 1 && (
-              <TouchableOpacity
-                style={styles.vuePastille}
-                hitSlop={HIT_PASTILLE}
-                accessibilityLabel="Changer d’étage"
-                onPress={() => setMenu(menuDesEtages())}>
-                <Text style={styles.vuePastilleTexte}>
-                  {abregerNiveau(niveauCourant)}
-                </Text>
-                <ChevronsUpDown
-                  size={15}
-                  color={teinte.inkFaint}
-                  strokeWidth={2.4}
-                />
-              </TouchableOpacity>
-            )}
             <TouchableOpacity
               style={styles.vuePastille}
               hitSlop={HIT_PASTILLE}
@@ -5496,6 +5440,52 @@ export function ResultScreen() {
               </Text>
               {!rangeeEnIcones && <ChevronsUpDown size={15} color={teinte.inkFaint} strokeWidth={2.4} />}
             </TouchableOpacity>
+          </View>
+        )}
+
+        {/*
+          LES NIVEAUX EN ONGLETS — revue des « découvreurs » : l'étage se
+          choisissait par une pastille « R+1 ⌃⌄ » perdue au bout de la rangée
+          du haut ; personne ne voyait qu'il y avait un autre niveau, ni
+          comment y aller. Dès deux niveaux, des onglets nommés en clair
+          (« RDC | 1er étage ») se posent sous la rangée, du plus bas au plus
+          haut, comme on monte l'escalier. Un appui change de niveau ; un
+          appui sur l'onglet affiché ouvre ses réglages (recaler, retirer,
+          scanner un étage de plus).
+
+          Un appartement de plain-pied n'a pas d'onglets : un sélecteur qui
+          n'aurait jamais qu'un choix. Le geste d'AJOUT vit dans le menu du
+          plan — on ne part pas scanner un étage par mégarde.
+        */}
+        {!capturing && niveaux.length > 1 && (
+          <View style={styles.ongletsNiveaux} accessibilityRole="tablist">
+            {[...niveaux].sort((x, y) => x - y).map((n) => {
+              const actif = n === niveauCourant;
+              return (
+                <TouchableOpacity
+                  key={n}
+                  style={[styles.ongletNiveau, actif && styles.ongletNiveauActif]}
+                  hitSlop={{ top: 5, bottom: 5 }}
+                  accessibilityRole="tab"
+                  accessibilityLabel={nomDuNiveau(n)}
+                  accessibilityState={{ selected: actif }}
+                  accessibilityHint={actif ? 'Réglages de ce niveau' : undefined}
+                  onPress={() => {
+                    haptic('leger');
+                    if (actif) {
+                      setMenu(menuDesEtages());
+                      return;
+                    }
+                    useScanStore.getState().allerAuNiveau(n);
+                  }}>
+                  <Text
+                    style={[styles.ongletNiveauTexte, actif && styles.ongletNiveauTexteActif]}
+                    numberOfLines={1}>
+                    {nomCourtDuNiveau(n)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
 
@@ -6718,6 +6708,12 @@ export function ResultScreen() {
                   ]
                 : [
                     {
+                      label: 'De face',
+                      icone: SOLAIRES.elevations,
+                      sansMot: true,
+                      onPress: () => openWallElevation(selectedWall.id),
+                    },
+                    {
                       label: 'Photo',
                       icone: SOLAIRES.image,
                       sansMot: true,
@@ -6830,16 +6826,12 @@ export function ResultScreen() {
                     sansMot: true,
                     onPress: () => percerLeMur(mur.id),
                   },
-                  ...(modeElec
-                    ? [
-                        {
-                          label: 'Élec',
-                          icone: SOLAIRES.elec,
-                          sansMot: true,
-                          onPress: () => openWallElevation(mur.id),
-                        },
-                      ]
-                    : []),
+                  {
+                    label: modeElec ? 'Élec' : 'De face',
+                    icone: modeElec ? SOLAIRES.elec : SOLAIRES.elevations,
+                    sansMot: true,
+                    onPress: () => openWallElevation(mur.id),
+                  },
                 ]}
               />
             );

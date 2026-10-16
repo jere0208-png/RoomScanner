@@ -50,7 +50,11 @@ const OUTILS_ELEC_PLAN = new Set(['plus', 'plafond', 'gaines', 'elec']);
 const OUTILS_ELEC_VOLUME = new Set(['volumes', 'nuit', 'plafond', 'reperes']);
 
 /* Revue « Bernard » : « Cotes » est un mot de métier ; le particulier
-   cherche les « Dimensions ». */
+   cherche les « Dimensions ». Et l'électricien aussi, désormais — revue des
+   « découvreurs » : « Cotes » ici, « Dimensions » là, pour le même calque,
+   selon la vue ou le mode. Un mot, partout. */
+const DIMENSIONS = 'Dimensions';
+
 const sansElec = (
   outils: (React.ReactElement | null | false | undefined)[],
   cles: Set<string>,
@@ -89,7 +93,62 @@ const RIEN = {
   couleurs: 'Aucune couleur relevée sur ce plan.',
   reperes: 'Aucun appareil posé — passez en mode édition, sur le plan.',
   volumes: 'Aucune baignoire ni douche relevée.',
+  decorer: 'Aucune pièce refermée à décorer : scannez ou dessinez une pièce.',
 } as const;
+
+/*
+  LES ACTIONS DE LA BARRE, LES MÊMES EN 2D ET EN 3D — revue des
+  « découvreurs » : « + Meuble » vivait en tête de rangée, sous le mot
+  « Afficher » (c'est une ACTION, il ne montre ni ne cache rien), et
+  disparaissait en mode électricité ; « Décorer » changeait de place d'une
+  vue à l'autre. Elles suivent désormais les calques, dans cet ordre, quelle
+  que soit la vue : on les retrouve sous le même pouce.
+
+  L'ICÔNE DE L'ACTION N'EST PAS CELLE DU CALQUE : le fauteuil, c'est le
+  calque « Meubles » (les montrer, les cacher) ; « + Meuble » prend le
+  « + » — on ajoute.
+*/
+function actionsDeLaBarre({
+  onAjouterMeuble,
+  onDecorer,
+  decorerVide,
+  afficher,
+  ouvrirAfficher,
+}: {
+  onAjouterMeuble?: () => void;
+  onDecorer?: () => void;
+  /** Rien à décorer : la pastille reste à sa place, grisée, avec sa phrase. */
+  decorerVide: string | null;
+  afficher: boolean;
+  ouvrirAfficher: () => void;
+}): React.ReactElement[] {
+  const rien = () => {};
+  return [
+    <ToolPill
+      key="ajoutMeuble"
+      icon="plus"
+      label="+ Meuble"
+      active={false}
+      vide={onAjouterMeuble ? null : 'Ouvrez le plan pour ajouter un meuble.'}
+      onPress={onAjouterMeuble ?? rien}
+    />,
+    <ToolPill
+      key="decorer"
+      icon="rouleau"
+      label="Décorer"
+      active={false}
+      vide={onDecorer ? decorerVide : RIEN.decorer}
+      onPress={onDecorer ?? rien}
+    />,
+    <ToolPill
+      key="afficher"
+      icon="points"
+      label="Autres"
+      active={afficher}
+      onPress={ouvrirAfficher}
+    />,
+  ];
+}
 
 /** Ce qui s'allume la nuit : une applique au mur, un luminaire au plafond. */
 const LUMINAIRES_AU_PLAFOND = new Set(['dcl', 'spot', 'applique', 'ventilateur']);
@@ -224,7 +283,9 @@ export function Toolbar2D({
   /*
     « REDRESSER » DIT CE QU'IL A FAIT — revue « Léa » : il remettait tout le
     plan d'équerre sans un mot ; elle croyait qu'il redressait un meuble, ou
-    qu'il ne faisait rien.
+    qu'il ne faisait rien. Et il s'appelle « Aligner » (revue des
+    « découvreurs » : « Redresser » ne disait pas QUOI) — il aligne les murs
+    presque droits, les remet d'équerre.
   */
   const redresser = () => {
     const avant = new Map(useScanStore.getState().walls.map((w) => [w.id, w]));
@@ -236,7 +297,7 @@ export function Toolbar2D({
         return !v || Math.hypot(w.a.x - v.a.x, w.a.z - v.a.z) > 1e-3 || Math.hypot(w.b.x - v.b.x, w.b.z - v.b.z) > 1e-3;
       });
     if (bouge) {
-      astuce('Murs remis d’équerre.', { action: { label: 'Annuler', faire: () => useScanStore.getState().undo() } });
+      astuce('Murs alignés et remis d’équerre.', { action: { label: 'Annuler', faire: () => useScanStore.getState().undo() } });
     } else {
       astuce('Le plan était déjà d’équerre.');
     }
@@ -347,7 +408,7 @@ export function Toolbar2D({
         <ToolPill
           key="square"
           icon="square"
-          label="Redresser"
+          label="Aligner"
           active={false}
           onPress={redresser}
         />,
@@ -434,20 +495,21 @@ export function Toolbar2D({
         /*
           LA RANGÉE NE GARDE QUE CE QU'ON ALLUME TOUS LES JOURS — relevé du
           patron : « affiche hors du “…” les boutons les plus utiles, comme
-          les meubles, les cotes, les surfaces ». Le reste — nord, grille,
-          notes, photos, gaines, plafond, couleurs des ouvertures — vit dans
-          le menu « Afficher », au bout de la rangée.
+          les meubles, les cotes, les surfaces ». Le reste — grille, notes,
+          photos, gaines, plafond, couleurs des ouvertures — vit dans le
+          menu « Autres », au bout de la rangée.
+
+          UNE BARRE STABLE — revue des « découvreurs » : les pastilles
+          changeaient de place, de mot et d'icône selon la vue et le mode.
+          L'ordre est désormais le même en 2D et en 3D (`actionsDeLaBarre`) :
+          les calques d'abord, puis les deux ACTIONS (« + Meuble »,
+          « Décorer »), puis « Autres ». Ce qui n'a rien à faire est grisé,
+          avec sa phrase, plutôt que retiré : la pastille garde sa place.
         */
-        /* Revue « Chloé » : elle voulait AJOUTER son canapé, touchait
-           « Meubles » — qui cache les meubles. Le geste qu'on vient faire
-           a sa pastille, hors édition, en tête de rangée. */
-        !modeElec && onAjouterMeuble ? (
-          <ToolPill key="ajoutMeuble" icon="furniture" label="+ Meuble" active={false} ajout onPress={onAjouterMeuble} />
-        ) : null,
         <ToolPill
           key="ruler"
           icon="ruler"
-          label={modeElec ? 'Cotes' : 'Dimensions'}
+          label={DIMENSIONS}
           active={showMeasures}
           vide={contenu.murs === 0 ? RIEN.cotes : null}
           onPress={() => setShowMeasures((v) => !v)}
@@ -476,10 +538,9 @@ export function Toolbar2D({
         />,
         // L'appareillage s'allume au départ, mais il se coupe — sur un
         // logement équipé, ses symboles couvrent la maçonnerie qu'on est
-        // venu regarder. Pas « Élec » : c'est déjà le nom de la commande qui
-        // ouvre l'établi depuis un mur.
-        // La PRISE, comme le bouton « Appareil » d'Ajouter — relevé du
-        // patron : l'éclair disait « électricité », pas « ce que j'ai posé ».
+        // venu regarder. La PRISE, comme le bouton « Appareil » d'Ajouter —
+        // relevé du patron : l'éclair disait « électricité », pas « ce que
+        // j'ai posé ».
         <ToolPill
           key="elec"
           icon="appareil"
@@ -488,18 +549,13 @@ export function Toolbar2D({
           vide={contenu.appareils === 0 ? RIEN.appareils : null}
           onPress={() => setShowFixtures((v) => !v)}
         />,
-        /* Revue « Léa » : elle cherchait les couleurs, et « Décorer » ne
-           vivait qu'en 3D ou au fond du menu « … ». */
-        onDecorer && contenu.pieces > 0 ? (
-          <ToolPill key="decorer" icon="rouleau" label="Décorer" active={false} onPress={onDecorer} />
-        ) : null,
-        <ToolPill
-          key="afficher"
-          icon="points"
-          label="Autres"
-          active={afficher}
-          onPress={() => setAfficher(true)}
-        />,
+        ...actionsDeLaBarre({
+          onAjouterMeuble,
+          onDecorer,
+          decorerVide: contenu.pieces === 0 ? RIEN.decorer : null,
+          afficher,
+          ouvrirAfficher: () => setAfficher(true),
+        }),
       ];
 
   return (
@@ -512,15 +568,6 @@ export function Toolbar2D({
       reserve={62}
       bas={bas}
       dessus={dessus}
-      /*
-        LA RANGÉE DIT CE QU'ELLE FAIT, DANS LES DEUX MODES.
-
-        Hors édition, ses boutons montrent ou cachent : « Afficher ». En
-        édition, quatre des cinq POSENT quelque chose : « Ajouter ». Le
-        cinquième est « Redresser », en tête de rangée — il ne pose rien, il
-        remet tout le plan d'équerre, et le peigne commence après lui.
-      */
-      peigne={edition ? { mot: 'Ajouter', depuis: 1 } : { mot: 'Afficher' }}
       elements={sansElec(outils, OUTILS_ELEC_PLAN, modeElec)}
     />
     <CalquesSheet
@@ -528,27 +575,21 @@ export function Toolbar2D({
       onClose={() => setAfficher(false)}
       titre="Afficher sur le plan"
       sousTitre="Ce que le plan montre — rien n'est supprimé."
+      /*
+        « AUTRES » NE RÉPÈTE PAS LA RANGÉE — revue des « découvreurs » : les
+        dimensions, les meubles, les surfaces et les appareils s'y
+        rallumaient une seconde fois, à côté de leurs pastilles. Le menu ne
+        porte plus que ce que la rangée n'a pas.
+      */
       sections={[
         {
-          titre: 'Sur le plan',
-          lignes: [
-            { cle: 'cotes', icone: 'ruler', libelle: modeElec ? 'Cotes' : 'Dimensions', aide: 'Les longueurs des murs, au centimètre', actif: showMeasures, vide: contenu.murs === 0 ? RIEN.cotes : null, onBascule: () => setShowMeasures((v) => !v) },
-            { cle: 'surfaces', icone: 'surface', libelle: 'Surfaces', aide: 'Le sol de chaque pièce et ses mètres carrés', actif: showSurfaces, vide: contenu.pieces === 0 ? RIEN.surfaces : null, onBascule: () => setShowSurfaces(!showSurfaces) },
-            {
-              cle: 'meubles', icone: 'furniture', libelle: 'Meubles', aide: 'Le mobilier relevé au scan ou ajouté', actif: showFurniture, vide: contenu.meubles === 0 ? RIEN.meubles2D : null,
-              onBascule: () => {
-                if (showFurniture) onFurnitureOff();
-                setShowFurniture(!showFurniture);
-              },
-            },
-            ...(modeElec
-              ? [
-                  { cle: 'appareils', icone: 'appareil' as const, libelle: 'Appareils', aide: 'Prises, interrupteurs et points lumineux posés', actif: showFixtures, vide: contenu.appareils === 0 ? RIEN.appareils : null, onBascule: () => setShowFixtures((v) => !v) },
-                  { cle: 'plafond', icone: 'plafond' as const, libelle: 'Plafond', aide: 'Points lumineux, spots, détecteurs, VMC', actif: showCeiling, vide: contenu.plafond === 0 ? RIEN.plafond : null, onBascule: () => setShowCeiling(!showCeiling) },
-                  { cle: 'gaines', icone: 'gaines' as const, libelle: 'Gaines (tracé proposé)', aide: 'Un chemin calculé pour une installation neuve — pas vos câbles réels', actif: showRoutes, vide: hasRoutes ? null : RIEN.gaines, onBascule: () => setShowRoutes((v) => !v) },
-                ]
-              : []),
-          ],
+          titre: 'Électricité',
+          lignes: modeElec
+            ? [
+                { cle: 'plafond', icone: 'plafond' as const, libelle: 'Plafond', aide: 'Points lumineux, spots, détecteurs, VMC', actif: showCeiling, vide: contenu.plafond === 0 ? RIEN.plafond : null, onBascule: () => setShowCeiling(!showCeiling) },
+                { cle: 'gaines', icone: 'gaines' as const, libelle: 'Gaines (tracé proposé)', aide: 'Un chemin calculé pour une installation neuve — pas vos câbles réels', actif: showRoutes, vide: hasRoutes ? null : RIEN.gaines, onBascule: () => setShowRoutes((v) => !v) },
+              ]
+            : [],
         },
         {
           titre: 'Repères',
@@ -600,7 +641,10 @@ export function Toolbar3D({
   focusIdx,
   setFocusIdx,
   onDecorer,
+  onAjouterMeuble,
 }: Cadre & {
+  /** Revient au plan, en édition, catalogue ouvert : on pose un meuble en 2D. */
+  onAjouterMeuble?: () => void;
   /**
    * DÉCORER — relevé du patron : « je ne vois pas la possibilité de changer
    * la couleur des meubles ou du sol ». C'est ici, sur la maquette, qu'on
@@ -672,12 +716,26 @@ export function Toolbar3D({
     LA RANGÉE DE LA MAQUETTE — relevé du patron : « “Volumes” est peu
     intuitif, ça peut être le volume d'une pièce ; et peu de gens demandent
     cela, surtout hors élec. Rajoute un bouton “…” en bas à droite à la place
-    de Pièces ». La rangée garde les meubles, les cotes, les surfaces (et les
-    couleurs relevées, les repères électriques quand il y en a) ; le sol, les
-    murs, la nuit, le nord, le plafond, les volumes de salle d'eau et la pièce
-    isolée passent au menu « Afficher ».
+    de Pièces ». Le sol, les murs, la nuit, le plafond, les couleurs
+    relevées, les volumes de salle d'eau et la pièce isolée passent au menu
+    « Autres ».
+
+    LA MÊME BARRE QU'EN PLAN — revue des « découvreurs » : en 3D, « Meubles »
+    passait devant « Dimensions », « Surfaces » changeait d'icône (une
+    étiquette ici, les calques là), « Couleurs » et « Repères » allaient et
+    venaient selon le relevé. Même ordre, mêmes mots, mêmes icônes que le plan
+    2D ; les repères électriques tiennent la place des appareils, grisés s'il
+    n'y a rien à étiqueter.
   */
   const outils = [
+    <ToolPill
+      key="ruler"
+      icon="ruler"
+      label={DIMENSIONS}
+      active={showMeasures}
+      vide={contenu.murs === 0 ? RIEN.cotes : null}
+      onPress={() => setShowMeasures((v) => !v)}
+    />,
     <ToolPill
       key="furniture"
       icon="furniture"
@@ -686,54 +744,33 @@ export function Toolbar3D({
       vide={contenu.meubles === 0 ? RIEN.meubles3D : null}
       onPress={() => setShowFurniture(!showFurniture)}
     />,
-    <ToolPill
-      key="ruler"
-      icon="ruler"
-      label={modeElec ? 'Cotes' : 'Dimensions'}
-      active={showMeasures}
-      vide={contenu.murs === 0 ? RIEN.cotes : null}
-      onPress={() => setShowMeasures((v) => !v)}
-    />,
-    /* « Surfaces » ne pose plus que le nom et les m² de chaque pièce : le sol
-       a son propre calque, dans le menu. */
+    /* « Surfaces » ne pose que le nom et les m² de chaque pièce : le sol a
+       son propre calque, dans le menu. */
     <ToolPill
       key="surface"
-      icon="etiquette"
+      icon="surface"
       label="Surfaces"
       active={show3DSurfaces}
       vide={contenu.pieces === 0 ? RIEN.surfaces : null}
       onPress={() => setShow3DSurfaces(!show3DSurfaces)}
     />,
-    colorsAvailable ? (
-      <ToolPill
-        key="couleurs"
-        icon="colors"
-        label="Couleurs"
-        active={showTextures}
-        onPress={() => setShowTextures(!showTextures)}
-      />
-    ) : null,
     /* Les repères électriques : indispensables pour poser, encombrants pour
        montrer. Une pièce équipée en porte une dizaine. */
-    fixtures.length > 0 ? (
-      <ToolPill
-        key="reperes"
-        icon="reperes"
-        label="Repères"
-        active={showElecTags}
-        onPress={() => setShowElecTags((v) => !v)}
-      />
-    ) : null,
-    onDecorer ? (
-      <ToolPill key="decorer" icon="rouleau" label="Décorer" active={false} onPress={onDecorer} />
-    ) : null,
     <ToolPill
-      key="afficher"
-      icon="points"
-      label="Autres"
-      active={afficher}
-      onPress={() => setAfficher(true)}
+      key="reperes"
+      icon="reperes"
+      label="Repères"
+      active={showElecTags}
+      vide={fixtures.length === 0 ? RIEN.reperes : null}
+      onPress={() => setShowElecTags((v) => !v)}
     />,
+    ...actionsDeLaBarre({
+      onAjouterMeuble,
+      onDecorer,
+      decorerVide: null,
+      afficher,
+      ouvrirAfficher: () => setAfficher(true),
+    }),
   ];
 
   return (
@@ -761,23 +798,16 @@ export function Toolbar3D({
         actuel: String(focusIdx),
         onChoix: (cle) => setFocusIdx(() => Number(cle)),
       }}
+      // « Autres » ne répète pas la rangée : voir le plan 2D.
       sections={[
         {
           titre: 'Le logement',
           lignes: [
-            { cle: 'sol', icone: 'surface', libelle: 'Sol', aide: 'Le sol de chaque pièce, ses lattes ou son image relevée', actif: showSol, vide: contenu.pieces === 0 ? RIEN.surfaces : null, onBascule: () => setShowSol(!showSol) },
+            { cle: 'sol', icone: 'grille', libelle: 'Sol', aide: 'Le sol de chaque pièce, ses lattes ou son image relevée', actif: showSol, vide: contenu.pieces === 0 ? RIEN.surfaces : null, onBascule: () => setShowSol(!showSol) },
             { cle: 'murs', icone: 'murs', libelle: 'Murs pleins', aide: 'Éteint, les murs qui vous font face s’effacent', actif: solidWalls, vide: contenu.murs === 0 ? RIEN.murs : null, onBascule: toggleSolidWalls },
-            { cle: 'meubles', icone: 'furniture', libelle: 'Meubles', aide: 'Le mobilier à ses cotes, dans ses couleurs', actif: showFurniture, vide: contenu.meubles === 0 ? RIEN.meubles3D : null, onBascule: () => setShowFurniture(!showFurniture) },
             ...(modeElec
               ? [{ cle: 'plafond', icone: 'plafond' as const, libelle: 'Plafond', aide: 'Points lumineux, spots, détecteurs, VMC', actif: showCeiling, vide: contenu.plafond === 0 ? RIEN.plafond : null, onBascule: () => setShowCeiling(!showCeiling) }]
               : []),
-          ],
-        },
-        {
-          titre: 'Mesures',
-          lignes: [
-            { cle: 'cotes', icone: 'ruler', libelle: modeElec ? 'Cotes' : 'Dimensions', aide: 'Les longueurs, posées sur les murs', actif: showMeasures, vide: contenu.murs === 0 ? RIEN.cotes : null, onBascule: () => setShowMeasures((v) => !v) },
-            { cle: 'surfaces', icone: 'etiquette', libelle: 'Surfaces', aide: 'Le nom et les mètres carrés de chaque pièce', actif: show3DSurfaces, vide: contenu.pieces === 0 ? RIEN.surfaces : null, onBascule: () => setShow3DSurfaces(!show3DSurfaces) },
           ],
         },
         {
@@ -794,7 +824,6 @@ export function Toolbar3D({
           titre: 'Électricité',
           lignes: modeElec
             ? [
-                { cle: 'reperes', icone: 'reperes', libelle: 'Repères électriques', aide: 'Les étiquettes des appareils posés', actif: showElecTags, vide: fixtures.length === 0 ? RIEN.reperes : null, onBascule: () => setShowElecTags((v) => !v) },
                 { cle: 'volumes', icone: 'goutte', libelle: 'Volumes de salle d’eau', aide: 'Les volumes 0, 1 et 2 autour de la baignoire et de la douche', actif: showVolumes, vide: zonesHumides > 0 ? null : RIEN.volumes, onBascule: () => setShowVolumes(!showVolumes) },
               ]
             : [],

@@ -4,7 +4,8 @@
  * Revue de lisibilité : `inkFaint` faisait 4,5:1 sur le blanc pur et
  * tombait à 4,0 sur une surface creusée, 3,7 sur une tuile pastel ; en
  * sombre, 4,1 sur un bouton rehaussé. Et le mot « Afficher » / « Ajouter »
- * du peigne, sous une opacité de 0,55, descendait à 2,1:1.
+ * du peigne, sous une opacité de 0,55, descendait à 2,1:1 (le peigne a depuis
+ * été retiré).
  */
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -12,12 +13,9 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   removeItem: jest.fn(async () => undefined),
 }));
 
-import React from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
-import TestRenderer, { act } from 'react-test-renderer';
+import { StyleSheet } from 'react-native';
 import { SURFACE_BOUTON_SOMBRE, dark, light } from '../src/theme';
 import { TEINTES_TUILES } from '../src/screens/HomeScreen';
-import { RangeeOutils } from '../src/components/RangeeOutils';
 import { getStyles } from '../src/screens/result/styles';
 
 const lum = (hex: string) => {
@@ -56,40 +54,23 @@ describe('inkFaint', () => {
   });
 });
 
-describe('le mot du peigne « Afficher »', () => {
-  it('se lit : inkSoft, 12 pt au moins, et aucune opacité sous 1 au-dessus de lui', () => {
+/*
+  LE PEIGNE EST PARTI (revue des « découvreurs » : des traits qui ne
+  faisaient que décorer) — son mot avec lui. Le texte discret qui reste au
+  bord du plan, c'est le libellé des chiffres du bandeau : il se lit.
+*/
+describe('le libellé des chiffres du bandeau', () => {
+  it('se lit : inkSoft, 12 pt, sans capitales serrées, et ne descend pas sous 11', () => {
     const styles = getStyles(light) as unknown as Record<string, object>;
-    const mot = StyleSheet.flatten(styles.peigneMot) as { color?: string; fontSize?: number };
+    const mot = StyleSheet.flatten(styles.metricLabel) as { color?: string; fontSize?: number; textTransform?: string };
     expect(mot.color).toBe(light.inkSoft);
     expect(mot.fontSize).toBeGreaterThanOrEqual(12);
-
-    const anim = new Animated.Value(1);
-    const pastille = (k: string) => <View key={k} />;
-    let t!: TestRenderer.ReactTestRenderer;
-    act(() => {
-      t = TestRenderer.create(
-        <RangeeOutils
-          elements={['a', 'b', 'c'].map(pastille)}
-          largeur={390}
-          reserve={0}
-          bas={10}
-          dessus={0}
-          anim={anim}
-          styles={styles}
-        />,
-      );
-    });
-    const texte = t.root.findAllByType(Text).find((n) => n.props.children === 'Afficher')!;
-    expect(texte).toBeDefined();
-    // De lui jusqu'à la racine : rien ne le voile.
-    let n: TestRenderer.ReactTestInstance | null = texte;
-    while (n) {
-      const st = StyleSheet.flatten(n.props.style) as { opacity?: unknown } | undefined;
-      const o = st?.opacity;
-      const valeur = typeof o === 'number' ? o : o && typeof (o as { __getValue?: () => number }).__getValue === 'function' ? (o as { __getValue: () => number }).__getValue() : 1;
-      expect(valeur).toBe(1);
-      n = n.parent;
-    }
-    act(() => t.unmount());
+    expect(mot.textTransform).toBeUndefined();
+    expect(ratio(light.inkSoft, light.surface)).toBeGreaterThanOrEqual(4.5);
+    // La réduction automatique s'arrête à 92 % : jamais sous 11 points.
+    const ecran = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'src/screens/ResultScreen.tsx'), 'utf8');
+    const m = ecran.match(/style=\{styles\.metricLabel\}[^>]*minimumFontScale=\{([\d.]+)\}/);
+    expect(m).not.toBeNull();
+    expect(Number(m![1]) * mot.fontSize!).toBeGreaterThanOrEqual(11);
   });
 });

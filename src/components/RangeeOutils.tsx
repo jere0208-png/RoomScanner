@@ -14,64 +14,18 @@
  * colonne des actions. Tout se voit d'un coup d'œil, sans un seul geste.
  */
 import React, { useEffect } from 'react';
-import { Animated, Text, View } from 'react-native';
-import Svg, { Line } from 'react-native-svg';
-import {
-  MARGE_RANGEE,
-  PILL_CELL_H,
-  PILL_CELL_W,
-  PILL_GAP,
-  PILL_PITCH,
-  PILL_SIZE,
-  PillSlot,
-  repartirOutils,
-} from './ToolPill';
-
-/** La largeur d'une cellule d'outil : le peigne vise son milieu. */
-const CELLULE = PILL_CELL_W;
+import { Animated, View } from 'react-native';
+import { PILL_GAP, PillSlot, repartirOutils } from './ToolPill';
 
 /*
-  LE PEIGNE SE POSE AU RAS DES PASTILLES — relevé du patron : « descends le
-  Afficher et ses lignes, les traits doivent presque toucher les boutons ».
-
-  Il flottait vingt points trop haut, et cet espace vide entre l'annotation
-  et ce qu'elle annote se lisait comme deux blocs sans rapport. Sa place se
-  CALCULE désormais : la hauteur d'une cellule d'outil (la pastille et son
-  mot), plus deux points — ce qu'il faut pour ne pas toucher, et rien de
-  plus. Un nombre écrit à la main aurait dérivé au premier changement de
-  pastille.
+  PLUS DE PEIGNE — revue des huit « découvreurs » (six sur huit) : les
+  traits en arbre qui reliaient les pastilles sous un mot (« Afficher »,
+  « Ajouter ») se lisaient comme une décoration, et le mot finissait par
+  mentir : « + Meuble », « Décorer » et « Autres » sont des ACTIONS, rangées
+  sous « Afficher ». Chaque pastille porte déjà son mot ; la rangée n'a plus
+  besoin d'être annotée. Le bandeau contextuel se pose désormais juste
+  au-dessus des pastilles (voir `ligneBandeau` dans l'écran).
 */
-const PEIGNE_H = 10;
-const PEIGNE_BAS = PILL_CELL_H + 2;
-/**
- * LA PLACE QUE LE PEIGNE PREND AU-DESSUS DE LA RANGÉE.
- *
- * Relevé du patron, capture à l'appui : « le bloc en bas cache le
- * "Afficher" ». Le bandeau d'un mur se posait une cellule au-dessus de la
- * rangée — la hauteur des pastilles — sans savoir que le peigne vit là,
- * lui aussi : sa barre, ses descentes, et son mot par-dessus. Le bandeau
- * lui passait donc dessus.
- *
- * Le peigne annonce désormais son encombrement, et l'écran s'en sert pour
- * poser ce qui vient au-dessus. Un nombre écrit à la main dans l'écran
- * dériverait au premier changement de pastille ou de police.
- */
-export const PEIGNE_TOTAL = PEIGNE_BAS + PEIGNE_H + 2 + 14;
-/*
-  UNE ANNOTATION, PAS UN CADRE.
-
-  Le trait et le mot se lisent EN RETRAIT — relevé du patron : « donne une
-  opacité au texte et aux lignes ». Ce peigne explique la rangée ; il ne
-  doit pas se disputer le regard avec elle, ni avec le plan qui est le sujet
-  de l'écran.
-
-  LES TRAITS SEULS — revue de lisibilité : l'opacité de 0,55 portait aussi
-  le mot, et « Afficher » / « Ajouter » tombait à 2,1:1. Le retrait du mot
-  passe désormais par sa couleur (`inkSoft`, 12 pt, voir `peigneMot`), qui
-  tient le contraste ; seuls les traits gardent leur voile.
-*/
-const TRAIT_PEIGNE = '#B6BECB';
-export const PEIGNE_OPACITE = 0.55;
 
 export function RangeeOutils({
   elements,
@@ -81,7 +35,6 @@ export function RangeeOutils({
   dessus,
   anim,
   styles,
-  peigne: peigneDemande = { mot: 'Afficher' },
   onSuite,
 }: {
   elements: React.ReactElement[];
@@ -95,23 +48,6 @@ export function RangeeOutils({
   dessus: number;
   anim: Animated.Value;
   styles: Record<string, object>;
-  /**
-   * LE PEIGNE : SON MOT, ET LE RANG DU PREMIER BOUTON QU'IL ANNOTE.
-   *
-   * Il a d'abord dit « Afficher », et disparu en édition — là, chaque
-   * bouton faisait autre chose. Relevé du patron : « dans l'édition fais le
-   * même système que le "Afficher" et ses lignes, mais cette fois
-   * "Ajouter" et on cible appareil, meuble, plafond, note ».
-   *
-   * Ils ne font pas chacun autre chose, en effet : quatre des cinq POSENT
-   * quelque chose sur le plan. Le cinquième — « Redresser » — ne pose rien,
-   * il remet le plan d'équerre ; il ouvre la rangée, et `depuis` dit au
-   * peigne de commencer après lui.
-   *
-   * `null` éteint le peigne : une rangée dont les boutons n'ont pas de
-   * geste commun ne se coiffe pas d'un mot.
-   */
-  peigne?: { mot: string; depuis?: number } | null;
   /**
    * La hauteur de la pile de droite, mesurée et rendue à l'écran.
    *
@@ -138,242 +74,8 @@ export function RangeeOutils({
   useEffect(() => {
     if (colonne.length === 0) onSuite?.(0);
   }, [colonne.length, onSuite]);
-  /*
-    LE PEIGNE « AFFICHER » — croquis Paint du patron.
-
-    Rien ne disait ce que ces boutons font. « Meubles », « Appareils »,
-    « Surfaces », « Nord » : quatre mots qui NOMMENT une chose sans dire ce
-    qu'on en fait — on peut aussi bien croire qu'on va en ajouter un. Ce
-    sont des interrupteurs de calque, et le seul geste possible est de les
-    allumer ou de les éteindre.
-
-    Le peigne le dit d'un dessin : un mot, une barre, une descente par
-    bouton. C'est ainsi qu'on annote un plan, et c'est ce que
-    l'électricien lit tous les jours sur ses schémas.
-
-    IL COMPTE SUR LA GRILLE DE LA RANGÉE, PAS SUR UNE VOISINE.
-
-    Relevé du patron : « le Afficher doit se centrer selon les boutons — si
-    cinq boutons et rien sur la colonne de droite, on axe aux cinq boutons ;
-    s'il y a un bouton sur la colonne, on axe aux boutons de la ligne, sans
-    compter le dernier à droite qui possède d'autres boutons au-dessus de
-    lui ».
-
-    Il partait du bord du peigne (4) et divisait `largeur − reserve − 4` ;
-    la rangée, elle, part de zéro et répartit dans `largeur − reserve` avec
-    DIX POINTS DE MARGE de chaque côté (`planTools`). Deux grilles voisines,
-    d'accord au milieu et fausses aux bords : huit points d'écart sur la
-    dernière descente, soit un cinquième de pastille — le trait ne tombait
-    plus sur son bouton. Le peigne prend donc la grille de la rangée, et
-    part du même bord qu'elle.
-  */
-  const bordDroit = reserve || 4;
-  /** Le cadre de la rangée : c'est lui qui porte les parts égales. */
-  const largeurRangee = Math.max(0, largeur - bordDroit);
-  const part =
-    rangee.length > 0
-      ? Math.max(0, largeurRangee - 2 * MARGE_RANGEE) / rangee.length
-      : 0;
-  /** Le milieu de la pastille de rang `i` — le même calcul que la rangée. */
-  const xPastille = (i: number) => MARGE_RANGEE + part * (i + 0.5);
-  /** Le premier bouton coiffé : les précédents restent hors du peigne. */
-  const depuis = Math.min(peigneDemande?.depuis ?? 0, Math.max(0, rangee.length - 1));
-  const peigne = !!peigneDemande && rangee.length - depuis > 1 && part > 0;
-  /*
-    LE MOT S'AXE SUR LES BOUTONS QU'IL COIFFE, et sur eux seuls.
-
-    Tant que le peigne partait du premier bouton, cet axe était le milieu du
-    cadre de la rangée. Dès qu'il en saute un — « Redresser » —, les deux ne
-    coïncident plus : le mot doit suivre ce qu'il annonce, pas le cadre.
-  */
-  const axeDuMot = (xPastille(depuis) + xPastille(rangee.length - 1)) / 2;
-  /** Une boîte large, centrée sur l'axe : le mot ne se coupe jamais. */
-  const BOITE_MOT = 120;
-  /*
-    LE PEIGNE SE COUCHE SUR LA LIGNE ET SE DRESSE SUR LA PILE — troisième
-    version, croquis rouge du patron à l'appui.
-
-    Il s'est d'abord arrêté au dernier outil de la LIGNE : ce qui ne tient
-    pas dans la ligne se range à droite, dans la même bande, et se
-    retrouvait hors du peigne — annoté par rien, il se lisait comme autre
-    chose qu'un calque. On a donc poussé la barre jusqu'à la pile, avec une
-    descente de plus. Sur le plan 2D, cette descente est tombée sur
-    « Édition » : la colonne de droite y MÉLANGE deux natures — le
-    trop-plein de calques par-dessus, les commandes en dessous —, et rien
-    dans la barre ne disait où s'arrêter.
-
-    Relevé du patron : « la barre s'arrête au dernier calque de la ligne,
-    puis monte en équerre vers les boutons de la colonne qui sont des
-    calques ; elle ne doit couvrir ni Édition, ni Enregistrer : ceux-là ne
-    montrent ni ne cachent rien ».
-
-    La rangée sait lesquels sont des calques sans qu'on le lui dise : elle
-    ne reçoit QUE des calques (les commandes vivent dans leur propre
-    colonne, posée par l'écran), et sa pile de trop-plein est donc entière
-    à annoter. Ce qu'elle ignorait, c'est OÙ cette pile se tient — et
-    `dessus` le lui disait déjà : la hauteur à franchir pour la rejoindre.
-
-    Le peigne y monte donc, et se dresse : une épine le long du bord gauche
-    des cellules, une branche par pastille, de la même longueur qu'une
-    descente. Même grammaire, tournée d'un quart de tour.
-  */
-  const largeurPeigne = colonne.length > 0 ? largeur - 4 : largeurRangee;
-  /** La pile se tient à quatre points du bord : c'est son axe. */
-  const xColonne = largeur - 4 - CELLULE / 2;
-  /** L'épine longe le bord gauche des cellules de la pile. */
-  const xEpine = xColonne - CELLULE / 2;
-  /** La branche s'arrête au ras de la pastille, comme la descente. */
-  const xBranche = xColonne - PILL_SIZE / 2 - 2;
-  /*
-    LA HAUTEUR D'UNE PASTILLE DE LA PILE, au-dessus du bas du peigne.
-
-    Elle se CALCULE — `dessus` pour rejoindre le pied de la pile, un pas par
-    rang, et le milieu de la pastille dans sa cellule (le mot est dessous).
-    Le rang se compte depuis le bas : la pile se rend de haut en bas, mais
-    elle est ancrée par le bas.
-  */
-  const hauteurPile = (i: number) =>
-    dessus +
-    PILL_PITCH * (colonne.length - 1 - i) +
-    (PILL_CELL_H - PILL_SIZE / 2) -
-    PEIGNE_BAS;
-  const hauteurs = colonne.map((_, i) => hauteurPile(i));
-  /*
-    EN 3D, LA PILE COMMENCE SUR LA LIGNE (`dessus` vaut zéro) : sa pastille
-    du bas est à hauteur des autres, et se dessert comme elles, par une
-    descente. Il n'y a pas de bouton d'édition sous elle pour s'y méprendre.
-  */
-  const surLaLigne = hauteurs.some((h) => h <= PEIGNE_H - 1);
-  const hautes = hauteurs.filter((h) => h > PEIGNE_H - 1);
-  const hauteurSvg = Math.max(PEIGNE_H, ...hautes.map((h) => h + 2));
-  const yBarre = hauteurSvg - (PEIGNE_H - 1);
-  const yPied = hauteurSvg - 1;
-  const xFin =
-    colonne.length === 0
-      ? xPastille(rangee.length - 1)
-      : surLaLigne
-      ? xColonne
-      : xEpine;
   return (
     <>
-      {peigne && (
-        /*
-          IL PART COMME LES PASTILLES — relevé du patron : « donne-lui la
-          même animation que les boutons lors du clic sur Édition, il doit
-          disparaître sans coupure nette ».
-
-          Il s'éteignait d'un coup pendant que la rangée, elle, se retirait
-          en fondu : deux temps pour un seul geste, et l'œil voit le
-          raccord. Il boit donc à la MÊME source (`anim`), avec le rang
-          zéro — celui des premières pastilles : l'annotation s'en va avec
-          ce qu'elle annonce, pas après.
-        */
-        <Animated.View
-          style={[
-            styles.peigne,
-            {
-              bottom: bas + PEIGNE_BAS,
-              // Le peigne part du même bord que la ligne ; il s'étend
-              // seulement plus loin quand il doit rejoindre la pile.
-              right: colonne.length > 0 ? 4 : bordDroit,
-              // Le fondu suit les pastilles ; le voile, lui, ne touche que
-              // les traits (plus bas) — le mot reste lisible.
-              opacity: anim,
-            },
-          ]}
-          pointerEvents="none">
-          {/*
-            LE MOT RESTE COLLÉ À SA BARRE.
-
-            Il vivait AU-DESSUS du dessin, dans le flux : le jour où le
-            dessin s'est mis à monter vers la pile, le mot est monté avec
-            lui — une légende à mi-hauteur du plan, loin de ce qu'elle
-            légende. Il se pose donc par le bas, deux points au-dessus de
-            la barre, et se centre sur la LIGNE seule : c'est elle qu'il
-            nomme, la pile n'en est que la suite.
-          */}
-          <Text
-            style={[
-              styles.peigneMot,
-              // Les pastilles de la LIGNE qu'il coiffe : la pile de droite —
-              // qui porte d'autres boutons au-dessus d'elle — n'entre pas
-              // dans le compte, et les boutons sautés non plus.
-              {
-                bottom: PEIGNE_H + 2,
-                left: axeDuMot - BOITE_MOT / 2,
-                width: BOITE_MOT,
-              },
-            ]}>
-            {peigneDemande?.mot}
-          </Text>
-          <Svg width={largeurPeigne} height={hauteurSvg} opacity={PEIGNE_OPACITE}>
-            {/* La barre ne court que d'une descente à l'autre : débordante,
-                elle ferait un cadre, et l'on annoterait la carte entière. */}
-            <Line
-              x1={xPastille(depuis)}
-              y1={yBarre}
-              x2={xFin}
-              y2={yBarre}
-              stroke={TRAIT_PEIGNE}
-              strokeWidth={1.5}
-              strokeLinecap="round"
-            />
-            {rangee.slice(depuis).map((el, i) => (
-              <Line
-                key={el.key}
-                x1={xPastille(depuis + i)}
-                y1={yBarre}
-                x2={xPastille(depuis + i)}
-                y2={yPied}
-                stroke={TRAIT_PEIGNE}
-                strokeWidth={1.5}
-                strokeLinecap="round"
-              />
-            ))}
-            {/* La pastille de la pile qui se tient SUR la ligne : une
-                descente, comme les autres. */}
-            {surLaLigne && (
-              <Line
-                x1={xColonne}
-                y1={yBarre}
-                x2={xColonne}
-                y2={yPied}
-                stroke={TRAIT_PEIGNE}
-                strokeWidth={1.5}
-                strokeLinecap="round"
-              />
-            )}
-            {/* L'ÉQUERRE : l'épine monte de la barre jusqu'au calque le
-                plus haut de la pile, et rien au-delà — au-dessus d'elle,
-                ce sont les commandes. */}
-            {hautes.length > 0 && (
-              <Line
-                x1={xEpine}
-                y1={yBarre}
-                x2={xEpine}
-                y2={hauteurSvg - Math.max(...hautes)}
-                stroke={TRAIT_PEIGNE}
-                strokeWidth={1.5}
-                strokeLinecap="round"
-              />
-            )}
-            {colonne.map((el, i) =>
-              hauteurs[i] > PEIGNE_H - 1 ? (
-                <Line
-                  key={el.key}
-                  x1={xEpine}
-                  y1={hauteurSvg - hauteurs[i]}
-                  x2={xBranche}
-                  y2={hauteurSvg - hauteurs[i]}
-                  stroke={TRAIT_PEIGNE}
-                  strokeWidth={1.5}
-                  strokeLinecap="round"
-                />
-              ) : null,
-            )}
-          </Svg>
-        </Animated.View>
-      )}
       <View
         style={[styles.planTools, { bottom: bas, right: reserve || 4 }]}
         pointerEvents="box-none">

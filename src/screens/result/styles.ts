@@ -139,13 +139,18 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     fontWeight: '600',
     letterSpacing: -0.4,
   },
+  /*
+    UN LIBELLÉ QUI SE LIT — revue des « découvreurs » : en capitales de dix
+    points, réduites à sept quand la cellule manquait de place, « M TOUR DES
+    PIÈCES » ne se lisait plus. Le bandeau ne garde que deux ou trois
+    chiffres : le libellé reprend douze points, en minuscules, et ne
+    descend plus sous onze.
+  */
   metricLabel: {
     color: c.inkSoft,
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.2,
-    marginTop: 2,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 1,
   },
   /**
    * La rangée flottante en haut à droite du dessin : le contrôle des
@@ -177,14 +182,33 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   /** Une pastille sans mot : un rond, l'icône au centre. */
   pastilleIcone: { width: 34, paddingHorizontal: 0, justifyContent: 'center' },
   /*
-    L'EXPLORATION, EN BLEU PLEIN — la seule pastille pleine de la rangée.
-
-    Les autres disent un ÉTAT (la vue, l'étage, le prix, le verdict) ; celle-ci
-    est une INVITATION, et c'est la fonction qu'on montre : elle doit se voir
-    du premier coup d'œil sur un plan qu'on vient de relever.
+    LES ONGLETS DES NIVEAUX — sous la rangée du haut, à gauche : un ruban
+    blanc comme les pastilles, l'onglet affiché en bleu plein (voir
+    `nomCourtDuNiveau`). « Visite » a rendu le bleu plein : c'est désormais
+    le seul plein de cette zone, et il dit où l'on est.
   */
-  explorerPastille: { backgroundColor: c.blue, gap: 6, paddingHorizontal: 13 },
-  explorerPastilleTexte: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  ongletsNiveaux: {
+    position: 'absolute',
+    top: 10 + 34 + 8,
+    left: 10,
+    zIndex: 4,
+    flexDirection: 'row',
+    padding: 3,
+    gap: 2,
+    borderRadius: radius.pill,
+    backgroundColor: c.surface,
+    ...ombreBouton,
+  },
+  ongletNiveau: {
+    height: 30,
+    paddingHorizontal: 12,
+    borderRadius: radius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ongletNiveauActif: { backgroundColor: c.blue },
+  ongletNiveauTexte: { color: c.ink, fontSize: 14, fontWeight: '600' },
+  ongletNiveauTexteActif: { color: '#FFFFFF' },
   canvas: { flex: 1, ...shadowCard, borderRadius: radius.lg },
   // Jusqu'à neuf pastilles : la barre défile plutôt que de se replier sur
   // deux rangs et de manger le plan.
@@ -233,8 +257,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     position: 'absolute',
     flexDirection: 'row',
     alignItems: 'flex-end',
-    // Le peigne « Afficher » compte sur cette marge pour tomber sur les
-    // pastilles : elle se partage, elle ne se réécrit pas.
+    // La marge se partage avec `repartirOutils` : elle ne se réécrit pas.
     paddingHorizontal: MARGE_RANGEE,
     left: 0,
     // La colonne des actions tient la droite : la rangée s'arrête avant elle,
@@ -404,32 +427,6 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   wallLengthDone: { color: c.blue, fontSize: 13, fontWeight: '600' },
   // Le mur sélectionné : une seule ligne, au pied du plan, à côté du bouton
   // d'enregistrement. Elle dit l'essentiel et ne mange pas le dessin.
-  /*
-    LE PEIGNE « AFFICHER » — croquis Paint du patron.
-
-    Posé au-dessus de la rangée de calques, il ne reçoit jamais le doigt :
-    c'est une annotation, pas un bouton. Le mot se centre sur la barre, et
-    la barre sur les pastilles.
-  */
-  /* Il part du MÊME BORD que la rangée (zéro) : c'est ce qui lui permet de
-     compter les pastilles avec la grille de celle-ci, sans décalage. */
-  peigne: { position: 'absolute', left: 0, alignItems: 'center', zIndex: 1 },
-  /*
-    Il se pose PAR LE BAS, au-dessus de la barre : le dessin monte
-    désormais vers la pile de droite, et un mot dans le flux serait monté
-    avec lui, loin de la rangée qu'il nomme. Sa hauteur et sa largeur —
-    celle de la ligne — viennent du peigne, qui seul les connaît.
-  */
-  /* Revue de lisibilité : 11 pt d'`inkFaint` sous un voile de 0,55 faisait
-     2,1:1. Le mot passe en `inkSoft`, 12,5 pt, sans voile : il reste en
-     retrait par sa couleur, et il se lit. */
-  peigneMot: {
-    position: 'absolute',
-    textAlign: 'center',
-    color: c.inkSoft,
-    fontSize: 12.5,
-    fontWeight: '700',
-  },
   wallStrip: {
     position: 'absolute',
     // Le pied réel est recalculé à l'affichage : un étage au-dessus de la

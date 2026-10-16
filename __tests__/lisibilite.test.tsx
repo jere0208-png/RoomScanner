@@ -104,7 +104,11 @@ describe('les chiffres de l’en-tête disent vrai', () => {
     ];
     const parts = roomParts(murs.slice(0, 4), [{ id: 'r1' }]);
     expect(perimetreDesPieces(parts)).toBeCloseTo(14, 6);
-    expect(lire('src/screens/ResultScreen.tsx')).toContain('perimetreDesPieces(parts)');
+    // MIS À JOUR — revue des « découvreurs » : le tour des pièces a quitté le
+    // bandeau de l'écran (trop de chiffres) ; il se lit sur la fiche de
+    // chaque pièce (« Périmètre · Les plinthes ») et dans la liste d'achats.
+    expect(lire('src/screens/ResultScreen.tsx')).not.toContain("label: 'm tour des pièces'");
+    expect(lire('src/screens/result/FichePieceSheet.tsx')).toContain('mot="Périmètre"');
   });
 
   it('« m² hab. » porte « ≈ » quand la surface est approchée, ou l’habitable à vérifier', () => {

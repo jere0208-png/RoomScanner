@@ -876,7 +876,7 @@ describe('l’écran des résultats', () => {
     // La rangée d'outils est là, effacée, et ne prend plus le doigt.
     const rangee = tree.root
       .findAll((n) => typeof n.type === 'string' && n.props?.pointerEvents === 'none')
-      .find((n) => n.findAll((x) => x.props?.accessibilityLabel === 'Redresser').length > 0);
+      .find((n) => n.findAll((x) => x.props?.accessibilityLabel === 'Aligner').length > 0);
     expect(rangee).toBeDefined();
     expect(platDe(rangee!).opacity).toBe(0);
     // Et la carte s'arrête avant la colonne de droite.
@@ -1236,6 +1236,9 @@ describe('les feuilles de l’écran des résultats', () => {
   it('ouvre le choix des cotes plutôt qu’un mode d’attente', () => {
     const tree = monter();
     act(() => bouton(tree, 'Plus')!.props.onPress());
+    // Le menu regroupé (revue des « découvreurs ») : « Ajouter une pièce »,
+    // puis la façon.
+    actionDuMenu(tree, 'Ajouter une pièce');
     actionDuMenu(tree, 'Dessiner une pièce à la main');
     // Les gabarits sont la...
     expect(textes(tree)).toContain('WC');
@@ -1257,6 +1260,7 @@ describe('les feuilles de l’écran des résultats', () => {
     const tree = monter();
     const avant = useScanStore.getState().rooms.length;
     act(() => bouton(tree, 'Plus')!.props.onPress());
+    actionDuMenu(tree, 'Ajouter une pièce');
     actionDuMenu(tree, 'Dessiner une pièce à la main');
     const wc = tree.root
       .findAll(
@@ -1522,24 +1526,25 @@ describe('la rangée d’outils', () => {
 
   it('échange les calques contre les outils en édition', () => {
     const tree = monter();
-    expect(bouton(tree, 'Cotes')).toBeDefined();
+    // « Dimensions » partout, même en mode électricité (revue des « découvreurs »).
+    expect(bouton(tree, 'Dimensions')).toBeDefined();
     expect(bouton(tree, 'Appareil')).toBeUndefined();
     act(() => bouton(tree, 'Édition')!.props.onPress());
     act(() => {
       jest.advanceTimersByTime(500);
     });
     expect(bouton(tree, 'Appareil')).toBeDefined();
-    expect(bouton(tree, 'Redresser')).toBeDefined();
+    // « Redresser » s'appelle « Aligner » (revue des « découvreurs »).
+    expect(bouton(tree, 'Aligner')).toBeDefined();
     // « Meuble » en édition ouvre le catalogue ; « Meubles » hors édition,
-    // c'est le calque. Même sujet, deux gestes selon le mode — et c'est le
-    // peigne « Afficher » qui dit lequel (voir `afficher.test.tsx`).
+    // c'est le calque. Même sujet, deux gestes selon le mode.
     expect(bouton(tree, 'Meuble')).toBeDefined();
     // Les calques ont cédé la place : ils reviendront en sortant d'édition.
-    expect(bouton(tree, 'Cotes')).toBeUndefined();
+    expect(bouton(tree, 'Dimensions')).toBeUndefined();
     expect(bouton(tree, 'Surfaces')).toBeUndefined();
   });
 
-  it('« Redresser » dit ce qu’il a fait', () => {
+  it('« Aligner » (ex-« Redresser ») dit ce qu’il a fait', () => {
     const { useAstuce } = require('../src/ui/astuce');
     const tree = monter();
     act(() => bouton(tree, 'Édition')!.props.onPress());
@@ -1547,7 +1552,7 @@ describe('la rangée d’outils', () => {
       jest.advanceTimersByTime(500);
     });
     act(() => useAstuce.setState({ courante: null, file: [] }));
-    act(() => bouton(tree, 'Redresser')!.props.onPress());
+    act(() => bouton(tree, 'Aligner')!.props.onPress());
     const a = useAstuce.getState();
     const dits = [a.courante, ...a.file].filter(Boolean).map((x: { texte: string }) => x.texte);
     expect(dits.some((x: string) => /équerre/.test(x))).toBe(true);
@@ -1561,18 +1566,18 @@ describe('la rangée d’outils', () => {
     geste qu'on fait en premier en entrant en édition — on redresse le
     relevé, puis on place dessus.
   */
-  it('ouvre la rangée d’édition par « Redresser »', () => {
+  it('ouvre la rangée d’édition par « Aligner » (ex-« Redresser »)', () => {
     const tree = monter();
     act(() => bouton(tree, 'Édition')!.props.onPress());
     act(() => {
       jest.advanceTimersByTime(500);
     });
-    const OUTILS = ['Redresser', 'Appareil', 'Meuble', 'Plafond', 'Note'];
+    const OUTILS = ['Aligner', 'Appareil', 'Meuble', 'Plafond', 'Note'];
     const ordre = tree.root
       .findAllByType(TouchableOpacity)
       .map((n) => String(n.props.accessibilityLabel ?? ''))
       .filter((l) => OUTILS.includes(l));
-    expect(ordre[0]).toBe('Redresser');
+    expect(ordre[0]).toBe('Aligner');
   });
 
   /**
@@ -1611,7 +1616,8 @@ describe('la rangée d’outils', () => {
     passerEn3D(tree);
     expect(bouton(tree, 'Passer en 2D')).toBeDefined();
     // La rangée garde l'essentiel ; le reste vit dans le menu « Afficher ».
-    expect(bouton(tree, 'Cotes')).toBeDefined();
+    // « Dimensions » en 3D comme en 2D (revue des « découvreurs »).
+    expect(bouton(tree, 'Dimensions')).toBeDefined();
     expect(bouton(tree, 'Meubles')).toBeDefined();
     expect(bouton(tree, 'Surfaces')).toBeDefined();
     // Le scan de référence porte de l'appareillage : ses repères sont là.
@@ -1629,7 +1635,7 @@ describe('la rangée d’outils', () => {
   /**
    * ET LES PASTILLES CONDITIONNELLES SE TAISENT quand rien ne les justifie.
    */
-  it('n’offre ni repères ni pièces sur un scan nu', () => {
+  it('grise les repères et n’offre pas de pièce isolée sur un scan nu', () => {
     let tree!: TestRenderer.ReactTestRenderer;
     act(() => {
       useScanStore.setState({
@@ -1655,7 +1661,14 @@ describe('la rangée d’outils', () => {
       }
     });
     passerEn3D(tree);
-    expect(bouton(tree, 'Repères')).toBeUndefined();
+    /*
+      MIS À JOUR — revue des « découvreurs » : une barre STABLE. Sans
+      appareil posé, « Repères » ne disparaît plus (la barre se décalerait) :
+      il reste à sa place, grisé, et dit pourquoi d'un appui.
+    */
+    const reperes = bouton(tree, 'Repères');
+    expect(reperes).toBeDefined();
+    expect(reperes!.props.accessibilityState).toEqual({ selected: false, disabled: true });
     ouvrirAfficher(tree);
     expect(ligne(tree, 'Murs pleins')).toBeDefined();
     // Une seule pièce : rien à isoler. Pas de plafond équipé : la ligne se grise.
@@ -1741,7 +1754,12 @@ describe('le menu du scan', () => {
     dessin, puis le dossier ; et « Normes auto » n'est plus offerte au
     particulier, qui n'a jamais allumé la norme.
   */
-  it('se lit dans l’ordre : relever, dessiner, puis le dossier', () => {
+  /*
+    MIS À JOUR — revue des « découvreurs » : le menu est regroupé (« Ajouter
+    une pièce », « Ajouter un niveau » ; scanner ou dessiner se choisit
+    ensuite), et en mode électricité le métier passe EN PREMIER.
+  */
+  it('se lit dans l’ordre : le métier, le projet, ajouter, modifier, puis le dossier', () => {
     const tree = monter();
     act(() => bouton(tree, 'Plus')!.props.onPress());
     const vu = textes(tree);
@@ -1751,13 +1769,13 @@ describe('le menu du scan', () => {
       return i;
     };
     const ordre = [
+      'Relever le tableau existant',
+      'Normes auto',
       'Liste d’achats',
-      'Scanner une autre pièce',
-      'Scanner un étage',
-      'Scanner un sous-sol',
-      'Dessiner une pièce à la main',
+      'Ajouter une pièce',
+      'Ajouter un niveau',
       'Ajouter un mur',
-      'Redétecter les pièces',
+      'Recalculer les pièces',
       'Renommer le plan',
       'Nouveau scan',
     ].map(rang);
@@ -1772,7 +1790,9 @@ describe('le menu du scan', () => {
     act(() => bouton(tree, 'Plus')!.props.onPress());
     const vu = textes(tree);
     expect(vu).not.toContain('Normes auto');
-    expect(vu).toContain('Placer prises et interrupteurs');
+    // Et plus de proposition du mode : il s'active au profil (revue des
+    // « découvreurs » : l'électricité s'imposait aux non-électriciens).
+    expect(vu).not.toContain('Placer prises et interrupteurs');
     act(() => useUsage.setState({ modeElec: avant }));
   });
 });
@@ -2112,10 +2132,12 @@ describe('le recoin technique du plan', () => {
  * se déclenchait qu'en passant par « Redresser », qui bouge la géométrie.
  */
 describe('redétecter les pièces', () => {
+  // Il s'appelle « Recalculer les pièces » (revue des « découvreurs » :
+  // « Redétecter » est un mot d'informaticien).
   it('est offert dans le menu du scan', () => {
     const tree = monter();
     act(() => bouton(tree, 'Plus')!.props.onPress());
-    expect(textes(tree)).toContain('Redétecter les pièces');
+    expect(textes(tree)).toContain('Recalculer les pièces');
   });
 
   it('retrouve une pièce que l’ancienne détection avait ratée', () => {

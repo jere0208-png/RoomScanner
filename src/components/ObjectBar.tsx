@@ -166,6 +166,18 @@ function Fleche({
   );
 }
 
+/**
+ * Ce que la puce « Ça passe ? » écrit : l'alerte telle quelle, et le oui
+ * avec sa coche et son compte — « ✓ Passe par les 2 portes ».
+ */
+export function texteDePassage(v: VerdictDePassage): string {
+  if (!v.ok) return v.court;
+  if (v.portes && v.portes > 0) {
+    return v.portes === 1 ? '✓ Passe par la porte' : `✓ Passe par les ${v.portes} portes`;
+  }
+  return `✓ ${v.court}`;
+}
+
 export function ObjectBar({
   object,
   styles,
@@ -419,17 +431,20 @@ export function ObjectBar({
         </View>
       </View>
       {/*
-        « ÇA PASSE » NE PARLE QUE POUR PRÉVENIR — relevé du patron : « l'info
-        “passe par les portes” n'est pas importante ; elle l'est si un meuble
-        ne passe PAS par les portes ». Un meuble qui passe n'a rien à dire.
+        « ÇA PASSE » — relevé du patron : « l'info “passe par les portes” n'est
+        pas importante ; elle l'est si un meuble ne passe PAS ». La puce
+        d'alerte reste ce qu'elle était. Mais le silence ne se lisait pas
+        comme un oui — revue des « découvreurs » (six sur huit) : on cherchait
+        la réponse, on ne la trouvait pas, on croyait que l'outil n'avait pas
+        regardé. Un meuble qui passe le DIT, discrètement, en vert.
       */}
-      {((passage && !passage.ok) || bloque || onCaler) && (
+      {(passage || bloque || onCaler) && (
         <View style={[local.verdicts, styles.bandeauFilet]}>
-          {passage && !passage.ok && (
+          {passage && (
             <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Ça passe ?"
-              accessibilityHint={passage.court}
+              accessibilityHint={texteDePassage(passage)}
               hitSlop={6}
               style={[local.puce, { backgroundColor: `${passage.ok ? palette.green : palette.amber}1F` }]}
               onPress={onPassage}>
@@ -437,7 +452,7 @@ export function ObjectBar({
                 <Path d={SOLAIRES.ouvertures} fill={passage.ok ? palette.green : palette.amber} fillRule="evenodd" />
               </Svg>
               <Text style={[local.puceTexte, { color: palette.ink }]} numberOfLines={1}>
-                {passage.court}
+                {texteDePassage(passage)}
               </Text>
             </TouchableOpacity>
           )}

@@ -612,7 +612,8 @@ export function WallElevation({
     select: onSelect,
   });
   live.current = {
-    mine,
+    // Hors mode électricité, le mur se regarde : aucun appareil ne se saisit.
+    mine: modeElec ? mine : [],
     face,
     scale,
     H,
@@ -2290,7 +2291,7 @@ export function WallElevation({
               );
             })()}
           {/* Un mur vide dit par où commencer — sans prendre le doigt. */}
-          {mine.length === 0 && !calqueVisible && (
+          {modeElec && mine.length === 0 && !calqueVisible && (
             <View style={styles.vide} pointerEvents="none">
               <Text style={styles.videMot}>
                 Touchez un appareil, en bas, pour le poser ici
@@ -2307,7 +2308,22 @@ export function WallElevation({
         ensemble qui se forme : ses deux questions.
       */}
       <View style={[styles.dock, { paddingBottom: margesSysteme.bottom + 12 }]}>
-        {fusion ? (
+        {/*
+          LE MUR DE FACE, POUR TOUT LE MONDE — revue des « découvreurs » : le
+          bricoleur y prévoit sa faïence, le plombier ses arrivées d'eau,
+          l'étudiante relève une élévation. Hors mode électricité, la page
+          montre le mur coté, ses ouvertures et ses meubles ; les outils
+          d'appareillage (le dock, la fiche, l'ensemble) restent au métier.
+        */}
+        {!modeElec ? (
+          <View accessibilityLabel="Le mur, vu de face">
+            <Text style={styles.dockTitre}>Le mur, vu de face</Text>
+            <Text style={styles.dockSous}>
+              Ses cotes, ses portes et fenêtres, et les meubles posés devant :
+              de quoi prévoir une faïence, une arrivée d’eau, une étagère.
+            </Text>
+          </View>
+        ) : fusion ? (
           (() => {
             const lot = mine.filter(
               f => f.id === fusion.base || f.id === fusion.moved,

@@ -56,12 +56,28 @@ const monter = (props: Record<string, unknown>) => {
 };
 const textes = (t: TestRenderer.ReactTestRenderer) => t.root.findAllByType(Text).map((n) => [].concat(n.props.children ?? []).join(''));
 
-describe('« ça passe » ne parle que pour prévenir', () => {
-  it('un meuble qui passe : rien à dire', () => {
-    const t = monter({ passage: { ok: true, court: 'Passe par les portes', detail: '…' } });
-    expect(textes(t)).not.toContain('Passe par les portes');
-    expect(t.root.findAll((n) => n.props.accessibilityLabel === 'Ça passe ?', { deep: false })).toHaveLength(0);
+/*
+  MIS À JOUR — revue des « découvreurs » (six sur huit) : le silence ne se
+  lisait pas comme un oui ; on croyait que l'outil n'avait pas regardé. Un
+  meuble qui passe le DIT, discrètement, en vert, avec le compte des portes.
+  L'alerte, elle, reste la même.
+*/
+describe('« ça passe » répond, oui ou non', () => {
+  it('un meuble qui passe : « ✓ Passe par les 2 portes »', () => {
+    const t = monter({ passage: { ok: true, court: 'Passe par les portes', detail: '…', portes: 2 } });
+    expect(textes(t)).toContain('✓ Passe par les 2 portes');
+    const puce = t.root.findAll((n) => n.props.accessibilityLabel === 'Ça passe ?', { deep: false });
+    expect(puce).toHaveLength(1);
     act(() => t.unmount());
+  });
+
+  it('une seule porte se dit au singulier ; en kit, le verdict garde son mot', () => {
+    const une = monter({ passage: { ok: true, court: 'Passe par les portes', detail: '…', portes: 1 } });
+    expect(textes(une)).toContain('✓ Passe par la porte');
+    act(() => une.unmount());
+    const kit = monter({ passage: { ok: true, court: 'Passe en kit', detail: '…' } });
+    expect(textes(kit)).toContain('✓ Passe en kit');
+    act(() => kit.unmount());
   });
 
   it('un meuble qui ne passe pas : la puce, en alerte', () => {

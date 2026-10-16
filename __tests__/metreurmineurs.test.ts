@@ -20,7 +20,10 @@ describe('le bandeau des mesures', () => {
   const ecran = readFileSync(join(__dirname, '..', 'src', 'screens', 'ResultScreen.tsx'), 'utf8');
   it('ne dit plus « périmètre » pour la somme des tours de pièces', () => {
     expect(ecran).not.toContain("label: 'm périmètre'");
-    expect(ecran).toContain("{ value: fr(perimeter), label: 'm tour des pièces' }");
+    // MIS À JOUR — revue des « découvreurs » : le bandeau ne garde que les
+    // pièces et les m² habitables ; le tour des pièces vit sur la fiche de
+    // pièce (« Périmètre ») et dans la liste d'achats (les plinthes).
+    expect(ecran).not.toContain("label: 'm tour des pièces'");
   });
 });
 

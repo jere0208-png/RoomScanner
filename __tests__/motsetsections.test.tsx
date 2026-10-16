@@ -54,15 +54,36 @@ describe('le menu du plan', () => {
     (m) => ({ section: m[1], label: m[2], icon: m[3] }),
   );
 
+  /*
+    MIS À JOUR — revue des « découvreurs » : le menu est regroupé. « Ajouter
+    une pièce » et « Ajouter un niveau » ouvrent une seconde feuille (scanner
+    ou dessiner) ; celle des niveaux a ses sections (« Au-dessus », « En
+    dessous »), celle de la pièce n'a que deux lignes. L'électricien voit son
+    métier EN PREMIER (« Électricité ») ; « Décorer » a quitté le menu pour la
+    barre du bas ; la proposition du mode, pour le profil.
+  */
   it('toutes ses entrées sont rangées dans une section titrée — aucune retirée', () => {
-    // « Jeter », « Activer », « Annuler » sont des boutons d'alerte (« Revenir… », passage en mode électricité), pas des entrées.
-    const labels = [...bloc.matchAll(/^\s*label: '([^']+)'/gm)].map((m) => m[1]).filter((l) => !['Jeter', 'Activer', 'Annuler'].includes(l));
-    expect(labels.length).toBeGreaterThanOrEqual(15);
+    // « Jeter », « Activer », « Annuler » sont des boutons d'alerte, pas des
+    // entrées ; les deux lignes de la feuille « Ajouter une pièce » n'ont pas
+    // de section (deux choix, un seul bloc).
+    const HORS = ['Jeter', 'Activer', 'Annuler', 'Scanner une autre pièce', 'Dessiner une pièce à la main'];
+    const labels = [...bloc.matchAll(/^\s*label: '([^']+)'/gm)].map((m) => m[1]).filter((l) => !HORS.includes(l));
+    expect(labels.length).toBeGreaterThanOrEqual(14);
     expect(entrees.map((e) => e.label).sort()).toEqual([...labels].sort());
-    expect([...new Set(entrees.map((e) => e.section))]).toEqual(['Votre projet', 'Ajouter', 'Modifier', 'Version']);
-    for (const l of ['Scanner un étage', 'Dessiner un étage', 'Scanner un sous-sol', 'Dessiner un sous-sol', 'Nouveau scan', 'Décorer']) {
+    expect([...new Set(entrees.map((e) => e.section))]).toEqual([
+      'Électricité',
+      'Votre projet',
+      'Ajouter',
+      'Au-dessus',
+      'En dessous',
+      'Modifier',
+      'Version',
+    ]);
+    for (const l of ['Ajouter une pièce', 'Ajouter un niveau', 'Scanner un étage', 'Dessiner un étage', 'Scanner un sous-sol', 'Dessiner un sous-sol', 'Nouveau scan']) {
       expect(labels).toContain(l);
     }
+    expect(labels).not.toContain('Décorer');
+    expect(labels).not.toContain('Placer prises et interrupteurs');
   });
 
   it('chaque entrée a son icône, distincte des autres', () => {

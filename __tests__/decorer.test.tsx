@@ -145,12 +145,17 @@ describe('décorer sans se battre avec l’écran', () => {
 });
 
 describe('le geste se trouve', () => {
-  it('« Décorer » sur la barre de la maquette, et dans le menu du plan', () => {
+  /*
+    MIS À JOUR — revue des « découvreurs » : « Décorer » est sur la barre du
+    bas, en 2D comme en 3D, à la même place (`actionsDeLaBarre`). Le menu du
+    plan le répétait : il ne le porte plus — une fois chacun.
+  */
+  it('« Décorer » sur la barre, dans les deux vues — et plus en double au menu du plan', () => {
     const barre = lire('src/screens/result/ResultToolbar.tsx');
-    expect(barre).toContain('<ToolPill key="decorer" icon="rouleau" label="Décorer" active={false} onPress={onDecorer} />');
+    expect(barre).toMatch(/key="decorer"\s+icon="rouleau"\s+label="Décorer"/);
     const ecran = lire('src/screens/ResultScreen.tsx');
     expect(ecran).toContain('onDecorer={() => setDecorant(true)}');
-    expect(ecran).toContain("label: 'Décorer',");
+    expect(ecran).not.toContain("label: 'Décorer',");
     expect(ecran).toContain('<DecorSheet');
   });
 });

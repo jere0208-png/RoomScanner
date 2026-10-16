@@ -366,10 +366,16 @@ describe('l’écran du scan, refondu', () => {
    */
   it('montre les mesures sans qu’on les demande', () => {
     const vu = textes(monter('scan'));
-    // Les libellés sont mis en capitales par le style, pas par le texte.
-    expect(vu).toContain('m² sol');
-    // « tour des pièces » : la somme des contours, pas le périmètre du logement (revue « Nadia »).
-    expect(vu).toContain('m tour des pièces');
+    /*
+      MIS À JOUR — revue des « découvreurs » : le bandeau ne garde que les
+      pièces et les m² habitables (le même mot dans les deux modes ; ce banc
+      ouvre en mode électricité, d'où « élec. »). Le tour des pièces et les
+      murs ont quitté le bandeau pour la fiche de pièce et la liste d'achats.
+    */
+    expect(vu).toContain('pièces');
+    expect(vu).toContain('m² habitables');
+    expect(vu).not.toContain('m² sol');
+    expect(vu).not.toContain('m tour des pièces');
   });
 
   it('et n’offre plus de les masquer', () => {
@@ -390,7 +396,9 @@ describe('l’écran du scan, refondu', () => {
       .find((n) => n.props.accessibilityLabel === 'Plus');
     expect(menu).toBeDefined();
     act(() => menu!.props.onPress());
-    expect(textes(tree)).toContain('Dessiner une pièce à la main');
+    // Le menu regroupé (revue des « découvreurs ») : « Ajouter une pièce »,
+    // puis la façon — scanner ou dessiner — dans une seconde feuille.
+    expect(textes(tree)).toContain('Ajouter une pièce');
     // « Nouveau scan » y reste, mais il a quitté le pied de page.
     expect(textes(tree)).toContain('Nouveau scan');
   });

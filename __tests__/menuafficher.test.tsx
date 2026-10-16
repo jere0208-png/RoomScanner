@@ -126,10 +126,16 @@ beforeEach(() => {
 });
 
 describe('le plan 2D', () => {
-  it('la rangée garde l’essentiel — cotes, meubles, surfaces, appareils — et « Autres » au bout', () => {
+  /*
+    MIS À JOUR — revue des « découvreurs » : « Dimensions » partout (plus de
+    « Cotes » en mode électricité), et la barre est STABLE — les deux actions
+    (« + Meuble », « Décorer ») suivent les calques dans les deux vues et les
+    deux modes, grisées quand elles n'ont rien à faire plutôt que retirées.
+  */
+  it('la rangée garde l’essentiel — dimensions, meubles, surfaces, appareils —, les actions, et « Autres » au bout', () => {
     const t = rangee2D(false);
     const ordre = libelles(t);
-    expect(ordre).toEqual(['Cotes', 'Meubles', 'Surfaces', 'Appareils', 'Autres']);
+    expect(ordre).toEqual(['Dimensions', 'Meubles', 'Surfaces', 'Appareils', '+ Meuble', 'Décorer', 'Autres']);
   });
 
   it('« Autres » ouvre le menu Afficher : grille, couleurs des ouvertures, notes, photos', () => {
@@ -169,16 +175,17 @@ describe('le plan 2D', () => {
     const affiche = icone(false, 'Appareils');
     expect(affiche).toBe(icone(true, 'Appareil'));
     expect(affiche).not.toBe('elec');
-    const src = lire('src/screens/result/ResultToolbar.tsx');
-    expect(src).toContain("{ cle: 'appareils', icone: 'appareil' as const,");
+    // La ligne « Appareils » du menu « Autres » est partie : elle répétait
+    // la pastille (revue des « découvreurs »).
   });
 
-  it('en édition, chaque bouton qui ajoute porte son petit « + » — « Redresser » non', () => {
+  // « Redresser » s'appelle « Aligner » (revue des « découvreurs »).
+  it('en édition, chaque bouton qui ajoute porte son petit « + » — « Aligner » non', () => {
     const t = rangee2D(true);
     const pastilles = t.root.findAllByType(ToolPill);
     const ajout = (label: string) => pastilles.find((p) => p.props.label === label)?.props.ajout === true;
     for (const label of ['Meuble', 'Appareil', 'Plafond', 'Note']) expect([label, ajout(label)]).toEqual([label, true]);
-    expect(ajout('Redresser')).toBe(false);
+    expect(ajout('Aligner')).toBe(false);
   });
 
   it('la grille se dessine sous le plan ; notes et photos se cachent hors édition', () => {
@@ -192,10 +199,12 @@ describe('le plan 2D', () => {
 });
 
 describe('la maquette 3D', () => {
-  it('la rangée : meubles, cotes, surfaces — et « Autres » à la place de « Pièces »', () => {
+  // MIS À JOUR : le même ordre, les mêmes mots qu'en plan 2D (revue des
+  // « découvreurs ») ; les repères tiennent la place des appareils.
+  it('la rangée : dimensions, meubles, surfaces — et « Autres » à la place de « Pièces »', () => {
     const t = rangee3D();
     const ordre = libelles(t);
-    expect(ordre).toEqual(['Meubles', 'Cotes', 'Surfaces', 'Autres']);
+    expect(ordre).toEqual(['Dimensions', 'Meubles', 'Surfaces', 'Repères', '+ Meuble', 'Décorer', 'Autres']);
     for (const parti of ['Pièces', 'Volumes', 'Nuit', 'Murs', 'Nord']) expect(ordre).not.toContain(parti);
   });
 
@@ -218,7 +227,9 @@ describe('la maquette 3D', () => {
     // « Volumes » ne se lit plus comme le volume d'une pièce, et dit quand il est vide.
     const volumes = t.root.findAll((n) => n.props.accessibilityLabel === 'Volumes de salle d’eau' && n.props.accessibilityRole === 'switch')[0];
     expect(volumes.props.accessibilityHint).toMatch(/baignoire ni douche/);
-    expect(t.root.findAllByType(Switch).length).toBeGreaterThan(8);
+    // Sept lignes : le menu ne répète plus les meubles, les dimensions, les
+    // surfaces ni les repères, qui ont leur pastille (revue des « découvreurs »).
+    expect(t.root.findAllByType(Switch).length).toBeGreaterThanOrEqual(7);
   });
 
   it('hors électricité, les volumes, la nuit et les repères ne sont pas proposés', () => {
@@ -290,11 +301,13 @@ describe('le menu se valide, ou se quitte sans rien changer', () => {
 
   it('un appui hors du bloc referme SANS valider, et le brouillon est oublié', () => {
     const t = rangee2D(false);
+    const couleursAvant = useScanStore.getState().showOpeningColors;
     appuyer(t, 'Autres');
     appuyer(t, 'Grille');
-    // « Cotes » est aussi une pastille de la rangée : on vise la LIGNE du menu.
-    act(() => ligne(t, 'Cotes').props.onPress());
-    expect(ligne(t, 'Cotes').props.accessibilityState.checked).toBe(true);
+    // Une seconde ligne du menu (les dimensions, qui servaient ici, ont
+    // quitté le menu : elles ont leur pastille).
+    act(() => ligne(t, 'Portes et fenêtres en couleur').props.onPress());
+    expect(ligne(t, 'Portes et fenêtres en couleur').props.accessibilityState.checked).toBe(!couleursAvant);
     // Le voile : ce qui reçoit l'appui autour de la feuille. Il est
     // désormais posé À CÔTÉ de la feuille, plus autour (revue VoiceOver,
     // voir `feuilleaccessible.test.tsx`).
@@ -309,7 +322,7 @@ describe('le menu se valide, ou se quitte sans rien changer', () => {
     // Rouvert : les lignes disent l'état RÉEL, pas le brouillon abandonné.
     appuyer(t, 'Autres');
     expect(ligne(t, 'Grille').props.accessibilityState.checked).toBe(false);
-    expect(ligne(t, 'Cotes').props.accessibilityState.checked).toBe(false);
+    expect(ligne(t, 'Portes et fenêtres en couleur').props.accessibilityState.checked).toBe(couleursAvant);
   });
 
   it('la croix referme sans valider, elle aussi', () => {

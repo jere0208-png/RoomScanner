@@ -1,5 +1,6 @@
 /**
- * LA PROPOSITION DU MODE ÉLECTRICITÉ, POUR UN PARTICULIER — revue « Gérard ».
+ * LA PROPOSITION DU MODE ÉLECTRICITÉ, POUR UN PARTICULIER — revue « Gérard »
+ * (puis retirée du menu : voir plus bas).
  *
  * Dans le menu du plan, « Placer prises et interrupteurs » promettait
  * « normes NF C 15-100 et devis » à un particulier, et un appui changeait
@@ -75,28 +76,19 @@ function ouvrirLeMenu() {
   return t;
 }
 
-it('le libellé ne parle pas de norme à un particulier', () => {
+/*
+  MIS À JOUR — revue des « découvreurs » (six testeurs sur huit) :
+  l'électricité s'imposait aux non-électriciens, jusque dans le menu du plan.
+  La proposition a quitté le menu : le mode s'active au profil, rubrique
+  « Mon usage » (voir `modeelectricite.test.tsx`). Ce qui reste vrai : le
+  menu d'un particulier ne lui parle pas de norme.
+*/
+it('le menu d’un particulier ne propose plus le mode, et ne parle pas de norme', () => {
   const t = ouvrirLeMenu();
-  const titre = t.root.findAllByType(Text).find((n) => texte(n) === 'Placer prises et interrupteurs');
-  expect(titre).toBeDefined();
-  const ligne = titre!.parent!.parent!;
-  const mots = ligne.findAllByType(Text).map(texte).join(' ');
-  // L'aide de la ligne est bien lue, et elle dit ce que ça fait.
-  expect(mots).toContain('éclairage');
-  expect(mots).not.toMatch(/NF C|15-100|norme/i);
-});
-
-it('un appui demande confirmation ; « Activer » allume le mode', () => {
-  const t = ouvrirLeMenu();
-  const titre = t.root.findAllByType(Text).find((n) => texte(n) === 'Placer prises et interrupteurs')!;
-  let ligne: TestRenderer.ReactTestInstance | null = titre;
-  while (ligne && typeof ligne.props.onPress !== 'function') ligne = ligne.parent;
-  act(() => ligne!.props.onPress());
-  act(() => jest.advanceTimersByTime(1000));
-  // Rien n'a basculé tout seul.
+  const mots = t.root.findAllByType(Text).map(texte);
+  expect(mots).toContain('Liste d’achats');
+  expect(mots).not.toContain('Placer prises et interrupteurs');
+  expect(mots.join(' ')).not.toMatch(/NF C|15-100|norme/i);
+  // Rien n'a basculé en ouvrant le menu.
   expect(useUsage.getState().modeElec).toBe(false);
-  const question = useAlerte.getState().courante;
-  expect(question?.titre).toBe('Passer en mode Électricité ?');
-  act(() => question!.actions!.find((a) => a.label === 'Activer')!.onPress!());
-  expect(useUsage.getState().modeElec).toBe(true);
 });
