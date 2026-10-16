@@ -17,9 +17,10 @@
  * Le même film se rejoue depuis « Comment ça marche », sur l'accueil.
  */
 import React, { useEffect, useRef } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
+import { estSombre, radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
+import { IconeAmenager, IconeElec } from './IconesUsage';
 import { haptic } from '../ui/haptic';
 import { useUsage } from '../store/usage';
 import { useScanStore } from '../store/scanStore';
@@ -55,6 +56,9 @@ const CHOIX: { elec: boolean; titre: string; phrase: string }[] = [
   },
 ];
 
+/** L'ambre de l'électricité : chaude, lisible sur clair comme sur sombre. */
+const AMBRE = '#F5A524';
+
 /** Sans capteur : ce qu'on fera, en une ligne. */
 export const AVIS_SANS_LIDAR = 'Sans capteur LiDAR ici : vous dessinerez le plan.';
 
@@ -82,6 +86,7 @@ export function PremierLancement({ onFini }: { onFini: () => void }) {
     la tuile éteinte ; nulle part ailleurs.
   */
   const sansLidar = useScanStore((st) => st.supported) === false;
+  const sombre = estSombre(c);
 
   const repondre = (elec: boolean) => {
     haptic('succes');
@@ -98,7 +103,15 @@ export function PremierLancement({ onFini }: { onFini: () => void }) {
             <Text style={styles.passer}>Passer</Text>
           </Pressable>
         </View>
-        <View style={styles.question}>
+        {/*
+          LA FICHE DU CHOIX — demande du patron : « une belle fiche moderne au
+          début pour le choix si on veut l'élec ou pas, avec des grosses icônes
+          animées légèrement, effet 3D léger ». Deux grandes cartes, chacune
+          sa scène teintée et son icône en relief (`IconesUsage`), puis ce
+          qu'on y fera. Un appui choisit et ferme, comme avant.
+        */}
+        <ScrollView contentContainerStyle={styles.question} showsVerticalScrollIndicator={false}>
+          <Text style={styles.surtitre}>BIENVENUE</Text>
           <Text style={styles.questionTitre}>À quoi va vous servir EchoPlan ?</Text>
           <Text style={styles.questionPhrase}>
             Vous pourrez changer d’avis à tout moment, dans votre profil.
@@ -110,20 +123,34 @@ export function PremierLancement({ onFini }: { onFini: () => void }) {
               </Text>
             </View>
           )}
-          {CHOIX.map((x) => (
-            <Pressable
-              key={x.titre}
-              accessibilityRole="button"
-              accessibilityLabel={x.titre}
-              style={({ pressed }) => [styles.choix, pressed && styles.choixEnfonce]}
-              onPress={() => repondre(x.elec)}>
-              <Text style={styles.choixTitre}>{x.titre}</Text>
-              <Text style={styles.choixPhrase}>
-                {sansLidar && !x.elec ? x.phrase.replace('Scanner son logement', 'Dessiner son logement') : x.phrase}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+          {CHOIX.map((x) => {
+            const teinte = x.elec ? AMBRE : c.blue;
+            return (
+              <Pressable
+                key={x.titre}
+                accessibilityRole="button"
+                accessibilityLabel={x.titre}
+                accessibilityHint={x.phrase}
+                style={({ pressed }) => [styles.choix, pressed && styles.choixEnfonce]}
+                onPress={() => repondre(x.elec)}>
+                <View style={[styles.scene, { backgroundColor: teinte + (sombre ? '26' : '14') }]}>
+                  {x.elec ? <IconeElec teinte={teinte} sombre={sombre} /> : <IconeAmenager teinte={teinte} sombre={sombre} />}
+                </View>
+                <View style={styles.texte}>
+                  <View style={styles.ligneTitre}>
+                    <Text style={styles.choixTitre}>{x.titre}</Text>
+                    <View style={[styles.fleche, { backgroundColor: teinte }]}>
+                      <Text style={styles.flecheTexte}>›</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.choixPhrase}>
+                    {sansLidar && !x.elec ? x.phrase.replace('Scanner son logement', 'Dessiner son logement') : x.phrase}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -134,37 +161,56 @@ const getStyles = themedStyles((c: Palette) =>
     fond: { flex: 1, backgroundColor: c.bg, paddingHorizontal: 20 },
     barre: { flexDirection: 'row', justifyContent: 'flex-end', minHeight: 32 },
     passer: { color: c.inkSoft, fontSize: 16, fontWeight: '600' },
-    question: { flex: 1, justifyContent: 'center', paddingHorizontal: 4 },
+    question: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 4, paddingBottom: 8 },
+    surtitre: {
+      color: c.blue,
+      fontSize: 13,
+      fontWeight: '800',
+      letterSpacing: 1.6,
+      textAlign: 'center',
+      marginBottom: 8,
+    },
     questionTitre: {
       color: c.ink,
-      fontSize: 32,
-      lineHeight: 36,
+      fontSize: 30,
+      lineHeight: 34,
       fontWeight: '800',
       letterSpacing: -0.9,
       textAlign: 'center',
     },
     questionPhrase: {
       color: c.inkSoft,
-      fontSize: 16,
-      lineHeight: 22,
+      fontSize: 15,
+      lineHeight: 21,
       textAlign: 'center',
-      marginTop: 10,
-      marginBottom: 22,
+      marginTop: 8,
+      marginBottom: 14,
     },
-    /* Deux cartes pleine largeur : la question se répond du pouce, et chaque
-       réponse porte sa phrase — on choisit sur ce qu'on fera, pas sur un mot. */
+    /* Deux grandes cartes : la scène et son icône en relief, puis ce qu'on y
+       fera — on choisit sur ce qu'on fera, pas sur un mot. */
     choix: {
       alignSelf: 'stretch',
       backgroundColor: c.surface,
-      borderRadius: radius.lg,
-      paddingVertical: 18,
-      paddingHorizontal: 18,
-      marginTop: 12,
+      borderRadius: 24,
+      marginTop: 14,
+      overflow: 'hidden',
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: c.line,
       ...shadowCard,
-      shadowOpacity: 0.07,
+      shadowOpacity: 0.08,
     },
+    scene: { height: 156, alignItems: 'center', justifyContent: 'center' },
+    texte: { paddingHorizontal: 18, paddingTop: 14, paddingBottom: 16 },
+    ligneTitre: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    fleche: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 10,
+    },
+    flecheTexte: { color: '#FFFFFF', fontSize: 22, lineHeight: 24, fontWeight: '700', marginLeft: 2 },
     avis: {
       alignSelf: 'stretch',
       backgroundColor: c.surfaceSunken,
@@ -174,8 +220,8 @@ const getStyles = themedStyles((c: Palette) =>
       marginBottom: 4,
     },
     avisTexte: { color: c.inkSoft, fontSize: 14, lineHeight: 19, textAlign: 'center' },
-    choixEnfonce: { opacity: 0.85, transform: [{ scale: 0.985 }] },
-    choixTitre: { color: c.ink, fontSize: 17, fontWeight: '800' },
-    choixPhrase: { color: c.inkSoft, fontSize: 14, lineHeight: 19, marginTop: 4 },
+    choixEnfonce: { opacity: 0.9, transform: [{ scale: 0.97 }] },
+    choixTitre: { color: c.ink, fontSize: 19, fontWeight: '800', letterSpacing: -0.3, flexShrink: 1 },
+    choixPhrase: { color: c.inkSoft, fontSize: 14.5, lineHeight: 20, marginTop: 5 },
   }),
 );
