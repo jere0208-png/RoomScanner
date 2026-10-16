@@ -23,7 +23,7 @@ import {
   View,
 } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
-import { RoomScan } from 'react-native-room-scan';
+import { RoomScan, type ObjectData } from 'react-native-room-scan';
 import { useTheme } from '../theme';
 import { getStyles } from './result/styles';
 import { fr } from './result/format';
@@ -55,6 +55,7 @@ import { RoomNameSheet } from './result/RoomNameSheet';
 import { Toolbar2D, Toolbar3D } from './result/ResultToolbar';
 import {
   FloorplanEditor,
+  SuitLeDoigt,
   type VuePlan,
   type ViseurPlan,
 } from '../components/FloorplanEditor';
@@ -2335,6 +2336,54 @@ export function ResultScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedObject?.id, selectedObject?.width, selectedObject?.depth, selectedObject?.height, selectedObject?.roomId, walls, openings, rooms],
   );
+  /*
+    LES VERDICTS DU MEUBLE TENU, IMAGE PAR IMAGE — sans rendre l'écran.
+
+    Pendant un glisser, le meuble vit « en vol » et le magasin ne l'apprend
+    qu'au lâcher (voir `useEnVol`) : cet écran ne se rend plus à chaque
+    image, et c'est tout le gain. Mais ce qui SUIT le meuble sous le doigt
+    doit continuer de le suivre — « Rentre ✓ · 23 cm du mur », « Caler dans
+    sa niche », les cotes de sa barre pendant qu'on l'étire, la porte qu'il
+    vient bloquer. Ces vues-là s'abonnent seules au meuble en vol
+    (`SuitLeDoigt`) et lisent ici les mêmes calculs qu'avant, refaits pour
+    lui — une fois par image, partagés entre elles.
+  */
+  const verdictsEnVol = useRef<{
+    o: ObjectData;
+    v: {
+      calage: typeof calage;
+      dansLaPiece: typeof dansLaPiece;
+      passage: typeof verdictDePassage;
+      bloquages: typeof bloquages;
+      portes: Set<string>;
+    };
+  } | null>(null);
+  const verdictsDe = (o: ObjectData) => {
+    if (o === selectedObject) {
+      return { calage, dansLaPiece, passage: verdictDePassage, bloquages, portes: portesBloquees };
+    }
+    if (verdictsEnVol.current?.o === o) return verdictsEnVol.current.v;
+    const memesCotes =
+      !!selectedObject &&
+      selectedObject.id === o.id &&
+      selectedObject.width === o.width &&
+      selectedObject.depth === o.depth &&
+      selectedObject.height === o.height &&
+      selectedObject.roomId === o.roomId;
+    const b = meublesQuiBloquent(
+      battants,
+      objects.map((x) => (x.id === o.id ? o : x)),
+    );
+    const v = {
+      calage: calerDansLaNiche(o, walls),
+      dansLaPiece: meubleDansLaPiece(o, parts.map((p) => p.surface?.nu ?? p.surface?.pts ?? [])),
+      passage: memesCotes ? verdictDePassage : passageDuMeuble(o, { walls, openings, rooms }),
+      bloquages: b,
+      portes: new Set(b.keys()),
+    };
+    verdictsEnVol.current = { o, v };
+    return v;
+  };
   // Une seule pièce : l'outil de nommage n'a pas besoin de sélection.
   const targetRoomId =
     selectedRoomId ?? (rooms.length === 1 ? rooms[0].id : null);
@@ -4663,6 +4712,7 @@ export function ResultScreen() {
             // Pas d'alerte rouge sur l'image qu'on partage (revue « Yasmine ») :
             // un meuble scanné peut être décalé de 10 cm.
             portesBloquees={showFurniture && !capturing ? portesBloquees : undefined}
+            bloqueesEnVol={showFurniture && !capturing ? (o) => verdictsDe(o).portes : undefined}
             regle={mesurant ? regle : null}
             onRegleTap={viserRegle}
             onRegleBout={(bout, p, tol) => {
@@ -5614,201 +5664,222 @@ export function ResultScreen() {
           « Cotes du meuble ». La barre entière reste à la demande (elle
           couvrait le plan) ; ces deux mots-là, non.
         */}
-        {vue === '2d' && selectedObject && showFurniture && !capturing && !objDims &&
-          ((verdictDePassage && !verdictDePassage.ok && !objDims) || calage || dansLaPiece) && (
-            <View style={[styles.pucesDuMeuble, { bottom: etageCommandes }]} pointerEvents="box-none">
-              {/* « Ça rentre ? » — la première question, sa réponse d'abord. */}
-              {dansLaPiece ? (
-                <View
-                  accessibilityRole="text"
-                  accessibilityLabel={dansLaPiece.dedans ? 'Rentre dans la pièce' : `Dépasse de ${Math.round(dansLaPiece.depasse * 100)} cm`}
-                  style={[styles.puceDuMeuble, { borderColor: dansLaPiece.dedans ? teinte.green : teinte.danger }]}>
-                  <Text style={styles.puceDuMeubleTexte} numberOfLines={1}>
-                    {dansLaPiece.dedans
-                      ? `Rentre ✓${Number.isFinite(dansLaPiece.reste) ? ` · ${Math.round(dansLaPiece.reste * 100)} cm du mur` : ''}`
-                      : `Dépasse de ${Math.round(dansLaPiece.depasse * 100)} cm`}
-                  </Text>
+        {vue === '2d' && selectedObject && showFurniture && !capturing && !objDims && (
+          /* Les puces suivent le meuble tenu, image par image : voir `verdictsDe`. */
+          <SuitLeDoigt
+            objet={selectedObject}
+            render={(enMain) => {
+              const v = verdictsDe(enMain);
+              const verdict = v.passage;
+              if (!((verdict && !verdict.ok && !objDims) || v.calage || v.dansLaPiece)) return null;
+              return (
+                <View style={[styles.pucesDuMeuble, { bottom: etageCommandes }]} pointerEvents="box-none">
+                  {/* « Ça rentre ? » — la première question, sa réponse d'abord. */}
+                  {v.dansLaPiece ? (
+                    <View
+                      accessibilityRole="text"
+                      accessibilityLabel={v.dansLaPiece.dedans ? 'Rentre dans la pièce' : `Dépasse de ${Math.round(v.dansLaPiece.depasse * 100)} cm`}
+                      style={[styles.puceDuMeuble, { borderColor: v.dansLaPiece.dedans ? teinte.green : teinte.danger }]}>
+                      <Text style={styles.puceDuMeubleTexte} numberOfLines={1}>
+                        {v.dansLaPiece.dedans
+                          ? `Rentre ✓${Number.isFinite(v.dansLaPiece.reste) ? ` · ${Math.round(v.dansLaPiece.reste * 100)} cm du mur` : ''}`
+                          : `Dépasse de ${Math.round(v.dansLaPiece.depasse * 100)} cm`}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {verdict && !verdict.ok ? (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel={verdict.court}
+                      style={[styles.puceDuMeuble, { borderColor: teinte.amber }]}
+                      onPress={() => alerte('Il ne passe pas', verdict.detail)}>
+                      <Text style={styles.puceDuMeubleTexte} numberOfLines={1}>
+                        {verdict.court}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {v.calage ? (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Caler le meuble dans sa niche"
+                      style={[styles.puceDuMeuble, { borderColor: teinte.blue }]}
+                      onPress={() => calerMeuble(selectedObject.id)}>
+                      <Text style={styles.puceDuMeubleTexte} numberOfLines={1}>
+                        Caler dans sa niche
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
-              ) : null}
-              {verdictDePassage && !verdictDePassage.ok ? (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel={verdictDePassage.court}
-                  style={[styles.puceDuMeuble, { borderColor: teinte.amber }]}
-                  onPress={() => alerte('Il ne passe pas', verdictDePassage.detail)}>
-                  <Text style={styles.puceDuMeubleTexte} numberOfLines={1}>
-                    {verdictDePassage.court}
-                  </Text>
-                </TouchableOpacity>
-              ) : null}
-              {calage ? (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Caler le meuble dans sa niche"
-                  style={[styles.puceDuMeuble, { borderColor: teinte.blue }]}
-                  onPress={() => calerMeuble(selectedObject.id)}>
-                  <Text style={styles.puceDuMeubleTexte} numberOfLines={1}>
-                    Caler dans sa niche
-                  </Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-          )}
+              );
+            }}
+          />
+        )}
         {vue === '2d' && selectedObject && showFurniture && objDims && !capturing && (
-          <ObjectBar
+          /* La barre suit le meuble tenu — ses cotes pendant qu'on l'étire :
+             voir `verdictsDe`. */
+          <SuitLeDoigt
             key={selectedObject.id}
-            object={selectedObject}
-            sol={solDesMurs(walls)}
-            onCaler={calage ? () => calerMeuble(selectedObject.id) : undefined}
-            styles={stylesBarres}
-            palette={teinte}
-            onPrompt={setPrompt}
-            onResize={(w, d) => {
-              resizeObject(selectedObject.id, w, d);
-              setDraftObject(null);
-            }}
-            onHeight={(h, base) => {
-              setObjectHeight(selectedObject.id, h, base);
-              setDraftObject(null);
-            }}
-            onRotate={() => rotateObject(selectedObject.id)}
-            onMeridienne={(() => {
-              const cote = meridienneDe(selectedObject);
-              if (!cote) return undefined;
-              return {
-                cote,
-                basculer: () => {
-                  useScanStore.getState().setMeridienne(selectedObject.id, cote === 'droite' ? 'gauche' : 'droite');
-                  haptic('succes');
-                },
-              };
-            })()}
-            onCancel={cancelObject}
-            passage={verdictDePassage}
-            teinte={selectedObject.teinte ?? null}
-            onTeinte={() => setMeubleATeinter(selectedObject.id)}
-            bloque={(() => {
-              const porte = [...bloquages].find(([, ids]) => ids.includes(selectedObject.id))?.[0];
-              const o = porte ? openings.find((x) => x.id === porte) : undefined;
-              return o ? `Gêne ${nomDeLaPorte(o, rooms, parts)}` : null;
-            })()}
-            onPassage={() =>
-              verdictDePassage &&
-              alerte(verdictDePassage.ok ? 'Il passe' : 'Il ne passe pas', verdictDePassage.detail)
-            }
-            onDupliquer={() => {
-              const copie = useScanStore.getState().dupliquerMeuble(selectedObject.id);
-              if (!copie) return;
-              setSelectedObjectId(copie);
-              haptic('succes');
-            }}
-            onPlacer={() => {
-              /*
-                PLACER AU CENTIMÈTRE — « le lit à quarante centimètres du
-                mur ». Les quatre bords du meuble, chacun avec son écart au
-                nu du mur d'en face, nommés par où ils regardent À L'ÉCRAN :
-                le plan peut être tourné, et « à gauche » doit vouloir dire
-                la gauche qu'on voit.
-              */
-              const obj = selectedObject;
-              const t0 = obj.transform;
-              const centre = { x: t0[12], z: t0[14] };
-              const box = {
-                width: obj.baseWidth ?? obj.width,
-                depth: obj.baseDepth ?? obj.depth,
-                yaw: Math.atan2(t0[2], t0[0]),
-              };
-              const murs = parts.find((p2) => p2.roomId === obj.roomId)?.walls ?? walls;
-              const cs = Math.cos(vuePlanRef.current.rot);
-              const sn = Math.sin(vuePlanRef.current.rot);
-              const cote = (d: { x: number; z: number }) => {
-                const sx = d.x * cs - d.z * sn;
-                const sy = d.x * sn + d.z * cs;
-                return Math.abs(sx) >= Math.abs(sy)
-                  ? sx > 0 ? 'À droite' : 'À gauche'
-                  : sy > 0 ? 'En bas' : 'En haut';
-              };
-              // Les autres meubles du niveau : on cote jusqu'à eux, pas à travers (revue « Théo »).
-              const voisins = objects
-                .filter((o) => o.id !== obj.id)
-                .map((o) => ({
-                  centre: { x: o.transform[12], z: o.transform[14] },
-                  width: o.baseWidth ?? o.width,
-                  depth: o.baseDepth ?? o.depth,
-                  yaw: Math.atan2(o.transform[2], o.transform[0]),
-                  nom: nomDuMeuble(o).toLowerCase(),
-                }));
-              const ecarts = ecartsAuxMurs(centre, box, murs, voisins).filter((e) => e.ecart !== null);
-              if (ecarts.length === 0) {
-                alerte('Aucun mur en face', 'Ce meuble ne regarde aucun mur : il se place au doigt ou aux flèches.');
-                return;
-              }
-              // Un meuble qui mord déjà dans son voisin s'affiche à 0, pas à −28 cm.
-              const cm = (e: { ecart: number | null }) => Math.max(0, Math.round((e.ecart ?? 0) * 100));
-              setMenu({
-                title: 'Placer le meuble',
-                subtitle: 'Choisissez un côté, puis tapez sa distance au mur ou au meuble d’en face.',
-                actions: ecarts.map((e) => ({
-                  label: `${cote(e.dir)} · ${cm(e)} cm ${e.vers ? `(${e.vers})` : 'du mur'}`,
-                  icon: 'regle' as const,
-                  onPress: () =>
-                    setPrompt({
-                      title: `${cote(e.dir)} : distance ${e.vers ? `au meuble (${e.vers})` : 'au mur'}`,
-                      subtitle: e.vers
-                        ? 'Du bord du meuble au meuble d’en face. Zéro : contre lui.'
-                        : 'Du bord du meuble au nu du mur. Zéro : contre le mur.',
-                      value: String(cm(e)),
-                      unit: 'cm',
-                      numeric: true,
-                      okLabel: 'Placer',
-                      onSubmit: (t) => {
-                        const v = lireCote(t);
-                        if (v === null) return;
-                        const p2 = centrePourEcart(centre, e, v);
-                        if (!p2) return;
-                        useScanStore.getState().setObjectCenter(obj.id, p2.x, p2.z, true);
-                        setDraftObject(null);
+            objet={selectedObject}
+            render={(enMain) => {
+              const enVol = verdictsDe(enMain);
+              const verdict = enVol.passage;
+              return (
+                <ObjectBar
+                  object={enMain}
+                  sol={solDesMurs(walls)}
+                  onCaler={enVol.calage ? () => calerMeuble(selectedObject.id) : undefined}
+                  styles={stylesBarres}
+                  palette={teinte}
+                  onPrompt={setPrompt}
+                  onResize={(w, d) => {
+                    resizeObject(selectedObject.id, w, d);
+                    setDraftObject(null);
+                  }}
+                  onHeight={(h, base) => {
+                    setObjectHeight(selectedObject.id, h, base);
+                    setDraftObject(null);
+                  }}
+                  onRotate={() => rotateObject(selectedObject.id)}
+                  onMeridienne={(() => {
+                    const cote = meridienneDe(selectedObject);
+                    if (!cote) return undefined;
+                    return {
+                      cote,
+                      basculer: () => {
+                        useScanStore.getState().setMeridienne(selectedObject.id, cote === 'droite' ? 'gauche' : 'droite');
                         haptic('succes');
                       },
-                    }),
-                })),
-              });
-            }}
-            onNudge={(dx, dy) => {
-              /*
-                UN CENTIMÈTRE DANS L'AXE DE L'ÉCRAN.
+                    };
+                  })()}
+                  onCancel={cancelObject}
+                  passage={verdict}
+                  teinte={selectedObject.teinte ?? null}
+                  onTeinte={() => setMeubleATeinter(selectedObject.id)}
+                  bloque={(() => {
+                    const porte = [...bloquages].find(([, ids]) => ids.includes(selectedObject.id))?.[0];
+                    const o = porte ? openings.find((x) => x.id === porte) : undefined;
+                    return o ? `Gêne ${nomDeLaPorte(o, rooms, parts)}` : null;
+                  })()}
+                  onPassage={() =>
+                    verdict &&
+                    alerte(verdict.ok ? 'Il passe' : 'Il ne passe pas', verdict.detail)
+                  }
+                  onDupliquer={() => {
+                    const copie = useScanStore.getState().dupliquerMeuble(selectedObject.id);
+                    if (!copie) return;
+                    setSelectedObjectId(copie);
+                    haptic('succes');
+                  }}
+                  onPlacer={() => {
+                    /*
+                      PLACER AU CENTIMÈTRE — « le lit à quarante centimètres du
+                      mur ». Les quatre bords du meuble, chacun avec son écart au
+                      nu du mur d'en face, nommés par où ils regardent À L'ÉCRAN :
+                      le plan peut être tourné, et « à gauche » doit vouloir dire
+                      la gauche qu'on voit.
+                    */
+                    const obj = selectedObject;
+                    const t0 = obj.transform;
+                    const centre = { x: t0[12], z: t0[14] };
+                    const box = {
+                      width: obj.baseWidth ?? obj.width,
+                      depth: obj.baseDepth ?? obj.depth,
+                      yaw: Math.atan2(t0[2], t0[0]),
+                    };
+                    const murs = parts.find((p2) => p2.roomId === obj.roomId)?.walls ?? walls;
+                    const cs = Math.cos(vuePlanRef.current.rot);
+                    const sn = Math.sin(vuePlanRef.current.rot);
+                    const cote = (d: { x: number; z: number }) => {
+                      const sx = d.x * cs - d.z * sn;
+                      const sy = d.x * sn + d.z * cs;
+                      return Math.abs(sx) >= Math.abs(sy)
+                        ? sx > 0 ? 'À droite' : 'À gauche'
+                        : sy > 0 ? 'En bas' : 'En haut';
+                    };
+                    // Les autres meubles du niveau : on cote jusqu'à eux, pas à travers (revue « Théo »).
+                    const voisins = objects
+                      .filter((o) => o.id !== obj.id)
+                      .map((o) => ({
+                        centre: { x: o.transform[12], z: o.transform[14] },
+                        width: o.baseWidth ?? o.width,
+                        depth: o.baseDepth ?? o.depth,
+                        yaw: Math.atan2(o.transform[2], o.transform[0]),
+                        nom: nomDuMeuble(o).toLowerCase(),
+                      }));
+                    const ecarts = ecartsAuxMurs(centre, box, murs, voisins).filter((e) => e.ecart !== null);
+                    if (ecarts.length === 0) {
+                      alerte('Aucun mur en face', 'Ce meuble ne regarde aucun mur : il se place au doigt ou aux flèches.');
+                      return;
+                    }
+                    // Un meuble qui mord déjà dans son voisin s'affiche à 0, pas à −28 cm.
+                    const cm = (e: { ecart: number | null }) => Math.max(0, Math.round((e.ecart ?? 0) * 100));
+                    setMenu({
+                      title: 'Placer le meuble',
+                      subtitle: 'Choisissez un côté, puis tapez sa distance au mur ou au meuble d’en face.',
+                      actions: ecarts.map((e) => ({
+                        label: `${cote(e.dir)} · ${cm(e)} cm ${e.vers ? `(${e.vers})` : 'du mur'}`,
+                        icon: 'regle' as const,
+                        onPress: () =>
+                          setPrompt({
+                            title: `${cote(e.dir)} : distance ${e.vers ? `au meuble (${e.vers})` : 'au mur'}`,
+                            subtitle: e.vers
+                              ? 'Du bord du meuble au meuble d’en face. Zéro : contre lui.'
+                              : 'Du bord du meuble au nu du mur. Zéro : contre le mur.',
+                            value: String(cm(e)),
+                            unit: 'cm',
+                            numeric: true,
+                            okLabel: 'Placer',
+                            onSubmit: (t) => {
+                              const v = lireCote(t);
+                              if (v === null) return;
+                              const p2 = centrePourEcart(centre, e, v);
+                              if (!p2) return;
+                              useScanStore.getState().setObjectCenter(obj.id, p2.x, p2.z, true);
+                              setDraftObject(null);
+                              haptic('succes');
+                            },
+                          }),
+                      })),
+                    });
+                  }}
+                  onNudge={(dx, dy) => {
+                    /*
+                      UN CENTIMÈTRE DANS L'AXE DE L'ÉCRAN.
 
-                Le plan peut avoir été tourné : « vers le haut » ne veut rien
-                dire dans le repère du scan. On ramène donc la flèche de
-                l'écran vers le monde en défaisant la rotation du plan — sans
-                quoi le meuble part de travers, et l'on ne comprend pas
-                pourquoi.
-              */
-              const c = Math.cos(-vuePlanRef.current.rot);
-              const s = Math.sin(-vuePlanRef.current.rot);
-              const PAS = 0.01;
-              const mx = (dx * c - dy * s) * PAS;
-              const mz = (dx * s + dy * c) * PAS;
-              const t0 = selectedObject.transform;
-              /*
-                LA FLÈCHE RANGE, COMME LE DOIGT — relevé du patron : « oui
-                comme le doigt pour les flèches ».
+                      Le plan peut avoir été tourné : « vers le haut » ne veut rien
+                      dire dans le repère du scan. On ramène donc la flèche de
+                      l'écran vers le monde en défaisant la rotation du plan — sans
+                      quoi le meuble part de travers, et l'on ne comprend pas
+                      pourquoi.
+                    */
+                    const c = Math.cos(-vuePlanRef.current.rot);
+                    const s = Math.sin(-vuePlanRef.current.rot);
+                    const PAS = 0.01;
+                    const mx = (dx * c - dy * s) * PAS;
+                    const mz = (dx * s + dy * c) * PAS;
+                    const t0 = selectedObject.transform;
+                    /*
+                      LA FLÈCHE RANGE, COMME LE DOIGT — relevé du patron : « oui
+                      comme le doigt pour les flèches ».
 
-                Elle a d'abord eu un aimant, qu'on lui a retiré parce qu'il
-                reprenait chaque pas à peine posé : contre un mur, la flèche
-                paraissait morte. Puis elle a gardé, seule, le rabotage et
-                le quart de tour automatiques — une commode de 1,40 m
-                poussée dans une alcôve de 1,20 en ressortait à 1,04, cotes
-                changées sans qu'on demande rien. Ils partent à leur tour :
-                le mur arrête, il ne retaille pas.
-              */
-              useScanStore
-                .getState()
-                .setObjectCenter(
-                  selectedObject.id,
-                  t0[12] + mx,
-                  t0[14] + mz,
-                );
+                      Elle a d'abord eu un aimant, qu'on lui a retiré parce qu'il
+                      reprenait chaque pas à peine posé : contre un mur, la flèche
+                      paraissait morte. Puis elle a gardé, seule, le rabotage et
+                      le quart de tour automatiques — une commode de 1,40 m
+                      poussée dans une alcôve de 1,20 en ressortait à 1,04, cotes
+                      changées sans qu'on demande rien. Ils partent à leur tour :
+                      le mur arrête, il ne retaille pas.
+                    */
+                    useScanStore
+                      .getState()
+                      .setObjectCenter(
+                        selectedObject.id,
+                        t0[12] + mx,
+                        t0[14] + mz,
+                      );
+                  }}
+                />
+              );
             }}
           />
         )}

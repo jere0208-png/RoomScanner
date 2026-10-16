@@ -128,7 +128,9 @@ describe('la pièce et le meuble, sans passer par l’édition', () => {
   it('« ne passe pas » et « caler » se disent dès que le meuble est choisi', () => {
     const ecran = lire('src/screens/ResultScreen.tsx');
     expect(ecran).toContain('accessibilityLabel="Caler le meuble dans sa niche"');
-    expect(ecran).toContain('verdictDePassage && !verdictDePassage.ok && !objDims');
+    // MIS À JOUR — fluidité du glisser : les puces suivent le meuble tenu en
+    // vol (`SuitLeDoigt`), et lisent son verdict sous le nom `verdict`.
+    expect(ecran).toContain('verdict && !verdict.ok && !objDims');
   });
 });
 

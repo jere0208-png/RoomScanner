@@ -173,7 +173,9 @@ describe('à l’écran', () => {
 
   it('le plan rougit le battant d’une porte bloquée ; l’écran le relaie au contrôle', () => {
     const plan = lire('src/components/FloorplanEditor.tsx');
-    expect(plan).toContain('const bloquee = !!portesBloquees?.has(o.id);');
+    // MIS À JOUR — fluidité du glisser : le battant rougit aussi pour le
+    // meuble tenu en vol, avant que le magasin ne l'apprenne au lâcher.
+    expect(plan).toContain('const bloquee = enVol && bloqueesEnVol ? bloqueesEnVol(enVol).has(o.id) : !!portesBloquees?.has(o.id);');
     const ecran = lire('src/screens/ResultScreen.tsx');
     expect(ecran).toContain('portesBloquees={showFurniture && !capturing ? portesBloquees : undefined}');
     expect(ecran).toContain('meublesQuiBloquent(battants, objects)');

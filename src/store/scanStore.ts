@@ -1644,6 +1644,165 @@ function sontFinis(...v: (number | undefined)[]): boolean {
   return v.every((x) => x === undefined || Number.isFinite(x));
 }
 
+/*
+  LE MEUBLE TEL QUE LE DOIGT LE TIENT — calculé, PAS ÉCRIT.
+
+  Relevé du patron sur iPhone : « optimise la fluidité des déplacements de
+  meubles ». Mesuré sur l'exemple : chaque image d'un glisser écrivait le
+  magasin, et l'écran du plan tout entier se rendait — ses sept feuilles,
+  ses bandeaux, le métré, les plans de travail, les portes bloquées —, pour
+  un meuble qui bougeait de deux pixels. Le doigt tient désormais le meuble
+  « en vol » (`store/geste`) ; le magasin n'est écrit qu'au lâcher.
+
+  Ces trois calculs sont ceux des actions du même nom, sortis tels quels
+  pour que la poignée montre EXACTEMENT ce que l'action écrira : une seule
+  formule, deux usages, aucune divergence possible.
+*/
+/** `setObjectCenter(…, auDoigt)` sans l'écriture. `null` : rien à poser. */
+export function meubleAuDoigt(
+  obj: ObjectData,
+  x: number,
+  z: number,
+  walls: WallSeg[],
+  faces?: ReturnType<typeof facesDesMurs>,
+): ObjectData | null {
+  if (!sontFinis(x, z)) return null;
+  const pose = poserLibre(
+    { x, z },
+    {
+      width: obj.baseWidth ?? obj.width,
+      depth: obj.baseDepth ?? obj.depth,
+      yaw: Math.atan2(obj.transform[2], obj.transform[0]),
+    },
+    walls,
+    faces,
+  );
+  const t = [...obj.transform];
+  t[12] = pose.centre.x;
+  t[14] = pose.centre.z;
+  return {
+    ...obj,
+    transform: t,
+    // Les cotes du catalogue, toujours : on ne rabote plus.
+    width: obj.baseWidth ?? obj.width,
+    depth: obj.baseDepth ?? obj.depth,
+  };
+}
+
+/** `setObjectYaw` sans l'écriture. */
+export function meubleTourne(obj: ObjectData, yaw: number): ObjectData | null {
+  if (!sontFinis(yaw)) return null;
+  const cos = Math.cos(yaw);
+  const sin = Math.sin(yaw);
+  const t = [...obj.transform];
+  t[0] = cos;
+  t[2] = sin;
+  t[8] = -sin;
+  t[10] = cos;
+  return { ...obj, transform: t };
+}
+
+/** `resizeObjectSide` sans l'écriture : le meuble étiré, et l'aimant a-t-il pris ? */
+export function meubleEtire(
+  st: { walls: WallSeg[]; rooms: ScanState['rooms'] },
+  obj: ObjectData,
+  cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-',
+  distance: number,
+  depuis?: { width: number; depth: number; cx: number; cz: number },
+): { objet: ObjectData; accroche: boolean } {
+  const yaw = Math.atan2(obj.transform[2], obj.transform[0]);
+  // Axe de la largeur, puis celui de la profondeur : la même convention
+  // que le plaquage et la poussée.
+  const axe =
+    cote === 'largeur+' || cote === 'largeur-'
+      ? { x: Math.cos(yaw), z: Math.sin(yaw) }
+      : { x: -Math.sin(yaw), z: Math.cos(yaw) };
+  const sens = cote.endsWith('+') ? 1 : -1;
+  const n = { x: axe.x * sens, z: axe.z * sens };
+  // La direction du bord lui-même : elle sert aux rayons de butée.
+  const leLong = { x: -n.z, z: n.x };
+  const surLargeur = cote.startsWith('largeur');
+  // Tout se calcule depuis l'état du DÉBUT du geste : sans ce point
+  // fixe, les corrections de l'aimant et de la butée se cumulent d'une
+  // image à l'autre, et le meuble part en vrille.
+  const base = depuis ?? {
+    width: obj.width,
+    depth: obj.depth,
+    cx: obj.transform[12],
+    cz: obj.transform[14],
+  };
+  const avant = surLargeur ? base.width : base.depth;
+  const long = surLargeur ? base.depth : base.width;
+  // Dix centimètres au minimum : en deçà, le meuble devient un trait
+  // qu'on ne sait plus attraper.
+  let apres = Math.max(0.1, Math.min(12, avant + distance));
+  /*
+    LE BORD OPPOSÉ NE BOUGE PAS : c'est lui le point fixe du geste, et
+    c'est de lui qu'on mesure tout le reste.
+  */
+  const fixe = {
+    x: base.cx - n.x * (avant / 2),
+    z: base.cz - n.z * (avant / 2),
+  };
+  const parts = roomParts(st.walls, st.rooms);
+  const ici = { x: base.cx, z: base.cz };
+  const part =
+    parts.find((p) => p.roomId === obj.roomId) ??
+    parts.find((p) => pointInPolygon(ici, p.surface?.pts ?? []));
+  const murs = part?.walls ?? st.walls;
+  /*
+    ET LA MAÇONNERIE ARRÊTE LE GESTE.
+
+    Un meuble qu'on agrandit contre un mur le traversait : on tirait, il
+    entrait dans la cloison, et le plan montrait un caisson au milieu du
+    béton. Sur le chantier, un meuble qui bute est un meuble qui bute.
+
+    Trois rayons plutôt qu'un — le milieu du bord fixe et ses deux
+    bouts : un seul rayon manque le mur qu'un coin touche déjà, sur un
+    logement dont les angles ne sont jamais droits.
+  */
+  if (distance > 0) {
+    let libre = Infinity;
+    for (const k of [-0.5, 0, 0.5]) {
+      const de = {
+        x: fixe.x + leLong.x * (long * k),
+        z: fixe.z + leLong.z * (long * k),
+      };
+      const d = castToWall(de, n, murs, facesDesMurs(st.walls));
+      if (d !== null) libre = Math.min(libre, d);
+    }
+    // Une butée qui vaudrait zéro — un bord déjà dans la maçonnerie —
+    // écraserait le meuble : on ne la retient que si elle laisse de quoi
+    // exister.
+    if (isFinite(libre) && libre > 0.1) apres = Math.min(apres, libre);
+  }
+  // L'aimant : le bord tiré se pose sur le nu du mur qu'il longe, ou sur
+  // le bout de celui qui se termine.
+  const bord = {
+    x: fixe.x + n.x * apres,
+    z: fixe.z + n.z * apres,
+  };
+  const colle = snapSideToWalls(bord, n, long / 2, murs, undefined, facesDesMurs(st.walls));
+  if (colle !== 0) {
+    apres = Math.max(0.1, Math.min(12, apres + colle));
+  }
+  const centre = {
+    x: fixe.x + n.x * (apres / 2),
+    z: fixe.z + n.z * (apres / 2),
+  };
+  const t = [...obj.transform];
+  t[12] = centre.x;
+  t[14] = centre.z;
+  const width = surLargeur ? apres : obj.width;
+  const depth = surLargeur ? obj.depth : apres;
+  // La cote tirée à la main devient LA référence, comme celle qu'on
+  // tape : elle ne doit pas être reprise par l'ajustement en niche.
+  return {
+    objet: { ...obj, width, depth, baseWidth: width, baseDepth: depth, transform: t },
+    accroche: colle !== 0,
+  };
+}
+
 /**
  * UNE COTE VALABLE : un nombre fini, strictement positif, et pas délirant.
  *
@@ -9465,18 +9624,8 @@ export const useScanStore = create<ScanState>((set, get) => {
     setObjectYaw: (id, yaw) => {
       if (!sontFinis(yaw)) return;
       pushHistory(`yaw:${id}`);
-      const cos = Math.cos(yaw);
-      const sin = Math.sin(yaw);
       set({
-        objects: get().objects.map((o) => {
-          if (o.id !== id) return o;
-          const t = [...o.transform];
-          t[0] = cos;
-          t[2] = sin;
-          t[8] = -sin;
-          t[10] = cos;
-          return { ...o, transform: t };
-        }),
+        objects: get().objects.map((o) => (o.id === id ? meubleTourne(o, yaw) ?? o : o)),
         dirty: true,
       });
     },
@@ -9605,29 +9754,11 @@ export const useScanStore = create<ScanState>((set, get) => {
         montre en rouge : c'est lui qui a le doigt sous les yeux.
       */
       if (auDoigt) {
-        const pose = poserLibre(
-          { x, z },
-          {
-            width: obj.baseWidth ?? obj.width,
-            depth: obj.baseDepth ?? obj.depth,
-            yaw: Math.atan2(obj.transform[2], obj.transform[0]),
-          },
-          st.walls,
-        );
+        // Le calcul est celui que la poignée montre pendant le geste : voir
+        // `meubleAuDoigt`.
+        const pose = meubleAuDoigt(obj, x, z, st.walls);
         set({
-          objects: st.objects.map((o) => {
-            if (o.id !== id) return o;
-            const t = [...o.transform];
-            t[12] = pose.centre.x;
-            t[14] = pose.centre.z;
-            return {
-              ...o,
-              transform: t,
-              // Les cotes du catalogue, toujours : on ne rabote plus.
-              width: o.baseWidth ?? o.width,
-              depth: o.baseDepth ?? o.depth,
-            };
-          }),
+          objects: st.objects.map((o) => (o.id === id && pose ? pose : o)),
           dirty: true,
         });
         return;
@@ -9991,108 +10122,14 @@ export const useScanStore = create<ScanState>((set, get) => {
       const obj = st.objects.find((o) => o.id === id);
       if (!obj) return { accroche: false };
       pushHistory(`resizeSide:${id}`);
-      const yaw = Math.atan2(obj.transform[2], obj.transform[0]);
-      // Axe de la largeur, puis celui de la profondeur : la même convention
-      // que le plaquage et la poussée.
-      const axe =
-        cote === 'largeur+' || cote === 'largeur-'
-          ? { x: Math.cos(yaw), z: Math.sin(yaw) }
-          : { x: -Math.sin(yaw), z: Math.cos(yaw) };
-      const sens = cote.endsWith('+') ? 1 : -1;
-      const n = { x: axe.x * sens, z: axe.z * sens };
-      // La direction du bord lui-même : elle sert aux rayons de butée.
-      const leLong = { x: -n.z, z: n.x };
-      const surLargeur = cote.startsWith('largeur');
-      // Tout se calcule depuis l'état du DÉBUT du geste : sans ce point
-      // fixe, les corrections de l'aimant et de la butée se cumulent d'une
-      // image à l'autre, et le meuble part en vrille.
-      const base = depuis ?? {
-        width: obj.width,
-        depth: obj.depth,
-        cx: obj.transform[12],
-        cz: obj.transform[14],
-      };
-      const avant = surLargeur ? base.width : base.depth;
-      const long = surLargeur ? base.depth : base.width;
-      // Dix centimètres au minimum : en deçà, le meuble devient un trait
-      // qu'on ne sait plus attraper.
-      let apres = Math.max(0.1, Math.min(12, avant + distance));
-      /*
-        LE BORD OPPOSÉ NE BOUGE PAS : c'est lui le point fixe du geste, et
-        c'est de lui qu'on mesure tout le reste.
-      */
-      const fixe = {
-        x: base.cx - n.x * (avant / 2),
-        z: base.cz - n.z * (avant / 2),
-      };
-      const parts = roomParts(st.walls, st.rooms);
-      const ici = { x: base.cx, z: base.cz };
-      const part =
-        parts.find((p) => p.roomId === obj.roomId) ??
-        parts.find((p) => pointInPolygon(ici, p.surface?.pts ?? []));
-      const murs = part?.walls ?? st.walls;
-      /*
-        ET LA MAÇONNERIE ARRÊTE LE GESTE.
-
-        Un meuble qu'on agrandit contre un mur le traversait : on tirait, il
-        entrait dans la cloison, et le plan montrait un caisson au milieu du
-        béton. Sur le chantier, un meuble qui bute est un meuble qui bute.
-
-        Trois rayons plutôt qu'un — le milieu du bord fixe et ses deux
-        bouts : un seul rayon manque le mur qu'un coin touche déjà, sur un
-        logement dont les angles ne sont jamais droits.
-      */
-      if (distance > 0) {
-        let libre = Infinity;
-        for (const k of [-0.5, 0, 0.5]) {
-          const de = {
-            x: fixe.x + leLong.x * (long * k),
-            z: fixe.z + leLong.z * (long * k),
-          };
-          const d = castToWall(de, n, murs, facesDesMurs(st.walls));
-          if (d !== null) libre = Math.min(libre, d);
-        }
-        // Une butée qui vaudrait zéro — un bord déjà dans la maçonnerie —
-        // écraserait le meuble : on ne la retient que si elle laisse de quoi
-        // exister.
-        if (isFinite(libre) && libre > 0.1) apres = Math.min(apres, libre);
-      }
-      // L'aimant : le bord tiré se pose sur le nu du mur qu'il longe, ou sur
-      // le bout de celui qui se termine.
-      const bord = {
-        x: fixe.x + n.x * apres,
-        z: fixe.z + n.z * apres,
-      };
-      const colle = snapSideToWalls(bord, n, long / 2, murs, undefined, facesDesMurs(st.walls));
-      if (colle !== 0) {
-        apres = Math.max(0.1, Math.min(12, apres + colle));
-      }
-      const centre = {
-        x: fixe.x + n.x * (apres / 2),
-        z: fixe.z + n.z * (apres / 2),
-      };
+      // Le calcul est celui que la poignée montre pendant le geste : voir
+      // `meubleEtire`.
+      const r = meubleEtire(st, obj, cote, distance, depuis);
       set({
-        objects: st.objects.map((o) => {
-          if (o.id !== id) return o;
-          const t = [...o.transform];
-          t[12] = centre.x;
-          t[14] = centre.z;
-          const width = surLargeur ? apres : o.width;
-          const depth = surLargeur ? o.depth : apres;
-          // La cote tirée à la main devient LA référence, comme celle qu'on
-          // tape : elle ne doit pas être reprise par l'ajustement en niche.
-          return {
-            ...o,
-            width,
-            depth,
-            baseWidth: width,
-            baseDepth: depth,
-            transform: t,
-          };
-        }),
+        objects: st.objects.map((o) => (o.id === id ? r.objet : o)),
         dirty: true,
       });
-      return { accroche: colle !== 0 };
+      return { accroche: r.accroche };
     },
 
     resizeObject: (id, width, depth) => {

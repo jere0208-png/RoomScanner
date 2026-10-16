@@ -259,7 +259,8 @@ interface EffMapping {
   toMeters: (px: { x: number; y: number }) => { x: number; z: number };
 }
 import { RoomScan } from 'react-native-room-scan';
-import { useScanStore } from '../store/scanStore';
+import { meubleAuDoigt, meubleEtire, meubleTourne, useScanStore } from '../store/scanStore';
+import { finirLeGeste, mettreEnVol, signalerRefus, useEnVol } from '../store/geste';
 import type { PlanNote } from '../store/scanStore';
 import {
   boiteDePoints,
@@ -284,6 +285,12 @@ import { useModeElec } from '../store/usage';
  * Empreinte d'un meuble, recalée contre les murs de SA pièce seulement :
  * la cloison de la pièce voisine ne doit pas le repousser.
  */
+/** Les emprises déjà calculées : voir `footprintOf`. */
+const EMPRISES = new WeakMap<
+  ObjectData,
+  { partOf: Map<string, RoomPart>; faces: Map<string, DemiFaces>; f: ObjectFootprint }
+>();
+
 /**
  * TRADUIT UN BORD DU DESSIN VERS LE MAGASIN.
  *
@@ -311,9 +318,21 @@ function footprintOf(
   /** Les faces des murs du plan entier : voir `clampFootprint`. */
   faces: Map<string, DemiFaces>,
 ): ObjectFootprint {
+  /*
+    UNE EMPRISE PAR MEUBLE ET PAR PLAN, PAS QUATRE PAR RENDU. Le dessin, les
+    cibles, les cartouches et les cotes la redemandaient chacun — et le
+    recadrage contre les murs (`clampFootprint`) n'est pas gratuit. Le
+    magasin rend un objet NEUF à chaque changement : la même référence, avec
+    les mêmes pièces et les mêmes faces, a forcément la même emprise.
+  */
+  const deja = EMPRISES.get(o);
+  if (deja && deja.partOf === partOf && deja.faces === faces) return deja.f;
   const part = partOf.get(roomOf(o));
-  if (!part) return toFootprint(o);
-  return clampFootprint(toFootprint(o), part.walls, part.labelAt, undefined, undefined, faces);
+  const f = part
+    ? clampFootprint(toFootprint(o), part.walls, part.labelAt, undefined, undefined, faces)
+    : toFootprint(o);
+  EMPRISES.set(o, { partOf, faces, f });
+  return f;
 }
 
 /** Le cadrage du plan : rotation (rad), zoom, et déplacement en pixels. */
@@ -577,6 +596,12 @@ interface Props {
    */
   portesBloquees?: Set<string>;
   /**
+   * Les mêmes, pour le meuble que le doigt tient en vol : la porte rougit
+   * dès qu'il entre dans son battant, sans attendre le lâcher (voir
+   * `useEnVol`).
+   */
+  bloqueesEnVol?: (meuble: ObjectData) => Set<string>;
+  /**
    * LA RÈGLE LIBRE — relevé du patron, point 7 de la réflexion « grand
    * public » : mesurer entre deux points du plan. Sortie (`regle` non nul),
    * chaque appui pose un bout ; ses bouts se glissent. L'écran accroche les
@@ -640,6 +665,40 @@ function ToileDuPlan({
       {children}
     </Svg>
   );
+}
+
+/**
+ * CE QUI SUIT LE MEUBLE TENU — et rien d'autre ne se rend.
+ *
+ * Relevé du patron : « optimise la fluidité des déplacements de meubles ».
+ * Pendant un glisser, le meuble vit « en vol » (`store/geste`) et le magasin
+ * n'est écrit qu'au lâcher : l'éditeur et l'écran qui le porte ne se rendent
+ * plus à chaque image. Seuls les morceaux qui DESSINENT le meuble tenu — son
+ * empreinte, ses dégagements, ses poignées, ses puces — passent par ici :
+ * ils lisent le meuble en vol à la place de celui du magasin, et se rendent
+ * seuls.
+ *
+ * `render` est le dessin d'avant, tel quel : il reçoit le meuble à dessiner.
+ */
+export function SuitLeDoigt({
+  objet,
+  render,
+}: {
+  objet: ObjectData;
+  render: (o: ObjectData, refuse: boolean) => React.ReactNode;
+}) {
+  const enVol = useEnVol((s) => (s.objet?.id === objet.id ? s.objet : null));
+  const refuse = useEnVol((s) => s.refuse);
+  return <>{render(enVol ?? objet, refuse)}</>;
+}
+
+/**
+ * Le meuble tenu, quel qu'il soit — pour ce qui en dépend sans le dessiner
+ * (les battants qu'il bloque). `null` hors geste.
+ */
+export function SuitLeVol({ render }: { render: (o: ObjectData | null) => React.ReactNode }) {
+  const enVol = useEnVol((s) => s.objet);
+  return <>{render(enVol)}</>;
 }
 
 /** Une chose qui se choisit sur le plan, telle que la carte du choix la nomme. */
@@ -737,6 +796,7 @@ export function FloorplanEditor({
   onEditRoomName,
   retourEfface,
   portesBloquees,
+  bloqueesEnVol,
   regle,
   onRegleTap,
   onRegleBout,
@@ -902,8 +962,10 @@ export function FloorplanEditor({
     placement si impossible) ». Le refus se voit AVANT le lâcher : c'est ce
     qui distingue une aide d'une sanction — on sait qu'il ne faut pas lâcher
     ici, on n'a pas à le découvrir après coup.
+
+    Il vit avec le meuble en vol (`signalerRefus`) : un état de l'éditeur le
+    rendait tout entier à chaque bascule du rouge, en plein glisser.
   */
-  const [poseRefusee, setPoseRefusee] = useState(false);
   /** Les deux coins du rectangle qu'on est en train de tirer, en metres. */
   const [tirage, setTirage] = useState<{ a: Pt; b: Pt } | null>(null);
 
@@ -2581,6 +2643,141 @@ export function FloorplanEditor({
     setChoixSousLeDoigt({ x: p.x, y: p.y, cibles: [defaut, ...autres] });
   };
 
+  /**
+   * L'EMPREINTE D'UN MEUBLE AU PLAN — une fonction, parce que le meuble tenu
+   * se dessine aussi depuis `SuitLeDoigt`, avec sa position en vol.
+   */
+  const dessinerMeuble = (o: ObjectData, poseRefusee = false) => {
+    if (!mapping) return null;
+    const f = footprintOf(o, partOf, facesPlan);
+    const ctr = mapping.toPx({ x: f.cx, z: f.cz });
+    const w = f.width * mapping.scale;
+    const d = f.depth * mapping.scale;
+    return (
+      <G
+        key={f.id}
+        testID={`meuble-${f.id}`}
+        transform={`translate(${ctr.x}, ${ctr.y}) rotate(${((f.yaw + view.rot) * 180) / Math.PI})`}>
+        {/*
+          ROUGE QUAND ON NE PEUT PAS POSER LÀ — relevé du patron.
+          Seul le meuble TENU se colore : les autres n'ont rien à
+          dire, et un plan qui rougit en entier ne désigne plus
+          rien.
+        */}
+        <Rect
+          x={-w / 2}
+          y={-d / 2}
+          width={w}
+          height={d}
+          /*
+            LA TEINTE CHOISIE SE VOIT AUSSI EN 2D — revue « Yasmine » :
+            le canapé vert sauge de « Décorer » restait bleu pâle sur
+            le plan. Hors plan électrique, le meuble prend sa teinte,
+            adoucie pour que son symbole se lise encore.
+          */
+          fill={
+            poseRefusee && o.id === selectedObjectId
+              ? c.danger
+              : planElec
+                ? c.surface
+                : o.teinte ?? c.blueSoft
+          }
+          fillOpacity={
+            poseRefusee && o.id === selectedObjectId ? 0.35 : !planElec && o.teinte ? 0.55 : 1
+          }
+          // Et ce qui en chevauche un autre GARDE son trait rouge
+          // une fois lâché (revue « Théo ») : le contrôle le dit
+          // aussi, mais c'est sur le plan qu'on le corrige.
+          stroke={
+            poseRefusee && o.id === selectedObjectId
+              ? c.danger
+              : o.id === selectedObjectId
+              ? c.blue
+              : meublesEnConflit?.has(o.id)
+                ? c.danger
+                : planElec
+                  ? c.line
+                  : c.lineStrong
+          }
+          strokeWidth={o.id === selectedObjectId ? 2.5 : meublesEnConflit?.has(o.id) ? 1.6 : 1}
+          rx={3}
+        />
+        {/*
+          UN TRAIT PAR POLYLIGNE, pas un nœud par segment.
+
+          Le symbole d'un lit ou d'un canapé, c'est trois ou quatre
+          lignes brisées. Elles étaient dessinées segment par
+          segment, chacun dans sa balise, groupés dans une balise
+          de plus : une quinzaine de nœuds par meuble, quand un
+          seul tracé par ligne suffit. Sur un logement meublé, ça
+          se compte en centaines — et chaque nœud se repaie à
+          chaque image quand le plan glisse sous le doigt.
+
+          Pendant le geste, le symbole s'efface même tout à fait :
+          on déplace un plan pour VOIR OÙ L'ON VA, la silhouette du
+          meuble suffit, et le détail revient au relâcher.
+        */}
+        {
+          furnitureStrokes(furnKind(f.category), w, d, meridienneDe(o)).map((line, li) => (
+            <Path
+              key={`s${li}`}
+              d={line
+                .map(
+                  (p, pi) =>
+                    `${pi === 0 ? 'M' : 'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`,
+                )
+                .join(' ')}
+              stroke={planElec ? c.inkFaint : c.inkSoft}
+              strokeWidth={planElec ? 1 : 1.2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          ))}
+        {/*
+          PLUS DE NOM DE MEUBLE SUR LE PLAN — relevé du patron :
+          « enlève le nom des meubles ». La silhouette dit déjà ce
+          qu'est un lit ou une table ; le nom ajoutait un mot de
+          plus là où le plan se lit déjà mal. Le meuble tenu, lui,
+          garde son nom dans sa barre (`ObjectBar`).
+        */}
+        {/*
+          LA CIBLE DU DOIGT EST PLUS LARGE QUE LE DESSIN.
+
+          Relevé du patron : « le clic sur un meuble est
+          capricieux, il faut parfois cliquer plusieurs fois et
+          viser des endroits précis ». La cible était le DESSIN
+          lui-même — l'aplat et les traits du symbole. Un aplat de
+          quarante-cinq centimètres au cinquantième fait neuf
+          millimètres à l'écran, moins que la pulpe d'un doigt, et
+          les traits du symbole ne répondent que sur le trait.
+
+          Elle est POSÉE EN DERNIER, donc au-dessus de tout ce que
+          le meuble dessine : plus rien ne peut lui voler l'appui.
+          Invisible, elle ne change pas le plan d'un pixel.
+        */}
+        <Rect
+          accessibilityLabel={`Autour du meuble ${frCategory(
+            f.category,
+          )}`}
+          x={-w / 2 - PRISE_MARGE}
+          y={-d / 2 - PRISE_MARGE}
+          width={w + PRISE_MARGE * 2}
+          height={d + PRISE_MARGE * 2}
+          fill="transparent"
+          onPress={
+            onSelectObject && editable
+              ? () =>
+                  onSelectObject(
+                    o.id === selectedObjectId ? null : o.id,
+                  )
+              : undefined
+          }
+        />
+      </G>
+    );
+  };
+
   return (
     <View
       ref={hote}
@@ -2893,134 +3090,16 @@ export function FloorplanEditor({
             */}
             {[...objects]
               .sort((a, b) => (a.category === 'tapis' ? 0 : 1) - (b.category === 'tapis' ? 0 : 1))
-              .map((o) => {
-              const f = footprintOf(o, partOf, facesPlan);
-              const ctr = mapping.toPx({ x: f.cx, z: f.cz });
-              const w = f.width * mapping.scale;
-              const d = f.depth * mapping.scale;
-              return (
-                <G
-                  key={f.id}
-                  testID={`meuble-${f.id}`}
-                  transform={`translate(${ctr.x}, ${ctr.y}) rotate(${((f.yaw + view.rot) * 180) / Math.PI})`}>
-                  {/*
-                    ROUGE QUAND ON NE PEUT PAS POSER LÀ — relevé du patron.
-                    Seul le meuble TENU se colore : les autres n'ont rien à
-                    dire, et un plan qui rougit en entier ne désigne plus
-                    rien.
-                  */}
-                  <Rect
-                    x={-w / 2}
-                    y={-d / 2}
-                    width={w}
-                    height={d}
-                    /*
-                      LA TEINTE CHOISIE SE VOIT AUSSI EN 2D — revue « Yasmine » :
-                      le canapé vert sauge de « Décorer » restait bleu pâle sur
-                      le plan. Hors plan électrique, le meuble prend sa teinte,
-                      adoucie pour que son symbole se lise encore.
-                    */
-                    fill={
-                      poseRefusee && o.id === selectedObjectId
-                        ? c.danger
-                        : planElec
-                          ? c.surface
-                          : o.teinte ?? c.blueSoft
-                    }
-                    fillOpacity={
-                      poseRefusee && o.id === selectedObjectId ? 0.35 : !planElec && o.teinte ? 0.55 : 1
-                    }
-                    // Et ce qui en chevauche un autre GARDE son trait rouge
-                    // une fois lâché (revue « Théo ») : le contrôle le dit
-                    // aussi, mais c'est sur le plan qu'on le corrige.
-                    stroke={
-                      poseRefusee && o.id === selectedObjectId
-                        ? c.danger
-                        : o.id === selectedObjectId
-                        ? c.blue
-                        : meublesEnConflit?.has(o.id)
-                          ? c.danger
-                          : planElec
-                            ? c.line
-                            : c.lineStrong
-                    }
-                    strokeWidth={o.id === selectedObjectId ? 2.5 : meublesEnConflit?.has(o.id) ? 1.6 : 1}
-                    rx={3}
-                  />
-                  {/*
-                    UN TRAIT PAR POLYLIGNE, pas un nœud par segment.
-
-                    Le symbole d'un lit ou d'un canapé, c'est trois ou quatre
-                    lignes brisées. Elles étaient dessinées segment par
-                    segment, chacun dans sa balise, groupés dans une balise
-                    de plus : une quinzaine de nœuds par meuble, quand un
-                    seul tracé par ligne suffit. Sur un logement meublé, ça
-                    se compte en centaines — et chaque nœud se repaie à
-                    chaque image quand le plan glisse sous le doigt.
-
-                    Pendant le geste, le symbole s'efface même tout à fait :
-                    on déplace un plan pour VOIR OÙ L'ON VA, la silhouette du
-                    meuble suffit, et le détail revient au relâcher.
-                  */}
-                  {
-                    furnitureStrokes(furnKind(f.category), w, d, meridienneDe(o)).map((line, li) => (
-                      <Path
-                        key={`s${li}`}
-                        d={line
-                          .map(
-                            (p, pi) =>
-                              `${pi === 0 ? 'M' : 'L'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`,
-                          )
-                          .join(' ')}
-                        stroke={planElec ? c.inkFaint : c.inkSoft}
-                        strokeWidth={planElec ? 1 : 1.2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        fill="none"
-                      />
-                    ))}
-                  {/*
-                    PLUS DE NOM DE MEUBLE SUR LE PLAN — relevé du patron :
-                    « enlève le nom des meubles ». La silhouette dit déjà ce
-                    qu'est un lit ou une table ; le nom ajoutait un mot de
-                    plus là où le plan se lit déjà mal. Le meuble tenu, lui,
-                    garde son nom dans sa barre (`ObjectBar`).
-                  */}
-                  {/*
-                    LA CIBLE DU DOIGT EST PLUS LARGE QUE LE DESSIN.
-
-                    Relevé du patron : « le clic sur un meuble est
-                    capricieux, il faut parfois cliquer plusieurs fois et
-                    viser des endroits précis ». La cible était le DESSIN
-                    lui-même — l'aplat et les traits du symbole. Un aplat de
-                    quarante-cinq centimètres au cinquantième fait neuf
-                    millimètres à l'écran, moins que la pulpe d'un doigt, et
-                    les traits du symbole ne répondent que sur le trait.
-
-                    Elle est POSÉE EN DERNIER, donc au-dessus de tout ce que
-                    le meuble dessine : plus rien ne peut lui voler l'appui.
-                    Invisible, elle ne change pas le plan d'un pixel.
-                  */}
-                  <Rect
-                    accessibilityLabel={`Autour du meuble ${frCategory(
-                      f.category,
-                    )}`}
-                    x={-w / 2 - PRISE_MARGE}
-                    y={-d / 2 - PRISE_MARGE}
-                    width={w + PRISE_MARGE * 2}
-                    height={d + PRISE_MARGE * 2}
-                    fill="transparent"
-                    onPress={
-                      onSelectObject && editable
-                        ? () =>
-                            onSelectObject(
-                              o.id === selectedObjectId ? null : o.id,
-                            )
-                        : undefined
-                    }
-                  />
-                </G>
-              );
+              .map((meuble) => {
+              /*
+                LE MEUBLE TENU SE DESSINE EN VOL — voir `SuitLeDoigt`. À sa
+                place dans l'ordre du dessin : il ne passe ni devant ni
+                derrière les autres parce qu'on le glisse.
+              */
+              if (meuble.id === selectedObjectId) {
+                return <SuitLeDoigt key={meuble.id} objet={meuble} render={dessinerMeuble} />;
+              }
+              return dessinerMeuble(meuble);
             })}
 
             {/*
@@ -3458,87 +3537,94 @@ export function FloorplanEditor({
               showFurniture &&
               showObjectDims &&
               (() => {
-                const o = meublesDuNiveau.find((x) => x.id === selectedObjectId);
-                if (!o) return null;
-                const f = footprintOf(o, partOf, facesPlan);
-                const murs = partOf.get(roomOf(o))?.walls ?? walls;
-                const cos = Math.cos(f.yaw);
-                const sin = Math.sin(f.yaw);
-                // Les quatre normales sortantes, dans le repère du meuble.
-                const cotes = [
-                  { d: { x: cos, z: sin }, demi: f.width / 2 },
-                  { d: { x: -cos, z: -sin }, demi: f.width / 2 },
-                  { d: { x: -sin, z: cos }, demi: f.depth / 2 },
-                  { d: { x: sin, z: -cos }, demi: f.depth / 2 },
-                ];
+                const tenu = meublesDuNiveau.find((x) => x.id === selectedObjectId);
+                if (!tenu) return null;
                 return (
-                  <G>
-                    {cotes.map(({ d, demi }, ci) => {
-                      const from = {
-                        x: f.cx + d.x * demi,
-                        z: f.cz + d.z * demi,
-                      };
-                      const gap = castToWall(from, d, murs, facesPlan);
-                      // Ni collé, ni à l'autre bout du logement : au-delà de
-                      // 4 m, ce n'est plus un dégagement, c'est du vide.
-                      if (gap === null || gap < 0.02 || gap > 4) return null;
-                      const to = {
-                        x: from.x + d.x * gap,
-                        z: from.z + d.z * gap,
-                      };
-                      const A = mapping.toPx(from);
-                      const B = mapping.toPx(to);
-                      const len = Math.hypot(B.x - A.x, B.y - A.y);
-                      if (len < 18) return null;
-                      let angle =
-                        (Math.atan2(B.y - A.y, B.x - A.x) * 180) / Math.PI;
-                      if (angle > 90) angle -= 180;
-                      if (angle < -90) angle += 180;
-                      const mx = (A.x + B.x) / 2;
-                      const my = (A.y + B.y) / 2;
-                      // Revue « Marc » : « 100 » pour 0,99999 m, et aucune unité —
-                      // 100 quoi ? Le centimètre se dit, le mètre aussi.
-                      const texte =
-                        Math.round(gap * 100) < 100
-                          ? `${Math.round(gap * 100)} cm`
-                          : `${gap.toFixed(2).replace('.', ',')} m`;
+                  <SuitLeDoigt
+                    objet={tenu}
+                    render={(o) => {
+                      const f = footprintOf(o, partOf, facesPlan);
+                      const murs = partOf.get(roomOf(o))?.walls ?? walls;
+                      const cos = Math.cos(f.yaw);
+                      const sin = Math.sin(f.yaw);
+                      // Les quatre normales sortantes, dans le repère du meuble.
+                      const cotes = [
+                        { d: { x: cos, z: sin }, demi: f.width / 2 },
+                        { d: { x: -cos, z: -sin }, demi: f.width / 2 },
+                        { d: { x: -sin, z: cos }, demi: f.depth / 2 },
+                        { d: { x: sin, z: -cos }, demi: f.depth / 2 },
+                      ];
                       return (
-                        <G key={ci}>
-                          <Line
-                            x1={A.x}
-                            y1={A.y}
-                            x2={B.x}
-                            y2={B.y}
-                            stroke={c.blue}
-                            strokeWidth={1}
-                            strokeDasharray="3 3"
-                          />
-                          <Circle cx={A.x} cy={A.y} r={2} fill={c.blue} />
-                          <Circle cx={B.x} cy={B.y} r={2} fill={c.blue} />
-                          <Rect
-                            x={mx - (texte.length * 3.6 + 7)}
-                            y={my - 8}
-                            width={texte.length * 7.2 + 14}
-                            height={16}
-                            rx={5}
-                            fill={c.surface}
-                            opacity={0.94}
-                            transform={`rotate(${angle}, ${mx}, ${my})`}
-                          />
-                          <SvgText
-                            x={mx}
-                            y={my + 3.5}
-                            fill={c.blue}
-                            fontSize={10}
-                            fontWeight="800"
-                            textAnchor="middle"
-                            transform={`rotate(${angle}, ${mx}, ${my})`}>
-                            {texte}
-                          </SvgText>
+                        <G>
+                          {cotes.map(({ d, demi }, ci) => {
+                            const from = {
+                              x: f.cx + d.x * demi,
+                              z: f.cz + d.z * demi,
+                            };
+                            const gap = castToWall(from, d, murs, facesPlan);
+                            // Ni collé, ni à l'autre bout du logement : au-delà de
+                            // 4 m, ce n'est plus un dégagement, c'est du vide.
+                            if (gap === null || gap < 0.02 || gap > 4) return null;
+                            const to = {
+                              x: from.x + d.x * gap,
+                              z: from.z + d.z * gap,
+                            };
+                            const A = mapping.toPx(from);
+                            const B = mapping.toPx(to);
+                            const len = Math.hypot(B.x - A.x, B.y - A.y);
+                            if (len < 18) return null;
+                            let angle =
+                              (Math.atan2(B.y - A.y, B.x - A.x) * 180) / Math.PI;
+                            if (angle > 90) angle -= 180;
+                            if (angle < -90) angle += 180;
+                            const mx = (A.x + B.x) / 2;
+                            const my = (A.y + B.y) / 2;
+                            // Revue « Marc » : « 100 » pour 0,99999 m, et aucune unité —
+                            // 100 quoi ? Le centimètre se dit, le mètre aussi.
+                            const texte =
+                              Math.round(gap * 100) < 100
+                                ? `${Math.round(gap * 100)} cm`
+                                : `${gap.toFixed(2).replace('.', ',')} m`;
+                            return (
+                              <G key={ci}>
+                                <Line
+                                  x1={A.x}
+                                  y1={A.y}
+                                  x2={B.x}
+                                  y2={B.y}
+                                  stroke={c.blue}
+                                  strokeWidth={1}
+                                  strokeDasharray="3 3"
+                                />
+                                <Circle cx={A.x} cy={A.y} r={2} fill={c.blue} />
+                                <Circle cx={B.x} cy={B.y} r={2} fill={c.blue} />
+                                <Rect
+                                  x={mx - (texte.length * 3.6 + 7)}
+                                  y={my - 8}
+                                  width={texte.length * 7.2 + 14}
+                                  height={16}
+                                  rx={5}
+                                  fill={c.surface}
+                                  opacity={0.94}
+                                  transform={`rotate(${angle}, ${mx}, ${my})`}
+                                />
+                                <SvgText
+                                  x={mx}
+                                  y={my + 3.5}
+                                  fill={c.blue}
+                                  fontSize={10}
+                                  fontWeight="800"
+                                  textAnchor="middle"
+                                  transform={`rotate(${angle}, ${mx}, ${my})`}>
+                                  {texte}
+                                </SvgText>
+                              </G>
+                            );
+                          })}
                         </G>
                       );
-                    })}
-                  </G>
+                    }}
+                  />
                 );
               })()}
 
@@ -3784,30 +3870,34 @@ export function FloorplanEditor({
                     traîner. Tous les plans du métier le dessinent ; le nôtre
                     ne le faisait pas.
                   */}
-                  {o.type === 'door' && battant && (() => {
-                    const bloquee = !!portesBloquees?.has(o.id);
-                    const arcs = battant.map(
-                      (f) => `M ${f.pivot.x} ${f.pivot.y} L ${f.bout.x} ${f.bout.y} A ${f.r} ${f.r} 0 0 ${f.sens} ${f.autre.x} ${f.autre.y}`,
-                    );
-                    const arc = arcs.join(' ');
-                    return (
-                      <>
-                        {/* Un meuble dans le battant : la surface balayée
-                            se teinte, la porte ne s'ouvre plus en grand. */}
-                        {bloquee && (
-                          <Path d={arcs.map((x) => `${x} Z`).join(' ')} fill={c.danger} fillOpacity={0.12} stroke="none" pointerEvents="none" />
-                        )}
-                        <Path
-                          d={arc}
-                          fill="none"
-                          stroke={choisie ? c.blue : bloquee ? c.danger : color}
-                          strokeWidth={bloquee ? 1.8 : 1.2}
-                          strokeLinecap="round"
-                          opacity={0.9}
-                        />
-                      </>
-                    );
-                  })()}
+                  {o.type === 'door' && battant && (
+                    <SuitLeVol
+                      render={(enVol) => {
+                        const bloquee = enVol && bloqueesEnVol ? bloqueesEnVol(enVol).has(o.id) : !!portesBloquees?.has(o.id);
+                        const arcs = battant.map(
+                          (f) => `M ${f.pivot.x} ${f.pivot.y} L ${f.bout.x} ${f.bout.y} A ${f.r} ${f.r} 0 0 ${f.sens} ${f.autre.x} ${f.autre.y}`,
+                        );
+                        const arc = arcs.join(' ');
+                        return (
+                          <>
+                            {/* Un meuble dans le battant : la surface balayée
+                                se teinte, la porte ne s'ouvre plus en grand. */}
+                            {bloquee && (
+                              <Path d={arcs.map((x) => `${x} Z`).join(' ')} fill={c.danger} fillOpacity={0.12} stroke="none" pointerEvents="none" />
+                            )}
+                            <Path
+                              d={arc}
+                              fill="none"
+                              stroke={choisie ? c.blue : bloquee ? c.danger : color}
+                              strokeWidth={bloquee ? 1.8 : 1.2}
+                              strokeLinecap="round"
+                              opacity={0.9}
+                            />
+                          </>
+                        );
+                      }}
+                    />
+                  )}
                 </G>
               );
             })}
@@ -4383,194 +4473,201 @@ export function FloorplanEditor({
           {selectedObjectId &&
             showFurniture &&
             (() => {
-              const o = meublesDuNiveau.find((x) => x.id === selectedObjectId);
-              if (!o) return null;
-              const f = footprintOf(o, partOf, facesPlan);
-              const p = mapping.toPx({ x: f.cx, z: f.cz });
-              // Boîte écran du rectangle tourné : c'est elle qu'on empoigne.
-              const ang = f.yaw + view.rot;
-              const cw = Math.abs(Math.cos(ang));
-              const sw = Math.abs(Math.sin(ang));
-              const w = f.width * mapping.scale;
-              const d = f.depth * mapping.scale;
-              // Marge de 10 px autour de l'emprise : le doigt tombe rarement
-              // pile dessus, et rater la poignée déplaçait le plan.
-              const hw = Math.max(28, (w * cw + d * sw) / 2 + 10);
-              const hh = Math.max(28, (w * sw + d * cw) / 2 + 10);
-              objBox.current = { x: p.x, y: p.y, hw, hh };
-              /*
-                LES COMMANDES SUIVENT LE MEUBLE, ET RIEN D'AUTRE.
-
-                Elles étaient bornées au cadre du plan : dès que le meuble
-                approchait d'un bord, elles s'en détachaient et restaient
-                plantées au milieu de l'écran — la croix rouge se retrouvait
-                sur un AUTRE meuble, et l'on supprimait celui qu'on ne
-                regardait pas. Elles se posent maintenant à huit points de
-                son contour, et elles s'en vont avec lui.
-
-                Trois pastilles en rangée, centrées sur le meuble : pivoter,
-                coter, retirer. La suppression est la dernière — c'est le
-                geste qu'on ne rattrape pas, il ne doit pas tomber sous le
-                pouce par hasard.
-              */
-              const ECART = 42;
-              const rangeeW = ECART * 2;
-              // Au-dessus du contour ; en dessous s'il n'y a pas la place —
-              // le meuble reste visible, ses commandes doivent l'être aussi.
-              /*
-                Et elle laisse la place aux poignées quand elles sont là :
-                posée à vingt-six points, la rangée mordait sur la poignée du
-                bord haut — deux cibles superposées, dont on ne sait laquelle
-                répondra.
-              */
-              const RECUL = showObjectDims ? 44 : 26;
-              const dessus = p.y - hh - RECUL > 4;
-              const by = dessus ? p.y - hh - RECUL : p.y + hh + RECUL;
-              const bx = p.x - rangeeW / 2;
-              /*
-                ET ELLES DISPARAISSENT AVEC LUI.
-
-                Un meuble poussé hors du cadre laissait ses boutons collés au
-                bord, sans rien à commander de visible. On juge sur la boîte
-                du meuble : si elle ne mord plus sur le plan, il n'y a plus
-                rien à afficher — les poignées restent calées sur le meuble,
-                simplement personne ne les voit.
-              */
-              const dansLeChamp =
-                p.x + hw > 0 &&
-                p.x - hw < layout.w &&
-                p.y + hh > 0 &&
-                p.y - hh < layout.h;
-              if (!dansLeChamp) return null;
-              /*
-                LES QUATRE BORDS SE TIRENT — quand les cotes sont demandées.
-
-                Hors cotes, on déplace ; en cotes, on dimensionne. Les
-                afficher en permanence poserait quatre cibles de plus autour
-                d'un meuble qu'on veut seulement pousser.
-              */
-              const cotesTirables: {
-                cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-';
-                n: { x: number; z: number };
-                demi: number;
-              }[] = [
-                { cote: 'largeur+', n: { x: Math.cos(f.yaw), z: Math.sin(f.yaw) }, demi: f.width / 2 },
-                { cote: 'largeur-', n: { x: -Math.cos(f.yaw), z: -Math.sin(f.yaw) }, demi: f.width / 2 },
-                { cote: 'profondeur+', n: { x: -Math.sin(f.yaw), z: Math.cos(f.yaw) }, demi: f.depth / 2 },
-                { cote: 'profondeur-', n: { x: Math.sin(f.yaw), z: -Math.cos(f.yaw) }, demi: f.depth / 2 },
-              ];
+              const tenu = meublesDuNiveau.find((x) => x.id === selectedObjectId);
+              if (!tenu) return null;
               return (
-                <>
-                  <ObjectDragHandle
-                    objectId={o.id}
-                    center={p}
-                    half={{ x: hw, y: hh }}
-                    mapping={mapping}
-                    raw={o}
-                    onRefus={setPoseRefusee}
-                    onTap={onSelectObject ? () => onSelectObject(null) : undefined}
-                  />
-                  {showObjectDims &&
-                    cotesTirables.map((b) => {
-                      // Milieu du bord, et un point voisin LE LONG du bord :
-                      // deux projections suffisent à connaître son angle à
-                      // l'écran, quelle que soit la rotation du plan.
-                      const mil = mapping.toPx({
-                        x: f.cx + b.n.x * b.demi,
-                        z: f.cz + b.n.z * b.demi,
-                      });
-                      const cote2 = mapping.toPx({
-                        x: f.cx + b.n.x * b.demi - b.n.z * 0.2,
-                        z: f.cz + b.n.z * b.demi + b.n.x * 0.2,
-                      });
-                      const inclinaison =
-                        (Math.atan2(cote2.y - mil.y, cote2.x - mil.x) * 180) /
-                        Math.PI;
-                      /*
-                        LA POIGNÉE SE POSE JUSTE DEHORS, pas sur le meuble.
+                <SuitLeDoigt
+                  objet={tenu}
+                  render={(o) => {
+                    const f = footprintOf(o, partOf, facesPlan);
+                    const p = mapping.toPx({ x: f.cx, z: f.cz });
+                    // Boîte écran du rectangle tourné : c'est elle qu'on empoigne.
+                    const ang = f.yaw + view.rot;
+                    const cw = Math.abs(Math.cos(ang));
+                    const sw = Math.abs(Math.sin(ang));
+                    const w = f.width * mapping.scale;
+                    const d = f.depth * mapping.scale;
+                    // Marge de 10 px autour de l'emprise : le doigt tombe rarement
+                    // pile dessus, et rater la poignée déplaçait le plan.
+                    const hw = Math.max(28, (w * cw + d * sw) / 2 + 10);
+                    const hh = Math.max(28, (w * sw + d * cw) / 2 + 10);
+                    objBox.current = { x: p.x, y: p.y, hw, hh };
+                    /*
+                      LES COMMANDES SUIVENT LE MEUBLE, ET RIEN D'AUTRE.
 
-                        Sa zone touchable fait quarante points ; posées sur
-                        les quatre bords d'un meuble de soixante centimètres,
-                        elles se rejoignaient au milieu et couvraient toute
-                        sa surface — il devenait impossible de le DÉPLACER,
-                        chaque appui tombant sur une poignée. Douze points
-                        vers l'extérieur, et l'intérieur du meuble redevient
-                        ce qu'il doit être : la prise pour le pousser.
-                      */
-                      const vers = Math.hypot(mil.x - p.x, mil.y - p.y) || 1;
-                      const at = {
-                        x: mil.x + ((mil.x - p.x) / vers) * 12,
-                        y: mil.y + ((mil.y - p.y) / vers) * 12,
-                      };
-                      return (
-                        <SideHandle
-                          key={b.cote}
+                      Elles étaient bornées au cadre du plan : dès que le meuble
+                      approchait d'un bord, elles s'en détachaient et restaient
+                      plantées au milieu de l'écran — la croix rouge se retrouvait
+                      sur un AUTRE meuble, et l'on supprimait celui qu'on ne
+                      regardait pas. Elles se posent maintenant à huit points de
+                      son contour, et elles s'en vont avec lui.
+
+                      Trois pastilles en rangée, centrées sur le meuble : pivoter,
+                      coter, retirer. La suppression est la dernière — c'est le
+                      geste qu'on ne rattrape pas, il ne doit pas tomber sous le
+                      pouce par hasard.
+                    */
+                    const ECART = 42;
+                    const rangeeW = ECART * 2;
+                    // Au-dessus du contour ; en dessous s'il n'y a pas la place —
+                    // le meuble reste visible, ses commandes doivent l'être aussi.
+                    /*
+                      Et elle laisse la place aux poignées quand elles sont là :
+                      posée à vingt-six points, la rangée mordait sur la poignée du
+                      bord haut — deux cibles superposées, dont on ne sait laquelle
+                      répondra.
+                    */
+                    const RECUL = showObjectDims ? 44 : 26;
+                    const dessus = p.y - hh - RECUL > 4;
+                    const by = dessus ? p.y - hh - RECUL : p.y + hh + RECUL;
+                    const bx = p.x - rangeeW / 2;
+                    /*
+                      ET ELLES DISPARAISSENT AVEC LUI.
+
+                      Un meuble poussé hors du cadre laissait ses boutons collés au
+                      bord, sans rien à commander de visible. On juge sur la boîte
+                      du meuble : si elle ne mord plus sur le plan, il n'y a plus
+                      rien à afficher — les poignées restent calées sur le meuble,
+                      simplement personne ne les voit.
+                    */
+                    const dansLeChamp =
+                      p.x + hw > 0 &&
+                      p.x - hw < layout.w &&
+                      p.y + hh > 0 &&
+                      p.y - hh < layout.h;
+                    if (!dansLeChamp) return null;
+                    /*
+                      LES QUATRE BORDS SE TIRENT — quand les cotes sont demandées.
+
+                      Hors cotes, on déplace ; en cotes, on dimensionne. Les
+                      afficher en permanence poserait quatre cibles de plus autour
+                      d'un meuble qu'on veut seulement pousser.
+                    */
+                    const cotesTirables: {
+                      cote: 'largeur+' | 'largeur-' | 'profondeur+' | 'profondeur-';
+                      n: { x: number; z: number };
+                      demi: number;
+                    }[] = [
+                      { cote: 'largeur+', n: { x: Math.cos(f.yaw), z: Math.sin(f.yaw) }, demi: f.width / 2 },
+                      { cote: 'largeur-', n: { x: -Math.cos(f.yaw), z: -Math.sin(f.yaw) }, demi: f.width / 2 },
+                      { cote: 'profondeur+', n: { x: -Math.sin(f.yaw), z: Math.cos(f.yaw) }, demi: f.depth / 2 },
+                      { cote: 'profondeur-', n: { x: Math.sin(f.yaw), z: -Math.cos(f.yaw) }, demi: f.depth / 2 },
+                    ];
+                    return (
+                      <>
+                        <ObjectDragHandle
                           objectId={o.id}
-                          // Le magasin raisonne sur le transform brut : si le
-                          // dessin a retourné le meuble, le bord se traduit.
-                          cote={coteVersLeMagasin(
-                            b.cote,
-                            f.yaw,
-                            Math.atan2(o.transform[2], o.transform[0]),
-                          )}
-                          at={at}
-                          angle={inclinaison}
-                          normale={b.n}
+                          center={p}
+                          half={{ x: hw, y: hh }}
                           mapping={mapping}
+                          raw={o}
+                          onRefus={signalerRefus}
+                          onTap={onSelectObject ? () => onSelectObject(null) : undefined}
                         />
-                      );
-                    })}
-                  <RotateHandle
-                    objectId={o.id}
-                    center={p}
-                    at={{ x: bx, y: by }}
-                    raw={o}
-                    viewRot={view.rot}
-                    frame={frame}
-                  />
-                  <TouchableOpacity
-                    style={[
-                      styles.objDelete,
-                      { left: bx + ECART * 2 - 17, top: by - 17 },
-                    ]}
-                    accessibilityLabel="Retirer le meuble"
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                    onPress={() => onDeleteObject?.(o.id)}>
-                    <CloseCross size={17} color="#FFFFFF" weight={3.4} />
-                  </TouchableOpacity>
-                  {/* Les cotes à la demande : le bandeau du bas et les
-                      dégagements ne s'affichent que si on les réclame. Ils
-                      couvraient le plan en permanence pour un réglage qu'on
-                      ne fait qu'une fois. */}
-                  <TouchableOpacity
-                    style={[
-                      styles.objMeasure,
-                      showObjectDims && styles.objMeasureOn,
-                      { left: bx + ECART - 17, top: by - 17 },
-                    ]}
-                    accessibilityLabel="Cotes du meuble"
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                    onPress={onToggleObjectDims}>
-                    <Svg width={17} height={17} viewBox="0 0 24 24">
-                      {[
-                        'M3.5 9 h17 a1.5 1.5 0 0 1 1.5 1.5 v3 a1.5 1.5 0 0 1 -1.5 1.5 h-17 a1.5 1.5 0 0 1 -1.5 -1.5 v-3 a1.5 1.5 0 0 1 1.5 -1.5 z',
-                        'M7.5 9 v3',
-                        'M11.5 9 v3',
-                        'M15.5 9 v3',
-                      ].map((dd) => (
-                        <Path
-                          key={dd}
-                          d={dd}
-                          stroke={showObjectDims ? '#FFFFFF' : c.ink}
-                          strokeWidth={2}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          fill="none"
+                        {showObjectDims &&
+                          cotesTirables.map((b) => {
+                            // Milieu du bord, et un point voisin LE LONG du bord :
+                            // deux projections suffisent à connaître son angle à
+                            // l'écran, quelle que soit la rotation du plan.
+                            const mil = mapping.toPx({
+                              x: f.cx + b.n.x * b.demi,
+                              z: f.cz + b.n.z * b.demi,
+                            });
+                            const cote2 = mapping.toPx({
+                              x: f.cx + b.n.x * b.demi - b.n.z * 0.2,
+                              z: f.cz + b.n.z * b.demi + b.n.x * 0.2,
+                            });
+                            const inclinaison =
+                              (Math.atan2(cote2.y - mil.y, cote2.x - mil.x) * 180) /
+                              Math.PI;
+                            /*
+                              LA POIGNÉE SE POSE JUSTE DEHORS, pas sur le meuble.
+
+                              Sa zone touchable fait quarante points ; posées sur
+                              les quatre bords d'un meuble de soixante centimètres,
+                              elles se rejoignaient au milieu et couvraient toute
+                              sa surface — il devenait impossible de le DÉPLACER,
+                              chaque appui tombant sur une poignée. Douze points
+                              vers l'extérieur, et l'intérieur du meuble redevient
+                              ce qu'il doit être : la prise pour le pousser.
+                            */
+                            const vers = Math.hypot(mil.x - p.x, mil.y - p.y) || 1;
+                            const at = {
+                              x: mil.x + ((mil.x - p.x) / vers) * 12,
+                              y: mil.y + ((mil.y - p.y) / vers) * 12,
+                            };
+                            return (
+                              <SideHandle
+                                key={b.cote}
+                                objectId={o.id}
+                                // Le magasin raisonne sur le transform brut : si le
+                                // dessin a retourné le meuble, le bord se traduit.
+                                cote={coteVersLeMagasin(
+                                  b.cote,
+                                  f.yaw,
+                                  Math.atan2(o.transform[2], o.transform[0]),
+                                )}
+                                at={at}
+                                angle={inclinaison}
+                                normale={b.n}
+                                mapping={mapping}
+                              />
+                            );
+                          })}
+                        <RotateHandle
+                          objectId={o.id}
+                          center={p}
+                          at={{ x: bx, y: by }}
+                          raw={o}
+                          viewRot={view.rot}
+                          frame={frame}
                         />
-                      ))}
-                    </Svg>
-                  </TouchableOpacity>
-                </>
+                        <TouchableOpacity
+                          style={[
+                            styles.objDelete,
+                            { left: bx + ECART * 2 - 17, top: by - 17 },
+                          ]}
+                          accessibilityLabel="Retirer le meuble"
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                          onPress={() => onDeleteObject?.(o.id)}>
+                          <CloseCross size={17} color="#FFFFFF" weight={3.4} />
+                        </TouchableOpacity>
+                        {/* Les cotes à la demande : le bandeau du bas et les
+                            dégagements ne s'affichent que si on les réclame. Ils
+                            couvraient le plan en permanence pour un réglage qu'on
+                            ne fait qu'une fois. */}
+                        <TouchableOpacity
+                          style={[
+                            styles.objMeasure,
+                            showObjectDims && styles.objMeasureOn,
+                            { left: bx + ECART - 17, top: by - 17 },
+                          ]}
+                          accessibilityLabel="Cotes du meuble"
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                          onPress={onToggleObjectDims}>
+                          <Svg width={17} height={17} viewBox="0 0 24 24">
+                            {[
+                              'M3.5 9 h17 a1.5 1.5 0 0 1 1.5 1.5 v3 a1.5 1.5 0 0 1 -1.5 1.5 h-17 a1.5 1.5 0 0 1 -1.5 -1.5 v-3 a1.5 1.5 0 0 1 1.5 -1.5 z',
+                              'M7.5 9 v3',
+                              'M11.5 9 v3',
+                              'M15.5 9 v3',
+                            ].map((dd) => (
+                              <Path
+                                key={dd}
+                                d={dd}
+                                stroke={showObjectDims ? '#FFFFFF' : c.ink}
+                                strokeWidth={2}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                fill="none"
+                              />
+                            ))}
+                          </Svg>
+                        </TouchableOpacity>
+                      </>
+                    );
+                  }}
+                />
               );
             })()}
 
@@ -5350,9 +5447,36 @@ export function ObjectDragHandle({
   live.current = { mapping, raw, onRefus, onTap };
   /* Le verrou du slop : un tap sur la poignée ne déplace plus rien. */
   const seuil = useRef(creerSeuil()).current;
+  /** Les murs du geste et leurs faces, lus une fois à l'appui. */
+  const prepare = useRef<{ murs: WallSeg[]; faces?: ReturnType<typeof facesDesMurs> }>({ murs: [] });
   const pan = useMemo(
-    () =>
-      PanResponder.create({
+    () => {
+      /*
+        LE MAGASIN APPREND LE GESTE AU LÂCHER — et l'apprend comme avant.
+
+        Il recevait chaque image (`setObjectCenter` au doigt), puis le
+        rangement. On rejoue la dernière image, PUIS le rangement : le
+        rangement part ainsi du même « d'où il vient » qu'avant (voir
+        `rangerMeuble`), sous la même clé d'historique — un seul point
+        d'annulation pour tout le geste. Le meuble en vol ne s'éteint
+        qu'après : il n'y a pas d'image où l'on reverrait l'ancienne place.
+      */
+      const poserAuLacher = (vise: { x: number; z: number }) => {
+        const st = useScanStore.getState();
+        st.setObjectCenter(objectId, vise.x, vise.z, true);
+        st.rangerMeuble(objectId, vise.x, vise.z);
+        dernierVise.current = null;
+        mettreEnVol(null);
+        /*
+          ET LE GESTE EST FINI POUR DE BON. Les écritures du lâcher ouvrent
+          un « geste en cours » (`pasDeGeste`) : l'écran figeait ses analyses
+          et se rendait une SECONDE fois, plan compris, un cinquième de
+          seconde plus tard. Il n'y a plus d'image à venir : un seul rendu,
+          analyses à jour.
+        */
+        finirLeGeste();
+      };
+      return PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         // Le geste ne se rend PAS au plan : `PanResponder` accepte par
         // défaut de céder la main, et le plan la redemande à chaque
@@ -5381,6 +5505,14 @@ export function ObjectDragHandle({
           */
           dernierVise.current = null;
           refuseAvant.current = false;
+          /*
+            LES MURS DU GESTE SE PRÉPARENT UNE FOIS. Ils ne bougent pas
+            pendant qu'on glisse un meuble : leurs faces se calculaient
+            pourtant deux fois par image — une pour le refus, une pour la
+            pose.
+          */
+          const murs = useScanStore.getState().walls;
+          prepare.current = { murs, faces: facesDesMurs(murs) };
         },
         /*
           LE DOIGT COMMANDE — relevé du patron : « on doit pouvoir les placer
@@ -5414,11 +5546,17 @@ export function ObjectDragHandle({
               depth: m.baseDepth ?? m.depth ?? m.width,
               yaw: Math.atan2(m.transform[2], m.transform[0]),
             },
-            useScanStore.getState().walls,
+            prepare.current.murs,
+            prepare.current.faces,
           );
-          useScanStore
-            .getState()
-            .setObjectCenter(objectId, vise.x, vise.z, true);
+          /*
+            LE MEUBLE SUIT LE DOIGT SANS ÉCRIRE LE MAGASIN — voir `useEnVol`.
+            C'est la même pose que l'action écrira au lâcher (`meubleAuDoigt`)
+            ; seules les vues qui le dessinent se rendent.
+          */
+          const tenu = useScanStore.getState().objects.find((x) => x.id === objectId);
+          const pose = tenu && meubleAuDoigt(tenu, vise.x, vise.z, prepare.current.murs, prepare.current.faces);
+          if (pose) mettreEnVol(pose);
           dire?.(!essai.valide);
           // On range CE point-là au lâcher, valable ou non : c'est le mur qui
           // arrêtera, pas un retour en arrière.
@@ -5448,7 +5586,7 @@ export function ObjectDragHandle({
           live.current.onRefus?.(false);
           const vise = dernierVise.current;
           if (vise) {
-            useScanStore.getState().rangerMeuble(objectId, vise.x, vise.z);
+            poserAuLacher(vise);
             if (refuseAvant.current) haptic('accroche');
           } else {
             // Rien de visé : c'était un appui. Il relâche le meuble, comme
@@ -5475,12 +5613,29 @@ export function ObjectDragHandle({
           releaseHaptic('butee');
           live.current.onRefus?.(false);
           const vise = dernierVise.current;
-          if (vise) {
-            useScanStore.getState().rangerMeuble(objectId, vise.x, vise.z);
-          }
+          if (vise) poserAuLacher(vise);
+          else mettreEnVol(null);
         },
-      }),
+      });
+    },
     [objectId, seuil],
+  );
+  /*
+    UNE POIGNÉE QUI S'EN VA EN PLEIN GESTE NE LAISSE PAS UN MEUBLE EN VOL.
+    Le magasin garde alors la dernière image, comme quand il l'apprenait à
+    chaque mouvement — et le meuble en vol s'éteint, sinon il resterait
+    dessiné à cet endroit la prochaine fois qu'on le choisirait.
+  */
+  useEffect(
+    () => () => {
+      const vise = dernierVise.current;
+      // Seulement si c'est ELLE qui tenait le meuble (et non sa voisine
+      // qui le fait pivoter).
+      if (!vise || useEnVol.getState().objet?.id !== objectId) return;
+      useScanStore.getState().setObjectCenter(objectId, vise.x, vise.z, true);
+      mettreEnVol(null);
+    },
+    [objectId],
   );
   return (
     <View
@@ -5526,6 +5681,16 @@ export function RotateHandle({
   const styles = getStyles(c);
   const [angle, setAngle] = useState<number | null>(null);
   const base = useRef({ yaw: 0, touche: 0 });
+  /** Le cap montré en vol, que le magasin n'a pas encore reçu. */
+  const dernierCap = useRef<number | null>(null);
+  const poserLeCap = useMemo(
+    () => () => {
+      const yaw = dernierCap.current;
+      dernierCap.current = null;
+      if (yaw !== null) useScanStore.getState().setObjectYaw(objectId, yaw);
+    },
+    [objectId],
+  );
   // Même règle que pour le déplacement : la poignée suit le meuble, donc
   // `at`, `center` et `raw` changent à chaque frame. Les mettre dans les
   // dépendances recréait le responder en plein geste et la rotation
@@ -5547,6 +5712,7 @@ export function RotateHandle({
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
           seuil.reprendre();
+          dernierCap.current = null;
           const L = live.current;
           base.current = {
             yaw: Math.atan2(L.raw.transform[2], L.raw.transform[0]),
@@ -5582,7 +5748,14 @@ export function RotateHandle({
           } else {
             releaseHaptic('accroche');
           }
-          useScanStore.getState().setObjectYaw(objectId, yaw);
+          // Le meuble tourne en vol ; le magasin l'apprend au lâcher (voir
+          // `useEnVol`), par la même formule (`meubleTourne`).
+          const tenu = useScanStore.getState().objects.find((x) => x.id === objectId);
+          const tourne = tenu && meubleTourne(tenu, yaw);
+          if (tourne) {
+            dernierCap.current = yaw;
+            mettreEnVol(tourne);
+          }
           const deg = Math.round(((yaw - vr) * 180) / Math.PI);
           setAngle(((deg % 360) + 360) % 360);
         },
@@ -5597,6 +5770,9 @@ export function RotateHandle({
             useScanStore.getState().rotateObject(objectId, 1);
             haptic('accroche');
           } else {
+            // Le dernier cap d'abord : c'est ce que le magasin recevait à
+            // chaque image, et c'est de lui que part le rangement.
+            poserLeCap();
             // Tourné au doigt, il se range lui aussi (voir `rotateObject`).
             const o = useScanStore.getState().objects.find((x) => x.id === objectId);
             if (o) {
@@ -5605,11 +5781,31 @@ export function RotateHandle({
                 .rangerMeuble(objectId, o.transform[12], o.transform[14], `yaw:${objectId}`);
             }
           }
+          mettreEnVol(null);
+          // Un seul rendu au lâcher, analyses à jour (voir la poignée de
+          // déplacement).
+          finirLeGeste();
           setAngle(null);
         },
-        onPanResponderTerminate: () => setAngle(null),
+        onPanResponderTerminate: () => {
+          // Coupé par le système : le meuble garde le cap atteint, comme
+          // quand le magasin l'apprenait image par image.
+          poserLeCap();
+          mettreEnVol(null);
+          setAngle(null);
+        },
       }),
-    [objectId, seuil],
+    [objectId, seuil, poserLeCap],
+  );
+  // Démontée en plein geste : le cap atteint est gardé, et le meuble en vol
+  // s'éteint — mais seulement si c'est ELLE qui le tenait.
+  useEffect(
+    () => () => {
+      if (dernierCap.current === null || useEnVol.getState().objet?.id !== objectId) return;
+      poserLeCap();
+      mettreEnVol(null);
+    },
+    [objectId, poserLeCap],
   );
   return (
     <>
@@ -5719,6 +5915,25 @@ export function SideHandle({
   } | null>(null);
   /* Le verrou du slop : un tap sur la poignée ne déplace plus rien. */
   const seuil = useRef(creerSeuil()).current;
+  /** La course montrée en vol, que le magasin n'a pas encore reçue. */
+  const dernierEtirement = useRef<number | null>(null);
+  /*
+    LE MAGASIN APPREND L'ÉTIREMENT AU LÂCHER : la dernière course, depuis
+    le même état de départ — exactement ce qu'il recevait à la dernière
+    image, sous la même clé d'historique.
+  */
+  const poserLEtirement = useMemo(
+    () => () => {
+      const total = dernierEtirement.current;
+      const base = depart.current;
+      dernierEtirement.current = null;
+      // Rien de montré en vol : ce n'est pas elle qui tient le meuble.
+      if (!objectId || total === null) return;
+      if (base) useScanStore.getState().resizeObjectSide(objectId, cote, total, base);
+      if (useEnVol.getState().objet?.id === objectId) mettreEnVol(null);
+    },
+    [objectId, cote],
+  );
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -5728,6 +5943,7 @@ export function SideHandle({
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
           seuil.reprendre();
+          dernierEtirement.current = null;
           if (roomId) {
             const murs = useScanStore
               .getState()
@@ -5772,25 +5988,37 @@ export function SideHandle({
           }
           const base = depart.current;
           if (!base || !objectId) return;
-          const r = useScanStore
-            .getState()
-            .resizeObjectSide(objectId, cote, total, base);
+          // Le meuble s'étire en vol ; le magasin l'apprend au lâcher (voir
+          // `useEnVol`), par la même formule (`meubleEtire`).
+          const st = useScanStore.getState();
+          const tenu = st.objects.find((x) => x.id === objectId);
+          if (!tenu) return;
+          const r = meubleEtire(st, tenu, cote, total, base);
+          dernierEtirement.current = total;
+          mettreEnVol(r.objet);
           if (r.accroche) haptic('accroche', true);
           else releaseHaptic('accroche');
         },
         onPanResponderRelease: () => {
+          poserLEtirement();
+          // Un seul rendu au lâcher, analyses à jour (voir la poignée de
+          // déplacement). Une pièce qu'on étire écrit déjà à chaque image :
+          // son geste se ferme comme avant, au silence.
+          if (objectId) finirLeGeste();
           depart.current = null;
           departPiece.current = null;
           releaseHaptic('accroche');
         },
         onPanResponderTerminate: () => {
+          poserLEtirement();
           depart.current = null;
           departPiece.current = null;
           releaseHaptic('accroche');
         },
       }),
-    [objectId, roomId, cote, seuil],
+    [objectId, roomId, cote, seuil, poserLEtirement],
   );
+  useEffect(() => () => poserLEtirement(), [poserLEtirement]);
   return (
     <View
       {...pan.panHandlers}
