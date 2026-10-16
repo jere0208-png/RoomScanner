@@ -15,8 +15,12 @@
  *   défloute : c'est l'offre, au moment où elle a un sens.
  * — ABONNÉ, ELLES SONT NETTES, et le jour où l'abonnement arrive, elles se
  *   défloutent sous les yeux.
- * — SANS LE NATIF (banc d'essai, Android), le sommaire tient lieu d'aperçu :
- *   une carte par feuille, son numéro et son nom.
+ * — EN ATTENDANT LE NATIF, OU SANS LUI (banc d'essai, Android), chaque
+ *   feuille se montre en MINIATURE DESSINÉE — son plan, ses tableaux, son
+ *   mur —, atténuée et filigranée sans abonnement. Revue « clair-22 » : ces
+ *   cartes portaient une icône grise sur fond gris sous « Aperçu flouté :
+ *   votre plan est là », et « ça fait cassé ». On ne montre jamais une case
+ *   vide en promettant un plan.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -32,31 +36,17 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 import type { FeuilleDuDossier } from '../export/pdf';
-import { radius, shadowCard, useTheme, type Palette } from '../theme';
-import { SOLAIRES } from '../ui/solaires';
+import { light, radius, shadowCard, useTheme, type Palette } from '../theme';
 import { haptic } from '../ui/haptic';
+import { cadrerLePlan, type MurDuFond } from './ExportFond';
 
 /** Les feuilles du dossier sont des A4 couchés. */
 export const FORMAT_FEUILLE = 842 / 595;
 
 const CADENAS =
   'M7 10V7a5 5 0 0 1 10 0v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1Zm2 0h6V7a3 3 0 0 0-6 0v3Z';
-
-/** L'icône d'une feuille, selon ce qu'elle montre. */
-const ICONE: Record<FeuilleDuDossier['genre'], string> = {
-  garde: SOLAIRES.maison,
-  plan: SOLAIRES.cotes2d,
-  metre: SOLAIRES.metre,
-  achats: SOLAIRES.panier,
-  existant: SOLAIRES.elec,
-  gaines: SOLAIRES.gaines,
-  perspective: SOLAIRES.vues3d,
-  elevation: SOLAIRES.elevations,
-  unifilaire: SOLAIRES.schema,
-  multifilaire: SOLAIRES.schema,
-};
 
 /** Le compte des feuilles, dit comme on le dirait : « 1 plan, 4 murs… ». */
 export function resumeDuDossier(sommaire: FeuilleDuDossier[]): string {
@@ -83,7 +73,8 @@ export function ApercuDuDossier({
   images,
   enCours,
   net,
-  onDeflouter,
+  murs = [],
+  onDebloquer,
 }: {
   sommaire: FeuilleDuDossier[];
   /** Les feuilles rendues, dans l'ordre ; `null` tant qu'elles ne le sont pas. */
@@ -92,7 +83,10 @@ export function ApercuDuDossier({
   enCours: boolean;
   /** Abonné : les feuilles sont nettes, sans filigrane. */
   net: boolean;
-  onDeflouter: () => void;
+  /** Les murs du niveau exporté : la miniature dessine LEUR plan. */
+  murs?: MurDuFond[];
+  /** Sans abonnement : ouvre l'offre, pour obtenir le PDF net. */
+  onDebloquer: () => void;
 }) {
   const c = useTheme();
   const s = getStyles(c);
@@ -141,7 +135,15 @@ export function ApercuDuDossier({
             {resumeDuDossier(sommaire)}
           </Text>
         </View>
-        <Animated.View style={[s.compte, { transform: [{ scale: pulse }] }]}>
+        {/* UN COMPTE, PAS UN BOUTON — revue « clair-22 » : la pastille bleue
+            pleine « 4 feuilles » appelait le doigt, et rien ne se passait.
+            Du texte, à l'encre, qui bat quand il change. */}
+        <Animated.View
+          testID="compte-feuilles"
+          accessible
+          accessibilityRole="text"
+          accessibilityLabel={`${total} feuille${total > 1 ? 's' : ''}`}
+          style={[s.compte, { transform: [{ scale: pulse }] }]}>
           <Text style={s.compteChiffre}>{total}</Text>
           <Text style={s.compteMot}>feuille{total > 1 ? 's' : ''}</Text>
         </Animated.View>
@@ -154,7 +156,7 @@ export function ApercuDuDossier({
             <Pressable
               key={`${i}-${f.titre}`}
               accessibilityRole="imagebutton"
-              accessibilityLabel={`Feuille ${i + 1} : ${f.titre}${net ? '' : ', aperçu flouté'}`}
+              accessibilityLabel={`Feuille ${i + 1} : ${f.titre}${net ? '' : im ? ', aperçu flouté' : ', aperçu atténué'}`}
               onPress={() => {
                 setOuverte(i);
                 haptic('leger');
@@ -164,10 +166,12 @@ export function ApercuDuDossier({
                 {im ? (
                   <PageImage base64={im} style={s.image} />
                 ) : (
-                  <Animated.View style={[s.attente, { opacity: souffle.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) }]}>
-                    <Svg width={30} height={30} viewBox="0 0 24 24">
-                      <Path d={ICONE[f.genre]} fill={c.inkFaint} fillRule="evenodd" />
-                    </Svg>
+                  <Animated.View
+                    style={[
+                      s.attente,
+                      enCours && { opacity: souffle.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) },
+                    ]}>
+                    <MiniatureFeuille feuille={f} murs={murs} net={net} largeur={CARTE} />
                   </Animated.View>
                 )}
                 {!net && (
@@ -186,13 +190,15 @@ export function ApercuDuDossier({
         })}
       </ScrollView>
 
+      {/* « DÉFLOUTER » N'EXISTE PAS — revue « clair-22 ». On dit ce
+          qu'on obtient : le PDF, net, sans filigrane. */}
       {!net && (
-        <Pressable accessibilityRole="button" accessibilityLabel="Déflouter le dossier" onPress={onDeflouter} style={s.offre}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Débloquer le PDF" onPress={onDebloquer} style={s.offre}>
           <Svg width={16} height={16} viewBox="0 0 24 24">
             <Path d={CADENAS} fill={c.blue} />
           </Svg>
           <Text style={s.offreTexte}>
-            Aperçu flouté : votre plan est là, prêt. Passez Pro pour le déflouter et le télécharger.
+            Votre dossier en aperçu. Avec Pro, le PDF part net et sans filigrane.
           </Text>
         </Pressable>
       )}
@@ -202,10 +208,11 @@ export function ApercuDuDossier({
         images={images}
         depart={ouverte}
         net={net}
+        murs={murs}
         onClose={() => setOuverte(null)}
-        onDeflouter={() => {
+        onDebloquer={() => {
           setOuverte(null);
-          onDeflouter();
+          onDebloquer();
         }}
       />
     </View>
@@ -234,15 +241,17 @@ function Visionneuse({
   images,
   depart,
   net,
+  murs,
   onClose,
-  onDeflouter,
+  onDebloquer,
 }: {
   sommaire: FeuilleDuDossier[];
   images: string[] | null;
   depart: number | null;
   net: boolean;
+  murs: MurDuFond[];
   onClose: () => void;
-  onDeflouter: () => void;
+  onDebloquer: () => void;
 }) {
   const c = useTheme();
   const s = getStyles(c);
@@ -286,7 +295,7 @@ function Visionneuse({
                 />
               ) : (
                 <View style={[s.pageVide, { width: larg, height: haut }]}>
-                  <Text style={s.pageVideTexte}>{f.titre}</Text>
+                  <MiniatureFeuille feuille={f} murs={murs} net={net} largeur={larg} />
                 </View>
               )}
             </View>
@@ -297,11 +306,11 @@ function Visionneuse({
             <Text style={s.voileArgument}>
               C’est bien votre plan. Sans flou ni filigrane, il est prêt à partir.
             </Text>
-            <TouchableOpacity accessibilityLabel="Déflouter et télécharger" style={s.voileBouton} onPress={onDeflouter}>
+            <TouchableOpacity accessibilityLabel="Débloquer le PDF" style={s.voileBouton} onPress={onDebloquer}>
               <Svg width={16} height={16} viewBox="0 0 24 24">
                 <Path d={CADENAS} fill="#FFFFFF" />
               </Svg>
-              <Text style={s.voileBoutonTexte}>Déflouter et télécharger</Text>
+              <Text style={s.voileBoutonTexte}>Débloquer le PDF</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -312,6 +321,132 @@ function Visionneuse({
 
 const CARTE = 196;
 
+/** Le filigrane de la miniature : le même mot que celui gravé par le natif. */
+export const FILIGRANE_MINIATURE = 'EchoPlan';
+
+/**
+ * UNE FEUILLE EN MINIATURE DESSINÉE — ce qu'elle montre, pas une icône.
+ *
+ * La page de garde, le plan, les gaines et les vues 3D portent LE PLAN
+ * relevé (les murs du niveau exporté) ; le métré, la liste d'achats, les
+ * schémas, leurs tableaux ; un mur de face, son mur et ses ouvertures. Le
+ * cartouche en bas à droite, comme sur chaque feuille du dossier.
+ *
+ * Sans abonnement : atténuée, et barrée du filigrane « EchoPlan » — on
+ * reconnaît son logement, on n'y lit pas une cote. Le dessin garde la
+ * palette CLAIRE : c'est du papier, il reste blanc la nuit.
+ */
+export function MiniatureFeuille({
+  feuille,
+  murs,
+  net,
+  largeur,
+}: {
+  feuille: FeuilleDuDossier;
+  murs: MurDuFond[];
+  net: boolean;
+  largeur: number;
+}) {
+  const c = light;
+  const w = largeur;
+  const h = largeur / FORMAT_FEUILLE;
+  const m = w * 0.06;
+  const trait = Math.max(1.2, w / 110);
+  const plan = (boite: { x: number; y: number; w: number; h: number }, couleur = c.ink, epais = trait) =>
+    cadrerLePlan(murs, boite).map((sg, i) => (
+      <Line key={`m${i}`} {...sg} stroke={couleur} strokeWidth={epais} strokeLinecap="round" />
+    ));
+  const lignes = (x: number, y: number, lw: number, n: number, pas: number) =>
+    Array.from({ length: n }, (_, i) => (
+      <Rect key={`l${i}`} x={x} y={y + i * pas} width={lw * (i % 3 === 2 ? 0.7 : 1)} height={Math.max(2, h / 60)} rx={1} fill={c.lineStrong} />
+    ));
+  const tableau = (x: number, y: number, tw: number, th: number, entete: string) => {
+    const rangs = 6;
+    const rh = th / rangs;
+    return (
+      <G>
+        <Rect x={x} y={y} width={tw} height={rh} rx={2} fill={entete} opacity={0.85} />
+        {Array.from({ length: rangs - 1 }, (_, r) => (
+          <G key={`r${r}`}>
+            <Line x1={x} y1={y + (r + 2) * rh} x2={x + tw} y2={y + (r + 2) * rh} stroke={c.line} strokeWidth={0.8} />
+            <Rect x={x + tw * 0.04} y={y + (r + 1.4) * rh} width={tw * 0.42} height={Math.max(2, rh * 0.22)} rx={1} fill={c.lineStrong} />
+            <Rect x={x + tw * 0.78} y={y + (r + 1.4) * rh} width={tw * 0.16} height={Math.max(2, rh * 0.22)} rx={1} fill={c.lineStrong} />
+          </G>
+        ))}
+      </G>
+    );
+  };
+  let corps: React.ReactNode;
+  switch (feuille.genre) {
+    case 'garde':
+      corps = (
+        <G>
+          <Rect x={m} y={m} width={w * 0.34} height={h * 0.07} rx={2} fill={c.ink} />
+          {lignes(m, m + h * 0.16, w * 0.3, 5, h * 0.08)}
+          {plan({ x: w * 0.46, y: m, w: w * 0.48, h: h * 0.7 })}
+        </G>
+      );
+      break;
+    case 'plan':
+    case 'gaines':
+      corps = (
+        <G>
+          {plan({ x: m * 1.5, y: m, w: w * 0.7, h: h * 0.8 })}
+          {feuille.genre === 'gaines' && plan({ x: m * 1.5, y: m, w: w * 0.7, h: h * 0.8 }, c.blue, trait * 0.6)}
+        </G>
+      );
+      break;
+    case 'perspective':
+      // Le plan couché : une vue plongeante, sans calcul de 3D.
+      corps = (
+        <G transform={`translate(${w * 0.18} ${h * 0.1}) skewX(-28) scale(1 0.62)`}>
+          {plan({ x: w * 0.12, y: 0, w: w * 0.62, h: h * 1.1 }, c.ink, trait * 1.1)}
+        </G>
+      );
+      break;
+    case 'elevation': {
+      const mx = m * 1.5;
+      const sol = h * 0.72;
+      const haut = h * 0.42;
+      corps = (
+        <G>
+          <Rect x={mx} y={sol - haut} width={w * 0.7} height={haut} fill="none" stroke={c.ink} strokeWidth={trait} />
+          <Rect x={mx + w * 0.12} y={sol - haut * 0.8} width={w * 0.1} height={haut * 0.8} fill={c.blueSoft} stroke={c.ink} strokeWidth={trait * 0.7} />
+          <Rect x={mx + w * 0.42} y={sol - haut * 0.78} width={w * 0.16} height={haut * 0.4} fill={c.blueSoft} stroke={c.ink} strokeWidth={trait * 0.7} />
+          <Line x1={mx} y1={sol + h * 0.06} x2={mx + w * 0.7} y2={sol + h * 0.06} stroke={c.inkFaint} strokeWidth={trait * 0.6} />
+        </G>
+      );
+      break;
+    }
+    default:
+      // Métré, liste d'achats, tableau existant, schémas : des tableaux.
+      corps = tableau(m, m, w * 0.62, h * 0.74, feuille.genre === 'achats' ? '#1E8E4E' : c.blue);
+  }
+  return (
+    <Svg width={w} height={h} testID={`miniature-${feuille.genre}`} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <Rect x={0} y={0} width={w} height={h} fill="#FFFFFF" />
+      <G opacity={net ? 1 : 0.5}>
+        {corps}
+        {/* Le cartouche, comme sur chaque feuille. */}
+        <Rect x={w * 0.72} y={h * 0.8} width={w * 0.22} height={h * 0.13} rx={1.5} fill="none" stroke={c.lineStrong} strokeWidth={0.8} />
+      </G>
+      {!net && (
+        <SvgText
+          x={w / 2}
+          y={h / 2 + w * 0.05}
+          fill={c.blue}
+          opacity={0.3}
+          fontSize={w * 0.15}
+          fontWeight="800"
+          textAnchor="middle"
+          transform={`rotate(-24 ${w / 2} ${h / 2})`}>
+          {FILIGRANE_MINIATURE}
+        </SvgText>
+      )}
+    </Svg>
+  );
+}
+
 const getStyles = (c: Palette) =>
   StyleSheet.create({
     bloc: { gap: 10 },
@@ -319,16 +454,9 @@ const getStyles = (c: Palette) =>
     teteTexte: { flex: 1 },
     titre: { color: c.ink, fontSize: 19, fontWeight: '700', letterSpacing: -0.2 },
     resume: { color: c.inkFaint, fontSize: 13, marginTop: 2, lineHeight: 18 },
-    compte: {
-      minWidth: 62,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: radius.md,
-      backgroundColor: c.blue,
-      alignItems: 'center',
-    },
-    compteChiffre: { color: '#FFFFFF', fontSize: 20, fontWeight: '800', lineHeight: 22 },
-    compteMot: { color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: '600' },
+    compte: { minWidth: 52, alignItems: 'flex-end' },
+    compteChiffre: { color: c.ink, fontSize: 22, fontWeight: '700', lineHeight: 24 },
+    compteMot: { color: c.inkFaint, fontSize: 11.5, fontWeight: '600' },
     rangee: { gap: 12, paddingVertical: 4, paddingRight: 8 },
     carte: { width: CARTE },
     feuille: {
@@ -343,7 +471,7 @@ const getStyles = (c: Palette) =>
       shadowOpacity: 0.08,
     },
     image: { width: '100%', height: '100%' },
-    attente: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: c.surfaceSunken },
+    attente: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
     verrou: {
       position: 'absolute',
       top: 6,
@@ -371,8 +499,7 @@ const getStyles = (c: Palette) =>
     voileTitre: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', flex: 1 },
     voileCroix: { color: '#FFFFFF', fontSize: 19, fontWeight: '700' },
     page: { alignItems: 'center', justifyContent: 'center' },
-    pageVide: { backgroundColor: '#FFFFFF', borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-    pageVideTexte: { color: '#5B6170', fontSize: 15, fontWeight: '600' },
+    pageVide: { backgroundColor: '#FFFFFF', borderRadius: 6, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
     voilePied: { paddingHorizontal: 18, gap: 12 },
     voileArgument: { color: 'rgba(255,255,255,0.86)', fontSize: 14, lineHeight: 20, textAlign: 'center' },
     voileBouton: {

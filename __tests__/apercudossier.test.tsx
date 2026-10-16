@@ -176,10 +176,11 @@ describe('sans abonnement : le dossier flouté, et l’envie de le déflouter', 
     expect(t.root.findAll((n) => /aperçu flouté/.test(String(n.props.accessibilityLabel ?? ''))).length).toBeGreaterThan(0);
   });
 
-  it('le bouton du bas défloute : il passe par la barrière, jamais par l’envoi', async () => {
+  // Revue « clair-22 » : « Déflouter » n'existe pas — « Débloquer le PDF ».
+  it('le bouton du bas débloque le PDF : il passe par la barrière, jamais par l’envoi', async () => {
     const t = monter(false);
     await bâtir();
-    const b = bouton(t, 'Déflouter et télécharger');
+    const b = bouton(t, 'Débloquer le PDF');
     expect(b).toBeDefined();
     await act(async () => {
       await b.props.onPress();
@@ -256,6 +257,8 @@ describe('chaque réglage change le dossier sous les yeux', () => {
   it('un calque touché dit ce qu’il montre', async () => {
     const t = monter(true);
     await bâtir();
+    // Les calques vivent derrière « Personnaliser les vues » (revue des « découvreurs »).
+    act(() => bouton(t, 'Personnaliser les vues').props.onPress());
     act(() => bouton(t, 'Surfaces').props.onPress());
     expect(textes(t)).toMatch(/Surfaces : Chaque pièce teintée/);
   });

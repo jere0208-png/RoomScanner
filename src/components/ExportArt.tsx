@@ -22,7 +22,8 @@ export type ExportArtKind =
   | 'materiel'
   | 'csv'
   | 'dxf'
-  | 'image';
+  | 'image'
+  | 'devis';
 
 const T = 44;
 
@@ -44,6 +45,7 @@ const TEINTE = (kind: ExportArtKind, c: Palette): string =>
     csv: '#E9F7EE',
     dxf: '#EDEFF4',
     image: '#F2ECFB',
+    devis: '#E9F7EE',
   }[kind]);
 
 const DESSINS: Record<ExportArtKind, (c: Palette) => React.ReactNode> = {
@@ -177,6 +179,15 @@ const DESSINS: Record<ExportArtKind, (c: Palette) => React.ReactNode> = {
           opacity={y === 17 ? 1 : 0.55}
         />
       ))}
+    </>
+  ),
+
+  /** Le devis : une feuille à lignes, et son total souligné en bas. */
+  devis: (c) => (
+    <>
+      <Rect x={12} y={9} width={20} height={26} rx={2.5} fill="#FFFFFF" stroke={c.blue} strokeWidth={1.6} />
+      <Path d="M16 15 h12 M16 19.5 h9 M16 24 h11" stroke={c.blue} strokeWidth={1.4} strokeLinecap="round" opacity={0.6} />
+      <Path d="M21 30 h7" stroke={c.blue} strokeWidth={2.2} strokeLinecap="round" />
     </>
   ),
 

@@ -233,7 +233,14 @@ const styles = getStyles(c);
    * sur la feuille.
    */
   const [reperes3D, setReperes3D] = useState(false);
-  const [includeMetre, setIncludeMetre] = useCaseRetenue(modeExport, 'metre', true);
+  /*
+    LE MÉTRÉ DÉTAILLÉ N'EST PAS COCHÉ POUR LE PARTICULIER — revue des
+    « découvreurs » : surfaces, périmètres, plinthes, ouvertures en
+    colonnes, c'est la feuille du chiffrage. Le particulier a sa liste
+    d'achats, qui en tire déjà ce qu'il faut acheter ; le métré reste à un
+    interrupteur près, et l'électricien comme l'artisan l'ont d'office.
+  */
+  const [includeMetre, setIncludeMetre] = useCaseRetenue(modeExport, 'metre', modeExport !== 'grandPublic');
   /*
     « CE QU'IL FAUT ACHETER » DANS LE DOSSIER — relevé du patron, point 3 de
     la réflexion « grand public ». Coché d'office pour le particulier, qui
@@ -899,6 +906,15 @@ const styles = getStyles(c);
     }).start();
   }, [fade]);
 
+  /*
+    LES RÉGLAGES FINS DES VUES, REPLIÉS — revue des « découvreurs » : l'écran
+    d'export embarquait un second éditeur (calques Cotes, Meubles, Surfaces,
+    « Recadrer », « + Un autre angle »…), et l'on ne voyait plus l'essentiel :
+    les feuilles, ce qu'elles contiennent, et le bouton. Tout est là, derrière
+    « Personnaliser les vues » ; rien n'a été retiré.
+  */
+  const [personnaliser, setPersonnaliser] = useState(false);
+
   /** Le mot qui explique le dernier calque touché du plan. */
   const [calqueDit, setCalqueDit] = useState<string | null>(null);
   const basculer = (fait: () => void, mot?: string) => {
@@ -1007,7 +1023,8 @@ const styles = getStyles(c);
             images={images}
             enCours={enCours}
             net={net}
-            onDeflouter={doExport}
+            murs={walls}
+            onDebloquer={doExport}
           />
 
           {/*
@@ -1120,31 +1137,8 @@ const styles = getStyles(c);
             icone={EXPORT_ICONS.cotes2d}
             titre="Plan coté"
             dit="La feuille maîtresse : le logement vu du dessus, droit et entier."
-            pages="Toujours inclus">
-            <View style={styles.calques}>
-              {calques.map((k) => (
-                <TouchableOpacity
-                  key={k.cle}
-                  accessibilityLabel={k.mot}
-                  accessibilityState={{ selected: k.actif }}
-                  style={[styles.calque, k.actif && styles.calqueOn]}
-                  onPress={() => basculer(k.basculer, `${k.mot} : ${k.dit}`)}>
-                  <Svg width={15} height={15} viewBox="0 0 24 24">
-                    <Path d={EXPORT_ICONS[k.cle]} fill={k.actif ? '#FFFFFF' : c.ink} fillRule="evenodd" />
-                  </Svg>
-                  <Text style={[styles.calqueMot, k.actif && styles.calqueMotOn]}>{k.mot}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text style={styles.calqueDit}>
-              {calqueDit ?? 'Touchez un calque : le plan ci-dessous le montre ou le retire.'}
-            </Text>
-            <PlanPreview
-              cotes={measures2D}
-              routes={gaines || schema ? cheminements?.traces : undefined}
-              ceiling={avecPlafond ? ceiling : undefined}
-            />
-          </Carte>
+            pages="Toujours inclus"
+          />
 
           {/* ------------------------------------------------- le métré */}
           <Carte
@@ -1157,19 +1151,22 @@ const styles = getStyles(c);
             onChange={(v) => basculer(() => setIncludeMetre(v))}
           />
 
-          {/* -------------------------------------- ce qu'il faut acheter */}
+          {/* ------------------------------------------- la liste d'achats */}
+          {/* Revue « clair-23 » : « Ce qu'il faut acheter » renvoyait aux
+              réglages de « Travaux », un écran qui s'appelle « Liste
+              d'achats ». Un seul nom, celui du bouton du plan. */}
           {piecesTravaux.length > 0 && (
             <Carte
               icone={EXPORT_ICONS.achats}
-              titre="Ce qu’il faut acheter"
+              titre="Liste d’achats"
               dit={
                 reglages.avecPrix
                   ? 'Peinture, sol et plinthes, pièce par pièce — avec le prix estimé.'
-                  : 'Peinture, sol et plinthes, pièce par pièce — aux réglages de « Travaux ».'
+                  : 'Peinture, sol et plinthes, pièce par pièce — aux réglages de la « Liste d’achats ».'
               }
               pages={pagesDe(includeAchats, combien(sommaire, 'achats'), combien(avecTout, 'achats'))}
               actif={includeAchats}
-              label="Ce qu’il faut acheter"
+              label="Liste d’achats"
               onChange={(v) => basculer(() => setIncludeAchats(v))}
             />
           )}
@@ -1192,89 +1189,8 @@ const styles = getStyles(c);
             }
             actif={include3D}
             label="Vues 3D"
-            onChange={(v) => basculer(() => setInclude3D(v))}>
-            {include3D && (
-              <>
-                <View style={styles.calques}>
-                  <TouchableOpacity
-                    accessibilityLabel="Cotes sur la 3D"
-                    accessibilityState={{ selected: measures3D }}
-                    style={[styles.calque, measures3D && styles.calqueOn]}
-                    onPress={() => basculer(() => setMeasures3D(!measures3D))}>
-                    <Svg width={15} height={15} viewBox="0 0 24 24">
-                      <Path d={EXPORT_ICONS.cotes3d} fill={measures3D ? '#FFFFFF' : c.ink} fillRule="evenodd" />
-                    </Svg>
-                    <Text style={[styles.calqueMot, measures3D && styles.calqueMotOn]}>Cotes sur la 3D</Text>
-                  </TouchableOpacity>
-                  {/* Les repères d'appareillage : utiles au chantier, de trop
-                      sur une perspective qu'on montre au client. */}
-                  {modeElec && toutLAppareillage.length > 0 && (
-                    <TouchableOpacity
-                      accessibilityLabel="Repères sur la 3D"
-                      accessibilityState={{ selected: reperes3D }}
-                      style={[styles.calque, reperes3D && styles.calqueOn]}
-                      onPress={() => basculer(() => setReperes3D(!reperes3D))}>
-                      <Svg width={15} height={15} viewBox="0 0 24 24">
-                        <Path d={SOLAIRES.reperes} fill={reperes3D ? '#FFFFFF' : c.ink} fillRule="evenodd" />
-                      </Svg>
-                      <Text style={[styles.calqueMot, reperes3D && styles.calqueMotOn]}>Repères</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity accessibilityLabel="Remettre les cadrages à zéro" style={styles.calque} onPress={reset}>
-                    <Text style={styles.calqueMot}>↻ Recadrer</Text>
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.calqueDit}>Un doigt pour tourner, deux pour zoomer : chaque vue part telle quelle.</Text>
-                {vues.map((v, i) => (
-                  <React.Fragment key={i}>
-                    {vues.length > 1 && (
-                      <View style={styles.vueTete}>
-                        <Text style={styles.vueNom}>Vue {i + 1}</Text>
-                        {i > 0 && (
-                          <TouchableOpacity
-                            accessibilityLabel={`Retirer la perspective ${i + 1}`}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                            onPress={() => setVues((liste) => liste.filter((_, k) => k !== i))}>
-                            <Text style={styles.retirer}>Retirer</Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    )}
-                    <View
-                      {...lockProps}
-                      style={styles.view3d}
-                      onLayout={(e) => {
-                        boites.current[i] = {
-                          w: e.nativeEvent.layout.width,
-                          h: e.nativeEvent.layout.height,
-                        };
-                      }}>
-                      <Iso3DView
-                        value={v}
-                        onChange={(nv) => setVues((liste) => liste.map((x, k) => (k === i ? nv : x)))}
-                        showMeasures={measures3D}
-                        // Ce qu'on voit est ce qui part : l'aperçu suit la
-                        // pastille « Repères », comme la feuille.
-                        showElecTags={reperes3D}
-                        // Les cardinaux appartiennent au plan 2D : sur une
-                        // perspective, quatre lettres au bord du cadre ne
-                        // désignent plus rien.
-                        showNorth={false}
-                      />
-                    </View>
-                  </React.Fragment>
-                ))}
-                {vues.length < MAX_VUES && (
-                  <TouchableOpacity
-                    style={styles.ajouter}
-                    accessibilityLabel="Ajouter une perspective"
-                    onPress={() => setVues((liste) => [...liste, { ...angleSuivant(liste.length) }])}>
-                    <Text style={styles.ajouterTexte}>+ Un autre angle</Text>
-                  </TouchableOpacity>
-                )}
-              </>
-            )}
-          </Carte>
+            onChange={(v) => basculer(() => setInclude3D(v))}
+          />
 
           {/* ------------------------------------------ les murs de face */}
           <Carte
@@ -1374,17 +1290,153 @@ const styles = getStyles(c);
               />
             </TouchableOpacity>
           )}
+          {/* --------------------------------- personnaliser les vues */}
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Personnaliser les vues"
+            accessibilityHint="Calques du plan, angles et cotes des vues 3D"
+            accessibilityState={{ expanded: personnaliser }}
+            style={styles.personnaliser}
+            onPress={() => {
+              setPersonnaliser((x) => !x);
+              haptic('leger');
+            }}>
+            <View style={styles.personnaliserTextes}>
+              <Text style={styles.personnaliserTitre}>Personnaliser les vues</Text>
+              <Text style={styles.personnaliserDit}>Calques du plan, angles et cotes des vues 3D.</Text>
+            </View>
+            <Text style={[styles.personnaliserChevron, personnaliser && styles.personnaliserChevronOuvert]}>›</Text>
+          </TouchableOpacity>
+
+          {personnaliser && (
+            <Carte
+              icone={EXPORT_ICONS.cotes2d}
+              titre="Calques du plan"
+              dit="Ce que montre la feuille maîtresse."
+              pages="">
+              <View style={styles.calques}>
+                {calques.map((k) => (
+                  <TouchableOpacity
+                    key={k.cle}
+                    accessibilityLabel={k.mot}
+                    accessibilityState={{ selected: k.actif }}
+                    style={[styles.calque, k.actif && styles.calqueOn]}
+                    onPress={() => basculer(k.basculer, `${k.mot} : ${k.dit}`)}>
+                    <Svg width={15} height={15} viewBox="0 0 24 24">
+                      <Path d={EXPORT_ICONS[k.cle]} fill={k.actif ? '#FFFFFF' : c.ink} fillRule="evenodd" />
+                    </Svg>
+                    <Text style={[styles.calqueMot, k.actif && styles.calqueMotOn]}>{k.mot}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={styles.calqueDit}>
+                {calqueDit ?? 'Touchez un calque : le plan ci-dessous le montre ou le retire.'}
+              </Text>
+              <PlanPreview
+                cotes={measures2D}
+                routes={gaines || schema ? cheminements?.traces : undefined}
+                ceiling={avecPlafond ? ceiling : undefined}
+              />
+            </Carte>
+          )}
+
+          {personnaliser && include3D && (
+            <Carte
+              icone={EXPORT_ICONS.vues3d}
+              titre="Angles des vues 3D"
+              dit="Le cadrage de chaque perspective du dossier."
+              pages="">
+              <View style={styles.calques}>
+                <TouchableOpacity
+                  accessibilityLabel="Cotes sur la 3D"
+                  accessibilityState={{ selected: measures3D }}
+                  style={[styles.calque, measures3D && styles.calqueOn]}
+                  onPress={() => basculer(() => setMeasures3D(!measures3D))}>
+                  <Svg width={15} height={15} viewBox="0 0 24 24">
+                    <Path d={EXPORT_ICONS.cotes3d} fill={measures3D ? '#FFFFFF' : c.ink} fillRule="evenodd" />
+                  </Svg>
+                  <Text style={[styles.calqueMot, measures3D && styles.calqueMotOn]}>Cotes sur la 3D</Text>
+                </TouchableOpacity>
+                {/* Les repères d'appareillage : utiles au chantier, de trop
+                    sur une perspective qu'on montre au client. */}
+                {modeElec && toutLAppareillage.length > 0 && (
+                  <TouchableOpacity
+                    accessibilityLabel="Repères sur la 3D"
+                    accessibilityState={{ selected: reperes3D }}
+                    style={[styles.calque, reperes3D && styles.calqueOn]}
+                    onPress={() => basculer(() => setReperes3D(!reperes3D))}>
+                    <Svg width={15} height={15} viewBox="0 0 24 24">
+                      <Path d={SOLAIRES.reperes} fill={reperes3D ? '#FFFFFF' : c.ink} fillRule="evenodd" />
+                    </Svg>
+                    <Text style={[styles.calqueMot, reperes3D && styles.calqueMotOn]}>Repères</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity accessibilityLabel="Remettre les cadrages à zéro" style={styles.calque} onPress={reset}>
+                  <Text style={styles.calqueMot}>↻ Recadrer</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.calqueDit}>Un doigt pour tourner, deux pour zoomer : chaque vue part telle quelle.</Text>
+              {vues.map((v, i) => (
+                <React.Fragment key={i}>
+                  {vues.length > 1 && (
+                    <View style={styles.vueTete}>
+                      <Text style={styles.vueNom}>Vue {i + 1}</Text>
+                      {i > 0 && (
+                        <TouchableOpacity
+                          accessibilityLabel={`Retirer la perspective ${i + 1}`}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          onPress={() => setVues((liste) => liste.filter((_, k) => k !== i))}>
+                          <Text style={styles.retirer}>Retirer</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+                  <View
+                    {...lockProps}
+                    style={styles.view3d}
+                    onLayout={(e) => {
+                      boites.current[i] = {
+                        w: e.nativeEvent.layout.width,
+                        h: e.nativeEvent.layout.height,
+                      };
+                    }}>
+                    <Iso3DView
+                      value={v}
+                      onChange={(nv) => setVues((liste) => liste.map((x, k) => (k === i ? nv : x)))}
+                      showMeasures={measures3D}
+                      // Ce qu'on voit est ce qui part : l'aperçu suit la
+                      // pastille « Repères », comme la feuille.
+                      showElecTags={reperes3D}
+                      // Les cardinaux appartiennent au plan 2D : sur une
+                      // perspective, quatre lettres au bord du cadre ne
+                      // désignent plus rien.
+                      showNorth={false}
+                    />
+                  </View>
+                </React.Fragment>
+              ))}
+              {vues.length < MAX_VUES && (
+                <TouchableOpacity
+                  style={styles.ajouter}
+                  accessibilityLabel="Ajouter une perspective"
+                  onPress={() => setVues((liste) => [...liste, { ...angleSuivant(liste.length) }])}>
+                  <Text style={styles.ajouterTexte}>+ Un autre angle</Text>
+                </TouchableOpacity>
+              )}
+            </Carte>
+          )}
+
         </ScrollView>
 
         {/*
           LE BOUTON DIT CE QU'IL FAIT. Abonné : il envoie le dossier. Sinon :
-          il défloute — c'est l'offre, au moment où le dossier est sous les
-          yeux.
+          il débloque le PDF — c'est l'offre, au moment où le dossier est
+          sous les yeux. (« Déflouter » n'existe pas : revue « clair-22 ».)
         */}
         <TouchableOpacity
           style={[styles.exportButton, preparation && styles.exportButtonOccupe]}
           accessibilityLabel={
-            preparation ? 'Préparation du PDF' : net ? 'Exporter le PDF' : 'Déflouter et télécharger'
+            preparation ? 'Préparation du PDF' : net ? 'Exporter le PDF' : 'Débloquer le PDF'
           }
           accessibilityState={{ disabled: preparation, busy: preparation }}
           disabled={preparation}
@@ -1400,7 +1452,7 @@ const styles = getStyles(c);
               ? 'Préparation…'
               : net
               ? `Exporter le PDF · ${sommaire.length} feuille${sommaire.length > 1 ? 's' : ''}`
-              : 'Déflouter et télécharger'}
+              : 'Débloquer le PDF'}
           </Text>
         </TouchableOpacity>
         <PromptSheet data={prompt} onClose={() => setPrompt(null)} />
@@ -1470,7 +1522,8 @@ function Carte({
             accessibilityLabel={label ?? titre}
             value={!!actif}
             onValueChange={onChange}
-            trackColor={{ true: c.blue, false: c.surfaceSunken }}
+            // Le même interrupteur iOS que le profil et la liste d'achats.
+            trackColor={{ true: c.blue, false: c.line }}
           />
         )}
       </View>
@@ -1590,6 +1643,20 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     alignItems: 'center',
   },
   ajouterTexte: { color: c.blue, fontSize: 14, fontWeight: '700' },
+  personnaliser: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: c.surface,
+    borderRadius: radius.lg,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  personnaliserTextes: { flex: 1 },
+  personnaliserTitre: { color: c.ink, fontSize: 15, fontWeight: '700' },
+  personnaliserDit: { color: c.inkSoft, fontSize: 13, lineHeight: 18, marginTop: 2 },
+  personnaliserChevron: { color: c.inkFaint, fontSize: 22, fontWeight: '600' },
+  personnaliserChevronOuvert: { transform: [{ rotate: '90deg' }] },
   segment: { flexDirection: 'row', backgroundColor: c.surfaceSunken, borderRadius: radius.pill, padding: 3 },
   segmentCase: { flex: 1, alignItems: 'center', borderRadius: radius.pill, paddingVertical: 8 },
   segmentCaseOn: { backgroundColor: c.surface, ...shadowCard, shadowOpacity: 0.08 },

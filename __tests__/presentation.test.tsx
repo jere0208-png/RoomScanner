@@ -76,6 +76,17 @@ function monter(quoi: 'export' | 'scan') {
       }
     }
   });
+  /*
+    Les réglages fins des vues (aperçu du plan, perspectives) vivent
+    derrière « Personnaliser les vues » (revue des « découvreurs ») : ce
+    banc les éprouve, il les déplie.
+  */
+  if (quoi === 'export') {
+    const deplier = tree.root.findAll(
+      (n) => n.props.accessibilityLabel === 'Personnaliser les vues' && typeof n.props.onPress === 'function',
+    )[0];
+    act(() => deplier.props.onPress());
+  }
   arbre = tree;
   return tree;
 }

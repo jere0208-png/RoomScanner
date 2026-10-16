@@ -39,36 +39,29 @@ export const PLAN_EXEMPLE: MurDuFond[] = [
 const themeSombre = (c: Palette) => luminance(c.bg) < 0.3;
 
 /**
- * La teinte de la carte, propre à chaque format — la même famille que les
- * icônes. EN SOMBRE, DES TEINTES PROFONDES : le titre passe à l'encre claire
- * du thème, et une carte pastel le rendrait illisible.
+ * LA TEINTE DE LA CARTE — LA MÊME POUR TOUTES.
+ *
+ * Revue « clair-20 » (designer produit) : trois cartes du même niveau,
+ * trois traitements — fond violet, fond bleu, contour blanc —, et l'œil
+ * cherchait laquelle comptait plus que les autres. Rien ne le justifiait :
+ * ce qui distingue une sortie, c'est son DESSIN, pas sa couleur de fond.
+ * Un seul fond neutre, un cran sous la feuille ; en sombre, un cran
+ * au-dessus d'elle, pour que la carte se détache sans liseré.
+ *
+ * (Le paramètre `kind` reste : l'appel ne change pas si un format devait un
+ * jour retrouver sa teinte.)
  */
-export const TEINTE_DU_FOND = (kind: ExportArtKind, c: Palette): string =>
-  themeSombre(c)
-    ? {
-        pdf: c.blueSoft,
-        obj: '#14302A',
-        materiel: '#33261A',
-        csv: '#14301E',
-        dxf: '#0F1319',
-        image: '#281F3D',
-      }[kind]
-    : {
-        pdf: c.blueSoft,
-        obj: '#E6F4EF',
-        materiel: '#FCEFDF',
-        csv: '#E5F5EB',
-        dxf: '#1B2029',
-        image: '#EFE8FA',
-      }[kind];
+export const FOND_CARTE_SOMBRE = '#232B37';
+export const TEINTE_DU_FOND = (_kind: ExportArtKind, c: Palette): string =>
+  themeSombre(c) ? FOND_CARTE_SOMBRE : c.surfaceSunken;
 
 /**
- * Le titre doit-il passer en blanc ? Seulement sur la carte du DXF en thème
- * clair — l'écran noir du logiciel de dessin. En sombre, l'encre du thème
- * est déjà claire.
+ * Le titre doit-il passer en blanc ? Plus jamais : la carte du DXF avait un
+ * fond noir plein — c'est désormais l'ÉCRAN du logiciel, dessiné dans
+ * l'image, qui est noir, et le titre se lit à l'encre du thème comme
+ * partout ailleurs.
  */
-export const FOND_SOMBRE = (kind: ExportArtKind, c?: Palette) =>
-  kind === 'dxf' && !(c && themeSombre(c));
+export const FOND_SOMBRE = (_kind: ExportArtKind, _c?: Palette) => false;
 
 /**
  * Le plan ramené dans une boîte : les murs, mis à l'échelle et centrés.
@@ -265,21 +258,32 @@ const DESSINS: Record<ExportArtKind, Dessin> = {
   },
 
   /* L'écran d'un logiciel de dessin : fond noir, calques en couleurs. */
-  dxf: (_c, z, murs) => {
-    const plan = cadrerLePlan(murs, { x: z.x + z.w * 0.24, y: z.y + z.h * 0.16, w: z.w * 0.6, h: z.h * 0.68 });
+  dxf: (_c, zone, murs) => {
+    // L'écran noir est une fenêtre DANS l'image, pas le fond de la carte :
+    // la carte garde le fond commun à toutes (voir `TEINTE_DU_FOND`).
+    const ecran = {
+      x: zone.x + zone.w * 0.2,
+      y: zone.y + zone.h * 0.12,
+      w: zone.w * 0.76,
+      h: zone.h * 0.76,
+    };
+    const z = ecran;
+    const plan = cadrerLePlan(murs, { x: z.x + z.w * 0.14, y: z.y + z.h * 0.14, w: z.w * 0.64, h: z.h * 0.72 });
     const calques = ['#52D1F0', '#F5D54A', '#FFFFFF'];
     const pas = 12;
     const grille: React.ReactNode[] = [];
-    for (let x = z.x; x < z.x + z.w; x += pas) {
+    for (let x = z.x + pas; x < z.x + z.w; x += pas) {
       grille.push(<Line key={`gx${x}`} x1={x} y1={z.y} x2={x} y2={z.y + z.h} stroke="#FFFFFF" strokeWidth={0.5} opacity={0.06} />);
     }
-    for (let y = z.y; y < z.y + z.h; y += pas) {
+    for (let y = z.y + pas; y < z.y + z.h; y += pas) {
       grille.push(<Line key={`gy${y}`} x1={z.x} y1={y} x2={z.x + z.w} y2={y} stroke="#FFFFFF" strokeWidth={0.5} opacity={0.06} />);
     }
-    const cx = z.x + z.w * 0.8;
-    const cy = z.y + z.h * 0.3;
+    const cx = z.x + z.w * 0.86;
+    const cy = z.y + z.h * 0.28;
     return (
       <G>
+        <Rect x={z.x + 5} y={z.y + 7} width={z.w} height={z.h} rx={8} fill="#0B0D12" opacity={0.08} />
+        <Rect x={z.x} y={z.y} width={z.w} height={z.h} rx={8} fill="#1B2029" />
         {grille}
         {plan.map((s, i) => (
           <Line key={i} {...s} stroke={calques[i % calques.length]} strokeWidth={1.6} strokeLinecap="round" />
@@ -287,6 +291,33 @@ const DESSINS: Record<ExportArtKind, Dessin> = {
         <Line x1={cx - 9} y1={cy} x2={cx + 9} y2={cy} stroke="#FFFFFF" strokeWidth={1} opacity={0.8} />
         <Line x1={cx} y1={cy - 9} x2={cx} y2={cy + 9} stroke="#FFFFFF" strokeWidth={1} opacity={0.8} />
         <Rect x={cx - 3} y={cy - 3} width={6} height={6} fill="none" stroke="#FFFFFF" strokeWidth={1} opacity={0.8} />
+      </G>
+    );
+  },
+
+  /* Le devis : une feuille à l'en-tête, ses lignes chiffrées, son total. */
+  devis: (c, z) => {
+    const fw = Math.min(z.w * 0.56, z.h * 1.0);
+    const fh = z.h * 0.86;
+    const fx = z.x + z.w * 0.36;
+    const fy = z.y + z.h * 0.1;
+    const rangs = [0, 1, 2];
+    return (
+      <G rotation={-4} origin={`${fx + fw / 2}, ${fy + fh / 2}`}>
+        <Rect x={fx + 6} y={fy + 8} width={fw} height={fh} rx={5} fill="#0B0D12" opacity={0.08} />
+        <Rect x={fx} y={fy} width={fw} height={fh} rx={5} fill="#FFFFFF" />
+        <Rect x={fx + fw * 0.1} y={fy + fh * 0.1} width={fw * 0.36} height={5} rx={2} fill={c.blue} opacity={0.8} />
+        {rangs.map((r) => {
+          const y = fy + fh * (0.3 + r * 0.16);
+          return (
+            <G key={r}>
+              <Rect x={fx + fw * 0.1} y={y} width={fw * 0.5} height={4} rx={2} fill={c.lineStrong} />
+              <Rect x={fx + fw * 0.72} y={y} width={fw * 0.18} height={4} rx={2} fill={c.lineStrong} />
+            </G>
+          );
+        })}
+        <Line x1={fx + fw * 0.1} y1={fy + fh * 0.8} x2={fx + fw * 0.9} y2={fy + fh * 0.8} stroke={c.line} strokeWidth={1} />
+        <Rect x={fx + fw * 0.62} y={fy + fh * 0.85} width={fw * 0.28} height={6} rx={2} fill={c.ink} />
       </G>
     );
   },

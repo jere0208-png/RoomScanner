@@ -9,7 +9,8 @@
  * tout le monde recoit LE MEME objet, sans un style recalcule.
  */
 import { StyleSheet } from 'react-native';
-import { ombreBouton, ombreAction, radius, shadowCard, themedStyles, type Palette } from '../../theme';
+import { estSombre, ombreBouton, ombreAction, radius, shadowCard, themedStyles, type Palette } from '../../theme';
+import { TEINTE_DU_FOND } from '../../components/ExportFond';
 import { MARGE_RANGEE, PILL_GAP } from '../../components/ToolPill';
 
 export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
@@ -1113,17 +1114,40 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   */
   /* La liste des sorties : une carte par ligne, l'image en fond. */
   exportListe: { gap: 10, paddingBottom: 2 },
+  /*
+    « AUTRES FORMATS », UNE CARTE COMME LES AUTRES — revue « clair-20 » :
+    elle seule était cerclée de blanc, sous deux cartes pleines. Même fond,
+    même rayon que ses voisines ; un chevron dit qu'elle s'ouvre.
+  */
   exportAutres: {
-    minHeight: 56,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: c.line,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    justifyContent: 'center',
+    minHeight: 64,
+    borderRadius: 18,
+    backgroundColor: TEINTE_DU_FOND('pdf', c),
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  exportAutresTexte: { color: c.ink, fontSize: 15, fontWeight: '700' },
-  exportAutresDetail: { color: c.inkSoft, fontSize: 13, marginTop: 2 },
+  exportAutresTextes: { flex: 1 },
+  exportAutresTexte: { color: c.ink, fontSize: 17, fontWeight: '600', letterSpacing: -0.2 },
+  exportAutresDetail: { color: c.inkSoft, fontSize: 13, lineHeight: 17, marginTop: 3 },
+  exportAutresChevron: { color: c.inkFaint, fontSize: 22, fontWeight: '600' },
+  /*
+    LA FEUILLE D'EXPORT, EN SOMBRE, SE DÉTACHE DU PLAN — revue « sombre-20 » :
+    la carte avait la surface du plan sous un voile léger, et l'œil ne
+    savait plus où finissait la fenêtre. Un voile plus profond, une surface
+    un cran plus claire, et un liseré fin comme les fenêtres d'iOS en
+    sombre. En clair, rien ne change : le blanc sur le voile se lit déjà.
+  */
+  exportVoile: estSombre(c) ? { backgroundColor: 'rgba(0,0,0,0.66)' } : {},
+  exportFeuille: estSombre(c)
+    ? {
+        backgroundColor: '#1A2029',
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: c.lineStrong,
+      }
+    : {},
   /* L'en-tête porte la croix, à droite du titre, comme les autres feuilles. */
   exportEntete: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   exportEnteteTextes: { flex: 1, minWidth: 0 },
@@ -1144,13 +1168,12 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderRadius: 18,
     overflow: 'hidden',
     justifyContent: 'center',
-    backgroundColor: c.surfaceSunken,
+    backgroundColor: TEINTE_DU_FOND('pdf', c),
   },
   exportCarteFond: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   /* Le texte tient la moitié gauche, sur le fondu : il se lit toujours. */
   exportCarteTextes: { paddingHorizontal: 18, width: '58%' },
   exportCarteTitre: { color: c.ink, fontSize: 17, fontWeight: '600', letterSpacing: -0.2 },
-  exportCarteTitreClair: { color: '#FFFFFF' },
   exportCarteLigne: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   exportBadgePro: {
     backgroundColor: c.blue,
@@ -1167,7 +1190,6 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 2,
   },
   exportCarteDetail: { color: c.inkSoft, fontSize: 13, lineHeight: 17, marginTop: 3 },
-  exportCarteDetailClair: { color: 'rgba(255,255,255,0.72)' },
   exportChoiceTexts: { flex: 1 },
   exportChoiceOn: { backgroundColor: c.blueSoft },
   exportChoiceTitleOn: { color: c.blue },

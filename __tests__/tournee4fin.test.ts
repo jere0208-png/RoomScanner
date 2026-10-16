@@ -125,7 +125,9 @@ describe('le va-et-vient', () => {
 describe('la feuille d’export', () => {
   it('sans Pro, l’image gratuite vient en tête, et dit qu’elle s’imprime', () => {
     const feuille = readFileSync(join(__dirname, '..', 'src', 'screens', 'result', 'ExportSheet.tsx'), 'utf8');
-    expect(feuille).toContain("const enOrdre = pro ? sorties : [...sorties.filter(([art]) => art === 'image')");
+    // Revue « clair-44 » : en mode électricité, le devis passe devant —
+    // puis l'image gratuite, avant les sorties Pro.
+    expect(feuille).toMatch(/const enOrdre = pro\s*\?\s*sorties\s*:\s*\[\s*\.\.\.sorties\.filter\(\(\[art\]\) => art === 'devis'\),\s*\.\.\.sorties\.filter\(\(\[art\]\) => art === 'image'\)/);
     expect(feuille).toContain('à envoyer ou à imprimer');
   });
 });

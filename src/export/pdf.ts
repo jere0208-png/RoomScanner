@@ -4714,8 +4714,10 @@ function metrePage(
  * acheter » parle au particulier ; remis par un professionnel à son client,
  * c'est un « Estimatif des fournitures ».
  */
+// Revue des « découvreurs » : un seul nom dans l'app et l'export, celui
+// du bouton du plan — « Liste d'achats ».
 function titreDesAchats(ctx: { particulier?: boolean }): string {
-  return ctx.particulier ? 'Ce qu’il faut acheter' : 'Estimatif des fournitures';
+  return ctx.particulier ? 'Liste d’achats' : 'Estimatif des fournitures';
 }
 
 function achatsPage(
@@ -7597,7 +7599,7 @@ const GENRE_EN_CLAIR: Record<FeuilleDuDossier['genre'], string> = {
   garde: 'Page de garde',
   plan: 'Plan coté',
   metre: 'Métré',
-  achats: 'Ce qu’il faut acheter',
+  achats: 'Liste d’achats',
   existant: 'Tableau existant',
   gaines: 'Plan des gaines',
   perspective: 'Perspectives',

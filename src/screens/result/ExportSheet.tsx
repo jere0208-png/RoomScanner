@@ -5,7 +5,7 @@
  * quatre mille lignes, retoucher la vignette d'une sortie obligeait à
  * traverser tout le plan et ses bandeaux pour y arriver.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -18,13 +18,10 @@ import {
 } from 'react-native';
 import { useTheme } from '../../theme';
 import { type ExportArtKind } from '../../components/ExportArt';
-import {
-  ExportFond,
-  FOND_SOMBRE,
-  type MurDuFond,
-} from '../../components/ExportFond';
+import { ExportFond, type MurDuFond } from '../../components/ExportFond';
 import { getStyles } from './styles';
 import { useAccountStore } from '../../store/accountStore';
+import { useScanStore } from '../../store/scanStore';
 import { AlerteHote } from '../../components/AlerteHote';
 import { CloseCross } from '../../components/CloseCross';
 
@@ -48,6 +45,7 @@ export function ExportSheet({
   onCsv,
   onDxf,
   onImage,
+  onDevis,
 }: {
   visible: boolean;
   /**
@@ -70,6 +68,11 @@ export function ExportSheet({
   onCsv: () => void;
   onDxf: () => void;
   onImage: () => void;
+  /**
+   * Le devis (mode électricité). Sans elle, la feuille se ferme et ouvre la
+   * page du devis d'elle-même — comme la pastille du prix sur le plan.
+   */
+  onDevis?: () => void;
 }) {
   const teinte = useTheme();
   const styles = getStyles(teinte);
@@ -79,7 +82,56 @@ export function ExportSheet({
     l'application, et il ne cède rien de ce qui se vend.
   */
   const pro = useAccountStore((st) => st.pro);
+  /*
+    CE QUI ATTEND LA FERMETURE — iOS ne présente pas deux fenêtres à la
+    fois : l'offre Pro (ou la page du devis) part quand la feuille a fini de
+    disparaître. Si `onDismiss` ne vient pas (hors iOS), un délai prend le
+    relais.
+  */
+  const apres = useRef<(() => void) | null>(null);
+  const lancerApres = () => {
+    const a = apres.current;
+    apres.current = null;
+    a?.();
+  };
+  useEffect(() => {
+    if (visible || !apres.current) return;
+    const t = setTimeout(lancerApres, 700);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+  const ouvrirDevis =
+    onDevis ??
+    (() => {
+      apres.current = () => {
+        // Comme la pastille du plan : le total se voit, le devis détaillé est Pro.
+        if (!useAccountStore.getState().pro) {
+          useAccountStore.getState().ouvrirSurprise();
+          return;
+        }
+        useScanStore.getState().demanderLesTarifs();
+        useScanStore.getState().setScreen('devis');
+      };
+      onClose();
+    });
   const sorties: [ExportArtKind, string, string, () => void][] = [
+    /*
+      LE DEVIS EN TÊTE, EN MODE ÉLECTRICITÉ — revue « Gérard », puis
+      « clair-44 » : l'électricien venait envoyer son devis et trouvait le
+      modèle 3D pour Blender, le DXF, le tableur… et pas le devis, qui ne
+      s'ouvrait que par la pastille du prix ou au fond de l'export PDF.
+      C'est ce qu'il remet le plus souvent : il passe devant.
+    */
+    ...(modeElec
+      ? ([
+          [
+            'devis',
+            'Devis',
+            'Numéroté, à votre en-tête, matériel et pose compris.',
+            ouvrirDevis,
+          ],
+        ] as [ExportArtKind, string, string, () => void][])
+      : []),
     [
       'pdf',
       'Plan PDF',
@@ -136,9 +188,11 @@ export function ExportSheet({
       // Revues « Nadia », « Marie », « Sophie » : la seule sortie gratuite
       // ne disait pas qu'elle l'était.
       // Revue « Bernard » : il cherchait comment IMPRIMER son plan.
+      // Revue « clair-20 » : le badge « GRATUIT » puis « Gratuite » dans
+      // la même carte — le badge le dit, le texte ne le répète pas.
       pro
         ? 'La vue affichée, avec ses cotes : à envoyer ou à imprimer, sans logo.'
-        : 'La vue affichée, avec ses cotes : à envoyer ou à imprimer. Gratuite, avec le logo EchoPlan.',
+        : 'La vue affichée, avec ses cotes : à envoyer ou à imprimer, avec le logo EchoPlan.',
       onImage,
     ],
   ];
@@ -146,7 +200,13 @@ export function ExportSheet({
     SANS PRO, L'IMAGE GRATUITE EN TÊTE — revue « Bernard » : cinq sorties
     « PRO » avant la seule qu'il pouvait prendre, en dernier.
   */
-  const enOrdre = pro ? sorties : [...sorties.filter(([art]) => art === 'image'), ...sorties.filter(([art]) => art !== 'image')];
+  const enOrdre = pro
+    ? sorties
+    : [
+        ...sorties.filter(([art]) => art === 'devis'),
+        ...sorties.filter(([art]) => art === 'image'),
+        ...sorties.filter(([art]) => art !== 'image' && art !== 'devis'),
+      ];
   const visibles = modeElec
     ? enOrdre
     : enOrdre.filter(([art]) => art !== 'materiel');
@@ -176,7 +236,10 @@ export function ExportSheet({
       visible={visible}
       transparent
       animationType="fade"
-      onDismiss={onDismiss}
+      onDismiss={() => {
+        onDismiss();
+        lancerApres();
+      }}
       onRequestClose={onClose}>
       {/*
         LE VOILE À CÔTÉ DE LA CARTE, PAS AUTOUR — revue VoiceOver : la carte
@@ -184,7 +247,7 @@ export function ExportSheet({
         tout ce que contient un élément accessible. Aucune sortie n'était
         activable. Même geste au doigt : l'appui hors de la carte ferme.
       */}
-      <View style={styles.modalBackdrop}>
+      <View style={[styles.modalBackdrop, styles.exportVoile]}>
         <Pressable
           testID="voile-export"
           accessibilityRole="button"
@@ -192,7 +255,7 @@ export function ExportSheet({
           style={StyleSheet.absoluteFill}
           onPress={onClose}
         />
-        <View style={styles.modalCard} accessibilityViewIsModal>
+        <View style={[styles.modalCard, styles.exportFeuille]} testID="feuille-export" accessibilityViewIsModal>
           <View style={styles.exportEntete}>
             <View style={styles.exportEnteteTextes}>
               <Text style={styles.modalTitle}>Exporter</Text>
@@ -232,7 +295,6 @@ export function ExportSheet({
               if (w > 0 && Math.abs(w - largeur) > 1) setLargeur(w);
             }}>
             {[...principales, ...(autres ? secondaires : [])].map(([art, titre, detail, action]) => {
-              const sombre = FOND_SOMBRE(art, teinte);
               /* Le badge se voit, il doit aussi se dire : « PRO » posé sur
                  la carte n'était pas lu par VoiceOver. */
               const statut = pro ? '' : art === 'image' ? ', gratuit' : ', réservé à l’abonnement Pro';
@@ -260,10 +322,7 @@ export function ExportSheet({
                   </View>
                   <View style={styles.exportCarteTextes} pointerEvents="none">
                     <View style={styles.exportCarteLigne}>
-                      <Text
-                        style={[styles.exportCarteTitre, sombre && styles.exportCarteTitreClair]}>
-                        {titre}
-                      </Text>
+                      <Text style={styles.exportCarteTitre}>{titre}</Text>
                       {!pro && art !== 'image' && (
                         <View style={styles.exportBadgePro} testID={`badge-pro-${art}`}>
                           <Text style={styles.exportBadgeProTexte}>PRO</Text>
@@ -275,9 +334,7 @@ export function ExportSheet({
                         </View>
                       )}
                     </View>
-                    <Text style={[styles.exportCarteDetail, sombre && styles.exportCarteDetailClair]}>
-                      {detail}
-                    </Text>
+                    <Text style={styles.exportCarteDetail}>{detail}</Text>
                   </View>
                 </TouchableOpacity>
               );
@@ -289,8 +346,11 @@ export function ExportSheet({
                 accessibilityLabel="Autres formats"
                 accessibilityHint="Modèle 3D, plan DXF, tableau des surfaces"
                 onPress={() => setAutres(true)}>
-                <Text style={styles.exportAutresTexte}>Autres formats</Text>
-                <Text style={styles.exportAutresDetail}>3D, DXF pour l’architecte, tableau des surfaces</Text>
+                <View style={styles.exportAutresTextes}>
+                  <Text style={styles.exportAutresTexte}>Autres formats</Text>
+                  <Text style={styles.exportAutresDetail}>3D, DXF pour l’architecte, tableau des surfaces</Text>
+                </View>
+                <Text style={styles.exportAutresChevron}>›</Text>
               </TouchableOpacity>
             )}
           </ScrollView>

@@ -37,6 +37,7 @@ const monter = (modeElec = true) => {
         onCsv={() => appels.push('csv')}
         onDxf={() => appels.push('dxf')}
         onImage={() => appels.push('image')}
+        onDevis={() => appels.push('devis')}
       />,
     );
   });
@@ -76,7 +77,8 @@ describe('les sorties offertes', () => {
   it('range les sorties en liste, une par ligne, dans une vue qui defile', () => {
     const t = monter();
     const liste = tuiles(t);
-    expect(liste).toHaveLength(6);
+    // Six formats, et le devis en tête en mode électricité (revue « clair-44 »).
+    expect(liste).toHaveLength(7);
     for (const x of liste) {
       const st = StyleSheet.flatten(x.props.style) as { width?: unknown; height?: number; minHeight?: number };
       // Pleine largeur : aucune demi-largeur ne traine.
@@ -126,16 +128,18 @@ describe('les sorties offertes', () => {
       );
     });
     const fonds = t.root.findAllByType(ExportFond);
-    // Sans Pro, l'image gratuite vient en tête (revue « Bernard »).
-    expect(fonds.map((f) => f.props.kind)).toEqual(['image', 'pdf', 'obj', 'materiel', 'csv', 'dxf']);
+    // Sans Pro, l'image gratuite vient en tête (revue « Bernard ») — après
+    // le devis, en mode électricité (revue « clair-44 »).
+    expect(fonds.map((f) => f.props.kind)).toEqual(['devis', 'image', 'pdf', 'obj', 'materiel', 'csv', 'dxf']);
     for (const f of fonds) {
       expect(f.props.hauteur).toBe(HAUTEUR_CARTE);
       expect(f.props.largeur).toBeGreaterThan(150);
       expect(f.props.murs).toBe(murs);
     }
-    // Le titre se lit en clair sur l ecran noir du DXF, a l encre ailleurs.
+    // Revue « clair-20 » : un seul traitement pour toutes les cartes. L ecran
+    // noir du DXF est dans le dessin ; son titre est a l encre, comme ailleurs.
     const titreDxf = t.root.findAllByType(Text).find((n) => n.props.children === 'Plan DXF')!;
-    expect(StyleSheet.flatten(titreDxf.props.style).color).toBe('#FFFFFF');
+    expect(StyleSheet.flatten(titreDxf.props.style).color).toBe(light.ink);
     const titrePdf = t.root.findAllByType(Text).find((n) => n.props.children === 'Plan PDF')!;
     expect(StyleSheet.flatten(titrePdf.props.style).color).toBe(light.ink);
     act(() => t.unmount());
@@ -153,12 +157,12 @@ describe('les sorties offertes', () => {
   it('chaque tuile appelle la sienne, et pas celle d a cote', () => {
     const t = monter();
     const liste = tuiles(t);
-    // Six sorties : PDF, 3D, materiel, CSV, DXF, image.
-    expect(liste.length).toBe(6);
+    // Sept sorties : devis, PDF, 3D, materiel, CSV, DXF, image.
+    expect(liste.length).toBe(7);
     for (const tuile of liste) act(() => tuile.props.onPress());
     // Chacune une fois, aucune deux fois : un doublon signalerait deux
     // entrees branchees sur la meme action.
-    for (const nom of ['pdf', 'obj', 'materiel', 'csv', 'dxf', 'image']) {
+    for (const nom of ['devis', 'pdf', 'obj', 'materiel', 'csv', 'dxf', 'image']) {
       expect(appels.filter((a) => a === nom)).toHaveLength(1);
     }
     act(() => t.unmount());
@@ -189,9 +193,9 @@ describe('les images de fond', () => {
     expect(cadrerLePlan([], { x: 0, y: 0, w: 100, h: 50 })).toHaveLength(PLAN_EXEMPLE.length);
   });
 
-  it('en sombre, des teintes profondes : le titre clair du theme reste lisible', () => {
+  it('en sombre, une teinte profonde : le titre clair du theme reste lisible', () => {
     const { luminance } = require('../src/geometry/appearance') as typeof import('../src/geometry/appearance');
-    for (const k of ['obj', 'materiel', 'csv', 'image'] as const) {
+    for (const k of ['pdf', 'obj', 'materiel', 'csv', 'dxf', 'image', 'devis'] as const) {
       expect([k, luminance(TEINTE_DU_FOND(k, light)) > 0.8]).toEqual([k, true]);
       expect([k, luminance(TEINTE_DU_FOND(k, dark)) < 0.2]).toEqual([k, true]);
     }
@@ -212,11 +216,11 @@ describe('le badge Pro', () => {
       .filter((x, i, a) => a.indexOf(x) === i)
       .sort();
 
-  it('marque les cinq exports Pro, pas l’image, quand on n’est pas abonné', () => {
+  it('marque les exports Pro et le devis, pas l’image, quand on n’est pas abonné', () => {
     act(() => useAccountStore.setState({ pro: false }));
     const t = monter();
     expect(badges(t)).toEqual(
-      ['badge-pro-csv', 'badge-pro-dxf', 'badge-pro-materiel', 'badge-pro-obj', 'badge-pro-pdf'],
+      ['badge-pro-csv', 'badge-pro-devis', 'badge-pro-dxf', 'badge-pro-materiel', 'badge-pro-obj', 'badge-pro-pdf'],
     );
     act(() => t.unmount());
   });

@@ -98,6 +98,12 @@ function monter() {
   act(() => {
     jest.advanceTimersByTime(400);
   });
+  // Les calques du plan et les cotes 3D vivent derrière « Personnaliser les
+  // vues » (revue des « découvreurs ») : on les déplie pour lire leur état.
+  const deplier = t.root.findAll(
+    (n) => n.props.accessibilityLabel === 'Personnaliser les vues' && typeof n.props.onPress === 'function',
+  )[0];
+  act(() => deplier.props.onPress());
   arbre = t;
   return t;
 }
@@ -195,8 +201,11 @@ describe('les murs de face, selon qui exporte', () => {
     useUsage.setState({ modeElec: false });
     const o = options(monter());
     expect(o.get('Murs de face')).toBe(false);
+    // Le métré détaillé non plus : c'est la feuille du chiffrage (revue des
+    // « découvreurs ») — sa liste d'achats lui suffit.
+    expect(o.get('Métré')).toBe(false);
     // Le reste du dossier ordinaire, lui, reste coché.
-    for (const nom of ['Vues 3D', 'Métré', 'Cotes', 'Meubles', 'Surfaces']) {
+    for (const nom of ['Vues 3D', 'Cotes', 'Meubles', 'Surfaces']) {
       expect({ [nom]: o.get(nom) }).toEqual({ [nom]: true });
     }
   });

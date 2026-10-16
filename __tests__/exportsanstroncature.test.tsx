@@ -50,7 +50,8 @@ describe('les cartes grandissent avec leur texte', () => {
   it('une hauteur minimale, jamais fixe ni coupee', () => {
     act(() => useAccountStore.setState({ pro: false }));
     const t = monter();
-    expect(cartes(t)).toHaveLength(6);
+    // Six formats, et le devis en tête en mode électricité (revue « clair-44 »).
+    expect(cartes(t)).toHaveLength(7);
     for (const c of cartes(t)) {
       const st = StyleSheet.flatten(c.props.style) as { height?: number; minHeight?: number };
       expect(st.height).toBeUndefined();

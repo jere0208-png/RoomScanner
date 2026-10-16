@@ -94,7 +94,7 @@ describe('un dossier pour toute la maison', () => {
       achats: { pieces, hypotheses: HYPOTHESES, prix: null },
     });
     expect(sommaire.filter((f) => f.genre === 'achats')).toHaveLength(1);
-    expect(sommaire.find((f) => f.genre === 'achats')!.titre).toBe('Ce qu’il faut acheter');
+    expect(sommaire.find((f) => f.genre === 'achats')!.titre).toBe('Liste d’achats');
   });
 
   it('les feuilles électriques restent au niveau courant', () => {
