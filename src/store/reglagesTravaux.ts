@@ -16,6 +16,7 @@ import {
   HYPOTHESES,
   PRIX_INDICATIFS,
   cleHorsTravaux,
+  type FaienceMurale,
   type HypothesesTravaux,
   type PrixTravaux,
 } from '../geometry/travaux';
@@ -45,6 +46,12 @@ interface Etat {
    * les plans — `room-1` est dans chacun.
    */
   horsTravaux: string[];
+  /**
+   * LA FAÏENCE MURALE DES PIÈCES D'EAU, plan par plan — même clé que la
+   * coche (`cleHorsTravaux`). Absente : aucune.
+   */
+  faienceMurale: Record<string, FaienceMurale>;
+  reglerFaience: (roomId: string, plan: string | null | undefined, hauteur: FaienceMurale) => void;
   /** Coche ou décoche une pièce du plan ouvert. */
   basculerPiece: (roomId: string, plan?: string | null) => void;
   /** Recoche ces pièces du plan ouvert (« Tout cocher »). */
@@ -60,12 +67,18 @@ interface Etat {
 /** Au-delà, les plus anciennes s'oublient : la liste ne grossit pas sans fin. */
 const HORS_MAX = 200;
 
-function ecrire(e: Pick<Etat, 'hypotheses' | 'avecPrix' | 'prix' | 'horsTravaux'>): void {
+function ecrire(e: Pick<Etat, 'hypotheses' | 'avecPrix' | 'prix' | 'horsTravaux' | 'faienceMurale'>): void {
   try {
     disque()
       .setItem(
         CLE_REGLAGES_TRAVAUX,
-        JSON.stringify({ hypotheses: e.hypotheses, avecPrix: e.avecPrix, prix: e.prix, horsTravaux: e.horsTravaux }),
+        JSON.stringify({
+          hypotheses: e.hypotheses,
+          avecPrix: e.avecPrix,
+          prix: e.prix,
+          horsTravaux: e.horsTravaux,
+          faienceMurale: e.faienceMurale,
+        }),
       )
       .catch(() => {});
   } catch {
@@ -85,12 +98,34 @@ function nombres<T extends object>(modele: T, lu: unknown): T {
   return out;
 }
 
+/** Ne garde de la faïence lue sur le disque que les crans connus. */
+function faiencesLues(lu: unknown): Record<string, FaienceMurale> {
+  const out: Record<string, FaienceMurale> = {};
+  if (lu && typeof lu === 'object') {
+    for (const [k, v] of Object.entries(lu as Record<string, unknown>)) {
+      if (v === 'h120' || v === 'h200' || v === 'toute') out[k] = v;
+    }
+  }
+  return out;
+}
+
 export const useReglagesTravaux = create<Etat>((set, get) => ({
   charge: false,
   hypotheses: HYPOTHESES,
   avecPrix: false,
   prix: PRIX_INDICATIFS,
   horsTravaux: [],
+  faienceMurale: {},
+
+  reglerFaience: (roomId, plan, hauteur) => {
+    const cle = cleHorsTravaux(plan, roomId);
+    const faienceMurale = { ...get().faienceMurale };
+    if ((faienceMurale[cle] ?? 'aucune') === hauteur) return;
+    delete faienceMurale[cle];
+    if (hauteur !== 'aucune') faienceMurale[cle] = hauteur;
+    set({ faienceMurale });
+    ecrire(get());
+  },
 
   basculerPiece: (roomId, plan) => {
     const cle = cleHorsTravaux(plan, roomId);
@@ -117,7 +152,13 @@ export const useReglagesTravaux = create<Etat>((set, get) => ({
     } catch {
       brut = null;
     }
-    let lu: { hypotheses?: unknown; avecPrix?: unknown; prix?: unknown; horsTravaux?: unknown } | null = null;
+    let lu: {
+      hypotheses?: unknown;
+      avecPrix?: unknown;
+      prix?: unknown;
+      horsTravaux?: unknown;
+      faienceMurale?: unknown;
+    } | null = null;
     try {
       lu = brut ? JSON.parse(brut) : null;
     } catch {
@@ -133,6 +174,7 @@ export const useReglagesTravaux = create<Etat>((set, get) => ({
             horsTravaux: Array.isArray(lu.horsTravaux)
               ? lu.horsTravaux.filter((x): x is string => typeof x === 'string').slice(-HORS_MAX)
               : [],
+            faienceMurale: faiencesLues(lu.faienceMurale),
           }
         : {}),
     });

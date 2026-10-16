@@ -477,8 +477,9 @@ const styles = getStyles(c);
     [multi, parNiveau, piecesTravaux],
   );
   const retenues = useMemo(
-    () => piecesRetenues(piecesDuDossier, reglages.horsTravaux, useScanStore.getState().currentSaveId),
-    [piecesDuDossier, reglages.horsTravaux],
+    () =>
+      piecesRetenues(piecesDuDossier, reglages.horsTravaux, useScanStore.getState().currentSaveId, reglages.faienceMurale),
+    [piecesDuDossier, reglages.horsTravaux, reglages.faienceMurale],
   );
   const achatsDuDossier = (oui: boolean) =>
     oui && retenues.length > 0

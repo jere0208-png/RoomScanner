@@ -569,7 +569,7 @@ export function DecorSheet({
 
           {piece && (
             <View style={s.tuiles} accessibilityRole="tablist" onTouchStart={() => (repos.current = Date.now())}>
-              {tuile('ambiances', 'Ambiance', ambianceActuelle?.nom ?? 'Personnalisée', rondTuile(c.blueSoft, null, SOLAIRES.baguette))}
+              {tuile('ambiances', 'Ambiance', ambianceActuelle?.nom ?? 'Libre', rondTuile(c.blueSoft, null, SOLAIRES.baguette))}
               {tuile('murs', 'Murs', peinture?.nom ?? '', rondTuile(peinture?.hex ?? '#FFFFFF'))}
               {tuile('sol', 'Sol', sol?.nom ?? '', rondTuile(sol?.hex ?? '#D9CBB4', sol?.motif))}
               {tuile(

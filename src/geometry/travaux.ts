@@ -22,7 +22,7 @@
  * face de la cloison, et chacun la perd sur la largeur de la porte.
  */
 import type { Pt, RoomPart, WallSeg } from './floorplan';
-import { hauteurDeLaPiece } from './floorplan';
+import { hauteurDeLaPiece, solDesMurs } from './floorplan';
 
 /** Les hypothèses du calcul — dites à l'écran, sous les chiffres. */
 export interface HypothesesTravaux {
@@ -90,6 +90,34 @@ export interface PieceTravaux {
    * d'abord dans une cuisine.
    */
   credence?: number;
+  /**
+   * LA FAÏENCE MURALE POSSIBLE D'UNE PIÈCE D'EAU (m²), pour chaque hauteur
+   * proposée, ouvertures déduites — absente ailleurs. Voir `avecFaienceMurale`.
+   */
+  faienceSelon?: Record<Exclude<FaienceMurale, 'aucune'>, number>;
+  /** La faïence murale retenue (m²) : elle a été retirée de `murs`. */
+  faienceMurale?: { hauteur: FaienceMurale; surface: number };
+}
+
+/**
+ * LA FAÏENCE MURALE D'UNE PIÈCE D'EAU — revue du retraité bricoleur : la
+ * faïence ne se comptait qu'en crédence de cuisine ; rien pour la salle de
+ * bains, et la peinture y comptait les murs jusqu'au plafond. Quatre crans,
+ * ceux qu'on pose vraiment : rien, à hauteur de lavabo, à hauteur de
+ * douche, jusqu'au plafond. Rien par défaut : on n'invente pas un carrelage.
+ */
+export type FaienceMurale = 'aucune' | 'h120' | 'h200' | 'toute';
+export const HAUTEURS_FAIENCE: { cle: FaienceMurale; libelle: string; metres: number }[] = [
+  { cle: 'aucune', libelle: 'Aucune', metres: 0 },
+  { cle: 'h120', libelle: '1,20 m', metres: 1.2 },
+  { cle: 'h200', libelle: '2 m', metres: 2 },
+  { cle: 'toute', libelle: 'Toute hauteur', metres: Infinity },
+];
+
+/** Salle de bains, salle d'eau, WC, douche : là où l'on carrelle les murs. */
+const PIECE_D_EAU = /\b(salles? de bains?|salles? d['’]eau|sdb|wc|toilettes?|douches?)\b/i;
+export function estPieceDEau(nom: string, kind?: string): boolean {
+  return kind === 'bathroom' || kind === 'wc' || kind === 'toilet' || PIECE_D_EAU.test(nom);
 }
 
 /** La hauteur d'une crédence carrelée, du plan de travail aux meubles hauts (m). */
@@ -123,6 +151,8 @@ export interface DecorDeLaPiece {
   peinture?: string;
   /** Identifiant de mur → clé de peinture. */
   accents?: Record<string, string>;
+  /** Le genre de la pièce (`bathroom`, `wc`…) : il dit une pièce d'eau. */
+  kind?: string;
 }
 
 function distanceAuSegment(p: Pt, a: Pt, b: Pt): number {
@@ -298,9 +328,28 @@ export function travauxDesPieces(
     const murs = mursNetsDe(contour, hauteur, siennes, part.walls);
     const decor = decorDe?.(part.roomId);
     const credence = credenceDe?.(part) ?? 0;
+    const nom = nomDe(part.roomId, rang);
+    /*
+      LA FAÏENCE À CHAQUE HAUTEUR : la bande du sol jusqu'au cran, chaque mur
+      à sa hauteur, moins la part de chaque baie qui tombe dans la bande —
+      toute la porte sous 2 m, la fenêtre au-dessus de son allège seulement.
+    */
+    let faienceSelon: PieceTravaux['faienceSelon'];
+    if (estPieceDEau(nom, decor?.kind)) {
+      const sol = solDesMurs(part.walls);
+      const bande = (H: number) => {
+        const haut = Math.min(H, hauteur);
+        const coupees = siennes.map((o) => {
+          const bas = Math.max(0, o.yCenter - o.height / 2 - sol);
+          return { ...o, height: Math.max(0, Math.min(haut, bas + o.height) - bas) };
+        });
+        return arrondi(Math.min(murs, mursNetsDe(contour, haut, coupees, part.walls)));
+      };
+      faienceSelon = { h120: bande(1.2), h200: bande(2), toute: arrondi(murs) };
+    }
     out.push({
       roomId: part.roomId,
-      nom: nomDe(part.roomId, rang),
+      nom,
       sol: arrondi(surface.area),
       plafond: arrondi(surface.area),
       perimetre: arrondi(tour),
@@ -311,9 +360,37 @@ export function travauxDesPieces(
       fenetres,
       ...(decor ? { teintes: teintesDeLaPiece(part, surface.pts, hauteur, murs, siennes, decor) } : {}),
       ...(credence > 0.05 ? { credence: arrondi(credence, 0.01) } : {}),
+      ...(faienceSelon ? { faienceSelon } : {}),
     });
   });
   return out;
+}
+
+/**
+ * LA FAÏENCE MURALE CHOISIE, POSÉE SUR LES PIÈCES : sa surface passe à la
+ * carte faïence et sort de la peinture de la pièce — chaque teinte y perd
+ * sa part, la face d'un mur d'accent se carrelle comme le reste.
+ */
+export function avecFaienceMurale<T extends PieceTravaux>(
+  pieces: T[],
+  choix: Readonly<Record<string, FaienceMurale>>,
+  plan?: string | null,
+): T[] {
+  return pieces.map((p) => {
+    const hauteur = choix[cleHorsTravaux(plan, p.roomId)];
+    if (!p.faienceSelon || !hauteur || hauteur === 'aucune') return p;
+    const surface = Math.min(p.murs, p.faienceSelon[hauteur] ?? 0);
+    if (!(surface > 0)) return p;
+    const reste = arrondi(Math.max(0, p.murs - surface));
+    let teintes = p.teintes;
+    if (teintes && p.murs > 0) {
+      const k = reste / p.murs;
+      const autres = teintes.slice(1).map((t) => ({ ...t, surface: auDixieme(t.surface * k) }));
+      const premiere = { ...teintes[0], surface: auDixieme(Math.max(0, reste - autres.reduce((x, t) => x + t.surface, 0))) };
+      teintes = [premiere, ...autres].filter((t) => t.surface > 0);
+    }
+    return { ...p, murs: reste, ...(teintes ? { teintes } : {}), faienceMurale: { hauteur, surface: arrondi(surface) } };
+  });
 }
 
 /**
@@ -326,10 +403,16 @@ export function piecesRetenues<T extends { roomId: string }>(
   horsTravaux: readonly string[],
   /** Le plan ouvert (`currentSaveId`) : la coche est la sienne. */
   plan?: string | null,
+  /**
+   * La faïence murale choisie pour les pièces d'eau (`cleHorsTravaux`) :
+   * la feuille, le dossier et le tableur la comptent tous les trois.
+   */
+  faience?: Readonly<Record<string, FaienceMurale>>,
 ): T[] {
-  if (horsTravaux.length === 0) return pieces;
   const hors = new Set(horsTravaux);
-  return pieces.filter((p) => !hors.has(cleHorsTravaux(plan, p.roomId)));
+  const retenues = horsTravaux.length === 0 ? pieces : pieces.filter((p) => !hors.has(cleHorsTravaux(plan, p.roomId)));
+  if (!faience || Object.keys(faience).length === 0) return retenues;
+  return avecFaienceMurale(retenues as unknown as PieceTravaux[], faience, plan) as unknown as T[];
 }
 
 /**
@@ -358,8 +441,12 @@ export interface Achats {
   plafonds: { surface: number; litres: number; pots: number };
   sol: { surface: number; avecChute: number; paquets: number };
   plinthes: { metres: number; barres: number };
-  /** La faïence de crédence : la longueur de plan de travail × 60 cm, marge comprise. */
-  faience: { longueur: number; surface: number; avecChute: number };
+  /**
+   * La faïence : la crédence (la longueur de plan de travail × 60 cm) et les
+   * murs des pièces d'eau (`murale`, m²) ; `surface` les réunit, et
+   * `avecChute` y ajoute la marge des coupes.
+   */
+  faience: { longueur: number; murale: number; surface: number; avecChute: number };
 }
 
 /** Ce qu'il faut acheter pour ces pièces, sur ces hypothèses. */
@@ -422,8 +509,14 @@ export function achats(pieces: PieceTravaux[], h: HypothesesTravaux = HYPOTHESES
     },
     faience: (() => {
       const longueur = somme((p) => p.credence ?? 0);
-      const surface = longueur * HAUTEUR_CREDENCE;
-      return { longueur: arrondi(longueur), surface: arrondi(surface), avecChute: arrondi(surface * (1 + h.chute)) };
+      const murale = somme((p) => p.faienceMurale?.surface ?? 0);
+      const surface = longueur * HAUTEUR_CREDENCE + murale;
+      return {
+        longueur: arrondi(longueur),
+        murale: arrondi(murale),
+        surface: arrondi(surface),
+        avecChute: arrondi(surface * (1 + h.chute)),
+      };
     })(),
   };
 }

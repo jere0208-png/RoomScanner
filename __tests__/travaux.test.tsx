@@ -81,6 +81,9 @@ const piece = (id: string, x0: number, z0: number, x1: number, z1: number, heigh
   };
 };
 const nom = (id: string) => id;
+/** Le texte d'un nœud, unités imbriquées comprises (« 3 » + « pots de 2,5 L »). */
+const texteDe = (x: TestRenderer.ReactTestInstance): string =>
+  x.children.map((e) => (typeof e === 'string' ? e : texteDe(e))).join('');
 
 describe('le métré des travaux, pièce par pièce', () => {
   it('une chambre de 4 × 3, une porte et une fenêtre : les comptes à la main', () => {
@@ -223,14 +226,17 @@ describe('la peinture, teinte par teinte', () => {
     act(() => {
       t = TestRenderer.create(<TravauxSheet visible onClose={() => {}} pieces={pieces} />);
     });
-    const vu = t.root
-      .findAllByType(Text)
-      .map((x) => (Array.isArray(x.props.children) ? x.props.children.join('') : String(x.props.children)))
-      .join(' | ');
-    expect(vu).toContain('Vert sauge');
-    expect(vu).toContain('Terracotta');
-    expect(vu).toContain('6 pots de 2,5 L · 13 L pour 65 m²');
-    expect(vu).toContain('1 pot de 2,5 L · 1,5 L pour 7,5 m²');
+    const vu = () => t.root.findAllByType(Text).map(texteDe).join(' | ');
+    expect(vu()).toContain('Vert sauge');
+    expect(vu()).toContain('Terracotta');
+    // La carte dit les pots ; la mesure qui les justifie est repliée sous
+    // « Comment c'est calculé » (diagnostic du patron : trop de texte).
+    expect(vu()).toContain('6 pots');
+    expect(vu()).not.toContain('13 L pour 65 m²');
+    const replie = t.root.findAll((x) => x.props?.accessibilityLabel === 'Comment c’est calculé' && typeof x.props?.onPress === 'function')[0];
+    act(() => replie.props.onPress());
+    expect(vu()).toContain('6 pots de 2,5 L · 13 L pour 65 m²');
+    expect(vu()).toContain('1 pot de 2,5 L · 1,5 L pour 7,5 m²');
     act(() => t.unmount());
   });
 
@@ -269,8 +275,11 @@ describe('la feuille', () => {
     useReglagesTravaux.setState({ horsTravaux: [] });
   });
   const pieces = travauxDesPieces([piece('Chambre', 0, 0, 4, 3), piece('Séjour', 4, 0, 9, 4)], [], nom);
-  const textes = (t: TestRenderer.ReactTestRenderer) =>
-    t.root.findAllByType(Text).map((x) => (Array.isArray(x.props.children) ? x.props.children.join('') : String(x.props.children)));
+  const textes = (t: TestRenderer.ReactTestRenderer) => t.root.findAllByType(Text).map(texteDe);
+  const ouvrirExplications = (t: TestRenderer.ReactTestRenderer) => {
+    const b = t.root.findAll((x) => x.props?.accessibilityLabel === 'Comment c’est calculé' && typeof x.props?.onPress === 'function')[0];
+    act(() => b.props.onPress());
+  };
 
   it('quatre achats, les hypothèses écrites, une coche par pièce', () => {
     act(() => {
@@ -281,7 +290,9 @@ describe('la feuille', () => {
       expect(vu).toContain(mot);
     }
     expect(vu).toContain('Pour tout le logement.');
-    expect(vu).toMatch(/2 couches, 1 litre pour 10 m²/);
+    // Les hypothèses restent écrites — repliées sous « Comment c'est calculé ».
+    ouvrirExplications(arbre!);
+    expect(textes(arbre!).join(' | ')).toMatch(/2 couches, 1 litre pour 10 m²/);
     const coches = arbre!.root.findAll((x) => x.props?.accessibilityRole === 'checkbox' && typeof x.props?.onPress === 'function');
     expect(coches.map((x) => x.props.accessibilityLabel)).toEqual(['Chambre', 'Séjour']);
   });
@@ -304,13 +315,15 @@ describe('la feuille', () => {
     act(() => {
       arbre = TestRenderer.create(<TravauxSheet visible onClose={() => {}} pieces={pieces} />);
     });
-    const avant = textes(arbre!).find((x) => /m², marge des coupes comprise/.test(x));
+    const sol = () => texteDe(arbre!.root.findAll((x) => x.props?.testID === 'carte-sol', { deep: false })[0]);
+    const avant = sol();
     const sejour = arbre!.root.findAll((x) => x.props?.accessibilityLabel === 'Séjour' && typeof x.props?.onPress === 'function')[0];
     act(() => sejour.props.onPress());
-    const apres = textes(arbre!).find((x) => /m², marge des coupes comprise/.test(x));
-    expect(apres).not.toBe(avant);
-    // 12 m² + 10 % : la chambre seule.
-    expect(apres).toBe('13,2 m², marge des coupes comprise');
+    expect(sol()).not.toBe(avant);
+    // 12 m² + 10 % = 13,2 m² : la chambre seule, en cartons de 2 m².
+    expect(sol()).toContain('7 cartons de 2 m²');
+    ouvrirExplications(arbre!);
+    expect(textes(arbre!).join(' | ')).toContain('13,2 m², marge des coupes comprise');
     expect(textes(arbre!).join(' | ')).toContain('Pour 1 pièce sur 2.');
   });
 
@@ -399,7 +412,10 @@ describe('le dossier et le tableur suivent la coche', () => {
   it('le tableur ne chiffre que les pièces retenues', () => {
     const src = readFileSync(join(__dirname, '..', 'src', 'screens', 'ResultScreen.tsx'), 'utf8');
     const csv = src.slice(src.indexOf('const shareCsv = async'), src.indexOf('metreFilename(scanName)'));
-    expect(csv).toMatch(/piecesRetenues\(piecesTravaux, reglages\.horsTravaux, useScanStore\.getState\(\)\.currentSaveId\)/);
+    // Et la faïence murale des pièces d'eau, réglée dans la même feuille.
+    expect(csv.replace(/\s+/g, ' ')).toMatch(
+      /piecesRetenues\( ?piecesTravaux, reglages\.horsTravaux, useScanStore\.getState\(\)\.currentSaveId, reglages\.faienceMurale,? ?\)/,
+    );
   });
 });
 

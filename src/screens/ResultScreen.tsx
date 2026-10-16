@@ -1822,7 +1822,12 @@ export function ResultScreen() {
       // Ce qu'il faut acheter suit le métré, aux réglages de « Travaux » —
       // et sur les seules pièces qu'on y a laissées cochées.
       const reglages = useReglagesTravaux.getState();
-      const retenues = piecesRetenues(piecesTravaux, reglages.horsTravaux, useScanStore.getState().currentSaveId);
+      const retenues = piecesRetenues(
+        piecesTravaux,
+        reglages.horsTravaux,
+        useScanStore.getState().currentSaveId,
+        reglages.faienceMurale,
+      );
       const a = achatsDe(retenues, reglages.hypotheses);
       await RoomScan.shareText(
         // Sans le mode Électricité, le fichier s'arrête au métré des pièces.
