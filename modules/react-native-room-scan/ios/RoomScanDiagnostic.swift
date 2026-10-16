@@ -113,7 +113,7 @@ final class RoomScanDiagnostic: RCTEventEmitter {
   @objc func figer(_ resolve: @escaping RCTPromiseResolveBlock,
                    reject: @escaping RCTPromiseRejectBlock) {
     figerInterne { f in
-      resolve(["video": f.video ?? NSNull(), "gestes": f.gestes])
+      resolve(["video": f.video.map { $0 as Any } ?? NSNull(), "gestes": f.gestes])
     }
   }
 
@@ -482,7 +482,7 @@ final class RoomScanDiagnostic: RCTEventEmitter {
       withName: "envoyer",
       body: [
         "message": message,
-        "video": fige.video ?? NSNull(),
+        "video": fige.video.map { $0 as Any } ?? NSNull(),
         "gestes": fige.gestes,
       ])
   }
