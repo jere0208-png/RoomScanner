@@ -30,7 +30,7 @@ describe('l’appartement d’exemple', () => {
 
   it('compte ses pièces au nu des refends, ses façades à leur trait', () => {
     // Séjour : 0 → 4,93 × 0 → 4,13.
-    proche(aire('Séjour'), 4.93 * 4.13);
+    proche(aire('Séjour-cuisine'), 4.93 * 4.13);
     // Chambre : 5,07 → 8 × 0 → 3,53.
     proche(aire('Chambre'), 2.93 * 3.53);
     proche(aire('Salle d’eau'), 2.93 * 2.33);

@@ -52,8 +52,8 @@ describe('le menu du plan', () => {
   );
 
   it('toutes ses entrées sont rangées dans une section titrée — aucune retirée', () => {
-    // « Jeter » est le bouton de l'alerte de « Revenir… », pas une entrée.
-    const labels = [...bloc.matchAll(/^\s*label: '([^']+)'/gm)].map((m) => m[1]).filter((l) => l !== 'Jeter');
+    // « Jeter », « Activer », « Annuler » sont des boutons d'alerte (« Revenir… », passage en mode électricité), pas des entrées.
+    const labels = [...bloc.matchAll(/^\s*label: '([^']+)'/gm)].map((m) => m[1]).filter((l) => !['Jeter', 'Activer', 'Annuler'].includes(l));
     expect(labels.length).toBeGreaterThanOrEqual(15);
     expect(entrees.map((e) => e.label).sort()).toEqual([...labels].sort());
     expect([...new Set(entrees.map((e) => e.section))]).toEqual(['Votre projet', 'Ajouter', 'Modifier', 'Version']);

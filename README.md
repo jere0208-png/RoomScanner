@@ -14353,6 +14353,73 @@ Deux testeurs (« Inès », « Hugo ») ont ensuite repassé toute la feuille.
 - Bancs : `decorsolide.test.tsx` compare deux rendus, avec et sans
   l'intrus. Il échoue sur l'ancien code et passe sur le nouveau.
 
+## Avant le lancement : sept testeurs, six chantiers
+
+Sept testeurs, chacun avec son profil et son objectif, ont cherché les défauts
+de l'app : Maxime (développeur mobile, efficacité et design), Gérard
+(électricien pressé), Camille (novice qui rénove), Jacqueline (malvoyante,
+VoiceOver), Sven (ancien relecteur App Review), Nadia (métreuse) et Lucas
+(19 ans, vieil iPhone, tape partout). Leurs défauts bloquants et majeurs ont
+été corrigés en six lots, chacun avec ses tests.
+- **App Store** :
+  - Les alertes s'affichent enfin par-dessus une feuille ou la page Pro.
+    Chaque fenêtre monte son propre hôte d'alerte (une pile, la plus haute
+    l'emporte). Avant, « Supprimer mon compte », « S'abonner » et
+    « Restaurer » ne montraient rien.
+  - Achat et restauration possibles sans compte : le Pro vient de
+    l'identifiant Apple.
+  - Bouton d'achat plein, sans double achat possible ; l'achat en attente
+    est expliqué ; la restauration synchronise d'abord avec l'App Store.
+  - La déconnexion efface le jeton.
+  - Identifiant `fr.echoplan.app`, iPhone seulement.
+  - Le serveur ne croit plus le champ `abonne` envoyé par l'app.
+- **Données** : un plan illisible n'efface plus la bibliothèque. Il est
+  écarté mais gardé sur le disque, et aucune clé n'est supprimée avant la fin
+  du chargement.
+- **Cotes** :
+  - Les refends de l'exemple sont au nu : 45,82 m² au lieu de 48,00.
+  - Corriger une cote déplace toute la ligne de mur, sans oblique ni bout
+    de mur.
+  - La saisie se lit sur la cote affichée (intérieur ou axe, comme le dit
+    le champ).
+  - Le PDF garde toujours la surface (nom abrégé) et donne 2 décimales
+    partout.
+  - « 3m405 » est accepté ; « tour des pièces » remplace « périmètre ».
+- **Électricité** :
+  - Une cuisine ouverte se reconnaît à son équipement (plaque, évier, plan
+    de travail), pas seulement à son nom ; l'exemple « Séjour-cuisine » est
+    réellement conforme.
+  - Un seul total, pose comprise, de la pastille au PDF.
+  - Le PDF client ne cite plus d'enseigne de prix.
+  - Le devis est accessible depuis l'export.
+  - La case électricité est cochée en fin de scan en mode électricité ; une
+    confirmation est demandée avant de passer un particulier dans ce mode.
+- **Fluidité** :
+  - La 3D arrive en ¾ dès l'ouverture. L'orbite était calculée avant que la
+    vue ait une taille (NaN, refusée par SceneKit, d'où la vue de face).
+  - Une silhouette s'affiche jusqu'à la première image native.
+  - La levée suit l'écran (`requestAnimationFrame`) et respecte « Réduire
+    les animations ».
+  - La maquette du plan est en pause derrière Décorer.
+  - Verrous sur l'export PDF, le partage d'image et « Terminer ».
+- **Lisibilité** :
+  - Sans LiDAR, on le sait dès la question d'usage, et la tuile Scanner
+    reste lisible.
+  - Plus de tuiles tronquées ; contrastes à 4,5:1 au moins.
+  - Panier pour « Liste d'achats », rouleau pour « Décorer » ; « Mes plans »
+    partout.
+  - Le menu du plan est rangé en sections.
+  - Décorer donne le nombre de pots de peinture.
+  - Les feuilles se ferment en glissant ; VoiceOver peut y entrer.
+
+**Restent ouverts** :
+- Les différentiels de type AC/A selon l'édition 2024 de la NF C 15-100, à
+  faire valider par l'électricien.
+- Un coefficient de vente pour le devis.
+- Le cas général du nu des plans scannés.
+- Les barres d'outils à emplacements fixes.
+- « Ce qu'il faut acheter » reste dans l'export et le PDF.
+
 ## Vu sur les vraies captures du simulateur
 
 Premier passage de l'app réelle, compilée et parcourue sur un iPhone
