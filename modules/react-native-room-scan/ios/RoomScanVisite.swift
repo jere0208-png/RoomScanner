@@ -67,8 +67,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   let bati = SCNNode()
   /// Les trois lumières, gardées : la maquette les règle autrement.
   private let ambiante = SCNLight()
-  /// L'ambiance des MEUBLES, plus douce que celle du bâti : voir `reglerLeJour`.
-  private let ambianteMeubles = SCNLight()
   private let jour = SCNLight()
   private let contre = SCNLight()
   private var noeudDuContre: SCNNode?
@@ -354,7 +352,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   private func reglerLeJour() {
     let maquette = orbite.count >= 10
     ambiante.intensity = maquette ? 640 : 620
-    ambianteMeubles.intensity = maquette ? 440 : 420
     jour.intensity = maquette ? 380 : 420
     contre.intensity = maquette ? 160 : 200
     noeudDuContre?.light = contre
@@ -668,32 +665,25 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     ambiante.type = .ambient
     ambiante.intensity = 620
     ambiante.color = UIColor.white
-    ambiante.categoryBitMask = Self.MASQUE_PIECE
     let noeudAmbiant = SCNNode()
     noeudAmbiant.light = ambiante
     scene.rootNode.addChildNode(noeudAmbiant)
 
     /*
-      DES MEUBLES QUI GARDENT LEUR COULEUR — premier diagnostic envoyé par le
-      patron, vidéo à l'appui : « lumière trop forte sur les meubles, ça les
-      rend blancs ». En visite, le canapé crème et le dessus de la table
-      basse passaient au blanc pur dès qu'on s'en approchait par le dessus.
+      DES MEUBLES QUI GARDENT LEUR COULEUR — premier diagnostic du patron :
+      « lumière trop forte sur les meubles, ça les rend blancs ». Les meubles
+      sont en matière PHYSIQUE : en plus de l'ambiance, du jour et du
+      contre-jour, ils recevaient un environnement fort (0,7, un ciel blanc
+      au-dessus) qui poussait un tissu clair au blanc. L'environnement ne
+      sert plus qu'à donner un reflet au chrome (0,2, plus bas).
 
-      Le calcul le disait : les meubles sont en matière PHYSIQUE, le bâti en
-      Lambert. Une face de meuble tournée vers le haut recevait l'ambiance
-      (620), le jour, le contre-jour ET l'environnement (0,7, un ciel blanc
-      au-dessus) — près de deux fois ce que reçoit un mur. Sur un tissu clair,
-      tout dépassait 100 % : du blanc. Les meubles ont donc leur ambiance à
-      eux, plus douce, et l'environnement ne sert plus qu'à donner un reflet
-      au chrome (0,2). Le bâti, lui, ne change pas.
+      PAS DE SECONDE AMBIANCE « POUR LES MEUBLES » — tentée, et retirée :
+      SceneKit n'applique pas le masque de catégorie à une lumière AMBIANTE.
+      La seconde s'ajoutait donc à la première sur TOUT (≈ 1 060 au lieu de
+      640) : la maquette sortait d'un blanc uni, murs, sols et meubles
+      confondus avec le fond (relevé du patron, captures à l'appui). Une seule
+      ambiance, pour tout.
     */
-    ambianteMeubles.type = .ambient
-    ambianteMeubles.intensity = 420
-    ambianteMeubles.color = UIColor.white
-    ambianteMeubles.categoryBitMask = Self.MASQUE_MEUBLE
-    let noeudAmbiantMeubles = SCNNode()
-    noeudAmbiantMeubles.light = ambianteMeubles
-    scene.rootNode.addChildNode(noeudAmbiantMeubles)
 
     jour.type = .directional
     jour.intensity = 420

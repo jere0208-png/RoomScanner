@@ -17,12 +17,15 @@ const swift = readFileSync(
 const nombre = (re: RegExp) => Number((swift.match(re) ?? [])[1]);
 
 describe('la lumière des meubles, en visite', () => {
-  it('les meubles ont leur ambiance à eux, plus douce que celle du bâti', () => {
-    expect(swift).toMatch(/ambiante\.categoryBitMask = Self\.MASQUE_PIECE/);
-    expect(swift).toMatch(/ambianteMeubles\.categoryBitMask = Self\.MASQUE_MEUBLE/);
-    const bati = nombre(/ambiante\.intensity = (\d+)\n/);
-    const meubles = nombre(/ambianteMeubles\.intensity = (\d+)\n/);
-    expect(meubles).toBeLessThan(bati * 0.75);
+  /*
+    UNE SEULE AMBIANCE — une seconde ambiance « pour les meubles » (masquée par
+    catégorie) avait été tentée : SceneKit n'applique pas ce masque aux
+    lumières ambiantes, elle s'ajoutait donc sur tout, et la maquette sortait
+    d'un blanc uni (murs, sols, meubles). Le banc ci-dessous empêche d'y revenir.
+  */
+  it('une seule lumière ambiante, sans masque de catégorie', () => {
+    expect((swift.match(/\.type = \.ambient/g) ?? []).length).toBe(1);
+    expect(swift).not.toMatch(/ambiante\w*\.categoryBitMask/);
   });
 
   it("l'environnement ne fait plus que le reflet du chrome", () => {
