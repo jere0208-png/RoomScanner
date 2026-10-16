@@ -110,7 +110,11 @@ jobs:
         working-directory: ios
         run: |
           ccache -z || true
-          xcodebuild \
+          set -o pipefail
+          # LES ERREURS DU COMPILATEUR EN ANNOTATIONS : les journaux bruts ne
+          # sont pas lisibles depuis toutes les sessions de développement ; les
+          # annotations, si (API check-runs).
+          if ! xcodebuild \
             -workspace RoomScanner.xcworkspace \
             -scheme RoomScanner \
             -configuration Release \
@@ -119,7 +123,10 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            build
+            build 2>&1 | tee xcodebuild.log; then
+            grep -E "(error|fatal error): " xcodebuild.log | sed 's|^.*/modules/|modules/|; s|^.*/src/|src/|' | sort -u | head -40 | while IFS= read -r l; do echo "::error::${l}"; done
+            exit 65
+          fi
           ccache -s || true
 
       - name: Empaqueter l'IPA
