@@ -14420,6 +14420,37 @@ VoiceOver), Sven (ancien relecteur App Review), Nadia (métreuse) et Lucas
 - Les barres d'outils à emplacements fixes.
 - « Ce qu'il faut acheter » reste dans l'export et le PDF.
 
+## Le mode diagnostic, réservé à l'administrateur
+
+Demande du patron : « au clic sur un bouton visible, les 10 dernières
+secondes de mes faits et gestes te seront envoyés, y compris pendant un scan
+avec l'enregistrement de mon écran », avec un message en plus.
+- **Qui y a droit** : le serveur, et lui seul, compare l'e-mail du compte à
+  `ADMIN_EMAILS`, dans sa configuration. Aucune adresse n'est écrite dans
+  l'app, dont le dépôt est public.
+  - L'app reçoit `admin` dans `connecter` et `etat`.
+  - Le serveur revérifie à chaque envoi.
+- **Le réglage** : Profil, section « Administrateur », « Mode diagnostic ».
+- **Ce qui est gardé** (natif, `RoomScanDiagnostic.swift`) :
+  - l'écran, en boucle : ReplayKit, segments de 3 s, demi-résolution, les
+    cinq derniers seulement ;
+  - chaque toucher, avec l'étiquette de la vue touchée, par un échange de
+    `UIWindow.sendEvent`. Il couvre les modales et le scan.
+
+  Côté JS (`src/diagnostic/`) : l'écran courant, les changements du plan,
+  les alertes, les astuces, `console.warn` et `console.error`, les erreurs
+  globales. Jetons et e-mails sont masqués.
+- **Le bouton** : un rond rouge déplaçable, posé dans une fenêtre au-dessus
+  de tout.
+  - L'appui fige l'instant, puis propose un message.
+  - « Envoyer » expédie les 10 dernières secondes : la vidéo, les gestes,
+    le journal, puis un instantané (appareil, version, plan complet).
+- **Le trajet** :
+  - `api.php`, action `diagnostic`, range le rapport dans un dépôt GitHub
+    privé (`DIAG_GITHUB_DEPOT`, `DIAG_GITHUB_JETON`) ;
+  - à défaut, dans `server/diagnostics/`, fermé par `.htaccess` ;
+  - en cas d'échec réseau, l'app propose de partager le fichier.
+
 ## Vu sur les vraies captures du simulateur
 
 Premier passage de l'app réelle, compilée et parcourue sur un iPhone
