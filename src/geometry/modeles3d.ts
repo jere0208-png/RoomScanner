@@ -775,10 +775,22 @@ function fenetre3d(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   const z0 = zc - pD / 2;
   const z1 = zc + pD / 2;
   const bas = auSol ? 0.02 : dorm;
-  a.boite(-W / 2, -W / 2 + dorm, 0, H, z0, z1, 'laque', blanc, { r: 0.003 });
-  a.boite(W / 2 - dorm, W / 2, 0, H, z0, z1, 'laque', blanc, { r: 0.003 });
+  /*
+    LE DORMANT ENTRE DANS LA MAÇONNERIE — relevé du patron : « il y a un
+    espace sur les côtés des ouvrants, on voit l'intérieur depuis
+    l'extérieur ». Bord à bord avec le tableau, l'arrondi de ses arêtes et le
+    moindre écart d'arrondi des calculs laissaient passer le jour. Comme sur
+    un chantier, il est scellé : ses montants filent d'un centimètre dans le
+    tableau, sa traverse basse dans l'allège — là où personne ne les voit.
+    Pas en haut : une baie montée jusqu'au plafond n'a pas de linteau, le
+    dormant sortirait au-dessus du mur.
+  */
+  const scelle = 0.01;
+  const pied = auSol ? 0 : -scelle;
+  a.boite(-W / 2 - scelle, -W / 2 + dorm, pied, H, z0, z1, 'laque', blanc, { r: 0.003 });
+  a.boite(W / 2 - dorm, W / 2 + scelle, pied, H, z0, z1, 'laque', blanc, { r: 0.003 });
   a.boite(-W / 2 + dorm, W / 2 - dorm, H - dorm, H, z0, z1, 'laque', blanc, { r: 0.003 });
-  a.boite(-W / 2 + dorm, W / 2 - dorm, 0, bas, z0, z1, auSol ? 'inox' : 'laque', auSol ? TEINTES.inox : blanc, { r: 0.003 });
+  a.boite(-W / 2 + dorm, W / 2 - dorm, pied, bas, z0, z1, auSol ? 'inox' : 'laque', auSol ? TEINTES.inox : blanc, { r: 0.003 });
   const xi0 = -W / 2 + dorm;
   const xi1 = W / 2 - dorm;
   const yi0 = bas;

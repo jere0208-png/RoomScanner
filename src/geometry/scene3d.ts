@@ -2392,15 +2392,59 @@ export function buildScene(
       facesSeules?: boolean;
       /** Les extrémités du mur qui rejoignent d'autres murs (voir `pushTopStrips`). */
       joints?: { a: boolean; b: boolean };
+      /**
+       * Le TRAIT du mur : `t0`/`t1` sont alors des fractions de SA longueur,
+       * reportées d'équerre sur chaque nu (voir `surLeNu`).
+       */
+      axe?: { a: Pt; b: Pt };
     },
   ) => {
     if (t1 - t0 < 1e-4 || yt - yb < 1e-4) return;
     const s = o.shrink ?? 0;
+    /*
+      UNE ABSCISSE DU TRAIT, REPORTÉE D'ÉQUERRE SUR UN NU.
+
+      Relevé du patron, vidéo à l'appui : « il y a un espace sur les côtés
+      des ouvrants fenêtres, baie, on peut voir l'intérieur depuis
+      l'extérieur ». Une ouverture se repère en fraction du TRAIT du mur
+      (`assignOpenings`), et la menuiserie en volume se pose à ces abscisses-
+      là. Mais le trou se perçait à la même FRACTION de chaque nu — et les
+      deux nus n'ont pas la longueur du trait : l'onglet allonge l'un,
+      raccourcit l'autre. Sur la façade nord de l'exemple (trait de 5 m, mur
+      de 14 cm relevé d'un côté), le nu intérieur mesure 4,93 m et le nu
+      extérieur 5,14 m : le bord de la fenêtre du séjour, posé à x = 0,80,
+      se perçait à 0,789 dedans et à 0,682 dehors. Le tableau partait en
+      biais, et entre lui et le dormant (à 0,80) restait une fente de part
+      en part du mur : 12 cm sur la façade, encore 1 cm au nu intérieur.
+      Toutes les baies de l'exemple en avaient une, d'un côté ou de l'autre.
+
+      Le trou se perce donc au point du nu qui tombe D'ÉQUERRE sous
+      l'abscisse du trait : les tableaux sont perpendiculaires au mur et
+      tombent pile sur les bords de la menuiserie. Les bouts du mur (0 et 1)
+      restent ceux du nu, onglet compris : un trumeau rejoint toujours
+      l'angle.
+    */
+    const surLeNu = (A: Pt, B: Pt, t: number): Pt => {
+      if (!o.axe || t <= 1e-6 || t >= 1 - 1e-6) return lerp2(A, B, t);
+      const { a, b } = o.axe;
+      const dx = b.x - a.x;
+      const dz = b.z - a.z;
+      const l2 = dx * dx + dz * dz;
+      if (l2 < 1e-12) return lerp2(A, B, t);
+      const sA = ((A.x - a.x) * dx + (A.z - a.z) * dz) / l2;
+      const sB = ((B.x - a.x) * dx + (B.z - a.z) * dz) / l2;
+      if (Math.abs(sB - sA) < 1e-9) return lerp2(A, B, t);
+      return lerp2(A, B, Math.max(0, Math.min(1, (t - sA) / (sB - sA))));
+    };
+    const plus0 = surLeNu(q.a1, q.b1, t0);
+    const plus1 = surLeNu(q.a1, q.b1, t1);
+    const moins0 = surLeNu(q.a2, q.b2, t0);
+    const moins1 = surLeNu(q.a2, q.b2, t1);
     // p1/q1 longent la face +n, p2/q2 la face −n.
-    const p1 = lerp2(lerp2(q.a1, q.b1, t0), lerp2(q.a2, q.b2, t0), s);
-    const r1 = lerp2(lerp2(q.a1, q.b1, t1), lerp2(q.a2, q.b2, t1), s);
-    const p2 = lerp2(lerp2(q.a2, q.b2, t0), lerp2(q.a1, q.b1, t0), s);
-    const r2 = lerp2(lerp2(q.a2, q.b2, t1), lerp2(q.a1, q.b1, t1), s);
+    const p1 = lerp2(plus0, moins0, s);
+    const r1 = lerp2(plus1, moins1, s);
+    const p2 = lerp2(moins0, plus0, s);
+    const r2 = lerp2(moins1, plus1, s);
 
     const face = (
       p: Pt,
@@ -2635,6 +2679,7 @@ export function buildScene(
     for (const panel of wallPanels(mine, w.height)) {
       pushWallBlock(q, panel.t0, panel.t1, panel.y0, panel.y1, {
         ...skin,
+        axe: w,
         // Rien devant : le pan reste d'un seul tenant (voir `devantLeMur`).
         whole: !litige,
         closeBottom: panel.y0 > 1e-3,
@@ -2699,6 +2744,7 @@ export function buildScene(
           portesAPoser.push({ seg: hole.seg, w, t0: hole.t0, t1: hole.t1, y0: hole.y0, y1: hole.y1 });
           const teinte = opts.colorOpenings ? pal.door : pal.opening;
           pushWallBlock(q, hole.t0, hole.t1, hole.y0, hole.y0 + 0.02, {
+            axe: w,
             fill: teinte,
             top: mixHex(teinte, '#FFFFFF', 0.25),
             stroke: mixHex(teinte, '#000000', 0.12),
@@ -2715,6 +2761,26 @@ export function buildScene(
           ? pal.door
           : pal.window
         : captured ?? pal.opening;
+      /*
+        LE SEUIL D'UNE BAIE QUI DESCEND AU SOL — même relevé que plus haut
+        (« on voit l'intérieur depuis l'extérieur »). Une fenêtre a son
+        allège, qui ferme le bas de l'embrasure ; une porte-fenêtre n'en a
+        pas, et le sol de la pièce s'arrête au nu intérieur : entre la façade
+        et le dormant restait une rainure ouverte sur le vide, sur toute la
+        largeur. Elle reçoit le seuil d'une porte, d'un nu à l'autre, un rien
+        plus bas que la traverse du dormant pour ne pas s'y confondre.
+      */
+      if (hole.y0 <= 1e-3) {
+        pushWallBlock(q, hole.t0, hole.t1, hole.y0, hole.y0 + 0.015, {
+          axe: w,
+          fill: paint,
+          top: mixHex(paint, '#FFFFFF', 0.25),
+          stroke: mixHex(paint, '#000000', 0.12),
+          topStroke: mixHex(paint, '#000000', 0.12),
+          shade: true,
+          depthY: w.height / 2,
+        });
+      }
       /**
        * UNE MENUISERIE N'EST PAS UN CAISSON.
        *
@@ -2732,6 +2798,7 @@ export function buildScene(
        */
       const avantMenuiserie = faces.length;
       pushWallBlock(q, hole.t0, hole.t1, hole.y0, hole.y1, {
+        axe: w,
         fill: paint,
         top: mixHex(paint, '#FFFFFF', 0.3),
         stroke: paint,
@@ -2792,6 +2859,7 @@ export function buildScene(
           hole.y1,
           Math.min(w.height, hole.y1 + coffreH),
           {
+            axe: w,
             fill: fondDedans,
             top: arase,
             stroke: pal.wallStroke,

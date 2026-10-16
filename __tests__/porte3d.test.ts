@@ -217,9 +217,23 @@ describe('la porte en volume', () => {
     expect(seuils(f)).toHaveLength(0);
   });
 
-  it('une fenetre garde son vitrage : ni percement ouvert, ni seuil', () => {
-    const f = scene(menuiserie('window')).faces;
+  /*
+    Une fenêtre sur allège n'a pas de seuil : l'allège ferme le bas de
+    l'embrasure. Une PORTE-FENÊTRE, elle, en reçoit un depuis le relevé du
+    patron « on voit l'intérieur depuis l'extérieur » (voir `embrasures`) :
+    sans allège, le bas de l'embrasure restait ouvert entre la façade et le
+    dormant. Ce banc-ci exigeait autrefois « ni seuil » de la baie au sol ;
+    la règle a changé, le contrôle inverse passe à la fenêtre sur allège.
+  */
+  it('une fenetre garde son vitrage : ni percement ouvert, ni seuil sur son allege', () => {
+    const f = scene({ ...menuiserie('window'), height: 1.2, yCenter: 1.5 }).faces;
     expect(seuils(f)).toHaveLength(0);
+    expect(pointilles(f)).toHaveLength(0);
+  });
+
+  it('une porte-fenetre ferme le bas de son embrasure d’un seuil', () => {
+    const f = scene(menuiserie('window')).faces;
+    expect(seuils(f).length).toBeGreaterThan(0);
     expect(pointilles(f)).toHaveLength(0);
   });
 });
