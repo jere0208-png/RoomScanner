@@ -1,5 +1,12 @@
 /**
- * LE PREMIER LANCEMENT — le film, puis la question.
+ * LE PREMIER LANCEMENT — la question, et rien d'autre.
+ *
+ * PLUS DE TUTORIEL À L'OUVERTURE — demande du patron : « enlève le tuto à
+ * la première ouverture de l'app ». Le film (`FilmTutoriel`) ne se joue plus
+ * d'office ; il ne reste que la question d'usage, qui règle le mode, et
+ * seulement si personne n'y a encore répondu.
+ *
+ * (Historique : le premier lancement jouait d'abord le film, puis la question.)
  *
  * Relevé du patron : « les tutos de comment ça marche sont mal faits : un
  * tutoriel réaliste, en motion design, fluide et rapide, avec une coupure
@@ -9,10 +16,9 @@
  *
  * Le même film se rejoue depuis « Comment ça marche », sur l'accueil.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FilmTutoriel } from './FilmTutoriel';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 import { haptic } from '../ui/haptic';
 import { useUsage } from '../store/usage';
@@ -58,7 +64,13 @@ export function PremierLancement({ onFini }: { onFini: () => void }) {
   const marges = useSafeAreaInsets();
   const aRepondu = useUsage((u) => u.choisi);
   const choisir = useUsage((u) => u.choisir);
-  const [question, setQuestion] = useState(false);
+  // Déjà répondu À L'OUVERTURE (réinstallation, compte retrouvé) : rien à
+  // montrer. Lu une fois : une réponse donnée ici referme déjà par `repondre`.
+  const dejaRepondu = useRef(aRepondu).current;
+  useEffect(() => {
+    if (dejaRepondu) onFini();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   /*
     LE CAPTEUR, DIT DÈS LA PREMIÈRE MINUTE — revue de lisibilité : sur un
     iPhone sans LiDAR, on n'apprenait qu'à l'accueil, devant une tuile
@@ -77,51 +89,42 @@ export function PremierLancement({ onFini }: { onFini: () => void }) {
     onFini();
   };
 
+  if (dejaRepondu) return null;
   return (
     <Modal visible transparent={false} animationType="fade" onRequestClose={onFini}>
-      {question ? (
-        <View style={[styles.fond, { paddingTop: marges.top + 8, paddingBottom: Math.max(marges.bottom, 14) + 6 }]}>
-          <View style={styles.barre}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Passer la question" hitSlop={12} onPress={onFini}>
-              <Text style={styles.passer}>Passer</Text>
-            </Pressable>
-          </View>
-          <View style={styles.question}>
-            <Text style={styles.questionTitre}>À quoi va vous servir EchoPlan ?</Text>
-            <Text style={styles.questionPhrase}>
-              Vous pourrez changer d’avis à tout moment, dans votre profil.
-            </Text>
-            {sansLidar && (
-              <View style={styles.avis} testID="avis-lidar-premier">
-                <Text style={styles.avisTexte} numberOfLines={1} adjustsFontSizeToFit>
-                  {AVIS_SANS_LIDAR}
-                </Text>
-              </View>
-            )}
-            {CHOIX.map((x) => (
-              <Pressable
-                key={x.titre}
-                accessibilityRole="button"
-                accessibilityLabel={x.titre}
-                style={({ pressed }) => [styles.choix, pressed && styles.choixEnfonce]}
-                onPress={() => repondre(x.elec)}>
-                <Text style={styles.choixTitre}>{x.titre}</Text>
-                <Text style={styles.choixPhrase}>
-                  {sansLidar && !x.elec ? x.phrase.replace('Scanner son logement', 'Dessiner son logement') : x.phrase}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+      <View style={[styles.fond, { paddingTop: marges.top + 8, paddingBottom: Math.max(marges.bottom, 14) + 6 }]}>
+        <View style={styles.barre}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Passer la question" hitSlop={12} onPress={onFini}>
+            <Text style={styles.passer}>Passer</Text>
+          </Pressable>
         </View>
-      ) : (
-        <FilmTutoriel
-          // Passer le film ne passe pas la question : un artisan pressé
-          // passe le film, et croyait l'app sans électricité (revue « Karim »).
-          onPasser={() => (aRepondu ? onFini() : setQuestion(true))}
-          onFini={() => (aRepondu ? onFini() : setQuestion(true))}
-          finTexte={aRepondu ? 'C’est parti' : 'Continuer'}
-        />
-      )}
+        <View style={styles.question}>
+          <Text style={styles.questionTitre}>À quoi va vous servir EchoPlan ?</Text>
+          <Text style={styles.questionPhrase}>
+            Vous pourrez changer d’avis à tout moment, dans votre profil.
+          </Text>
+          {sansLidar && (
+            <View style={styles.avis} testID="avis-lidar-premier">
+              <Text style={styles.avisTexte} numberOfLines={1} adjustsFontSizeToFit>
+                {AVIS_SANS_LIDAR}
+              </Text>
+            </View>
+          )}
+          {CHOIX.map((x) => (
+            <Pressable
+              key={x.titre}
+              accessibilityRole="button"
+              accessibilityLabel={x.titre}
+              style={({ pressed }) => [styles.choix, pressed && styles.choixEnfonce]}
+              onPress={() => repondre(x.elec)}>
+              <Text style={styles.choixTitre}>{x.titre}</Text>
+              <Text style={styles.choixPhrase}>
+                {sansLidar && !x.elec ? x.phrase.replace('Scanner son logement', 'Dessiner son logement') : x.phrase}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
     </Modal>
   );
 }

@@ -1,5 +1,9 @@
 /**
- * LE FILM « COMMENT ÇA MARCHE » — et la question du mode, après lui.
+ * LE FILM « COMMENT ÇA MARCHE » — et la question du mode au premier lancement.
+ *
+ * MIS À JOUR — demande du patron : « enlève le tuto à la première ouverture
+ * de l'app ». Le premier lancement ne joue plus le film : il pose seulement
+ * la question du mode. Le film (`FilmTutoriel`) garde son banc, monté seul.
  *
  * Relevé du patron : « les tutos de comment ça marche sont mal faits. Fais en
  * sorte d'avoir un tutoriel réaliste, sous forme de vidéo en motion design,
@@ -35,7 +39,7 @@ import React from 'react';
 import { AccessibilityInfo, Image, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { PremierLancement } from '../src/components/PremierLancement';
-import { planDuFilm } from '../src/components/FilmTutoriel';
+import { FilmTutoriel, planDuFilm } from '../src/components/FilmTutoriel';
 import { ARETES_DU_SCAN, CHAPITRES } from '../src/data/film';
 import { appartementExemple } from '../src/data/exemple';
 import { useUsage } from '../src/store/usage';
@@ -53,7 +57,7 @@ afterEach(() => {
 const monter = (onFini = () => {}) => {
   let t!: TestRenderer.ReactTestRenderer;
   act(() => {
-    t = TestRenderer.create(<PremierLancement onFini={onFini} />);
+    t = TestRenderer.create(<FilmTutoriel onPasser={onFini} onFini={onFini} finTexte="C’est parti" />);
   });
   // La scène prend sa taille : c'est elle qui fait jouer le décor.
   act(() => {
@@ -263,36 +267,28 @@ describe('un film réaliste', () => {
   });
 });
 
-describe('la question du mode, après le film', () => {
-  /*
-    Elle se pose APRÈS le film — après avoir vu ce que fait l'application,
-    pas avant : demander « êtes-vous électricien ? » à quelqu'un qui ne sait
-    pas encore ce qu'il a téléchargé, c'est lui faire choisir à l'aveugle.
-  */
-  const jusquALaQuestion = (onFini = () => {}) => {
+describe('le premier lancement : la question, sans film', () => {
+  const premier = (onFini = () => {}) => {
     useUsage.setState({ charge: true, modeElec: false, choisi: false });
-    const t = monter(onFini);
-    for (let i = 0; i < CHAPITRES.length - 1; i++) {
-      jouer(i);
-      enchainer(t);
-    }
-    jouer(4);
-    // Le dernier chapitre ne lance pas : il reste la question.
-    act(() => bouton(t, 'Continuer').props.onPress());
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      t = TestRenderer.create(<PremierLancement onFini={onFini} />);
+    });
+    arbre = t;
     return t;
   };
 
-  it('vient après le film, et porte deux réponses', () => {
-    const t = jusquALaQuestion();
-    const lus = mots(t);
-    expect(lus).toContain('À quoi va vous servir EchoPlan ?');
+  it('pose la question d’emblée, sans film, avec deux réponses', () => {
+    const t = premier();
+    expect(t.root.findAll((n) => typeof n.props?.onPasser === 'function')).toHaveLength(0);
+    expect(mots(t)).toContain('À quoi va vous servir EchoPlan ?');
     expect(bouton(t, 'Mesurer et aménager')).toBeDefined();
     expect(bouton(t, 'Prévoir l’électricité')).toBeDefined();
   });
 
   it('« Prévoir l’électricité » allume le mode, et referme', () => {
     const fini = jest.fn();
-    const t = jusquALaQuestion(fini);
+    const t = premier(fini);
     act(() => bouton(t, 'Prévoir l’électricité').props.onPress());
     expect(useUsage.getState().modeElec).toBe(true);
     expect(useUsage.getState().choisi).toBe(true);
@@ -300,7 +296,7 @@ describe('la question du mode, après le film', () => {
   });
 
   it('« Mesurer et aménager » laisse le grand public, et c’est une RÉPONSE', () => {
-    const t = jusquALaQuestion();
+    const t = premier();
     act(() => bouton(t, 'Mesurer et aménager').props.onPress());
     expect(useUsage.getState().modeElec).toBe(false);
     expect(useUsage.getState().choisi).toBe(true);
@@ -308,9 +304,21 @@ describe('la question du mode, après le film', () => {
 
   it('on peut aussi la passer', () => {
     const fini = jest.fn();
-    const t = jusquALaQuestion(fini);
+    const t = premier(fini);
     act(() => bouton(t, 'Passer la question').props.onPress());
     expect(fini).toHaveBeenCalledTimes(1);
     expect(useUsage.getState().choisi).toBe(false);
+  });
+
+  it('déjà répondu : rien ne s’affiche, et l’accueil reprend la main', () => {
+    useUsage.setState({ charge: true, modeElec: false, choisi: true });
+    const fini = jest.fn();
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      t = TestRenderer.create(<PremierLancement onFini={fini} />);
+    });
+    arbre = t;
+    expect(t.toJSON()).toBeNull();
+    expect(fini).toHaveBeenCalled();
   });
 });

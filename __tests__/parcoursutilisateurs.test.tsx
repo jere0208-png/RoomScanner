@@ -240,14 +240,17 @@ describe('l’électricité sans faux-semblant (Paul, Sophie, Karim)', () => {
     expect(ecran).not.toContain("label: 'Placer prises et interrupteurs'");
   });
 
-  it('« Passer » le film ne fait plus sauter la question de l’usage', () => {
+  /*
+    MIS À JOUR — demande du patron : « enlève le tuto à la première ouverture ».
+    Il n'y a plus de film à passer : la question de l'usage vient d'emblée.
+  */
+  it('au premier lancement, la question de l’usage vient d’emblée, sans film', () => {
     act(() => useUsage.setState({ choisi: false } as never));
     let t!: TestRenderer.ReactTestRenderer;
     act(() => {
       t = TestRenderer.create(<PremierLancement onFini={() => {}} />);
     });
-    const film = t.root.findAll((n) => typeof n.props?.onPasser === 'function')[0];
-    act(() => film.props.onPasser());
+    expect(t.root.findAll((n) => typeof n.props?.onPasser === 'function')).toHaveLength(0);
     const vu = t.root.findAllByType(Text).map((n) => [].concat(n.props.children).join('')).join(' | ');
     expect(vu).toContain('À quoi va vous servir EchoPlan ?');
     expect(vu).toContain('Prévoir l’électricité');

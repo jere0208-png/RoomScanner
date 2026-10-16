@@ -1,5 +1,5 @@
-# Premier lancement, données effacées : connexion, film, question de
-# l'usage, puis l'accueil. Ne tourne qu'une fois (thème clair).
+# Premier lancement, données effacées : connexion, question de l'usage
+# (plus de film à l'ouverture, demande du patron), puis l'accueil. Ne tourne qu'une fois (thème clair).
 appId: ${APP_ID}
 name: Premier lancement
 ---
@@ -15,21 +15,6 @@ name: Premier lancement
     commands:
       - takeScreenshot: ${THEME}-01-connexion
       - tapOn: "Découvrir sans compte"
-      - waitForAnimationToEnd:
-          timeout: 5000
-
-- runFlow:
-    when:
-      visible: "Passer le film"
-    commands:
-      - takeScreenshot: ${THEME}-02-film-premier-lancement
-      - tapOn:
-          text: "Suivant"
-          optional: true
-      - waitForAnimationToEnd:
-          timeout: 5000
-      - takeScreenshot: ${THEME}-03-film-etape-2
-      - tapOn: "Passer le film"
       - waitForAnimationToEnd:
           timeout: 5000
 
