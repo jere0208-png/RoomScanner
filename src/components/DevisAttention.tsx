@@ -36,6 +36,7 @@ import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Image } from 'react-native';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
+import { useReduceMotion } from '../ui/useReduceMotion';
 import { photoDe } from '../ui/produits';
 
 /**
@@ -67,8 +68,16 @@ export function DevisAttention({
   const styles = getStyles(c);
   const pose = useRef(new Animated.Value(0)).current;
   const onde = useRef(new Animated.Value(0)).current;
+  const reduit = useReduceMotion();
 
   useEffect(() => {
+    /* « Réduire les animations » : la boucle ne tourne pas, la valeur de
+       repos est posée — l'état se lit par sa couleur et son libellé. */
+    if (reduit) {
+      pose.setValue(1);
+      onde.setValue(0);
+      return;
+    }
     /*
       LE SIGNE SE POSE, PUIS LA BAGUE RESPIRE.
 
@@ -103,7 +112,7 @@ export function DevisAttention({
     );
     boucle.start();
     return () => boucle.stop();
-  }, [pose, onde]);
+  }, [pose, onde, reduit]);
 
   return (
     <View style={styles.cadre}>

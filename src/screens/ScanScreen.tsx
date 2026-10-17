@@ -18,6 +18,7 @@ import { useModeElec } from '../store/usage';
 import { useRoomScan } from '../native/useRoomScan';
 import { CloseCross } from '../components/CloseCross';
 import { haptic } from '../ui/haptic';
+import { annoncer } from '../ui/annoncer';
 import { CompteurVivant } from '../components/CompteurVivant';
 import { panne as expliquer } from '../ui/panne';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -111,6 +112,20 @@ export function ScanScreen() {
   const murDouteux = useScanStore((s) => s.murDouteux);
   const consigne = consigneDuMur(mursDouteux, murDouteux);
   /*
+    LE MUR DOUTEUX SE DIT, UNE FOIS — VoiceOver n'entendait pas le bandeau
+    (`accessibilityLiveRegion` est muet sur iOS). Le compte arrive deux fois
+    par seconde : on n'annonce que le PASSAGE de « tout est franc » à « un
+    mur à repasser », pas chaque mise à jour.
+  */
+  const consigneRef = useRef(consigne.texte);
+  consigneRef.current = consigne.texte;
+  const douteuxAvant = useRef(mursDouteux);
+  useEffect(() => {
+    const avant = douteuxAvant.current;
+    douteuxAvant.current = mursDouteux;
+    if (avant === 0 && mursDouteux > 0) annoncer(consigneRef.current);
+  }, [mursDouteux]);
+  /*
     LE MUR REPASSÉ SE FÊTE — on désignait un mur, il vient d'être bien vu :
     une vibration et « Mur validé » une seconde et demie. Repasser un mur
     doit se sentir, sinon on ne sait pas quand s'arrêter.
@@ -122,6 +137,7 @@ export function ScanScreen() {
   useEffect(() => {
     if (!murValideA || murValideA === murValideAvant.current) return;
     haptic('succes');
+    annoncer('Mur validé');
     setMurValideVu(true);
     const t = setTimeout(() => setMurValideVu(false), 1500);
     return () => clearTimeout(t);
@@ -424,6 +440,7 @@ export function ScanScreen() {
       setTorch(!!e.on);
       if (e.on && e.auto) {
         haptic('leger');
+        annoncer('Peu de lumière, torche allumée');
         setTorcheAuto(true);
         if (minuteur) clearTimeout(minuteur);
         minuteur = setTimeout(() => setTorcheAuto(false), 3000);

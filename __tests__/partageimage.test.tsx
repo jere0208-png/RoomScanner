@@ -154,7 +154,7 @@ describe('« Décorer » ouvert par-dessus la maquette', () => {
   it('la maquette du plan est en pause, et reprend à la fermeture', () => {
     const t = monter();
     const bouton = t.root
-      .findAll((n) => n.props?.accessibilityLabel === 'Passer en 3D' && typeof n.props?.onPress === 'function')
+      .findAll((n) => n.props?.accessibilityLabel === '2D, passer en 3D' && typeof n.props?.onPress === 'function')
       .pop();
     act(() => bouton!.props.onPress());
     act(() => jest.runOnlyPendingTimers());

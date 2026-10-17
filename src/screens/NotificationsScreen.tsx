@@ -241,7 +241,6 @@ export function NotificationsScreen() {
 
       <ScrollView
         contentContainerStyle={[s.liste, { paddingBottom: insets.bottom + 90 }]}
-        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={enCours} onRefresh={() => rafraichir().catch(() => {})} tintColor={c.inkFaint} />
         }>
@@ -307,7 +306,7 @@ export function NotificationsScreen() {
               </Svg>
             </Pressable>
           </View>
-          <ScrollView contentContainerStyle={[s.detailCorps, { paddingBottom: insets.bottom + 40 }]} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={[s.detailCorps, { paddingBottom: insets.bottom + 40 }]}>
             <Puce genre={ouvert.genre} c={c} />
             <Text style={s.detailTitre}>{ouvert.titre}</Text>
             <Text style={s.detailDate}>{dateLongue(ouvert.date)}</Text>

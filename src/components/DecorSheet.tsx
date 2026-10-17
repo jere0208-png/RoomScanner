@@ -870,7 +870,6 @@ export function DecorSheet({
             ref={corps}
             style={s.corps}
             contentContainerStyle={s.corpsFond}
-            showsVerticalScrollIndicator={false}
             scrollEnabled={!geste}
             keyboardShouldPersistTaps="handled"
             onTouchStart={() => (repos.current = Date.now())}

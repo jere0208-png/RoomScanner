@@ -53,6 +53,10 @@ import {
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
 import type { WallSeg } from '../src/geometry/floorplan';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 let arbre: TestRenderer.ReactTestRenderer | null = null;
 afterEach(() => {
@@ -151,7 +155,7 @@ describe('l’écran d’export', () => {
   */
   it('le Retour est un bouton, et sa cible atteint 44 points', () => {
     const t = monter();
-    const retour = t.root.findAllByType(TouchableOpacity).find((n) => n.props.accessibilityLabel === 'Retour')!;
+    const retour = t.root.findAll(estUneTouche).find((n) => n.props.accessibilityLabel === 'Retour')!;
     expect(retour.props.accessibilityRole).toBe('button');
     const h = retour.props.hitSlop;
     expect(38 + h.top + h.bottom).toBeGreaterThanOrEqual(44);
@@ -160,7 +164,7 @@ describe('l’écran d’export', () => {
 
   it('le bouton d’export et les champs « Renseigner » ont leur rôle', () => {
     const t = monter();
-    const touches = t.root.findAllByType(TouchableOpacity);
+    const touches = t.root.findAll(estUneTouche);
     const champs = touches.filter((n) => String(n.props.accessibilityLabel ?? '').startsWith('Renseigner : '));
     expect(champs.length).toBe(3);
     for (const c of champs) expect(c.props.accessibilityRole).toBe('button');
@@ -205,11 +209,11 @@ describe('le menu du plan', () => {
     });
     poser(t);
     arbre = t;
-    const icone = t.root.findAllByType(TouchableOpacity).find((n) => n.props.accessibilityLabel === 'Exporter ou imprimer le plan');
+    const icone = t.root.findAll(estUneTouche).find((n) => n.props.accessibilityLabel === 'Exporter ou imprimer le plan');
     expect(icone).toBeDefined();
     expect(icone!.props.accessibilityRole).toBe('button');
 
-    const plus = t.root.findAllByType(TouchableOpacity).find((n) => n.props.accessibilityLabel === 'Plus')!;
+    const plus = t.root.findAll(estUneTouche).find((n) => n.props.accessibilityLabel === 'Options du plan')!;
     act(() => plus.props.onPress());
     act(() => jest.advanceTimersByTime(400));
     // En tête : la section « Le dossier », avant même le métier.

@@ -115,7 +115,8 @@ export function MenuCompte({
           centré au milieu de l'écran perd le lien avec ce qui l'a ouvert :
           on le cherche des yeux là où le doigt vient d'appuyer.
         */}
-        <View style={s.carte} accessibilityViewIsModal>
+        {/* Le « Z » à deux doigts de VoiceOver referme, comme le voile. */}
+        <View style={s.carte} accessibilityViewIsModal onAccessibilityEscape={fermer}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Se déconnecter"
@@ -161,7 +162,7 @@ const themed = (c: Palette) =>
     entree: { paddingVertical: 14, paddingHorizontal: 18 },
     enfoncee: { backgroundColor: c.surfaceSunken },
     entreeTexte: { color: c.ink, fontSize: 15, fontWeight: '600' },
-    danger: { color: c.danger },
+    danger: { color: c.dangerTexte },
     filet: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: c.line,

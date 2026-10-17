@@ -25,6 +25,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import type { Palette } from '../theme';
+import { useReduceMotion } from '../ui/useReduceMotion';
 
 /** Hauteur de la bande : les ondes ondulent dedans, et rien ne dépasse. */
 export const RIBBON_H = 96;
@@ -117,8 +118,14 @@ function Ligne({
   opacite: number;
 }) {
   const glisse = useRef(new Animated.Value(0)).current;
+  /* « Réduire les animations » : le néon reste allumé, immobile. */
+  const reduit = useReduceMotion();
 
   useEffect(() => {
+    if (reduit) {
+      glisse.setValue(0);
+      return;
+    }
     const boucle = Animated.loop(
       Animated.timing(glisse, {
         toValue: 1,
@@ -129,7 +136,7 @@ function Ligne({
     );
     boucle.start();
     return () => boucle.stop();
-  }, [glisse, duree]);
+  }, [glisse, duree, reduit]);
 
   const d = useMemo(
     () => onde(periode * 2, height, phase, amplitude),

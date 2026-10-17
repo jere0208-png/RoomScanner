@@ -146,8 +146,7 @@ export function GammeScreen() {
 
       <ScrollView
         style={styles.rouleau}
-        contentContainerStyle={styles.rouleauFond}
-        showsVerticalScrollIndicator={false}>
+        contentContainerStyle={styles.rouleauFond}>
         {GAMMES.map((g) => {
           const choisi = g.id === gamme;
           return (

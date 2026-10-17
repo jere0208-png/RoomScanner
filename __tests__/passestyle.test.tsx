@@ -41,6 +41,10 @@ import { DevisPastille } from '../src/components/DevisPastille';
 import { ControlePastille } from '../src/components/ControlePastille';
 import { LibraryScreen } from '../src/screens/LibraryScreen';
 import { useScanStore } from '../src/store/scanStore';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 const racine = join(__dirname, '..');
 const lire = (p: string) => readFileSync(join(racine, p), 'utf8');
@@ -90,7 +94,7 @@ describe('2 — du blanc net sur les pages claires', () => {
 
   it('la pastille d’outil : blanche, ombre neutre et légère, aucun verre', () => {
     const t = monter(<ToolPill icon="ruler" label="Cotes" active={false} onPress={() => {}} />);
-    const st = plein(t.root.findAllByType(TouchableOpacity)[0].props.style);
+    const st = plein(t.root.findAll(estUneTouche)[0].props.style);
     expect(st.fond).toBe(theme.light.surface);
     expect(st.ombre).toBe('#0B0D12');
     expect(st.force).toBeLessThanOrEqual(0.1);
@@ -98,10 +102,10 @@ describe('2 — du blanc net sur les pages claires', () => {
 
   it('les pastilles de prix et de contrôle aussi, leur contour de sens gardé', () => {
     const prix = monter(<DevisPastille total={1248} onPress={() => {}} />);
-    expect(plein(prix.root.findAllByType(TouchableOpacity)[0].props.style).fond).toBe(theme.light.surface);
+    expect(plein(prix.root.findAll(estUneTouche)[0].props.style).fond).toBe(theme.light.surface);
     act(() => arbre?.unmount());
     const ctrl = monter(<ControlePastille alertes={0} commence onPress={() => {}} />);
-    const b = ctrl.root.findAllByType(TouchableOpacity)[0];
+    const b = ctrl.root.findAll(estUneTouche)[0];
     const st = StyleSheet.flatten(b.props.style) as { borderColor?: string; backgroundColor?: string };
     expect(st.borderColor).toBe(theme.light.green);
     expect(st.backgroundColor).toBe(theme.light.surface);

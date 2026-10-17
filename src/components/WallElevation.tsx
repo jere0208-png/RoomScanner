@@ -3031,7 +3031,7 @@ const getStyles = themedStyles((c: Palette) =>
     puceAVoir: { backgroundColor: `${c.amber}24`, borderColor: `${c.amber}40` },
     puceMot: { color: c.inkSoft, fontSize: 13, fontWeight: '600' },
     puceMotOn: { color: '#FFFFFF' },
-    puceMotOk: { color: c.green },
+    puceMotOk: { color: c.vertTexte },
     puceMotAVoir: { color: c.ink },
     /* La règle dépliée sous les pastilles : ce qu'elle dit, et le geste. */
     regle: {
@@ -3169,7 +3169,7 @@ const getStyles = themedStyles((c: Palette) =>
       fontWeight: '600',
       marginTop: 1,
     },
-    ficheSousKO: { color: c.danger },
+    ficheSousKO: { color: c.dangerTexte },
     hauteurs: { gap: 6, paddingTop: 10 },
     hauteur: {
       height: 32,
@@ -3323,7 +3323,7 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    ensSplitText: { color: c.danger, fontSize: 13, fontWeight: '600' },
+    ensSplitText: { color: c.dangerTexte, fontSize: 13, fontWeight: '600' },
     fusion: {
       marginTop: 10,
       backgroundColor: c.blueSoft,
@@ -3363,7 +3363,7 @@ const getStyles = themedStyles((c: Palette) =>
       alignItems: 'center',
     },
     alerteTexte: {
-      color: c.danger,
+      color: c.dangerTexte,
       fontSize: 12.5,
       fontWeight: '700',
       textAlign: 'center',

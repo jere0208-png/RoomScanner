@@ -225,7 +225,7 @@ export function DiagnosticSheet({
           </Svg>
           <View style={styles.jaugeCoeur} pointerEvents="none">
             {alertes > 0 ? (
-              <Text style={[styles.jaugeChiffre, { color: c.danger }]}>{alertes}</Text>
+              <Text style={[styles.jaugeChiffre, { color: c.dangerTexte }]}>{alertes}</Text>
             ) : (
               <Svg width={24} height={24} viewBox="0 0 24 24">
                 <Path d={SOLAIRES.coche} fill="none" stroke={c.green} strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" />
@@ -291,7 +291,7 @@ export function DiagnosticSheet({
         </View>
       )}
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scroll}>
         {issues.length === 0 || (bravo && infos === 0) ? (
           <View style={styles.fete}>
             <View style={styles.feteRond}>

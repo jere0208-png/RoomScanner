@@ -64,7 +64,8 @@ export function FichePieceSheet({
           style={StyleSheet.absoluteFill}
           onPress={onClose}
         />
-        <View style={s.carte} accessibilityViewIsModal>
+        {/* Le « Z » à deux doigts de VoiceOver referme, comme le voile. */}
+        <View style={s.carte} accessibilityViewIsModal onAccessibilityEscape={onClose}>
           <View style={s.tete}>
             <View style={s.teteTexte}>
               <Text style={s.titre} numberOfLines={1}>

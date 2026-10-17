@@ -54,6 +54,7 @@ import { CLOCHE } from './NotificationsScreen';
 import { useRoomScan } from '../native/useRoomScan';
 import { SOLAIRES } from '../ui/solaires';
 import { haptic } from '../ui/haptic';
+import { useReduceMotion } from '../ui/useReduceMotion';
 import { alerte } from '../ui/alerte';
 import { panne as expliquer } from '../ui/panne';
 import { sansPerdreLeReleve } from '../ui/releveInterrompu';
@@ -251,17 +252,24 @@ export function HomeScreen() {
     passe par le fil JavaScript pendant qu'on regarde.
   */
   const reveal = useRef(new Animated.Value(dejaArrive ? 1 : 0)).current;
+  /*
+    « RÉDUIRE LES ANIMATIONS » : un seul fondu de 150 ms, sans glissement ni
+    grossissement — revue UX iOS. Rien ne change pour les autres.
+  */
+  const reduit = useReduceMotion();
   useEffect(() => {
     if (dejaArrive) return;
     dejaArrive = true;
     Animated.timing(reveal, {
       toValue: 1,
-      duration: 900,
+      duration: reduit ? 150 : 900,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reveal]);
   const fadeIn = (i: number, grandit = false) => {
+    if (reduit) return { opacity: reveal };
     const range = [i * 0.08, Math.min(i * 0.08 + 0.42, 1)];
     const v = (a: number, b: number) =>
       reveal.interpolate({ inputRange: range, outputRange: [a, b], extrapolate: 'clamp' });
@@ -483,7 +491,6 @@ export function HomeScreen() {
     <View style={styles.container}>
       <ScrollView
         contentContainerStyle={[styles.page, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 28 }]}
-        showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
         {/*
           EN HAUT À DROITE, DEUX RONDS JUMEAUX — la cloche et le compte. Rien
@@ -1094,7 +1101,7 @@ const getStyles = themedStyles((c: Palette) => {
     carteNom: { color: c.ink, fontSize: 16, fontWeight: '600', letterSpacing: -0.2 },
     carteMeta: { color: c.inkSoft, fontSize: 12.5, marginTop: 3, lineHeight: 17 },
     // Ce qui attend d'être enregistré, en ambre : voir `ui/miseDeCote`.
-    carteMetaAttente: { color: c.amber, fontWeight: '600' },
+    carteMetaAttente: { color: c.ambreTexte, fontWeight: '600' },
     carteDelai: { color: c.inkFaint, fontSize: 11, marginTop: 1, lineHeight: 14 },
     /* La carte glissante porte l'écart entre deux cartes : la corbeille s'y arrête. */
     carteGlissante: { marginBottom: 10 },

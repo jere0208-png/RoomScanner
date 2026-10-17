@@ -1155,7 +1155,6 @@ const styles = getStyles(c);
         </View>
 
         <ScrollView
-          showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scroll}
           scrollEnabled={!scrollLocked}>
           {/*
@@ -1790,7 +1789,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   calqueDit: { color: c.inkFaint, fontSize: 12.5, lineHeight: 17 },
   vueTete: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   vueNom: { color: c.inkSoft, fontSize: 12.5, fontWeight: '700' },
-  retirer: { color: c.danger, fontSize: 12.5, fontWeight: '700' },
+  retirer: { color: c.dangerTexte, fontSize: 12.5, fontWeight: '700' },
   // Gouttières invisibles : les bandes latérales appartiennent au scroll,
   // seul le centre manipule le modèle.
   view3d: { height: 210, borderRadius: 14, overflow: 'hidden', marginHorizontal: 18 },

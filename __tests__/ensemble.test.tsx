@@ -32,6 +32,10 @@ import { dark, light } from '../src/theme';
 
 import type { Fixture } from '../src/geometry/electrical';
 import type { WallSeg } from '../src/geometry/floorplan';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 beforeAll(() => jest.useFakeTimers());
 afterAll(() => jest.useRealTimers());
@@ -164,7 +168,7 @@ describe('le bandeau d’un ensemble', () => {
   it('et toute commande de cet écran fait 44 points sous le doigt', () => {
     const tree = rendu();
     const boutons = tree.root
-      .findAllByType(TouchableOpacity)
+      .findAll(estUneTouche)
       .filter((n) => cible(n.props) > 0);
     // Le bandeau en apporte au moins six : quatre côtés, deux axes.
     expect(boutons.length).toBeGreaterThanOrEqual(6);
@@ -183,7 +187,8 @@ describe('le bandeau d’un ensemble', () => {
       .findAllByType(Text)
       .find((n) => n.props.children === 'Séparer les appareils')!;
     const style = StyleSheet.flatten(libelle.props.style) as { color?: string };
-    // La couleur d'alerte du thème, celle des actions destructives.
-    expect([light.danger, dark.danger]).toContain(style.color);
+    // La couleur d'alerte du thème, celle des actions destructives — dans sa
+    // teinte de MOT, lisible à 4,5:1 (revue d'accessibilité).
+    expect([light.dangerTexte, dark.dangerTexte]).toContain(style.color);
   });
 });

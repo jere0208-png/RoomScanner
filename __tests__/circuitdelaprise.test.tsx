@@ -538,7 +538,7 @@ describe('l’écran donne bien ses départs à la maquette', () => {
     const bouton = t.root
       .findAll(
         (n) =>
-          n.props?.accessibilityLabel === 'Passer en 3D' &&
+          n.props?.accessibilityLabel === '2D, passer en 3D' &&
           typeof n.props?.onPress === 'function',
       )
       .pop();

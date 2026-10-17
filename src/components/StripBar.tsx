@@ -34,7 +34,7 @@ import {
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { CloseCross } from './CloseCross';
-import { useTheme } from '../theme';
+import { PLAFOND_BARRE, useTheme } from '../theme';
 import { SOLAIRES } from '../ui/solaires';
 import { DEBORD_DOIGT } from '../ui/bandeau';
 import { haptic } from '../ui/haptic';
@@ -492,6 +492,10 @@ export function StripBar({
                 a.sansMot && styles.bandeauBtnIcone,
               ]}
               accessibilityLabel={a.label}
+              /* Gros caractères : le mot est plafonné (PLAFOND_BARRE), la
+                 loupe d'iOS le montre en grand sur un appui long. */
+              accessibilityShowsLargeContentViewer
+              accessibilityLargeContentTitle={a.mot ?? a.label}
               /* Quarante points dessinés, quarante-huit sous le doigt. */
               hitSlop={DEBORD_DOIGT}
               onPress={a.onPress}>
@@ -502,7 +506,7 @@ export function StripBar({
                 </Svg>
               )}
               {!a.sansMot && (
-                <Text style={texte} numberOfLines={1}>
+                <Text style={texte} numberOfLines={1} maxFontSizeMultiplier={PLAFOND_BARRE}>
                   {a.label}
                 </Text>
               )}
@@ -518,7 +522,7 @@ export function StripBar({
           return (
             <View key={a.label} style={styles.bandeauCellule}>
               {bouton}
-              <Text style={styles.bandeauMot} numberOfLines={1}>
+              <Text style={styles.bandeauMot} numberOfLines={1} maxFontSizeMultiplier={PLAFOND_BARRE}>
                 {a.mot ?? a.label}
               </Text>
             </View>

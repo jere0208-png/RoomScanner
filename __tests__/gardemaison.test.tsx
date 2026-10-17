@@ -41,6 +41,10 @@ import {
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
 import type { Fixture } from '../src/geometry/electrical';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 beforeAll(() => jest.useFakeTimers());
 afterAll(() => jest.useRealTimers());
@@ -107,7 +111,7 @@ describe('quitter un plan modifié', () => {
     const t = ecran();
     const avant = useScanStore.getState().saves.length;
     const retour = t.root
-      .findAllByType(TouchableOpacity)
+      .findAll(estUneTouche)
       .find((n) => n.props.accessibilityLabel === 'Retour')!;
     act(() => retour.props.onPress());
     act(() => jest.advanceTimersByTime(400));
@@ -130,7 +134,7 @@ describe('quitter un plan modifié', () => {
     });
     const avant = useScanStore.getState().saves.length;
     const retour = t.root
-      .findAllByType(TouchableOpacity)
+      .findAll(estUneTouche)
       .find((n) => n.props.accessibilityLabel === 'Retour')!;
     act(() => retour.props.onPress());
     act(() => jest.advanceTimersByTime(400));
@@ -179,7 +183,7 @@ describe('refermer un mur sans garder', () => {
       useScanStore.getState().moveFixture('f1', 2, 0.25);
     });
     const croix = t.root
-      .findAllByType(TouchableOpacity)
+      .findAll(estUneTouche)
       .find((n) => n.props.accessibilityLabel === 'Fermer sans garder')!;
     act(() => croix.props.onPress());
     expect(alerte).not.toHaveBeenCalled();

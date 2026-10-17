@@ -75,7 +75,9 @@ const ligne = (t: TestRenderer.ReactTestRenderer, nom: string) =>
   t.root.findAll(
     (n) =>
       typeof n.props?.onPress === 'function' &&
-      n.props?.accessibilityLabel === `Ouvrir ${nom}`,
+      // La ligne dit ce qu'on voit (nom, client, date…) ; l'appui, en indice.
+      n.props?.accessibilityHint === 'Ouvre le plan' &&
+      String(n.props?.accessibilityLabel ?? '').startsWith(`${nom},`),
   )[0];
 
 describe('ouvrir un plan depuis la bibliothèque', () => {

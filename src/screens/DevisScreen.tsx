@@ -117,6 +117,7 @@ import { fr } from './result/format';
 import { haptic } from '../ui/haptic';
 import { useScanStore } from '../store/scanStore';
 import { ombreBouton, radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
+import { Presse } from '../components/Presse';
 
 /** Un prix, écrit comme sur un ticket : virgule, et l'euro collé au nombre. */
 const euros = (v: number) => `${fr(v, 2)} €`;
@@ -343,10 +344,14 @@ const Article = React.memo(function Article({
   const hors = !!ligne.ecarte;
   const puHt = vente?.puHt ?? null;
   return (
-    <TouchableOpacity
+    /* Une ligne du devis : `Presse` plutôt qu'un `TouchableOpacity` — même
+       pâleur sous le doigt (0,7), sans valeur animée par ligne à chaque rendu
+       du ticket (voir `Presse`). */
+    <Presse
       accessibilityLabel={`${ligne.libelle}${hors ? ', écarté du devis' : ''}`}
       accessibilityRole="button"
-      activeOpacity={0.7}
+      echelle={1}
+      opacite={0.7}
       style={styles.article}
       onPress={() => onBasculer(ligne)}>
       <View style={[styles.vignette, hors && styles.efface]}>
@@ -451,7 +456,7 @@ const Article = React.memo(function Article({
         */}
         {!hors && ligne.pu !== null && (
           <View style={styles.pasRangee}>
-            <TouchableOpacity
+            <Presse
               accessibilityRole="button"
               accessibilityLabel={`Un ${ligne.libelle} de moins`}
               disabled={ligne.quantite <= 0}
@@ -465,8 +470,8 @@ const Article = React.memo(function Article({
                   strokeLinecap="round"
                 />
               </Svg>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </Presse>
+            <Presse
               accessibilityRole="button"
               accessibilityLabel={`Un ${ligne.libelle} de plus`}
               style={styles.pas}
@@ -479,11 +484,11 @@ const Article = React.memo(function Article({
                   strokeLinecap="round"
                 />
               </Svg>
-            </TouchableOpacity>
+            </Presse>
           </View>
         )}
       </View>
-    </TouchableOpacity>
+    </Presse>
   );
 }, memeArticle);
 
@@ -624,7 +629,7 @@ function EditeurLigneLibre({
       <View style={styles.libreRangee}>
         {onRetirer && (
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Supprimer la ligne" style={styles.remettre} onPress={onRetirer}>
-            <Text style={[styles.remettreTexte, { color: c.danger }]}>Supprimer</Text>
+            <Text style={[styles.remettreTexte, { color: c.dangerTexte }]}>Supprimer</Text>
           </TouchableOpacity>
         )}
         <View style={styles.texts} />
@@ -1348,8 +1353,7 @@ export function DevisScreen() {
         contentContainerStyle={styles.rouleauFond}
         // Les champs d'une ligne libre restent au-dessus du clavier.
         automaticallyAdjustKeyboardInsets
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
+        keyboardShouldPersistTaps="handled">
         {etape === 0 && (
           /*
             UNE SEULE CHOSE À DIRE, ET C'EST CELLE QUI COÛTE.
@@ -2219,7 +2223,7 @@ const getStyles = themedStyles((c: Palette) =>
     articleSource: { color: c.inkFaint, fontSize: 10, marginTop: 2 },
     articleOffres: { color: c.inkSoft, fontSize: 10, marginTop: 1 },
     /* Le prix d'achat pro : en vert d'encre, c'est ce qui reste en poche. */
-    articlePro: { color: c.green, fontSize: 10.5, fontWeight: '600', marginTop: 2 },
+    articlePro: { color: c.vertTexte, fontSize: 10.5, fontWeight: '600', marginTop: 2 },
     /* Ce qui n'a pas été mesuré le dit, en bleu : c'est la couleur du devis. */
     articleOrigine: {
       color: c.blue,
@@ -2258,7 +2262,7 @@ const getStyles = themedStyles((c: Palette) =>
     },
     libreRangee: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     libreCase: { flex: 1 },
-    libreFaute: { color: c.danger, fontSize: 12 },
+    libreFaute: { color: c.dangerTexte, fontSize: 12 },
     // ------------------------------------------------- la TVA, les conditions
     tvaRangee: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginTop: 8 },
     tvaNom: { color: c.inkSoft, fontSize: 12.5, marginRight: 2 },
@@ -2357,7 +2361,7 @@ const getStyles = themedStyles((c: Palette) =>
       marginTop: 4,
     },
     sousTotalPro: {
-      color: c.green,
+      color: c.vertTexte,
       fontSize: 12.5,
       lineHeight: 17,
       fontWeight: '600',

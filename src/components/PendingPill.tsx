@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import Svg, { Path, Text as SvgText } from 'react-native-svg';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
+import { useReduceMotion } from '../ui/useReduceMotion';
 import {
   FIXTURES,
   assemblySymbol,
@@ -97,7 +98,14 @@ export function EnAttente({
       ? CEILING_SYMBOL[plafond]
       : assemblySymbol(kind!);
   const souffle = useRef(new Animated.Value(0)).current;
+  const reduit = useReduceMotion();
   useEffect(() => {
+    /* « Réduire les animations » : la boucle ne tourne pas, la valeur de
+       repos est posée — l'état se lit par sa couleur et son libellé. */
+    if (reduit) {
+      souffle.setValue(0);
+      return;
+    }
     const boucle = Animated.loop(
       Animated.sequence([
         Animated.timing(souffle, {
@@ -116,7 +124,7 @@ export function EnAttente({
     );
     boucle.start();
     return () => boucle.stop();
-  }, [souffle]);
+  }, [souffle, reduit]);
   return (
     <View style={styles.attente} pointerEvents="box-none">
       {/* L'auréole qui bat : elle dit « en attente » sans écrire le mot. */}

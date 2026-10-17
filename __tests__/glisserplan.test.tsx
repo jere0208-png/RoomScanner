@@ -44,6 +44,19 @@ const plan = (id: string, name: string) =>
 
 const bouton = (t: TestRenderer.ReactTestRenderer, nom: string) =>
   t.root.findAll((n) => n.props?.accessibilityLabel === nom && typeof n.props?.onPress === 'function')[0];
+/**
+ * La ligne d'un plan. À l'accueil, la carte s'appelle « Ouvrir … » ; dans
+ * « Mes plans », la ligne dit ce qu'on voit (nom, client, date…) et l'appui
+ * passe en indice, « Ouvre le plan ».
+ */
+const ligneDe = (t: TestRenderer.ReactTestRenderer, nom: string) =>
+  t.root.findAll(
+    (n) =>
+      typeof n.props?.onPress === 'function' &&
+      (n.props?.accessibilityLabel === `Ouvrir ${nom}` ||
+        (n.props?.accessibilityHint === 'Ouvre le plan' &&
+          String(n.props?.accessibilityLabel ?? '').startsWith(`${nom},`))),
+  )[0];
 const textes = (t: TestRenderer.ReactTestRenderer) =>
   t.root.findAllByType(Text).map((n) => String(n.props.children));
 /** Les plans hors corbeille. */
@@ -87,10 +100,10 @@ describe.each([
     act(() => {
       jest.advanceTimersByTime(300);
     });
-    expect(bouton(t, 'Ouvrir Salon Dupont')).toBeUndefined();
+    expect(ligneDe(t, 'Salon Dupont')).toBeUndefined();
     expect(textes(t)).toContain('« Salon Dupont » mis à la corbeille');
     act(() => bouton(t, 'Annuler la suppression').props.onPress());
-    expect(bouton(t, 'Ouvrir Salon Dupont')).toBeDefined();
+    expect(ligneDe(t, 'Salon Dupont')).toBeDefined();
     act(() => {
       jest.advanceTimersByTime(DELAI_ANNULER + 500);
     });
@@ -163,7 +176,7 @@ describe('la corbeille', () => {
     act(() => {
       jest.advanceTimersByTime(800);
     });
-    expect(bouton(t, 'Ouvrir Studio Martin')).toBeUndefined();
+    expect(ligneDe(t, 'Studio Martin')).toBeUndefined();
     act(() => bouton(t, 'Corbeille').props.onPress());
     act(() => {
       jest.advanceTimersByTime(800);
@@ -180,7 +193,7 @@ describe('la corbeille', () => {
     act(() => {
       jest.advanceTimersByTime(800);
     });
-    expect(bouton(t, 'Ouvrir Studio Martin')).toBeDefined();
+    expect(ligneDe(t, 'Studio Martin')).toBeDefined();
     act(() => t.unmount());
   });
 });

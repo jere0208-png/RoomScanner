@@ -22,6 +22,7 @@ import { Animated, Easing, StyleSheet, Text, TouchableOpacity, View } from 'reac
 import Svg, { Path } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
 import { ombreBouton, themedStyles, useTheme, type Palette } from '../theme';
+import { useReduceMotion } from '../ui/useReduceMotion';
 
 /** Diamètre du bouton : plus petit que la pastille 2D/3D, comme demandé. */
 const D = 30;
@@ -60,9 +61,12 @@ export function ControlePastille({
   const styles = getStyles(c);
   const onde = useRef(new Animated.Value(0)).current;
   const enAlerte = alertes > 0 && commence;
+  const reduit = useReduceMotion();
 
   useEffect(() => {
-    if (!enAlerte) {
+    /* « Réduire les animations » : la boucle ne tourne pas, la valeur de
+       repos est posée — l'état se lit par sa couleur et son libellé. */
+    if (!enAlerte || reduit) {
       onde.stopAnimation();
       onde.setValue(0);
       return;
@@ -87,7 +91,7 @@ export function ControlePastille({
     );
     boucle.start();
     return () => boucle.stop();
-  }, [enAlerte, onde]);
+  }, [enAlerte, onde, reduit]);
 
   const teinte = !commence ? c.inkFaint : enAlerte ? c.danger : c.green;
   return (

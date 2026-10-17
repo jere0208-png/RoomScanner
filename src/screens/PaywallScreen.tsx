@@ -304,8 +304,7 @@ export function PaywallScreen() {
         */}
         <ScrollView
           style={s.devant}
-          contentContainerStyle={s.contenu}
-          showsVerticalScrollIndicator={false}>
+          contentContainerStyle={s.contenu}>
           {/*
             LE TITRE EST CENTRÉ, ET LA MARQUE PORTE LA COULEUR.
 
@@ -749,7 +748,7 @@ const themed = (c: Palette) =>
       marginTop: 14,
     },
     lien: { color: c.blue, fontSize: 13, fontWeight: '600' },
-    motDuCode: { color: c.danger, fontSize: 13, textAlign: 'center', marginTop: 6 },
+    motDuCode: { color: c.dangerTexte, fontSize: 13, textAlign: 'center', marginTop: 6 },
     lienPoint: { color: c.inkFaint, fontSize: 13 },
     mentions: {
       color: c.inkFaint,

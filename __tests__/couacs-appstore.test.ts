@@ -117,7 +117,7 @@ describe('les textes', () => {
   it('la pastille de réalité augmentée dit « Sur la table », plus « RA »', () => {
     const ecran = lire('src/screens/ResultScreen.tsx');
     expect(ecran).not.toContain('>RA</Text>');
-    expect(ecran).toContain('<Text style={styles.vuePastilleTexte}>Sur la table</Text>');
+    expect(ecran).toMatch(/<Text style=\{styles\.vuePastilleTexte\}[^>]*>\s*Sur la table\s*<\/Text>/);
   });
 
   it('le modèle de départ n’est plus une dépendance', () => {

@@ -57,6 +57,10 @@ import {
   SNAPSHOT_ROOMS,
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 /** Remet la préférence dans l'état d'une installation qui ne l'a jamais lue. */
 const neuve = () => {
@@ -179,7 +183,7 @@ function monter(modeElec: boolean) {
 const etiquettes = (t: TestRenderer.ReactTestRenderer) =>
   new Set(
     t.root
-      .findAllByType(TouchableOpacity)
+      .findAll(estUneTouche)
       .map((n) => String(n.props.accessibilityLabel ?? '')),
   );
 
@@ -194,7 +198,7 @@ const textes = (t: TestRenderer.ReactTestRenderer) =>
 
 const presser = (t: TestRenderer.ReactTestRenderer, label: string) => {
   const b = t.root
-    .findAllByType(TouchableOpacity)
+    .findAll(estUneTouche)
     .find((n) => n.props.accessibilityLabel === label);
   expect(b).toBeDefined();
   act(() => b!.props.onPress());
@@ -238,7 +242,7 @@ describe('sans le mode, l’électricité disparaît de l’écran', () => {
 
   it('la 3D ne propose plus la nuit, les volumes, ni les repères', () => {
     const t = monter(false);
-    presser(t, 'Passer en 3D');
+    presser(t, '2D, passer en 3D');
     const vu = etiquettes(t);
     for (const outil of ['Nuit', 'Volumes', 'Repères', 'Plafond']) {
       expect(`${outil} : ${vu.has(outil)}`).toBe(`${outil} : false`);
@@ -248,7 +252,7 @@ describe('sans le mode, l’électricité disparaît de l’écran', () => {
 
   it('le menu du plan ne propose plus de relever un tableau électrique', () => {
     const t = monter(false);
-    presser(t, 'Plus');
+    presser(t, 'Options du plan');
     expect(textes(t)).not.toContain('Relever le tableau existant');
   });
 
@@ -278,7 +282,7 @@ describe('la proposition', () => {
   */
   it('sans le mode, le menu du plan ne le propose plus', () => {
     const t = monter(false);
-    presser(t, 'Plus');
+    presser(t, 'Options du plan');
     expect(textes(t)).not.toContain('Placer prises et interrupteurs');
     expect(textes(t)).not.toContain('Normes auto');
   });
@@ -287,7 +291,7 @@ describe('la proposition', () => {
     const t = monter(true);
     const vu = etiquettes(t);
     expect(vu.has('Appareils')).toBe(true);
-    presser(t, 'Plus');
+    presser(t, 'Options du plan');
     const menu = textes(t);
     expect(menu).toContain('Relever le tableau existant');
     expect(menu).not.toContain('Placer prises et interrupteurs');

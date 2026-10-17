@@ -20,7 +20,8 @@
  * pas par ici : on les veut à l'image même.
  */
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet } from 'react-native';
+import { Animated, Easing, StyleSheet } from 'react-native';
+import { useReduceMotion } from '../ui/useReduceMotion';
 
 export type EntreeDeScene = 'poussee' | 'fondu';
 
@@ -35,7 +36,23 @@ export function Scene({
   children: React.ReactNode;
 }) {
   const t = useRef(new Animated.Value(0)).current;
+  /*
+    « RÉDUIRE LES ANIMATIONS » : UN FONDU COURT, SANS GLISSEMENT NI
+    GROSSISSEMENT — revue UX iOS. Les personnes sujettes au vertige ont une
+    page qui s'allume sur place, en 150 ms ; pour les autres, rien ne change.
+    Lu à l'entrée : l'entrée ne se joue qu'une fois.
+  */
+  const reduit = useReduceMotion();
   useEffect(() => {
+    if (reduit) {
+      Animated.timing(t, {
+        toValue: 1,
+        duration: 150,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
     Animated.spring(t, {
       toValue: 1,
       damping: 20,
@@ -43,9 +60,11 @@ export function Scene({
       mass: 0.9,
       useNativeDriver: true,
     }).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t]);
-  const style =
-    entree === 'poussee'
+  const style = reduit
+    ? { opacity: t }
+    : entree === 'poussee'
       ? {
           opacity: t.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 1, 1] }),
           transform: [{ translateX: t.interpolate({ inputRange: [0, 1], outputRange: [RECUL_POUSSEE, 0] }) }],

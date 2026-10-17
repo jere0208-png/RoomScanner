@@ -16,6 +16,7 @@
  * tout.
  */
 import { create } from 'zustand';
+import { annoncer } from './annoncer';
 
 export interface Bulle {
   texte: string;
@@ -35,7 +36,11 @@ interface EtatDeLaBulle {
 
 export const useBulle = create<EtatDeLaBulle>((set, get) => ({
   bulle: null,
-  montrer: (texte, x, y) => set({ bulle: { texte, x, y, n: (get().bulle?.n ?? 0) + 1 } }),
+  montrer: (texte, x, y) => {
+    // La bulle se DIT aussi : VoiceOver ne la voyait pas naître.
+    annoncer(texte);
+    set({ bulle: { texte, x, y, n: (get().bulle?.n ?? 0) + 1 } });
+  },
   cacher: () => set({ bulle: null }),
 }));
 

@@ -202,6 +202,6 @@ const getStyles = themedStyles((c: Palette) =>
     partagerMot: { color: c.blue, fontSize: 14.5, fontWeight: '700' },
     releve: { color: c.inkSoft, fontSize: 12, marginTop: 2 },
     vider: { alignSelf: 'center', paddingVertical: 12, marginTop: 4 },
-    viderMot: { color: c.danger, fontSize: 14.5, fontWeight: '700' },
+    viderMot: { color: c.dangerTexte, fontSize: 14.5, fontWeight: '700' },
   }),
 );

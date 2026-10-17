@@ -173,8 +173,7 @@ export function ProfilScreen() {
       onRetour={() => setScreen('home')}
       style={[s.fond, { paddingTop: insets.top }]}>
       <ScrollView
-        contentContainerStyle={[s.contenu, { paddingBottom: insets.bottom + 32 }]}
-        showsVerticalScrollIndicator={false}>
+        contentContainerStyle={[s.contenu, { paddingBottom: insets.bottom + 32 }]}>
         <View style={s.barre}>
           <Pressable
             accessibilityRole="button"

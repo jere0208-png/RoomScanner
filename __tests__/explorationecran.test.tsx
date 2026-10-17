@@ -144,7 +144,7 @@ describe('on y entre depuis le plan', () => {
   it('la pastille « Explorer » est sur le plan, en 2D comme en 3D', () => {
     const t = monter();
     expect(t.root.findAllByType(TouchableOpacity).some((n) => n.props.accessibilityLabel === 'Explorer')).toBe(true);
-    presser(t, 'Passer en 3D');
+    presser(t, '2D, passer en 3D');
     expect(t.root.findAllByType(TouchableOpacity).some((n) => n.props.accessibilityLabel === 'Explorer')).toBe(true);
   });
 

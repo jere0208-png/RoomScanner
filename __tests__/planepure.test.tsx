@@ -51,6 +51,10 @@ import {
   SNAPSHOT_ROOMS,
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 beforeAll(() => jest.useFakeTimers());
 afterAll(() => {
@@ -98,7 +102,7 @@ function monter(modeElec: boolean, autres: Record<string, unknown> = {}) {
 const textes = (t: TestRenderer.ReactTestRenderer) =>
   t.root.findAllByType(Text).map((n) => [].concat(n.props.children ?? []).filter((x) => typeof x === 'string').join(''));
 const bouton = (t: TestRenderer.ReactTestRenderer, label: string) =>
-  t.root.findAllByType(TouchableOpacity).find((n) => n.props.accessibilityLabel === label);
+  t.root.findAll(estUneTouche).find((n) => n.props.accessibilityLabel === label);
 const presser = (t: TestRenderer.ReactTestRenderer, label: string) => {
   const b = bouton(t, label);
   expect([label, !!b]).toEqual([label, true]);
@@ -154,7 +158,7 @@ describe('2. une barre stable et des boutons hiérarchisés', () => {
     const t = monter(false);
     const en2D = barre(t);
     expect(en2D.map((p) => p.mot)).toEqual(['Dimensions', 'Meubles', 'Surfaces', 'Meubler', 'Décorer', 'Autres']);
-    presser(t, 'Passer en 3D');
+    presser(t, '2D, passer en 3D');
     const en3D = barre(t);
     expect(en3D).toEqual(en2D);
   });
@@ -164,7 +168,7 @@ describe('2. une barre stable et des boutons hiérarchisés', () => {
     const en2D = barre(t).map((p) => p.mot);
     expect(en2D).toEqual(['Dimensions', 'Meubles', 'Surfaces', 'Appareils', 'Meubler', 'Décorer', 'Autres']);
     expect(en2D).not.toContain('Cotes');
-    presser(t, 'Passer en 3D');
+    presser(t, '2D, passer en 3D');
     const en3D = barre(t).map((p) => p.mot);
     expect(en3D).toEqual(['Dimensions', 'Meubles', 'Surfaces', 'Repères', 'Meubler', 'Décorer', 'Autres']);
   });
@@ -174,7 +178,7 @@ describe('2. une barre stable et des boutons hiérarchisés', () => {
     const icone = (mot: string) => barre(t).find((p) => p.mot === mot)!.icone;
     const surfaces2D = icone('Surfaces');
     expect(icone('Meubles')).not.toBe(icone('Meubler'));
-    presser(t, 'Passer en 3D');
+    presser(t, '2D, passer en 3D');
     expect(icone('Surfaces')).toBe(surfaces2D);
     expect(icone('Meubles')).not.toBe(icone('Meubler'));
   });
@@ -209,13 +213,13 @@ describe('2. une barre stable et des boutons hiérarchisés', () => {
 
   it('« Meubler » depuis la 3D revient au plan et ouvre le catalogue', () => {
     const t = monter(false);
-    presser(t, 'Passer en 3D');
+    presser(t, '2D, passer en 3D');
     // La maquette se relève : on attend la fin du mouvement.
     act(() => jest.advanceTimersByTime(3000));
     expect(t.root.findByType(FurnitureSheet).props.visible).toBe(false);
     presser(t, 'Meubler');
     act(() => jest.advanceTimersByTime(3000));
-    expect(bouton(t, 'Passer en 3D')).toBeDefined();
+    expect(bouton(t, '2D, passer en 3D')).toBeDefined();
     expect(t.root.findByType(FurnitureSheet).props.visible).toBe(true);
   });
 
@@ -230,7 +234,7 @@ describe('2. une barre stable et des boutons hiérarchisés', () => {
 describe('3. le menu du plan, regroupé', () => {
   it('dit QUOI ajouter — une pièce, un niveau, un mur —, sans « Scanner… » ni « Dessiner… » au premier niveau', () => {
     const t = monter(false);
-    presser(t, 'Plus');
+    presser(t, 'Options du plan');
     const vu = menu(t);
     for (const l of ['Ajouter une pièce', 'Ajouter un niveau', 'Ajouter un mur', 'Liste d’achats', 'Recalculer les pièces']) {
       expect([l, vu.includes(l)]).toEqual([l, true]);
@@ -252,7 +256,7 @@ describe('3. le menu du plan, regroupé', () => {
 
   it('la façon — scanner ou dessiner — se choisit ensuite', () => {
     const t = monter(false);
-    presser(t, 'Plus');
+    presser(t, 'Options du plan');
     choisir(t, 'Ajouter un niveau');
     const vu = menu(t);
     for (const l of ['Scanner un étage', 'Dessiner un étage', 'Scanner un sous-sol', 'Dessiner un sous-sol']) {
@@ -262,7 +266,7 @@ describe('3. le menu du plan, regroupé', () => {
 
   it('sans LiDAR, aucun « Scanner… » pour un niveau', () => {
     const t = monter(false, { supported: false });
-    presser(t, 'Plus');
+    presser(t, 'Options du plan');
     choisir(t, 'Ajouter un niveau');
     const vu = menu(t);
     expect(vu).toContain('Dessiner un étage');
@@ -272,7 +276,7 @@ describe('3. le menu du plan, regroupé', () => {
 
   it('sans LiDAR, la pièce se dessine tout de suite', () => {
     const t = monter(false, { supported: false });
-    presser(t, 'Plus');
+    presser(t, 'Options du plan');
     choisir(t, 'Ajouter une pièce');
     const vu = textes(t);
     expect(vu).not.toContain('Scanner une autre pièce');
@@ -282,7 +286,7 @@ describe('3. le menu du plan, regroupé', () => {
 
   it('en mode électricité, le métier vient EN PREMIER', () => {
     const t = monter(true);
-    presser(t, 'Plus');
+    presser(t, 'Options du plan');
     const vu = menu(t);
     const tableau = vu.indexOf('Relever le tableau existant');
     const normes = vu.indexOf('Normes auto');

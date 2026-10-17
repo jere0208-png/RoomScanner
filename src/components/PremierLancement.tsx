@@ -123,7 +123,7 @@ export function PremierLancement({ onFini }: { onFini: () => void }) {
           sa scène teintée et son icône en relief (`IconesUsage`), puis ce
           qu'on y fera. Un appui choisit et ferme, comme avant.
         */}
-        <ScrollView contentContainerStyle={styles.question} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.question}>
           <Text style={styles.surtitre}>BIENVENUE</Text>
           <Text style={styles.questionTitre}>À quoi va vous servir EchoPlan ?</Text>
           <Text style={styles.questionPhrase}>

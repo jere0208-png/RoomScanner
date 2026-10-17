@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../theme';
+import { useReduceMotion } from '../ui/useReduceMotion';
 
 /**
  * Le logo EchoPlan : des ondes d'écho, de plus en plus nettes, dont la
@@ -116,7 +117,7 @@ export const COURBES_ECHO = {
 export function LogoEcho({
   size = 34,
   teinte,
-  anime = true,
+  anime: animeDemande = true,
 }: {
   size?: number;
   teinte?: string;
@@ -126,6 +127,9 @@ export function LogoEcho({
   const c = useTheme();
   const ink = teinte ?? c.ink;
   const t = useRef(new Animated.Value(0)).current;
+  /* « Réduire les animations » : l'écho se tait, le glyphe reste plein. */
+  const reduit = useReduceMotion();
+  const anime = animeDemande && !reduit;
   useEffect(() => {
     if (!anime) return;
     const boucle = Animated.loop(

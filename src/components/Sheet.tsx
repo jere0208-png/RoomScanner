@@ -42,6 +42,8 @@ import { CloseCross } from './CloseCross';
 import { AlerteHote } from './AlerteHote';
 import { SOLAIRES } from '../ui/solaires';
 import { haptic } from '../ui/haptic';
+import { annoncer } from '../ui/annoncer';
+import { useReduceMotion } from '../ui/useReduceMotion';
 import type { FauteDeCote } from '../ui/saisieCote';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 
@@ -336,6 +338,13 @@ export function SheetShell({
   const hauteurMax = Math.max(220, hauteurEcran - clavier - marges.top - 10);
   const monte = useRef(new Animated.Value(0)).current;
   /*
+    « RÉDUIRE LES ANIMATIONS » : UN FONDU, SANS GLISSEMENT — revue UX iOS.
+    La feuille monte de 40 points en s'allumant ; avec le réglage d'iOS, elle
+    s'allume sur place, en 150 ms. Le geste de la poignée, lui, suit
+    toujours le doigt : c'est la main qui bouge, pas l'interface.
+  */
+  const reduit = useReduceMotion();
+  /*
     LA POIGNÉE SE TIRE — relevé de la revue : « la barre en haut des
     feuilles ne fait rien ». Elle était un dessin ; toutes les feuilles
     d'iOS se referment en la tirant vers le bas, et c'est le premier geste
@@ -377,12 +386,14 @@ export function SheetShell({
     }
     Animated.timing(monte, {
       toValue: visible ? 1 : 0,
-      duration: visible ? 220 : 160,
+      duration: reduit ? 150 : visible ? 220 : 160,
       easing: visible ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (finished && !visible) setRendu(false);
     });
+    // `reduit` est lu à l'instant du mouvement : le changer ne rejoue rien.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, monte, glisse]);
   // Le démontage de la fenêtre native se fait au rendu suivant : on prévient
   // à ce moment-là, pas à la fin de l'animation.
@@ -432,7 +443,7 @@ export function SheetShell({
                   translateY: Animated.add(
                     monte.interpolate({
                       inputRange: [0, 1],
-                      outputRange: [40, 0],
+                      outputRange: [reduit ? 0 : 40, 0],
                     }),
                     glisse,
                   ),
@@ -442,6 +453,13 @@ export function SheetShell({
             <View
               testID="carte-feuille"
               accessibilityViewIsModal
+              /*
+                LE GESTE « RETOUR » DE VOICEOVER FERME LA FEUILLE — le « Z » à
+                deux doigts. Un `Modal` de React Native ne le relaie pas (il
+                ne répond qu'au glissé de présentation) : la feuille le prend
+                elle-même, comme toutes les feuilles d'Apple.
+              */
+              onAccessibilityEscape={onClose}
               onLayout={(e) => {
                 hauteurFeuille.current = e.nativeEvent.layout.height;
               }}
@@ -485,8 +503,7 @@ export function SheetShell({
                   style={styles.defile}
                   bounces={false}
                   keyboardShouldPersistTaps="handled"
-                  keyboardDismissMode="none"
-                  showsVerticalScrollIndicator={false}>
+                  keyboardDismissMode="none">
                   {children}
                 </ScrollView>
               ) : (
@@ -684,6 +701,10 @@ export function PromptSheet({
   const vu = useDernier(data);
   const [texte, setTexte] = useState('');
   const [faute, setFaute] = useState<FauteDeCote | null>(null);
+  // Le refus se DIT : `accessibilityLiveRegion` est muet sur iOS.
+  useEffect(() => {
+    annoncer(faute?.message);
+  }, [faute]);
   // La valeur dont on a déjà dit qu'elle sortait du commun : la revalider la garde.
   const douteDit = useRef<string | null>(null);
   useEffect(() => {
@@ -834,7 +855,7 @@ const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
     backdrop: { flex: 1, justifyContent: 'flex-end' },
     faute: { marginTop: 8, gap: 8, alignItems: 'flex-start' },
-    fauteTexte: { color: c.danger, fontSize: 14, lineHeight: 19 },
+    fauteTexte: { color: c.dangerTexte, fontSize: 14, lineHeight: 19 },
     veil: { backgroundColor: 'rgba(11,13,18,0.42)' },
     avoider: { width: '100%' },
     sheet: {
@@ -955,7 +976,7 @@ const getStyles = themedStyles((c: Palette) =>
     },
     tuileDanger: { backgroundColor: 'rgba(229, 72, 77, 0.12)' },
     rowLabel: { color: c.ink, fontSize: 15.5, fontWeight: '700' },
-    rowDanger: { color: c.danger },
+    rowDanger: { color: c.dangerTexte },
     rowHint: { color: c.inkFaint, fontSize: 12, marginTop: 1, lineHeight: 15 },
     champRow: {
       flexDirection: 'row',

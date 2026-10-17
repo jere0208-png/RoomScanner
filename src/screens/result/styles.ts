@@ -777,7 +777,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     silhouettes qu'on uniformise, pas les étiquettes.
   */
   bandeauIcone: { color: c.blue },
-  bandeauIconeDanger: { color: c.danger },
+  bandeauIconeDanger: { color: c.dangerTexte },
   bandeauIconePleine: { color: '#FFFFFF' },
   bandeauBtnTexte: { color: '#FFFFFF', fontSize: 13.5, fontWeight: '600' },
   bandeauBtnGhostTexte: { color: c.blue, fontSize: 13.5, fontWeight: '600' },
@@ -1243,7 +1243,7 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 11,
     marginLeft: 10,
   },
-  removeRoomText: { color: c.danger, fontWeight: '700', fontSize: 14 },
+  removeRoomText: { color: c.dangerTexte, fontWeight: '700', fontSize: 14 },
   objectList: { maxHeight: 58, marginTop: 10, marginBottom: 6, flexGrow: 0 },
   objectChipSelected: { borderColor: c.blue, borderWidth: 1.5 },
   objectChip: {

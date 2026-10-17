@@ -42,6 +42,10 @@ import {
   SNAPSHOT_ROOMS,
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 beforeAll(() => jest.useFakeTimers());
 afterAll(() => jest.useRealTimers());
@@ -88,7 +92,7 @@ function monter(dirty = false) {
 
 const presser = (t: TestRenderer.ReactTestRenderer, label: string) => {
   const b = t.root
-    .findAllByType(TouchableOpacity)
+    .findAll(estUneTouche)
     .find((n) => n.props.accessibilityLabel === label);
   expect(b).toBeDefined();
   act(() => b!.props.onPress());
@@ -98,7 +102,7 @@ const presser = (t: TestRenderer.ReactTestRenderer, label: string) => {
 /** Une pastille d'outil est-elle allumée ? (fond bleu = active) */
 const allume = (t: TestRenderer.ReactTestRenderer, label: string) => {
   const b = t.root
-    .findAllByType(TouchableOpacity)
+    .findAll(estUneTouche)
     .find((n) => n.props.accessibilityLabel === label);
   if (!b) return undefined;
   const st = StyleSheet.flatten(b.props.style) as { backgroundColor?: string };
@@ -115,7 +119,7 @@ describe('la vue 3D à l’ouverture d’un scan', () => {
 
   it('n’allume que les meubles et le sol, murs de face effacés', () => {
     const t = monter();
-    presser(t, 'Passer en 3D');
+    presser(t, '2D, passer en 3D');
     for (const nom of ALLUMES) {
       expect({ [nom]: allume(t, nom) }).toEqual({ [nom]: true });
     }
@@ -143,7 +147,7 @@ describe('le bouton Enregistrer', () => {
   /** À quelle hauteur une pastille se tient : le bloc absolu qui la porte. */
   const pastille = (t: TestRenderer.ReactTestRenderer, label: string) => {
     const b = t.root
-      .findAllByType(TouchableOpacity)
+      .findAll(estUneTouche)
       .find((n) => n.props.accessibilityLabel === label);
     if (!b) return null;
     let n: TestRenderer.ReactTestInstance | null = b;
@@ -225,7 +229,7 @@ describe('le bouton Enregistrer', () => {
     const t = monter(true);
     const ligne = pastille(t, 'Édition')!;
     const enPlan = pastille(t, 'Enregistrer')!;
-    presser(t, 'Passer en 3D');
+    presser(t, '2D, passer en 3D');
     const en3D = pastille(t, 'Enregistrer')!;
     // Il redescend en passant en 3D : la colonne des commandes reste au plan.
     expect(en3D).toBeLessThan(enPlan);

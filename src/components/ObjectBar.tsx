@@ -471,7 +471,7 @@ export function ObjectBar({
             </TouchableOpacity>
           ) : null}
           {bloque ? (
-            <Text style={[local.bloque, { color: palette.danger }]} numberOfLines={1}>
+            <Text style={[local.bloque, { color: palette.dangerTexte }]} numberOfLines={1}>
               {bloque}
             </Text>
           ) : null}

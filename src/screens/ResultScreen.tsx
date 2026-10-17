@@ -24,7 +24,7 @@ import {
 } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import { RoomScan, type ObjectData } from 'react-native-room-scan';
-import { useTheme } from '../theme';
+import { PLAFOND_BARRE, useTheme } from '../theme';
 import { getStyles } from './result/styles';
 import { fr } from './result/format';
 import { AddRoomSheet } from './result/AddRoomSheet';
@@ -68,6 +68,7 @@ import {
 } from '../geometry/lacher';
 import type { Pt } from '../geometry/floorplan';
 import { SidePill } from '../components/SidePill';
+import { Presse } from '../components/Presse';
 import { CeilingBar } from '../components/CeilingBar';
 import { ObjectBar } from '../components/ObjectBar';
 import { calerDansLaNiche } from '../geometry/niche';
@@ -328,6 +329,21 @@ function PastilleRecadrer({
       </Svg>
     </TouchableOpacity>
   );
+}
+
+/**
+ * UNE MESURE DU BANDEAU, À VOIX HAUTE — « 45,8 mètres carrés habitables ».
+ *
+ * Les abréviations du bandeau sont faites pour l'œil, pas pour l'oreille :
+ * « ≈ », « m² », « hab. », « élec. » se disent en toutes lettres.
+ */
+export function libelleDeMesure(valeur: string, libelle: string): string {
+  const v = valeur.replace(/^≈\s*/, 'environ ');
+  const l = libelle
+    .replace(/m²/g, 'mètres carrés')
+    .replace(/\bhab\./g, 'habitables')
+    .replace(/élec\./g, 'points électriques');
+  return `${v} ${l}`;
 }
 
 export function ResultScreen() {
@@ -4672,16 +4688,27 @@ export function ResultScreen() {
     */
     <RetourGlisse onRetour={sortirDuPlan} style={styles.container}>
       <View style={styles.headerRow}>
-        <TouchableOpacity
+        {/* Les ronds d'en-tête s'enfoncent sous le doigt, comme les
+            pastilles du plan : voir `Presse`. */}
+        <Presse
           style={styles.backButton}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityRole="button"
           accessibilityLabel="Retour"
           onPress={sortirDuPlan}>
           <BackChevron color={teinte.ink} />
-        </TouchableOpacity>
+        </Presse>
+        {/*
+          LE TITRE SE LIT POUR CE QU'IL EST — revue d'accessibilité. Libellé
+          « Options du plan », il remplaçait le nom du relevé et sa date :
+          VoiceOver ne disait jamais sur quel plan on se trouvait. Le nom et
+          « enregistré il y a… » se lisent ; ce que fait l'appui passe en indice.
+        */}
         <TouchableOpacity
           style={styles.titleWrap}
-          accessibilityLabel="Options du plan"
+          accessibilityRole="button"
+          accessibilityLabel={`${scanName}${majTexte ? `, ${majTexte}` : ''}`}
+          accessibilityHint="Options du plan"
           onPress={menuDuScan}>
           <View style={styles.titleCol}>
             <Text style={styles.title} numberOfLines={1}>
@@ -4707,7 +4734,7 @@ export function ResultScreen() {
           là sans y penser, et le dessin reprend la place.
         */}
         {Platform.OS === 'ios' && (
-          <TouchableOpacity
+          <Presse
             style={styles.headerIcon}
             accessibilityRole="button"
             // Un pictogramme muet se nomme en entier pour VoiceOver — même
@@ -4720,17 +4747,20 @@ export function ResultScreen() {
             <Svg width={20} height={20} viewBox="0 0 24 24">
               <Trace d={SOLAIRES.partage} fill={teinte.blue} fillRule="evenodd" />
             </Svg>
-          </TouchableOpacity>
+          </Presse>
         )}
-        <TouchableOpacity
+        {/* « Plus » ne disait pas ce que le « … » ouvre : il se nomme
+            désormais comme son menu. */}
+        <Presse
           style={styles.headerIcon}
-          accessibilityLabel="Plus"
+          accessibilityRole="button"
+          accessibilityLabel="Options du plan"
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           onPress={menuDuScan}>
           <Svg width={20} height={20} viewBox="0 0 24 24">
             <Trace d={SOLAIRES.points} fill={teinte.ink} fillRule="evenodd" />
           </Svg>
-        </TouchableOpacity>
+        </Presse>
       </View>
 
       {/* Le bandeau tient TOUJOURS dans l'écran.
@@ -4750,19 +4780,36 @@ export function ResultScreen() {
         est un chiffre qu'on ne lit plus. Le cartouche est simplement plus
         serré qu'avant.
       */}
+      {/*
+        CHAQUE MESURE SE LIT D'UN SEUL TENANT — revue d'accessibilité :
+        VoiceOver lisait « 5 », « pièces », « 45,8 », « m² habitables » en
+        quatre arrêts. La cellule est un seul élément, « 45,8 mètres carrés
+        habitables ». Et ses mots suivent les gros caractères dans la limite
+        de PLAFOND_BARRE : le bandeau a une hauteur fixe.
+      */}
       <View style={styles.metricsRow}>
         {metrics.map((m, i) => (
-          <View key={m.label} style={[styles.metric, i > 0 && styles.metricBorder]}>
+          <View
+            key={m.label}
+            style={[styles.metric, i > 0 && styles.metricBorder]}
+            accessible
+            accessibilityLabel={libelleDeMesure(m.value, m.label)}>
             <Text
               style={styles.metricValue}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.65}>
+              minimumFontScale={0.65}
+              maxFontSizeMultiplier={PLAFOND_BARRE}>
               {m.value}
             </Text>
             {/* Revue « Yasmine » : « M² … » — le libellé du chiffre qui
                 compte était coupé ; il cède un peu de taille plutôt. */}
-            <Text style={styles.metricLabel} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.92}>
+            <Text
+              style={styles.metricLabel}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.92}
+              maxFontSizeMultiplier={PLAFOND_BARRE}>
               {m.label}
             </Text>
           </View>
@@ -5678,6 +5725,8 @@ export function ResultScreen() {
                 hitSlop={HIT_PASTILLE}
                 accessibilityLabel="Explorer"
                 accessibilityHint="Entrer dans la pièce et s’y promener"
+                accessibilityShowsLargeContentViewer
+                accessibilityLargeContentTitle="Explorer"
                 onPress={() => {
                   haptic('leger');
                   setExplorant(true);
@@ -5686,7 +5735,9 @@ export function ResultScreen() {
                   <Trace d={SOLAIRES.marcher} fill={teinte.blue} fillRule="evenodd" />
                 </Svg>
                 {!explorerIcone && (
-                  <Text style={styles.vuePastilleTexte}>{explorerCourt ? 'Visite' : 'Explorer'}</Text>
+                  <Text style={styles.vuePastilleTexte} maxFontSizeMultiplier={PLAFOND_BARRE}>
+                    {explorerCourt ? 'Visite' : 'Explorer'}
+                  </Text>
                 )}
               </TouchableOpacity>
             )}
@@ -5705,11 +5756,17 @@ export function ResultScreen() {
                 hitSlop={HIT_PASTILLE}
                 accessibilityLabel="Réalité augmentée"
                 accessibilityHint="Poser la maquette chez soi, à travers la caméra"
+                accessibilityShowsLargeContentViewer
+                accessibilityLargeContentTitle="Sur la table"
                 onPress={() => voirChezSoi()}>
                 <Svg width={16} height={16} viewBox="0 0 24 24">
                   <Trace d={SOLAIRES.model} fill={teinte.blue} fillRule="evenodd" />
                 </Svg>
-                {!rangeeEnIcones && <Text style={styles.vuePastilleTexte}>Sur la table</Text>}
+                {!rangeeEnIcones && (
+                  <Text style={styles.vuePastilleTexte} maxFontSizeMultiplier={PLAFOND_BARRE}>
+                    Sur la table
+                  </Text>
+                )}
               </TouchableOpacity>
             )}
             {/*
@@ -5720,12 +5777,20 @@ export function ResultScreen() {
             {walls.length > 0 && tab === '2d' && (
               <PastilleRecadrer style={[styles.vuePastille, styles.pastilleIcone]} teinte={teinte.blue} />
             )}
+            {/*
+              LE MOT AFFICHÉ EST DANS LE LIBELLÉ — revue d'accessibilité :
+              la pastille montre « 2D » et s'appelait « Passer en 3D » ;
+              avec la Commande vocale, « Toucher 2D » ne la trouvait pas.
+            */}
             <TouchableOpacity
               style={styles.vuePastille}
               hitSlop={HIT_PASTILLE}
-              accessibilityLabel={vue === '2d' ? 'Passer en 3D' : 'Passer en 2D'}
+              accessibilityRole="button"
+              accessibilityLabel={vue === '2d' ? '2D, passer en 3D' : '3D, passer en 2D'}
+              accessibilityShowsLargeContentViewer
+              accessibilityLargeContentTitle={vue === '2d' ? '2D' : '3D'}
               onPress={basculerVue}>
-              <Text style={styles.vuePastilleTexte}>
+              <Text style={styles.vuePastilleTexte} maxFontSizeMultiplier={PLAFOND_BARRE}>
                 {vue === '2d' ? '2D' : '3D'}
               </Text>
               {!rangeeEnIcones && <ChevronsUpDown size={15} color={teinte.inkFaint} strokeWidth={2.4} />}

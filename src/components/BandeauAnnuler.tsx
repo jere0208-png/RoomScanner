@@ -10,12 +10,24 @@
  * qu'on a déjà vue se faire.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from 'react-native';
 import { dark, themedStyles, useTheme, type Palette } from '../theme';
 import { haptic } from '../ui/haptic';
+import { annoncer, useLecteurDEcran } from '../ui/annoncer';
 
 /** Le temps de se raviser. */
 export const DELAI_ANNULER = 4500;
+/**
+ * LE TEMPS DE SE RAVISER, AVEC VOICEOVER — revue d'accessibilité.
+ *
+ * Quatre secondes et demie suffisent à un pouce : le bandeau est sous les
+ * yeux, « Annuler » à portée. Avec la synthèse vocale, il faut d'abord
+ * entendre le bandeau, puis y amener le curseur, puis activer : c'était
+ * pratiquement impossible dans le temps. Le délai passe à douze secondes
+ * quand VoiceOver est actif, et le curseur est posé sur « Annuler ». Sans
+ * VoiceOver, rien ne change.
+ */
+export const DELAI_ANNULER_LECTEUR = 12000;
 
 /**
  * La suppression qui attend. `masque` est l'identifiant à cacher dès
@@ -28,6 +40,10 @@ export function useSuppressionDifferee(supprimer: (id: string) => void) {
   const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null);
   const faire = useRef(supprimer);
   faire.current = supprimer;
+  // Suivi pour que la décision, à l'instant du geste, lise le bon état.
+  const lecteur = useLecteurDEcran();
+  const lecteurRef = useRef(lecteur);
+  lecteurRef.current = lecteur;
 
   const confirmer = useCallback(() => {
     if (minuteur.current) clearTimeout(minuteur.current);
@@ -47,7 +63,7 @@ export function useSuppressionDifferee(supprimer: (id: string) => void) {
       minuteur.current = setTimeout(() => {
         confirmer();
         setEnAttente(null);
-      }, DELAI_ANNULER);
+      }, lecteurRef.current ? DELAI_ANNULER_LECTEUR : DELAI_ANNULER);
     },
     [confirmer],
   );
@@ -77,6 +93,29 @@ export function BandeauAnnuler({
 }) {
   const c = useTheme();
   const s = getStyles(c);
+  const bouton = useRef<View>(null);
+  const lecteur = useLecteurDEcran();
+  /*
+    LE BANDEAU SE DIT, ET LE CURSEUR VA SUR « ANNULER ».
+
+    Il apparaissait en silence : VoiceOver restait sur la ligne qui venait
+    de partir. L'annonce dit ce qui s'est passé et qu'on peut revenir
+    dessus ; le curseur posé sur le bouton évite d'aller le chercher. Rien
+    ne bouge pour qui n'a pas VoiceOver (l'annonce est alors sans effet).
+  */
+  useEffect(() => {
+    annoncer(`${texte}. Annuler disponible.`);
+    if (!lecteur) return;
+    // Laisser l'annonce partir avant de déplacer le curseur.
+    const t = setTimeout(() => {
+      try {
+        if (bouton.current) AccessibilityInfo.sendAccessibilityEvent(bouton.current, 'focus');
+      } catch {
+        // Sans curseur, le bouton reste trouvable par balayage.
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [texte, lecteur]);
   return (
     <View style={[s.bandeau, { bottom: bas }]} pointerEvents="box-none">
       <View style={s.pilule}>
@@ -84,6 +123,7 @@ export function BandeauAnnuler({
           {texte}
         </Text>
         <Pressable
+          ref={bouton}
           accessibilityRole="button"
           accessibilityLabel="Annuler la suppression"
           hitSlop={10}

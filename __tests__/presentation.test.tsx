@@ -32,6 +32,10 @@ import {
   SNAPSHOT_ROOMS,
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 beforeAll(() => jest.useFakeTimers());
 afterAll(() => jest.useRealTimers());
@@ -107,7 +111,7 @@ describe('la présentation animée n’existe plus', () => {
     expect(textes(tree)).not.toContain('Présentation animée');
     expect(
       tree.root
-        .findAllByType(TouchableOpacity)
+        .findAll(estUneTouche)
         .some((n) => n.props.accessibilityLabel === 'Présentation animée'),
     ).toBe(false);
   });
@@ -142,7 +146,7 @@ describe('le nord dans le dossier', () => {
     const tree = monter('export');
     expect(
       tree.root
-        .findAllByType(TouchableOpacity)
+        .findAll(estUneTouche)
         .find((n) => n.props.accessibilityLabel === 'Nord'),
     ).toBeUndefined();
     // Relevé du patron : les cardinaux ne s'affichent QUE sur le plan 2D
@@ -238,7 +242,7 @@ describe('les perspectives du dossier', () => {
     tree.root.findAllByType(Iso3DView);
   const boutonQuiDit = (tree: TestRenderer.ReactTestRenderer, label: string) =>
     tree.root
-      .findAllByType(TouchableOpacity)
+      .findAll(estUneTouche)
       .find((n) => n.props.accessibilityLabel === label);
 
   it('n’en propose qu’une au départ', () => {
@@ -345,7 +349,7 @@ describe('l’écran du scan, refondu', () => {
   it('porte l’export en icône, et plus en bandeau', () => {
     const tree = monter('scan');
     const icone = tree.root
-      .findAllByType(TouchableOpacity)
+      .findAll(estUneTouche)
       .find((n) => n.props.accessibilityLabel === 'Exporter ou imprimer le plan');
     expect(icone).toBeDefined();
     // Le bandeau bleu n'existe plus : plus aucun bouton n'écrit « Exporter ».
@@ -381,8 +385,8 @@ describe('l’écran du scan, refondu', () => {
   it('et n’offre plus de les masquer', () => {
     const tree = monter('scan');
     const menu = tree.root
-      .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Plus');
+      .findAll(estUneTouche)
+      .find((n) => n.props.accessibilityLabel === 'Options du plan');
     act(() => menu!.props.onPress());
     const vu = textes(tree);
     expect(vu).not.toContain('Masquer les mesures');
@@ -392,8 +396,8 @@ describe('l’écran du scan, refondu', () => {
   it('et propose d’ajouter une pièce, sans effacer le relevé', () => {
     const tree = monter('scan');
     const menu = tree.root
-      .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Plus');
+      .findAll(estUneTouche)
+      .find((n) => n.props.accessibilityLabel === 'Options du plan');
     expect(menu).toBeDefined();
     act(() => menu!.props.onPress());
     // Le menu regroupé (revue des « découvreurs ») : « Ajouter une pièce »,
@@ -489,8 +493,8 @@ describe('l’espace de travail du plan', () => {
   it('remplace le bandeau 2D/3D par une pastille', () => {
     const tree = monter('scan');
     const pastille = tree.root
-      .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Passer en 3D');
+      .findAll(estUneTouche)
+      .find((n) => n.props.accessibilityLabel === '2D, passer en 3D');
     expect(pastille).toBeDefined();
     const st = style(pastille!);
     expect(st.height).toBeLessThanOrEqual(36);
@@ -503,8 +507,8 @@ describe('l’espace de travail du plan', () => {
         s?.position === 'absolute' &&
         s?.flexDirection === 'row' &&
         v
-          .findAllByType(TouchableOpacity)
-          .some((b) => b.props.accessibilityLabel === 'Passer en 3D')
+          .findAll(estUneTouche)
+          .some((b) => b.props.accessibilityLabel === '2D, passer en 3D')
       );
     });
     expect(rangee).toBeDefined();
@@ -570,8 +574,8 @@ describe('la bascule entre le plan et le volume', () => {
     );
 
     const pastille = tree.root
-      .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Passer en 3D');
+      .findAll(estUneTouche)
+      .find((n) => n.props.accessibilityLabel === '2D, passer en 3D');
     expect(pastille).toBeDefined();
     act(() => pastille!.props.onPress());
 

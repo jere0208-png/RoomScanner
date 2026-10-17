@@ -60,6 +60,7 @@ import {
 } from '../../geometry/existant';
 import type { TableauExistant } from '../../store/scanStore';
 import { haptic } from '../../ui/haptic';
+import { annoncer } from '../../ui/annoncer';
 import {
   nommerOrgane,
   TableauVivant,
@@ -221,6 +222,10 @@ export function ExistantSheet({
   const [visee, setVisee] = useState<number | null>(0);
   /** Ce que le dernier geste refusé avait à dire. */
   const [refus, setRefus] = useState<string | null>(null);
+  // Le refus se DIT : `accessibilityLiveRegion` est muet sur iOS.
+  useEffect(() => {
+    annoncer(refus);
+  }, [refus]);
   const choix = departs.find((d) => d.id === choisi) ?? null;
   const choixImpl = impl.modules.find((m) => m.depart.id === choisi) ?? null;
 
@@ -449,7 +454,7 @@ export function ExistantSheet({
                   setAVider(false);
                   onVider();
                 }}>
-                <Text style={[styles.viderTexte, aVider && { color: c.danger }]}>
+                <Text style={[styles.viderTexte, aVider && { color: c.dangerTexte }]}>
                   {aVider ? `Retirer les ${departs.length} organe(s) ?` : 'Vider le tableau'}
                 </Text>
               </TouchableOpacity>
@@ -511,7 +516,7 @@ export function ExistantSheet({
                   onPress={() => changerRangees(impl.rangees - 1)}>
                   <Text style={styles.pasSigne}>−</Text>
                 </TouchableOpacity>
-                <Text style={[styles.pasValeur, impl.rangees < RANGEES_MIN && { color: c.danger }]}>{impl.rangees}</Text>
+                <Text style={[styles.pasValeur, impl.rangees < RANGEES_MIN && { color: c.dangerTexte }]}>{impl.rangees}</Text>
                 <TouchableOpacity
                   accessibilityLabel="Une rangée de plus"
                   style={styles.pasBouton}
@@ -915,7 +920,7 @@ function Puces<T extends string | number>({
               onChoix(v);
               haptic(faux ? 'alerte' : 'leger');
             }}>
-            <Text style={[styles.choixTexte, pris && { color: '#FFFFFF' }, !pris && faux && { color: c.amber }]}>{mot(v)}</Text>
+            <Text style={[styles.choixTexte, pris && { color: '#FFFFFF' }, !pris && faux && { color: c.ambreTexte }]}>{mot(v)}</Text>
           </TouchableOpacity>
         );
       })}
@@ -1063,7 +1068,7 @@ const getStyles = (c: Palette) =>
     },
     flecheTexte: { color: c.ink, fontSize: 14, fontWeight: '700' },
     retirer: { marginTop: 14, alignItems: 'center' },
-    retirerTexte: { color: c.danger, fontSize: 13.5, fontWeight: '700' },
+    retirerTexte: { color: c.dangerTexte, fontSize: 13.5, fontWeight: '700' },
     horsRail: { marginTop: 4 },
     grille: { backgroundColor: c.surface, borderRadius: radius.md, padding: 12, gap: 9 },
     regle: { flexDirection: 'row', alignItems: 'center', gap: 10 },

@@ -126,7 +126,7 @@ const getStyles = themedStyles((c: Palette) =>
     tete: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     titre: { color: c.ink, fontSize: 14.5, fontWeight: '700' },
     texte: { color: c.inkSoft, fontSize: 12.5, lineHeight: 17 },
-    message: { color: c.amber, fontSize: 12, lineHeight: 16, fontWeight: '600' },
+    message: { color: c.ambreTexte, fontSize: 12, lineHeight: 16, fontWeight: '600' },
     gestes: { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 4 },
     bouton: {
       height: 36,

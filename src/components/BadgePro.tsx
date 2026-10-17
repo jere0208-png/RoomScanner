@@ -25,6 +25,7 @@
  */
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View, type ViewStyle } from 'react-native';
+import { useReduceMotion } from '../ui/useReduceMotion';
 import Svg, {
   Defs,
   LinearGradient,
@@ -47,8 +48,14 @@ const PERIODE = LARGEUR * 4;
 
 export function BadgePro({ style }: { style?: ViewStyle }) {
   const glisse = useRef(new Animated.Value(0)).current;
+  /* « Réduire les animations » : la bande d'ors reste posée, immobile. */
+  const reduit = useReduceMotion();
 
   useEffect(() => {
+    if (reduit) {
+      glisse.setValue(0);
+      return;
+    }
     const boucle = Animated.loop(
       Animated.timing(glisse, {
         toValue: 1,
@@ -59,7 +66,7 @@ export function BadgePro({ style }: { style?: ViewStyle }) {
     );
     boucle.start();
     return () => boucle.stop();
-  }, [glisse]);
+  }, [glisse, reduit]);
 
   return (
     <View style={[styles.badge, style]} accessible={false}>

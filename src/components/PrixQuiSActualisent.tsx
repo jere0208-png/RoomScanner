@@ -31,6 +31,7 @@ import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
+import { useReduceMotion } from '../ui/useReduceMotion';
 
 /**
  * LE DIAMÈTRE DE L'ANNEAU, en points.
@@ -62,8 +63,19 @@ function LigneFantome({ retard }: { retard: number }) {
   const c = useTheme();
   const styles = getStyles(c);
   const souffle = useRef(new Animated.Value(0)).current;
+  /*
+    « RÉDUIRE LES ANIMATIONS » : les lignes fantômes ne respirent plus, elles
+    restent posées. L'anneau, lui, continue de tourner : c'est un indicateur
+    de travail en cours, comme celui d'iOS, qui tourne aussi avec le réglage —
+    figé, il dirait « l'application est bloquée ».
+  */
+  const reduit = useReduceMotion();
 
   useEffect(() => {
+    if (reduit) {
+      souffle.setValue(1);
+      return;
+    }
     const boucle = Animated.loop(
       Animated.sequence([
         Animated.delay(retard),
@@ -85,7 +97,7 @@ function LigneFantome({ retard }: { retard: number }) {
     return () => boucle.stop();
     // Le retard ne change jamais pour une ligne donnée : la boucle se monte
     // une fois. La relancer à chaque rendu ferait sauter la cascade.
-  }, [retard, souffle]);
+  }, [retard, souffle, reduit]);
 
   /*
     ENTRE UN TIERS ET UN, JAMAIS ZÉRO. Une ligne qui disparaît tout à fait
@@ -418,7 +430,7 @@ const getStyles = themedStyles((c: Palette) =>
     bandeauTexte: { flex: 1 },
     bandeauMot: { fontSize: 13, fontWeight: '600', color: c.blue },
     bandeauMotGris: { color: c.ink },
-    bandeauMotVert: { color: c.green },
+    bandeauMotVert: { color: c.vertTexte },
     bandeauSource: { fontSize: 11, color: c.inkFaint, marginTop: 1 },
     bandeauAction: {
       fontSize: 12,

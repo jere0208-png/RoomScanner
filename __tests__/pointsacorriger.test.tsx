@@ -22,6 +22,10 @@ import { DiagnosticSheet, type Constat } from '../src/components/DiagnosticSheet
 import { buildScene, type ScenePalette } from '../src/geometry/scene3d';
 import { fabriquer } from '../src/geometry/modeles3d';
 import type { WallSeg } from '../src/geometry/floorplan';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 const lire = (p: string) => readFileSync(join(__dirname, '..', p), 'utf8');
 const textes = (t: TestRenderer.ReactTestRenderer) =>
@@ -56,7 +60,7 @@ describe('le nord à orienter se dit en clair', () => {
     // « Explorer » garde son mot (revue « Chloé ») : serré, il se dit
     // « Visite » — dans le style des autres pastilles, plus en bleu plein
     // (revue des « découvreurs »).
-    expect(ecran).toContain("<Text style={styles.vuePastilleTexte}>{explorerCourt ? 'Visite' : 'Explorer'}</Text>");
+    expect(ecran).toMatch(/<Text style=\{styles\.vuePastilleTexte\}[^>]*>\s*\{explorerCourt \? 'Visite' : 'Explorer'\}\s*<\/Text>/);
     // La liste d'achats a quitté cette rangée (revue des « découvreurs ») :
     // voir `listedachats.test.tsx`.
     expect(ecran).not.toContain('accessibilityLabel="Liste d’achats"');
@@ -109,7 +113,7 @@ describe('les points à corriger, version ludique', () => {
     expect(filtre('À vérifier · 1')).toBeDefined();
     act(() => filtre('À vérifier · 1').props.onPress());
     const messages = t.root
-      .findAllByType(TouchableOpacity)
+      .findAll(estUneTouche)
       .map((n) => n.props.accessibilityLabel)
       .filter((l) => typeof l === 'string' && /Défaut|À regarder/.test(l));
     expect(messages).toEqual(['À regarder']);
@@ -125,7 +129,7 @@ describe('les points à corriger, version ludique', () => {
       t = TestRenderer.create(<DiagnosticSheet visible issues={[alerte(1), info]} rooms={ROOMS} onClose={jest.fn()} onGoToIssue={onGo} onFix={onFix} />);
     });
     expect(textes(t)).toEqual(expect.arrayContaining(['À corriger', 'À vérifier']));
-    const corriger = t.root.findAllByType(TouchableOpacity).find((n) => n.props.accessibilityLabel === 'Poser RJ45')!;
+    const corriger = t.root.findAll(estUneTouche).find((n) => n.props.accessibilityLabel === 'Poser RJ45')!;
     act(() => corriger.props.onPress());
     expect(onFix).toHaveBeenCalled();
     expect(onGo).not.toHaveBeenCalled();

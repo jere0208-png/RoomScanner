@@ -105,7 +105,7 @@ export function CalquesSheet({
         <Text style={s.titre}>{titre}</Text>
         {sousTitre ? <Text style={s.sousTitre}>{sousTitre}</Text> : null}
       </View>
-      <ScrollView style={s.corps} contentContainerStyle={s.corpsFond} showsVerticalScrollIndicator={false}>
+      <ScrollView style={s.corps} contentContainerStyle={s.corpsFond}>
         {vue && vue.options.length > 1 ? (
           <View style={s.section}>
             <Text style={s.sectionTitre}>{vue.titre}</Text>
@@ -165,7 +165,7 @@ export function CalquesSheet({
                       </View>
                       <View style={s.textes}>
                         <Text style={[s.libelle, eteint && { color: c.inkFaint }]}>{l.libelle}</Text>
-                        <Text style={[s.aide, eteint && { color: c.amber }]} numberOfLines={2}>
+                        <Text style={[s.aide, eteint && { color: c.ambreTexte }]} numberOfLines={2}>
                           {l.vide ?? l.aide}
                         </Text>
                       </View>

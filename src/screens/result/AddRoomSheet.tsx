@@ -21,6 +21,7 @@ import { useTheme } from '../../theme';
 import { RoomChoice } from '../../components/RoomChoice';
 import { getStyles } from './styles';
 import { BORNES_PIECE, fauteDeMetres, lireMetres, type FauteDeCote } from '../../ui/saisieCote';
+import { annoncer } from '../../ui/annoncer';
 
 /** Les gabarits proposés : des pièces qu'on rencontre, aux cotes usuelles. */
 export const MODELES_DE_PIECE = [
@@ -73,6 +74,10 @@ export function AddRoomSheet({
   */
   const [nom, setNom] = useState('');
   const [faute, setFaute] = useState<(FauteDeCote & { champ: 'l' | 'p' }) | null>(null);
+  // Le refus se DIT : `accessibilityLiveRegion` est muet sur iOS.
+  useEffect(() => {
+    annoncer(faute?.message);
+  }, [faute]);
   // Ce qu'on a déjà signalé comme hors du commun : le revalider le garde.
   const [douteDit, setDouteDit] = useState<string | null>(null);
   /*
@@ -185,7 +190,7 @@ export function AddRoomSheet({
                 />
               </View>
               {faute && (
-                <Text style={{ color: c.danger, fontSize: 13, marginTop: 10 }} accessibilityLiveRegion="polite">
+                <Text style={{ color: c.dangerTexte, fontSize: 13, marginTop: 10 }} accessibilityLiveRegion="polite">
                   {faute.message}
                 </Text>
               )}

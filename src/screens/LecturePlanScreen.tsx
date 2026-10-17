@@ -932,20 +932,20 @@ function DetailsDeLaLecture({
             {r.cotes.relues > 0 ? ` (dont ${r.cotes.relues} relue${r.cotes.relues > 1 ? 's' : ''} dans leur unité)` : ''}.
           </Text>
           {r.cotes.ecartees.length > 0 && (
-            <Text style={[s.ligne, { color: c.amber }]}>
+            <Text style={[s.ligne, { color: c.ambreTexte }]}>
               Écartée{r.cotes.ecartees.length > 1 ? 's' : ''} : {r.cotes.ecartees.map((e) => `« ${e.texte} »`).join(', ')} —
               contredite{r.cotes.ecartees.length > 1 ? 's' : ''} par le reste du plan.
             </Text>
           )}
           {r.murs.aVerifier.length > 0 && (
-            <Text style={[s.ligne, { color: c.amber }]}>
+            <Text style={[s.ligne, { color: c.ambreTexte }]}>
               {r.murs.aVerifier.length} mur{r.murs.aVerifier.length > 1 ? 's' : ''} sans cote qui le
               {r.murs.aVerifier.length > 1 ? 's' : ''} confirme, en orange : vérifiez-le
               {r.murs.aVerifier.length > 1 ? 's' : ''} sur la feuille.
             </Text>
           )}
           {r.surfacesDouteuses.map((d) => (
-            <Text key={d.piece} style={[s.ligne, { color: c.amber }]}>
+            <Text key={d.piece} style={[s.ligne, { color: c.ambreTexte }]}>
               {d.piece} : {d.ecrite} m² écrits, {d.calculee} m² dessinés.
             </Text>
           ))}
@@ -959,7 +959,7 @@ function DetailsDeLaLecture({
             </Text>
           ))}
           {r.symboles.inconnus.length > 0 && (
-            <Text style={[s.ligne, { color: c.amber }]}>
+            <Text style={[s.ligne, { color: c.ambreTexte }]}>
               Non reconnu{r.symboles.inconnus.length > 1 ? 's' : ''}, non posé{r.symboles.inconnus.length > 1 ? 's' : ''} :{' '}
               {r.symboles.inconnus.slice(0, 8).join(', ')}.
             </Text>

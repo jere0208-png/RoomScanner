@@ -216,8 +216,7 @@ export function ConfidentialiteScreen() {
         contentContainerStyle={[
           s.contenu,
           { paddingBottom: insets.bottom + 32 },
-        ]}
-        showsVerticalScrollIndicator={false}>
+        ]}>
         <Text style={s.chapeau}>
           EchoPlan est une application de chantier : elle garde le moins de
           choses possible, et le plus près possible de vous.

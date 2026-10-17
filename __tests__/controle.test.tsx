@@ -323,7 +323,7 @@ describe('la pastille sur l’écran des résultats', () => {
       if (st?.position !== 'absolute' || st?.flexDirection !== 'row') return false;
       const dedans = v.findAllByType(TouchableOpacity);
       return (
-        dedans.some((b) => b.props.accessibilityLabel === 'Passer en 3D') &&
+        dedans.some((b) => b.props.accessibilityLabel === '2D, passer en 3D') &&
         dedans.some((b) =>
           String(b.props.accessibilityLabel ?? '').startsWith('Contrôle'),
         )

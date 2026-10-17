@@ -35,6 +35,7 @@ import {
 } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { haptic } from '../ui/haptic';
+import { annoncer } from '../ui/annoncer';
 import {
   bornerTeinte,
   estSombre,
@@ -241,6 +242,10 @@ export function NuancierLibre({
     setEditionEtat(v);
   };
   const [refus, setRefus] = useState<string | null>(null);
+  // Le refus se DIT : `accessibilityLiveRegion` est muet sur iOS.
+  useEffect(() => {
+    annoncer(refus);
+  }, [refus]);
   useEffect(() => {
     if (!edition) setSaisie(hex);
   }, [hex, edition]);
@@ -593,7 +598,7 @@ const getStyles = themedStyles((c: Palette) =>
       borderColor: c.lineStrong,
     },
     hexaRefus: { borderColor: c.danger, borderWidth: 2 },
-    refus: { color: c.danger, fontSize: 13, fontWeight: '600' },
+    refus: { color: c.dangerTexte, fontSize: 13, fontWeight: '600' },
     curseurLigne: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     curseurNom: {
       width: 16,

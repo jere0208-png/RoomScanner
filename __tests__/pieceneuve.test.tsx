@@ -44,6 +44,10 @@ import {
   SNAPSHOT_ROOMS,
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 const st = () => useScanStore.getState();
 
@@ -186,8 +190,8 @@ describe('deux poses de suite, depuis l’ecran', () => {
     // Le menu est regroupé (revue des « découvreurs ») : « Ajouter une
     // pièce » d'abord, puis la façon — scanner ou dessiner.
     const plus = t.root
-      .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Plus')!;
+      .findAll(estUneTouche)
+      .find((n) => n.props.accessibilityLabel === 'Options du plan')!;
     act(() => plus.props.onPress());
     act(() => jest.advanceTimersByTime(600));
     const choisir = (mot: string) => {

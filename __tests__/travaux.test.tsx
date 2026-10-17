@@ -40,6 +40,10 @@ import {
   SNAPSHOT_ROOMS,
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 let n = 0;
 const mur = (ax: number, az: number, bx: number, bz: number, height = 2.5): WallSeg => ({
@@ -460,7 +464,7 @@ describe('dans l’écran du plan', () => {
     return arbre!;
   };
   const pastille = (t: TestRenderer.ReactTestRenderer) =>
-    t.root.findAllByType(TouchableOpacity).find((x) => x.props.accessibilityLabel === 'Liste d’achats');
+    t.root.findAll(estUneTouche).find((x) => x.props.accessibilityLabel === 'Liste d’achats');
 
   /*
     MIS À JOUR — revue des « découvreurs » : la pastille « Liste d'achats »
@@ -476,7 +480,7 @@ describe('dans l’écran du plan', () => {
   it('le grand public ouvre la liste depuis le menu du plan, avec ses pièces', () => {
     const t = monter(false);
     expect(pastille(t)).toBeUndefined();
-    const plus = t.root.findAllByType(TouchableOpacity).find((x) => x.props.accessibilityLabel === 'Plus')!;
+    const plus = t.root.findAll(estUneTouche).find((x) => x.props.accessibilityLabel === 'Options du plan')!;
     act(() => plus.props.onPress());
     act(() => jest.advanceTimersByTime(400));
     expect(t.root.findAllByType(TravauxSheet)[0].props.visible).toBe(false);
@@ -500,7 +504,7 @@ describe('dans l’écran du plan', () => {
   */
   it('et le grand public la trouve en tête du menu « Plus »', () => {
     const t = monter(false);
-    const plus = t.root.findAllByType(TouchableOpacity).find((x) => x.props.accessibilityLabel === 'Plus')!;
+    const plus = t.root.findAll(estUneTouche).find((x) => x.props.accessibilityLabel === 'Options du plan')!;
     act(() => plus.props.onPress());
     act(() => jest.advanceTimersByTime(400));
     const mots = t.root.findAllByType(Text).map((x) => [].concat(x.props.children ?? []).join(''));

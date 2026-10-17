@@ -26,6 +26,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+import { useReduceMotion } from '../ui/useReduceMotion';
 import Svg, {
   Defs,
   LinearGradient,
@@ -79,9 +80,15 @@ export function ContourVif({
   children: React.ReactNode;
 }) {
   const glisse = useRef(new Animated.Value(0)).current;
+  /* « Réduire les animations » : la bande d'ors reste posée, immobile. */
+  const reduit = useReduceMotion();
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
 
   useEffect(() => {
+    if (reduit) {
+      glisse.setValue(0);
+      return;
+    }
     const boucle = Animated.loop(
       Animated.timing(glisse, {
         toValue: 1,
@@ -92,7 +99,7 @@ export function ContourVif({
     );
     boucle.start();
     return () => boucle.stop();
-  }, [glisse]);
+  }, [glisse, reduit]);
 
   // Le dégradé est LONG — plusieurs blocs de large — donc presque uni à
   // tout instant : on sent le mouvement, on ne compte pas les couleurs.
@@ -185,9 +192,15 @@ export function TexteVif({
   style?: StyleProp<ViewStyle>;
 }) {
   const glisse = useRef(new Animated.Value(0)).current;
+  /* « Réduire les animations » : la bande d'ors reste posée, immobile. */
+  const reduit = useReduceMotion();
   const [dims, setDims] = useState<{ w: number; h: number } | null>(null);
 
   useEffect(() => {
+    if (reduit) {
+      glisse.setValue(0);
+      return;
+    }
     const boucle = Animated.loop(
       Animated.timing(glisse, {
         toValue: 1,
@@ -198,7 +211,7 @@ export function TexteVif({
     );
     boucle.start();
     return () => boucle.stop();
-  }, [glisse]);
+  }, [glisse, reduit]);
 
   const periode = dims ? Math.max(60, dims.w) * 4 : 0;
 

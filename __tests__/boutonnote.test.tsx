@@ -34,6 +34,10 @@ import {
   SNAPSHOT_ROOMS,
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 beforeAll(() => jest.useFakeTimers());
 afterAll(() => jest.useRealTimers());
@@ -79,7 +83,7 @@ function monter() {
 
 const presser = (t: TestRenderer.ReactTestRenderer, label: string) => {
   const b = t.root
-    .findAllByType(TouchableOpacity)
+    .findAll(estUneTouche)
     .find((n) => n.props.accessibilityLabel === label);
   expect(b).toBeDefined();
   act(() => b!.props.onPress());

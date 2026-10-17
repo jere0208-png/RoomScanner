@@ -128,6 +128,29 @@ function decoupageDe(item: SavedScan) {
 }
 
 /**
+ * CE QUE VOICEOVER DIT D'UNE LIGNE — revue d'accessibilité.
+ *
+ * La ligne se réduisait à « Ouvrir Salon » : ni le client, ni l'adresse, ni
+ * la date, ni l'état « non enregistré » n'étaient lus (le libellé posé sur
+ * le texte intérieur est ignoré : c'est la ligne, l'élément accessible).
+ * Deux « Salon » de deux clients ne se distinguaient pas. Elle dit
+ * maintenant ce qu'on voit, dans l'ordre où on le lit ; ce que fait l'appui
+ * passe en indice (« Ouvre le plan »).
+ */
+export function libelleDeLigne(item: SavedScan, maintenant = Date.now()): string {
+  const attente = etatDAttente(item, maintenant);
+  return [
+    item.name,
+    [item.client, item.address].filter(Boolean).join(', '),
+    attente ? attente.texte : formatDate(item.updatedAt),
+    decoupageDe(item).details,
+  ]
+    .filter(Boolean)
+    .join(', ')
+    .replace(/\s*·\s*/g, ', ');
+}
+
+/**
  * LES PIÈCES EN DÉFAUT D'UN SCAN, mémoïsées comme son découpage.
  *
  * La vignette les relançait à CHAQUE rendu de la liste — une frappe dans la
@@ -673,6 +696,8 @@ interface RowProps {
   onRelease: (deposer: boolean) => void;
   /** Referme la corbeille entrouverte — et dit qu'elle l'était. */
   refermer?: () => boolean;
+  /** La mise à la corbeille, pour l'action VoiceOver « Supprimer ». */
+  onSupprimer?: () => void;
 }
 
 /**
@@ -705,6 +730,7 @@ const ScanRow = React.memo(function ScanRow({
   onHoldMove,
   onRelease,
   refermer,
+  onSupprimer,
 }: RowProps) {
   /*
     LA LIGNE NE SE DÉPLACE PLUS : ELLE LAISSE SA PLACE.
@@ -752,7 +778,21 @@ const ScanRow = React.memo(function ScanRow({
         activeOpacity={0.75}
         disabled={fige}
         accessibilityRole="button"
-        accessibilityLabel={`Ouvrir ${item.name}`}
+        accessibilityLabel={libelleDeLigne(item, maintenant)}
+        accessibilityHint="Ouvre le plan"
+        /*
+          LES GESTES CACHÉS, DANS LE ROTOR « ACTIONS » — comme dans Mail. Le
+          glissé qui jette et le « … » se trouvent au doigt ; avec VoiceOver,
+          on balaie vers le haut sur la ligne et l'on choisit.
+        */
+        accessibilityActions={[
+          { name: 'options', label: 'Options' },
+          ...(onSupprimer ? [{ name: 'supprimer', label: 'Mettre à la corbeille' }] : []),
+        ]}
+        onAccessibilityAction={(e) => {
+          if (e.nativeEvent.actionName === 'options') onMenu();
+          else if (e.nativeEvent.actionName === 'supprimer') onSupprimer?.();
+        }}
         onPress={() => {
           // Une corbeille entrouverte se referme d'abord : on n'ouvre pas un
           // plan par accident en voulant la ranger.
@@ -874,6 +914,7 @@ const LigneDePlan = React.memo(function LigneDePlan({
           onHoldMove={actions.bouger}
           onRelease={actions.lacher}
           refermer={refermer}
+          onSupprimer={onSupprimer}
         />
       )}
     </GlisserPourSupprimer>
@@ -1731,7 +1772,6 @@ export function LibraryScreen() {
           maxToRenderPerBatch={8}
           windowSize={7}
           contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
           // Pendant qu'on tient un scan, la liste ne défile pas : les deux
           // gestes sont le même mouvement du doigt.
           scrollEnabled={dragId === null}
@@ -2070,7 +2110,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     borderColor: c.amber,
   },
   attenteTextes: { flexShrink: 1 },
-  attenteTexte: { flexShrink: 1, color: c.amber, fontSize: 12, fontWeight: '600' },
+  attenteTexte: { flexShrink: 1, color: c.ambreTexte, fontSize: 12, fontWeight: '600' },
   attenteDelai: { color: c.inkFaint, fontSize: 11, marginTop: 1 },
   /* La ligne glissante porte l'écart : la corbeille s'arrête à la ligne. */
   rowGlissante: { marginBottom: 10, borderRadius: radius.md + 2 },

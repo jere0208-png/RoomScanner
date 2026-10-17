@@ -145,8 +145,7 @@ export function DiagnosticPlanScreen() {
         contentContainerStyle={[s.contenu, { paddingBottom: insets.bottom + 32 }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
-        automaticallyAdjustKeyboardInsets
-        showsVerticalScrollIndicator={false}>
+        automaticallyAdjustKeyboardInsets>
         <Text style={s.nom}>{plan.name}</Text>
         <Text style={s.chapeau}>
           Ce que l’application voit dans ce plan, et ce que vous pouvez nous signaler pour l’améliorer.
@@ -187,7 +186,7 @@ export function DiagnosticPlanScreen() {
               <Text style={s.pieceNom} numberOfLines={1}>
                 {p.nom}
               </Text>
-              <Text style={[s.pieceInfo, !p.fermee && { color: c.danger }]}>
+              <Text style={[s.pieceInfo, !p.fermee && { color: c.dangerTexte }]}>
                 {`${p.murs} murs · ${m2(p.aire)} · ${p.fermee ? 'fermée' : 'ne se ferme pas'}`}
               </Text>
             </View>

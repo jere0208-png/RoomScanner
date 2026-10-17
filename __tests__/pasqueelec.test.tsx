@@ -65,6 +65,10 @@ import { PaywallScreen } from '../src/screens/PaywallScreen';
 import { useScanStore } from '../src/store/scanStore';
 import { useAccountStore } from '../src/store/accountStore';
 import { pourChercher } from '../src/ui/mots';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -130,7 +134,7 @@ describe('la fin du scan ne pose pas d’électricité sans qu’on la demande',
     )!;
 
   const valider = (t: TestRenderer.ReactTestRenderer) => {
-    const b = t.root.findAllByType(TouchableOpacity).find(
+    const b = t.root.findAll(estUneTouche).find(
       (n) => n.props.accessibilityLabel === 'C’est bon',
     )!;
     act(() => b.props.onPress());
@@ -236,7 +240,7 @@ describe('la rangée d’édition met le meuble avant l’appareil', () => {
   /** Les libellés des pastilles, dans l'ordre où elles sont rendues. */
   const rang = (t: TestRenderer.ReactTestRenderer) =>
     t.root
-      .findAllByType(TouchableOpacity)
+      .findAll(estUneTouche)
       .map((n) => String(n.props.accessibilityLabel ?? ''))
       .filter((m) => m.length > 0);
 

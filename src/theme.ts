@@ -34,6 +34,21 @@ export interface Palette {
   danger: string;
   green: string;
   amber: string;
+  /*
+    LES TEINTES DU MOT — quand l'alerte est ÉCRITE, pas peinte.
+
+    Revue d'accessibilité : l'ambre #E8A13B ne fait que 2,2:1 sur blanc, le
+    vert 2,6:1, le rouge 3,9:1 — sous les 4,5:1 du texte courant. « En
+    attente », « retirer », un refus de saisie : les mots qui comptent le
+    plus disparaissaient au soleil. `amber`, `green` et `danger` restent
+    pour les pastilles, les points et les fonds, où la tache de couleur
+    suffit ; ces trois-ci servent dès que la couleur est celle d'un MOT ou
+    d'un pictogramme. Elles tiennent 4,5:1 sur le blanc, le fond de page et
+    la surface creusée.
+  */
+  ambreTexte: string;
+  vertTexte: string;
+  dangerTexte: string;
   sky: string;
   scanInk: string;
   scanPill: string;
@@ -61,6 +76,9 @@ export const light: Palette = {
   danger: '#E5484D',
   green: '#1DB954',
   amber: '#E8A13B',
+  ambreTexte: '#9A5B00',
+  vertTexte: '#117A3B',
+  dangerTexte: '#C62A30',
   sky: '#3EB8E5',
   scanInk: '#F4F6FA',
   scanPill: 'rgba(12,14,20,0.72)',
@@ -85,6 +103,11 @@ export const dark: Palette = {
   danger: '#F0575C',
   green: '#2BC963',
   amber: '#EFAF52',
+  // En sombre, l'ambre et le vert tiennent déjà ; le rouge s'éclaircit d'un
+  // cran pour rester à 4,5:1 sur un bouton rehaussé.
+  ambreTexte: '#EFAF52',
+  vertTexte: '#2BC963',
+  dangerTexte: '#F46D71',
   sky: '#54C4EE',
   scanInk: '#F4F6FA',
   scanPill: 'rgba(12,14,20,0.72)',
@@ -145,6 +168,21 @@ export function estSombre(c: Palette): boolean {
   const [r, g, b] = [m[1], m[2], m[3]].map((x) => parseInt(x, 16) / 255);
   return 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.35;
 }
+
+/**
+ * LE PLAFOND DES GROS CARACTÈRES SUR L'HABILLAGE DU PLAN.
+ *
+ * Revue d'accessibilité : React Native multiplie la taille ET l'interligne
+ * du texte par le réglage « Taille du texte » d'iOS. Les écrans de lecture
+ * (feuilles, listes, profil, devis, accueil) le suivent sans limite — c'est
+ * la règle. Mais l'habillage posé sur le plan vit dans des cellules de
+ * hauteur fixe (la pastille et son mot, le bandeau des mesures) : dès
+ * « Plus grand », « Décorer » chevauchait la pastille du dessus et la rangée
+ * du bas se faisait rogner. Ces mots-là grossissent de 20 % au plus ; au-delà,
+ * un appui long montre la loupe d'iOS (`accessibilityShowsLargeContentViewer`),
+ * comme dans les barres d'onglets d'Apple.
+ */
+export const PLAFOND_BARRE = 1.2;
 
 /** Le fond d'un bouton posé sur une surface, en sombre : un cran plus clair. */
 export const SURFACE_BOUTON_SOMBRE = '#232B37';

@@ -49,6 +49,7 @@ import { fr } from './result/format';
 import { haptic } from '../ui/haptic';
 import { useScanStore } from '../store/scanStore';
 import { radius, themedStyles, useTheme, type Palette } from '../theme';
+import { Presse } from '../components/Presse';
 
 const euros = (v: number) => `${fr(v, 2)} €`;
 
@@ -67,7 +68,9 @@ function Pas({
   const c = useTheme();
   const styles = getStyles(c);
   return (
-    <TouchableOpacity
+    /* Le pas s'enfonce sous le doigt, sans valeur animée par ligne (voir
+       `Presse`) : la liste du magasin en porte deux cents. */
+    <Presse
       accessibilityRole="button"
       accessibilityLabel={nom}
       disabled={!actif}
@@ -92,7 +95,7 @@ function Pas({
           strokeLinecap="round"
         />
       </Svg>
-    </TouchableOpacity>
+    </Presse>
   );
 }
 

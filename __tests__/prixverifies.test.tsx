@@ -187,7 +187,8 @@ describe('le bandeau dit « vérifiés » quand ça l’est', () => {
       .flat(3)
       .map((s) => (s && typeof s === 'object' ? (s as { color?: string }).color : null))
       .filter(Boolean);
-    expect(teintes).toContain(light.green);
+    // Le vert du MOT (revue d'accessibilité : `green` fait 2,6:1 sur blanc).
+    expect(teintes).toContain(light.vertTexte);
   });
 
   it('mais sans relevé du jour, il ne se vante pas', () => {

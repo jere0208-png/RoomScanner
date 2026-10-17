@@ -26,6 +26,10 @@ import {
   SNAPSHOT_ROOMS,
   SNAPSHOT_WALLS,
 } from '../src/export/snapshotFixture';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 beforeAll(() => jest.useFakeTimers());
 afterAll(() => {
@@ -70,7 +74,7 @@ function ouvrirLeMenu() {
   });
   act(() => jest.advanceTimersByTime(400));
   arbre = t;
-  const plus = t.root.findAllByType(TouchableOpacity).find((n) => n.props.accessibilityLabel === 'Plus')!;
+  const plus = t.root.findAll(estUneTouche).find((n) => n.props.accessibilityLabel === 'Options du plan')!;
   act(() => plus.props.onPress());
   act(() => jest.advanceTimersByTime(400));
   return t;

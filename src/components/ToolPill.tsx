@@ -17,12 +17,12 @@ import {
   Easing,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
-import { ombreBouton, themedStyles, useTheme, type Palette } from '../theme';
+import { ombreBouton, PLAFOND_BARRE, themedStyles, useTheme, type Palette } from '../theme';
+import { Presse } from './Presse';
 import { useGeste } from '../store/geste';
 import { haptic } from '../ui/haptic';
 import { useBulle } from '../ui/bulle';
@@ -117,6 +117,13 @@ export function PillSlot({
   anim: Animated.Value;
   children: React.ReactNode;
 }) {
+  /*
+    « RÉDUIRE LES ANIMATIONS » : les pastilles s'allument sur place, toutes
+    ensemble — ni montée depuis le bouton d'édition, ni grossissement, ni
+    cascade (revue UX iOS).
+  */
+  const reduit = useReduceMotion();
+  if (reduit) return <Animated.View style={{ opacity: anim }}>{children}</Animated.View>;
   // Le rang n'entre en scène qu'après les précédents, sans jamais dépasser
   // la moitié de la course : à huit pastilles, la dernière partirait sinon
   // quand l'animation est déjà finie.
@@ -180,6 +187,7 @@ export function ToolPill({
   halo,
   vide,
   ajout,
+  calque,
 }: {
   icon: ToolIcon;
   /**
@@ -220,6 +228,15 @@ export function ToolPill({
    * avant même d'avoir lu le mot.
    */
   ajout?: boolean;
+  /**
+   * UN CALQUE QUI BASCULE SE SENT — revue UX iOS. Allumer ou éteindre
+   * « Dimensions », « Meubles »… ne produisait aucune secousse, alors que
+   * les onglets de niveaux et la portée en donnaient déjà une. L'électricien
+   * ganté, téléphone en main, sait sans regarder que le calque a basculé.
+   * Réservé aux calques : un bouton d'action (annuler, enregistrer) a déjà
+   * son propre retour.
+   */
+  calque?: boolean;
 }) {
   const c = useTheme();
   const styles = getStyles(c);
@@ -229,6 +246,7 @@ export function ToolPill({
   const montrerBulle = useBulle((s) => s.montrer);
   const toucher = () => {
     if (!vide) {
+      if (calque) haptic('leger');
       onPress();
       return;
     }
@@ -295,9 +313,14 @@ export function ToolPill({
   */
   return (
     <View style={styles.toolCell} ref={cellule}>
-      <TouchableOpacity
+      {/* La pastille s'enfonce sous le doigt, comme `Bouton` : voir `Presse`. */}
+      <Presse
         style={[styles.toolPill, plein && styles.toolPillActive, eteint && styles.toolPillVide]}
         accessibilityLabel={label}
+        /* Gros caractères : le mot est plafonné (voir PLAFOND_BARRE) ; un appui
+           long le montre en grand dans la loupe d'iOS. */
+        accessibilityShowsLargeContentViewer={!!label}
+        accessibilityLargeContentTitle={label}
         accessibilityHint={vide ?? undefined}
         /*
           ET CE QUI EST ALLUMÉ SE DIT.
@@ -366,11 +389,12 @@ export function ToolPill({
           <Path d={SOLAIRES[icon]} fill={stroke} fillRule="evenodd" />
         </Svg>
         )}
-      </TouchableOpacity>
+      </Presse>
       {label ? (
         <Text
           style={[styles.toolLabel, active && !eteint && styles.toolLabelActive]}
           numberOfLines={1}
+          maxFontSizeMultiplier={PLAFOND_BARRE}
           // « Dimensions » tient dans sa cellule, quitte à céder un point.
           adjustsFontSizeToFit
           minimumFontScale={0.85}>

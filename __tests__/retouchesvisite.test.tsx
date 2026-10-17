@@ -205,8 +205,12 @@ describe('les pièces de la visite', () => {
     expect(bouton('Séjour').props.accessibilityState).toEqual({ selected: true });
     expect(bouton('Chambre').props.accessibilityState).toEqual({ selected: false });
     expect(style('Séjour').backgroundColor).not.toEqual(style('Chambre').backgroundColor);
-    // Petites : moins de trente points de haut.
-    expect(style('Chambre').height).toBeLessThanOrEqual(28);
+    // Discrètes, mais à la taille d'un doigt (revue d'accessibilité) : 36 à
+    // 40 points dessinés, 44 sous le doigt avec le débord.
+    expect(style('Chambre').height).toBeGreaterThanOrEqual(36);
+    expect(style('Chambre').height).toBeLessThanOrEqual(40);
+    const debord = bouton('Chambre').props.hitSlop as { top: number; bottom: number };
+    expect(style('Chambre').height + debord.top + debord.bottom).toBeGreaterThanOrEqual(44);
 
     // En colonne, contre le bord droit — plus de rangée en travers de la vue.
     const colonne = t.root.findAll((n) => n.props?.testID === 'pieces-de-la-visite')[0];

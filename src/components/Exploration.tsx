@@ -68,6 +68,26 @@ import { useFigePendantLeGeste } from '../store/geste';
 import { useImageSansLogo } from '../store/accountStore';
 import { usePriseDeVue } from '../ui/partageRendu';
 import { AlerteHote } from './AlerteHote';
+import { annoncer } from '../ui/annoncer';
+import { useReduceMotion } from '../ui/useReduceMotion';
+
+/*
+  LES BOUTONS DE PIÈCE, À LA TAILLE D'UN DOIGT — revue d'accessibilité.
+
+  Ils faisaient 26 points de haut, six d'écart, et 34 points de cible avec
+  leur débord : on les touche debout, d'une main, parfois ganté, au bord
+  droit de l'écran. 36 points dessinés, 44 sous le doigt (débord de 4 en
+  haut et en bas), et huit points entre deux. La colonne n'en montre que
+  quatre et demi au plus — la moitié du cinquième dit qu'elle défile — et
+  elle suit le visiteur : la pièce où l'on est reste à l'écran.
+*/
+export const PIECE_H = 36;
+export const PIECE_ECART = 8;
+export const PIECE_DEBORD = (44 - PIECE_H) / 2;
+/** Hauteur de la colonne des pièces : 42 % de l'écran, et 4,5 boutons au plus. */
+export function hauteurColonnePieces(hauteurEcran: number): number {
+  return Math.min(hauteurEcran * 0.42, 4 * (PIECE_H + PIECE_ECART) + PIECE_H / 2);
+}
 
 /**
  * LE PAS — 1,65 m/s à fond de manette : celui de quelqu'un qui visite d'un
@@ -808,6 +828,34 @@ export function Exploration({
   useEffect(() => {
     if (!capturant) setPosePhoto(null);
   }, [capturant]);
+  // « Image prête » se DIT aussi : `accessibilityLiveRegion` est muet sur iOS.
+  useEffect(() => {
+    if (prete && !capturant) annoncer('Image prête');
+  }, [prete, capturant]);
+
+  /*
+    LA PIÈCE OÙ L'ON EST RESTE DANS LA COLONNE — quand elle défile (plus de
+    quatre pièces ; l'app est en portrait seulement, et même un SE garde
+    ses quatre boutons et demi sous les 42 % d'écran), elle suit
+    le visiteur : à
+    chaque changement de pièce, la colonne glisse juste ce qu'il faut pour
+    que le bouton teinté soit visible.
+  */
+  const reduit = useReduceMotion();
+  const colonne = useRef<ScrollView>(null);
+  const hautsDesPieces = useRef(new Map<string, number>());
+  const decalageColonne = useRef(0);
+  const hauteurColonne = hauteurColonnePieces(hauteur);
+  useEffect(() => {
+    if (!pieceIci) return;
+    const y = hautsDesPieces.current.get(pieceIci);
+    if (y == null) return;
+    const haut = decalageColonne.current;
+    let vers: number | null = null;
+    if (y - PIECE_DEBORD < haut) vers = y - PIECE_DEBORD;
+    else if (y + PIECE_H + PIECE_DEBORD > haut + hauteurColonne) vers = y + PIECE_H + PIECE_DEBORD - hauteurColonne;
+    if (vers != null) colonne.current?.scrollTo?.({ y: Math.max(0, vers), animated: !reduit });
+  }, [pieceIci, hauteurColonne, reduit]);
   const cameraPhoto = useMemo(
     () => (posePhoto ? cameraDe(posePhoto) : null),
     [posePhoto, ouverture], // eslint-disable-line react-hooks/exhaustive-deps
@@ -827,7 +875,14 @@ export function Exploration({
       animationType="fade"
       presentationStyle="fullScreen"
       onRequestClose={onClose}>
-      <View style={styles.fond}>
+      {/* Le « Z » à deux doigts de VoiceOver termine la visite, comme
+          « Terminer ». */}
+      <View
+        style={styles.fond}
+        onAccessibilityEscape={() => {
+          arreterTout();
+          onClose();
+        }}>
         {/* La 3D, à hauteur d'œil. Elle ne prend aucun doigt : les deux
             pouces sont pour la manette et le regard. */}
         <View ref={vueCapturee} collapsable={false} style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -972,10 +1027,14 @@ export function Exploration({
         */}
         {piecesNommees.length > 1 && (
           <ScrollView
+            ref={colonne}
             testID="pieces-de-la-visite"
-            style={[styles.pieces, { top: marges.top + 58 }]}
+            style={[styles.pieces, { top: marges.top + 58, maxHeight: hauteurColonne }]}
             contentContainerStyle={styles.piecesFond}
-            showsVerticalScrollIndicator={false}>
+            scrollEventThrottle={64}
+            onScroll={(e) => {
+              decalageColonne.current = e.nativeEvent.contentOffset.y;
+            }}>
             {piecesNommees.map((p) => {
               const ici = p.id === pieceIci;
               return (
@@ -984,7 +1043,8 @@ export function Exploration({
                   accessibilityRole="button"
                   accessibilityLabel={`Aller dans : ${p.nom}`}
                   accessibilityState={{ selected: ici }}
-                  hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
+                  hitSlop={{ top: PIECE_DEBORD, bottom: PIECE_DEBORD, left: 8, right: 8 }}
+                  onLayout={(e) => hautsDesPieces.current.set(p.id, e.nativeEvent.layout.y)}
                   style={({ pressed }) => [styles.piece, ici && styles.pieceIci, pressed && styles.enfonce]}
                   onPress={() => allerDans(p.id)}>
                   <Text style={[styles.pieceTexte, ici && styles.pieceTexteIci]} numberOfLines={1}>
@@ -1070,13 +1130,14 @@ const getStyles = themedStyles((c: Palette) =>
     },
     terminerTexte: { color: c.blue, fontSize: 16, fontWeight: '600' },
     hautDroite: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    /* Une colonne contre le bord droit : pas plus de deux cinquièmes de l'écran. */
-    pieces: { position: 'absolute', right: 14, maxHeight: '42%', maxWidth: 150 },
-    piecesFond: { alignItems: 'flex-end', gap: 6, paddingBottom: 4 },
+    /* Une colonne contre le bord droit : sa hauteur, voir `hauteurColonnePieces`.
+       Le débord du haut et du bas tient dans la colonne (rembourrage). */
+    pieces: { position: 'absolute', right: 14, maxWidth: 150 },
+    piecesFond: { alignItems: 'flex-end', gap: PIECE_ECART, paddingVertical: PIECE_DEBORD },
     piece: {
-      height: 26,
-      paddingHorizontal: 10,
-      borderRadius: 13,
+      height: PIECE_H,
+      paddingHorizontal: 12,
+      borderRadius: PIECE_H / 2,
       backgroundColor: c.surfaceVoile,
       alignItems: 'center',
       justifyContent: 'center',

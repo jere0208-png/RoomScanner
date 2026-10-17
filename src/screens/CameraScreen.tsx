@@ -154,7 +154,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     fontWeight: '600',
   },
   deniedText: {
-    color: c.danger,
+    color: c.dangerTexte,
     fontSize: 13.5,
     lineHeight: 19,
     textAlign: 'center',

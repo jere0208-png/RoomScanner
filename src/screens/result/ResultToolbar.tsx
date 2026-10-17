@@ -514,6 +514,7 @@ export function Toolbar2D({
         */
         <ToolPill
           key="ruler"
+          calque
           icon="ruler"
           label={DIMENSIONS}
           active={showMeasures}
@@ -522,6 +523,7 @@ export function Toolbar2D({
         />,
         <ToolPill
           key="furniture"
+          calque
           icon="furniture"
           label="Meubles"
           active={showFurniture}
@@ -536,6 +538,7 @@ export function Toolbar2D({
         />,
         <ToolPill
           key="surface"
+          calque
           icon="surface"
           label="Surfaces"
           active={showSurfaces}
@@ -549,6 +552,7 @@ export function Toolbar2D({
         // j'ai posé ».
         <ToolPill
           key="elec"
+          calque
           icon="appareil"
           label="Appareils"
           active={showFixtures}
@@ -738,6 +742,7 @@ export function Toolbar3D({
   const outils = [
     <ToolPill
       key="ruler"
+      calque
       icon="ruler"
       label={DIMENSIONS}
       active={showMeasures}
@@ -746,6 +751,7 @@ export function Toolbar3D({
     />,
     <ToolPill
       key="furniture"
+      calque
       icon="furniture"
       label="Meubles"
       active={showFurniture}
@@ -756,6 +762,7 @@ export function Toolbar3D({
        son propre calque, dans le menu. */
     <ToolPill
       key="surface"
+      calque
       icon="surface"
       label="Surfaces"
       active={show3DSurfaces}
@@ -766,6 +773,7 @@ export function Toolbar3D({
        montrer. Une pièce équipée en porte une dizaine. */
     <ToolPill
       key="reperes"
+      calque
       icon="reperes"
       label="Repères"
       active={showElecTags}

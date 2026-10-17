@@ -58,6 +58,10 @@ import {
 import { castToWall, planFrameAngle, segLength } from '../src/geometry/floorplan';
 
 import type { CeilingFixture } from '../src/geometry/ceiling';
+import { Presse } from '../src/components/Presse';
+
+/** Un bouton de l'app : `TouchableOpacity`, ou `Presse` (pastilles, ronds d'en-tête). */
+const estUneTouche = (n: { type: unknown }) => n.type === TouchableOpacity || n.type === Presse;
 
 beforeAll(() => jest.useFakeTimers());
 afterAll(() => jest.useRealTimers());
@@ -146,7 +150,7 @@ const textes = (tree: TestRenderer.ReactTestRenderer) =>
 /** Le bouton portant cette étiquette d'accessibilité. */
 const bouton = (tree: TestRenderer.ReactTestRenderer, label: string) =>
   tree.root
-    .findAllByType(TouchableOpacity)
+    .findAll(estUneTouche)
     .find((n) => n.props.accessibilityLabel === label);
 
 /** Une ligne du menu « Afficher » (ouvert par « Plus ») : un interrupteur. */
@@ -627,7 +631,7 @@ describe('l’écran des résultats', () => {
       bas, ou trois mots ne tiennent pas.
     */
     const boutonsDuBandeau = tree.root
-      .findAllByType(TouchableOpacity)
+      .findAll(estUneTouche)
       .filter((n) =>
         ['Mesures', 'Laser', 'Détacher'].includes(
           String(n.props.accessibilityLabel),
@@ -1197,7 +1201,7 @@ describe('les feuilles de l’écran des résultats', () => {
    */
   it('ouvre le renommage du scan, avec sa copie', () => {
     const tree = monter();
-    act(() => bouton(tree, 'Plus')!.props.onPress());
+    act(() => bouton(tree, 'Options du plan')!.props.onPress());
     expect(textes(tree)).toContain('Renommer le plan');
     actionDuMenu(tree, 'Renommer le plan');
     const vu = textes(tree);
@@ -1236,7 +1240,7 @@ describe('les feuilles de l’écran des résultats', () => {
   */
   it('ouvre le choix des cotes plutôt qu’un mode d’attente', () => {
     const tree = monter();
-    act(() => bouton(tree, 'Plus')!.props.onPress());
+    act(() => bouton(tree, 'Options du plan')!.props.onPress());
     // Le menu regroupé (revue des « découvreurs ») : « Ajouter une pièce »,
     // puis la façon.
     actionDuMenu(tree, 'Ajouter une pièce');
@@ -1260,7 +1264,7 @@ describe('les feuilles de l’écran des résultats', () => {
   it('pose la pièce choisie, neuve et prête à être réglée', () => {
     const tree = monter();
     const avant = useScanStore.getState().rooms.length;
-    act(() => bouton(tree, 'Plus')!.props.onPress());
+    act(() => bouton(tree, 'Options du plan')!.props.onPress());
     actionDuMenu(tree, 'Ajouter une pièce');
     actionDuMenu(tree, 'Dessiner une pièce à la main');
     const wc = tree.root
@@ -1418,7 +1422,7 @@ describe('les feuilles de l’écran des résultats', () => {
 describe('la rangée d’outils', () => {
   /** Bascule en vue 3D, animation comprise. */
   const passerEn3D = (tree: TestRenderer.ReactTestRenderer) => {
-    act(() => bouton(tree, 'Passer en 3D')!.props.onPress());
+    act(() => bouton(tree, '2D, passer en 3D')!.props.onPress());
     act(() => {
       jest.advanceTimersByTime(1200);
     });
@@ -1443,7 +1447,7 @@ describe('la rangée d’outils', () => {
     // Allumé au départ : c'est ce qu'on vient chercher.
     expect(plan().props.showFixtures).not.toBe(false);
     const bouton = tree.root
-      .findAllByType(TouchableOpacity)
+      .findAll(estUneTouche)
       .find((n) => n.props.accessibilityLabel === 'Appareils');
     expect(bouton).toBeDefined();
     act(() => bouton!.props.onPress());
@@ -1504,7 +1508,7 @@ describe('la rangée d’outils', () => {
     /** La hauteur du bloc absolu qui porte cette pastille. */
     const hauteurDe = (label: string) => {
       const b = tree.root
-        .findAllByType(TouchableOpacity)
+        .findAll(estUneTouche)
         .find((n) => n.props.accessibilityLabel === label);
       let n: TestRenderer.ReactTestInstance | null = b ?? null;
       while (n) {
@@ -1575,7 +1579,7 @@ describe('la rangée d’outils', () => {
     });
     const OUTILS = ['Aligner', 'Appareil', 'Meuble', 'Plafond', 'Note'];
     const ordre = tree.root
-      .findAllByType(TouchableOpacity)
+      .findAll(estUneTouche)
       .map((n) => String(n.props.accessibilityLabel ?? ''))
       .filter((l) => OUTILS.includes(l));
     expect(ordre[0]).toBe('Aligner');
@@ -1615,7 +1619,7 @@ describe('la rangée d’outils', () => {
   it('porte ses calques en vue 3D, murs et repères compris', () => {
     const tree = monter();
     passerEn3D(tree);
-    expect(bouton(tree, 'Passer en 2D')).toBeDefined();
+    expect(bouton(tree, '3D, passer en 2D')).toBeDefined();
     // La rangée garde l'essentiel ; le reste vit dans le menu « Afficher ».
     // « Dimensions » en 3D comme en 2D (revue des « découvreurs »).
     expect(bouton(tree, 'Dimensions')).toBeDefined();
@@ -1731,7 +1735,7 @@ describe('le sigle des appareils en 3D', () => {
 describe('le menu du scan', () => {
   it('illustre Normes auto avec le bouclier du contrôle', () => {
     const tree = monter();
-    const points = bouton(tree, 'Plus')!;
+    const points = bouton(tree, 'Options du plan')!;
     act(() => points.props.onPress());
     const vu = textes(tree);
     expect(vu).toContain('Normes auto');
@@ -1762,7 +1766,7 @@ describe('le menu du scan', () => {
   */
   it('se lit dans l’ordre : le métier, le projet, ajouter, modifier, puis le dossier', () => {
     const tree = monter();
-    act(() => bouton(tree, 'Plus')!.props.onPress());
+    act(() => bouton(tree, 'Options du plan')!.props.onPress());
     const vu = textes(tree);
     const rang = (m: string) => {
       const i = vu.indexOf(m);
@@ -1788,7 +1792,7 @@ describe('le menu du scan', () => {
     const avant = useUsage.getState().modeElec;
     act(() => useUsage.setState({ modeElec: false }));
     const tree = monter();
-    act(() => bouton(tree, 'Plus')!.props.onPress());
+    act(() => bouton(tree, 'Options du plan')!.props.onPress());
     const vu = textes(tree);
     expect(vu).not.toContain('Normes auto');
     // Et plus de proposition du mode : il s'active au profil (revue des
@@ -2029,7 +2033,7 @@ describe('ajouter un mur à la main', () => {
   */
   it('est offert dans le menu du scan', () => {
     const tree = monter();
-    act(() => bouton(tree, 'Plus')!.props.onPress());
+    act(() => bouton(tree, 'Options du plan')!.props.onPress());
     expect(textes(tree)).toContain('Ajouter un mur');
   });
 
@@ -2137,7 +2141,7 @@ describe('redétecter les pièces', () => {
   // « Redétecter » est un mot d'informaticien).
   it('est offert dans le menu du scan', () => {
     const tree = monter();
-    act(() => bouton(tree, 'Plus')!.props.onPress());
+    act(() => bouton(tree, 'Options du plan')!.props.onPress());
     expect(textes(tree)).toContain('Recalculer les pièces');
   });
 
