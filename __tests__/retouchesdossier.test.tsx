@@ -39,18 +39,14 @@ const latin1 = (b: Uint8Array) => {
 };
 
 describe('la visite garde les couleurs des meubles', () => {
-  it('des lampes plus douces, d’une lumière moins orangée, et une nuit moins noire', () => {
+  it('plus de lampe ni de température dans la visite : les meubles gardent leur teinte sous le jour', () => {
     const natif = lire('modules/react-native-room-scan/ios/RoomScanVisite.swift');
-    // Le blanc chaud suit désormais la température choisie (voir
-    // `eclairagevisite.test.ts`) : 3000 K d'office, adouci vers le blanc.
-    expect(natif).toContain('l.color = teinteDesLampes');
-    expect(natif).toContain('RoomScanVisite.teinteDeKelvin(3000)');
-    // La force de chaque luminaire : celle de ses faisceaux d'hier (voir
-    // `retouchesvisite.test.tsx`), au vingtième (« on va sur 5 % »).
-    expect(natif).toContain('case 4: return 250  // le plafonnier');
-    expect(natif).toContain('case 2: return 240  // le spot');
+    expect(natif).not.toContain('teinteDesLampes');
+    expect(natif).not.toContain('teinteDeKelvin');
     expect(natif).not.toContain('intensite: 700');
     expect(natif).not.toContain('intensite: 720');
+    // Le plafond de couleur des meubles, lui, demeure.
+    expect(natif).toContain('nuanceurPlafondDesMeubles');
   });
 });
 

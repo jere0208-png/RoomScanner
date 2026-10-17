@@ -3,9 +3,9 @@
  * LA VISITE ET LES POINTS LUMINEUX DU PLAN.
  *
  * Relevés du patron :
- *   — « diminue la lumière, son interrupteur allumé, dans la visite. La
- *     lumière doit être plus perceptible sans augmenter ; au contraire elle
- *     doit moins impacter les meubles, qui deviennent blancs sous lumière » ;
+ *   — « diminue la lumière, son interrupteur allumé, dans la visite » — puis
+ *     « supprime la possibilité d'éclairer la pièce en appuyant sur le bouton
+ *     lors de la visite » : plus aucune lampe ne s'y allume ;
  *   — « un tableau de trois rangées doit pouvoir se réduire à deux en
  *     enlevant le rail vide, pas forcément le troisième : j'ai vidé le premier
  *     rail et je ne pouvais pas passer à deux rangées » ;
@@ -27,7 +27,6 @@ jest.mock('react-native-room-scan', () => ({
   poserCameraDeVisite: jest.fn(() => true),
   poserOrbiteDeMaquette: jest.fn(() => true),
   poserLeveeDeMaquette: jest.fn(() => true),
-  poserLampesDeVisite: jest.fn(() => true),
 }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),
@@ -66,23 +65,11 @@ const dep = (id: string, organe: DepartExistant['organe'], rangee: number, calib
 
 describe('la lumière de la visite', () => {
   const natif = lire('modules', 'react-native-room-scan', 'ios', 'RoomScanVisite.swift');
-  const debut = natif.indexOf('static func puissance(_ genre: Int)');
-  const corps = natif.slice(debut, natif.indexOf('\n  }\n', debut));
 
-  it('des lampes plus douces : aucun luminaire ne dépasse 360 (une applique, deux faisceaux d’hier)', () => {
-    const forces = [...corps.matchAll(/return (\d+)/g)].map((m) => Number(m[1]));
-    expect(forces.length).toBeGreaterThanOrEqual(5);
-    expect(Math.max(...forces)).toBeLessThanOrEqual(360);
-  });
-
-  it('elles éclairent la pièce, et ne touchent pas les meubles', () => {
-    expect(natif).toMatch(/l\.categoryBitMask = piece >= 0 \? Self\.masqueDeLaPiece\(piece\) : Self\.MASQUE_PIECE/);
-    expect(natif).toMatch(/categoryBitMask = Self\.MASQUE_MEUBLE/);
-  });
-
-  it('la lumière se voit à sa source : un halo autour du luminaire allumé', () => {
-    expect(natif).toContain('SCNBillboardConstraint()');
-    expect(natif).toMatch(/eclairage\.addChildNode\(halo\(/);
+  it('plus de lampe allumée : ni faisceau, ni halo, ni masque par pièce', () => {
+    expect(natif).not.toMatch(/static func puissance|FORCE_DES_LAMPES|lumiereDeLaPiece/);
+    expect(natif).not.toMatch(/SCNBillboardConstraint|matiereDuHalo|eclairage\.addChildNode/);
+    expect(natif).not.toMatch(/masqueDeLaPiece|MASQUE_PIECE|MASQUE_MEUBLE/);
   });
 });
 

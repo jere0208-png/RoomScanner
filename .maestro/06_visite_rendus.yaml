@@ -1,12 +1,13 @@
-# La visite 3D, lampes éteintes puis allumées — relevé du patron : « fais des
-# screens de quatre propositions, lumières allumées et non allumées ». Le
-# rendu C a été retenu ; les captures suivent ses réglages.
+# La visite 3D, telle qu'on la voit — relevé du patron : « supprime la
+# possibilité d'éclairer la pièce en appuyant sur le bouton lors de la
+# visite ». Plus de lampes à allumer : une seule capture, à l'éclairage de
+# base de la pièce.
 appId: ${APP_ID}
-name: Visite — éteinte et allumée
+name: Visite
 ---
 - launchApp
 - runFlow: commun/vers-accueil.yaml
-# Les lampes de l'exemple n'existent qu'en mode Électricité.
+# Les luminaires de l'exemple n'existent qu'en mode Électricité.
 - tapOn: "Mon compte"
 - waitForAnimationToEnd:
     timeout: 5000
@@ -21,8 +22,7 @@ name: Visite — éteinte et allumée
 - runFlow: commun/ouvrir-exemple.yaml
 - tapOn: "Explorer"
 - extendedWaitUntil:
-    visible:
-      id: "tout-allumer"
+    visible: "Terminer"
     timeout: 20000
 - waitForAnimationToEnd:
     timeout: 8000
@@ -35,15 +35,7 @@ name: Visite — éteinte et allumée
 - waitForAnimationToEnd:
     timeout: 5000
 
-# Le rendu retenu (C, « Chaleureux du soir »), lampes éteintes puis allumées.
-- takeScreenshot: ${THEME}-60-visite-eteinte
-- tapOn:
-    id: "tout-allumer"
-- waitForAnimationToEnd:
-    timeout: 4000
-- takeScreenshot: ${THEME}-61-visite-allumee
-- tapOn:
-    id: "tout-allumer"
+- takeScreenshot: ${THEME}-60-visite
 
 # Retour au grand public pour les parcours suivants.
 - tapOn: "Terminer"

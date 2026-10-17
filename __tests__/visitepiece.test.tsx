@@ -17,7 +17,6 @@ jest.mock('react-native-room-scan', () => ({
   poserCameraDeVisite: jest.fn(() => true),
   poserOrbiteDeMaquette: jest.fn(() => true),
   poserLeveeDeMaquette: jest.fn(() => true),
-  poserLampesDeVisite: jest.fn(() => true),
 }));
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(async () => null),

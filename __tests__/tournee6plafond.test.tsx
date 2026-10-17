@@ -26,7 +26,7 @@ import { CEILING_SYMBOL, type CeilingFixture } from '../src/geometry/ceiling';
 import { detectRooms, mergeColinear, splitAtJunctions, weldCorners, type WallSeg } from '../src/geometry/floorplan';
 import { groupesDesAppareils } from '../src/geometry/appareils3d';
 import type { Fixture } from '../src/geometry/electrical';
-import { GENRE, basculer, lampesDeLInterrupteur, lampesDeLaScene, rangsDesLampes } from '../src/geometry/lumieres';
+import { GENRE, lampesDeLaScene, rangsDesLampes } from '../src/geometry/lumieres';
 import { maillageDeLaMaquette } from '../src/geometry/maquette3d';
 import { jalonsDuRuban, longueurDuRuban } from '../src/geometry/ruban';
 import { buildScene, type ScenePalette } from '../src/geometry/scene3d';
@@ -124,7 +124,7 @@ describe('le ruban LED lié à un interrupteur', () => {
   const sc = buildScene(MURS, [], [], { palette: PAL, rooms: ROOMS as never, showSurfaces: true, ceiling: [LIE], fixtures: [INTER] });
   const lampes = lampesDeLaScene(sc.appareils ?? []);
 
-  it('est une lampe de la visite : une nappe douce, depuis le milieu de son tracé', () => {
+  it('est une lampe de la scène, posée au milieu de son tracé', () => {
     const l = lampes.find((x) => x.id === 'cl-r')!;
     expect(l).toBeDefined();
     expect(l.genre).toBe(GENRE.plafonnier);
@@ -132,18 +132,10 @@ describe('le ruban LED lié à un interrupteur', () => {
     expect(l.z).toBeCloseTo(1.5, 2);
   });
 
-  it('son diffuseur court sur tout le tracé, et s’allume avec elle', () => {
+  it('son diffuseur court sur tout le tracé, dans son groupe à lui', () => {
     const groupes = groupesDesAppareils(sc.appareils ?? [], rangsDesLampes(lampes));
     const diffuseur = groupes.filter((g) => g.mat === 'lumiere' && g.lampe === lampes.find((x) => x.id === 'cl-r')!.index);
     expect(diffuseur.length).toBeGreaterThan(0);
-  });
-
-  it('l’interrupteur qui le commande l’allume, puis l’éteint', () => {
-    const siennes = lampesDeLInterrupteur(INTER, [INTER], [LIE], () => 'room-1').filter((id) => lampes.some((x) => x.id === id));
-    expect(siennes).toEqual(['cl-r']);
-    const allume = basculer(new Set(), siennes);
-    expect(allume.has('cl-r')).toBe(true);
-    expect(basculer(allume, siennes).has('cl-r')).toBe(false);
   });
 
   it('ses jalons se répartissent sur toute sa longueur', () => {

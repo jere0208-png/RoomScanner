@@ -13,7 +13,7 @@ import { ECLAT_LAMPE } from '../src/ui/maquette';
 
 const lire = (p: string) => readFileSync(join(__dirname, '..', p), 'utf8');
 
-describe('le halo se pose à l’ampoule', () => {
+describe('le halo de la maquette se pose à l’ampoule', () => {
   it('une DCL rayonne de son ampoule, à soixante centimètres sous la rosace', () => {
     expect(DESCENTE_DE_LA_LUMIERE.dcl).toBeCloseTo(0.59, 2);
     // Un spot et un plafonnier rayonnent au ras du plafond ; un ventilateur sous son moteur.
@@ -26,13 +26,6 @@ describe('le halo se pose à l’ampoule', () => {
     expect(vue).toContain('y: haut - (DESCENTE_DE_LA_LUMIERE[cl.kind] ?? 0.08)');
     expect(vue).not.toContain('y: haut - 0.08, z: cl.at.z');
   });
-
-  it('le natif place la lumière de la DCL au même endroit', () => {
-    const natif = lire('modules/react-native-room-scan/ios/RoomScanVisite.swift');
-    // La lumière de la pièce se pose au centre de l'ampoule (voir `descente`).
-    expect(natif).toContain('case 3: return 0.59');
-    expect(natif).toContain('e.y += p.y - Self.descente(genre)');
-  });
 });
 
 describe('les meubles gardent leur couleur', () => {
@@ -42,14 +35,16 @@ describe('les meubles gardent leur couleur', () => {
   });
 
   /*
-    ALLUMER N'ÉTEINT PAS LE JOUR — relevé du patron, plus tard : « sur la
-    visite, allumer une pièce rend les murs plus sombres, ce devrait être
-    l'inverse ». La lampe AJOUTE sa lumière ; le jour ne dépend plus d'elle.
+    LE JOUR DE LA VISITE NE DÉPEND D'AUCUNE LAMPE — relevé du patron : « sur
+    la visite, allumer une pièce rend les murs plus sombres », puis « supprime
+    la possibilité d'éclairer la pièce en appuyant sur le bouton lors de la
+    visite ». Plus de nuit ni de lampe : le jour est fixe.
   */
-  it('allumer ajoute de la lumière : le jour ne baisse plus quand une lampe s’allume', () => {
+  it('le jour de la visite ne baisse jamais : il est fixe', () => {
     const natif = lire('modules/react-native-room-scan/ios/RoomScanVisite.swift');
     expect(natif).not.toContain('nuitAllumee');
     expect(natif).not.toContain('if allume { nuit = true }');
     expect(natif).not.toContain('noeudDuContre?.light = nil');
+    expect(natif).toContain('let j = maquette ? Self.JOUR_MAQUETTE : Self.JOUR_VISITE');
   });
 });

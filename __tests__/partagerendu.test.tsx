@@ -33,7 +33,6 @@ jest.mock('react-native-room-scan', () => ({
   poserCameraDeVisite: jest.fn(() => true),
   poserOrbiteDeMaquette: jest.fn(() => false),
   poserLeveeDeMaquette: jest.fn(() => false),
-  poserLampesDeVisite: jest.fn(() => false),
 }));
 
 import React from 'react';

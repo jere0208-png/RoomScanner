@@ -395,11 +395,6 @@ export const RoomScanVisite = UIManager.getViewManagerConfig?.(
         sols: number[];
         camera?: number[];
         fond: string;
-        /* La température des lampes de la visite, en kelvins (voir `temperatureLampes`). */
-        temperature?: number;
-        /* La pièce de chaque triangle du maillage, de chaque sol (voir `maillageDeLaVisite`). */
-        piecesDuMaillage?: number[];
-        piecesDesSols?: number[];
         /* LE MODE ORBITE — la maquette du plan (voir `geometry/maquette3d`). */
         orientes?: number[];
         ecorche?: number[];
@@ -464,18 +459,6 @@ export function poserLeveeDeMaquette(cle: string, levee: number, solY: number): 
   const regie = Platform.OS === 'ios' ? NativeModules.RoomScanVisiteRegie : undefined;
   if (!regie?.levee) return false;
   regie.levee(cle, levee, solY);
-  return true;
-}
-
-/**
- * LES LAMPES DE LA VISITE, posées directement — neuf nombres par lampe :
- * `[rang, genre, allumée, source, x, y, z, nx, nz]` (voir `geometry/lumieres`).
- * Par la régie, comme la caméra : allumer ne reconvertit pas le logement.
- */
-export function poserLampesDeVisite(cle: string, valeurs: number[]): boolean {
-  const regie = Platform.OS === 'ios' ? NativeModules.RoomScanVisiteRegie : undefined;
-  if (!regie?.lampes) return false;
-  regie.lampes(cle, valeurs);
   return true;
 }
 

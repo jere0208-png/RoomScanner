@@ -39,29 +39,19 @@ import {
 } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { RoomScanVisite, poserCameraDeVisite, poserLampesDeVisite } from 'react-native-room-scan';
+import { RoomScanVisite, poserCameraDeVisite } from 'react-native-room-scan';
 import { Iso3DView } from './Iso3DView';
 import { SOLAIRES } from '../ui/solaires';
 import { floorsOf, useScanStore } from '../store/scanStore';
 import { useModeElec } from '../store/usage';
 import { filtrerAuNiveau, roomParts, type Pt } from '../geometry/floorplan';
 import { buildScene, type ScenePalette } from '../geometry/scene3d';
-import { cameraNative, maillageDeLaVisite, pieceDeLaFace } from '../geometry/visite3d';
+import { cameraNative, maillageDeLaVisite } from '../geometry/visite3d';
 import { maillageDesMeubles } from '../geometry/modeles3d';
 import { groupesDesAppareils, habillerLesTableaux } from '../geometry/appareils3d';
 import { RAIL_VIDE, railDuReleve } from '../geometry/existant';
 import { useTableauDeReference } from '../store/tableauDeReference';
-import {
-  basculer,
-  interrupteurSousLeDoigt,
-  interrupteursDeLaVisite,
-  lampesDeLaScene,
-  lampesDeLInterrupteur,
-  lampesPourLeNatif,
-  rangsDesLampes,
-  type Lampe,
-} from '../geometry/lumieres';
-import { fixturePlacement, roomInputsOf } from '../geometry/nfc15100';
+import { lampesDeLaScene, rangsDesLampes } from '../geometry/lumieres';
 import { mixHex, pointInPolygon } from '../geometry/appearance';
 import { MAQUETTE, matieresDesSols } from '../ui/maquette';
 import { hexDePeinture } from '../ui/peintures';
@@ -78,8 +68,6 @@ import { useFigePendantLeGeste } from '../store/geste';
 import { useImageSansLogo } from '../store/accountStore';
 import { usePriseDeVue } from '../ui/partageRendu';
 import { AlerteHote } from './AlerteHote';
-import { nomDeTemperature, useTemperatureLampes } from '../store/temperatureLampes';
-import { astuce } from '../ui/astuce';
 
 /**
  * LE PAS — 1,65 m/s à fond de manette : celui de quelqu'un qui visite d'un
@@ -91,9 +79,6 @@ import { astuce } from '../ui/astuce';
  * part et on s'arrête aussi net qu'avant.
  */
 export const VITESSE_MARCHE = 1.65;
-/** Un appui, pas un geste : moins de trois dixièmes de seconde, à peine bougé. */
-const APPUI_MS = 300;
-const APPUI_PX = 12;
 /**
  * L'OUVERTURE DU REGARD — 68° EN LARGEUR, quelle que soit la forme de l'écran.
  *
@@ -404,28 +389,19 @@ export function Exploration({
     // Les caisses restent au canevas : la visite a les vrais meubles, et la
     // vraie prise au mur (voir `appareils3d`).
     /*
-      CHAQUE LAMPE A SON DIFFUSEUR À ELLE — il s'allume avec elle (voir
-      `lumieres`). Les autres matières se partagent leurs groupes, comme avant.
+      LES LUMINAIRES SE VOIENT, ÉTEINTS — relevé du patron : « supprime la
+      possibilité d'éclairer la pièce en appuyant sur le bouton lors de la
+      visite ». Chaque lampe garde son diffuseur à elle, qui porte son rang :
+      c'est ce qui le distingue, côté natif, de la lueur des diffuseurs de la
+      maquette. Dans la visite, il reste toujours éteint.
     */
-    /*
-      UNE LAMPE, UNE PIÈCE — relevé du patron : « la lumière ne doit pas agir
-      sur les autres pièces que celle où elle est allumée ». Chaque face, chaque
-      sol et chaque lampe retient le rang de sa pièce ; le natif n'éclaire
-      d'une lampe que le bâti de la sienne.
-    */
-    const contours = roomParts(walls, rooms).map((p) => (p.surface?.pts ?? []).map((q) => ({ x: q.x, z: q.z })));
-    const lampes = lampesDeLaScene(appareils ?? []).map((l) => ({
-      ...l,
-      // Une applique est au nu du mur : on la cherche un peu dans la pièce.
-      piece: pieceDeLaFace([{ x: l.x + l.nx * 0.1, y: l.y, z: l.z + l.nz * 0.1 }], { x: 0, y: 1, z: 0 }, contours),
-    }));
+    const lampes = lampesDeLaScene(appareils ?? []);
     return {
-      ...maillageDeLaVisite(faces, { sansMeubles: true, pieces: contours }),
+      ...maillageDeLaVisite(faces, { sansMeubles: true }),
       meubles: maillageDesMeubles(
         meubles ?? [],
         groupesDesAppareils(habillerLesTableaux(appareils ?? [], rail), rangsDesLampes(lampes)),
       ),
-      lampes,
     };
   }, [
     natif,
@@ -443,36 +419,6 @@ export function Exploration({
     accents,
     rail,
   ]);
-  /*
-    LES INTERRUPTEURS DE LA VISITE, et ce que chacun allume — relevé du
-    patron : « donne la possibilité d'allumer les lumières depuis un
-    interrupteur ». Les liens du plan d'abord ; sans lien, la pièce où il est.
-  */
-  const inters = useMemo(() => interrupteursDeLaVisite(fixtures, walls), [fixtures, walls]);
-  const pieceDe = useMemo(() => {
-    const entrees = roomInputsOf(
-      rooms.map((r) => ({ ...r, name: r.name ?? '' })),
-      roomParts(walls, rooms),
-    );
-    const placement = fixturePlacement(fixtures, walls, entrees);
-    return (f: { id: string }) => placement.get(f.id);
-  }, [fixtures, walls, rooms]);
-  const [allumees, setAllumees] = useState<ReadonlySet<string>>(() => new Set());
-  // On entre de jour : les lampes s'allument à la main, une visite à la fois.
-  useEffect(() => {
-    if (!visible) setAllumees(new Set());
-  }, [visible]);
-  const lampes: Lampe[] = useMemo(() => maille?.lampes ?? [], [maille]);
-  /*
-    LA TEMPÉRATURE DES LAMPES — relevé du patron : « offre la possibilité de
-    choisir entre 2700, 3000, 4000 K ». Une préférence de l'appareil (voir
-    `temperatureLampes`), lue à l'ouverture de la visite.
-  */
-  const kelvin = useTemperatureLampes((s) => s.kelvin);
-  useEffect(() => {
-    if (visible) void useTemperatureLampes.getState().charger();
-  }, [visible]);
-
   // Derrière les baies : un ciel clair, dans la teinte du thème.
   const fond = useMemo(() => mixHex(teinte.sky, '#FFFFFF', 0.55), [teinte.sky]);
 
@@ -541,36 +487,6 @@ export function Exploration({
     demande.current = 0;
   }, [vue, plancher]);
 
-  /*
-    UN APPUI BREF SUR UN INTERRUPTEUR L'ACTIONNE — et rien d'autre ne change :
-    la marche et le regard gardent leurs pouces. Moins de trois dixièmes de
-    seconde, à peine bougé : c'est un appui, pas un pas ni un regard. La cible
-    est plus large que le mécanisme, et un interrupteur derrière une cloison
-    ne répond pas (voir `interrupteurSousLeDoigt`).
-  */
-  const appuiFini = (d: Doigt) => {
-    if (Date.now() - d.t0 > APPUI_MS) return;
-    if (Math.hypot(d.x - d.x0, d.y - d.y0) > APPUI_PX) return;
-    if (inters.length === 0 || lampes.length === 0) return;
-    const p = pose.current;
-    const id = interrupteurSousLeDoigt(
-      { x: d.x, y: d.y },
-      { x: p.x, y: HAUTEUR_OEIL, z: p.z, lacet: p.lacet, tangage: p.tangage, fov: ouverture },
-      { w: largeur, h: hauteur },
-      inters,
-      obstacles,
-    );
-    if (!id) return;
-    const inter = fixtures.find((f) => f.id === id);
-    if (!inter) return;
-    const siennes = lampesDeLInterrupteur(inter, fixtures, ceiling, pieceDe).filter((l) =>
-      lampes.some((x) => x.id === l),
-    );
-    if (siennes.length === 0) return;
-    haptic('accroche');
-    setAllumees((avant) => basculer(avant, siennes));
-  };
-
   /** Pose la caméra là où elle doit aller — vue native, ou vue JavaScript. */
   const publier = (arret: boolean) => {
     if (natifPret) {
@@ -593,8 +509,6 @@ export function Exploration({
     y0: number;
     x: number;
     y: number;
-    /** Quand il s'est posé : un appui bref sur un interrupteur allume. */
-    t0: number;
   }
   const doigts = useRef(new Map<number, Doigt>());
   const enCours = useRef(false);
@@ -768,7 +682,7 @@ export function Exploration({
       // Le rôle de sa moitié d'écran, sinon l'autre s'il est libre.
       const role = !roles.has(voulu) ? voulu : !roles.has(autre) ? autre : null;
       if (!role) continue;
-      doigts.current.set(id, { role, x0: t.pageX, y0: t.pageY, x: t.pageX, y: t.pageY, t0: Date.now() });
+      doigts.current.set(id, { role, x0: t.pageX, y0: t.pageY, x: t.pageX, y: t.pageY });
       if (role === 'marche') haptic('leger');
       demarrer();
     }
@@ -830,7 +744,6 @@ export function Exploration({
       const d = doigts.current.get(id)!;
       doigts.current.delete(id);
       if (d.role === 'marche') manette.current = { x: 0, y: 0 };
-      appuiFini(d);
     }
   };
   /*
@@ -858,38 +771,17 @@ export function Exploration({
         const d = doigts.current.get(id)!;
         doigts.current.delete(id);
         if (d.role === 'marche') manette.current = { x: 0, y: 0 };
-        appuiFini(d);
       }
       demarrer();
       return;
     }
     // Plus aucun doigt : ce qu'on regarde se montre tout de suite ; l'élan
     // retombe, et la boucle s'arrête d'elle-même.
-    for (const d of doigts.current.values()) appuiFini(d);
     doigts.current.clear();
     manette.current = { x: 0, y: 0 };
     publier(true);
     demarrer();
   };
-
-  /*
-    LES LAMPES PARTENT PAR LA RÉGIE, comme la caméra : allumer ne reconvertit
-    pas le logement. Le choix des lampes qui ont droit à une vraie source suit
-    le visiteur (les plus proches) ; on ne renvoie que ce qui a changé.
-  */
-  const dernieresLampes = useRef('');
-  useEffect(() => {
-    if (!natifPret || lampes.length === 0) return;
-    const valeurs = lampesPourLeNatif(lampes, allumees, { x: carte.x, z: carte.z });
-    const cleValeurs = valeurs.join(',');
-    if (cleValeurs === dernieresLampes.current) return;
-    dernieresLampes.current = cleValeurs;
-    if (typeof poserLampesDeVisite === 'function') poserLampesDeVisite(cle, valeurs);
-  }, [natifPret, lampes, allumees, carte, cle]);
-  // Une vue native neuve repart de zéro : ce qui a été envoyé à l'ancienne ne compte plus.
-  useEffect(() => {
-    dernieresLampes.current = '';
-  }, [maille]);
 
   /*
     LA PHOTO DE LA VISITE — revue « découvreurs » : « impossible de faire une
@@ -950,9 +842,6 @@ export function Exploration({
               camera={cameraPlate}
               cle={cle}
               fond={fond}
-              temperature={kelvin}
-              piecesDuMaillage={maille.piecesDuMaillage}
-              piecesDesSols={maille.piecesDesSols}
             />
           )}
           {/* Sans le natif (banc d'essai), la vue en JavaScript tient lieu. */}
@@ -1045,29 +934,6 @@ export function Exploration({
             qu'on touche, et le mot ne peut plus en sortir.
           */}
           <View style={styles.hautDroite} pointerEvents="box-none">
-          {/*
-            LA TEINTE DES LAMPES, D'UN APPUI — 2700 K, 3000 K, 4000 K, lumière
-            du jour, et on recommence. Seulement s'il y a des lampes à allumer.
-          */}
-          {lampes.length > 0 && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Température des lampes : ${kelvin} kelvins, ${nomDeTemperature(kelvin)}`}
-              accessibilityHint="Passe à la température suivante"
-              testID="temperature-lampes"
-              style={({ pressed }) => [styles.temperature, pressed && styles.enfonce]}
-              hitSlop={8}
-              onPress={() => {
-                const k = useTemperatureLampes.getState().suivante();
-                haptic('leger');
-                astuce(`Lampes : ${nomDeTemperature(k)}, ${k} K`, { icone: 'lumiere' });
-              }}>
-              <View style={[styles.temperaturePastille, { backgroundColor: teinteDeKelvin(kelvin) }]} />
-              <Text style={styles.temperatureTexte} numberOfLines={1}>
-                {kelvin} K
-              </Text>
-            </Pressable>
-          )}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Terminer l’exploration"
@@ -1082,29 +948,6 @@ export function Exploration({
             </Text>
           </Pressable>
           </View>
-        </View>
-
-        {/*
-          L'INTERRUPTEUR GÉNÉRAL, sous la mini-carte : un appui allume ou
-          éteint tout le logement.
-        */}
-        <View style={[styles.reglages, { top: marges.top + 8 + 112 + 10 }]} pointerEvents="box-none">
-          {lampes.length > 0 && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={allumees.size > 0 ? 'Tout éteindre' : 'Tout allumer'}
-              testID="tout-allumer"
-              style={({ pressed }) => [styles.temperature, pressed && styles.enfonce]}
-              hitSlop={8}
-              onPress={() => {
-                haptic('leger');
-                setAllumees((avant) => (avant.size > 0 ? new Set() : new Set(lampes.map((l) => l.id))));
-              }}>
-              <Text style={styles.temperatureTexte} numberOfLines={1}>
-                {allumees.size > 0 ? 'Tout éteindre' : 'Tout allumer'}
-              </Text>
-            </Pressable>
-          )}
         </View>
 
         {/*
@@ -1149,11 +992,7 @@ export function Exploration({
         */}
         {!aBouge && (
           <View style={[styles.consigne, { bottom: marges.bottom + 118 }]} pointerEvents="none">
-            <Text style={styles.consigneTexte}>
-              {inters.length > 0 && lampes.length > 0
-                ? 'Pouce gauche pour marcher · glissez à droite pour regarder · touchez un interrupteur pour allumer'
-                : 'Pouce gauche pour marcher · glissez à droite pour regarder'}
-            </Text>
+            <Text style={styles.consigneTexte}>Pouce gauche pour marcher · glissez à droite pour regarder</Text>
           </View>
         )}
 
@@ -1191,14 +1030,6 @@ export function Exploration({
   );
 }
 
-/** La pastille de la température : la teinte de la lumière, adoucie. */
-function teinteDeKelvin(k: number): string {
-  if (k <= 2700) return '#FFD9A8';
-  if (k <= 3000) return '#FFE4BE';
-  if (k <= 4000) return '#FFF1DE';
-  return '#EEF4FF';
-}
-
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
     fond: { flex: 1, backgroundColor: c.bg },
@@ -1228,19 +1059,6 @@ const getStyles = themedStyles((c: Palette) =>
     },
     terminerTexte: { color: c.blue, fontSize: 16, fontWeight: '600' },
     hautDroite: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    reglages: { position: 'absolute', left: 14, gap: 8, alignItems: 'flex-start' },
-    temperature: {
-      height: 40,
-      paddingHorizontal: 12,
-      borderRadius: 20,
-      backgroundColor: c.surface,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 7,
-      ...ombreBouton,
-    },
-    temperaturePastille: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: c.line },
-    temperatureTexte: { color: c.ink, fontSize: 14, fontWeight: '700' },
     /* Une colonne contre le bord droit : pas plus de deux cinquièmes de l'écran. */
     pieces: { position: 'absolute', right: 14, maxHeight: '42%', maxWidth: 150 },
     piecesFond: { alignItems: 'flex-end', gap: 6, paddingBottom: 4 },

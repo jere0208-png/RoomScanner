@@ -150,7 +150,6 @@ RCT_EXPORT_VIEW_PROPERTY(styles, NSArray)
 RCT_EXTERN_METHOD(camera:(NSString *)cle valeurs:(NSArray *)valeurs)
 RCT_EXTERN_METHOD(orbite:(NSString *)cle valeurs:(NSArray *)valeurs)
 RCT_EXTERN_METHOD(levee:(NSString *)cle k:(nonnull NSNumber *)k solY:(nonnull NSNumber *)solY)
-RCT_EXTERN_METHOD(lampes:(NSString *)cle valeurs:(NSArray *)valeurs)
 RCT_EXTERN_METHOD(realiteAugmentee:(NSString *)cle
                   secours:(NSString *)secours
                   resolve:(RCTPromiseResolveBlock)resolve
@@ -167,9 +166,6 @@ RCT_EXPORT_VIEW_PROPERTY(maillage, NSArray)
 RCT_EXPORT_VIEW_PROPERTY(sols, NSArray)
 RCT_EXPORT_VIEW_PROPERTY(camera, NSArray)
 RCT_EXPORT_VIEW_PROPERTY(fond, NSString)
-RCT_EXPORT_VIEW_PROPERTY(temperature, NSNumber)
-RCT_EXPORT_VIEW_PROPERTY(piecesDuMaillage, NSArray)
-RCT_EXPORT_VIEW_PROPERTY(piecesDesSols, NSArray)
 RCT_EXPORT_VIEW_PROPERTY(orientes, NSArray)
 RCT_EXPORT_VIEW_PROPERTY(ecorche, NSArray)
 RCT_EXPORT_VIEW_PROPERTY(voile, BOOL)

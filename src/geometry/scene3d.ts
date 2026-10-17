@@ -3342,9 +3342,9 @@ export function buildScene(
       const chemin = cl.ferme && tr.length > 2 ? [...tr, tr[0]] : tr;
       const yb = haut - 0.03;
       /*
-        ET SON DIFFUSEUR, EN VRAI MODÈLE — c'est lui qui s'allume avec
-        l'interrupteur dans la visite (voir `ruban`, `lampesDeLaScene`). La
-        bande bleue reste : c'est elle qu'on voit de loin, éteint.
+        ET SON DIFFUSEUR, EN VRAI MODÈLE — c'est lui qu'on voit dans la
+        visite, toujours éteint (voir `ruban`, `lampesDeLaScene`). La bande
+        bleue reste : c'est elle qu'on voit de loin.
       */
       if (tr.length >= 2) {
         appareils.push({

@@ -69,13 +69,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   private let ambiante = SCNLight()
   private let jour = SCNLight()
   private let contre = SCNLight()
-  private var noeudDuContre: SCNNode?
-  /// Les lumières des lampes allumées (voir `poserLampes`).
-  private let eclairage = SCNNode()
-  /// Les diffuseurs de chaque lampe, par rang : ils s'allument avec elle.
-  private var diffuseurs: [Int: [SCNNode]] = [:]
-  /// L'état des lampes, par rang, tel que le JavaScript l'a posé.
-  private var lampesPosees: [Float] = []
 
   /*
     CHAQUE PROPRIÉTÉ NE REBÂTIT QUE SI ELLE A CHANGÉ. La couche de
@@ -119,37 +112,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     set { if Self.recevoir(newValue, dans: &fSols) { rebatir(.sols) } }
   }
 
-  /*
-    LA PIÈCE DE CHAQUE TRIANGLE DU BÂTI, DE CHAQUE SOL — relevé du patron :
-    « la lumière ne doit pas agir sur les autres pièces que celle où elle est
-    allumée ». SceneKit n'arrête pas une lumière à un mur : un faisceau de
-    cinq mètres traversait la cloison et éclairait la chambre d'à côté. Le
-    bâti se découpe donc par pièce, chaque morceau porte le bit de sa pièce
-    (`masqueDeLaPiece`), et une lampe n'éclaire que les morceaux du sien.
-  */
-  private var fPiecesMaillage: [Float] = []
-  private var fPiecesSols: [Float] = []
-
-  @objc var piecesDuMaillage: [NSNumber] {
-    get { [] }
-    set { if Self.recevoir(newValue, dans: &fPiecesMaillage) { rebatir(.bati) } }
-  }
-
-  @objc var piecesDesSols: [NSNumber] {
-    get { [] }
-    set { if Self.recevoir(newValue, dans: &fPiecesSols) { rebatir(.sols) } }
-  }
-
-  /// Le bit d'une pièce (au-delà de soixante pièces, aucune : seule la lumière du jour).
-  private static func masqueDeLaPiece(_ piece: Int) -> Int {
-    piece >= 0 && piece < 60 ? 1 << (piece + 3) : 0
-  }
-
-  /// Les matières du bâti, par pièce (−1 : hors pièce), pour la clarté des pièces allumées.
-  private var matieresParPiece: [Int: [SCNMaterial]] = [:]
-  /// Les pièces où au moins une lampe est allumée.
-  private var piecesEclairees: Set<Int> = []
-
   @objc var camera: [NSNumber] = [] {
     didSet { if camera != oldValue { placerOeil() } }
   }
@@ -168,18 +130,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     et du liseré. `nil` tant que rien n'est posé ; `true` en maquette.
   */
   private var modePose: Bool?
-  /// Les matières du bâti (murs, plafonds) : elles reçoivent la lumière
-  /// diffuse de la pièce (voir `nuanceurRebond`).
-  private var matieresDuBati: [SCNMaterial] = []
-  /*
-    AUCUNE LAMPE DANS LE LOGEMENT. Relevé du patron :
-    « oui, éclairage allumé par défaut sans lampes ». Hors mode Électricité,
-    le logement n'a pas de luminaire : on ne pourrait jamais allumer, et la
-    visite resterait dans sa pénombre. Tant qu'aucune lampe n'est posée, le
-    logement est donc éclairé ; dès que le JavaScript pose ses lampes, il
-    prend sa pénombre, et chaque lampe allumée n'éclaire que sa pièce.
-  */
-  private var sansLampes = true
 
   /**
    * LA VUE CHANGE DE MODE : visite (à hauteur d'œil) ou maquette (en orbite).
@@ -206,35 +156,13 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   }
 
   /*
-    LA TEMPÉRATURE DES LAMPES, EN KELVINS — relevé du patron : « offre la
-    possibilité de choisir entre 2700, 3000, 4000 K ». Elle teinte les
-    faisceaux, la lueur, le halo et le diffuseur allumé.
-  */
-  @objc var temperature: NSNumber = 3000 {
-    didSet {
-      guard temperature != oldValue else { return }
-      teinteDesLampes = Self.teinteDeKelvin(temperature.doubleValue)
-      diffuseurAllume = Self.fabriquerDiffuseur(allume: true, teinte: teinteDesLampes)
-      matiereDuHalo.multiply.contents = teinteDesLampes
-      for (rang, noeuds) in diffuseurs where lampeAllumee(rang) {
-        for n in noeuds { n.geometry?.materials = [diffuseurAllume] }
-      }
-      appliquerLampes()
-    }
-  }
-
-  /*
     LE RENDU DE LA VISITE — relevé du patron : « fais une refonte de la
-    visite plus propre et réaliste ». Il règle le jour (éteint et allumé), la
-    lumière diffuse des murs, le liseré des meubles, la teinte de matière des
-    meubles et du sol, le veinage du parquet, l'ombre de contact et la force
-    des lampes. La couleur des murs, elle, vient du JavaScript (la palette).
+    visite plus propre et réaliste ». Il règle le liseré des meubles, la
+    teinte de matière des meubles et du sol, le veinage du parquet et
+    l'ombre de contact. La couleur des murs, elle, vient du JavaScript (la
+    palette) ; la lumière est fixe (voir `JOUR_VISITE`).
   */
   struct Rendu {
-    let eteint: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat)
-    let allume: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat)
-    /// La lumière diffuse des murs et plafonds, éteint puis allumé.
-    let rebond: (eteint: CGFloat, allume: CGFloat)
     /// L'opacité du liseré des meubles, en visite.
     let lisere: CGFloat
     /// La luminance maximale d'un meuble, d'un sol — `nil` : la teinte telle quelle.
@@ -243,51 +171,13 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     let veinage: Bool
     /// L'opacité de l'ombre de contact au pied des meubles.
     let ombre: CGFloat
-    /// Le multiplicateur des faisceaux des lampes.
-    let lampes: CGFloat
   }
 
-  /*
-    LE RENDU RETENU : « CHALEUREUX DU SOIR » — relevé du patron, sur les
-    captures des quatre propositions : « le rendu C est parfait en mode tout
-    éteint ; en mode allumé, la lumière est trop forte dans n'importe quelle
-    scène, les meubles deviennent pas agréables à regarder ». Éteint, il
-    reste tel quel. Allumé, la pièce ne gagne plus qu'un tiers de lumière
-    (au lieu de presque le double), les faisceaux reprennent leur force
-    d'origine, et l'ambiance ne prend qu'un soupçon de la teinte des lampes.
-  */
-  static let RENDU = Rendu(
-    eteint: (300, 180, 90), allume: (390, 235, 110), rebond: (0.22, 0.2), lisere: 0.24,
-    albedoMeubles: 0.84, albedoSol: 0.74, veinage: true, ombre: 0.55, lampes: 1)
+  /// Le rendu retenu par le patron (« Chaleureux du soir »), sans les lampes.
+  static let RENDU = Rendu(lisere: 0.24, albedoMeubles: 0.84, albedoSol: 0.74, veinage: true, ombre: 0.55)
 
   /// Le rendu de la visite (voir `RENDU`).
   private let choix: Rendu = RoomScanVisite.RENDU
-
-  /// La teinte des lampes, tirée de la température (voir `teinteDeKelvin`).
-  private var teinteDesLampes: UIColor = RoomScanVisite.teinteDeKelvin(3000)
-
-  /**
-   * LA COULEUR D'UNE TEMPÉRATURE, ADOUCIE — l'approximation classique du
-   * corps noir (Tanner Helland), puis rapprochée du blanc aux six dixièmes :
-   * la lumière garde sa chaleur sans repeindre la pièce en orange (le 2700 K
-   * brut est un ambre franc qui teint tout ce qu'il touche).
-   */
-  static func teinteDeKelvin(_ k: Double) -> UIColor {
-    let t = max(1000, min(12000, k)) / 100
-    var r: Double, g: Double, b: Double
-    if t <= 66 {
-      r = 255
-      g = 99.4708025861 * log(t) - 161.1195681661
-      b = t <= 19 ? 0 : 138.5177312231 * log(t - 10) - 305.0447927307
-    } else {
-      r = 329.698727446 * pow(t - 60, -0.1332047592)
-      g = 288.1221695283 * pow(t - 60, -0.0755148492)
-      b = 255
-    }
-    let c = { (v: Double) -> CGFloat in CGFloat(max(0, min(255, v)) / 255) }
-    let doux = { (v: CGFloat) -> CGFloat in v + (1 - v) * 0.6 }
-    return UIColor(red: doux(c(r)), green: doux(c(g)), blue: doux(c(b)), alpha: 1)
-  }
 
   @objc var orientes: [NSNumber] {
     get { [] }
@@ -377,9 +267,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   private static var camerasEnAttente: [String: [NSNumber]] = [:]
   private static var orbitesEnAttente: [String: [NSNumber]] = [:]
   private static var leveesEnAttente: [String: (NSNumber, NSNumber)] = [:]
-  private static var lampesEnAttente: [String: [NSNumber]] = [:]
-
-  static func attendre(_ cle: String, lampes: [NSNumber]) { lampesEnAttente[cle] = lampes }
 
   static func attendre(_ cle: String, camera: [NSNumber]) { camerasEnAttente[cle] = camera }
   static func attendre(_ cle: String, orbite: [NSNumber]) { orbitesEnAttente[cle] = orbite }
@@ -391,7 +278,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     if let c = camerasEnAttente.removeValue(forKey: cle) { vue.poserCamera(c) }
     if let o = orbitesEnAttente.removeValue(forKey: cle) { vue.poserOrbite(o) }
     if let l = leveesEnAttente.removeValue(forKey: cle) { vue.poserLevee(l.0, solY: l.1) }
-    if let l = lampesEnAttente.removeValue(forKey: cle) { vue.poserLampes(l) }
   }
 
   /** La caméra de la visite, posée directement : voir `cle`. */
@@ -410,385 +296,62 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     levee = k
   }
 
-  // ------------------------------------------------------------- lampes
+  // ------------------------------------------------------------- lumière
 
   /*
-    ON APPUIE SUR L'INTERRUPTEUR, LA PIÈCE S'ÉCLAIRE — relevé du patron :
-    « donne la possibilité d'allumer les lumières depuis un interrupteur, et
-    fais une lumière plus réaliste pour chaque luminaire, en fonction de leur
-    forme et de leur usage (par exemple une lumière diffuse en haut et en bas
-    de l'applique murale) ».
-
-    Le JavaScript pose neuf nombres par lampe — `[rang, genre, allumée,
-    source, x, y, z, nx, nz]` (voir `lumieres.ts`) —, par la régie, sans
-    toucher aux propriétés : allumer ne reconvertit pas le logement. Le
-    diffuseur s'allume ou s'éteint ; les lampes qui ont droit à une source
-    reçoivent une vraie lumière, à la façon de leur luminaire.
+    LE DIFFUSEUR D'UN LUMINAIRE, TOUJOURS ÉTEINT — relevé du patron : « le
+    système de lumière est mal fait ; supprime la possibilité d'éclairer la
+    pièce en appuyant sur le bouton lors de la visite ». Le luminaire garde
+    sa forme, et son diffuseur un blanc opalin : il ne s'allume plus. Une
+    seule matière, créée une fois, pour tous les diffuseurs.
   */
-  func poserLampes(_ valeurs: [NSNumber]) {
-    lampesPosees = valeurs.map { $0.floatValue }
-    appliquerLampes()
-  }
+  private lazy var diffuseurEteint: SCNMaterial = Self.fabriquerDiffuseurEteint()
 
-  private func lampeAllumee(_ rang: Int) -> Bool {
-    var i = 0
-    while i + Self.PAR_LAMPE <= lampesPosees.count {
-      if Int(lampesPosees[i]) == rang { return lampesPosees[i + 2] > 0.5 }
-      i += Self.PAR_LAMPE
-    }
-    return false
-  }
-
-  /*
-    LES DEUX MATIÈRES D'UN DIFFUSEUR, CRÉÉES UNE FOIS. Chaque interrupteur en
-    fabriquait de neuves pour chaque diffuseur : autant de matériaux que
-    SceneKit devait préparer à nouveau, et l'image sautait au moment même où
-    la lumière s'allume.
-  */
-  private lazy var diffuseurAllume: SCNMaterial = Self.fabriquerDiffuseur(allume: true, teinte: teinteDesLampes)
-  private lazy var diffuseurEteint: SCNMaterial = Self.fabriquerDiffuseur(allume: false, teinte: teinteDesLampes)
-
-  private func materiauDeDiffuseur(allume: Bool) -> SCNMaterial {
-    allume ? diffuseurAllume : diffuseurEteint
-  }
-
-  /** Éteint : un blanc opalin. Allumé : il rayonne, de sa teinte chaude. */
-  private static func fabriquerDiffuseur(allume: Bool, teinte: UIColor) -> SCNMaterial {
+  /** Un blanc opalin, qui reçoit la lumière comme le reste. */
+  private static func fabriquerDiffuseurEteint() -> SCNMaterial {
     let m = SCNMaterial()
     m.isDoubleSided = false
     m.cullMode = .back
-    if allume {
-      m.lightingModel = .constant
-      // La teinte des lampes, plus claire encore : c'est la source.
-      var r: CGFloat = 1, g: CGFloat = 1, b: CGFloat = 1, a: CGFloat = 1
-      teinte.getRed(&r, green: &g, blue: &b, alpha: &a)
-      m.diffuse.contents = UIColor(red: r + (1 - r) * 0.5, green: g + (1 - g) * 0.5, blue: b + (1 - b) * 0.5, alpha: 1)
-    } else {
-      m.lightingModel = .physicallyBased
-      m.diffuse.contents = UIColor(red: 0.92, green: 0.91, blue: 0.88, alpha: 1)
-      m.roughness.contents = NSNumber(value: 0.55)
-      m.metalness.contents = NSNumber(value: 0)
-    }
+    m.lightingModel = .physicallyBased
+    m.diffuse.contents = UIColor(red: 0.92, green: 0.91, blue: 0.88, alpha: 1)
+    m.roughness.contents = NSNumber(value: 0.55)
+    m.metalness.contents = NSNumber(value: 0)
     return m
   }
 
   /*
-    ALLUMER AJOUTE DE LA LUMIÈRE — relevé du patron : « sur la visite, allumer
-    une pièce rend les murs plus sombres, ce devrait être l'inverse ; revois
-    tout le système de lumière et son impact sur les pièces et les meubles ».
-
-    La moindre lampe allumée faisait « tomber le soir » : le jour baissait de
-    moitié, le contre-jour se retirait — et toute la pièce, sauf le cercle
-    sous la lampe, s'assombrissait au moment même où l'on allumait. Le jour ne
-    bouge plus : une lampe AJOUTE sa lumière à celle qui est là, comme chez
-    soi. Le contre-jour reste à sa place — cinq lampes, le jour, le contre-jour
-    et l'ambiance tiennent dans les huit lumières de la carte graphique.
+    LE JOUR DE LA VUE — l'éclairage de base d'une pièce, celui d'avant les
+    lampes de la visite (relevé du patron : « rends l'éclairage qu'on avait
+    de base d'une pièce »). Une ambiance franche, un jour qui vient d'en haut
+    et d'un côté, un contre-jour plus faible de l'autre : fixes, ils ne
+    dépendent d'aucune lampe. La maquette garde le sien : vue de dessus,
+    l'arase des murs et les sols saturaient avec les réglages de la visite.
   */
-  /// Dix nombres par lampe : `[rang, genre, allumée, source, x, y, z, nx, nz, pièce]`.
-  static let PAR_LAMPE = 10
-
-  private func appliquerLampes() {
-    for enfant in eclairage.childNodes { enfant.removeFromParentNode() }
-    var i = 0
-    let v = lampesPosees
-    var eclairees: Set<Int> = []
-    // Par pièce allumée : la somme des forces, et le milieu de ses luminaires.
-    var parPiece: [Int: (force: CGFloat, x: Float, y: Float, z: Float, n: Float)] = [:]
-    while i + Self.PAR_LAMPE <= v.count {
-      let rang = Int(v[i])
-      let genre = Int(v[i + 1])
-      let allume = v[i + 2] > 0.5
-      let matiere = materiauDeDiffuseur(allume: allume)
-      for n in diffuseurs[rang] ?? [] where n.geometry?.firstMaterial !== matiere {
-        n.geometry?.materials = [matiere]
-      }
-      if allume {
-        let piece = Int(v[i + 9])
-        eclairees.insert(piece)
-        let p = SCNVector3(x: v[i + 4], y: v[i + 5], z: v[i + 6])
-        // Toute lampe allumée a son halo — même loin.
-        eclairage.addChildNode(halo(genre: genre, a: p, nx: v[i + 7], nz: v[i + 8]))
-        var e = parPiece[piece] ?? (0, 0, 0, 0, 0)
-        e.force += Self.puissance(genre)
-        e.x += p.x + v[i + 7] * 0.1
-        e.y += p.y - Self.descente(genre)
-        e.z += p.z + v[i + 8] * 0.1
-        e.n += 1
-        parPiece[piece] = e
-      }
-      i += Self.PAR_LAMPE
-    }
-    for (piece, e) in parPiece where e.n > 0 {
-      let c = SCNVector3(x: e.x / e.n, y: e.y / e.n, z: e.z / e.n)
-      eclairage.addChildNode(lumiereDeLaPiece(piece, en: c, puissance: e.force))
-    }
-    /*
-      ALLUMER N'ÉCLAIRE QUE SA PIÈCE — relevé du patron : « elle ne doit pas
-      agir sur les autres pièces ». Le jour du logement ne bouge plus quand on
-      allume (il montait partout, meubles compris) : seules la pièce allumée,
-      ses murs et son plafond, gagnent en clarté (`reglerLesRebonds`). Sans
-      aucune lampe, le logement entier reste éclairé (voir `sansLampes`).
-    */
-    piecesEclairees = eclairees
-    let aucune = v.count < Self.PAR_LAMPE
-    if aucune != sansLampes {
-      sansLampes = aucune
-      reglerLeJour()
-    } else {
-      reglerLesRebonds()
-    }
-  }
-
-  /*
-    LE JOUR DE LA VUE — relevé du patron : « tout est déjà trop illuminé ;
-    fais en sorte que ce soit plus sombre de base, et que ce soit éclairé
-    comme sans lumière actuellement si on allume la lumière ».
-
-    En visite, la pièce éteinte est une pièce de jour tamisé : ambiance,
-    jour et contre-jour aux trois cinquièmes de ce qu'ils étaient. Les murs
-    blancs ne saturent plus, une face au jour se distingue d'une face à
-    l'ombre, et la nappe d'une lampe se voit enfin sur le mur. Une lampe
-    allumée rend à la pièce la lumière d'avant — sa lumière se diffuse, elle
-    rebondit sur les murs et le plafond : c'est l'ambiance qui monte, en un
-    fondu, et ses faisceaux posent la nappe par-dessus. La maquette garde le
-    sien : on la regarde de loin, en plein jour.
-  */
+  static let JOUR_VISITE: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat) = (620, 420, 200)
   static let JOUR_MAQUETTE: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat) = (640, 380, 160)
-
-  /*
-    LES MURS RESTENT BLANCS — relevé du patron, sur captures : « les murs
-    sont trop gris ; la majorité des murs chez les particuliers sont
-    blancs ». La pièce assombrie l'était partout, et un mur blanc sous une
-    lumière tamisée sort gris. Or chez soi, l'œil voit son mur blanc : c'est
-    la lumière diffuse, renvoyée de partout par les murs et le plafond, qui
-    le tient clair — celle que les lumières directes de la scène ne donnent
-    pas. Les murs et plafonds la reçoivent ici, en part de leur propre
-    teinte : un mur peint garde sa couleur, un mur blanc reste blanc. Les
-    meubles et le sol restent dans la pénombre voulue : ils se détachent du
-    mur au lieu de s'y fondre.
-  */
-  static let nuanceurRebond = """
-    #pragma arguments
-    float rebond;
-    #pragma body
-    _output.color.rgb += _surface.diffuse.rgb * rebond;
-    """
-
-  /// La lumière diffuse des murs, selon la vue et la présence de lampes.
-  private func rebondDuMoment() -> CGFloat {
-    modePose != false ? 0 : sansLampes ? choix.rebond.allume : choix.rebond.eteint
-  }
-
-  /*
-    LA CLARTÉ D'UNE PIÈCE ALLUMÉE : ses murs et son plafond prennent un soupçon
-    de plus de leur teinte — au vingtième, comme les lampes (relevé du patron :
-    « on va sur 5 % »). Les meubles n'en reçoivent rien, les autres pièces non
-    plus.
-  */
-  static let CLARTE_PIECE_ALLUMEE: CGFloat = 0.08 * 0.05
-
-  private func rebondDe(_ piece: Int) -> CGFloat {
-    let base = rebondDuMoment()
-    guard modePose == false, piecesEclairees.contains(piece) else { return base }
-    return base + Self.CLARTE_PIECE_ALLUMEE
-  }
-
-  private func reglerLesRebonds() {
-    for (piece, matieres) in matieresParPiece {
-      let r = NSNumber(value: Float(rebondDe(piece)))
-      for m in matieres { m.setValue(r, forKey: "rebond") }
-    }
-    reveiller(0.6)
-  }
 
   private func reglerLeJour() {
     let maquette = orbite.count >= 10
-    let j = maquette ? Self.JOUR_MAQUETTE : sansLampes ? choix.allume : choix.eteint
-    SCNTransaction.begin()
-    // Pas de fondu avant la première image : les lampes posées à l'ouverture
-    // ne doivent pas faire « tomber la nuit » sous les yeux.
-    SCNTransaction.animationDuration = maquette || !premiereAnnoncee ? 0 : 0.45
+    let j = maquette ? Self.JOUR_MAQUETTE : Self.JOUR_VISITE
     ambiante.intensity = j.ambiance
     jour.intensity = j.jour
     contre.intensity = j.contre
-    SCNTransaction.commit()
-    let rebond = rebondDuMoment()
-    for m in matieresDuBati { m.setValue(NSNumber(value: Float(rebond)), forKey: "rebond") }
-    reglerLesRebonds()
-    if !maquette { matiereContour.transparency = choix.lisere }
-    noeudDuContre?.light = contre
     reveiller(0.6)
   }
-
-  /*
-    UNE LUMIÈRE PAR PIÈCE ALLUMÉE — relevés du patron, sur vidéo : « lorsque
-    tout est allumé, dans une même pièce, la lumière d'un côté disparaît selon
-    la distance », puis « sortir d'une pièce ne doit pas éteindre l'autre
-    pièce ; on doit voir quand même les autres allumées ».
-
-    Chaque luminaire avait ses faisceaux, mais la carte graphique n'en tient
-    que quelques-uns : seules les lampes allumées les plus proches du visiteur
-    recevaient une vraie lumière, et ce choix changeait à chaque pas — une
-    moitié de séjour s'éteignait quand on reculait, une pièce quand on en
-    sortait. Désormais, chaque pièce allumée a UNE lumière douce, posée au
-    milieu de ses luminaires allumés, qui n'éclaire que son bâti (le bit de sa
-    pièce) : elle ne dépend plus d'où l'on se tient, et toutes les pièces
-    allumées le restent. Sa force est la somme de celles de ses luminaires.
-
-    À CINQ POUR CENT — relevé du patron : « on va sur 5 %, même le 10 % est
-    trop éclairé ». La force d'un luminaire est celle de ses anciens
-    faisceaux, au vingtième des six dixièmes. Les meubles n'en reçoivent
-    rien : ils gardent leur couleur ; la lampe se voit à sa source (le halo,
-    le diffuseur allumé) et sur les murs.
-  */
-  static let FORCE_DES_LAMPES: CGFloat = 0.6 * 0.05
-
-  /// La force d'un luminaire, selon son genre (celle de ses anciens faisceaux).
-  static func puissance(_ genre: Int) -> CGFloat {
-    switch genre {
-    case 1: return 360  // l'applique : vers le plafond et vers le sol
-    case 2: return 240  // le spot
-    case 3: return 210  // l'ampoule de la DCL
-    case 4: return 250  // le plafonnier
-    case 5: return 220  // le ventilateur
-    default: return 0
-    }
-  }
-
-  /// Où le luminaire donne sa lumière : sous la rosace, au centre de l'ampoule.
-  static func descente(_ genre: Int) -> Float {
-    switch genre {
-    case 3: return 0.59
-    case 5: return 0.37
-    case 1: return 0
-    default: return 0.07
-    }
-  }
-
-  private func lumiereDeLaPiece(_ piece: Int, en c: SCNVector3, puissance: CGFloat) -> SCNNode {
-    let l = SCNLight()
-    l.type = .omni
-    l.color = teinteDesLampes
-    l.intensity = puissance * Self.FORCE_DES_LAMPES
-    // Douce et large : elle porte d'un bout à l'autre de la pièce.
-    l.attenuationStartDistance = 0.5
-    l.attenuationEndDistance = 9
-    l.attenuationFalloffExponent = 1
-    l.castsShadow = false
-    // Sa pièce seule ; une lampe hors de toute pièce éclaire le bâti entier.
-    l.categoryBitMask = piece >= 0 ? Self.masqueDeLaPiece(piece) : Self.MASQUE_PIECE
-    let n = SCNNode()
-    n.light = l
-    n.position = c
-    return n
-  }
-
-  /*
-    QUI REÇOIT QUELLE LUMIÈRE. Le jour, l'ambiance et le contre-jour éclairent
-    tout (leur masque a tous les bits). La lumière d'une pièce n'éclaire que
-    son bâti ; les meubles et les appareils portent le bit du MEUBLE et n'en
-    reçoivent rien.
-  */
-  private static let MASQUE_PIECE = 1
-  private static let MASQUE_MEUBLE = 2
-
-  /// Le halo : un disque doux, d'un blanc chaud, plein au cœur, nul au bord.
-  private static let imageDuHalo: UIImage = {
-    let cote: CGFloat = 128
-    return UIGraphicsImageRenderer(size: CGSize(width: cote, height: cote)).image { ctx in
-      let couleurs = [
-        UIColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.5).cgColor,
-        UIColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.16).cgColor,
-        UIColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0).cgColor,
-      ] as CFArray
-      guard let g = CGGradient(
-        colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: couleurs, locations: [0, 0.32, 1])
-      else { return }
-      let c = CGPoint(x: cote / 2, y: cote / 2)
-      ctx.cgContext.drawRadialGradient(
-        g, startCenter: c, startRadius: 0, endCenter: c, endRadius: cote / 2, options: [])
-    }
-  }()
-
-  /// Une matière pour tous les halos : ni lumière, ni profondeur écrite.
-  private lazy var matiereDuHalo: SCNMaterial = {
-    let m = SCNMaterial()
-    m.lightingModel = .constant
-    m.diffuse.contents = Self.imageDuHalo
-    m.transparent.contents = Self.imageDuHalo
-    m.transparencyMode = .aOne
-    m.blendMode = .alpha
-    m.writesToDepthBuffer = false
-    m.readsFromDepthBuffer = true
-    m.isDoubleSided = true
-    // Blanc dans l'image, teinté ici par la température des lampes.
-    m.multiply.contents = self.teinteDesLampes
-    /*
-      LE HALO S'EFFACE QUAND ON S'EN APPROCHE — relevé du patron : « tout
-      devient blanc ». Une ampoule de DCL pend à hauteur d'œil : en passant
-      près d'elle, son halo couvrait l'écran et voilait tout ce qu'il y avait
-      derrière, meubles compris. Il disparaît sous un mètre, et ne retrouve
-      tout son éclat qu'à deux mètres et demi.
-    */
-    m.shaderModifiers = [
-      .fragment: """
-      #pragma body
-      float k = smoothstep(1.0, 2.5, length(_surface.position));
-      _output.color *= k;
-      """
-    ]
-    return m
-  }()
 
   /*
     LA COULEUR D'UN MEUBLE NE DÉPASSE PAS SA TEINTE — relevé du patron : « la
     lumière sur les meubles est toujours trop élevée, tout devient blanc ;
     ils doivent gagner au plus 10 % de leur couleur de base ». Quelle que
-    soit la lumière qui l'atteint — lampes, jour, environnement —, un meuble
+    soit la lumière qui l'atteint — jour, environnement —, un meuble
     ne peut plus devenir plus clair que sa teinte relevée majorée de 15 %
     (la marge du jour sur une face bien éclairée), plus sa propre émission
-    (l'appareillage). Un tissu beige reste beige sous la lampe.
+    (l'appareillage). Un tissu beige reste beige en plein jour.
   */
   private static let nuanceurPlafondDesMeubles = """
     #pragma body
     _output.color.rgb = min(_output.color.rgb, _surface.diffuse.rgb * 1.15 + _surface.emission.rgb);
     """
-
-  /*
-    LA LUMIÈRE SE VOIT À SA SOURCE. Une lampe allumée se reconnaît d'abord à
-    l'éclat autour d'elle : un disque doux, toujours face au regard, qui
-    n'éclaire rien — il ne pousse aucun meuble au blanc. Le mur ou le
-    plafond le coupe là où il passe derrière (il lit la profondeur).
-  */
-  private func halo(genre: Int, a p: SCNVector3, nx: Float, nz: Float) -> SCNNode {
-    let diametre: CGFloat
-    let q: SCNVector3
-    switch genre {
-    case 1:
-      diametre = 0.55
-      q = SCNVector3(x: p.x + nx * 0.08, y: p.y, z: p.z + nz * 0.08)
-    case 2:
-      diametre = 0.32
-      q = SCNVector3(x: p.x, y: p.y - 0.04, z: p.z)
-    case 3:
-      diametre = 0.42
-      q = SCNVector3(x: p.x, y: p.y - 0.59, z: p.z)
-    case 4:
-      diametre = 0.75
-      q = SCNVector3(x: p.x, y: p.y - 0.08, z: p.z)
-    default:
-      diametre = 0.6
-      q = SCNVector3(x: p.x, y: p.y - 0.37, z: p.z)
-    }
-    let plan = SCNPlane(width: diametre, height: diametre)
-    plan.materials = [matiereDuHalo]
-    let n = SCNNode(geometry: plan)
-    n.position = q
-    n.constraints = [SCNBillboardConstraint()]
-    n.castsShadow = false
-    n.renderingOrder = 20
-    return n
-  }
 
   /// Le parquet et le carrelage, dessinés une fois par matière et par teinte.
   private static var imagesDesSols: [String: UIImage] = [:]
@@ -888,7 +451,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     // d'un côté, un contre-jour plus faible de l'autre — assez pour que
     // deux murs d'une même teinte se distinguent à l'angle.
     ambiante.type = .ambient
-    ambiante.intensity = RoomScanVisite.RENDU.allume.ambiance
+    ambiante.intensity = RoomScanVisite.JOUR_VISITE.ambiance
     ambiante.color = UIColor.white
     let noeudAmbiant = SCNNode()
     noeudAmbiant.light = ambiante
@@ -911,7 +474,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     */
 
     jour.type = .directional
-    jour.intensity = RoomScanVisite.RENDU.allume.jour
+    jour.intensity = RoomScanVisite.JOUR_VISITE.jour
     jour.castsShadow = false
     let noeudJour = SCNNode()
     noeudJour.light = jour
@@ -919,14 +482,12 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     scene.rootNode.addChildNode(noeudJour)
 
     contre.type = .directional
-    contre.intensity = RoomScanVisite.RENDU.allume.contre
+    contre.intensity = RoomScanVisite.JOUR_VISITE.contre
     contre.castsShadow = false
     let noeudContre = SCNNode()
     noeudContre.light = contre
     noeudContre.eulerAngles = SCNVector3(x: -Float.pi / 3.5, y: Float.pi / 5 + Float.pi, z: 0)
     scene.rootNode.addChildNode(noeudContre)
-    noeudDuContre = noeudContre
-    scene.rootNode.addChildNode(eclairage)
 
     scene.rootNode.addChildNode(bati)
     for g in [gBati, gSols, gImages, gMeubles] { bati.addChildNode(g) }
@@ -1162,17 +723,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     }
   }
 
-  /// Le maillage, triangle par triangle, rangé par pièce (tout en −1 si les pièces manquent).
-  private static func morceauxParPiece(_ source: [Float], _ pieces: [Float]) -> [(Int, [Float])] {
-    let n = source.count / 12
-    guard n > 0, pieces.count == n else { return [(-1, source)] }
-    var parPiece: [Int: [Float]] = [:]
-    for t in 0..<n {
-      parPiece[Int(pieces[t]), default: []].append(contentsOf: source[t * 12..<(t + 1) * 12])
-    }
-    return parPiece.sorted { $0.key < $1.key }.map { ($0.key, $0.value) }
-  }
-
   private static func vider(_ n: SCNNode) {
     for enfant in n.childNodes { enfant.removeFromParentNode() }
   }
@@ -1183,18 +733,8 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     if s.contains(.bati) {
       Self.vider(gBati)
       matiereEcorche = nil
-      matieresDuBati.removeAll()
-      // Un morceau de bâti par pièce, au bit de sa pièce (voir `piecesDuMaillage`).
-      matieresParPiece.removeAll()
-      for (piece, morceau) in Self.morceauxParPiece(fMaillage, fPiecesMaillage) {
-        guard let g = geometrie(morceau, deuxFaces: true) else { continue }
-        let n = SCNNode(geometry: g)
-        n.categoryBitMask = Self.MASQUE_PIECE | Self.masqueDeLaPiece(piece)
-        if let m = g.firstMaterial {
-          matieresParPiece[piece, default: []].append(m)
-          m.setValue(NSNumber(value: Float(rebondDe(piece))), forKey: "rebond")
-        }
-        gBati.addChildNode(n)
+      if let g = geometrie(fMaillage, deuxFaces: true) {
+        gBati.addChildNode(SCNNode(geometry: g))
       }
       if let g = geometrie(fOrientes, deuxFaces: false) {
         gBati.addChildNode(SCNNode(geometry: g))
@@ -1218,12 +758,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     }
     if s.contains(.meubles) {
       Self.vider(gMeubles)
-      diffuseurs.removeAll()
-      for n in noeudsDesMeubles() {
-        // Les faisceaux des lampes ne les touchent pas : voir `MASQUE_MEUBLE`.
-        n.enumerateHierarchy { m, _ in m.categoryBitMask = Self.MASQUE_MEUBLE }
-        gMeubles.addChildNode(n)
-      }
+      for n in noeudsDesMeubles() { gMeubles.addChildNode(n) }
     }
     if !premiereAnnoncee && !gBati.childNodes.isEmpty { guetteLaPremiere = true }
     reveiller()
@@ -1248,15 +783,12 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   private func appliquerVoile() {
     guard let m = matiereEcorche else { return }
     if voile {
-      // Le voile remplace le rebond : une façade vue du dehors n'en a pas besoin.
-      matieresDuBati.removeAll { $0 === m }
       m.shaderModifiers = [.fragment: Self.nuanceurVoile]
       m.blendMode = .alpha
       m.writesToDepthBuffer = false
     } else {
       // Sans voile, la façade redevient un mur comme les autres.
-      m.shaderModifiers = [.fragment: Self.nuanceurRebond]
-      if !matieresDuBati.contains(where: { $0 === m }) { matieresDuBati.append(m) }
+      m.shaderModifiers = nil
       m.writesToDepthBuffer = true
     }
   }
@@ -1411,10 +943,8 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       let g = SCNGeometry(sources: [positions, normales, uvs], elements: [element])
       g.materials = [materiauDuMeuble(code, teinte, rugosite, metal)]
       let n = SCNNode(geometry: g)
-      if code == 5 && lampe >= 0 {
-        diffuseurs[lampe, default: []].append(n)
-        g.materials = [materiauDeDiffuseur(allume: lampeAllumee(lampe))]
-      }
+      // Le diffuseur d'un luminaire du plan : toujours éteint (voir `diffuseurEteint`).
+      if code == 5 && lampe >= 0 { g.materials = [diffuseurEteint] }
       // Ce qui se pose PAR-DESSUS le reste — l'ombre, le verre — passe après.
       if code == 9 { n.renderingOrder = 5 }
       if code == 3 || code == 6 { n.renderingOrder = 6 }
@@ -1580,8 +1110,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
         L'APPAREILLAGE SE VOIT MÊME SANS LAMPE — relevé du patron : « les
         éléments élec sont trop gris sans lumière ». Une part de sa propre
         teinte en émission : une prise blanche reste blanche dans un coin
-        d'ombre, sans briller. Les faisceaux des lampes ne le touchent pas
-        (`MASQUE_MEUBLE`) : il ne blanchit pas non plus quand on allume.
+        d'ombre, sans briller.
       */
       m.emission.contents = teinte
       m.emission.intensity = 0.22
@@ -1858,9 +1387,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     // parcours s'est trompé reste un mur, pas un trou.
     m.isDoubleSided = deuxFaces
     m.cullMode = .back
-    m.shaderModifiers = [.fragment: Self.nuanceurRebond]
-    m.setValue(NSNumber(value: Float(rebondDuMoment())), forKey: "rebond")
-    matieresDuBati.append(m)
     g.materials = [m]
     return g
   }
@@ -1998,12 +1524,8 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   private func noeudsDesSols() -> [SCNNode] {
     let v = fSols
     var i = 0
-    var bloc = 0
     var out: [SCNNode] = []
     while i + 6 <= v.count {
-      // Le sol porte le bit de sa pièce : seules ses lampes l'éclairent.
-      let piece = bloc < fPiecesSols.count ? Int(fPiecesSols[bloc]) : -1
-      bloc += 1
       let matiere = Int(v[i])
       let sens = Int(v[i + 1])
       /*
@@ -2061,9 +1583,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
         m.diffuse.contents = teinte
       }
       g.materials = [m]
-      let noeud = SCNNode(geometry: g)
-      noeud.categoryBitMask = Self.MASQUE_PIECE | Self.masqueDeLaPiece(piece)
-      out.append(noeud)
+      out.append(SCNNode(geometry: g))
     }
     return out
   }
@@ -2104,17 +1624,6 @@ final class RoomScanVisiteRegie: NSObject {
         vue.poserLevee(k, solY: solY)
       } else {
         RoomScanVisite.attendre(cle, levee: k, solY: solY)
-      }
-    }
-  }
-
-  /// Les lampes de la visite : allumées ou non, et lesquelles ont leur lumière.
-  @objc func lampes(_ cle: String, valeurs: [NSNumber]) {
-    DispatchQueue.main.async {
-      if let vue = RoomScanVisite.parCle(cle) {
-        vue.poserLampes(valeurs)
-      } else {
-        RoomScanVisite.attendre(cle, lampes: valeurs)
       }
     }
   }

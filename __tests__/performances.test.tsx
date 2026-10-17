@@ -254,9 +254,9 @@ describe('côté iPhone, plus rien ne tourne pour rien', () => {
   it('la visite : deux pixels par point, des diffuseurs réutilisés, une coque sans chaînes', () => {
     const visite = natif('RoomScanVisite.swift');
     expect(visite).toContain('vue.contentScaleFactor = min(2, UIScreen.main.scale)');
-    // Deux matières de diffuseur, créées une fois — plus de matériau neuf par interrupteur.
-    expect(visite).toContain('private lazy var diffuseurAllume: SCNMaterial');
-    expect(visite).not.toMatch(/private func materiauDeDiffuseur\(allume: Bool\) -> SCNMaterial \{\s*let m = SCNMaterial\(\)/);
+    // Une seule matière de diffuseur (toujours éteint), créée une fois — pas une par luminaire.
+    expect(visite).toContain('private lazy var diffuseurEteint: SCNMaterial');
+    expect(visite).not.toMatch(/materiauDeDiffuseur/);
     // La coque des meubles soude ses normales sur une clé entière, pas une chaîne.
     expect(visite).toContain('var cumul: [SIMD3<Int32>: SCNVector3] = [:]');
     expect(visite).not.toMatch(/for p in \[p0, p1, p2\]/);

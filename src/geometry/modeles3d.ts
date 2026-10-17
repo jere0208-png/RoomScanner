@@ -178,9 +178,9 @@ export interface GroupeLocal {
   mat: Matiere;
   couleur: string;
   /**
-   * Le rang de la LAMPE dont c'est le diffuseur (voir `lumieres`) : il
-   * s'allume et s'éteint avec elle. Il voyage dans le code du groupe —
-   * `code + 100 × (rang + 1)` — pour que la vue native le retrouve.
+   * Le rang de la LAMPE dont c'est le diffuseur (voir `lumieres`). Il
+   * voyage dans le code du groupe — `code + 100 × (rang + 1)` — pour que la
+   * vue native le retrouve, et lui donne sa matière éteinte.
    */
   lampe?: number;
   /** x, y, z, nx, ny, nz, u, v — huit nombres par sommet. */

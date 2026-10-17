@@ -33,10 +33,10 @@ describe('la lumière des meubles, en visite', () => {
   });
 });
 
-describe('la lampe allumée, sur les meubles', () => {
-  it('elle ne les touche plus du tout (relevé du patron : « ça agit trop sur les meubles »)', () => {
+describe('plus de lampe allumée dans la visite', () => {
+  it('rien n’éclaire plus les meubles que le jour (relevé du patron : « supprime la possibilité d’éclairer la pièce »)', () => {
     expect(swift).not.toMatch(/lueurDesMeubles/);
-    // La lumière d'une pièce n'éclaire que son bâti — et de sa pièce seule.
-    expect(swift).toMatch(/l\.categoryBitMask = piece >= 0 \? Self\.masqueDeLaPiece\(piece\) : Self\.MASQUE_PIECE/);
+    expect(swift).not.toMatch(/lumiereDeLaPiece|\.type = \.omni|\.type = \.spot/);
+    expect(swift).not.toMatch(/categoryBitMask/);
   });
 });

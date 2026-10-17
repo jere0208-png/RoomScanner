@@ -1265,8 +1265,8 @@ export function groupesDesAppareils(
   poses: PoseDAppareil[],
   /**
    * Le rang de chaque LAMPE, par identifiant de pose (voir `lumieres`) : le
-   * diffuseur d'une lampe forme alors son propre groupe, qui s'allume avec
-   * elle. Sans rangs, tous les diffuseurs restent allumés — la maquette.
+   * diffuseur d'une lampe forme alors son propre groupe, que la visite garde
+   * éteint. Sans rangs, tous les diffuseurs restent allumés — la maquette.
    */
   lampes?: ReadonlyMap<string, number>,
 ): GroupeLocal[] {
