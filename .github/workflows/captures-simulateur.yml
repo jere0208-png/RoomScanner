@@ -172,7 +172,7 @@ jobs:
           }
           parcourir clair .maestro/0*.yaml
           xcrun simctl ui "$SIM_UDID" appearance dark
-          parcourir sombre $(ls .maestro/0*.yaml | grep -v 01_premier_lancement)
+          parcourir sombre $(ls .maestro/0*.yaml | grep -v 01_premier_lancement | grep -v 06_visite_rendus)
           xcrun simctl ui "$SIM_UDID" appearance light || true
           echo "Parcours en échec : $ECHECS"
           test "$ECHECS" -eq 0

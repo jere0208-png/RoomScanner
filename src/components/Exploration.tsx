@@ -79,6 +79,7 @@ import { useImageSansLogo } from '../store/accountStore';
 import { usePriseDeVue } from '../ui/partageRendu';
 import { AlerteHote } from './AlerteHote';
 import { nomDeTemperature, useTemperatureLampes } from '../store/temperatureLampes';
+import { RENDUS_VISITE, useRenduVisite } from '../store/renduVisite';
 import { astuce } from '../ui/astuce';
 
 /**
@@ -355,9 +356,23 @@ export function Exploration({
     sol et un plafond, puisqu'on est dedans.
   */
   const natif = !!RoomScanVisite;
+  /*
+    LE RENDU DE LA VISITE — quatre propositions (voir `renduVisite`) : il
+    donne la couleur des murs côté pièce ; le natif règle le reste.
+  */
+  const rendu = useRenduVisite((s) => s.rendu);
+  useEffect(() => {
+    if (visible) void useRenduVisite.getState().charger();
+  }, [visible]);
   const palette = useMemo<ScenePalette>(
-    () => ({ ...MAQUETTE, door: teinte.amber, window: teinte.sky, passage: teinte.blue }),
-    [teinte],
+    () => ({
+      ...MAQUETTE,
+      wallInside: RENDUS_VISITE[rendu]?.murs ?? MAQUETTE.wallInside,
+      door: teinte.amber,
+      window: teinte.sky,
+      passage: teinte.blue,
+    }),
+    [teinte, rendu],
   );
   // Le sol choisi et les murs d'accent, pièce par pièce (point 9).
   const sols = useMemo(() => solsDesPieces(rooms), [rooms]);
@@ -926,6 +941,7 @@ export function Exploration({
               cle={cle}
               fond={fond}
               temperature={kelvin}
+              rendu={rendu}
             />
           )}
           {/* Sans le natif (banc d'essai), la vue en JavaScript tient lieu. */}
@@ -1066,6 +1082,46 @@ export function Exploration({
           « Terminer », contre le bord droit : le regard passe au milieu.
           Celle de la pièce où l'on est se teinte, et suit le visiteur.
         */}
+        {/*
+          LE RENDU ET L'INTERRUPTEUR GÉNÉRAL, sous la mini-carte — relevé du
+          patron : « quatre propositions, lumières allumées et non allumées ».
+          Un appui change de rendu ; l'autre allume ou éteint tout le logement.
+        */}
+        <View style={[styles.reglages, { top: marges.top + 8 + 112 + 10 }]} pointerEvents="box-none">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Rendu ${RENDUS_VISITE[rendu]?.lettre} : ${RENDUS_VISITE[rendu]?.nom}`}
+            accessibilityHint="Passe au rendu suivant"
+            testID="rendu-visite"
+            style={({ pressed }) => [styles.temperature, pressed && styles.enfonce]}
+            hitSlop={8}
+            onPress={() => {
+              const r = useRenduVisite.getState().suivant();
+              haptic('leger');
+              astuce(`Rendu ${RENDUS_VISITE[r].lettre} · ${RENDUS_VISITE[r].nom}`, { icone: 'lumiere' });
+            }}>
+            <Text style={styles.temperatureTexte} numberOfLines={1}>
+              Rendu {RENDUS_VISITE[rendu]?.lettre}
+            </Text>
+          </Pressable>
+          {lampes.length > 0 && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={allumees.size > 0 ? 'Tout éteindre' : 'Tout allumer'}
+              testID="tout-allumer"
+              style={({ pressed }) => [styles.temperature, pressed && styles.enfonce]}
+              hitSlop={8}
+              onPress={() => {
+                haptic('leger');
+                setAllumees((avant) => (avant.size > 0 ? new Set() : new Set(lampes.map((l) => l.id))));
+              }}>
+              <Text style={styles.temperatureTexte} numberOfLines={1}>
+                {allumees.size > 0 ? 'Tout éteindre' : 'Tout allumer'}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+
         {piecesNommees.length > 1 && (
           <ScrollView
             testID="pieces-de-la-visite"
@@ -1178,6 +1234,7 @@ const getStyles = themedStyles((c: Palette) =>
     },
     terminerTexte: { color: c.blue, fontSize: 16, fontWeight: '600' },
     hautDroite: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    reglages: { position: 'absolute', left: 14, gap: 8, alignItems: 'flex-start' },
     temperature: {
       height: 40,
       paddingHorizontal: 12,

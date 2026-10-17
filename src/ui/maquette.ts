@@ -43,14 +43,11 @@ export const MAQUETTE: ScenePalette = {
   floorStroke: '#DCD1BF',
   /* Le bâti : blanc CASSÉ. Un blanc pur à côté d'un sable paraît bleu. */
   wall: '#FFFCF6',
-  /* Les murs côté pièce : un blanc cassé chaud — relevés du patron, « les
-     murs intérieurs sont de base trop gris », puis « rends les murs plus
-     blancs que beige, sans blanc pur ». La teinte d'une peinture « blanc
-     cassé » de magasin : blanche à l'œil, à peine chaude à côté du sol
-     sable, jamais le blanc d'écran qui signe le dessin. Puis, sur captures :
-     « les murs sont trop gris ; la majorité des murs chez les particuliers
-     sont blancs » — un blanc franc, à peine chaud. */
-  wallInside: '#F6F4F0',
+  /* Les murs côté pièce : le blanc cassé du bâti — relevé du patron, « la
+     majorité des murs chez les particuliers sont blancs », puis « la visite
+     était mieux avant les changements d'aujourd'hui ». La visite choisit le
+     sien parmi ses quatre rendus (voir `renduVisite`). */
+  wallInside: '#FFFCF6',
   wallStroke: '#E0D6C5',
   /* L'arase des murs, vue de dessus : c'est elle qui reçoit le plus de
      lumière, elle est donc la plus claire des trois. */

@@ -73,44 +73,6 @@ describe('l’appareillage se voit sans lampe', () => {
 });
 
 describe('la lampe du plafond, sur les meubles et l’appareillage : au plus 10 %', () => {
-  const nombre = (re: RegExp, src = swift) => Number((src.match(re) ?? [])[1]);
-
-  it('la lueur des meubles reste sous le dixième de l’ambiance la plus sombre', () => {
-    const lueur = nombre(/l\.intensity = (\d+)/, swift.slice(swift.indexOf('private func lueurDesMeubles')));
-    const eteint = nombre(/JOUR_ETEINT: \(ambiance: CGFloat, jour: CGFloat, contre: CGFloat\) = \((\d+)/);
-    expect(eteint).toBeGreaterThan(0);
-    expect(lueur).toBeLessThanOrEqual(eteint * 0.1);
-  });
-
-  it('allumer AJOUTE de la lumière, en fondu — jamais n’assombrit', () => {
-    const bloc = swift.slice(swift.indexOf('private func appliquerLampes'), swift.indexOf('private func reglerLeJour'));
-    // Les lampes ne touchent pas elles-mêmes au jour : elles passent par
-    // `reglerLeJour`, qui choisit entre l'éteint et l'allumé.
-    expect(bloc).not.toMatch(/ambiante\.|jour\.intensity|contre\./);
-    expect(bloc).toMatch(/lumiereAllumee = allumees > 0/);
-    const regle = swift.slice(swift.indexOf('private func reglerLeJour'));
-    expect(regle.slice(0, 600)).toMatch(/lumiereAllumee \? Self\.JOUR_ALLUME : Self\.JOUR_ETEINT/);
-    expect(regle.slice(0, 600)).toMatch(/SCNTransaction\.animationDuration = maquette \? 0 : 0\.45/);
-  });
-
-  it('la visite est plus sombre de base ; allumer lui rend la lumière d’avant (relevé du patron)', () => {
-    const jour = (nom: string) => {
-      const m = swift.match(new RegExp(nom + ': \\(ambiance: CGFloat, jour: CGFloat, contre: CGFloat\\) = \\((\\d+), (\\d+), (\\d+)\\)'));
-      return (m ?? []).slice(1).map(Number);
-    };
-    const eteint = jour('JOUR_ETEINT');
-    const allume = jour('JOUR_ALLUME');
-    expect(eteint).toHaveLength(3);
-    expect(allume).toHaveLength(3);
-    // L'ancienne visite, éteinte : 620, 420, 200. Allumée, on la retrouve
-    // à cinq pour cent près ; éteinte, on descend d'un bon tiers.
-    [620, 420, 200].forEach((avant, i) => {
-      expect(Math.abs(allume[i] - avant) / avant).toBeLessThanOrEqual(0.05);
-      expect(eteint[i]).toBeLessThanOrEqual(avant * 0.65);
-    });
-    // La vue s'ouvre éteinte.
-    expect(swift).toMatch(/ambiante\.intensity = Self\.JOUR_ETEINT\.ambiance/);
-  });
 
   it('les faisceaux ne touchent que le bâti, meubles et appareils portent l’autre masque', () => {
     expect(swift).toMatch(/l\.categoryBitMask = Self\.MASQUE_PIECE/);
@@ -152,50 +114,86 @@ describe('rien ne blanchit plus sous la lampe (relevé du patron : « tout devie
   });
 });
 
-describe('le semi-réalisme de la visite (relevé du patron : « trop dessin animé »)', () => {
-  it("le liseré se règle selon la vue, maquette ou visite", () => {
-    expect(swift).toMatch(/if let coque = noeudDeContour/);
+describe('les quatre rendus de la visite (relevé du patron : « quatre propositions, je choisirai »)', () => {
+  const rendus = (() => {
+    const bloc = swift.slice(swift.indexOf('static let RENDUS: [Rendu] = ['), swift.indexOf('/// Le rendu choisi'));
+    return [...bloc.matchAll(/Rendu\(\s*eteint: \((\d+), (\d+), (\d+)\), allume: \((\d+), (\d+), (\d+)\), rebond: \(([\d.]+), ([\d.]+)\), lisere: ([\d.]+),\s*albedoMeubles: (nil|[\d.]+), albedoSol: (nil|[\d.]+), veinage: (true|false), ombre: ([\d.]+), lampes: ([\d.]+)/g)].map(
+      (m) => ({
+        eteint: [1, 2, 3].map((k) => Number(m[k])),
+        allume: [4, 5, 6].map((k) => Number(m[k])),
+        rebond: [Number(m[7]), Number(m[8])],
+        lisere: Number(m[9]),
+        albedoMeubles: m[10] === 'nil' ? null : Number(m[10]),
+        veinage: m[12] === 'true',
+        ombre: Number(m[13]),
+        lampes: Number(m[14]),
+      }),
+    );
+  })();
+
+  it('quatre rendus côté natif, quatre côté app, dans le même ordre', () => {
+    expect(rendus).toHaveLength(4);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { RENDUS_VISITE } = require('../src/store/renduVisite');
+    expect(RENDUS_VISITE.map((r: { lettre: string }) => r.lettre)).toEqual(['A', 'B', 'C', 'D']);
+    const m = readFileSync(join(__dirname, '../modules/react-native-room-scan/ios/RoomScan.m'), 'utf8');
+    expect(m).toMatch(/RCT_EXPORT_VIEW_PROPERTY\(rendu, NSNumber\)/);
   });
 
-  it('les matières pleines prennent une teinte de matière réelle : au plus huit dixièmes', () => {
-    expect(swift).toMatch(/plafond: CGFloat = 0\.8/);
-    expect(swift).toMatch(/let k: CGFloat = l > plafond \? plafond \/ l : 1/);
-    const bloc = swift.slice(swift.indexOf('private func materiauDuMeuble'));
-    expect(bloc.slice(0, 600)).toMatch(/Self\.teinteReelle\(teinteRelevee\)/);
+  it('dans chacun, allumer ajoute de la lumière — jamais n’assombrit', () => {
+    for (const r of rendus) {
+      r.eteint.forEach((v, i) => expect(r.allume[i]).toBeGreaterThan(v));
+      expect(r.rebond[1]).toBeLessThanOrEqual(r.rebond[0]);
+    }
+    const bloc = swift.slice(swift.indexOf('private func appliquerLampes'), swift.indexOf('private func rebondDuMoment'));
+    expect(bloc).not.toMatch(/ambiante\.intensity|jour\.intensity|contre\.intensity/);
+    expect(bloc).toMatch(/lumiereAllumee = allumees > 0/);
+    expect(swift).toMatch(/lumiereAllumee \? choix\.allume : choix\.eteint/);
   });
 
-  it('le plafond : un ton plus clair que les murs, jamais le blanc pur', () => {
-    const scene = readFileSync(join(__dirname, '../src/geometry/scene3d.ts'), 'utf8');
-    expect(scene).toMatch(/fill: mixHex\(pal\.wallInside \?\? pal\.wall, '#FFFFFF', 0\.3\)/);
+  it('A garde les matières d’avant aujourd’hui, avec la lumière et le ciel d’aujourd’hui', () => {
+    const a = rendus[0];
+    expect(a.eteint).toEqual([380, 250, 115]);
+    expect(a.allume).toEqual([600, 400, 190]);
+    expect(a.rebond).toEqual([0, 0]);
+    expect(a.lisere).toBeCloseTo(0.32);
+    expect(a.albedoMeubles).toBeNull();
+    expect(a.veinage).toBe(false);
   });
-});
 
-describe('les murs restent blancs dans la pénombre (relevé du patron : « les murs sont trop gris »)', () => {
-  it('murs et plafonds reçoivent la lumière diffuse de la pièce, en part de leur teinte', () => {
+  it('la lueur des meubles reste sous le dixième de l’ambiance la plus sombre des rendus', () => {
+    const lueur = Number((swift.slice(swift.indexOf('private func lueurDesMeubles')).match(/l\.intensity = (\d+)/) ?? [])[1]);
+    const plusSombre = Math.min(...rendus.map((r) => r.eteint[0]));
+    expect(lueur).toBeLessThanOrEqual(plusSombre * 0.1);
+  });
+
+  it('les murs du rendu viennent de l’app ; le natif règle le reste, et la visite se réveille au changement', () => {
+    const expl = readFileSync(join(__dirname, '../src/components/Exploration.tsx'), 'utf8');
+    expect(expl).toMatch(/wallInside: RENDUS_VISITE\[rendu\]\?\.murs/);
+    expect(expl).toMatch(/rendu=\{rendu\}/);
+    expect(expl).toMatch(/testID="rendu-visite"/);
+    expect(expl).toMatch(/testID="tout-allumer"/);
+    expect(swift).toMatch(/rebatir\(\[\.meubles, \.sols\]\)/);
+  });
+
+  it('murs et plafonds reçoivent la lumière diffuse du rendu, meubles et sol non', () => {
     expect(swift).toMatch(/_output\.color\.rgb \+= _surface\.diffuse\.rgb \* rebond;/);
-    const geo = swift.slice(swift.indexOf('private func geometrie('));
-    expect(geo.slice(0, 4000)).toMatch(/m\.shaderModifiers = \[\.fragment: Self\.nuanceurRebond\]/);
-    const n = (nom: string) => Number((swift.match(new RegExp(`static let ${nom}: CGFloat = ([\\d.]+)`)) ?? [])[1]);
-    // Éteint, un mur blanc remonte vers le blanc ; allumé, un peu moins de
-    // rebond, la lampe faisant le reste.
-    expect(n('REBOND_ETEINT')).toBeGreaterThanOrEqual(0.35);
-    expect(n('REBOND_ALLUME')).toBeLessThan(n('REBOND_ETEINT'));
-  });
-
-  it('les meubles et le sol n’en reçoivent pas : ils se détachent du mur', () => {
     const meuble = swift.slice(swift.indexOf('private func materiauDuMeuble'), swift.indexOf('static func teinteReelle'));
     expect(meuble).not.toMatch(/nuanceurRebond/);
     const sols = swift.slice(swift.indexOf('private func noeudsDesSols'));
     expect(sols.slice(0, 4000)).not.toMatch(/nuanceurRebond/);
   });
 
-  it('un liseré léger revient en visite (« les meubles se fondent dans le mur »)', () => {
-    expect(swift).toMatch(/matiereContour\.transparency = maquette \? 0\.32 : 0\.2/);
-    expect(swift).not.toMatch(/c\.isHidden = !maquette/);
+  it('le plafond : un ton plus clair que les murs', () => {
+    const scene = readFileSync(join(__dirname, '../src/geometry/scene3d.ts'), 'utf8');
+    expect(scene).toMatch(/fill: mixHex\(pal\.wallInside \?\? pal\.wall, '#FFFFFF', 0\.35\)/);
   });
 
-  it('le parquet a son veinage, et sa teinte de matière réelle', () => {
-    expect(swift).toMatch(/LE FIL DU BOIS/);
-    expect(swift).toMatch(/teinteReelle\(UIColor\([\s\S]{0,140}plafond: 0\.7\)/);
+  it('le parcours de captures photographie les quatre rendus, éteints puis allumés', () => {
+    const flow = readFileSync(join(__dirname, '../.maestro/06_visite_rendus.yaml'), 'utf8');
+    for (const l of ['A', 'B', 'C', 'D']) {
+      expect(flow).toContain(`rendu-${l}-eteint`);
+      expect(flow).toContain(`rendu-${l}-allume`);
+    }
   });
 });

@@ -162,7 +162,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       plus léger encore qu'en maquette : un souffle au bord d'un meuble
       blanc devant un mur blanc, pas un trait.
     */
-    matiereContour.transparency = maquette ? 0.32 : 0.2
+    matiereContour.transparency = maquette ? 0.32 : choix.lisere
     scene.background.contents = maquette ? nil : Self.imageDuCiel(couleur(fond) ?? .white)
     reglerLeJour()
   }
@@ -181,6 +181,71 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       for (rang, noeuds) in diffuseurs where lampeAllumee(rang) {
         for n in noeuds { n.geometry?.materials = [diffuseurAllume] }
       }
+      appliquerLampes()
+    }
+  }
+
+  /*
+    LE RENDU DE LA VISITE — quatre propositions à comparer, relevé du patron :
+    « fais une refonte de la visite plus propre et réaliste, et fais des
+    screens de quatre propositions, lumières allumées et non allumées ; je
+    devrai choisir ». Chacune règle le jour (éteint et allumé), la lumière
+    diffuse des murs, le liseré des meubles, la teinte de matière des meubles
+    et du sol, le veinage du parquet, l'ombre de contact et la force des
+    lampes. La couleur des murs, elle, vient du JavaScript (la palette).
+  */
+  struct Rendu {
+    let eteint: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat)
+    let allume: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat)
+    /// La lumière diffuse des murs et plafonds, éteint puis allumé.
+    let rebond: (eteint: CGFloat, allume: CGFloat)
+    /// L'opacité du liseré des meubles, en visite.
+    let lisere: CGFloat
+    /// La luminance maximale d'un meuble, d'un sol — `nil` : la teinte telle quelle.
+    let albedoMeubles: CGFloat?
+    let albedoSol: CGFloat?
+    let veinage: Bool
+    /// L'opacité de l'ombre de contact au pied des meubles.
+    let ombre: CGFloat
+    /// Le multiplicateur des faisceaux des lampes.
+    let lampes: CGFloat
+    /// Allumée, l'ambiance prend un peu de la teinte des lampes.
+    let ambianceTeintee: Bool
+  }
+
+  static let RENDUS: [Rendu] = [
+    // A — COMME HIER : les matières d'avant aujourd'hui, la lumière et le ciel d'aujourd'hui.
+    Rendu(
+      eteint: (380, 250, 115), allume: (600, 400, 190), rebond: (0, 0), lisere: 0.32,
+      albedoMeubles: nil, albedoSol: nil, veinage: false, ombre: 0.38, lampes: 1,
+      ambianceTeintee: false),
+    // B — LUMINEUX NATUREL : une pièce de jour, claire et nette, des ombres posées.
+    Rendu(
+      eteint: (470, 330, 140), allume: (640, 440, 200), rebond: (0.16, 0.1), lisere: 0.24,
+      albedoMeubles: 0.86, albedoSol: 0.8, veinage: true, ombre: 0.5, lampes: 1,
+      ambianceTeintee: false),
+    // C — CHALEUREUX DU SOIR : pénombre douce éteint, lumière chaude et franche allumé.
+    Rendu(
+      eteint: (300, 180, 90), allume: (560, 330, 160), rebond: (0.22, 0.14), lisere: 0.24,
+      albedoMeubles: 0.84, albedoSol: 0.74, veinage: true, ombre: 0.55, lampes: 1.5,
+      ambianceTeintee: true),
+    // D — STUDIO DOUX : lumière enveloppante, peu d'ombres portées, tout lisible.
+    Rendu(
+      eteint: (540, 170, 110), allume: (720, 240, 150), rebond: (0.08, 0.05), lisere: 0.18,
+      albedoMeubles: 0.86, albedoSol: 0.78, veinage: true, ombre: 0.6, lampes: 0.8,
+      ambianceTeintee: false),
+  ]
+
+  /// Le rendu choisi (voir `RENDUS`).
+  private var choix: Rendu = RoomScanVisite.RENDUS[0]
+
+  @objc var rendu: NSNumber = 0 {
+    didSet {
+      guard rendu != oldValue else { return }
+      choix = Self.RENDUS[max(0, min(Self.RENDUS.count - 1, rendu.intValue))]
+      // Les matières des meubles et des sols dépendent du rendu : on rebâtit.
+      rebatir([.meubles, .sols])
+      reglerLeJour()
       appliquerLampes()
     }
   }
@@ -455,8 +520,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     fondu, et ses faisceaux posent la nappe par-dessus. La maquette garde le
     sien : on la regarde de loin, en plein jour.
   */
-  static let JOUR_ETEINT: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat) = (380, 250, 115)
-  static let JOUR_ALLUME: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat) = (600, 400, 190)
   static let JOUR_MAQUETTE: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat) = (640, 380, 160)
 
   /*
@@ -471,8 +534,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     meubles et le sol restent dans la pénombre voulue : ils se détachent du
     mur au lieu de s'y fondre.
   */
-  static let REBOND_ETEINT: CGFloat = 0.42
-  static let REBOND_ALLUME: CGFloat = 0.3
   static let nuanceurRebond = """
     #pragma arguments
     float rebond;
@@ -480,17 +541,25 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     _output.color.rgb += _surface.diffuse.rgb * rebond;
     """
 
+  /// La lumière diffuse des murs, selon la vue, le rendu et les lampes.
+  private func rebondDuMoment() -> CGFloat {
+    modePose != false ? 0 : lumiereAllumee ? choix.rebond.allume : choix.rebond.eteint
+  }
+
   private func reglerLeJour() {
     let maquette = orbite.count >= 10
-    let j = maquette ? Self.JOUR_MAQUETTE : lumiereAllumee ? Self.JOUR_ALLUME : Self.JOUR_ETEINT
+    let j = maquette ? Self.JOUR_MAQUETTE : lumiereAllumee ? choix.allume : choix.eteint
     SCNTransaction.begin()
     SCNTransaction.animationDuration = maquette ? 0 : 0.45
     ambiante.intensity = j.ambiance
     jour.intensity = j.jour
     contre.intensity = j.contre
+    ambiante.color = !maquette && lumiereAllumee && choix.ambianceTeintee
+      ? melange(.white, teinteDesLampes, 0.35) : UIColor.white
     SCNTransaction.commit()
-    let rebond = maquette ? 0 : lumiereAllumee ? Self.REBOND_ALLUME : Self.REBOND_ETEINT
+    let rebond = rebondDuMoment()
     for m in matieresDuBati { m.setValue(NSNumber(value: Float(rebond)), forKey: "rebond") }
+    if !maquette { matiereContour.transparency = choix.lisere }
     noeudDuContre?.light = contre
     reveiller(0.6)
   }
@@ -537,7 +606,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       let l = SCNLight()
       l.type = .spot
       l.color = teinte
-      l.intensity = intensite
+      l.intensity = intensite * choix.lampes
       l.spotInnerAngle = interieur
       l.spotOuterAngle = exterieur
       l.attenuationStartDistance = 0.3
@@ -568,7 +637,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       let l = SCNLight()
       l.type = .omni
       l.color = chaud
-      l.intensity = 210
+      l.intensity = 210 * choix.lampes
       l.attenuationStartDistance = 0.3
       l.attenuationEndDistance = 4.5
       l.attenuationFalloffExponent = 2
@@ -844,7 +913,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     // d'un côté, un contre-jour plus faible de l'autre — assez pour que
     // deux murs d'une même teinte se distinguent à l'angle.
     ambiante.type = .ambient
-    ambiante.intensity = Self.JOUR_ETEINT.ambiance
+    ambiante.intensity = RoomScanVisite.RENDUS[0].eteint.ambiance
     ambiante.color = UIColor.white
     let noeudAmbiant = SCNNode()
     noeudAmbiant.light = ambiante
@@ -867,7 +936,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     */
 
     jour.type = .directional
-    jour.intensity = Self.JOUR_ETEINT.jour
+    jour.intensity = RoomScanVisite.RENDUS[0].eteint.jour
     jour.castsShadow = false
     let noeudJour = SCNNode()
     noeudJour.light = jour
@@ -875,7 +944,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     scene.rootNode.addChildNode(noeudJour)
 
     contre.type = .directional
-    contre.intensity = Self.JOUR_ETEINT.contre
+    contre.intensity = RoomScanVisite.RENDUS[0].eteint.contre
     contre.castsShadow = false
     let noeudContre = SCNNode()
     noeudContre.light = contre
@@ -1483,7 +1552,12 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     m.lightingModel = .physicallyBased
     // Les matières pleines prennent une teinte de matière réelle (voir
     // `teinteReelle`) ; le verre, la lumière, l'ombre et l'appareillage non.
-    let teinte = [0, 1, 2, 4].contains(code) && metal < 0.5 ? Self.teinteReelle(teinteRelevee) : teinteRelevee
+    let teinte: UIColor
+    if let plafond = choix.albedoMeubles, [0, 1, 2, 4].contains(code) && metal < 0.5 {
+      teinte = Self.teinteReelle(teinteRelevee, plafond: plafond)
+    } else {
+      teinte = teinteRelevee
+    }
     m.diffuse.contents = teinte
     m.roughness.contents = NSNumber(value: Float(rugosite))
     m.metalness.contents = NSNumber(value: Float(metal))
@@ -1542,7 +1616,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       m.shaderModifiers = [.fragment: Self.nuanceurVerre]
     case 9:
       m.lightingModel = .constant
-      m.diffuse.contents = RoomScanVisite.imageDOmbre
+      m.diffuse.contents = RoomScanVisite.imageDOmbre(choix.ombre)
       m.blendMode = .alpha
       m.writesToDepthBuffer = false
     default:
@@ -1722,7 +1796,16 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
    * bord du meuble, puis s'éteint sur la marge. C'est elle qui fait POSER un
    * meuble — sans elle, il flotte, même parfaitement à sa place.
    */
-  private static let imageDOmbre: UIImage = {
+  private static var ombres: [Int: UIImage] = [:]
+  private static func imageDOmbre(_ opacite: CGFloat) -> UIImage {
+    let cle = Int(opacite * 100)
+    if let deja = ombres[cle] { return deja }
+    let image = dessinerOmbre(Double(opacite))
+    ombres[cle] = image
+    return image
+  }
+
+  private static func dessinerOmbre(_ opacite: Double) -> UIImage {
     let n = 128
     var pixels = [UInt8](repeating: 0, count: n * n * 4)
     for y in 0..<n {
@@ -1730,9 +1813,8 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
         let u = abs((Double(x) + 0.5) / Double(n) * 2 - 1)
         let w = abs((Double(y) + 0.5) / Double(n) * 2 - 1)
         let d = pow(pow(u, 4) + pow(w, 4), 0.25)
-        // Plus large et plus posée : un meuble s'ancre au sol sans cerne.
-        let a = max(0, min(1, (1 - d) / 0.3))
-        pixels[(y * n + x) * 4 + 3] = UInt8(pow(a, 1.8) * 0.5 * 255)
+        let a = max(0, min(1, (1 - d) / 0.25))
+        pixels[(y * n + x) * 4 + 3] = UInt8(pow(a, 1.6) * opacite * 255)
       }
     }
     guard let fournisseur = CGDataProvider(data: Data(pixels) as CFData),
@@ -1743,7 +1825,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
         provider: fournisseur, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
     else { return UIImage() }
     return UIImage(cgImage: image)
-  }()
+  }
 
   /** Le ciel des matériaux physiques : blanc en haut, gris chaud à l'horizon, sol beige. */
   private static func imageDEnvironnement() -> UIImage {
@@ -1853,8 +1935,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     m.isDoubleSided = deuxFaces
     m.cullMode = .back
     m.shaderModifiers = [.fragment: Self.nuanceurRebond]
-    let rebond = modePose != false ? 0 : lumiereAllumee ? Self.REBOND_ALLUME : Self.REBOND_ETEINT
-    m.setValue(NSNumber(value: Float(rebond)), forKey: "rebond")
+    m.setValue(NSNumber(value: Float(rebondDuMoment())), forKey: "rebond")
     matieresDuBati.append(m)
     g.materials = [m]
     return g
@@ -1882,7 +1963,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     var b: CGFloat = 0
     var a: CGFloat = 0
     teinte.getRed(&r, green: &g, blue: &b, alpha: &a)
-    let cle = "\(matiere)-\(Int(r * 255))-\(Int(g * 255))-\(Int(b * 255))"
+    let cle = "\(matiere)-\(Int(r * 255))-\(Int(g * 255))-\(Int(b * 255))-\(choix.veinage)"
     if let deja = Self.imagesDesSols[cle] { return deja }
     let image = dessinerLeSol(matiere, teinte)
     if let image = image { Self.imagesDesSols[cle] = image }
@@ -1921,6 +2002,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
           plus clairs d'un rien, serrés par endroits, et de loin en loin un
           nœud. Le tirage est fixe : le même parquet à chaque visite.
         */
+        let avecVeinage = self.choix.veinage
         var graine: UInt64 = 0x51_7CC1_B727_220A
         func hasard() -> CGFloat {
           graine = graine &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
@@ -1928,7 +2010,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
         }
         let fonce = melange(teinte, UIColor(red: 0.25, green: 0.15, blue: 0.08, alpha: 1), 0.55)
         let clair = melange(teinte, .white, 0.35)
-        for (zone, _) in tons {
+        for (zone, _) in tons where avecVeinage {
           c.saveGState()
           c.clip(to: zone)
           for k in 0..<34 {
@@ -2001,8 +2083,9 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
         sept dixièmes de la lumière, pas tout. Plafonné à sept dixièmes, il
         cesse de sortir délavé, d'un pêche d'écran.
       */
-      let teinte = Self.teinteReelle(UIColor(
-        red: CGFloat(v[i + 2]), green: CGFloat(v[i + 3]), blue: CGFloat(v[i + 4]), alpha: 1), plafond: 0.7)
+      let brute = UIColor(
+        red: CGFloat(v[i + 2]), green: CGFloat(v[i + 3]), blue: CGFloat(v[i + 4]), alpha: 1)
+      let teinte = choix.albedoSol.map { Self.teinteReelle(brute, plafond: $0) } ?? brute
       let n = Int(v[i + 5])
       i += 6
       // Un tableau tronqué ne doit pas faire tomber l'application.
