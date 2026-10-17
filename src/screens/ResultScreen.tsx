@@ -3764,7 +3764,8 @@ export function ResultScreen() {
       !modeElec && alertesDePlan > 0 ? 34 : 0,
       walls.length > 0 && tab === '2d' ? 34 : 0,
       walls.length > 0 ? 118 : 0,
-      walls.length > 0 && tab === '3d' ? 66 : 0,
+      // « Sur la table » : l'icône, le mot et les marges (« RA » tenait en 66).
+      walls.length > 0 && tab === '3d' ? 130 : 0,
       70,
     ].filter((l) => l > 0);
     const total = largeurs.reduce((t, l) => t + l, 0) + 8 * (largeurs.length - 1);
@@ -3786,7 +3787,7 @@ export function ResultScreen() {
         !modeElec && alertesDePlan > 0 ? 34 : 0,
         walls.length > 0 && tab === '2d' ? 34 : 0,
         walls.length > 0 ? 118 : 0,
-        walls.length > 0 && tab === '3d' ? 66 : 0,
+        walls.length > 0 && tab === '3d' ? 130 : 0,
         70,
       ].filter((l) => l > 0);
       const total = largeurs.reduce((t, l) => t + l, 0) + 8 * (largeurs.length - 1);
@@ -3800,7 +3801,7 @@ export function ResultScreen() {
     encore de onze points. La rangée se mesure (une vue ordinaire : rien
     d'animé ne se mesure ici), et tant qu'elle dépasse la carte elle se
     resserre d'un cran : 1, « Travaux » en icône ; 2, « Explorer » se dit
-    « Visite » ; 3, « RA » en icône et la bascule 2D/3D sans chevrons ;
+    « Visite » ; 3, « Sur la table » en icône et la bascule 2D/3D sans chevrons ;
     4, « Visite » en icône. Le prix, lui, se lit toujours en entier.
   */
   const cleRangee = [
@@ -5600,6 +5601,10 @@ export function ResultScreen() {
               CHEZ SOI, EN RÉALITÉ AUGMENTÉE — la maquette telle qu'elle est à
               l'écran, posée sur la table du client (voir
               `ui/realiteAugmentee`). En 3D seulement : c'est elle qu'on emporte.
+
+              « SUR LA TABLE », PLUS « RA » — relevé « rénovation » : le sigle ne
+              disait rien à personne. Le mot dit le geste : la maquette posée
+              sur la table, à travers la caméra.
             */}
             {walls.length > 0 && tab === '3d' && (
               <TouchableOpacity
@@ -5611,7 +5616,7 @@ export function ResultScreen() {
                 <Svg width={16} height={16} viewBox="0 0 24 24">
                   <Trace d={SOLAIRES.model} fill={teinte.blue} fillRule="evenodd" />
                 </Svg>
-                {!rangeeEnIcones && <Text style={styles.vuePastilleTexte}>RA</Text>}
+                {!rangeeEnIcones && <Text style={styles.vuePastilleTexte}>Sur la table</Text>}
               </TouchableOpacity>
             )}
             <TouchableOpacity

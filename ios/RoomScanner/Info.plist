@@ -49,11 +49,14 @@
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<false/>
+		<!-- METRO, EN DEBUG SEULEMENT : la phase « Local networking : Debug only »
+		     du projet retire cette clé du paquet hors Debug (relevé App Store :
+		     un reste du modèle de départ dans le build de production). -->
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>La caméra sert à scanner vos pièces en 3D et à photographier vos plans papier.</string>
+	<string>La caméra sert à scanner vos pièces en 3D, à prendre des photos de repérage sur le plan et à photographier vos plans papier.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Pour lire les mesures de votre télémètre laser (Leica DISTO) et les reporter directement sur le plan.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

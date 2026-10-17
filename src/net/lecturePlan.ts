@@ -6,7 +6,9 @@
  * une minute. On l'attend deux minutes et demie, pas cinq secondes comme une
  * vérification de compte — et l'écran le dit pendant ce temps.
  *
- * Rien n'est gardé, ni ici ni là-bas : la page part, la lecture revient.
+ * Nous ne gardons rien, ni ici ni sur le serveur : la page part, la lecture
+ * revient. Anthropic, lui, la garde un temps limité (contrôles de sécurité) —
+ * c'est déclaré au manifeste de confidentialité (« Photos ou vidéos »).
  *
  * L'ABONNEMENT PART EN PREUVE, PLUS EN DÉCLARATION — revue « sécurité » :
  * le drapeau `abonne` que le serveur croyait est remplacé par `preuve`, la

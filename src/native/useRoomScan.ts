@@ -43,8 +43,27 @@ const INSTRUCTIONS_FR: Record<string, string> = {
  */
 let partiDUnPlan = false;
 
+/**
+ * LA CAMÉRA AVANT LE SCAN D'UN PLAN OUVERT — relevé App Store : « Scanner un
+ * étage » partait sans demander l'autorisation caméra. RoomPlan échouait
+ * alors en silence, ou laissait l'étage « en cours » sur un refus.
+ *
+ * On ne passe PAS par la page caméra : son « Autoriser » lance un relevé
+ * NEUF (`begin` → `repartirANeuf`), et l'étage qu'on voulait ajouter
+ * effacerait le plan ouvert. On pose donc la question du système ici même
+ * quand elle n'a jamais été posée ; refusée, on le DIT, et rien n'est
+ * commencé — comme sans LiDAR.
+ */
+async function exigerLaCamera(): Promise<void> {
+  const etat = await RoomScan.cameraStatus();
+  if (etat === 'granted') return;
+  if (etat === 'undetermined' && (await RoomScan.requestCamera())) return;
+  throw new Error('Le scan demande l’accès à la caméra : autorisez-le dans Réglages › EchoPlan.');
+}
+
 export async function demarrerComplement(): Promise<void> {
   const st = useScanStore.getState();
+  await exigerLaCamera();
   partiDUnPlan = true;
   /*
     ADDITIF SEULEMENT AVEC LES PASSAGES DU PLAN — revue « Agathe ». L'iPhone
@@ -101,6 +120,7 @@ export async function demarrerEtage(n: number): Promise<void> {
   if (st.supported === false) {
     throw new Error('Le scan demande un iPhone Pro (capteur LiDAR).');
   }
+  await exigerLaCamera();
   st.scannerUnEtage(n);
   st.beginScan();
   partiDUnPlan = true;

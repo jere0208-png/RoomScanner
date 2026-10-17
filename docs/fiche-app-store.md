@@ -72,7 +72,7 @@ Un interrupteur, et EchoPlan devient votre outil de relevé : prises, interrupte
 GRATUIT POUR COMMENCER
 Scanner, mesurer, meubler, explorer en 3D et savoir ce qu'il faut acheter : gratuit, sans limite de logements ni d'étages. L'abonnement EchoPlan Pro sert à envoyer vos plans — PDF coté, DXF pour l'architecte, modèle 3D, métré CSV, liste du matériel —, à les sauvegarder en ligne et, pour les électriciens, à chiffrer le devis aux prix du magasin. 4,90 € par mois ou 49 € par an, sans engagement.
 
-Compatibilité : le scan nécessite un iPhone ou un iPad équipé du LiDAR (iPhone 12 Pro et modèles Pro suivants, iPad Pro 2020 et suivants). Le dessin au doigt fonctionne sur tous les appareils.
+Compatibilité : le scan nécessite un iPhone équipé du LiDAR (iPhone 12 Pro et modèles Pro suivants). Le dessin au doigt fonctionne sur tous les iPhone.
 ```
 
 ## Catégories

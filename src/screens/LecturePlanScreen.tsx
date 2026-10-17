@@ -431,9 +431,15 @@ function Invitation({
           <Tuile s={s} c={c} icone="planPapier" titre="Un fichier" sous="PDF ou image" libelle="Ouvrir un fichier" hauteur={entre(58, 70)} onPress={onFichier} />
         </View>
       </View>
+      {/*
+        « NOUS NE GARDONS RIEN », PAS « RIEN N'EST GARDÉ » — relevé App Store :
+        Anthropic garde la page un temps limité (contrôles de sécurité, voir
+        l'écran Confidentialité). Ce qui est vrai, c'est que NOUS ne gardons
+        ni l'image ni la lecture.
+      */}
       <Text style={s.pied} numberOfLines={2}>
         {pro ? 'Compris dans votre abonnement Pro.' : 'Une lecture offerte pour essayer, puis réservée au Pro.'} Lu par une IA
-        (Claude, d’Anthropic) : rien n’est gardé.
+        (Claude, d’Anthropic) : nous ne gardons rien.
       </Text>
     </>
   );
