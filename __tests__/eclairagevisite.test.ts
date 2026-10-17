@@ -153,13 +153,13 @@ describe('rien ne blanchit plus sous la lampe (relevé du patron : « tout devie
 });
 
 describe('le semi-réalisme de la visite (relevé du patron : « trop dessin animé »)', () => {
-  it('pas de liseré de dessin en visite ; il reste sur la maquette', () => {
-    expect(swift).toMatch(/for c in coques \{ c\.isHidden = !maquette \}/);
-    expect(swift).toMatch(/coque\.isHidden = modePose != true/);
+  it("le liseré se règle selon la vue, maquette ou visite", () => {
+    expect(swift).toMatch(/if let coque = noeudDeContour/);
   });
 
   it('les matières pleines prennent une teinte de matière réelle : au plus huit dixièmes', () => {
-    expect(swift).toMatch(/let k: CGFloat = l > 0\.8 \? 0\.8 \/ l : 1/);
+    expect(swift).toMatch(/plafond: CGFloat = 0\.8/);
+    expect(swift).toMatch(/let k: CGFloat = l > plafond \? plafond \/ l : 1/);
     const bloc = swift.slice(swift.indexOf('private func materiauDuMeuble'));
     expect(bloc.slice(0, 600)).toMatch(/Self\.teinteReelle\(teinteRelevee\)/);
   });
@@ -167,5 +167,35 @@ describe('le semi-réalisme de la visite (relevé du patron : « trop dessin ani
   it('le plafond : un ton plus clair que les murs, jamais le blanc pur', () => {
     const scene = readFileSync(join(__dirname, '../src/geometry/scene3d.ts'), 'utf8');
     expect(scene).toMatch(/fill: mixHex\(pal\.wallInside \?\? pal\.wall, '#FFFFFF', 0\.3\)/);
+  });
+});
+
+describe('les murs restent blancs dans la pénombre (relevé du patron : « les murs sont trop gris »)', () => {
+  it('murs et plafonds reçoivent la lumière diffuse de la pièce, en part de leur teinte', () => {
+    expect(swift).toMatch(/_output\.color\.rgb \+= _surface\.diffuse\.rgb \* rebond;/);
+    const geo = swift.slice(swift.indexOf('private func geometrie('));
+    expect(geo.slice(0, 4000)).toMatch(/m\.shaderModifiers = \[\.fragment: Self\.nuanceurRebond\]/);
+    const n = (nom: string) => Number((swift.match(new RegExp(`static let ${nom}: CGFloat = ([\\d.]+)`)) ?? [])[1]);
+    // Éteint, un mur blanc remonte vers le blanc ; allumé, un peu moins de
+    // rebond, la lampe faisant le reste.
+    expect(n('REBOND_ETEINT')).toBeGreaterThanOrEqual(0.35);
+    expect(n('REBOND_ALLUME')).toBeLessThan(n('REBOND_ETEINT'));
+  });
+
+  it('les meubles et le sol n’en reçoivent pas : ils se détachent du mur', () => {
+    const meuble = swift.slice(swift.indexOf('private func materiauDuMeuble'), swift.indexOf('static func teinteReelle'));
+    expect(meuble).not.toMatch(/nuanceurRebond/);
+    const sols = swift.slice(swift.indexOf('private func noeudsDesSols'));
+    expect(sols.slice(0, 4000)).not.toMatch(/nuanceurRebond/);
+  });
+
+  it('un liseré léger revient en visite (« les meubles se fondent dans le mur »)', () => {
+    expect(swift).toMatch(/matiereContour\.transparency = maquette \? 0\.32 : 0\.2/);
+    expect(swift).not.toMatch(/c\.isHidden = !maquette/);
+  });
+
+  it('le parquet a son veinage, et sa teinte de matière réelle', () => {
+    expect(swift).toMatch(/LE FIL DU BOIS/);
+    expect(swift).toMatch(/teinteReelle\(UIColor\([\s\S]{0,140}plafond: 0\.7\)/);
   });
 });

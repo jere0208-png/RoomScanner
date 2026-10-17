@@ -137,8 +137,9 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     et du liseré. `nil` tant que rien n'est posé ; `true` en maquette.
   */
   private var modePose: Bool?
-  /// Les liserés des meubles : montrés en maquette, cachés en visite.
-  private var coques: [SCNNode] = []
+  /// Les matières du bâti (murs, plafonds) : elles reçoivent la lumière
+  /// diffuse de la pièce (voir `nuanceurRebond`).
+  private var matieresDuBati: [SCNMaterial] = []
   /// Au moins une lampe allumée dans le logement.
   private var lumiereAllumee = false
 
@@ -154,7 +155,14 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   private func regleLeMode(maquette: Bool) {
     guard modePose != maquette else { return }
     modePose = maquette
-    for c in coques { c.isHidden = !maquette }
+    /*
+      UN LISERÉ LÉGER, FINALEMENT — relevé du patron, après l'avoir vu
+      retiré : « les meubles se fondent dans le mur, peut-être qu'un léger
+      contour est nécessaire finalement ». En visite, il revient en voile
+      plus léger encore qu'en maquette : un souffle au bord d'un meuble
+      blanc devant un mur blanc, pas un trait.
+    */
+    matiereContour.transparency = maquette ? 0.32 : 0.2
     scene.background.contents = maquette ? nil : Self.imageDuCiel(couleur(fond) ?? .white)
     reglerLeJour()
   }
@@ -451,6 +459,27 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   static let JOUR_ALLUME: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat) = (600, 400, 190)
   static let JOUR_MAQUETTE: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat) = (640, 380, 160)
 
+  /*
+    LES MURS RESTENT BLANCS — relevé du patron, sur captures : « les murs
+    sont trop gris ; la majorité des murs chez les particuliers sont
+    blancs ». La pièce assombrie l'était partout, et un mur blanc sous une
+    lumière tamisée sort gris. Or chez soi, l'œil voit son mur blanc : c'est
+    la lumière diffuse, renvoyée de partout par les murs et le plafond, qui
+    le tient clair — celle que les lumières directes de la scène ne donnent
+    pas. Les murs et plafonds la reçoivent ici, en part de leur propre
+    teinte : un mur peint garde sa couleur, un mur blanc reste blanc. Les
+    meubles et le sol restent dans la pénombre voulue : ils se détachent du
+    mur au lieu de s'y fondre.
+  */
+  static let REBOND_ETEINT: CGFloat = 0.42
+  static let REBOND_ALLUME: CGFloat = 0.3
+  static let nuanceurRebond = """
+    #pragma arguments
+    float rebond;
+    #pragma body
+    _output.color.rgb += _surface.diffuse.rgb * rebond;
+    """
+
   private func reglerLeJour() {
     let maquette = orbite.count >= 10
     let j = maquette ? Self.JOUR_MAQUETTE : lumiereAllumee ? Self.JOUR_ALLUME : Self.JOUR_ETEINT
@@ -460,6 +489,8 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     jour.intensity = j.jour
     contre.intensity = j.contre
     SCNTransaction.commit()
+    let rebond = maquette ? 0 : lumiereAllumee ? Self.REBOND_ALLUME : Self.REBOND_ETEINT
+    for m in matieresDuBati { m.setValue(NSNumber(value: Float(rebond)), forKey: "rebond") }
     noeudDuContre?.light = contre
     reveiller(0.6)
   }
@@ -1097,6 +1128,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     if s.contains(.bati) {
       Self.vider(gBati)
       matiereEcorche = nil
+      matieresDuBati.removeAll()
       if let g = geometrie(fMaillage, deuxFaces: true) {
         gBati.addChildNode(SCNNode(geometry: g))
       }
@@ -1123,7 +1155,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     if s.contains(.meubles) {
       Self.vider(gMeubles)
       diffuseurs.removeAll()
-      coques.removeAll()
       for n in noeudsDesMeubles() {
         // Les faisceaux des lampes ne les touchent pas : voir `MASQUE_MEUBLE`.
         n.enumerateHierarchy { m, _ in m.categoryBitMask = Self.MASQUE_MEUBLE }
@@ -1153,11 +1184,15 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   private func appliquerVoile() {
     guard let m = matiereEcorche else { return }
     if voile {
+      // Le voile remplace le rebond : une façade vue du dehors n'en a pas besoin.
+      matieresDuBati.removeAll { $0 === m }
       m.shaderModifiers = [.fragment: Self.nuanceurVoile]
       m.blendMode = .alpha
       m.writesToDepthBuffer = false
     } else {
-      m.shaderModifiers = nil
+      // Sans voile, la façade redevient un mur comme les autres.
+      m.shaderModifiers = [.fragment: Self.nuanceurRebond]
+      if !matieresDuBati.contains(where: { $0 === m }) { matieresDuBati.append(m) }
       m.writesToDepthBuffer = true
     }
   }
@@ -1325,9 +1360,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       if code != 9 && code != 3 && code != 4 && code != 5 && code != 6 {
         if let coque = noeudDeContour(v, debut: debut, nS: nS, indices: indices,
                                       positions: positions, element: element) {
-          // En visite, pas de trait de dessin (voir `regleLeMode`).
-          coque.isHidden = modePose != true
-          coques.append(coque)
           out.append(coque)
         }
       }
@@ -1532,11 +1564,11 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     dessin. La teinte relevée garde sa couleur, plafonnée à ces huit
     dixièmes, et perd un soupçon de sa saturation — celle des catalogues.
   */
-  static func teinteReelle(_ c: UIColor) -> UIColor {
+  static func teinteReelle(_ c: UIColor, plafond: CGFloat = 0.8) -> UIColor {
     var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
     c.getRed(&r, green: &g, blue: &b, alpha: &a)
     let l = 0.2126 * r + 0.7152 * g + 0.0722 * b
-    let k: CGFloat = l > 0.8 ? 0.8 / l : 1
+    let k: CGFloat = l > plafond ? plafond / l : 1
     let gris = l * k
     let d: CGFloat = 0.08
     return UIColor(
@@ -1820,6 +1852,10 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     // parcours s'est trompé reste un mur, pas un trou.
     m.isDoubleSided = deuxFaces
     m.cullMode = .back
+    m.shaderModifiers = [.fragment: Self.nuanceurRebond]
+    let rebond = modePose != false ? 0 : lumiereAllumee ? Self.REBOND_ALLUME : Self.REBOND_ETEINT
+    m.setValue(NSNumber(value: Float(rebond)), forKey: "rebond")
+    matieresDuBati.append(m)
     g.materials = [m]
     return g
   }
@@ -1878,6 +1914,53 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
           c.setFillColor(fond.cgColor)
           c.fill(zone)
         }
+        /*
+          LE FIL DU BOIS — relevé du patron : « de vraies textures ». Un
+          parquet uni, à trois aplats, signait le dessin. Chaque lame reçoit
+          son veinage : des fils sinueux le long de la lame, plus sombres ou
+          plus clairs d'un rien, serrés par endroits, et de loin en loin un
+          nœud. Le tirage est fixe : le même parquet à chaque visite.
+        */
+        var graine: UInt64 = 0x51_7CC1_B727_220A
+        func hasard() -> CGFloat {
+          graine = graine &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+          return CGFloat((graine >> 33) & 0xFF_FFFF) / CGFloat(0xFF_FFFF)
+        }
+        let fonce = melange(teinte, UIColor(red: 0.25, green: 0.15, blue: 0.08, alpha: 1), 0.55)
+        let clair = melange(teinte, .white, 0.35)
+        for (zone, _) in tons {
+          c.saveGState()
+          c.clip(to: zone)
+          for k in 0..<34 {
+            let y0 = zone.minY + hasard() * zone.height
+            let amplitude = 0.6 + hasard() * 2.4
+            let periode = 50 + hasard() * 120
+            let phase = hasard() * 6.28
+            let sombre = hasard() < 0.7
+            c.setStrokeColor((sombre ? fonce : clair).withAlphaComponent(0.08 + hasard() * 0.14).cgColor)
+            c.setLineWidth(0.5 + hasard() * 1.6)
+            c.beginPath()
+            var x = zone.minX
+            while x <= zone.maxX + 8 {
+              let y = y0 + CGFloat(sin(Double(x / periode) + Double(phase) + Double(k) * 0.3)) * amplitude
+              if x == zone.minX { c.move(to: CGPoint(x: x, y: y)) } else { c.addLine(to: CGPoint(x: x, y: y)) }
+              x += 8
+            }
+            c.strokePath()
+          }
+          // Un nœud, une lame sur deux.
+          if hasard() < 0.5 {
+            let cx = zone.minX + 40 + hasard() * (zone.width - 80)
+            let cy = zone.minY + zone.height * (0.3 + hasard() * 0.4)
+            for anneau in 0..<4 {
+              let r = CGFloat(anneau) * 2.2 + 2.5
+              c.setStrokeColor(fonce.withAlphaComponent(0.22 - CGFloat(anneau) * 0.04).cgColor)
+              c.setLineWidth(1)
+              c.strokeEllipse(in: CGRect(x: cx - r * 2.2, y: cy - r, width: r * 4.4, height: r * 2))
+            }
+          }
+          c.restoreGState()
+        }
         c.setStrokeColor(joint.cgColor)
         c.setLineWidth(2)
         // Les rangs : en haut de la tuile (qui se répète) et entre les deux.
@@ -1913,8 +1996,13 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     while i + 6 <= v.count {
       let matiere = Int(v[i])
       let sens = Int(v[i + 1])
-      let teinte = UIColor(
-        red: CGFloat(v[i + 2]), green: CGFloat(v[i + 3]), blue: CGFloat(v[i + 4]), alpha: 1)
+      /*
+        UN SOL DE MATIÈRE RÉELLE : le chêne clair d'un parquet renvoie six à
+        sept dixièmes de la lumière, pas tout. Plafonné à sept dixièmes, il
+        cesse de sortir délavé, d'un pêche d'écran.
+      */
+      let teinte = Self.teinteReelle(UIColor(
+        red: CGFloat(v[i + 2]), green: CGFloat(v[i + 3]), blue: CGFloat(v[i + 4]), alpha: 1), plafond: 0.7)
       let n = Int(v[i + 5])
       i += 6
       // Un tableau tronqué ne doit pas faire tomber l'application.
