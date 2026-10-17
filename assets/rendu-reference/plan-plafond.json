@@ -173,8 +173,8 @@
     {
      "type": "RNSVGSvgView",
      "props": {
-      "width": 900,
-      "height": 620,
+      "width": 1620,
+      "height": 1340,
       "focusable": false,
       "style": [
        {
@@ -182,17 +182,21 @@
         "borderWidth": 0
        },
        {
-        "width": 900,
-        "height": 620,
+        "marginLeft": -360,
+        "marginTop": -360
+       },
+       {
+        "width": 1620,
+        "height": 1340,
         "flex": 0
        }
       ],
-      "bbWidth": 900,
-      "bbHeight": 620,
-      "minX": 0,
-      "minY": 0,
-      "vbWidth": 900,
-      "vbHeight": 620,
+      "bbWidth": 1620,
+      "bbHeight": 1340,
+      "minX": -360,
+      "minY": -360,
+      "vbWidth": 1620,
+      "vbHeight": 1340,
       "align": "xMidYMid",
       "meetOrSlice": 0
      },

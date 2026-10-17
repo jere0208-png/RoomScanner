@@ -769,7 +769,7 @@ describe('le plan suit les doigts, et se pose d’une traite', () => {
     rendu (voir `margesDeToile`) : au repos, elle est déjà ouverte du côté où
     le plan dépasse, et le geste n'y touche pas.
   */
-  it('plan qui déborde : la toile est ouverte dès le repos, et ne change pas pendant le geste', () => {
+  it('plan qui déborde : la toile est ouverte dès le repos, et ni le geste ni le lâcher n’y touchent', () => {
     const b = monter();
     const toile = () =>
       b.tree.root
@@ -791,5 +791,8 @@ describe('le plan suit les doigts, et se pose d’une traite', () => {
     expect(toile()).toBe(auRepos);
     b.lever(0);
     lacher(b, 1);
+    // Et le lâcher ne la change pas non plus (diagnostic « il se déplace tout
+    // seul au relâcher ») : la toile a une taille fixe.
+    expect(toile()).toBe(auRepos);
   });
 });

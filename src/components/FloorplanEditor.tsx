@@ -628,28 +628,23 @@ interface Props {
  * et coins déplaçables (les murs soudés au même coin suivent).
  */
 /**
- * LES MARGES DE LA TOILE — ce qu'on peint au-delà de l'écran, côté par côté
- * (gauche, haut, droite, bas, en points).
+ * LES MARGES DE LA TOILE — ce qu'on peint au-delà de l'écran, tout autour.
  *
- * Relevé du patron, diagnostic à l'appui : « encore des bugs au zoom,
- * pincer, relâcher ; ça devrait être fluide, c'est juste de la 2D ». La
- * vidéo, image par image : sur un plan zoomé qui déborde de l'écran,
- * l'écran se FIGEAIT de trois à six dixièmes de seconde au début du geste —
- * aucune image, les doigts déjà en route —, puis le plan sautait d'un coup
- * pour les rattraper. Sur un plan qui tient dans l'écran, rien : le geste
- * coulait dès la première image.
+ * Relevés du patron, deux diagnostics à l'appui, vidéos image par image :
+ *   1. « encore des bugs au zoom, pincer, relâcher » : sur un plan zoomé,
+ *      l'écran se figeait au début du geste — la toile s'agrandissait à la
+ *      prise du doigt, et tout le plan se repeignait sur sept écrans ;
+ *   2. « pire qu'avant, il se déplace tout seul au relâcher » : les marges,
+ *      recalculées à chaque lâcher, faisaient changer la taille de la toile
+ *      ET son cadrage (`viewBox`) dans le même rendu. Le dessin natif restait
+ *      calé sur l'ancien cadrage : le plan partait hors de l'écran au lâcher,
+ *      et n'était remis en place qu'au geste suivant.
  *
- * La différence, c'était la toile. Elle s'ouvrait à la PRISE du doigt, de
- * huit dixièmes d'écran de chaque côté : six cents balises à repeindre sur
- * une surface sept fois plus grande que l'écran, au moment exact où le
- * doigt commence à bouger.
- *
- * Elle ne s'ouvre donc plus au geste. Ses marges se calculent AU RENDU,
- * avec le cadrage — au lâcher du geste précédent, quand le dessin se refait
- * de toute façon — et un geste qui commence n'a plus rien à peindre. Elles
- * sont taillées au plus juste : seulement du côté où le plan dépasse
- * vraiment, plus l'air d'une cote, et bornées. Le vide n'a pas besoin d'être
- * peint.
+ * Une seule règle tient les deux : LA TOILE NE CHANGE JAMAIS DE TAILLE. Sa
+ * marge est fixe, la même de chaque côté, tirée des seules dimensions de la
+ * zone du plan — elle ne bouge qu'avec elles (une rotation de l'écran). Un
+ * geste n'a rien à repeindre en commençant, un lâcher ne change que le
+ * dessin, et le plan ramené au centre n'est jamais coupé.
  */
 export interface MargesDeToile {
   g: number;
@@ -660,32 +655,11 @@ export interface MargesDeToile {
 const SANS_MARGE: MargesDeToile = { g: 0, h: 0, d: 0, b: 0 };
 const MargeDeLaToile = React.createContext<MargesDeToile>(SANS_MARGE);
 
-/**
- * LES MARGES QU'IL FAUT, pour des points du dessin déjà projetés à l'écran :
- * ce qui dépasse de chaque bord, plus `air` (une cote, un cartouche), borné
- * à `max` par côté. Pure : le banc la vérifie.
- */
-export function margesDeToile(
-  points: { x: number; y: number }[],
-  largeur: number,
-  hauteur: number,
-  air = 48,
-  max = Math.round(0.6 * Math.max(largeur, hauteur)),
-): MargesDeToile {
-  if (points.length === 0 || largeur <= 0 || hauteur <= 0) return SANS_MARGE;
-  let x0 = Infinity;
-  let y0 = Infinity;
-  let x1 = -Infinity;
-  let y1 = -Infinity;
-  for (const q of points) {
-    if (q.x < x0) x0 = q.x;
-    if (q.y < y0) y0 = q.y;
-    if (q.x > x1) x1 = q.x;
-    if (q.y > y1) y1 = q.y;
-  }
-  // Rien ne dépasse d'un côté : pas de marge de ce côté-là.
-  const cote = (depasse: number) => (depasse <= -air ? 0 : Math.min(max, Math.ceil(depasse + air)));
-  return { g: cote(-x0), h: cote(-y0), d: cote(x1 - largeur), b: cote(y1 - hauteur) };
+/** La marge fixe de la toile pour une zone de plan : quatre dixièmes de sa plus grande dimension. */
+export function margeFixeDeToile(largeur: number, hauteur: number): MargesDeToile {
+  if (largeur <= 0 || hauteur <= 0) return SANS_MARGE;
+  const m = Math.round(0.4 * Math.max(largeur, hauteur));
+  return { g: m, h: m, d: m, b: m };
 }
 
 /**
@@ -1325,8 +1299,8 @@ export function FloorplanEditor({
         return true;
       },
       onPanResponderGrant: (e, g) => {
-        // Rien à peindre à la prise : la toile a ses marges depuis le rendu
-        // (voir `margesDeToile`).
+        // Rien à peindre à la prise : la toile a sa taille fixe (voir
+        // `margeFixeDeToile`).
         vueVive.current = viewRef.current;
         // Le recalage repart de zero a chaque prise : le decalage se compte
         // en petits pas, et un geste qui commence herite du precedent.
@@ -1557,43 +1531,8 @@ export function FloorplanEditor({
     }
     return <G pointerEvents="none">{traits}</G>;
   }, [showGrille, mapping, walls, c.line, c.lineStrong]);
-  /*
-    LA MARGE DE LA TOILE : nulle au repos, large pendant le geste — et
-    seulement si le dessin déborde de l'écran (voir la prise du doigt).
-
-    Huit dixièmes de la plus grande dimension : un doigt ne traverse pas
-    l'écran et demi d'un seul trait, donc son bord n'est jamais atteint. Un
-    nombre ROND, arrondi au point, sinon le `viewBox` change à chaque
-    fraction de pixel de mise en page.
-
-    LE DESSIN DÉBORDE-T-IL ? Un bout de mur à moins de trente-six points du
-    bord — la place d'une cote — suffit : ce qui l'entoure a pu ne pas être
-    peint. Le cadrage d'ouverture en laisse quarante (`makeMapping`) : un
-    plan qu'on n'a pas encore déplacé ne déborde jamais.
-  */
-  const deborde = useMemo(() => {
-    if (!mapping) return false;
-    const BORD = 36;
-    for (const w of [...walls, ...(filigrane ?? [])]) {
-      for (const pt of [w.a, w.b]) {
-        const q = mapping.toPx(pt);
-        if (q.x < BORD || q.y < BORD || q.x > layout.w - BORD || q.y > layout.h - BORD) return true;
-      }
-    }
-    return false;
-  }, [mapping, walls, filigrane, layout.w, layout.h]);
-  /*
-    LES MARGES DE LA TOILE, AU RENDU — voir `margesDeToile`. Un plan qui
-    tient dans l'écran n'en a aucune : il est peint en entier.
-  */
-  const margesToile = useMemo(() => {
-    if (!mapping || !deborde) return SANS_MARGE;
-    const pts: { x: number; y: number }[] = [];
-    for (const w of [...walls, ...(filigrane ?? [])]) {
-      pts.push(mapping.toPx(w.a), mapping.toPx(w.b));
-    }
-    return margesDeToile(pts, layout.w, layout.h);
-  }, [mapping, deborde, walls, filigrane, layout.w, layout.h]);
+  // La toile ne change jamais de taille : voir `margeFixeDeToile`.
+  const margesToile = useMemo(() => margeFixeDeToile(layout.w, layout.h), [layout.w, layout.h]);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
 

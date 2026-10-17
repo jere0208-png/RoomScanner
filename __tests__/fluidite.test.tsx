@@ -435,16 +435,22 @@ describe('le plan glisse sans se redessiner', () => {
   });
 
   /*
-    LA TOILE A SES MARGES DÈS LE REPOS — diagnostic du patron : sur un plan
-    zoomé, l'écran se figeait au début du geste, le temps de repeindre une
-    toile agrandie à la prise du doigt. Elle s'agrandit désormais au rendu,
-    avec le cadrage, du seul côté où le plan dépasse ; le geste n'a plus rien
-    à peindre, et le plan peut toujours revenir sans être coupé.
+    LA TOILE NE CHANGE JAMAIS DE TAILLE — deux diagnostics du patron : l'écran
+    figé au début d'un geste (la toile s'agrandissait à la prise), puis le
+    plan « qui se déplace tout seul au relâcher » (taille et cadrage de la
+    toile changeaient au lâcher ; le dessin natif restait sur l'ancien
+    cadrage). Sa marge est fixe : ni le geste, ni le lâcher n'y touchent.
   */
-  it('un plan qui déborde : la toile est déjà ouverte au repos, et le geste n’y touche pas', () => {
+  it('la toile garde sa taille et son cadrage : au repos, pendant le geste, après le lâcher', () => {
     const tree = planEquipe();
-    const auCentre = toileDe(tree).props.bbWidth;
-    // Un premier geste le pousse à moitié hors de l'écran, vers la droite.
+    const cadre = () => {
+      const p = toileDe(tree).props;
+      return [p.bbWidth, p.bbHeight, p.minX, p.minY, p.vbWidth, p.vbHeight].join(' ');
+    };
+    const auCentre = cadre();
+    // Assez grande pour ramener au centre ce qui sort de l'écran.
+    expect(toileDe(tree).props.minX).toBeLessThan(0);
+    // Un premier geste pousse le plan à moitié hors de l'écran.
     act(() => {
       const zone = zoneDuPlan(tree);
       zone.props.onMoveShouldSetResponder?.(doigt(400, 300));
@@ -452,17 +458,11 @@ describe('le plan glisse sans se redessiner', () => {
       zone.props.onResponderMove?.(doigtDepuis(400, 300, 800, 300));
       zone.props.onResponderRelease?.(doigtDepuis(400, 300, 800, 300));
     });
-    const auRepos = toileDe(tree).props.bbWidth;
-    // Au repos, la toile a déjà de quoi ramener ce qui est sorti à droite…
-    expect(auRepos).toBeGreaterThan(auCentre);
-    // … et rien à gauche, où le plan ne dépasse pas : sa fenêtre ne s'ouvre
-    // que du côté utile.
-    expect(toileDe(tree).props.minX).toBe(0);
+    expect(cadre()).toBe(auCentre);
     const avant = empreinte(tree);
-
     glisser(tree);
     // Pendant le geste, rien ne change : ni la toile, ni le dessin.
-    expect(toileDe(tree).props.bbWidth).toBe(auRepos);
+    expect(cadre()).toBe(auCentre);
     expect(empreinte(tree)).toBe(avant);
   });
 
