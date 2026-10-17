@@ -119,6 +119,49 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     set { if Self.recevoir(newValue, dans: &fSols) { rebatir(.sols) } }
   }
 
+  /*
+    LA PIÈCE DE CHAQUE TRIANGLE DU BÂTI, DE CHAQUE SOL — relevé du patron :
+    « la lumière ne doit pas agir sur les autres pièces que celle où elle est
+    allumée ». SceneKit n'arrête pas une lumière à un mur : un faisceau de
+    cinq mètres traversait la cloison et éclairait la chambre d'à côté. Le
+    bâti se découpe donc par pièce, chaque morceau porte le bit de sa pièce
+    (`masqueDeLaPiece`), et une lampe n'éclaire que les morceaux du sien.
+  */
+  private var fPiecesMaillage: [Float] = []
+  private var fPiecesSols: [Float] = []
+
+  @objc var piecesDuMaillage: [NSNumber] {
+    get { [] }
+    set { if Self.recevoir(newValue, dans: &fPiecesMaillage) { rebatir(.bati) } }
+  }
+
+  @objc var piecesDesSols: [NSNumber] {
+    get { [] }
+    set { if Self.recevoir(newValue, dans: &fPiecesSols) { rebatir(.sols) } }
+  }
+
+  /*
+    L'INTENSITÉ DES LAMPES, EN POUR CENT — relevé du patron : « fais-moi un
+    réglage de lumière pour te guider vers le % voulu ». Elle règle les
+    faisceaux, la lueur des meubles et la clarté que prennent les murs de la
+    pièce allumée.
+  */
+  @objc var intensite: NSNumber = 100 {
+    didSet { if intensite != oldValue { appliquerLampes() } }
+  }
+
+  private var facteurDesLampes: CGFloat { CGFloat(max(0, min(200, intensite.doubleValue))) / 100 }
+
+  /// Le bit d'une pièce (au-delà de soixante pièces, aucune : seule la lumière du jour).
+  private static func masqueDeLaPiece(_ piece: Int) -> Int {
+    piece >= 0 && piece < 60 ? 1 << (piece + 3) : 0
+  }
+
+  /// Les matières du bâti, par pièce (−1 : hors pièce), pour la clarté des pièces allumées.
+  private var matieresParPiece: [Int: [SCNMaterial]] = [:]
+  /// Les pièces où au moins une lampe est allumée.
+  private var piecesEclairees: Set<Int> = []
+
   @objc var camera: [NSNumber] = [] {
     didSet { if camera != oldValue { placerOeil() } }
   }
@@ -141,14 +184,14 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   /// diffuse de la pièce (voir `nuanceurRebond`).
   private var matieresDuBati: [SCNMaterial] = []
   /*
-    AU MOINS UNE LAMPE ALLUMÉE — OU AUCUNE LAMPE DU TOUT. Relevé du patron :
+    AUCUNE LAMPE DANS LE LOGEMENT. Relevé du patron :
     « oui, éclairage allumé par défaut sans lampes ». Hors mode Électricité,
     le logement n'a pas de luminaire : on ne pourrait jamais allumer, et la
-    visite resterait dans sa pénombre. Tant qu'aucune lampe n'est posée, la
-    pièce est donc éclairée ; dès que le JavaScript pose ses lampes, ce sont
-    elles qui décident.
+    visite resterait dans sa pénombre. Tant qu'aucune lampe n'est posée, le
+    logement est donc éclairé ; dès que le JavaScript pose ses lampes, il
+    prend sa pénombre, et chaque lampe allumée n'éclaire que sa pièce.
   */
-  private var lumiereAllumee = true
+  private var sansLampes = true
 
   /**
    * LA VUE CHANGE DE MODE : visite (à hauteur d'œil) ou maquette (en orbite).
@@ -214,8 +257,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     let ombre: CGFloat
     /// Le multiplicateur des faisceaux des lampes.
     let lampes: CGFloat
-    /// Allumée, l'ambiance prend un peu de la teinte des lampes.
-    let ambianceTeintee: Bool
   }
 
   /*
@@ -229,8 +270,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   */
   static let RENDU = Rendu(
     eteint: (300, 180, 90), allume: (390, 235, 110), rebond: (0.22, 0.2), lisere: 0.24,
-    albedoMeubles: 0.84, albedoSol: 0.74, veinage: true, ombre: 0.55, lampes: 1,
-    ambianceTeintee: true)
+    albedoMeubles: 0.84, albedoSol: 0.74, veinage: true, ombre: 0.55, lampes: 1)
 
   /// Le rendu de la visite (voir `RENDU`).
   private let choix: Rendu = RoomScanVisite.RENDU
@@ -404,9 +444,9 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
 
   private func lampeAllumee(_ rang: Int) -> Bool {
     var i = 0
-    while i + 9 <= lampesPosees.count {
+    while i + Self.PAR_LAMPE <= lampesPosees.count {
       if Int(lampesPosees[i]) == rang { return lampesPosees[i + 2] > 0.5 }
-      i += 9
+      i += Self.PAR_LAMPE
     }
     return false
   }
@@ -456,12 +496,15 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     soi. Le contre-jour reste à sa place — cinq lampes, le jour, le contre-jour
     et l'ambiance tiennent dans les huit lumières de la carte graphique.
   */
+  /// Dix nombres par lampe : `[rang, genre, allumée, source, x, y, z, nx, nz, pièce]`.
+  static let PAR_LAMPE = 10
+
   private func appliquerLampes() {
     for enfant in eclairage.childNodes { enfant.removeFromParentNode() }
     var i = 0
     let v = lampesPosees
-    var allumees = 0
-    while i + 9 <= v.count {
+    var eclairees: Set<Int> = []
+    while i + Self.PAR_LAMPE <= v.count {
       let rang = Int(v[i])
       let genre = Int(v[i + 1])
       let allume = v[i + 2] > 0.5
@@ -471,25 +514,36 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
         n.geometry?.materials = [matiere]
       }
       if allume {
-        allumees += 1
+        let piece = Int(v[i + 9])
+        eclairees.insert(piece)
+        // Sa pièce seule ; une lampe hors de toute pièce éclaire le bâti entier.
+        let masque = piece >= 0 ? Self.masqueDeLaPiece(piece) : Self.MASQUE_PIECE
         let p = SCNVector3(x: v[i + 4], y: v[i + 5], z: v[i + 6])
         // Toute lampe allumée a son halo — même loin, même sans source.
         eclairage.addChildNode(halo(genre: genre, a: p, nx: v[i + 7], nz: v[i + 8]))
         if source {
-          for l in lumieres(genre: genre, a: p, nx: v[i + 7], nz: v[i + 8]) {
+          for l in lumieres(genre: genre, a: p, nx: v[i + 7], nz: v[i + 8], masque: masque) {
             eclairage.addChildNode(l)
           }
           eclairage.addChildNode(lueurDesMeubles(genre: genre, a: p, nx: v[i + 7], nz: v[i + 8]))
         }
       }
-      i += 9
+      i += Self.PAR_LAMPE
     }
-    // Allumer rend sa lumière à la pièce (voir `reglerLeJour`) ; sans
-    // aucune lampe, la pièce reste éclairée (voir `lumiereAllumee`).
-    let eclairee = allumees > 0 || v.count < 9
-    if eclairee != lumiereAllumee {
-      lumiereAllumee = eclairee
+    /*
+      ALLUMER N'ÉCLAIRE QUE SA PIÈCE — relevé du patron : « elle ne doit pas
+      agir sur les autres pièces ». Le jour du logement ne bouge plus quand on
+      allume (il montait partout, meubles compris) : seules la pièce allumée,
+      ses murs et son plafond, gagnent en clarté (`reglerLesRebonds`). Sans
+      aucune lampe, le logement entier reste éclairé (voir `sansLampes`).
+    */
+    piecesEclairees = eclairees
+    let aucune = v.count < Self.PAR_LAMPE
+    if aucune != sansLampes {
+      sansLampes = aucune
       reglerLeJour()
+    } else {
+      reglerLesRebonds()
     }
   }
 
@@ -528,14 +582,35 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     _output.color.rgb += _surface.diffuse.rgb * rebond;
     """
 
-  /// La lumière diffuse des murs, selon la vue, le rendu et les lampes.
+  /// La lumière diffuse des murs, selon la vue et la présence de lampes.
   private func rebondDuMoment() -> CGFloat {
-    modePose != false ? 0 : lumiereAllumee ? choix.rebond.allume : choix.rebond.eteint
+    modePose != false ? 0 : sansLampes ? choix.rebond.allume : choix.rebond.eteint
+  }
+
+  /*
+    LA CLARTÉ D'UNE PIÈCE ALLUMÉE : ses murs et son plafond prennent un peu
+    plus de leur teinte, au pourcentage du réglage. Les meubles n'en reçoivent
+    rien, les autres pièces non plus.
+  */
+  static let CLARTE_PIECE_ALLUMEE: CGFloat = 0.08
+
+  private func rebondDe(_ piece: Int) -> CGFloat {
+    let base = rebondDuMoment()
+    guard modePose == false, piecesEclairees.contains(piece) else { return base }
+    return base + Self.CLARTE_PIECE_ALLUMEE * facteurDesLampes
+  }
+
+  private func reglerLesRebonds() {
+    for (piece, matieres) in matieresParPiece {
+      let r = NSNumber(value: Float(rebondDe(piece)))
+      for m in matieres { m.setValue(r, forKey: "rebond") }
+    }
+    reveiller(0.6)
   }
 
   private func reglerLeJour() {
     let maquette = orbite.count >= 10
-    let j = maquette ? Self.JOUR_MAQUETTE : lumiereAllumee ? choix.allume : choix.eteint
+    let j = maquette ? Self.JOUR_MAQUETTE : sansLampes ? choix.allume : choix.eteint
     SCNTransaction.begin()
     // Pas de fondu avant la première image : les lampes posées à l'ouverture
     // ne doivent pas faire « tomber la nuit » sous les yeux.
@@ -543,11 +618,10 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     ambiante.intensity = j.ambiance
     jour.intensity = j.jour
     contre.intensity = j.contre
-    ambiante.color = !maquette && lumiereAllumee && choix.ambianceTeintee
-      ? melange(.white, teinteDesLampes, 0.2) : UIColor.white
     SCNTransaction.commit()
     let rebond = rebondDuMoment()
     for m in matieresDuBati { m.setValue(NSNumber(value: Float(rebond)), forKey: "rebond") }
+    reglerLesRebonds()
     if !maquette { matiereContour.transparency = choix.lisere }
     noeudDuContre?.light = contre
     reveiller(0.6)
@@ -583,7 +657,15 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
    perceptible, c'est sa SOURCE : le halo autour du luminaire (`halo`), et la
    nappe sur le mur et le sol — pas un meuble poussé au blanc.
    */
-  private func lumieres(genre: Int, a p: SCNVector3, nx: Float, nz: Float) -> [SCNNode] {
+  /*
+    PLUS DOUCES ENCORE — relevé du patron : « réduis encore l'intensité de la
+    lumière ». Les faisceaux passent aux six dixièmes de leur force, puis au
+    pourcentage du réglage (`intensite`).
+  */
+  static let FORCE_DES_FAISCEAUX: CGFloat = 0.6
+
+  private func lumieres(genre: Int, a p: SCNVector3, nx: Float, nz: Float, masque: Int) -> [SCNNode] {
+    let force = choix.lampes * Self.FORCE_DES_FAISCEAUX * facteurDesLampes
     // La température choisie par l'utilisateur, pour tous les luminaires.
     let chaud = teinteDesLampes
     let blanc = teinteDesLampes
@@ -595,14 +677,14 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       let l = SCNLight()
       l.type = .spot
       l.color = teinte
-      l.intensity = intensite * choix.lampes
+      l.intensity = intensite * force
       l.spotInnerAngle = interieur
       l.spotOuterAngle = exterieur
       l.attenuationStartDistance = 0.3
       l.attenuationEndDistance = portee
       l.attenuationFalloffExponent = 2
       l.castsShadow = false
-      l.categoryBitMask = Self.MASQUE_PIECE
+      l.categoryBitMask = masque
       let n = SCNNode()
       n.light = l
       n.position = q
@@ -626,12 +708,12 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       let l = SCNLight()
       l.type = .omni
       l.color = chaud
-      l.intensity = 210 * choix.lampes
+      l.intensity = 210 * force
       l.attenuationStartDistance = 0.3
       l.attenuationEndDistance = 4.5
       l.attenuationFalloffExponent = 2
       l.castsShadow = false
-      l.categoryBitMask = Self.MASQUE_PIECE
+      l.categoryBitMask = masque
       let n = SCNNode()
       n.light = l
       // Au centre de l'ampoule (`DESCENTE_DE_LA_LUMIERE.dcl`), pas à la rosace.
@@ -689,7 +771,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     // « la lumière sur les meubles est toujours trop élevée, tout devient
     // blanc ; réduis considérablement ». Et le plafond de couleur des meubles
     // (voir `nuanceurPlafondDesMeubles`) tient la règle quoi qu'il arrive.
-    l.intensity = 4
+    l.intensity = 3 * facteurDesLampes
     l.attenuationStartDistance = 0.2
     l.attenuationEndDistance = 3.2
     l.attenuationFalloffExponent = 2
@@ -1172,6 +1254,17 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     }
   }
 
+  /// Le maillage, triangle par triangle, rangé par pièce (tout en −1 si les pièces manquent).
+  private static func morceauxParPiece(_ source: [Float], _ pieces: [Float]) -> [(Int, [Float])] {
+    let n = source.count / 12
+    guard n > 0, pieces.count == n else { return [(-1, source)] }
+    var parPiece: [Int: [Float]] = [:]
+    for t in 0..<n {
+      parPiece[Int(pieces[t]), default: []].append(contentsOf: source[t * 12..<(t + 1) * 12])
+    }
+    return parPiece.sorted { $0.key < $1.key }.map { ($0.key, $0.value) }
+  }
+
   private static func vider(_ n: SCNNode) {
     for enfant in n.childNodes { enfant.removeFromParentNode() }
   }
@@ -1183,8 +1276,17 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       Self.vider(gBati)
       matiereEcorche = nil
       matieresDuBati.removeAll()
-      if let g = geometrie(fMaillage, deuxFaces: true) {
-        gBati.addChildNode(SCNNode(geometry: g))
+      // Un morceau de bâti par pièce, au bit de sa pièce (voir `piecesDuMaillage`).
+      matieresParPiece.removeAll()
+      for (piece, morceau) in Self.morceauxParPiece(fMaillage, fPiecesMaillage) {
+        guard let g = geometrie(morceau, deuxFaces: true) else { continue }
+        let n = SCNNode(geometry: g)
+        n.categoryBitMask = Self.MASQUE_PIECE | Self.masqueDeLaPiece(piece)
+        if let m = g.firstMaterial {
+          matieresParPiece[piece, default: []].append(m)
+          m.setValue(NSNumber(value: Float(rebondDe(piece))), forKey: "rebond")
+        }
+        gBati.addChildNode(n)
       }
       if let g = geometrie(fOrientes, deuxFaces: false) {
         gBati.addChildNode(SCNNode(geometry: g))
@@ -1988,8 +2090,12 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   private func noeudsDesSols() -> [SCNNode] {
     let v = fSols
     var i = 0
+    var bloc = 0
     var out: [SCNNode] = []
     while i + 6 <= v.count {
+      // Le sol porte le bit de sa pièce : seules ses lampes l'éclairent.
+      let piece = bloc < fPiecesSols.count ? Int(fPiecesSols[bloc]) : -1
+      bloc += 1
       let matiere = Int(v[i])
       let sens = Int(v[i + 1])
       /*
@@ -2047,7 +2153,9 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
         m.diffuse.contents = teinte
       }
       g.materials = [m]
-      out.append(SCNNode(geometry: g))
+      let noeud = SCNNode(geometry: g)
+      noeud.categoryBitMask = Self.MASQUE_PIECE | Self.masqueDeLaPiece(piece)
+      out.append(noeud)
     }
     return out
   }

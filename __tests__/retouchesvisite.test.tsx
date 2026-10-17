@@ -77,7 +77,7 @@ describe('la lumière de la visite', () => {
 
   it('elles éclairent la pièce, et ne blanchissent plus les meubles', () => {
     // Les faisceaux ne touchent que le bâti ; les meubles ont leur lueur, douce.
-    expect(corps).toContain('l.categoryBitMask = Self.MASQUE_PIECE');
+    expect(corps).toContain('l.categoryBitMask = masque');
     expect(natif).toMatch(/categoryBitMask = Self\.MASQUE_MEUBLE/);
     const lueur = natif.slice(natif.indexOf('private func lueurDesMeubles'));
     const force = Number(/l\.intensity = (\d+)/.exec(lueur)![1]);

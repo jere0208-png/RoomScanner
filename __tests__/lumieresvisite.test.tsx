@@ -189,9 +189,11 @@ describe('les sources vont aux lampes allumées les plus proches', () => {
   }));
   it('dans le budget, les plus proches d’abord, et toutes disent si elles sont allumées', () => {
     const v = lampesPourLeNatif(lampes, new Set(['a0', 'a1', 'a2', 'a3']), { x: 0, z: 0 });
-    expect(v).toHaveLength(lampes.length * 9);
-    const sources = [0, 1, 2, 3].map((i) => v[i * 9 + 3]);
-    const allumees = [0, 1, 2, 3].map((i) => v[i * 9 + 2]);
+    expect(v).toHaveLength(lampes.length * 10);
+    const sources = [0, 1, 2, 3].map((i) => v[i * 10 + 3]);
+    const allumees = [0, 1, 2, 3].map((i) => v[i * 10 + 2]);
+    // La pièce, en dixième nombre : inconnue ici.
+    expect([0, 1, 2, 3].map((i) => v[i * 10 + 9])).toEqual([-1, -1, -1, -1]);
     expect(allumees).toEqual([1, 1, 1, 1]);
     // Deux appliques de deux faisceaux : quatre sources sur cinq, la troisième n'entre pas.
     expect(sources).toEqual([1, 1, 0, 0]);

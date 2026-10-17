@@ -52,6 +52,52 @@ export interface MaillageDeVisite {
   textures: string[];
   /** Les faces habillées : seize nombres par triangle (voir `Habilleur`). */
   texturees: number[];
+  /**
+   * LA PIÈCE DE CHAQUE TRIANGLE de `maillage`, et de chaque sol de `sols` —
+   * son rang dans `pieces`, −1 hors de toute pièce (une façade). Relevé du
+   * patron : « la lumière ne doit pas agir sur les autres pièces que celle
+   * où elle est allumée ». Le natif en fait un masque par pièce : une lampe
+   * n'éclaire que le bâti de la sienne.
+   */
+  piecesDuMaillage: number[];
+  piecesDesSols: number[];
+}
+
+/**
+ * LA PIÈCE D'UNE FACE — son centre, poussé de huit centimètres le long de sa
+ * normale (vers la pièce qu'elle regarde : un mur a une face par pièce),
+ * puis cherché dans les contours. −1 hors de toute pièce.
+ */
+export function pieceDeLaFace(pts: P3[], normale: P3 | null, pieces: readonly { x: number; z: number }[][]): number {
+  if (pieces.length === 0 || pts.length === 0) return -1;
+  let cx = 0;
+  let cz = 0;
+  for (const p of pts) {
+    cx += p.x;
+    cz += p.z;
+  }
+  cx /= pts.length;
+  cz /= pts.length;
+  const n = normale ?? normaleDuContour(pts);
+  const h = Math.hypot(n.x, n.z);
+  if (h > 0.5) {
+    cx += (n.x / h) * 0.08;
+    cz += (n.z / h) * 0.08;
+  }
+  for (let i = 0; i < pieces.length; i++) {
+    if (dansLeContour(cx, cz, pieces[i])) return i;
+  }
+  return -1;
+}
+
+function dansLeContour(x: number, z: number, poly: readonly { x: number; z: number }[]): boolean {
+  let dedans = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i];
+    const b = poly[j];
+    if (a.z > z !== b.z > z && x < ((b.x - a.x) * (z - a.z)) / (b.z - a.z) + a.x) dedans = !dedans;
+  }
+  return dedans;
 }
 
 /**
@@ -201,9 +247,15 @@ export function sensDesLames(pts: P3[], sens?: 'x' | 'z'): 0 | 1 {
  * l'occlusion font le contact d'un meuble avec le sol, et une nappe posée
  * sur le sol se battrait avec lui.
  */
-export function maillageDeLaVisite(faces: Face3D[], o: { sansMeubles?: boolean } = {}): MaillageDeVisite {
+export function maillageDeLaVisite(
+  faces: Face3D[],
+  o: { sansMeubles?: boolean; pieces?: readonly { x: number; z: number }[][] } = {},
+): MaillageDeVisite {
   const maillage: number[] = [];
   const sols: number[] = [];
+  const piecesDuMaillage: number[] = [];
+  const piecesDesSols: number[] = [];
+  const contours = o.pieces ?? [];
   // Les murs et les sols en vraies images (voir `habillage`).
   const habilleur = new Habilleur();
   const pousser = (cible: number[], pts: P3[], tri: [number, number, number]) => {
@@ -235,7 +287,9 @@ export function maillageDeLaVisite(faces: Face3D[], o: { sansMeubles?: boolean }
     }
     if (tris.length === 0) continue;
     const [r, g, b] = composantes(face.fill);
+    const piece = pieceDeLaFace(face.pts, voulue, contours);
     if (face.isFloor) {
+      piecesDesSols.push(piece);
       sols.push(
         face.matiere === 'parquet'
           ? MATIERE.parquet
@@ -253,10 +307,18 @@ export function maillageDeLaVisite(faces: Face3D[], o: { sansMeubles?: boolean }
       for (const t of tris) {
         pousser(maillage, face.pts, t);
         maillage.push(r, g, b);
+        piecesDuMaillage.push(piece);
       }
     }
   }
-  return { maillage, sols, textures: habilleur.textures, texturees: habilleur.texturees };
+  return {
+    maillage,
+    sols,
+    textures: habilleur.textures,
+    texturees: habilleur.texturees,
+    piecesDuMaillage,
+    piecesDesSols,
+  };
 }
 
 /** La caméra, à plat : position, lacet, tangage, ouverture verticale (°). */

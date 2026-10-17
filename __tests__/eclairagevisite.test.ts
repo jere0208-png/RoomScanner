@@ -75,7 +75,9 @@ describe('l’appareillage se voit sans lampe', () => {
 describe('la lampe du plafond, sur les meubles et l’appareillage : au plus 10 %', () => {
 
   it('les faisceaux ne touchent que le bâti, meubles et appareils portent l’autre masque', () => {
-    expect(swift).toMatch(/l\.categoryBitMask = Self\.MASQUE_PIECE/);
+    // Le bâti seul, et de sa pièce seule (voir `masqueDeLaPiece`).
+    expect(swift).toMatch(/l\.categoryBitMask = masque/);
+    expect(swift).toMatch(/let masque = piece >= 0 \? Self\.masqueDeLaPiece\(piece\) : Self\.MASQUE_PIECE/);
     expect(swift).toMatch(/m\.categoryBitMask = Self\.MASQUE_MEUBLE/);
   });
 });
@@ -132,26 +134,27 @@ describe('le rendu retenu : C, « Chaleureux du soir » (relevé du patron)', ()
     expect(r.rebond[0]).toBeCloseTo(0.22);
   });
 
-  it('« allumé, la lumière est trop forte » : allumer ajoute au plus un tiers, faisceaux à leur force d’origine', () => {
-    r.eteint.forEach((v, i) => {
-      expect(r.allume[i]).toBeGreaterThan(v);
-      expect(r.allume[i]).toBeLessThanOrEqual(v * 1.34);
-    });
-    expect(r.rebond[1]).toBeLessThanOrEqual(r.rebond[0]);
-    expect(r.lampes).toBeLessThanOrEqual(1);
-    expect(swift).toMatch(/melange\(\.white, teinteDesLampes, 0\.2\)/);
-  });
-
-  it('allumer passe par le jour du rendu, jamais n’assombrit', () => {
+  it('« la lumière ne doit pas agir sur les autres pièces » : allumer ne touche plus au jour du logement', () => {
+    // Le jour du logement ne dépend que de la présence de lampes, pas de leur état.
+    expect(swift).toMatch(/let j = maquette \? Self\.JOUR_MAQUETTE : sansLampes \? choix\.allume : choix\.eteint/);
     const bloc = swift.slice(swift.indexOf('private func appliquerLampes'), swift.indexOf('private func rebondDuMoment'));
     expect(bloc).not.toMatch(/ambiante\.intensity|jour\.intensity|contre\.intensity/);
-    expect(bloc).toMatch(/let eclairee = allumees > 0 \|\| v\.count < 9/);
-    expect(swift).toMatch(/lumiereAllumee \? choix\.allume : choix\.eteint/);
+    expect(bloc).toMatch(/let aucune = v\.count < Self\.PAR_LAMPE/);
+    // Seule la pièce allumée gagne en clarté, au pourcentage du réglage.
+    expect(swift).toMatch(/static let CLARTE_PIECE_ALLUMEE: CGFloat = 0\.08/);
+    expect(swift).toMatch(/guard modePose == false, piecesEclairees\.contains\(piece\) else \{ return base \}/);
+  });
+
+  it('« réduis encore l’intensité » : faisceaux aux six dixièmes, puis au réglage ; lueur des meubles à 3', () => {
+    expect(swift).toMatch(/static let FORCE_DES_FAISCEAUX: CGFloat = 0\.6/);
+    expect(swift).toMatch(/let force = choix\.lampes \* Self\.FORCE_DES_FAISCEAUX \* facteurDesLampes/);
+    expect(swift).toMatch(/l\.intensity = 3 \* facteurDesLampes/);
   });
 
   it('la lueur des meubles reste sous le dixième de l’ambiance éteinte', () => {
     const lueur = Number((swift.slice(swift.indexOf('private func lueurDesMeubles')).match(/l\.intensity = (\d+)/) ?? [])[1]);
-    expect(lueur).toBeLessThanOrEqual(r.eteint[0] * 0.1);
+    // Au réglage le plus fort (200 %), toujours sous le dixième.
+    expect(lueur * 2).toBeLessThanOrEqual(r.eteint[0] * 0.1);
   });
 
   it('plus de choix de rendu ni de pastille : un seul rendu, les murs blancs chauds', () => {
@@ -184,9 +187,69 @@ describe('le rendu retenu : C, « Chaleureux du soir » (relevé du patron)', ()
 
 describe('sans aucune lampe, la visite est éclairée (relevé du patron : « éclairage allumé par défaut sans lampes »)', () => {
   it('la vue part allumée, et ne s’assombrit que si des lampes sont posées, toutes éteintes', () => {
-    expect(swift).toMatch(/private var lumiereAllumee = true/);
+    expect(swift).toMatch(/private var sansLampes = true/);
     expect(swift).toMatch(/ambiante\.intensity = RoomScanVisite\.RENDU\.allume\.ambiance/);
     // Pas de fondu avant la première image.
     expect(swift).toMatch(/SCNTransaction\.animationDuration = maquette \|\| !premiereAnnoncee \? 0 : 0\.45/);
+  });
+});
+
+describe('une lampe, une pièce (relevé du patron : « elle ne doit pas agir sur les autres pièces »)', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { pieceDeLaFace, maillageDeLaVisite } = require('../src/geometry/visite3d');
+  const salon = [{ x: 0, z: 0 }, { x: 4, z: 0 }, { x: 4, z: 3 }, { x: 0, z: 3 }];
+  const chambre = [{ x: 4, z: 0 }, { x: 7, z: 0 }, { x: 7, z: 3 }, { x: 4, z: 3 }];
+
+  it('une face de cloison appartient à la pièce qu’elle regarde', () => {
+    const cloison = [{ x: 4, y: 0, z: 0 }, { x: 4, y: 0, z: 3 }, { x: 4, y: 2.5, z: 3 }, { x: 4, y: 2.5, z: 0 }];
+    expect(pieceDeLaFace(cloison, { x: -1, y: 0, z: 0 }, [salon, chambre])).toBe(0);
+    expect(pieceDeLaFace(cloison, { x: 1, y: 0, z: 0 }, [salon, chambre])).toBe(1);
+    // Hors de toute pièce : −1.
+    expect(pieceDeLaFace([{ x: 20, y: 0, z: 20 }], { x: 0, y: 1, z: 0 }, [salon, chambre])).toBe(-1);
+  });
+
+  it('le maillage de visite donne une pièce par triangle et par sol', () => {
+    const faces = [
+      { pts: [{ x: 0, y: 0, z: 0 }, { x: 4, y: 0, z: 0 }, { x: 4, y: 0, z: 3 }, { x: 0, y: 0, z: 3 }], fill: '#CCCCCC', isFloor: true },
+      { pts: [{ x: 5, y: 2.5, z: 1 }, { x: 6, y: 2.5, z: 1 }, { x: 6, y: 2.5, z: 2 }], fill: '#FFFFFF', isCeiling: true },
+    ];
+    const m = maillageDeLaVisite(faces as never, { pieces: [salon, chambre] });
+    expect(m.piecesDesSols).toEqual([0]);
+    expect(m.piecesDuMaillage).toEqual([1]);
+    expect(m.maillage.length / 12).toBe(m.piecesDuMaillage.length);
+  });
+
+  it('le natif découpe le bâti et les sols par pièce, et borne chaque lampe à la sienne', () => {
+    expect(swift).toMatch(/private static func masqueDeLaPiece\(_ piece: Int\) -> Int/);
+    expect(swift).toMatch(/n\.categoryBitMask = Self\.MASQUE_PIECE \| Self\.masqueDeLaPiece\(piece\)/);
+    expect(swift).toMatch(/noeud\.categoryBitMask = Self\.MASQUE_PIECE \| Self\.masqueDeLaPiece\(piece\)/);
+    expect(swift).toMatch(/static let PAR_LAMPE = 10/);
+    const m = readFileSync(join(__dirname, '../modules/react-native-room-scan/ios/RoomScan.m'), 'utf8');
+    expect(m).toMatch(/RCT_EXPORT_VIEW_PROPERTY\(piecesDuMaillage, NSArray\)/);
+    expect(m).toMatch(/RCT_EXPORT_VIEW_PROPERTY\(piecesDesSols, NSArray\)/);
+  });
+});
+
+describe('le réglage de la lumière (relevé du patron : « pour te guider vers le % voulu »)', () => {
+  it('de dix en dix, de 0 à 200 %, cent par défaut', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { useIntensiteLampes } = require('../src/store/intensiteLampes');
+    expect(useIntensiteLampes.getState().pourcent).toBe(100);
+    useIntensiteLampes.setState({ pourcent: 190 });
+    expect(useIntensiteLampes.getState().ajuster(1)).toBe(200);
+    expect(useIntensiteLampes.getState().ajuster(1)).toBe(200);
+    useIntensiteLampes.setState({ pourcent: 10 });
+    expect(useIntensiteLampes.getState().ajuster(-1)).toBe(0);
+    expect(useIntensiteLampes.getState().ajuster(-1)).toBe(0);
+  });
+
+  it('la visite affiche le réglage et le passe au natif', () => {
+    const expl = readFileSync(join(__dirname, '../src/components/Exploration.tsx'), 'utf8');
+    expect(expl).toMatch(/testID="intensite-moins"/);
+    expect(expl).toMatch(/testID="intensite-plus"/);
+    expect(expl).toMatch(/Lumière \{intensite\} %/);
+    expect(expl).toMatch(/intensite=\{intensite\}/);
+    const m = readFileSync(join(__dirname, '../modules/react-native-room-scan/ios/RoomScan.m'), 'utf8');
+    expect(m).toMatch(/RCT_EXPORT_VIEW_PROPERTY\(intensite, NSNumber\)/);
   });
 });

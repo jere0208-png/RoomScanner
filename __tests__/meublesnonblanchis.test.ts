@@ -39,6 +39,8 @@ describe('la lampe allumée, sur les meubles', () => {
     const intensite = Number((bloc.match(/l\.intensity = (\d+)/) ?? [])[1]);
     expect(intensite).toBeLessThanOrEqual(20);
     // Et les faisceaux des lampes ne touchent que le bâti.
-    expect(swift).toMatch(/l\.categoryBitMask = Self\.MASQUE_PIECE/);
+    // Le bâti seul, et de sa pièce seule (voir `masqueDeLaPiece`).
+    expect(swift).toMatch(/l\.categoryBitMask = masque/);
+    expect(swift).toMatch(/let masque = piece >= 0 \? Self\.masqueDeLaPiece\(piece\) : Self\.MASQUE_PIECE/);
   });
 });

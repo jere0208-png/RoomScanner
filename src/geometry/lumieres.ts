@@ -74,6 +74,8 @@ export interface Lampe {
   nz: number;
   /** Ce que coûte sa lumière : une applique fait deux faisceaux. */
   sources: number;
+  /** Le rang de sa pièce (voir `maillageDeLaVisite`), −1 inconnue. */
+  piece?: number;
 }
 
 /** Les lumières que la carte graphique tient à la fois, en plus du jour. */
@@ -277,9 +279,14 @@ export function interrupteurSousLeDoigt(
   return meilleur;
 }
 
+/** Nombres par lampe envoyés au natif. */
+export const PAR_LAMPE = 10;
+
 /**
- * CE QUE LE NATIF REÇOIT — neuf nombres par lampe, toutes les lampes :
- * `[rang, genre, allumée, source, x, y, z, nx, nz]`.
+ * CE QUE LE NATIF REÇOIT — dix nombres par lampe, toutes les lampes :
+ * `[rang, genre, allumée, source, x, y, z, nx, nz, pièce]`. La pièce borne sa
+ * lumière (relevé du patron : « elle ne doit pas agir sur les autres pièces
+ * que celle où elle est allumée »).
  *
  * `source` dit si elle a droit à une vraie lumière : les lampes allumées les
  * plus proches du visiteur, jusqu'à `SOURCES_MAX` (une applique compte deux).
@@ -311,6 +318,7 @@ export function lampesPourLeNatif(
       l.z,
       l.nx,
       l.nz,
+      l.piece ?? -1,
     );
   }
   return out;
