@@ -57,6 +57,8 @@ export function resumeDuDossier(sommaire: FeuilleDuDossier[]): string {
   };
   dire(n('garde'), 'page de garde', 'pages de garde');
   dire(n('plan'), 'plan', 'plans');
+  // L'état existant et le projet : un avant, un après.
+  dire(n('phases'), 'plan avant/après', 'plans avant/après');
   // Un métré sur deux feuilles reste UN métré.
   dire(Math.min(1, n('metre')), 'métré', 'métrés');
   dire(Math.min(1, n('menuiseries')), 'carnet des menuiseries', 'carnets des menuiseries');

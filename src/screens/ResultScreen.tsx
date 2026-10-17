@@ -91,7 +91,7 @@ import {
 import ChevronsUpDown from 'lucide-react-native/icons/chevrons-up-down';
 import Svg, { Path as Trace } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
-import { NATURES_MUR, libelleNature, natureDe } from '../geometry/natureMurs';
+import { NATURES_MUR, estDevinee, libelleNature, natureDe } from '../geometry/natureMurs';
 import { PastilleNature } from '../components/PastilleNature';
 import {
   DEFAULT_VIEW3D,
@@ -6653,7 +6653,7 @@ export function ResultScreen() {
             )} m`}
             note={`${(() => {
               const n = natureDe(selectedWall);
-              return n ? libelleNature(n).toLowerCase() : 'mur';
+              return n ? `${libelleNature(n).toLowerCase()}${estDevinee(selectedWall) ? ' (devinée)' : ''}` : 'mur';
             })()} · ${Math.round(epaisseurDe(selectedWall) * 100)} cm d’épaisseur`}
             onFermer={fermerLaCarte}
             actions={[
@@ -6768,13 +6768,16 @@ export function ResultScreen() {
                 onPress: () => {
                   const id = selectedWall.id;
                   const actuelle = natureDe(selectedWall);
+                  const devinee = estDevinee(selectedWall);
                   setMenu({
                     title: 'Nature du mur',
-                    subtitle: 'Le plan et le PDF le dessinent comme un plan d’architecte, avec sa légende.',
+                    subtitle: devinee
+                      ? 'Devinée d’après son épaisseur ou sa place en façade : touchez la bonne pour la confirmer.'
+                      : 'Le plan et le PDF le dessinent comme un plan d’architecte, avec sa légende.',
                     actions: [
                       ...NATURES_MUR.map((n) => ({
                         label: n.libelle,
-                        hint: n.cle === actuelle ? 'Nature actuelle' : n.aide,
+                        hint: n.cle === actuelle ? (devinee ? 'Devinée — touchez pour confirmer' : 'Nature actuelle') : n.aide,
                         node: <PastilleNature nature={n.cle} />,
                         onPress: () => {
                           useScanStore.getState().setNatureMur(id, n.cle);
@@ -6791,6 +6794,27 @@ export function ResultScreen() {
                             },
                           }]
                         : []),
+                      /*
+                        DEVINER POUR TOUT LE PLAN — relevé du patron : la
+                        nature se devine depuis l'épaisseur (et la façade),
+                        puis se corrige à la main. Utile sur un plan
+                        enregistré avant ; les natures choisies ne bougent
+                        pas.
+                      */
+                      {
+                        label: 'Deviner pour tout le plan',
+                        hint: 'D’après l’épaisseur de chaque mur et les façades. Vos choix sont gardés.',
+                        onPress: () => {
+                          const n = useScanStore.getState().devinerLesNaturesDuPlan();
+                          haptic(n > 0 ? 'succes' : 'leger');
+                          astuce(
+                            n > 0
+                              ? `${n} mur${n > 1 ? 's' : ''} ${n > 1 ? 'ont' : 'a'} reçu une nature devinée — touchez-en un pour corriger.`
+                              : 'Rien à deviner : épaisseurs inconnues, ou natures déjà choisies.',
+                            n > 0 ? { action: { label: 'Annuler', faire: () => useScanStore.getState().undo() } } : undefined,
+                          );
+                        },
+                      },
                     ],
                   });
                 },

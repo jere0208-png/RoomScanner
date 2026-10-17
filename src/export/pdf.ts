@@ -7,6 +7,8 @@
  * PDF 1.4 non compressé, A4, polices Helvetica (WinAnsi).
  */
 import {
+  aDesTravaux,
+  mursDeLaPhase,
   bouclesDuDoublage,
   dessinDesNatures,
   libelleNature,
@@ -17,7 +19,7 @@ import {
 import { jonctionsDetaillees, wallQuadsOf as quadsDesMursNature } from '../geometry/floorplan';
 import { carnetDesMenuiseries } from '../geometry/menuiseries';
 import { BLEU_FENETRE, ENCRE_ELEC } from '../ui/encreElec';
-import { dansLeBati, pocheDesMurs, SUREPAISSEUR_FACADE } from '../geometry/poche';
+import { dansLeBati, pocheDesMurs, porteurDe, SUREPAISSEUR_FACADE } from '../geometry/poche';
 import { cotesExterieurs } from '../geometry/cibleMur';
 import { CarteDEncre, boiteDuMot } from './encre';
 import type { FloorData, ObjectData } from 'react-native-room-scan';
@@ -1764,6 +1766,12 @@ interface SheetContext {
   entreprise?: EntreprisePdf | null;
   /** Les perspectives portent-elles les repères d'appareillage ? */
   reperes3D?: boolean;
+  /**
+   * LE PLAN PORTE LES REPÈRES DES MENUISERIES (P1, F1, B1…) — quand le
+   * carnet des menuiseries est dans le dossier, et seulement alors : un
+   * repère qui ne renvoie à aucun tableau ne dit rien.
+   */
+  reperesMenuiseries?: boolean;
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
@@ -2764,6 +2772,52 @@ function planPage(
         // Hors du poché, le numéro est un mot posé sur le blanc : il réserve
         // aussi sa place sur la carte.
         if (q.couleur !== '#FFFFFF') encre.boite(q.boite);
+      }
+    }
+
+    /*
+      LES REPÈRES DES MENUISERIES — relevé du patron, plans « MEX » du
+      dossier d'architecte à l'appui : chaque baie porte son repère (P1, F1,
+      B1…), celui du carnet des menuiseries, dans une étiquette cernée.
+      Côté dehors pour une baie de façade, côté pièce sinon ; glissée le
+      long de la baie, la place la plus blanche gagne. Elle se réserve
+      AVANT les cotes, comme les numéros de mur : ce sont les cotes qui
+      s'écartent.
+    */
+    const reperesPoses: { texte: string; boite: Boite }[] = [];
+    if (ctx.reperesMenuiseries && !extra) {
+      const centreR = centreDesMurs(walls);
+      for (const l of carnetDesMenuiseries(walls, openings, ctx.rooms, ctx.roomNames)) {
+        const o = openings.find((x) => x.id === l.id);
+        if (!o) continue;
+        const L = segLength(o);
+        if (L < 1e-3) continue;
+        const u = { x: (o.b.x - o.a.x) / L, z: (o.b.z - o.a.z) / L };
+        let nrm = { x: -u.z, z: u.x };
+        const m = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+        // +n vers le dehors (loin du centre du logement).
+        if ((centreR.x - m.x) * nrm.x + (centreR.z - m.z) * nrm.z > 0) nrm = { x: -nrm.x, z: -nrm.z };
+        const hote = porteurDe(o, walls);
+        const demi = (hote ? epaisseurDe(hote) : WALL_T) / 2;
+        const facade = !dansLeBati(walls, { x: m.x + nrm.x * (demi + 0.3), z: m.z + nrm.z * (demi + 0.3) });
+        const larg = 0.62 * TAILLE_REPERE * l.repere.length + 4;
+        const haut = TAILLE_REPERE + 3;
+        const candidats: { b: Boite; cout: number }[] = [];
+        for (const cote of facade ? [1, -1] : [-1, 1]) {
+          const ecart = demi + (cote === 1 && facade ? SUREPAISSEUR_FACADE : 0) + (haut / 2 + 2.5) / scale;
+          for (const glisse of [0, -0.3, 0.3, -0.45, 0.45]) {
+            const t = glisse * L;
+            const c = px({ x: m.x + u.x * t + nrm.x * cote * ecart, z: m.z + u.z * t + nrm.z * cote * ecart });
+            const b = { x: c.x - larg / 2, y: c.y - haut / 2, w: larg, h: haut };
+            if (!dansLaFenetre(b) || !libre(b)) continue;
+            candidats.push({ b, cout: encre.sous(b) * 10 + Math.abs(glisse) * 3 + (cote === (facade ? 1 : -1) ? 0 : 2) });
+          }
+        }
+        candidats.sort((p, q) => p.cout - q.cout);
+        const choix = candidats[0];
+        if (!choix) continue;
+        reserver(choix.b);
+        reperesPoses.push({ texte: l.repere, boite: choix.b });
       }
     }
 
@@ -4366,6 +4420,12 @@ function planPage(
     for (const q of numerosPoses.values()) {
       d.text(String(q.n), q.x, q.y - 0.36 * q.taille, q.taille, q.couleur);
     }
+    // Les repères des menuiseries : une étiquette cernée, comme les « MEX ».
+    for (const r of reperesPoses) {
+      const b = r.boite;
+      d.poly(rectArrondi(b.x, b.y, b.w, b.h, 2), '#FFFFFF', BLEU_REPERE, 0.6);
+      d.text(r.texte, b.x + b.w / 2, b.y + b.h / 2 - 0.36 * TAILLE_REPERE, TAILLE_REPERE, BLEU_REPERE, { bold: true });
+    }
 
     // La surcouche vient EN DERNIER, dans la même fenêtre de découpe : un
     // schéma se lit par-dessus le plan, jamais dessous.
@@ -4526,6 +4586,10 @@ const LIGNES_DU_METRE = 24;
 function feuillesDuMetre(walls: WallSeg[], rooms: RoomShape[] | undefined): number {
   return Math.max(1, Math.ceil(roomParts(walls, rooms).length / LIGNES_DU_METRE));
 }
+
+/** Le corps et l'encre des repères de menuiseries sur le plan. */
+const TAILLE_REPERE = 5.4;
+const BLEU_REPERE = '#286BC1';
 
 /** Lignes du carnet des menuiseries par feuille. */
 const LIGNES_DES_MENUISERIES = 28;
@@ -7809,6 +7873,7 @@ function ctxTemporaire(scan: ScanForPdf): SheetContext {
 const GENRE_EN_CLAIR: Record<FeuilleDuDossier['genre'], string> = {
   garde: 'Page de garde',
   plan: 'Plan coté',
+  phases: 'Existant et projet',
   metre: 'Métré',
   menuiseries: 'Menuiseries',
   achats: 'Liste d’achats',
@@ -8005,6 +8070,7 @@ export interface FeuilleDuDossier {
   genre:
     | 'garde'
     | 'plan'
+    | 'phases'
     | 'metre'
     | 'menuiseries'
     | 'achats'
@@ -8098,6 +8164,7 @@ function planifierUnNiveau(
     particulier: scan.particulier,
     entreprise: scan.entreprise ?? null,
     reperes3D: opts.reperes3D ?? true,
+    reperesMenuiseries: opts.metre ?? true,
     walls: scan.walls,
     openings: scan.openings,
     objects: scan.objects,
@@ -8130,6 +8197,33 @@ function planifierUnNiveau(
       fabriquer: (n) => planPage({ ...ctx, routes: undefined }, n, opts.plan, opts.measures2D ?? true),
     },
   ];
+  /*
+    AVANT ET APRÈS LES TRAVAUX — relevé du patron, dossier d'architecte à
+    l'appui : dès qu'un mur est marqué « à démolir » ou « à créer », le
+    dossier porte l'ÉTAT EXISTANT (les murs à démolir en jaune, ceux à créer
+    pas encore là) et le PROJET (les murs créés en rouge, les démolis en
+    tirets) — voir `mursDeLaPhase`. Le plan coté, lui, montre les deux. Ces
+    feuilles sont d'architecture : ni appareillage, ni plafond.
+  */
+  if (aDesTravaux(scan.walls)) {
+    for (const phase of ['existant', 'projet'] as const) {
+      const m = mursDeLaPhase(ctx.walls, ctx.openings, phase, porteurDe);
+      feuilles.push({
+        genre: 'phases',
+        titre: phase === 'existant' ? 'État existant' : 'Projet',
+        fabriquer: (n) =>
+          planPage(
+            { ...ctx, walls: m.walls, openings: m.openings, routes: undefined, fixtures: [], ceiling: [], reperesMenuiseries: false },
+            n,
+            opts.plan,
+            opts.measures2D ?? true,
+            phase === 'existant'
+              ? { title: 'État existant', sub: 'Avant travaux : les murs à démolir en jaune.', hideLegend: true }
+              : { title: 'Projet', sub: 'Après travaux : les murs à créer en rouge, les murs démolis en tirets.', hideLegend: true },
+          ),
+      });
+    }
+  }
   if (withMetre) {
     const pages = feuillesDuMetre(scan.walls, scan.rooms);
     for (let page = 1; page <= pages; page++) {

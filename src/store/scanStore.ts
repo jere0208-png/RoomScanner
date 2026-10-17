@@ -146,7 +146,7 @@ import { equilibrerLaScene, pointInPolygon } from '../geometry/appearance';
 import { ancrerElec } from '../geometry/viseur';
 import { poserLibre } from '../geometry/poser';
 import { orienterLesSieges } from '../geometry/sieges';
-import type { NatureMur } from '../geometry/natureMurs';
+import { devinerLesNatures, type NatureMur } from '../geometry/natureMurs';
 import type { SurfaceTexture } from 'react-native-room-scan';
 import {
   deduceRoomKind, deduireLaPiece,
@@ -2367,6 +2367,12 @@ interface ScanState {
    */
   setNatureMur: (id: string, nature: NatureMur | null) => void;
   /**
+   * DEVINE LA NATURE DE TOUS LES MURS qui n'en ont pas de choisie (épaisseur,
+   * façade — voir `devinerNature`). Rend le nombre de murs qui en ont reçu
+   * une ou en ont changé.
+   */
+  devinerLesNaturesDuPlan: () => number;
+  /**
    * COMBLE UN TROU DU RELEVÉ — le mur manquant, et la porte avec.
    *
    * Le défaut de scan le plus courant : une porte ouverte que la caméra
@@ -2833,6 +2839,9 @@ interface ScanState {
   /** Une grille de cinquante centimètres sous le plan, pour estimer d'un coup d'œil. */
   showGrille: boolean;
   setShowGrille: (v: boolean) => void;
+  /** Les repères des menuiseries (P1, F1, B1…), ceux du carnet du PDF. */
+  showReperesBaies: boolean;
+  setShowReperesBaies: (v: boolean) => void;
 
   // Couleurs et textures relevées au scan (2D, 3D, PDF). Décoché par défaut.
   showTextures: boolean;
@@ -3270,6 +3279,7 @@ const CALQUES_DE_BASE = {
   showNotes: true,
   showPhotos: true,
   showGrille: false,
+  showReperesBaies: false,
 } as const;
 
 /**
@@ -3867,7 +3877,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         b: { x: w.b.x + dx, z: w.b.z + dz },
         niveau: n,
       }));
-    const walls = pose(bruts);
+    // La nature de chaque mur, devinée (épaisseur, façade) : voir `devinerNature`.
+    const walls = devinerLesNatures(pose(bruts));
     let openings = baiesHorsDesAngles(baiesVitrees(portesVuesOuvertes(pose(ouverturesBrutes), walls), walls), walls);
 
     const detected = detectRooms(walls, undefined, openings);
@@ -4598,6 +4609,8 @@ export const useScanStore = create<ScanState>((set, get) => {
     setShowPhotos: (showPhotos) => set({ showPhotos }),
     showGrille: false,
     setShowGrille: (showGrille) => set({ showGrille }),
+    showReperesBaies: false,
+    setShowReperesBaies: (showReperesBaies) => set({ showReperesBaies }),
 
     showTextures: false,
     // L'écorché d'office (voir `CALQUES_DE_BASE`) : les murs qui font face
@@ -5607,6 +5620,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         ],
         dirty: true,
       });
+      // Posé à « Cloison · 7 cm » : il se dessine en cloison (`devinerNature`).
+      if (e && e > 0) set({ walls: devinerLesNatures(get().walls, new Set([id])) });
       /*
         LE MUR QUI REFERME UNE PIÈCE LA FAIT APPARAÎTRE — revue « Hugo » :
         les deux pans de la cloison de sa salle d'eau posés, le plan disait
@@ -5698,14 +5713,19 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (Math.abs(e0 - e) < 1e-6) return;
       pushHistory(`epaisseur:${id}`);
       set({
-        walls: st.walls.map((x) => {
-          if (x.id !== id) return x;
-          // Revenue à l'épaisseur de tous, elle ne s'écrit plus : le mur
-          // redevient comme ceux que RoomPlan a relevés.
-          const reste: WallSeg = { ...x };
-          delete reste.epaisseur;
-          return Math.abs(e - WALL_T) < 1e-6 ? reste : { ...reste, epaisseur: e };
-        }),
+        // L'épaisseur dite peut changer la nature devinée (7 cm : une
+        // cloison) — jamais une nature choisie. Voir `devinerNature`.
+        walls: devinerLesNatures(
+          st.walls.map((x) => {
+            if (x.id !== id) return x;
+            // Revenue à l'épaisseur de tous, elle ne s'écrit plus : le mur
+            // redevient comme ceux que RoomPlan a relevés.
+            const reste: WallSeg = { ...x };
+            delete reste.epaisseur;
+            return Math.abs(e - WALL_T) < 1e-6 ? reste : { ...reste, epaisseur: e };
+          }),
+          new Set([id]),
+        ),
         dirty: true,
       });
       /*
@@ -5733,7 +5753,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       const w = st.walls.find((x) => x.id === id);
       if (!w || w.type !== 'wall') return;
-      if ((w.nature ?? null) === nature) return;
+      if ((w.nature ?? null) === nature && !w.natureDevinee) return;
       // Un geste discret : chaque choix s'annule pour lui-même.
       pushHistory('natureMur');
       set({
@@ -5741,10 +5761,23 @@ export const useScanStore = create<ScanState>((set, get) => {
           if (x.id !== id) return x;
           const reste: WallSeg = { ...x };
           delete reste.nature;
+          // Choisie : elle n'est plus devinée, et ne se reprendra plus seule.
+          delete reste.natureDevinee;
           return nature ? { ...reste, nature } : reste;
         }),
         dirty: true,
       });
+    },
+
+    devinerLesNaturesDuPlan: () => {
+      const st = get();
+      const apres = devinerLesNatures(st.walls);
+      if (apres === st.walls) return 0;
+      const avant = new Map(st.walls.map((w) => [w.id, w]));
+      const n = apres.filter((w) => (avant.get(w.id)?.nature ?? null) !== (w.nature ?? null)).length;
+      pushHistory('natureMur');
+      set({ walls: apres, dirty: true });
+      return n;
     },
 
     declarerRecoin: (at, nom = 'Placard') => {
@@ -7667,11 +7700,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       );
       const auNiveau = <T extends WallSeg>(w: T): T =>
         n === NIVEAU_RDC || w.niveau === n ? w : { ...w, niveau: n };
-      const walls = (
-        tracesALaMain.length > 0
+      const walls = devinerLesNatures(
+        (tracesALaMain.length > 0
           ? sansEclats(mergeColinear(splitAtJunctions(weldCorners([...venus, ...tracesALaMain]))), []).walls
           : venus
-      ).map(auNiveau);
+        ).map(auNiveau),
+      );
       // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`),
       // et la porte collée à l'angle, dégagée du mur d'angle (voir
       // `baiesHorsDesAngles`).
@@ -8186,7 +8220,9 @@ export const useScanStore = create<ScanState>((set, get) => {
       const logique = releveLogique(nettoyes, segments.filter((s) => s.type !== 'wall'));
       // Le refend relevé d'un seul côté : le chemin de la caméra dit lequel
       // (voir `marquerLesFacesVues`, D7).
-      const walls = marquerLesFacesVues(logique.walls, trajetDe(r));
+      // Et la nature de chaque mur, devinée — épaisseur mesurée, façade —, à
+      // corriger d'un appui (voir `devinerNature`).
+      const walls = devinerLesNatures(marquerLesFacesVues(logique.walls, trajetDe(r)));
       // La baie vitrée que RoomPlan a prise pour une porte (voir `baiesVitrees`),
       // et la porte collée à l'angle, dégagée du mur d'angle (voir
       // `baiesHorsDesAngles`).

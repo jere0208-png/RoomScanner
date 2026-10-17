@@ -333,7 +333,7 @@ export function buildDxf(plan: PlanPourDxf): string {
   for (const w of plan.walls) {
     if (!quads.get(w.id)) out += ligne(CALQUE.murs, w.a, w.b);
   }
-  const CALQUE_NATURE: Record<Exclude<NatureMur, 'porteur'>, string> = {
+  const CALQUE_NATURE: Partial<Record<NatureMur, string>> = {
     cloison: 'ECHOPLAN-CLOISONS',
     doublage: 'ECHOPLAN-DOUBLAGES',
     demolir: 'ECHOPLAN-A-DEMOLIR',
@@ -341,7 +341,8 @@ export function buildDxf(plan: PlanPourDxf): string {
   };
   for (const w of plan.walls.filter(seDistingue)) {
     const q = quads.get(w.id);
-    if (q) out += polyligne(CALQUE_NATURE[w.nature as Exclude<NatureMur, 'porteur'>], contourDuQuad(q));
+    const calque = CALQUE_NATURE[w.nature!];
+    if (q && calque) out += polyligne(calque, contourDuQuad(q));
   }
 
   /*

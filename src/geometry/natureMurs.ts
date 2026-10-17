@@ -25,8 +25,14 @@
  */
 import { epaisseurDe, type Pt, type WallQuad, type WallSeg } from './floorplan';
 import { mixHex } from './appearance';
+import { dansLeBati, SUREPAISSEUR_FACADE } from './poche';
 
-export type NatureMur = 'porteur' | 'cloison' | 'doublage' | 'demolir' | 'creer';
+/**
+ * Les cinq natures du menu, et deux états que seules les feuilles « État
+ * existant » et « Projet » du PDF posent (voir `mursDeLaPhase`) : `absent`,
+ * le mur qui n'existe pas encore ; `fantome`, celui qui a été démoli.
+ */
+export type NatureMur = 'porteur' | 'cloison' | 'doublage' | 'demolir' | 'creer' | 'absent' | 'fantome';
 
 export interface DefNature {
   cle: NatureMur;
@@ -45,7 +51,11 @@ export const NATURES_MUR: DefNature[] = [
   { cle: 'creer', libelle: 'À créer', aide: 'Le mur se monte pendant les travaux — en rouge' },
 ];
 
-const PAR_CLE = new Map(NATURES_MUR.map((n) => [n.cle, n]));
+/** Le mur démoli, tel que la feuille « Projet » le légende. */
+const FANTOME: DefNature = { cle: 'fantome', libelle: 'Mur démoli', aide: 'Il n’existe plus après les travaux — en tirets' };
+const ABSENT: DefNature = { cle: 'absent', libelle: 'Pas encore construit', aide: '' };
+
+const PAR_CLE = new Map([...NATURES_MUR, FANTOME, ABSENT].map((n) => [n.cle, n]));
 
 /** La nature d'un mur, si on l'a dite ; `null` : un mur comme les autres. */
 export function natureDe(w: { nature?: NatureMur }): NatureMur | null {
@@ -68,7 +78,8 @@ export const seDistingue = (w: { nature?: NatureMur; type?: string }): boolean =
 /** Les natures présentes sur un plan, dans l'ordre du menu : pour la légende. */
 export function naturesPresentes(walls: readonly WallSeg[]): NatureMur[] {
   const vues = new Set(walls.filter((w) => w.type === 'wall').map(natureDe).filter((n): n is NatureMur => n !== null));
-  return NATURES_MUR.map((n) => n.cle).filter((c) => vues.has(c));
+  // Le mur démoli se légende ; celui qui n'existe pas encore, non.
+  return [...NATURES_MUR, FANTOME].map((n) => n.cle).filter((c) => vues.has(c));
 }
 
 export interface RenduNature {
@@ -101,6 +112,12 @@ export function renduNature(n: NatureMur, encre: string, fondPapier: string): Re
       return { fond: mixHex(JAUNE_A_DEMOLIR, fondPapier, 0.2), contour: encre, tirets: true, boucles: false };
     case 'creer':
       return { fond: mixHex(ROUGE_A_CREER, fondPapier, 0.72), contour: ROUGE_A_CREER, tirets: false, boucles: false };
+    // Pas encore construit : la place du papier, sans trait.
+    case 'absent':
+      return { fond: fondPapier, contour: fondPapier, tirets: false, boucles: false };
+    // Démoli : son ancienne place, en tirets gris.
+    case 'fantome':
+      return { fond: fondPapier, contour: mixHex(encre, fondPapier, 0.5), tirets: true, boucles: false };
     default:
       return { fond: encre, contour: encre, tirets: false, boucles: false };
   }
@@ -208,12 +225,26 @@ export function dessinDesNatures(
       const t = (p.x - face.x) * u.x + (p.z - face.z) * u.z;
       return { x: face.x + u.x * t, z: face.z + u.z * t };
     };
-    const ext: WallQuad = {
+    let ext: WallQuad = {
       a1: butee(w.a) ? perp(q.a1, w.a) : q.a1,
       a2: butee(w.a) ? perp(q.a2, w.a) : q.a2,
       b1: butee(w.b) ? perp(q.b1, w.b) : q.b1,
       b2: butee(w.b) ? perp(q.b2, w.b) : q.b2,
     };
+    /*
+      LE MUR PAS ENCORE CONSTRUIT EFFACE AUSSI SA BANDE DE FAÇADE — le poché
+      épaissit une façade vers le dehors (`SUREPAISSEUR_FACADE`) ; sans
+      cela, l'extension future laissait un filet noir sur l'état existant.
+      Le poché découpe ce qui déborde côté pièce.
+    */
+    if (w.nature === 'absent') {
+      const n = { x: -u.z, z: u.x };
+      const pousse = (p: Pt, ref: Pt) => {
+        const s = (p.x - ref.x) * n.x + (p.z - ref.z) * n.z >= 0 ? 1 : -1;
+        return { x: p.x + n.x * s * SUREPAISSEUR_FACADE, z: p.z + n.z * s * SUREPAISSEUR_FACADE };
+      };
+      ext = { a1: pousse(ext.a1, w.a), a2: pousse(ext.a2, w.a), b1: pousse(ext.b1, w.b), b2: pousse(ext.b2, w.b) };
+    }
     /*
       LE FILET COURT LE LONG DES FACES — pas autour du bout. Les onglets d'un
       nœud font s'arrêter chaque face là où elle rencontre sa voisine : deux
@@ -287,3 +318,98 @@ export function dessinDesNatures(
   }
   return { corps, coeurs, maconnerie };
 }
+
+/* ------------------------------------------------------------------------ */
+
+/**
+ * LA NATURE DEVINÉE — relevé du patron : « deviner la nature du mur depuis
+ * son épaisseur, à corriger à la main ensuite ».
+ *
+ * Deux indices, et pas un de plus :
+ *   — L'ÉPAISSEUR, quand on la connaît (le scan l'a mesurée en voyant les
+ *     deux faces, ou on l'a dite) : 11 cm ou moins, c'est une cloison en
+ *     plaque de plâtre (7 à 10 cm sur le plan fourni) ; 18 cm ou plus, de la
+ *     maçonnerie (20 à 30 cm). Entre les deux, on ne sait pas : on se tait.
+ *   — LA FAÇADE : un mur qui donne sur le dehors d'un côté est de la
+ *     maçonnerie dans l'immense majorité des logements.
+ * Un mur dont on a CHOISI la nature n'est jamais deviné : `natureDevinee`
+ * marque ce qui vient de l'app, et le choix de l'utilisateur l'efface.
+ */
+export function devinerNature(w: WallSeg, walls: WallSeg[]): NatureMur | null {
+  if (w.type !== 'wall') return null;
+  if (w.epaisseur !== undefined) {
+    if (w.epaisseur <= 0.11 + 1e-9) return 'cloison';
+    if (w.epaisseur >= 0.18 - 1e-9) return 'porteur';
+  }
+  const L = Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z);
+  if (L < 0.3) return null;
+  const n = { x: -(w.b.z - w.a.z) / L, z: (w.b.x - w.a.x) / L };
+  const m = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+  const ecart = epaisseurDe(w) / 2 + 0.3;
+  const dehors = (s: number) => !dansLeBati(walls, { x: m.x + n.x * s * ecart, z: m.z + n.z * s * ecart });
+  if (dehors(1) !== dehors(-1)) return 'porteur';
+  return null;
+}
+
+/** Ce mur porte-t-il une nature que l'app a devinée, et non choisie ? */
+export const estDevinee = (w: { nature?: NatureMur; natureDevinee?: boolean }): boolean =>
+  !!w.nature && !!w.natureDevinee;
+
+/**
+ * DEVINE LA NATURE DE TOUS LES MURS QUI N'EN ONT PAS DE CHOISIE — et
+ * reprend celles qu'elle avait devinées (une épaisseur a pu changer). Rend
+ * la même liste si rien ne change.
+ */
+export function devinerLesNatures(walls: WallSeg[], ids?: Set<string>): WallSeg[] {
+  let change = false;
+  const out = walls.map((w) => {
+    if (w.type !== 'wall') return w;
+    if (ids && !ids.has(w.id)) return w;
+    if (w.nature && !w.natureDevinee) return w;
+    const g = devinerNature(w, walls);
+    if ((w.nature ?? null) === g) return w;
+    change = true;
+    const reste: WallSeg = { ...w };
+    delete reste.nature;
+    delete reste.natureDevinee;
+    return g ? { ...reste, nature: g, natureDevinee: true } : reste;
+  });
+  return change ? out : walls;
+}
+
+/* ------------------------------------------------------------------------ */
+
+/**
+ * LES MURS D'UNE PHASE — les feuilles « État existant » et « Projet » d'un
+ * dossier de rénovation, tirées des murs marqués « à démolir » et « à
+ * créer ».
+ *
+ *   — AVANT les travaux, le mur à créer n'existe pas : il prend la place du
+ *     papier (`absent`) ; le mur à démolir est là, en jaune.
+ *   — APRÈS, le mur démoli ne laisse que ses tirets (`fantome`) ; le mur
+ *     créé est là, en rouge.
+ * Les murs restent dans la géométrie — les pièces gardent leurs contours et
+ * leurs surfaces ; seul leur dessin change. Les baies percées dans un mur
+ * qui n'existe pas à cette phase disparaissent avec lui.
+ */
+export function mursDeLaPhase(
+  walls: WallSeg[],
+  openings: WallSeg[],
+  phase: 'existant' | 'projet',
+  porteurDeLaBaie: (o: WallSeg, walls: WallSeg[]) => WallSeg | null,
+): { walls: WallSeg[]; openings: WallSeg[] } {
+  const quitte: NatureMur = phase === 'existant' ? 'creer' : 'demolir';
+  const devient: NatureMur = phase === 'existant' ? 'absent' : 'fantome';
+  const partis = new Set(walls.filter((w) => w.type === 'wall' && w.nature === quitte).map((w) => w.id));
+  return {
+    walls: walls.map((w) => (partis.has(w.id) ? { ...w, nature: devient } : w)),
+    openings: openings.filter((o) => {
+      const h = porteurDeLaBaie(o, walls);
+      return !h || !partis.has(h.id);
+    }),
+  };
+}
+
+/** Le plan a-t-il de quoi faire un avant et un après ? */
+export const aDesTravaux = (walls: readonly WallSeg[]): boolean =>
+  walls.some((w) => w.type === 'wall' && (w.nature === 'demolir' || w.nature === 'creer'));

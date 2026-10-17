@@ -352,7 +352,7 @@ export interface Poche {
 }
 
 /** Le mur qui porte une baie : celui dont l'axe la contient. */
-function porteurDe(o: WallSeg, walls: WallSeg[]): WallSeg | null {
+export function porteurDe(o: WallSeg, walls: WallSeg[]): WallSeg | null {
   let mieux: WallSeg | null = null;
   let ecart = Infinity;
   for (const w of walls) {

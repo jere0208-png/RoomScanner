@@ -68,6 +68,7 @@ import {
   jonctionsDetaillees,
 } from '../geometry/floorplan';
 import { dessinDesNatures, renduNature } from '../geometry/natureMurs';
+import { carnetDesMenuiseries } from '../geometry/menuiseries';
 import type { ObjectData } from 'react-native-room-scan';
 import {
   faceX,
@@ -918,6 +919,7 @@ export function FloorplanEditor({
   const colorOpenings = useScanStore((s) => s.showOpeningColors);
   const showSurfaces = useScanStore((s) => s.showSurfaces);
   const showGrille = useScanStore((s) => s.showGrille);
+  const showReperesBaies = useScanStore((s) => s.showReperesBaies);
   const c = useTheme();
   const styles = getStyles(c);
   /* Le conteneur du plan : c'est LUI qu'on mesure pour viser depuis
@@ -1671,6 +1673,28 @@ export function FloorplanEditor({
     marqué s'y peint, découpé au poché pour que les baies restent des vides,
     et le cœur d'un nœud prend la nature de ses murs quand ils la partagent.
   */
+  /*
+    LES REPÈRES DES MENUISERIES, À L'ÉCRAN — le calque « Repères des
+    menuiseries » du menu « Autres » : les mêmes P1, F1, B1 que le carnet et
+    le plan du PDF, posés côté pièce au milieu de chaque baie.
+  */
+  const reperesBaies = useMemo(() => {
+    if (!showReperesBaies || walls.length === 0) return [];
+    const noms = Object.fromEntries(rooms.map((r) => [r.id, r.name ?? '']));
+    const b = bounds(walls);
+    const centre = { x: (b.minX + b.maxX) / 2, z: (b.minZ + b.maxZ) / 2 };
+    return carnetDesMenuiseries(walls, openings, rooms, noms).flatMap((l) => {
+      const o = openings.find((x) => x.id === l.id);
+      if (!o) return [];
+      const L = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z);
+      if (L < 1e-3) return [];
+      let n = { x: -(o.b.z - o.a.z) / L, z: (o.b.x - o.a.x) / L };
+      const m = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+      // Vers le centre du logement : côté pièce.
+      if ((centre.x - m.x) * n.x + (centre.z - m.z) * n.z < 0) n = { x: -n.x, z: -n.z };
+      return [{ id: l.id, texte: l.repere, m, n }];
+    });
+  }, [showReperesBaies, walls, openings, rooms]);
   const corpsDeNature = useMemo(
     () => dessinDesNatures(mursDifferes, wallQuadsOf(mursDifferes), jonctionsDetaillees(mursDifferes)),
     [mursDifferes],
@@ -3399,6 +3423,20 @@ export function FloorplanEditor({
                 }
               />
             ))}
+
+            {reperesBaies.map((r) => {
+              const decale = WALL_T / 2 + 12 / mapping.scale;
+              const p = mapping.toPx({ x: r.m.x + r.n.x * decale, z: r.m.z + r.n.z * decale });
+              const larg = 8 + r.texte.length * 6.4;
+              return (
+                <G key={`repere-${r.id}`} pointerEvents="none" testID={`repere-${r.texte}`}>
+                  <Rect x={p.x - larg / 2} y={p.y - 7.5} width={larg} height={15} rx={4} fill={c.surface} stroke={c.blue} strokeWidth={1} />
+                  <SvgText x={p.x} y={p.y + 3.6} fontSize={10} fontWeight="700" fill={c.blue} textAnchor="middle">
+                    {r.texte}
+                  </SvgText>
+                </G>
+              );
+            })}
 
             {/* Les retours d'un mur percé, chacun touchable pour lui-même.
                 Une zone invisible par tronçon : c'est le dessin qui répond

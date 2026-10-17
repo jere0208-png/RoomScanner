@@ -223,6 +223,12 @@ export interface WallSeg {
    * relève : le mur se dessine alors en noir, comme avant.
    */
   nature?: NatureMur;
+  /**
+   * LA NATURE A ÉTÉ DEVINÉE par l'app (épaisseur, façade — voir
+   * `devinerNature`), pas choisie : elle se reprend si l'épaisseur change,
+   * et le premier choix de l'utilisateur l'efface.
+   */
+  natureDevinee?: boolean;
 }
 
 /** Pièce d'un élément, valeur par défaut comprise. */

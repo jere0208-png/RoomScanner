@@ -17,6 +17,8 @@ import { roomParts, segLength, type WallSeg } from './floorplan';
 import { baiesDeLaPiece } from './travaux';
 
 export interface LigneMenuiserie {
+  /** L'identifiant de la baie : le plan y pose le repère. */
+  id: string;
   repere: string;
   /** La pièce, ou les deux pièces qu'elle relie. */
   pieces: string;
@@ -72,6 +74,7 @@ export function carnetDesMenuiseries(
     compte[lettre] += 1;
     const allege = o.type === 'window' ? Math.max(0, o.yCenter - o.height / 2) : null;
     return {
+      id: o.id,
       repere: `${lettre}${compte[lettre]}`,
       pieces: (piecesDe.get(o.id) ?? ['—']).join(' / '),
       // Une porte qui ne donne que sur une pièce (et pas un placard) ouvre

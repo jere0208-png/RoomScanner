@@ -281,6 +281,9 @@ export function Toolbar2D({
   const setShowGrille = useScanStore((s) => s.setShowGrille);
   const showOpeningColors = useScanStore((s) => s.showOpeningColors);
   const setShowOpeningColors = useScanStore((s) => s.setShowOpeningColors);
+  const showReperesBaies = useScanStore((s) => s.showReperesBaies);
+  const setShowReperesBaies = useScanStore((s) => s.setShowReperesBaies);
+  const nbBaies = useScanStore((s) => s.openings.length);
   /** Le menu « Afficher » du plan : tout ce que la rangée ne garde pas. */
   const [afficher, setAfficher] = useState(false);
   /*
@@ -599,6 +602,8 @@ export function Toolbar2D({
           lignes: [
             { cle: 'grille', icone: 'grille', libelle: 'Grille', aide: 'Un trait tous les 50 cm, pour estimer d’un coup d’œil', actif: showGrille, vide: contenu.murs === 0 ? RIEN.murs : null, onBascule: () => setShowGrille(!showGrille) },
             { cle: 'ouvertures', icone: 'ouvertures', libelle: 'Portes et fenêtres en couleur', aide: 'Les portes en ambre, les fenêtres en bleu', actif: showOpeningColors, onBascule: () => setShowOpeningColors(!showOpeningColors) },
+            // Les repères du carnet des menuiseries du PDF (dossier d'architecte du patron).
+            { cle: 'reperesBaies', icone: 'etiquette', libelle: 'Repères des menuiseries', aide: 'P1, F1, B1… : ceux du carnet des menuiseries du PDF', actif: showReperesBaies, vide: nbBaies === 0 ? 'Aucune porte ni fenêtre relevée.' : null, onBascule: () => setShowReperesBaies(!showReperesBaies) },
             { cle: 'notes', icone: 'note', libelle: 'Notes', aide: 'Les mots écrits sur le plan', actif: showNotes, vide: contenu.notes === 0 ? RIEN.notes : null, onBascule: () => setShowNotes(!showNotes) },
             { cle: 'photos', icone: 'image', libelle: 'Photos', aide: 'Les repères des photos prises sur place', actif: showPhotos, vide: contenu.photos === 0 ? RIEN.photos : null, onBascule: () => setShowPhotos(!showPhotos) },
           ],
