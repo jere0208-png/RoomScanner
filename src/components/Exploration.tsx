@@ -920,12 +920,22 @@ export function Exploration({
         )}
 
         <View style={[styles.haut, { top: marges.top + 8 }]} pointerEvents="box-none">
-          <MiniCarte
-            murs={walls}
-            pose={carte}
-            styles={styles}
-            teinte={teinte}
-          />
+          {/*
+            PAS DE CARTE SANS MUR — relevé « bug-3d » : sur un niveau sans
+            mur, le cadre de la mini-carte naissait d'un minimum sans valeur
+            (Infinity), et tout son dessin tombait en NaN. Une vue vide tient
+            sa place : « Terminer » reste à droite.
+          */}
+          {walls.length > 0 ? (
+            <MiniCarte
+              murs={walls}
+              pose={carte}
+              styles={styles}
+              teinte={teinte}
+            />
+          ) : (
+            <View />
+          )}
           {/*
             « TERMINER » EST SA PILULE — relevé du patron : « le bouton quitter
             est mal fait, le bouton plus petit que le texte ». Le mot vivait

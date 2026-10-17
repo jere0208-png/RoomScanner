@@ -5,6 +5,18 @@ import SceneKit
 import UIKit
 import simd
 
+/*
+  UN NOMBRE SANS VALEUR NE FAIT PLUS TOMBER L'APPLICATION — relevé
+  « bug-natif-appstore » : `Int(_:)` s'arrête net sur un NaN, un infini ou un
+  flottant plus grand que ce qu'un entier contient. Un seul de ces nombres
+  dans les tableaux reçus du JavaScript, et la visite fermait l'app. Ici il
+  devient −1, que chaque lecteur écarte déjà (rang d'image, nombre de
+  sommets, matière inconnue).
+*/
+@inline(__always) private func entier<F: BinaryFloatingPoint>(_ f: F) -> Int {
+  f > -1e9 && f < 1e9 ? Int(f) : -1
+}
+
 /**
  * LA VISITE À LA PREMIÈRE PERSONNE — sur SceneKit, le moteur 3D d'iOS.
  *
@@ -161,23 +173,43 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     tiers de sa teinte, un blanc pur en gris. Murs et plafonds reçoivent en
     plus un quart de leur propre teinte — la lumière que les murs se renvoient
     entre eux : un blanc reste blanc, une couleur reste elle-même. Les meubles
-    et les sols n'en reçoivent rien. La maquette garde son rendu.
+    et les sols n'en reçoivent rien. La maquette a la sienne (voir
+    `CLARTE_MAQUETTE`).
   */
   static let CLARTE_DES_MURS: CGFloat = 0.25
+  /*
+    LA MAQUETTE A SA CLARTÉ, SUR LES FLANCS SEULEMENT — demande du patron :
+    « des murs vraiment blancs » sur le plan 3D aussi. Mesuré sur capture,
+    un mur « Blanc cassé » (#FFFCF6) sortait à 220, 219, 217 : un gris. La
+    clarté de la visite ne valait pas pour la maquette, et l'y appliquer
+    telle quelle aurait rebrûlé l'arase des murs, que la vue de dessus prend
+    déjà de face (voir `JOUR_MAQUETTE`). Les faces VERTICALES reçoivent donc
+    près d'un quart de leur teinte en plus : un blanc pur ressort au-dessus
+    de 245 ; ce qui regarde le ciel n'en reçoit rien. Les angles se lisent
+    aux arêtes légères, désormais envoyées par la maquette aussi.
+  */
+  static let CLARTE_MAQUETTE: CGFloat = 0.22
   static let nuanceurClarte = """
     #pragma arguments
     float clarte;
+    float clarteFlancs;
     #pragma body
     _output.color.rgb += _surface.diffuse.rgb * clarte;
+    float3 normaleMonde = normalize((scn_frame.inverseViewTransform * float4(_surface.normal, 0.0)).xyz);
+    _output.color.rgb += _surface.diffuse.rgb * clarteFlancs * (1.0 - abs(normaleMonde.y));
     """
   /// Les matières du bâti, qui reçoivent la clarté des murs.
   private var matieresDuBati: [SCNMaterial] = []
   private var clarteDesMurs: CGFloat { modePose == false ? Self.CLARTE_DES_MURS : 0 }
+  private var clarteDesFlancs: CGFloat { modePose == true ? Self.CLARTE_MAQUETTE : 0 }
 
   private func regleLeMode(maquette: Bool) {
     guard modePose != maquette else { return }
     modePose = maquette
-    for m in matieresDuBati { m.setValue(NSNumber(value: Float(clarteDesMurs)), forKey: "clarte") }
+    for m in matieresDuBati {
+      m.setValue(NSNumber(value: Float(clarteDesMurs)), forKey: "clarte")
+      m.setValue(NSNumber(value: Float(clarteDesFlancs)), forKey: "clarteFlancs")
+    }
     /*
       UN LISERÉ LÉGER, FINALEMENT — relevé du patron, après l'avoir vu
       retiré : « les meubles se fondent dans le mur, peut-être qu'un léger
@@ -389,7 +421,14 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     """
 
   /// Le parquet et le carrelage, dessinés une fois par matière et par teinte.
-  private static var imagesDesSols: [String: UIImage] = [:]
+  /// UN CACHE QUI REND LA MÉMOIRE — relevé « bug-3d » : le dictionnaire
+  /// gardait chaque teinte essayée au nuancier, sans fin. Comme `imagesLues` :
+  /// seize mégaoctets d'images au plus, et le système reprend le reste.
+  private static let imagesDesSols: NSCache<NSString, UIImage> = {
+    let c = NSCache<NSString, UIImage>()
+    c.totalCostLimit = 16 << 20
+    return c
+  }()
 
   /*
     CHAQUE FAMILLE A SON NŒUD, ET NE SE REBÂTIT QUE SI ELLE CHANGE. Tout
@@ -851,7 +890,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     guard n > 0, !textures.isEmpty else { return [] }
     var parImage: [Int: [Int]] = [:]
     for t in 0..<n {
-      parImage[Int(v[t * 16]), default: []].append(t)
+      parImage[entier(v[t * 16]), default: []].append(t)
     }
     var noeuds: [SCNNode] = []
     for (k, liste) in parImage {
@@ -945,15 +984,15 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     var out: [SCNNode] = []
     while k + 8 <= v.count {
       // Un DIFFUSEUR de lampe porte son rang dans son code : 5 + 100 × (rang + 1).
-      let brut = Int(v[k])
+      let brut = entier(v[k])
       let lampe = brut >= 100 ? brut / 100 - 1 : -1
       let code = brut % 100
       let teinte = UIColor(
         red: CGFloat(v[k + 1]), green: CGFloat(v[k + 2]), blue: CGFloat(v[k + 3]), alpha: 1)
       let rugosite = CGFloat(v[k + 4])
       let metal = CGFloat(v[k + 5])
-      let nS = Int(v[k + 6])
-      let nI = Int(v[k + 7])
+      let nS = entier(v[k + 6])
+      let nI = entier(v[k + 7])
       k += 8
       guard nS > 0, nI > 0, k + nS * 8 + nI <= v.count else { break }
       /*
@@ -1043,7 +1082,8 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     for k in 0..<nS {
       let p = point(k)
       let cle = SIMD3<Int32>(
-        Int32((p.x * 2000).rounded()), Int32((p.y * 2000).rounded()), Int32((p.z * 2000).rounded()))
+        Int32(entier((p.x * 2000).rounded())), Int32(entier((p.y * 2000).rounded())),
+        Int32(entier((p.z * 2000).rounded())))
       cles.append(cle)
       let deja = cumul[cle] ?? SCNVector3(x: 0, y: 0, z: 0)
       cumul[cle] = SCNVector3(
@@ -1426,6 +1466,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     m.cullMode = .back
     m.shaderModifiers = [.fragment: Self.nuanceurClarte]
     m.setValue(NSNumber(value: Float(clarteDesMurs)), forKey: "clarte")
+    m.setValue(NSNumber(value: Float(clarteDesFlancs)), forKey: "clarteFlancs")
     matieresDuBati.append(m)
     g.materials = [m]
     return g
@@ -1481,10 +1522,13 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     var b: CGFloat = 0
     var a: CGFloat = 0
     teinte.getRed(&r, green: &g, blue: &b, alpha: &a)
-    let cle = "\(matiere)-\(Int(r * 255))-\(Int(g * 255))-\(Int(b * 255))-\(choix.veinage)"
-    if let deja = Self.imagesDesSols[cle] { return deja }
+    let cle = "\(matiere)-\(entier(r * 255))-\(entier(g * 255))-\(entier(b * 255))-\(choix.veinage)"
+    if let deja = Self.imagesDesSols.object(forKey: cle as NSString) { return deja }
     let image = dessinerLeSol(matiere, teinte)
-    if let image = image { Self.imagesDesSols[cle] = image }
+    if let image = image {
+      let cout: Int = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
+      Self.imagesDesSols.setObject(image, forKey: cle as NSString, cost: cout)
+    }
     return image
   }
 
@@ -1594,8 +1638,8 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     var i = 0
     var out: [SCNNode] = []
     while i + 6 <= v.count {
-      let matiere = Int(v[i])
-      let sens = Int(v[i + 1])
+      let matiere = entier(v[i])
+      let sens = entier(v[i + 1])
       /*
         UN SOL DE MATIÈRE RÉELLE : le chêne clair d'un parquet renvoie six à
         sept dixièmes de la lumière, pas tout. Plafonné à sept dixièmes, il
@@ -1604,7 +1648,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       let brute = UIColor(
         red: CGFloat(v[i + 2]), green: CGFloat(v[i + 3]), blue: CGFloat(v[i + 4]), alpha: 1)
       let teinte = choix.albedoSol.map { Self.teinteReelle(brute, plafond: $0) } ?? brute
-      let n = Int(v[i + 5])
+      let n = entier(v[i + 5])
       i += 6
       // Un tableau tronqué ne doit pas faire tomber l'application.
       guard n > 0, i + n * 9 <= v.count else { break }

@@ -1348,7 +1348,13 @@ function television(a: Atelier, { W, D, H }: Gabarit) {
   a.boite(-W / 2, W / 2, y0, H, z0, z1, 'noir', TEINTES.noir, { r: 0.004 });
   // La platine murale : elle tient la dalle à quelques centimètres du mur.
   if (!surPied && D / 2 - z1 > 0.005) a.boite(-W * 0.15, W * 0.15, H * 0.3, H * 0.7, z1, D / 2, 'noir', TEINTES.anthracite);
-  a.boite(-W / 2 + 0.006, W / 2 - 0.006, y0 + 0.006, H - 0.006, z0 - (surPied ? 0.0015 : 0), z0 + 0.001, 'ecran', TEINTES.ecran, { sans: ['arriere'] });
+  /*
+    L'ÉCRAN DEVANT LA DALLE, AU MUR AUSSI — relevé « bug-3d » : l'écran de la
+    télé murale clignotait. Seule la télé sur pied avançait son verre d'un
+    millimètre et demi ; au mur, sa face avant tombait dans le plan même de
+    la dalle noire, et les deux se disputaient l'écran.
+  */
+  a.boite(-W / 2 + 0.006, W / 2 - 0.006, y0 + 0.006, H - 0.006, z0 - 0.0015, z0 + 0.001, 'ecran', TEINTES.ecran, { sans: ['arriere'] });
   if (!surPied) a.boite(-W / 2 + 0.004, W / 2 - 0.004, y0 + 0.004, H - 0.004, z0 + 0.0012, z0 + 0.003, 'noir', TEINTES.noir);
   if (surPied) {
     a.boite(-W * 0.18, W * 0.18, 0, 0.012, -D / 2, D / 2, 'noir', TEINTES.anthracite, { r: [0.02, 0.004, 0.02], seg: 2 });
@@ -1938,8 +1944,13 @@ function evier(a: Atelier, g: Gabarit, c: Commande) {
     a.boite(-W / 2, W / 2, y0, H, bz1, D / 2, 'bois', TEINTES.chene, { r: 0.003 });
     a.boite(-W / 2, bx0, y0, H, bz0, bz1, 'bois', TEINTES.chene);
     a.boite(bx1, W / 2, y0, H, bz0, bz1, 'bois', TEINTES.chene);
-    // La cuve inox, creusée.
-    a.boite(bx0, bx1, H - 0.2, H, bz0, bz1, 'inox', TEINTES.inox, { r: [0.025, 0.025, 0.025], seg: 2, dedans: true, sans: ['haut'] });
+    /*
+      La cuve inox, creusée. EN RETRAIT D'UN MILLIMÈTRE — relevé « bug-3d » :
+      le bord de la cuve clignotait. Ses parois tombaient dans le plan même
+      des chants du plan découpé, tournées du même côté : l'inox et le chêne
+      se disputaient l'écran.
+    */
+    a.boite(bx0 + 0.001, bx1 - 0.001, H - 0.2, H, bz0 + 0.001, bz1 - 0.001, 'inox', TEINTES.inox, { r: [0.025, 0.025, 0.025], seg: 2, dedans: true, sans: ['haut'] });
     a.tour([[0, H - 0.199], [0.03, H - 0.199], [0.03, H - 0.198], [0, H - 0.198]], (bx0 + bx1) / 2, (bz0 + bz1) / 2, 'chrome', TEINTES.chrome, { seg: 14 });
     robinet(a, (bx0 + bx1) / 2, H, bz1 + 0.05, 0.3, 0.2);
     return;
@@ -2422,7 +2433,13 @@ function radiateur(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
     const x = -W / 2 + 0.03 + ((W - 0.06) * (k + 0.5)) / n;
     a.boite(x - 0.006, x + 0.006, 0.04, H - 0.04, -D / 2, zAv, 'laque', blanc);
   }
-  a.boite(-W / 2 + 0.02, W / 2 - 0.02, H - 0.004, H, zAv + 0.01, zAr - 0.01, 'noir', TEINTES.anthracite);
+  /*
+    LA GRILLE AU-DESSUS DU PANNEAU — relevé « bug-3d » : le dessus du
+    radiateur clignotait. La grille finissait à la hauteur exacte du panneau
+    laqué : leurs deux dessus se disputaient l'écran. Elle dépasse d'un
+    demi-millimètre.
+  */
+  a.boite(-W / 2 + 0.02, W / 2 - 0.02, H - 0.0035, H + 0.0005, zAv + 0.01, zAr - 0.01, 'noir', TEINTES.anthracite);
   for (const x of [-W / 2 + 0.08, W / 2 - 0.08]) a.boite(x - 0.015, x + 0.015, H * 0.4, H * 0.6, zAr, z1, 'noir', TEINTES.anthracite);
 }
 
@@ -2535,9 +2552,16 @@ function cadre(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
     a.boite(x0 + b, x1 - b, y0 + b, y1 - b, zf, z1, 'papier', fond, { sans: ['arriere'] });
     return { x0: x0 + b, x1: x1 - b, y0: y0 + b, y1: y1 - b };
   };
-  // Ce qui se montre, posé sur le fond.
+  /*
+    Ce qui se montre, posé sur le fond. CHAQUE APLAT DEVANT LE PRÉCÉDENT —
+    relevé « bug-3d » : les aplats des tableaux clignotaient. Tous avaient
+    leur face avant dans le même plan : là où deux masses de couleur se
+    chevauchent (l'horizon et la masse bleue), aucune ne gagnait. Chacun
+    avance d'un demi-millimètre de plus que celui d'avant.
+  */
+  let aplats = 0;
   const aplat = (x0: number, x1: number, y0: number, y1: number, teinte: string) =>
-    a.boite(x0, x1, y0, y1, zf - 0.002, zf, 'papier', teinte, { sans: ['arriere'] });
+    a.boite(x0, x1, y0, y1, zf - 0.002 - 0.0005 * aplats++, zf, 'papier', teinte, { sans: ['arriere'] });
 
   if (c.modele.startsWith('triptyque')) {
     // TROIS TOILES QUI SE RÉPONDENT, côte à côte.
@@ -3028,8 +3052,17 @@ export interface PoseDeMeuble {
   murId?: string;
 }
 
+/*
+  LE CACHE DES MODÈLES GARDE CE QUI SERT — relevé « bug-3d » : au-delà de
+  240 meubles, il ne gardait plus rien. Chaque scène redemande les meubles
+  dans le même ordre ; un cache plus petit que le logement, qui jette le
+  plus ANCIEN, jetait justement celui qu'on allait redemander, et tout se
+  refabriquait à chaque fois. Il tient désormais 600 modèles, et un modèle
+  resservi repasse en tête : ce qui part, c'est ce qu'aucune scène n'a
+  redemandé depuis longtemps (l'ancienne forme d'un meuble retouché).
+*/
 const ATELIER_CACHE = new Map<string, ModeleLocal>();
-const CACHE_MAX = 240;
+export const CACHE_DES_MODELES = 600;
 
 /** Le modèle d'un meuble posé — fabriqué une fois, gardé tant qu'il ne change pas. */
 export function modeleDe(p: PoseDeMeuble): ModeleLocal {
@@ -3046,7 +3079,11 @@ export function modeleDe(p: PoseDeMeuble): ModeleLocal {
     (p.attributes ?? []).join(','),
   ].join('|');
   const deja = ATELIER_CACHE.get(cle);
-  if (deja) return deja;
+  if (deja) {
+    ATELIER_CACHE.delete(cle);
+    ATELIER_CACHE.set(cle, deja);
+    return deja;
+  }
   const modele = fabriquer(
     p.category,
     { W: p.width, D: p.depth, H: p.height },
@@ -3059,7 +3096,7 @@ export function modeleDe(p: PoseDeMeuble): ModeleLocal {
       hasard: graineDe(p.id || cle),
     },
   );
-  if (ATELIER_CACHE.size >= CACHE_MAX) {
+  if (ATELIER_CACHE.size >= CACHE_DES_MODELES) {
     const premiere = ATELIER_CACHE.keys().next().value;
     if (premiere !== undefined) ATELIER_CACHE.delete(premiere);
   }

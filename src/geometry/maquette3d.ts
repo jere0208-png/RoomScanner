@@ -28,6 +28,7 @@
 import type { Face3D, P3 } from './scene3d';
 import {
   MATIERE,
+  aretesDuBati,
   composantes,
   normaleDuContour,
   orienterVers,
@@ -48,10 +49,12 @@ export interface MaillageDeMaquette {
   /** Les vraies images du relevé, et les faces qu'elles habillent (voir `visite3d`). */
   textures: string[];
   texturees: number[];
+  /** Les arêtes du bâti : six nombres par segment (voir `aretesDuBati`). */
+  aretes: number[];
 }
 
 /** Les triangles d'une face, tournés vers sa normale quand elle en a une. */
-function triangles(face: Face3D): { tris: [number, number, number][]; oriente: boolean } {
+function triangles(face: Face3D): { tris: [number, number, number][]; oriente: boolean; voulue: P3 | null } {
   const voulue: P3 | null = face.isFloor
     ? { x: 0, y: 1, z: 0 }
     : face.isCeiling
@@ -64,13 +67,20 @@ function triangles(face: Face3D): { tris: [number, number, number][]; oriente: b
       tris = tris.map(([a, b, c]) => [c, b, a]);
     }
   }
-  return { tris, oriente: !!voulue };
+  return { tris, oriente: !!voulue, voulue };
 }
 
 /**
  * Les faces de la maquette, rangées pour la carte graphique. Les arêtes
  * (faces sans aplat) et les ombres posées au sol n'y vont pas : la lumière
  * et l'occlusion de SceneKit font ce qu'elles simulaient.
+ *
+ * LES ARÊTES LÉGÈRES DU BÂTI, COMME EN VISITE — demande du patron : « des
+ * murs vraiment blancs et des arêtes légères » sur le plan 3D aussi. Un pan
+ * de mur blanc posé devant un autre pan blanc ne se distinguait pas, ni le
+ * tableau d'un passage sans porte. La maquette envoie désormais les mêmes
+ * traits que la visite (`aretesDuBati`) : fins de mur, angles, tableaux,
+ * pied des murs.
  */
 export function maillageDeLaMaquette(
   faces: Face3D[],
@@ -83,8 +93,11 @@ export function maillageDeLaMaquette(
     sols: [],
     textures: [],
     texturees: [],
+    aretes: [],
   };
   const habilleur = new Habilleur();
+  // Les faces du bâti et leur normale tournée, pour les arêtes (comme `maillageDeLaVisite`).
+  const polys: { pts: P3[]; n: P3 }[] = [];
   for (const face of faces) {
     if (face.pts.length < 3 || !face.fill || face.ombre || face.isCeiling) continue;
     // Les meubles et l'appareillage en caisses restent au canevas : la carte
@@ -99,8 +112,13 @@ export function maillageDeLaMaquette(
       habilleur.ajouter(face.habillage, triangulerContour, orienterVers(voulue));
       continue;
     }
-    const { tris, oriente } = triangles(face);
+    const { tris, oriente, voulue } = triangles(face);
     if (tris.length === 0) continue;
+    if (!face.meuble && !face.appareil) {
+      const n = normaleDuContour(face.pts);
+      const tournee = voulue && n.x * voulue.x + n.y * voulue.y + n.z * voulue.z < 0 ? { x: -n.x, y: -n.y, z: -n.z } : n;
+      polys.push({ pts: face.pts, n: tournee });
+    }
     const [r, g, b] = composantes(face.fill);
     if (face.isFloor) {
       out.sols.push(
@@ -122,6 +140,7 @@ export function maillageDeLaMaquette(
   }
   out.textures = habilleur.textures;
   out.texturees = habilleur.texturees;
+  out.aretes = aretesDuBati(polys);
   return out;
 }
 

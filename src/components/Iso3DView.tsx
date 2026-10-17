@@ -2935,6 +2935,7 @@ export function Iso3DView({
               maillage={maquette.maillage}
               orientes={maquette.orientes}
               ecorche={maquette.ecorche}
+              aretes={maquette.aretes}
               sols={maquette.sols}
               textures={maquette.textures}
               texturees={maquette.texturees}

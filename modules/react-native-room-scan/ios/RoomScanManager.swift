@@ -1287,6 +1287,18 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     if let error = error {
       RoomScanEvents.shared?.emit(name: "onScanError",
                                   body: ["message": error.localizedDescription])
+      /*
+        « TERMINER » NE RESTE PLUS BLOQUÉ — relevé « bug-natif-appstore » :
+        une session finie en erreur n'a rien à assembler, et la promesse de
+        « Terminer » attendait pour toujours (le bouton restait figé sur
+        l'assemblage). Si personne d'autre ne livrera — aucune donnée brute
+        d'un passage encore en cours d'assemblage —, on la rejette ici.
+      */
+      if stopResolver != nil && dernierReleve == nil {
+        RoomScanCompass.shared.detach()
+        stopRejecter?("SCAN_FAILED", error.localizedDescription, error)
+        clearPromise()
+      }
       return
     }
     // Les données BRUTES de ce passage : c'est d'elles que `RoomBuilder` et
