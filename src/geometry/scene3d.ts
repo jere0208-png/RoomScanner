@@ -1375,6 +1375,12 @@ export interface ScenePalette {
   floor: string;
   floorStroke: string;
   wall: string;
+  /**
+   * LA FACE D'UN MUR CÔTÉ PIÈCE, quand ni peinture ni relevé ne la teinte.
+   * Absente, `wall`. Relevé du patron : « les murs intérieurs, en visite et
+   * en 3D, sont de base trop gris — donne-leur un ton plus beige ».
+   */
+  wallInside?: string;
   wallStroke: string;
   wallTop: string;
   wallTopStroke: string;
@@ -2626,8 +2632,10 @@ export function buildScene(
       roomId ? opts.accents?.[roomId]?.[w.id] ?? opts.peintures?.[roomId] : undefined;
     const peintPlus = peintureDe(pieceDuCote(1));
     const peintMoins = peintureDe(pieceDuCote(-1));
-    const fondPlus = peintPlus ?? avg ?? pal.wall;
-    const fondMoins = peintMoins ?? avg ?? pal.wall;
+    // Côté pièce, le beige du bâti ; côté dehors, le blanc cassé de la façade.
+    const nu = (signe: 1 | -1) => (pieceDuCote(signe) ? pal.wallInside ?? pal.wall : pal.wall);
+    const fondPlus = peintPlus ?? avg ?? nu(1);
+    const fondMoins = peintMoins ?? avg ?? nu(-1);
     /*
       L'ARASE SUIT LA FACE INTÉRIEURE. Vue de dessus, elle borde la pièce
       qu'on regarde ; la caler sur la façade donnerait un liseré blanc autour
@@ -2644,7 +2652,7 @@ export function buildScene(
             pointOnSeg(p, v.a, v.b).dist < epaisseurDe(v) / 2 + 1e-3),
       );
     const arase =
-      fondDedans === pal.wall ? pal.wallTop : mixHex(fondDedans, '#FFFFFF', 0.45);
+      fondDedans === pal.wall || fondDedans === pal.wallInside ? pal.wallTop : mixHex(fondDedans, '#FFFFFF', 0.45);
     araseDe.set(w.id, arase);
     const skin = {
       joints: { a: jointe(w.a), b: jointe(w.b) },

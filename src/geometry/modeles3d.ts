@@ -96,6 +96,14 @@ export const RENDU: Record<Matiere, { code: number; rugosite: number; metal: num
 
 /** Le code de l'ombre de contact : un voile doux sous le meuble. */
 export const CODE_OMBRE = 9;
+/**
+ * LE CODE DE L'APPAREILLAGE — prises, interrupteurs, plaques, tableaux.
+ * Relevé du patron : « les éléments élec sont trop sous faible luminosité
+ * sans lumière, ils sont trop gris ; ajoute-leur un peu de lumière même sans
+ * lumière de pièce ». Le natif leur donne une part de leur propre teinte en
+ * émission. Ils ne se mêlent donc plus aux meubles de même matière.
+ */
+export const CODE_APPAREIL = 7;
 /** Nombres d'en-tête d'un groupe, puis huit par sommet, un par indice. */
 export const ENTETE_GROUPE = 8;
 export const PAR_SOMMET = 8;
@@ -3165,9 +3173,12 @@ export function maillageDesMeubles(
     if (gl.i.length === 0) continue;
     const r = RENDU[gl.mat];
     const lampe = gl.lampe !== undefined && gl.lampe >= 0 ? gl.lampe : null;
+    // Une matière « pleine » de l'appareillage prend le code de l'appareil ;
+    // le verre, la lumière et la feuille gardent le leur.
+    const code = r.code === 0 ? CODE_APPAREIL : r.code;
     const g = groupe(
-      lampe === null ? `${gl.mat}|${gl.couleur}` : `${gl.mat}|${gl.couleur}|L${lampe}`,
-      lampe === null ? r.code : r.code + 100 * (lampe + 1),
+      lampe === null ? `app|${gl.mat}|${gl.couleur}` : `${gl.mat}|${gl.couleur}|L${lampe}`,
+      lampe === null ? code : r.code + 100 * (lampe + 1),
       gl.couleur,
       r.rugosite,
       r.metal,

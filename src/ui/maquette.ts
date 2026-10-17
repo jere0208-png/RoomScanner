@@ -43,6 +43,10 @@ export const MAQUETTE: ScenePalette = {
   floorStroke: '#DCD1BF',
   /* Le bâti : blanc CASSÉ. Un blanc pur à côté d'un sable paraît bleu. */
   wall: '#FFFCF6',
+  /* Les murs côté pièce : un beige clair — relevé du patron, « les murs
+     intérieurs sont de base trop gris ». Sous l'ombrage, le blanc cassé
+     virait au gris ; le beige reste chaud, à côté du sol sable. */
+  wallInside: '#F1E5D1',
   wallStroke: '#E0D6C5',
   /* L'arase des murs, vue de dessus : c'est elle qui reçoit le plus de
      lumière, elle est donc la plus claire des trois. */
@@ -96,6 +100,7 @@ export function crepuscule(pal: ScenePalette): ScenePalette {
     floor: eteindre(pal.floor),
     floorStroke: eteindre(pal.floorStroke, 0.2),
     wall: eteindre(pal.wall),
+    ...(pal.wallInside ? { wallInside: eteindre(pal.wallInside) } : {}),
     wallStroke: eteindre(pal.wallStroke, 0.2),
     wallTop: eteindre(pal.wallTop, 0.28),
     wallTopStroke: eteindre(pal.wallTopStroke, 0.2),

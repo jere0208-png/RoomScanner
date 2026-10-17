@@ -480,7 +480,15 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     let l = SCNLight()
     l.type = .omni
     l.color = UIColor(red: 1.0, green: 0.95, blue: 0.88, alpha: 1)
-    l.intensity = 15
+    /*
+      AU PLUS DIX POUR CENT — relevé du patron : « la lumière doit être
+      perceptible sur les murs mais très peu sur les meubles et éléments,
+      ils doivent gagner max en luminosité 10 % de leur couleur de base ».
+      Le moins éclairé des meubles reçoit l'ambiance (620) : une lueur de
+      12, pleine au pied de la lampe et qui s'éteint en trois mètres, n'y
+      ajoute jamais plus de 2 %. Les faisceaux, eux, ne touchent que le bâti.
+    */
+    l.intensity = 12
     l.attenuationStartDistance = 0.2
     l.attenuationEndDistance = 3.2
     l.attenuationFalloffExponent = 2
@@ -1320,6 +1328,16 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       m.writesToDepthBuffer = false
     case 4:
       m.isDoubleSided = true
+    case 7:
+      /*
+        L'APPAREILLAGE SE VOIT MÊME SANS LAMPE — relevé du patron : « les
+        éléments élec sont trop gris sans lumière ». Une part de sa propre
+        teinte en émission : une prise blanche reste blanche dans un coin
+        d'ombre, sans briller. Les faisceaux des lampes ne le touchent pas
+        (`MASQUE_MEUBLE`) : il ne blanchit pas non plus quand on allume.
+      */
+      m.emission.contents = teinte
+      m.emission.intensity = 0.22
     case 5:
       // CE QUI ÉCLAIRE — le diffuseur d'une applique, le verre d'un spot,
       // une ampoule : il donne la lumière au lieu de la recevoir. Il se
