@@ -66,7 +66,6 @@ function Application() {
   const screen = useScanStore((s) => s.screen);
   const loadSaves = useScanStore((s) => s.loadSaves);
   const savesCharges = useScanStore((s) => s.savesCharges);
-  const saves = useScanStore((s) => s.saves);
   const repriseAuBesoin = useScanStore((s) => s.repriseAuBesoin);
   const compte = useAccountStore((s) => s.compte);
   const invite = useAccountStore((s) => s.invite);
@@ -247,12 +246,29 @@ function Application() {
     LES PLANS DANS LA RECHERCHE DE L'IPHONE — tenus à jour à chaque
     enregistrement, un instant après : une rafale de sauvegardes n'indexe
     qu'une fois. Voir `ui/spotlight`.
+
+    PAR UN ABONNEMENT, PAS PAR UN SÉLECTEUR — relevé des testeurs : lire
+    `saves` ici redessinait l'application ENTIÈRE, l'écran ouvert compris, à
+    chaque enregistrement automatique, pour un effet qui ne dessine rien.
+    L'abonnement suit la bibliothèque sans jamais demander de rendu.
   */
   useEffect(() => {
-    if (!savesCharges) return;
-    const t = setTimeout(() => indexerLesPlans(saves), 1500);
-    return () => clearTimeout(t);
-  }, [saves, savesCharges]);
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const planifier = (saves: ReturnType<typeof useScanStore.getState>['saves']) => {
+      clearTimeout(t);
+      t = setTimeout(() => indexerLesPlans(saves), 1500);
+    };
+    const depart = useScanStore.getState();
+    if (depart.savesCharges) planifier(depart.saves);
+    const desabonner = useScanStore.subscribe((s, avant) => {
+      if (!s.savesCharges) return;
+      if (s.saves !== avant.saves || !avant.savesCharges) planifier(s.saves);
+    });
+    return () => {
+      desabonner();
+      clearTimeout(t);
+    };
+  }, []);
 
   /*
     LES PLANS DU COMPTE REDESCENDENT DÈS QUE LES DEUX SONT LÀ.

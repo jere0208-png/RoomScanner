@@ -185,6 +185,14 @@ export function sousLecture(pro: boolean): string {
   return pro ? 'Photo ou PDF' : 'Photo ou PDF · 1 lecture offerte';
 }
 
+/*
+  L'ARRIVÉE NE SE JOUE QU'UNE FOIS PAR LANCEMENT — relevé des testeurs :
+  l'accueil se démonte à chaque écran ouvert, et la cascade se rejouait à
+  CHAQUE retour : une seconde de tuiles qui clignotent pour revenir où l'on
+  était déjà. Elle tient au niveau du module, pas de l'écran.
+*/
+let dejaArrive = false;
+
 export function HomeScreen() {
   const supported = useScanStore((s) => s.supported);
   const raccourciEnAttente = useScanStore((s) => s.raccourciEnAttente);
@@ -228,8 +236,10 @@ export function HomeScreen() {
     l'une après l'autre en grandissant d'un rien. Au pilote natif : rien ne
     passe par le fil JavaScript pendant qu'on regarde.
   */
-  const reveal = useRef(new Animated.Value(0)).current;
+  const reveal = useRef(new Animated.Value(dejaArrive ? 1 : 0)).current;
   useEffect(() => {
+    if (dejaArrive) return;
+    dejaArrive = true;
     Animated.timing(reveal, {
       toValue: 1,
       duration: 900,

@@ -4,6 +4,7 @@ import {
   Animated,
   PanResponder,
   type GestureResponderEvent,
+  type GestureResponderHandlers,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -673,15 +674,22 @@ export function margeFixeDeToile(largeur: number, hauteur: number): MargesDeToil
 function CoucheDuPlan({
   style,
   marges,
+  gestes,
   children,
 }: {
   style: React.ComponentProps<typeof Animated.View>['style'];
   marges: MargesDeToile;
+  /** Le glissement de la pièce choisie : voir `piece` dans l'éditeur. */
+  gestes?: GestureResponderHandlers;
   children: React.ReactNode;
 }) {
   return (
     <MargeDeLaToile.Provider value={marges}>
-      <Animated.View collapsable={false} style={style} pointerEvents="box-none">
+      <Animated.View
+        collapsable={false}
+        style={style}
+        pointerEvents="box-none"
+        {...gestes}>
         {children}
       </Animated.View>
     </MargeDeLaToile.Provider>
@@ -1279,7 +1287,17 @@ export function FloorplanEditor({
   const pieceSousLeDoigt = (e: GestureResponderEvent) => {
     const poly = contourChoisi.current;
     if (!poly || poly.length < 3) return false;
-    const { locationX: x, locationY: y } = e.nativeEvent;
+    /*
+      LE DOIGT SE SITUE PAR LA PAGE ET LA PLACE DU CADRE, PAS PAR
+      `locationX` — comme `dernierToucher`. `locationX` se lit par rapport à
+      la vue TOUCHÉE : ici le SVG du dessin, dont la toile déborde du cadre
+      de sa marge fixe (voir `margeFixeDeToile`). Le contour, lui, est en
+      pixels du cadre : lu tel quel, le doigt tombait à côté de la pièce.
+      `origineDuCadre` est mesuré à la pose du doigt (`onTouchStart`).
+    */
+    const org = origineDuCadre.current;
+    const x = e.nativeEvent.pageX - org.x;
+    const y = e.nativeEvent.pageY - org.y;
     let dedans = false;
     for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
       if (
@@ -1295,12 +1313,26 @@ export function FloorplanEditor({
     return dedans;
   };
 
+  /*
+    LE DÉPLACEMENT DE LA PIÈCE PASSE PAR UNE RÉFÉRENCE, comme `tracantRef`.
+
+    Relevé des testeurs : « glisser une pièce dans le plan 2D ne la déplace
+    pas ». Le `PanResponder` ci-dessous est créé UNE FOIS : il appelait le
+    `onMoveRoom` du tout premier rendu — celui de l'écran du plan, quand
+    aucune pièce n'était encore choisie, et qui ne déplaçait donc rien. On
+    lit la fonction À JOUR au moment du geste.
+  */
+  const onMoveRoomRef = useRef(onMoveRoom);
+  onMoveRoomRef.current = onMoveRoom;
+
   /** Le glissement de la pièce : en mètres, dans le repère du monde. */
   const piece = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (e, g) =>
-        !!onMoveRoom && estUnGlissement(g.dx, g.dy) && pieceSousLeDoigt(e),
+        !!onMoveRoomRef.current &&
+        estUnGlissement(g.dx, g.dy) &&
+        pieceSousLeDoigt(e),
       onPanResponderGrant: () => {
         pieceDep.current = { x: 0, y: 0 };
       },
@@ -1314,11 +1346,11 @@ export function FloorplanEditor({
         // compris. La réécrire ici, c'est se tromper d'un signe un jour.
         const d = m.deltaToMeters(dx, dy);
         // Pendant le geste, sans aimant : il ramenait la pièce à chaque pas.
-        onMoveRoom?.(d.x, d.z, false);
+        onMoveRoomRef.current?.(d.x, d.z, false);
       },
       // Au lâcher : l'aimant et la soudure des murs qui se recouvrent.
-      onPanResponderRelease: () => onMoveRoom?.(0, 0, true),
-      onPanResponderTerminate: () => onMoveRoom?.(0, 0, true),
+      onPanResponderRelease: () => onMoveRoomRef.current?.(0, 0, true),
+      onPanResponderTerminate: () => onMoveRoomRef.current?.(0, 0, true),
     }),
   ).current;
   const pieceDep = useRef({ x: 0, y: 0 });
@@ -3097,21 +3129,6 @@ export function FloorplanEditor({
         />
       )}
       {/*
-        LA ZONE QUI PREND LE GLISSEMENT DE LA PIÈCE.
-
-        Posée SOUS le dessin (aucun pixel peint), elle ne répond qu'au
-        mouvement, et seulement dans le contour de la pièce choisie : le
-        reste — taper un mur, promener le plan, saisir un meuble — continue
-        de fonctionner exactement pareil.
-      */}
-      {editable && selectedRoomId && onMoveRoom && (
-        <View
-          style={StyleSheet.absoluteFill}
-          pointerEvents="box-only"
-          {...piece.panHandlers}
-        />
-      )}
-      {/*
           LA COUCHE QUI PORTE LE GESTE.
 
           Tout le dessin vit dessous — le SVG et les cartouches posés
@@ -3126,6 +3143,24 @@ export function FloorplanEditor({
       {mapping && (
         <CoucheDuPlan
           marges={margesToile}
+          /*
+            LE GLISSEMENT DE LA PIÈCE SE PREND SUR LA COUCHE, PAS À CÔTÉ.
+
+            Il vivait dans une zone soeur posée SOUS le dessin. Or le toucher
+            ne remonte qu'aux ANCÊTRES de ce qu'on touche, et en édition le
+            SVG plein cadre — son fond qui désélectionne, la surface des
+            pièces — prend tout appui : la zone n'était jamais consultée, et
+            le plan, lui, s'écartait exprès devant la pièce. Le doigt ne
+            faisait rien du tout. La couche est l'ancêtre de tout le dessin :
+            elle est demandée avant le plan, ne répond qu'au mouvement, et
+            seulement dans le contour de la pièce choisie — taper un mur,
+            promener le plan, saisir un meuble restent inchangés.
+          */
+          gestes={
+            editable && selectedRoomId && onMoveRoom
+              ? piece.panHandlers
+              : undefined
+          }
           style={[
             StyleSheet.absoluteFill,
             {

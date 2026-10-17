@@ -197,20 +197,32 @@ export interface PromptData {
  * feuille se pose juste au-dessus. Plus rien à mesurer, plus rien à
  * deviner — et ça vaut pour TOUTES les saisies de l'app, puisqu'elles
  * passent toutes par cette coquille.
+ *
+ * UNE FEUILLE FERMÉE N'ÉCOUTE PAS LE CLAVIER (`actif`). Relevé des
+ * testeurs : chaque écran monte ses feuilles d'avance, fermées ; abonnées
+ * quand même, elles se redessinaient TOUTES à chaque mouvement du clavier
+ * d'un champ voisin — pour une marge que personne ne voyait. Rallumée, la
+ * feuille repart de la hauteur du clavier DÉJÀ levé, s'il l'est : elle ne
+ * se poserait pas dessous en attendant son prochain mouvement.
  */
-export function useKeyboardInset(): number {
+export function useKeyboardInset(actif = true): number {
   const [inset, setInset] = useState(0);
   useEffect(() => {
+    if (!actif) {
+      setInset(0);
+      return;
+    }
+    const couvertPar = (fin: { screenY: number; height: number }) => {
+      const ecran = Dimensions.get('window').height;
+      return Platform.OS === 'ios'
+        ? Math.max(0, ecran - fin.screenY)
+        : fin.height;
+    };
+    const deja = Keyboard.metrics();
+    setInset(deja ? couvertPar(deja) : 0);
     const bouge = (e: {
       endCoordinates: { screenY: number; height: number };
-    }) => {
-      const ecran = Dimensions.get('window').height;
-      const couvert =
-        Platform.OS === 'ios'
-          ? Math.max(0, ecran - e.endCoordinates.screenY)
-          : e.endCoordinates.height;
-      setInset(couvert);
-    };
+    }) => setInset(couvertPar(e.endCoordinates));
     const abonnements = [
       Keyboard.addListener(
         Platform.OS === 'ios' ? 'keyboardWillChangeFrame' : 'keyboardDidShow',
@@ -222,7 +234,7 @@ export function useKeyboardInset(): number {
       ),
     ];
     return () => abonnements.forEach((a) => a.remove());
-  }, []);
+  }, [actif]);
   return inset;
 }
 
@@ -276,7 +288,18 @@ export function SheetShell({
 }) {
   const c = useTheme();
   const styles = getStyles(c);
-  const clavier = useKeyboardInset();
+  /**
+   * La feuille survit à sa fermeture, le temps de descendre.
+   *
+   * Le `Modal` était monté sur `visible` : à la fermeture il disparaissait
+   * dans l'image même où l'animation démarrait, et les 140 ms de descente se
+   * jouaient dans le vide. On voyait donc la feuille MONTER en douceur et
+   * DISPARAÎTRE d'un coup — une asymétrie qu'on ne s'explique pas en la
+   * regardant, mais qu'on sent.
+   */
+  const [rendu, setRendu] = useState(visible);
+  // Fermée, la feuille n'écoute pas le clavier : voir `useKeyboardInset`.
+  const clavier = useKeyboardInset(rendu);
   /**
    * SUR TABLETTE, UNE FEUILLE NE TRAVERSE PAS L'ÉCRAN.
    *
@@ -333,16 +356,6 @@ export function SheetShell({
       },
     }),
   ).current;
-  /**
-   * La feuille survit à sa fermeture, le temps de descendre.
-   *
-   * Le `Modal` était monté sur `visible` : à la fermeture il disparaissait
-   * dans l'image même où l'animation démarrait, et les 140 ms de descente se
-   * jouaient dans le vide. On voyait donc la feuille MONTER en douceur et
-   * DISPARAÎTRE d'un coup — une asymétrie qu'on ne s'explique pas en la
-   * regardant, mais qu'on sent.
-   */
-  const [rendu, setRendu] = useState(visible);
   useEffect(() => {
     if (visible) {
       setRendu(true);
