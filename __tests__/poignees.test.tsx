@@ -26,6 +26,7 @@ import {
   RotateHandle,
 } from '../src/components/FloorplanEditor';
 import { useScanStore } from '../src/store/scanStore';
+import { usePlanEnVol } from '../src/store/planEnVol';
 import type { WallSeg } from '../src/geometry/floorplan';
 import type { ObjectData } from 'react-native-room-scan';
 
@@ -483,16 +484,29 @@ describe('le mur choisi', () => {
       // avait manqué.
       p.props.onResponderMove(doigt(400, 90, 300, 90));
     });
-    const n = useScanStore.getState().walls.find((w) => w.id === 'n')!;
-    // Le mur n'est plus horizontal, et il a gardé sa longueur.
-    expect(Math.abs(n.b.z - n.a.z)).toBeGreaterThan(0.05);
-    expect(Math.hypot(n.b.x - n.a.x, n.b.z - n.a.z)).toBeCloseTo(4, 6);
+    /*
+      LE MUR TOURNE EN VOL, LE MAGASIN L'APPREND AU LÂCHER — relevé des
+      testeurs (fluidité du plan 2D) : chaque image du geste redessinait tout
+      l'écran. Pendant le geste, c'est le mur en vol qui tourne
+      (`store/planEnVol`) ; le magasin n'a encore rien reçu.
+    */
+    const enVol = usePlanEnVol.getState().plan?.murs.get('n');
+    expect(enVol).toBeDefined();
+    expect(Math.abs(enVol!.b.z - enVol!.a.z)).toBeGreaterThan(0.05);
+    const avant = useScanStore.getState().walls.find((w) => w.id === 'n')!;
+    expect(avant.b.z - avant.a.z).toBeCloseTo(0, 9);
     // L'angle s'écrit le temps du geste : sans lui, on tourne à l'aveugle.
     const vus = tree.root
       .findAllByType(Text)
       .map((t) => String(t.props.children))
       .join(' | ');
     expect(vus).toMatch(/-?\d+°/);
+    act(() => p.props.onResponderRelease(doigt(400, 90, 300, 90)));
+    const n = useScanStore.getState().walls.find((w) => w.id === 'n')!;
+    // Le mur n'est plus horizontal, et il a gardé sa longueur.
+    expect(Math.abs(n.b.z - n.a.z)).toBeGreaterThan(0.05);
+    expect(Math.hypot(n.b.x - n.a.x, n.b.z - n.a.z)).toBeCloseTo(4, 6);
+    expect(usePlanEnVol.getState().plan).toBeNull();
     act(() => tree.unmount());
   });
 });

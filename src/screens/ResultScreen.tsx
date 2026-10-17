@@ -641,6 +641,18 @@ export function ResultScreen() {
   }, [tab, vue, bascule]);
   // Pièce visée par l'outil « nom de pièce » et par la suppression.
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  /*
+    LE DÉPLACEMENT DE LA PIÈCE CHOISIE, STABLE — il était écrit en ligne,
+    neuf à chaque rendu. Le plan relaie de toute façon le rappel À JOUR
+    (voir l'enveloppe de `FloorplanEditor`) ; celui-ci est le plus sollicité,
+    et il ne change qu'avec la pièce choisie.
+  */
+  const deplacerLaPiece = useCallback(
+    (dx: number, dz: number, aimant?: boolean) => {
+      if (selectedRoomId) moveRoom(selectedRoomId, dx, dz, aimant);
+    },
+    [selectedRoomId, moveRoom],
+  );
   const [naming, setNaming] = useState(false);
   // Diagnostic du plan : ce dont il faut se méfier après un scan.
   /*
@@ -1038,6 +1050,16 @@ export function ResultScreen() {
   */
   const [murNeuf, setMurNeuf] = useState<PoseDeMur | null>(null);
   const [apercuMur, setApercuMur] = useState<PoseDeMur | null>(null);
+  /*
+    LES FANTÔMES DONNÉS AU PLAN, STABLES — relevé des testeurs (fluidité du
+    plan 2D) : le plan se redessinait à chaque rendu de l'écran. La liste
+    `[apercuMur]` était neuve à chaque fois : le plan, mémoïsé, la voyait
+    changer pendant toute la saisie des cotes d'un mur neuf.
+  */
+  const posesDuPlan = useMemo(
+    () => posesMur ?? (apercuMur ? [apercuMur] : undefined),
+    [posesMur, apercuMur],
+  );
   /* La pièce qu'on coupe, en attente de ses cotes — voir `CoupeSheet`. */
   const [coupePiece, setCoupePiece] = useState<RoomPart | null>(null);
   /* L'ouverture dont on donne les cotes — voir `OuvertureSheet`. */
@@ -4722,7 +4744,7 @@ export function ResultScreen() {
             filigrane={filigrane}
             pleinCadre={capturing}
             /* Les fantômes bleus d'un mur neuf, et le doigt qui tranche. */
-            poses={posesMur ?? (apercuMur ? [apercuMur] : undefined)}
+            poses={posesDuPlan}
             onPose={(id) => {
               const pose = posesMur?.find((x) => x.id === id);
               if (!pose) return;
@@ -4836,10 +4858,10 @@ export function ResultScreen() {
             }}
             selectedRoomId={selectedRoomId}
             /* Glisser dans la pièce choisie la déplace, avec ses meubles et
-               son appareillage — et elle s'aimante aux murs voisins. */
-            onMoveRoom={(dx, dz, aimant) =>
-              selectedRoomId && moveRoom(selectedRoomId, dx, dz, aimant)
-            }
+               son appareillage — et elle s'aimante aux murs voisins. Le
+               plan la montre en vol pendant le geste et n'appelle qu'au
+               lâcher, avec la course entière (voir `store/planEnVol`). */
+            onMoveRoom={deplacerLaPiece}
             ceiling={ceiling}
             showCeiling={showCeiling}
             /* Sans nord, l'édition propose d'orienter le plan (le badge de

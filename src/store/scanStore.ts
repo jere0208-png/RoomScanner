@@ -2365,7 +2365,7 @@ export function defaultName(d: Date, pieces?: { name?: string; kind?: RoomKind |
   return `Scan ${jour} · ${two(d.getHours())}h${two(d.getMinutes())}`;
 }
 
-interface ScanState {
+export interface ScanState {
   screen: Screen;
   /** Le plan que la page du diagnostic examine (voir `ouvrirDiagnostic`). */
   diagnosticId: string | null;
@@ -3652,7 +3652,34 @@ function rangerLeTableau(t: TableauExistant): TableauExistant {
   return { ...t, departs: rattacher(places, impl) };
 }
 
-export const useScanStore = create<ScanState>((set, get) => {
+/*
+  LE MAGASIN À BLANC — l'essai en cours de `simuler`, ou rien.
+
+  Tant qu'il est posé, les actions lisent et écrivent CETTE copie de l'état,
+  et l'historique ne retient rien : voir `simuler`, plus bas.
+*/
+let essaiABlanc: { etat: ScanState; ecrit: boolean } | null = null;
+
+export const useScanStore = create<ScanState>((setVrai, getVrai) => {
+  /*
+    LES ACTIONS PASSENT PAR CES DEUX PORTES — et l'essai à blanc s'y glisse.
+
+    Hors essai, elles sont exactement celles de zustand. Pendant un essai
+    (`simuler`), `get` rend la copie de l'essai et `set` l'écrit, elle :
+    personne n'est réveillé, rien ne s'enregistre, et l'action, elle, ne
+    sait pas qu'on l'essaie — c'est tout l'intérêt.
+  */
+  const get = (): ScanState => essaiABlanc?.etat ?? getVrai();
+  const set = ((partiel: Parameters<typeof setVrai>[0], ecraser?: boolean) => {
+    const essai = essaiABlanc;
+    if (essai) {
+      const p = typeof partiel === 'function' ? partiel(essai.etat) : partiel;
+      essai.etat = { ...essai.etat, ...p };
+      essai.ecrit = true;
+      return;
+    }
+    setVrai(partiel as never, ecraser as never);
+  }) as typeof setVrai;
   // Le pont entre l'écriture différée — qui vit hors du store — et l'état que
   // l'écran observe. Une seule alerte par incident : voir `persistSoon`.
   signalerPanne = (p) => {
@@ -3668,6 +3695,8 @@ export const useScanStore = create<ScanState>((set, get) => {
    * qu'UNE entrée d'historique, pas une par image.
    */
   const pushHistory = (key: string) => {
+    // Un essai à blanc ne laisse pas de trace : voir `simuler`.
+    if (essaiABlanc) return;
     const now = Date.now();
     /*
       LA FUSION NE VAUT QUE POUR LES GESTES CONTINUS.
@@ -11568,3 +11597,53 @@ export const useScanStore = create<ScanState>((set, get) => {
     },
   };
 });
+
+/**
+ * CE QU'ÉCRIRAIT UNE ACTION, SANS RIEN ÉCRIRE — l'état d'après, ou `null` si
+ * l'action n'a rien changé (un mur introuvable, un geste refusé).
+ *
+ * Relevé des testeurs (fluidité du plan 2D) : « chaque image d'un coin,
+ * d'un côté ou d'une pièce tirée redessine deux fois tout l'écran et tout
+ * l'éditeur » — deux cent dix millisecondes par image sur l'exemple, trois
+ * cent soixante-dix sur trente pièces. Le meuble avait déjà sa parade : il
+ * vit « en vol » pendant le geste, et le magasin n'apprend sa place qu'au
+ * lâcher (voir `useEnVol`). Les murs et les pièces la prennent à leur tour
+ * (voir `store/planEnVol`).
+ *
+ * Mais leurs gestes passent par des actions longues — la soudure des coins,
+ * le dédoublement d'une cloison mitoyenne, les menuiseries qui suivent, la
+ * pièce recousue à ses voisines. Les recopier pour le vol, c'était deux
+ * formules qui divergeraient un jour, et un mur qui saute au lâcher. On
+ * EXÉCUTE donc l'action elle-même, sur une copie : elle lit et écrit l'essai
+ * (voir les deux portes `get` et `set` du magasin), l'historique n'en garde
+ * rien, et personne n'est réveillé. Le doigt voit exactement ce que le
+ * lâcher écrira — c'est la même action, une fois pour de vrai.
+ *
+ * `action` reçoit l'état du magasin : elle appelle l'action voulue dessus
+ * (`(st) => st.moveWallPoint(…)`). Tout se passe dans l'appel, sans rien
+ * d'asynchrone : l'essai est retiré avant de rendre la main.
+ */
+export function simuler(action: (st: ScanState) => void): ScanState | null {
+  // Pas d'essai dans un essai : le second écrirait dans le premier.
+  if (essaiABlanc) return null;
+  const essai = { etat: useScanStore.getState(), ecrit: false };
+  essaiABlanc = essai;
+  try {
+    action(essai.etat);
+  } finally {
+    essaiABlanc = null;
+  }
+  return essai.ecrit ? essai.etat : null;
+}
+
+/**
+ * LE DOIGT S'EST LEVÉ : le prochain geste sera une annulation de plus.
+ *
+ * L'historique fusionne les pas d'un geste continu par leur clé et l'horloge
+ * (huit dixièmes de seconde, voir `pushHistory`). Un geste « en vol » n'écrit
+ * qu'une fois, au lâcher ; sans cette fermeture, deux coins tirés coup sur
+ * coup — le même, à moins d'une seconde — ne feraient qu'un « Annuler ».
+ */
+export function cloreLeGesteDansLHistorique(): void {
+  lastKey = '';
+}

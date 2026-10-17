@@ -252,16 +252,25 @@ describe('glisser une pièce dans le plan 2D', () => {
       h.onResponderGrant?.(e1);
       h.onResponderMove?.(m.bouger(x + 60, y));
       h.onResponderMove?.(m.bouger(x + 90, y + 10));
+    });
+    /*
+      MIS À JOUR — la pièce glisse EN VOL (lot « maj-plan2d », relevé des
+      testeurs : chaque image écrivait le magasin et redessinait tout
+      l'écran). Pendant le geste, l'écran n'est pas appelé : la pièce se
+      dessine à sa place en vol (`store/planEnVol`).
+    */
+    expect(aJour).not.toHaveBeenCalled();
+    act(() => {
       h.onResponderRelease?.(m.lever());
     });
 
     // Le `onMoveRoom` À JOUR, jamais celui du premier rendu.
     expect(premier).not.toHaveBeenCalled();
-    const pas = aJour.mock.calls.filter((c) => c[2] === false);
-    expect(pas.length).toBeGreaterThan(0);
-    expect(pas.some((c) => Math.hypot(c[0], c[1]) > 0)).toBe(true);
-    // Le lâcher pose l'aimant.
-    expect(aJour.mock.calls[aJour.mock.calls.length - 1]).toEqual([0, 0, true]);
+    // Au lâcher, UNE écriture : la course entière, avec l'aimant.
+    expect(aJour).toHaveBeenCalledTimes(1);
+    const [dx, dz, aimant] = aJour.mock.calls[0];
+    expect(aimant).toBe(true);
+    expect(Math.hypot(dx, dz)).toBeGreaterThan(0);
   });
 
   it('situe le doigt par la page : la vue touchée n’est pas le cadre du plan', () => {
@@ -313,7 +322,8 @@ describe('glisser une pièce dans le plan 2D', () => {
       h.onResponderMove?.(m.bouger(x + 60, y));
       h.onResponderRelease?.(m.lever());
     });
-    expect(aJour.mock.calls.some((c) => c[2] === false)).toBe(true);
+    // La course entière, au lâcher (voir plus haut).
+    expect(aJour.mock.calls.some((c) => c[2] === true && Math.hypot(c[0], c[1]) > 0)).toBe(true);
   });
 
   it('sans pièce choisie, le dessin ne porte aucun glissement de pièce', () => {

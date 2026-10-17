@@ -1,4 +1,4 @@
-import React, { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { texteDeMesure, type Mesure } from '../geometry/regle';
 import {
   Animated,
@@ -266,6 +266,7 @@ interface EffMapping {
 import { RoomScan } from 'react-native-room-scan';
 import { meubleAuDoigt, meubleEtire, meubleTourne, useScanStore } from '../store/scanStore';
 import { finirLeGeste, mettreEnVol, signalerRefus, useEnVol } from '../store/geste';
+import { atterrir, usePlanEnVol, volerLAction } from '../store/planEnVol';
 import type { PlanNote } from '../store/scanStore';
 import {
   boiteDePoints,
@@ -740,8 +741,12 @@ export function SuitLeDoigt({
   render: (o: ObjectData, refuse: boolean) => React.ReactNode;
 }) {
   const enVol = useEnVol((s) => (s.objet?.id === objet.id ? s.objet : null));
-  const refuse = useEnVol((s) => s.refuse);
-  return <>{render(enVol ?? objet, refuse)}</>;
+  // Le rouge ne regarde que le meuble tenu : les autres ne se rendent pas
+  // quand il bascule.
+  const refuse = useEnVol((s) => s.objet?.id === objet.id && s.refuse);
+  // La pièce qu'on glisse emporte ses meubles (voir `store/planEnVol`).
+  const avecLaPiece = usePlanEnVol((s) => s.plan?.meubles.get(objet.id) ?? null);
+  return <>{render(enVol ?? avecLaPiece ?? objet, refuse)}</>;
 }
 
 /**
@@ -822,7 +827,69 @@ function ChoixSousLeDoigt({
   );
 }
 
-export function FloorplanEditor({
+/**
+ * L'ÉDITEUR, TEL QUE LES ÉCRANS LE MONTENT — une enveloppe qui ne dessine rien.
+ *
+ * Relevé des testeurs (fluidité du plan 2D) : « une simple sélection coûte de
+ * 75 à 170 ms ». L'écran du plan a soixante-dix-huit états et passe au plan
+ * une trentaine de rappels écrits en ligne : neufs à chaque rendu de l'écran
+ * — un bandeau qui s'ouvre, un enregistrement, une feuille —, ils faisaient
+ * redessiner le plan entier à chaque fois, quand rien de ce qu'il montre
+ * n'avait changé.
+ *
+ * L'enveloppe donne au dessin (`EditeurDuPlan`, mémoïsé) des rappels
+ * STABLES : un relais par nom, créé une fois, qui appelle la fonction du
+ * DERNIER rendu de l'écran. C'est ce qu'un `useCallback` ferait côté écran,
+ * pour chacun des trois écrans qui montent le plan, sans en oublier aucun —
+ * et sans le piège qui vient d'être corrigé sur le glisser d'une pièce : un
+ * rappel figé au premier rendu (`onMoveRoomRef`). Le relais lit toujours le
+ * rappel à jour ; seule sa présence compte pour le dessin (un rappel absent
+ * reste absent).
+ */
+export function FloorplanEditor(props: Props) {
+  const vif = useRef(props);
+  vif.current = props;
+  const relais = useRef(new Map<string, (...args: unknown[]) => unknown>()).current;
+  const stables: Record<string, unknown> = {};
+  for (const [cle, v] of Object.entries(props)) {
+    if (typeof v !== 'function') {
+      stables[cle] = v;
+      continue;
+    }
+    let f = relais.get(cle);
+    if (!f) {
+      f = (...args: unknown[]) => {
+        const actuel = (vif.current as unknown as Record<string, unknown>)[cle];
+        return typeof actuel === 'function' ? actuel(...args) : undefined;
+      };
+      relais.set(cle, f);
+    }
+    stables[cle] = f;
+  }
+  return <EditeurDuPlan {...(stables as unknown as Props)} />;
+}
+
+/**
+ * LE DESSIN NE SE REFAIT QUE SI CE QU'IL MONTRE CHANGE — les rappels sont
+ * stables (voir l'enveloppe), et le cadrage de départ n'est lu qu'au
+ * montage : l'écran le remet à jour après chaque geste, ce n'est pas une
+ * raison de tout redessiner.
+ */
+function memesProps(avant: Props, apres: Props): boolean {
+  const cles = new Set([...Object.keys(avant), ...Object.keys(apres)]);
+  for (const cle of cles) {
+    if (cle === 'vueInitiale') continue;
+    if (!Object.is((avant as unknown as Record<string, unknown>)[cle], (apres as unknown as Record<string, unknown>)[cle])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Le dessin garde le nom de l'éditeur : c'est lui que les bancs comptent dans
+// les piles d'appels (voir `meublefluide`, `maj-plan2d`).
+// eslint-disable-next-line @typescript-eslint/no-shadow
+const EditeurDuPlan = React.memo(function FloorplanEditor({
   showMeasures,
   vueInitiale,
   marges,
@@ -1324,7 +1391,49 @@ export function FloorplanEditor({
   */
   const onMoveRoomRef = useRef(onMoveRoom);
   onMoveRoomRef.current = onMoveRoom;
+  /** La pièce choisie, relue au geste — même raison que `onMoveRoomRef`. */
+  const pieceChoisieRef = useRef(selectedRoomId ?? null);
+  pieceChoisieRef.current = selectedRoomId ?? null;
+  /** La course de la pièce depuis la prise du doigt, en mètres. */
+  const pieceCourse = useRef({ x: 0, z: 0 });
 
+  /*
+    LA PIÈCE GLISSE EN VOL — le magasin ne l'apprend qu'au lâcher.
+
+    Relevé des testeurs : « chaque image d'une pièce tirée redessine deux
+    fois tout l'écran et tout l'éditeur » — cent soixante-dix millisecondes
+    par image sur l'exemple, plus d'une demi-seconde sur trente pièces.
+    Chaque pas écrivait le magasin (`onMoveRoom` sans aimant), et tout ce qui
+    le lit se rendait.
+
+    Pendant le geste, la pièce vit dans `store/planEnVol` : ses murs, ses
+    menuiseries, ses meubles et son sol se dessinent à leur place en vol, par
+    la même action exécutée à blanc (`moveRoom`, sans aimant), et le reste du
+    plan ne se rend plus. Au lâcher, `onMoveRoom` reçoit la course ENTIÈRE,
+    avec l'aimant et la soudure : une écriture, un seul « Annuler ».
+
+    La course se lit depuis la prise, pas à pas : le cadrage ne change pas
+    pendant le geste (le plan ne se rend plus), et une course totale ne
+    cumule aucun arrondi.
+  */
+  const pieceEnCours = useRef(false);
+  const poserLaPiece = () => {
+    const d = pieceCourse.current;
+    pieceCourse.current = { x: 0, z: 0 };
+    pieceEnCours.current = false;
+    // Au lâcher : l'aimant et la soudure des murs qui se recouvrent.
+    atterrir(() => onMoveRoomRef.current?.(d.x, d.z, true));
+  };
+  // Un plan qui s'en va en plein geste pose la pièce, et ne laisse rien en vol.
+  useEffect(
+    () => () => {
+      if (pieceEnCours.current) poserLaPiece();
+      atterrir();
+    },
+    // Au démontage seulement : `poserLaPiece` ne lit que des références.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
   /** Le glissement de la pièce : en mètres, dans le repère du monde. */
   const piece = useRef(
     PanResponder.create({
@@ -1334,26 +1443,24 @@ export function FloorplanEditor({
         estUnGlissement(g.dx, g.dy) &&
         pieceSousLeDoigt(e),
       onPanResponderGrant: () => {
-        pieceDep.current = { x: 0, y: 0 };
+        pieceCourse.current = { x: 0, z: 0 };
+        pieceEnCours.current = true;
       },
       onPanResponderMove: (_e, g) => {
         const m = mappingRef.current;
-        if (!m) return;
-        const dx = g.dx - pieceDep.current.x;
-        const dy = g.dy - pieceDep.current.y;
-        pieceDep.current = { x: g.dx, y: g.dy };
+        const id = pieceChoisieRef.current;
+        if (!m || !id) return;
         // Écran → monde : la conversion est déjà écrite, rotation et zoom
         // compris. La réécrire ici, c'est se tromper d'un signe un jour.
-        const d = m.deltaToMeters(dx, dy);
+        const d = m.deltaToMeters(g.dx, g.dy);
+        pieceCourse.current = { x: d.x, z: d.z };
         // Pendant le geste, sans aimant : il ramenait la pièce à chaque pas.
-        onMoveRoomRef.current?.(d.x, d.z, false);
+        volerLAction((st) => st.moveRoom(id, d.x, d.z, false), { id, dx: d.x, dz: d.z });
       },
-      // Au lâcher : l'aimant et la soudure des murs qui se recouvrent.
-      onPanResponderRelease: () => onMoveRoomRef.current?.(0, 0, true),
-      onPanResponderTerminate: () => onMoveRoomRef.current?.(0, 0, true),
+      onPanResponderRelease: () => poserLaPiece(),
+      onPanResponderTerminate: () => poserLaPiece(),
     }),
   ).current;
-  const pieceDep = useRef({ x: 0, y: 0 });
   /*
     LE MODE TRACE PASSE PAR UNE REFERENCE, comme tout ce que le geste lit.
 
@@ -1737,7 +1844,7 @@ export function FloorplanEditor({
   }, [walls, openings]);
 
   /** Le quadrilatère d'un tronçon de mur, découpé dans l'onglet du mur. */
-  const runQuad = (w: WallSeg, run: WallRun): Pt[] => {
+  const runQuad = useCallback((w: WallSeg, run: WallRun): Pt[] => {
     const q = quads.get(w.id);
     const lp = (a: Pt, b: Pt, t: number) => ({
       x: a.x + (b.x - a.x) * t,
@@ -1765,7 +1872,7 @@ export function FloorplanEditor({
       { x: p1.x - nx, z: p1.z - nz },
       { x: p0.x - nx, z: p0.z - nz },
     ];
-  };
+  }, [quads]);
 
   const pierRun =
     pier != null ? (retours.get(pier.wallId) ?? [])[pier.i] ?? null : null;
@@ -1858,16 +1965,19 @@ export function FloorplanEditor({
     [walls, roomById],
   );
   /*
-    Le poché se refait quand un mur bouge — à chaque image d'un glissé. Il se
-    calcule donc sur une valeur DIFFÉRÉE : le doigt n'attend pas l'union, le
-    mur tenu se dessine en bleu en temps réel, et la maçonnerie se recale dès
-    que le geste lui en laisse le temps.
+    LE POCHÉ NE SE DIFFÈRE PLUS — relevé des testeurs : « le poché est
+    calculé sur `useDeferredValue` dans le même composant monolithique : la
+    passe différée re-rend donc tout l'éditeur une seconde fois pour
+    économiser `pocheDesMurs`, soit environ 5 % du temps ». Deux rendus
+    complets par image pour gagner un vingtième de l'un d'eux.
+
+    Et il n'a plus à se presser : pendant un geste, le magasin n'est plus
+    écrit (voir `store/planEnVol`) — le poché ne se refait qu'au lâcher, une
+    fois, avec le reste du plan.
   */
-  const mursDifferes = useDeferredValue(mursPoses);
-  const baiesDifferees = useDeferredValue(openings);
   const poche = useMemo(
-    () => pocheDesMurs(mursDifferes, baiesDifferees, rooms),
-    [mursDifferes, baiesDifferees, rooms],
+    () => pocheDesMurs(mursPoses, openings, rooms),
+    [mursPoses, openings, rooms],
   );
   const baieDuPoche = useMemo(() => new Map(poche.baies.map((b) => [b.id, b])), [poche]);
   /*
@@ -1901,8 +2011,8 @@ export function FloorplanEditor({
     });
   }, [showReperesBaies, walls, openings, rooms]);
   const corpsDeNature = useMemo(
-    () => dessinDesNatures(mursDifferes, wallQuadsOf(mursDifferes), jonctionsDetaillees(mursDifferes)),
-    [mursDifferes],
+    () => dessinDesNatures(mursPoses, wallQuadsOf(mursPoses), jonctionsDetaillees(mursPoses)),
+    [mursPoses],
   );
   // Le sol garde sa teinte neutre. Les couleurs relevées au scan ne servent
   // qu'à la vue 3D : sur un plan vu de dessus, sous le poché des murs et le
@@ -1915,7 +2025,8 @@ export function FloorplanEditor({
     mobilier en gris clair. On lit l'électricité d'un coup d'œil.
   */
   const planElec = showFixtures || showCeiling;
-  const encre = planElec ? encreElectrique(c) : undefined;
+  // Stable : les calques du plafond et de l'appareillage sont mémoïsés.
+  const encre = useMemo(() => (planElec ? encreElectrique(c) : undefined), [planElec, c]);
   /*
     LE SOL CHOISI DANS « DÉCORER » SE VOIT — correctif de l'audit : le décor
     était invisible sur le plan 2D. Pas sur le plan de l'électricien, qui
@@ -1942,7 +2053,7 @@ export function FloorplanEditor({
     (le voisin a la sienne) ; un mur d'accent porte la sienne par-dessus. Le
     mur, dessiné ensuite, en couvre la moitié : il en reste quatre points.
   */
-  const decorDesMurs = (part: RoomPart, poly: string, echelle: number) => {
+  const decorDesMurs = useCallback((part: RoomPart, poly: string, echelle: number) => {
     const piece = roomById.get(part.roomId) as
       | { peinture?: string; accents?: Record<string, string> }
       | undefined;
@@ -1981,7 +2092,7 @@ export function FloorplanEditor({
         })}
       </G>
     );
-  };
+  }, [roomById, mapping]);
   /**
    * OÙ SE POSE LE CARTOUCHE DE CHAQUE PIÈCE — CALCULÉ AVANT LES COTES.
    *
@@ -2713,9 +2824,13 @@ export function FloorplanEditor({
     meuble posé, une menuiserie percée : chacun salue d'une ondée, à sa
     taille. Rouvrir un dossier ne fait naître personne.
   */
-  const piecesNees = useNaissances(rooms.map((r) => r.id));
-  const meublesNes = useNaissances(objects.map((o) => o.id));
-  const menuiseriesNees = useNaissances(openings.map((o) => o.id));
+  // Des listes stables : la mémoire des naissances ne se recompare qu'à un changement.
+  const idsDesPieces = useMemo(() => rooms.map((r) => r.id), [rooms]);
+  const idsDesMeubles = useMemo(() => objects.map((o) => o.id), [objects]);
+  const idsDesBaies = useMemo(() => openings.map((o) => o.id), [openings]);
+  const piecesNees = useNaissances(idsDesPieces);
+  const meublesNes = useNaissances(idsDesMeubles);
+  const menuiseriesNees = useNaissances(idsDesBaies);
 
   /*
     LE VISEUR — de quoi lâcher un meuble du catalogue à l'endroit du doigt.
@@ -2924,7 +3039,7 @@ export function FloorplanEditor({
    * L'EMPREINTE D'UN MEUBLE AU PLAN — une fonction, parce que le meuble tenu
    * se dessine aussi depuis `SuitLeDoigt`, avec sa position en vol.
    */
-  const dessinerMeuble = (o: ObjectData, poseRefusee = false) => {
+  const dessinerMeuble = useCallback((o: ObjectData, poseRefusee = false) => {
     if (!mapping) return null;
     const f = footprintOf(o, partOf, facesPlan);
     const ctr = mapping.toPx({ x: f.cx, z: f.cz });
@@ -3053,7 +3168,1070 @@ export function FloorplanEditor({
         />
       </G>
     );
+  }, [
+    mapping, partOf, facesPlan, view.rot, selectedObjectId, planElec, c, meublesEnConflit,
+    onSelectObject, editable,
+  ]);
+
+  /*
+    LES GESTES DES COUCHES MÉMOÏSÉES PASSENT PAR UNE RÉFÉRENCE : voir plus
+    bas. Une couche gardée d'un rendu à l'autre ne peut pas capturer les
+    fonctions de CE rendu — elle lirait une sélection périmée.
+  */
+  const actes = useRef({
+    appuiSurLeMur,
+    toucher,
+    cibleDuMeuble,
+    cibleDeLaBaie,
+    cibleDuPlafond,
+    cibleDeLAppareil,
+    selectedObjectId,
+    selectedWallId,
+    selectedRoomId,
+  });
+  actes.current = {
+    appuiSurLeMur,
+    toucher,
+    cibleDuMeuble,
+    cibleDeLaBaie,
+    cibleDuPlafond,
+    cibleDeLAppareil,
+    selectedObjectId,
+    selectedWallId,
+    selectedRoomId,
   };
+  /** L'appui de chaque mur : un relais par mur, créé une fois (voir `WallBody`). */
+  const appuisDesMurs = useRef(new Map<string, () => void>()).current;
+  const appuiDuMur = useCallback(
+    (id: string) => {
+      let f = appuisDesMurs.get(id);
+      if (!f) {
+        f = () => actes.current.appuiSurLeMur(id);
+        appuisDesMurs.set(id, f);
+      }
+      return f;
+    },
+    [appuisDesMurs],
+  );
+  const choisirAuPlafond = useCallback(
+    (id: string) =>
+      actes.current.toucher(actes.current.cibleDuPlafond(id), () => onSelectCeiling?.(id)),
+    [onSelectCeiling],
+  );
+  const choisirLAppareil = useCallback(
+    (id: string, wallId: string) =>
+      actes.current.toucher(actes.current.cibleDeLAppareil(id), () => onSelectFixture?.(id, wallId)),
+    [onSelectFixture],
+  );
+  /** La cote de chaque mur, au nu : une fois par plan, pas une fois par sélection. */
+  const longueurs = useMemo(
+    () => new Map(walls.map((w) => [w.id, longueurCotee(walls, w, parts)])),
+    [walls, parts],
+  );
+
+  /*
+    LES COUCHES QUI NE BOUGENT PAS SE GARDENT D'UN RENDU À L'AUTRE.
+
+    Relevé des testeurs : « une simple sélection coûte de 75 à 170 ms » —
+    choisir un mur, une pièce, un meuble redessinait tout le plan : le poché,
+    les sols, les vingt-six meubles, l'appareillage, les cotes. Chaque couche
+    est maintenant un élément mémoïsé : React reprend l'arbre de la veille
+    tant que ce qu'elle dessine n'a pas changé, et une sélection ne refait
+    que ce qu'elle colore. Leurs appuis lisent la sélection du moment par
+    `actes` (une couche gardée ne doit pas répondre avec celle de la veille).
+  */
+  const coucheDesSols = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {/* Surface au sol : aplat + semis de points, pour la distinguer
+            d'un coup d'œil des murs pochés en noir. */}
+        {showSurfaces && dots && (
+          <G>
+            <Defs>
+              <Pattern
+                id="floorDots"
+                x={dots.x}
+                y={dots.y}
+                width={dots.size}
+                height={dots.size}
+                patternUnits="userSpaceOnUse">
+                <Circle cx={1.1} cy={1.1} r={0.9} fill={c.inkFaint} opacity={0.55} />
+              </Pattern>
+            </Defs>
+            {parts.map((part) => {
+              if (!part.surface) return null;
+              const poly = part.surface.pts
+                .map((p) => {
+                  const q = mapping.toPx(p);
+                  return `${q.x},${q.y}`;
+                })
+                .join(' ');
+              return (
+                <CacheEnVol key={part.roomId} piece={part.roomId}>
+                  <G
+                    onPress={
+                      editable && onSelectRoom
+                        ? () => {
+                            /*
+                              TOUCHER LE SOL QUAND UN MEUBLE EST TENU,
+                              C'EST LE LÂCHER — pas choisir la pièce.
+                              Relevé du patron : la surface captait
+                              l'appui et ouvrait le bandeau de la pièce
+                              par-dessus le meuble encore tenu. Un
+                              geste, un effet : le premier appui lâche,
+                              le suivant prend la pièce.
+                            */
+                            if (actes.current.selectedObjectId) {
+                              onSelectObject?.(null);
+                              return;
+                            }
+                            /*
+                              ET TOUCHER LE SOL QUAND UN MUR EST CHOISI,
+                              C'EST LE LÂCHER — relevé du patron :
+                              « lorsqu'un mur est sélectionné, le clic
+                              n'importe où sur la surface doit quitter la
+                              sélection ».
+
+                              La règle existait déjà pour le meuble ; le
+                              mur, lui, restait pris, et l'appui ouvrait
+                              le bandeau de la pièce PAR-DESSUS son menu.
+                              Un geste, un effet : le premier appui
+                              lâche, le suivant prend la pièce.
+                            */
+                            if (actes.current.selectedWallId) {
+                              onSelectWall(null);
+                              return;
+                            }
+                            onSelectRoom(
+                              part.roomId === actes.current.selectedRoomId ? null : part.roomId,
+                            );
+                          }
+                        : undefined
+                    }>
+                    <Polygon
+                      points={poly}
+                      fill={fillOf(part.roomId)}
+                      stroke="none"
+                    />
+                    {/*
+                      LE SEMIS N'EST QU'UN OUTIL D'ÉDITION — revue de Léa,
+                      Sophie et Chloé : la grille de points sur les sols
+                      « fait brouillon / debug ». Elle sert à s'aligner en
+                      posant ; en lecture, à l'aperçu du dossier, le sol
+                      est un aplat net, comme sur le PDF. Et même en
+                      édition elle se fait plus discrète.
+                    */}
+                    {editable ? <Polygon points={poly} fill="url(#floorDots)" stroke="none" /> : null}
+                    {!planElec && mapping && decorDesMurs(part, poly, mapping.scale)}
+                  </G>
+                </CacheEnVol>
+              );
+            })}
+          </G>
+        )}
+      </>
+    );
+  }, [
+    showSurfaces, dots, mapping, parts, editable, onSelectRoom, onSelectObject, onSelectWall,
+    fillOf, planElec, decorDesMurs, c,
+  ]);
+
+  const coucheDesHalos = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {walls.map((w) => (
+          <WallBody
+            key={`halo-${w.id}`}
+            wall={w}
+            quad={quads.get(w.id)}
+            mapping={mapping}
+            couche="halo"
+            neuve={!!roomById.get(roomOf(w) ?? '')?.neuve}
+            showMeasure={false}
+            selected={false}
+            onPress={editable ? appuiDuMur(w.id) : undefined}
+          />
+        ))}
+      </>
+    );
+  }, [walls, quads, mapping, roomById, editable, appuiDuMur]);
+
+  const coucheDesMeubles = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {[...objects]
+          .sort((a, b) => (a.category === 'tapis' ? 0 : 1) - (b.category === 'tapis' ? 0 : 1))
+          /*
+            LE MEUBLE TENU SE DESSINE EN VOL — voir `SuitLeDoigt`. À sa
+            place dans l'ordre du dessin : il ne passe ni devant ni
+            derrière les autres parce qu'on le glisse. TOUS passent par
+            lui désormais : la pièce qu'on glisse emporte les siens
+            (voir `store/planEnVol`), et chacun ne se rend que s'il bouge.
+          */
+          .map((meuble) => (
+            <SuitLeDoigt key={meuble.id} objet={meuble} render={dessinerMeuble} />
+          ))}
+      </>
+    );
+  }, [objects, mapping, dessinerMeuble]);
+
+  const coucheDesPrises = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {onSelectObject &&
+          editable &&
+          objects
+            .map((o) => ({ o, f: footprintOf(o, partOf, facesPlan) }))
+            .sort((a, b) => b.f.width * b.f.depth - a.f.width * a.f.depth)
+            .map(({ o, f }) => {
+              const ctr = mapping.toPx({ x: f.cx, z: f.cz });
+              const w = f.width * mapping.scale;
+              const d = f.depth * mapping.scale;
+              return (
+                <Rect
+                  key={`prise-${f.id}`}
+                  accessibilityLabel={`Meuble ${frCategory(f.category)}`}
+                  x={-w / 2}
+                  y={-d / 2}
+                  width={w}
+                  height={d}
+                  fill="transparent"
+                  transform={`translate(${ctr.x}, ${ctr.y}) rotate(${
+                    ((f.yaw + view.rot) * 180) / Math.PI
+                  })`}
+                  onPress={() =>
+                    actes.current.toucher(actes.current.cibleDuMeuble(o.id), () =>
+                      onSelectObject(o.id === actes.current.selectedObjectId ? null : o.id),
+                    )
+                  }
+                />
+              );
+            })}
+      </>
+    );
+  }, [onSelectObject, editable, objects, partOf, facesPlan, mapping, view.rot]);
+
+  const coucheDesMassifs = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {massifs.map((contour, i) => (
+          <Polygon
+            key={`massif-${i}`}
+            points={contour
+              .map((p) => mapping.toPx(p))
+              .map((p) => `${p.x},${p.y}`)
+              .join(' ')}
+            fill={c.ink}
+            // Un placard fermé sans porte se poche aussi : un appui le déclare.
+            onPress={
+              editable && onRecoin
+                ? () =>
+                    onRecoin({
+                      x: contour.reduce((t, p) => t + p.x, 0) / contour.length,
+                      z: contour.reduce((t, p) => t + p.z, 0) / contour.length,
+                    })
+                : undefined
+            }
+          />
+        ))}
+      </>
+    );
+  }, [massifs, mapping, c, editable, onRecoin]);
+
+  const coucheDuFiligrane = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {(filigrane ?? []).map((w) => {
+          const a = mapping.toPx(w.a);
+          const b = mapping.toPx(w.b);
+          return (
+            <Line
+              key={`sous-${w.id}`}
+              x1={a.x}
+              y1={a.y}
+              x2={b.x}
+              y2={b.y}
+              stroke={c.ink}
+              strokeOpacity={0.16}
+              strokeWidth={5}
+              strokeLinecap="round"
+            />
+          );
+        })}
+      </>
+    );
+  }, [filigrane, mapping, c]);
+
+  // La maçonnerie, d'un seul tenant : voir `pocheDesMurs` — et pendant un geste, `CoucheDuPoche`.
+  const coucheDuPoche = useMemo(
+    () =>
+      mapping ? (
+        <CoucheDuPoche
+          murs={mursPoses}
+          baies={openings}
+          rooms={rooms}
+          poche={poche}
+          natures={corpsDeNature}
+          mapping={mapping}
+          c={c}
+        />
+      ) : null,
+    [mursPoses, openings, rooms, poche, corpsDeNature, mapping, c],
+  );
+
+  const coucheDesMurs = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {walls.map((w) => (
+          <SuitLeMur
+            key={w.id}
+            wall={w}
+            quad={quads.get(w.id)}
+            mapping={mapping}
+            sansCorps
+            exterieur={dehorsDesMurs.get(w.id)}
+            /* Une piece qu'on vient de poser et qu'on n'a pas encore
+               lachee : son trait reste ouvert. Voir `WallBody`. */
+            neuve={!!roomById.get(roomOf(w) ?? '')?.neuve}
+            showMeasure={
+              placementCotes.murs.has(w.id) &&
+              cotesArbitrees.gardees.has(`w:${w.id}`)
+            }
+            measureAt={cotesArbitrees.poses.get(`w:${w.id}`)}
+            measureOpacity={1 - detail}
+            longueur={longueurs.get(w.id)}
+            selected={editable && w.id === selectedWallId}
+            onPress={editable ? appuiDuMur(w.id) : undefined}
+          />
+        ))}
+      </>
+    );
+  }, [
+    walls, quads, mapping, dehorsDesMurs, roomById, placementCotes, cotesArbitrees, detail,
+    longueurs, editable, selectedWallId, appuiDuMur,
+  ]);
+
+  const coucheDesReperes = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {reperesBaies.map((r) => {
+          const decale = WALL_T / 2 + 12 / mapping.scale;
+          const p = mapping.toPx({ x: r.m.x + r.n.x * decale, z: r.m.z + r.n.z * decale });
+          const larg = 8 + r.texte.length * 6.4;
+          return (
+            <G key={`repere-${r.id}`} pointerEvents="none" testID={`repere-${r.texte}`}>
+              <Rect x={p.x - larg / 2} y={p.y - 7.5} width={larg} height={15} rx={4} fill={c.surface} stroke={c.blue} strokeWidth={1} />
+              <SvgText x={p.x} y={p.y + 3.6} fontSize={10} fontWeight="700" fill={c.blue} textAnchor="middle">
+                {r.texte}
+              </SvgText>
+            </G>
+          );
+        })}
+      </>
+    );
+  }, [reperesBaies, mapping, c]);
+
+  const coucheDesRetours = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {editable &&
+          walls.map((w) =>
+            (retours.get(w.id) ?? []).map((run, ri) => {
+              const pts = runQuad(w, run)
+                .map((p) => mapping.toPx(p))
+                .map((p) => `${p.x},${p.y}`)
+                .join(' ');
+              return (
+                <Polygon
+                  key={`pier-hit-${w.id}-${ri}`}
+                  points={pts}
+                  fill="transparent"
+                  stroke="transparent"
+                  // 18 px de halo débordaient de NEUF pixels dans la
+                  // pièce : un meuble plaqué contre le mur tombait
+                  // dedans, et c'est le mur qui se sélectionnait. Le
+                  // retour se vise sur sa maçonnerie, pas au large.
+                  strokeWidth={6}
+                  onPress={() => {
+                    onSelectWall(null);
+                    onSelectOpening?.(null);
+                    onSelectObject?.(null);
+                    setPier({ wallId: w.id, i: ri });
+                  }}
+                  /*
+                    NEUF CENTS MILLISECONDES, C'EST TROP LONG.
+
+                    Le doigt bouge toujours un peu sur un écran, et le
+                    moindre glissement annule l'appui : à ce régime, on
+                    réussit une fois sur trois. Un tiers de seconde suffit
+                    à distinguer un appui d'un tap, et c'est ce que font
+                    les applications de plan.
+                  */
+                  delayLongPress={320}
+                  onLongPress={() => {
+                    setPier(null);
+                    onSelectWall(w.id);
+                  }}
+                />
+              );
+            }),
+          )}
+      </>
+    );
+  }, [editable, walls, retours, runQuad, mapping, onSelectWall, onSelectOpening, onSelectObject]);
+
+  const coucheDesPhotos = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {photos?.filter((ph) => !ph.auto).map((ph) => {
+          const w = wallById.get(ph.wallId);
+          if (!w) return null;
+          const face = wallFace(w, quads.get(w.id), interiorSide(w, walls));
+          const p = facePoint(face, faceX(face, ph.along), 0.14);
+          const q = mapping.toPx(p);
+          return (
+            /*
+              LE REPÈRE D'UNE PHOTO — l'appareil du jeu commun.
+
+              Relevé du patron, lien à l'appui :
+              `svgrepo.com/svg/525723/camera`, « utilise cette icône là
+              où il y a la photo en icône pour la photo de mur ». C'est
+              `solar:camera-bold`, celle que porte déjà la sortie
+              « Image » : le même objet, le même dessin.
+
+              Il était dessiné à la main — un rectangle et un rond au
+              trait — et c'était le seul pictogramme de l'app à ne pas
+              venir du jeu : posé à côté des silhouettes pleines, il se
+              lisait comme un cadre vide.
+
+              La pastille claire dessous reste : la silhouette est
+              pleine, et sur un mur poché en noir elle disparaîtrait.
+            */
+            <G key={`photo-${ph.id}`} onPress={() => onSelectPhoto?.(ph.id)}>
+              <Circle cx={q.x} cy={q.y} r={12} fill="transparent" />
+              <Circle
+                cx={q.x}
+                cy={q.y}
+                r={10}
+                fill={c.surface}
+                stroke={c.line}
+                strokeWidth={1}
+              />
+              <G
+                transform={`translate(${q.x - 6.5} ${q.y - 6.5}) scale(${13 / 24})`}>
+                <Path d={SOLAIRES.image} fill={c.ink} fillRule="evenodd" />
+              </G>
+            </G>
+          );
+        })}
+      </>
+    );
+  }, [photos, wallById, quads, walls, mapping, c, onSelectPhoto]);
+
+  const coucheDesCotes = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {showMeasures && detail > 0.02 &&
+          walls.map((w) => (
+            // Les cotes d'un mur tiré reviennent au lâcher, à leur place.
+            <CacheEnVol key={`runs-${w.id}`} mur={w.id}>
+              {wallRuns(w, openings).map((run, ri) => {
+                const A = mapping.toPx(w.a);
+                const B = mapping.toPx(w.b);
+                const dx = B.x - A.x;
+                const dy = B.y - A.y;
+                let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+                if (angle > 90) angle -= 180;
+                if (angle < -90) angle += 180;
+                // Où elle s'écrit — et si elle s'écrit : le placement a
+                // déjà tranché, valeur par valeur.
+                const cle = `${w.id}#${ri}`;
+                const pose = cotesArbitrees.poses.get(`r:${cle}`);
+                if (!pose) return null;
+                const px = pose.x;
+                const py = pose.y;
+                const texte = run.length.toFixed(2).replace('.', ',');
+                const p = plaqueDeCote(texte, 9.5);
+                return (
+                  <G key={`run-${w.id}-${ri}`} opacity={detail}>
+                    {pose.attache ? (
+                      <Line
+                        testID="attache-cote"
+                        x1={pose.attache.x}
+                        y1={pose.attache.y}
+                        x2={px}
+                        y2={py}
+                        stroke={c.inkFaint}
+                        strokeWidth={0.8}
+                      />
+                    ) : null}
+                    <Rect
+                      x={px - p.w / 2}
+                      y={py - p.h / 2}
+                      width={p.w}
+                      height={p.h}
+                      rx={3}
+                      fill={c.surface}
+                      opacity={0.92}
+                      transform={`rotate(${angle}, ${px}, ${py})`}
+                    />
+                    <SvgText
+                      x={px}
+                      y={py + 3.4}
+                      fill={run.kind === 'mur' ? c.inkSoft : c.blue}
+                      fontSize={9.5}
+                      fontWeight="700"
+                      textAnchor="middle"
+                      transform={`rotate(${angle}, ${px}, ${py})`}>
+                      {texte}
+                    </SvgText>
+                  </G>
+                );
+              })}
+            </CacheEnVol>
+          ))}
+      </>
+    );
+  }, [showMeasures, detail, walls, openings, mapping, cotesArbitrees, c]);
+
+  const coucheDesBaies = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {openings.map((o) => {
+          /*
+            LA BAIE EST UN VIDE DANS LE POCHÉ — plus un aplat posé sur le
+            noir pour l'effacer (voir `pocheDesMurs`). La menuiserie se
+            dessine DANS l'épaisseur réelle du mur, façade comprise : ses
+            deux faces, en traits fins, comme sur un plan d'architecte.
+          */
+          const baie = baieDuPoche.get(o.id);
+          const face = (cote: 1 | -1) =>
+            baie
+              ? [baie.a, baie.b].map((p) =>
+                  mapping.toPx({
+                    x: p.x + baie.n.x * cote * (cote > 0 ? baie.plus : baie.moins),
+                    z: p.z + baie.n.z * cote * (cote > 0 ? baie.plus : baie.moins),
+                  }),
+                )
+              : null;
+          const vitre = (decalage: number) =>
+            baie
+              ? [baie.a, baie.b].map((p) =>
+                  mapping.toPx({ x: p.x + baie.n.x * decalage, z: p.z + baie.n.z * decalage }),
+                )
+              : null;
+          const a = mapping.toPx(o.a);
+          const b = mapping.toPx(o.b);
+          const color = colorOpenings
+            ? o.type === 'door'
+              ? c.amber
+              : c.sky
+            : c.inkFaint;
+          const choisie = o.id === selectedOpeningId;
+          /*
+            OÙ S'OUVRE LE VANTAIL : vers la pièce, jamais vers le mur.
+
+            Le pivot se met du côté du dormant le plus proche d'un angle
+            — c'est ainsi qu'on pose une porte, pour que le battant se
+            range contre le mur. Faute de mieux, le premier bout fait
+            l'affaire : ce qui compte, c'est le SENS d'ouverture.
+          */
+          const battant = (() => {
+            // La porte de garage ne bat pas (voir `porteDeGarage`), la
+            // façade de placard coulisse (voir `facadesDePlacard`).
+            if (o.type !== 'door' || o.garage || o.placard) return null;
+            const ancre = partOf.get(roomOf(o))?.labelAt;
+            if (!ancre) return null;
+            const dedans = mapping.toPx(ancre);
+            const mx = (a.x + b.x) / 2;
+            const my = (a.y + b.y) / 2;
+            const ex = b.x - a.x;
+            const ey = b.y - a.y;
+            const r = Math.hypot(ex, ey);
+            if (r < 6) return null;
+            // La normale écran tournée vers l'intérieur de la pièce.
+            let n = { x: -ey / r, y: ex / r };
+            if ((dedans.x - mx) * n.x + (dedans.y - my) * n.y < 0) {
+              n = { x: -n.x, y: -n.y };
+            }
+            // Une porte qui ouvre vers l'AUTRE pièce : le vantail
+            // bascule de l'autre côté du dormant. Fréquent sur un
+            // placard, un cellier, une porte palière.
+            if (o.versExterieur) n = { x: -n.x, y: -n.y };
+            /*
+              LE PIVOT N'EST PLUS LE PREMIER BOUT VENU.
+
+              Il l'était : celui que le scan avait livré en premier. Deux
+              portes voisines tombant du même côté, leurs quarts de
+              cercle se croisaient — le plan racontait un contact qui
+              n'existe pas. `pivotsDesBattants` les range dos à dos.
+            */
+            const vantail = (pivot: { x: number; y: number }, opp: { x: number; y: number }) => {
+              const rv = Math.hypot(opp.x - pivot.x, opp.y - pivot.y);
+              const bout = { x: pivot.x + n.x * rv, y: pivot.y + n.y * rv };
+              // Sens de l'arc : celui qui ramène le battant sur le dormant.
+              const croix = n.x * (opp.y - pivot.y) - n.y * (opp.x - pivot.x);
+              return { pivot, bout, autre: opp, r: rv, sens: croix > 0 ? 1 : 0 };
+            };
+            // La porte à deux vantaux : chacun de son tableau jusqu'au milieu.
+            if (o.vantaux === 2) return [vantail(a, { x: mx, y: my }), vantail(b, { x: mx, y: my })];
+            const cote = pivots.get(o.id) === 'b' ? b : a;
+            return [vantail(cote, cote === a ? b : a)];
+          })();
+          return (
+            <CacheEnVol key={o.id} baie={o.id}>
+              <G
+                testID={`baie-${o.id}`}
+                onPress={
+                  editable && onSelectOpening
+                    ? () => actes.current.toucher(actes.current.cibleDeLaBaie(o.id), () => onSelectOpening(choisie ? null : o.id))
+                    : undefined
+                }>
+                {/* Cible tactile : une menuiserie fait 3 px d'épaisseur. */}
+                <Line
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  stroke="transparent"
+                  strokeWidth={26}
+                />
+                {/* Les deux faces du tableau : le dormant, en traits fins, dans
+                    le bleu doux des fenêtres (voir `ui/encreElec`). */}
+                {o.type === 'window' &&
+                  [face(1), face(-1)].map((f, i) =>
+                    f ? (
+                      <Line
+                        key={`f${i}`}
+                        x1={f[0].x}
+                        y1={f[0].y}
+                        x2={f[1].x}
+                        y2={f[1].y}
+                        stroke={choisie ? c.blue : bleuFenetre(c)}
+                        strokeWidth={1.2}
+                      />
+                    ) : null,
+                  )}
+                {/* Le vitrage : deux traits serrés au cœur du mur. */}
+                {o.type === 'window' &&
+                  [0.015, -0.015].map((d, i) => {
+                    const v = vitre((baie?.coeur ?? 0) + d) ?? [a, b];
+                    return (
+                      <Line
+                        key={`v${i}`}
+                        x1={v[0].x}
+                        y1={v[0].y}
+                        x2={v[1].x}
+                        y2={v[1].y}
+                        stroke={choisie ? c.blue : bleuFenetre(c)}
+                        strokeWidth={choisie ? 2 : 1.1}
+                      />
+                    );
+                  })}
+                {/* Un passage sans porte : son linteau, en tireté. */}
+                {((o.type !== 'window' && o.type !== 'door') || o.garage) &&
+                  [face(1), face(-1)].map((f, i) =>
+                    f ? (
+                      <Line
+                        key={`p${i}`}
+                        x1={f[0].x}
+                        y1={f[0].y}
+                        x2={f[1].x}
+                        y2={f[1].y}
+                        stroke={c.inkFaint}
+                        strokeWidth={1}
+                        strokeDasharray="4,3"
+                      />
+                    ) : null,
+                  )}
+                {/* La porte de garage : son tablier fermé, dans la trouée. */}
+                {o.type === 'door' && o.garage && (
+                  <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={choisie ? c.blue : color} strokeWidth={1.4} />
+                )}
+                {/* La façade de placard : ses vantaux coulissants, deux traits décalés. */}
+                {o.type === 'door' && o.placard && (() => {
+                  const ex = b.x - a.x;
+                  const ey = b.y - a.y;
+                  const l = Math.hypot(ex, ey) || 1;
+                  const nx = (-ey / l) * 2.5;
+                  const ny = (ex / l) * 2.5;
+                  const mx = (a.x + b.x) / 2;
+                  const my = (a.y + b.y) / 2;
+                  const trait = choisie ? c.blue : color;
+                  return (
+                    <>
+                      <Line x1={a.x + nx} y1={a.y + ny} x2={mx + ex * 0.06 + nx} y2={my + ey * 0.06 + ny} stroke={trait} strokeWidth={1.3} />
+                      <Line x1={mx - ex * 0.06 - nx} y1={my - ey * 0.06 - ny} x2={b.x - nx} y2={b.y - ny} stroke={trait} strokeWidth={1.3} />
+                    </>
+                  );
+                })()}
+                {/* La baie choisie : soulignée, quel que soit son genre. */}
+                {choisie && o.type !== 'window' && (
+                  <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={c.blue} strokeWidth={4} strokeLinecap="butt" />
+                )}
+                {/*
+                  LE VANTAIL ET SON ARC.
+
+                  Une porte, sur un plan, ce n'est pas un trait dans un
+                  mur : c'est un battant et le quart de cercle qu'il
+                  balaie. C'est ce qui dit de quel côté elle s'ouvre — donc
+                  où l'on peut poser un interrupteur, et où rien ne doit
+                  traîner. Tous les plans du métier le dessinent ; le nôtre
+                  ne le faisait pas.
+                */}
+                {o.type === 'door' && battant && (
+                  <SuitLeVol
+                    render={(enVol) => {
+                      const bloquee = enVol && bloqueesEnVol ? bloqueesEnVol(enVol).has(o.id) : !!portesBloquees?.has(o.id);
+                      const arcs = battant.map(
+                        (f) => `M ${f.pivot.x} ${f.pivot.y} L ${f.bout.x} ${f.bout.y} A ${f.r} ${f.r} 0 0 ${f.sens} ${f.autre.x} ${f.autre.y}`,
+                      );
+                      const arc = arcs.join(' ');
+                      return (
+                        <>
+                          {/* Un meuble dans le battant : la surface balayée
+                              se teinte, la porte ne s'ouvre plus en grand. */}
+                          {bloquee && (
+                            <Path d={arcs.map((x) => `${x} Z`).join(' ')} fill={c.danger} fillOpacity={0.12} stroke="none" pointerEvents="none" />
+                          )}
+                          <Path
+                            d={arc}
+                            fill="none"
+                            stroke={choisie ? c.blue : bloquee ? c.danger : color}
+                            strokeWidth={bloquee ? 1.8 : 1.2}
+                            strokeLinecap="round"
+                            opacity={0.9}
+                          />
+                        </>
+                      );
+                    }}
+                  />
+                )}
+              </G>
+            </CacheEnVol>
+          );
+        })}
+      </>
+    );
+  }, [
+    openings, baieDuPoche, mapping, colorOpenings, c, selectedOpeningId, partOf, pivots,
+    portesBloquees, bloqueesEnVol, editable, onSelectOpening,
+  ]);
+
+  const coucheElectrique = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {/*
+          LE DÉTECTEUR D'OUVERTURE : « DO » en bleu, dans la baie, côté
+          pièce — comme le plan d'architecte l'écrit.
+        */}
+        {showFixtures &&
+          openings
+            .filter((o) => o.detecteur)
+            .map((o) => {
+              const g = mapping.toPx(placeDuDetecteur(o, partOf.get(roomOf(o))?.labelAt));
+              const t = Math.max(6, Math.min(10, mapping.scale * 0.1));
+              return (
+                <G key={`do-${o.id}`} pointerEvents="none">
+                  <Rect
+                    x={g.x - t * 1.2}
+                    y={g.y - t * 0.65}
+                    width={t * 2.4}
+                    height={t * 1.3}
+                    rx={t * 0.3}
+                    fill={c.surface}
+                    stroke={C_LED}
+                    strokeWidth={0.9}
+                  />
+                  <SvgText x={g.x} y={g.y + t * 0.36} fontSize={t} fontWeight="800" fill={C_LED} textAnchor="middle">
+                    DO
+                  </SvgText>
+                </G>
+              );
+            })}
+
+        {/*
+          LES GAINES : un filet tireté qui longe les murs, du tableau à
+          chaque appareil. Son tracé est celui du métré porté au devis,
+          pas une illustration.
+
+          ELLES PASSENT SOUS LE PLAFOND, ET PLUS SEULEMENT SOUS LES
+          APPAREILS — relevé du patron : « les chiffres sont cachés par
+          le passage de la gaine, les pointillés gênent la lecture de la
+          cote entre spots ».
+
+          Elles étaient dessinées ENTRE le calque du plafond et celui des
+          appareils : les tiretés se peignaient donc par-dessus les cotes
+          de spots, qu'aucune plaque opaque ne pouvait protéger — une
+          plaque ne protège rien de ce qui vient après elle. Elles
+          remontent d'un cran. La règle ne change pas, elle s'applique
+          simplement à un calque de plus : un CHEMINEMENT passe sous ce
+          qui l'annote.
+        */}
+        {cableRoutes?.map((r) => (
+          <Polyline
+            key={`gaine-${r.id}`}
+            points={r.path
+              .map((p) => {
+                const q = mapping.toPx(p);
+                return `${q.x},${q.y}`;
+              })
+              .join(' ')}
+            fill="none"
+            // La teinte du circuit, celle-là même que porte le schéma du
+            // PDF : on suit un tracé à l'œil avant de lire son repère.
+            stroke={
+              circuitMarks?.get(r.id)
+                ? markColor(circuitMarks.get(r.id)!)
+                : c.blue
+            }
+            strokeWidth={1.6}
+            strokeDasharray="7 4"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            opacity={0.75}
+          />
+        ))}
+        <CeilingLayer
+          ecartsGardes={cotesArbitrees.ecarts}
+          ceiling={ceiling}
+          showCeiling={showCeiling}
+          selectedCeilingId={selectedCeilingId}
+          selectedCeilingRow={selectedCeilingRow}
+          /* Le bouton « Cotes » vaut aussi pour le plafond : les écarts
+             d'une ligne de spots s'y lisent comme ceux d'un mur. */
+          showMeasures={showMeasures}
+          onSelectCeiling={
+            onSelectCeiling ? choisirAuPlafond : undefined
+          }
+          fixtures={showFixtures ? fixtures : VIDE}
+          walls={walls}
+          quads={quads}
+          partOf={partOf}
+          mapping={mapping}
+          frame={frame}
+          encre={encre}
+          c={c}
+        />
+
+        <FixtureLayer
+          fixtures={showFixtures ? fixtures : VIDE}
+          circuitMarks={circuitMarks}
+          walls={walls}
+          quads={quads}
+          mapping={mapping}
+          viewRot={view.rot}
+          elecLod={elecLod}
+          navigating={false}
+          onSelectFixture={
+            onSelectFixture ? choisirLAppareil : undefined
+          }
+          encre={encre}
+          dehors={dehorsDesMurs}
+          c={c}
+        />
+      </>
+    );
+  }, [
+    showFixtures, openings, partOf, mapping, c, cableRoutes, circuitMarks, cotesArbitrees.ecarts,
+    ceiling, showCeiling, selectedCeilingId, selectedCeilingRow, showMeasures, onSelectCeiling,
+    choisirAuPlafond, fixtures, walls, quads, frame, encre, view.rot, elecLod, onSelectFixture,
+    choisirLAppareil, dehorsDesMurs,
+  ]);
+
+  const coucheDesCartouches = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {/* Cartouche par pièce : nom encadré et surface au sol.
+            Chacun esquive les meubles de sa pièce pour rester lisible.
+            Il s'efface pendant qu'on règle un appareil de plafond : le
+            cartouche tombe au CENTRE de la pièce, c'est-à-dire là où se
+            pose un point lumineux. */}
+        {(selectedCeilingId ? [] : parts).map((part) => {
+          /*
+            LE CARTOUCHE NE SE CALCULE PLUS ICI — il se DESSINE.
+
+            Sa géométrie (les textes retenus, leur taille, la place
+            trouvée) vit dans le mémo `cartouches`, et pour une raison de
+            fond : il doit être posé AVANT les cotes, qui se rangent
+            ensuite autour de lui. Le calculer au rendu, c'était le
+            calculer après elles — et dans une pièce serrée, le dernier
+            arrivé n'avait plus de place et se posait dessus.
+
+            Une SEULE source pour la boîte qu'on réserve et celle qu'on
+            dessine : deux calculs de la même boîte finissent par
+            diverger, et l'arbitre protège alors une place que le dessin
+            n'occupe pas.
+
+            Ce qui reste ici est ce qui ne regarde que le dessin : les
+            couleurs, l'état de sélection, le geste de renommage.
+          */
+          const car = cartouches.get(part.roomId);
+          if (!car) return null;
+          const roomName = roomById.get(part.roomId)?.name ?? '';
+          const { pos, wpx, hpx, gene } = car;
+          const k = echelleDesNoms(view.zoom);
+          const PAD = 4 * k;
+          const LH = 12.5 * k;
+          const TAILLES = {
+            nom: 10.5 * k,
+            aire: (roomName !== '' ? 9.5 : 10.5) * k,
+            hors: 8.5 * k,
+            invite: 10.5 * k,
+          } as const;
+          const retenues = car.textes.map((t) => ({
+            t: t.t,
+            size: TAILLES[t.role],
+            fill:
+              t.role === 'nom'
+                ? selectedRoomId === part.roomId && editable
+                  ? c.blue
+                  : c.ink
+                : t.role === 'aire'
+                  ? roomName !== ''
+                    ? c.inkSoft
+                    : c.ink
+                  : c.inkFaint,
+            bold: t.role === 'nom' || t.role === 'invite' || roomName === '',
+          }));
+          const p = mapping.toPx(pos);
+          const selected = editable && part.roomId === selectedRoomId;
+          return (
+            <CacheEnVol key={`label-${part.roomId}`} piece={part.roomId}>
+              <G
+                // Posé faute de mieux SUR un meuble : il se dessine, il ne
+                // prend plus le doigt. Voir `gene` ci-dessus.
+                pointerEvents={gene ? 'none' : 'auto'}
+                // En édition, le cartouche EST le bouton de renommage :
+                // on touche le nom là où il s'affiche.
+                onPress={
+                  !gene
+                    ? () => {
+                        if (editable) {
+                          // Toucher le sol, c'est quitter le meuble.
+                          onSelectObject?.(null);
+                          onSelectRoom?.(part.roomId);
+                        }
+                        /*
+                          HORS ÉDITION AUSSI : toucher le nom d'une pièce
+                          ouvre ce qu'on peut en faire — sa fiche d'abord
+                          (correctif de l'audit : elle n'était accessible
+                          qu'en mode édition).
+                        */
+                        onEditRoomName?.(part.roomId);
+                      }
+                    : undefined
+                }>
+                {/*
+                  LE TRAIT DE RAPPEL d'un cartouche sorti de sa pièce trop
+                  petite : du bord de la boîte à un point dans la pièce.
+                */}
+                {car.rappel
+                  ? (() => {
+                      const r = mapping.toPx(car.rappel);
+                      const bx = Math.max(p.x - wpx / 2, Math.min(p.x + wpx / 2, r.x));
+                      const by = Math.max(p.y - hpx / 2, Math.min(p.y + hpx / 2, r.y));
+                      return (
+                        <G testID={`rappel-${part.roomId}`}>
+                          <Line x1={bx} y1={by} x2={r.x} y2={r.y} stroke={c.inkSoft} strokeWidth={0.8} />
+                          <Circle cx={r.x} cy={r.y} r={1.8} fill={c.inkSoft} />
+                        </G>
+                      );
+                    })()
+                  : null}
+                <Rect
+                  x={p.x - wpx / 2}
+                  y={p.y - hpx / 2}
+                  width={wpx}
+                  height={hpx}
+                  rx={5}
+                  fill={c.surface}
+                  /*
+                    LE FOND LAISSE VOIR — relevé du patron. Il a été
+                    opaque (les meubles le traversaient) ; maintenant que
+                    le cartouche ESQUIVE meubles et spots, la
+                    transparence ne coûte plus la lisibilité, et ce qui
+                    passe dessous reste deviné.
+                  */
+                  /* Et son fond laisse voir davantage : sept dixièmes,
+                     pas huit et demi. Ce qui passe dessous — un meuble,
+                     une gaine — se devine sans qu'on ait à le déplacer. */
+                  fillOpacity={gene ? 0.92 : planElec ? 0 : 0.7}
+                  /*
+                    SUR LE PLAN ÉLECTRIQUE, LE NOM EST UN TEXTE NU — comme
+                    sur le plan de l'architecte. L'encadré, même à demi
+                    transparent, grisait la cloison qu'il chevauchait et
+                    pâlissait l'interrupteur posé dessous. Il garde le
+                    toucher (fond transparent) et le bleu de la sélection.
+                  */
+                  stroke={selected ? c.blue : planElec ? 'none' : c.lineStrong}
+                  strokeWidth={selected ? 2 : 1}
+                />
+                {/* Le point ambre de conformité a vécu ici — relevé du
+                    patron : rien sur le nom de la pièce. Les constats se
+                    lisent dans le dossier, où ils se chiffrent. */}
+                {retenues.map((l, li) => (
+                  <SvgText
+                    key={li}
+                    x={p.x}
+                    y={p.y - hpx / 2 + PAD + li * LH + LH / 2 + l.size * 0.35}
+                    fill={l.fill}
+                    fontSize={l.size}
+                    fontWeight={l.bold ? '700' : '600'}
+                    textAnchor="middle">
+                    {l.t}
+                  </SvgText>
+                ))}
+                {/*
+                  PLUS D'ANNEAU À CÔTÉ DU NOM — relevé du patron : « enlève
+                  les points verts qui sélectionnent la pièce, le nom
+                  cliqué suffit ». L'anneau de progression (socles posés
+                  sur exigés, vert une fois la pièce conforme) se lisait
+                  comme un bouton collé au nom. Le nom, lui, reste le
+                  geste : on le touche, la pièce est prise.
+                */}
+              </G>
+            </CacheEnVol>
+          );
+        })}
+      </>
+    );
+  }, [
+    selectedCeilingId, parts, cartouches, roomById, view.zoom, selectedRoomId, editable, mapping,
+    c, planElec, onSelectObject, onSelectRoom, onEditRoomName,
+  ]);
+
+  const coucheDesNotes = useMemo(() => {
+    if (!mapping) return null;
+    return (
+      <>
+        {!!notes?.length && (
+          <NotesLayer
+            notes={notes}
+            mapping={mapping}
+            niveau={niveauCourant}
+            selectedId={selectedNoteId ?? null}
+            onSelect={onSelectNote}
+            c={c}
+          />
+        )}
+      </>
+    );
+  }, [notes, mapping, niveauCourant, selectedNoteId, onSelectNote, c]);
 
   return (
     <View
@@ -3254,91 +4432,9 @@ export function FloorplanEditor({
             */}
             {grille}
 
-            {/* Surface au sol : aplat + semis de points, pour la distinguer
-                d'un coup d'œil des murs pochés en noir. */}
-            {showSurfaces && dots && (
-              <G>
-                <Defs>
-                  <Pattern
-                    id="floorDots"
-                    x={dots.x}
-                    y={dots.y}
-                    width={dots.size}
-                    height={dots.size}
-                    patternUnits="userSpaceOnUse">
-                    <Circle cx={1.1} cy={1.1} r={0.9} fill={c.inkFaint} opacity={0.55} />
-                  </Pattern>
-                </Defs>
-                {parts.map((part) => {
-                  if (!part.surface) return null;
-                  const poly = part.surface.pts
-                    .map((p) => {
-                      const q = mapping.toPx(p);
-                      return `${q.x},${q.y}`;
-                    })
-                    .join(' ');
-                  return (
-                    <G
-                      key={part.roomId}
-                      onPress={
-                        editable && onSelectRoom
-                          ? () => {
-                              /*
-                                TOUCHER LE SOL QUAND UN MEUBLE EST TENU,
-                                C'EST LE LÂCHER — pas choisir la pièce.
-                                Relevé du patron : la surface captait
-                                l'appui et ouvrait le bandeau de la pièce
-                                par-dessus le meuble encore tenu. Un
-                                geste, un effet : le premier appui lâche,
-                                le suivant prend la pièce.
-                              */
-                              if (selectedObjectId) {
-                                onSelectObject?.(null);
-                                return;
-                              }
-                              /*
-                                ET TOUCHER LE SOL QUAND UN MUR EST CHOISI,
-                                C'EST LE LÂCHER — relevé du patron :
-                                « lorsqu'un mur est sélectionné, le clic
-                                n'importe où sur la surface doit quitter la
-                                sélection ».
-
-                                La règle existait déjà pour le meuble ; le
-                                mur, lui, restait pris, et l'appui ouvrait
-                                le bandeau de la pièce PAR-DESSUS son menu.
-                                Un geste, un effet : le premier appui
-                                lâche, le suivant prend la pièce.
-                              */
-                              if (selectedWallId) {
-                                onSelectWall(null);
-                                return;
-                              }
-                              onSelectRoom(
-                                part.roomId === selectedRoomId ? null : part.roomId,
-                              );
-                            }
-                          : undefined
-                      }>
-                      <Polygon
-                        points={poly}
-                        fill={fillOf(part.roomId)}
-                        stroke="none"
-                      />
-                      {/*
-                        LE SEMIS N'EST QU'UN OUTIL D'ÉDITION — revue de Léa,
-                        Sophie et Chloé : la grille de points sur les sols
-                        « fait brouillon / debug ». Elle sert à s'aligner en
-                        posant ; en lecture, à l'aperçu du dossier, le sol
-                        est un aplat net, comme sur le PDF. Et même en
-                        édition elle se fait plus discrète.
-                      */}
-                      {editable ? <Polygon points={poly} fill="url(#floorDots)" stroke="none" /> : null}
-                      {!planElec && mapping && decorDesMurs(part, poly, mapping.scale)}
-                    </G>
-                  );
-                })}
-              </G>
-            )}
+            {coucheDesSols}
+            {/* La pièce qu'on glisse : son sol suit le doigt (voir `SolEnVol`). */}
+            <SolEnVol mapping={mapping} parts={parts} />
 
             {/*
               LE HALO DES MURS — la tolérance, et rien qu'elle.
@@ -3349,19 +4445,7 @@ export function FloorplanEditor({
               peint après et que sa tolérance déborde de trois points.
               Ce qu'on touche prime sur ce qui est à côté.
             */}
-            {walls.map((w) => (
-              <WallBody
-                key={`halo-${w.id}`}
-                wall={w}
-                quad={quads.get(w.id)}
-                mapping={mapping}
-                couche="halo"
-                neuve={!!roomById.get(roomOf(w) ?? '')?.neuve}
-                showMeasure={false}
-                selected={false}
-                onPress={editable ? () => appuiSurLeMur(w.id) : undefined}
-              />
-            ))}
+            {coucheDesHalos}
 
             {/*
               Objets (empreintes au sol). LES TAPIS D'ABORD — revue
@@ -3369,19 +4453,7 @@ export function FloorplanEditor({
               après la table la recouvrait, sur l'image même qu'on envoie au
               client. Un tapis est sous les meubles ; il se dessine dessous.
             */}
-            {[...objects]
-              .sort((a, b) => (a.category === 'tapis' ? 0 : 1) - (b.category === 'tapis' ? 0 : 1))
-              .map((meuble) => {
-              /*
-                LE MEUBLE TENU SE DESSINE EN VOL — voir `SuitLeDoigt`. À sa
-                place dans l'ordre du dessin : il ne passe ni devant ni
-                derrière les autres parce qu'on le glisse.
-              */
-              if (meuble.id === selectedObjectId) {
-                return <SuitLeDoigt key={meuble.id} objet={meuble} render={dessinerMeuble} />;
-              }
-              return dessinerMeuble(meuble);
-            })}
+            {coucheDesMeubles}
 
             {/*
               CE QU'ON VOIT SOUS LE DOIGT PASSE AVANT CE QUI EST À CÔTÉ.
@@ -3422,35 +4494,7 @@ export function FloorplanEditor({
               en passant d'une pièce à l'autre sortait un menu. Les cibles
               ne se posent donc plus du tout : l'appui passe au plan.
             */}
-            {onSelectObject &&
-              editable &&
-              objects
-                .map((o) => ({ o, f: footprintOf(o, partOf, facesPlan) }))
-                .sort((a, b) => b.f.width * b.f.depth - a.f.width * a.f.depth)
-                .map(({ o, f }) => {
-                  const ctr = mapping.toPx({ x: f.cx, z: f.cz });
-                  const w = f.width * mapping.scale;
-                  const d = f.depth * mapping.scale;
-                  return (
-                    <Rect
-                      key={`prise-${f.id}`}
-                      accessibilityLabel={`Meuble ${frCategory(f.category)}`}
-                      x={-w / 2}
-                      y={-d / 2}
-                      width={w}
-                      height={d}
-                      fill="transparent"
-                      transform={`translate(${ctr.x}, ${ctr.y}) rotate(${
-                        ((f.yaw + view.rot) * 180) / Math.PI
-                      })`}
-                      onPress={() =>
-                        toucher(cibleDuMeuble(o.id), () =>
-                          onSelectObject(o.id === selectedObjectId ? null : o.id),
-                        )
-                      }
-                    />
-                  );
-                })}
+            {coucheDesPrises}
 
             {/* Voile d'estompage : quand un mur est sélectionné, tout le
                 reste passe en retrait pour qu'on ne lise plus que lui. */}
@@ -3479,26 +4523,7 @@ export function FloorplanEditor({
               Ils passent SOUS les murs : leur poché rejoint celui de la
               maçonnerie sans jamais mordre sur ses arêtes.
             */}
-            {massifs.map((contour, i) => (
-              <Polygon
-                key={`massif-${i}`}
-                points={contour
-                  .map((p) => mapping.toPx(p))
-                  .map((p) => `${p.x},${p.y}`)
-                  .join(' ')}
-                fill={c.ink}
-                // Un placard fermé sans porte se poche aussi : un appui le déclare.
-                onPress={
-                  editable && onRecoin
-                    ? () =>
-                        onRecoin({
-                          x: contour.reduce((t, p) => t + p.x, 0) / contour.length,
-                          z: contour.reduce((t, p) => t + p.z, 0) / contour.length,
-                        })
-                    : undefined
-                }
-              />
-            ))}
+            {coucheDesMassifs}
 
             {/*
               LE NIVEAU DU DESSOUS, EN TRANSPARENCE.
@@ -3509,23 +4534,7 @@ export function FloorplanEditor({
               d'axe suffit ; le poché du bas donnerait deux plans mêlés au
               lieu d'un plan et de son ombre.
             */}
-            {(filigrane ?? []).map((w) => {
-              const a = mapping.toPx(w.a);
-              const b = mapping.toPx(w.b);
-              return (
-                <Line
-                  key={`sous-${w.id}`}
-                  x1={a.x}
-                  y1={a.y}
-                  x2={b.x}
-                  y2={b.y}
-                  stroke={c.ink}
-                  strokeOpacity={0.16}
-                  strokeWidth={5}
-                  strokeLinecap="round"
-                />
-              );
-            })}
+            {coucheDuFiligrane}
 
             {/*
               LES POSES D'UN MUR NEUF — en bleu, à faible opacité.
@@ -3568,113 +4577,17 @@ export function FloorplanEditor({
               );
             })}
 
-            {/* La maçonnerie, d'un seul tenant : voir `pocheDesMurs`. */}
-            <Path
-              testID="poche-des-murs"
-              d={cheminDuPoche(poche.contours, mapping.toPx)}
-              fill={c.ink}
-              fillRule="evenodd"
-            />
-            {corpsDeNature ? (
-              <G testID="nature-des-murs" pointerEvents="none">
-                <Defs>
-                  <ClipPath id="clip-poche-nature">
-                    <Path d={cheminDuPoche(poche.contours, mapping.toPx)} clipRule="evenodd" />
-                  </ClipPath>
-                </Defs>
-                <G clipPath="url(#clip-poche-nature)">
-                  {corpsDeNature.coeurs.map((j, i) => (
-                    <Polygon
-                      key={`coeur-${i}`}
-                      points={j.poly.map((p) => mapping.toPx(p)).map((p) => `${p.x},${p.y}`).join(' ')}
-                      fill={renduNature(j.nature, c.ink, c.surface).fond}
-                    />
-                  ))}
-                  {corpsDeNature.corps.map((m) => {
-                    const r = renduNature(m.nature, c.ink, c.surface);
-                    // Le trait est coupé de moitié par le poché : on le
-                    // double pour garder le filet fin du plan d'architecte.
-                    const trait = Math.min(2.4, Math.max(1.2, mapping.scale * 0.02));
-                    return (
-                      <G key={`nature-${m.id}`}>
-                        <Polygon
-                          testID={`nature-${m.nature}`}
-                          points={m.contour.map((p) => mapping.toPx(p)).map((p) => `${p.x},${p.y}`).join(' ')}
-                          fill={r.fond}
-                        />
-                        {m.filets.map((f, k) => (
-                          <Polyline
-                            key={k}
-                            points={f.map((p) => mapping.toPx(p)).map((p) => `${p.x},${p.y}`).join(' ')}
-                            fill="none"
-                            stroke={r.contour}
-                            strokeWidth={trait}
-                            strokeDasharray={r.tirets ? [5, 3] : undefined}
-                          />
-                        ))}
-                        {m.boucles ? (
-                          <Polyline
-                            points={m.boucles.map((p) => mapping.toPx(p)).map((p) => `${p.x},${p.y}`).join(' ')}
-                            fill="none"
-                            stroke={r.contour}
-                            strokeWidth={Math.max(0.6, trait * 0.45)}
-                          />
-                        ) : null}
-                      </G>
-                    );
-                  })}
-                  {/* La maçonnerie reprend la main aux butées : voir `dessinDesNatures`. */}
-                  {corpsDeNature.maconnerie.map((poly, i) => (
-                    <Polygon
-                      key={`macon-${i}`}
-                      points={poly.map((p) => mapping.toPx(p)).map((p) => `${p.x},${p.y}`).join(' ')}
-                      fill={c.ink}
-                    />
-                  ))}
-                </G>
-              </G>
-            ) : null}
+            {coucheDuPoche}
 
             {/* Murs : leur corps ne se dessine plus (le poché le fait) ; il
                 garde le toucher, la cote, et le bleu de la sélection. Leur
                 tolérance de toucher, elle, est passée plus bas, sous les
                 meubles. */}
-            {walls.map((w) => (
-              <WallBody
-                key={w.id}
-                wall={w}
-                quad={quads.get(w.id)}
-                mapping={mapping}
-                sansCorps
-                exterieur={dehorsDesMurs.get(w.id)}
-                /* Une piece qu'on vient de poser et qu'on n'a pas encore
-                   lachee : son trait reste ouvert. Voir `WallBody`. */
-                neuve={!!roomById.get(roomOf(w) ?? '')?.neuve}
-                showMeasure={
-                  placementCotes.murs.has(w.id) &&
-                  cotesArbitrees.gardees.has(`w:${w.id}`)
-                }
-                measureAt={cotesArbitrees.poses.get(`w:${w.id}`)}
-                measureOpacity={1 - detail}
-                longueur={longueurCotee(walls, w, parts)}
-                selected={editable && w.id === selectedWallId}
-                onPress={editable ? () => appuiSurLeMur(w.id) : undefined}
-              />
-            ))}
+            {coucheDesMurs}
+            {/* Les murs nés pendant un geste (voir `MursNesEnVol`). */}
+            <MursNesEnVol mapping={mapping} roomById={roomById} />
 
-            {reperesBaies.map((r) => {
-              const decale = WALL_T / 2 + 12 / mapping.scale;
-              const p = mapping.toPx({ x: r.m.x + r.n.x * decale, z: r.m.z + r.n.z * decale });
-              const larg = 8 + r.texte.length * 6.4;
-              return (
-                <G key={`repere-${r.id}`} pointerEvents="none" testID={`repere-${r.texte}`}>
-                  <Rect x={p.x - larg / 2} y={p.y - 7.5} width={larg} height={15} rx={4} fill={c.surface} stroke={c.blue} strokeWidth={1} />
-                  <SvgText x={p.x} y={p.y + 3.6} fontSize={10} fontWeight="700" fill={c.blue} textAnchor="middle">
-                    {r.texte}
-                  </SvgText>
-                </G>
-              );
-            })}
+            {coucheDesReperes}
 
             {/* Les retours d'un mur percé, chacun touchable pour lui-même.
                 Une zone invisible par tronçon : c'est le dessin qui répond
@@ -3709,48 +4622,7 @@ export function FloorplanEditor({
                 );
               })}
 
-            {editable &&
-              walls.map((w) =>
-                (retours.get(w.id) ?? []).map((run, ri) => {
-                  const pts = runQuad(w, run)
-                    .map((p) => mapping.toPx(p))
-                    .map((p) => `${p.x},${p.y}`)
-                    .join(' ');
-                  return (
-                    <Polygon
-                      key={`pier-hit-${w.id}-${ri}`}
-                      points={pts}
-                      fill="transparent"
-                      stroke="transparent"
-                      // 18 px de halo débordaient de NEUF pixels dans la
-                      // pièce : un meuble plaqué contre le mur tombait
-                      // dedans, et c'est le mur qui se sélectionnait. Le
-                      // retour se vise sur sa maçonnerie, pas au large.
-                      strokeWidth={6}
-                      onPress={() => {
-                        onSelectWall(null);
-                        onSelectOpening?.(null);
-                        onSelectObject?.(null);
-                        setPier({ wallId: w.id, i: ri });
-                      }}
-                      /*
-                        NEUF CENTS MILLISECONDES, C'EST TROP LONG.
-
-                        Le doigt bouge toujours un peu sur un écran, et le
-                        moindre glissement annule l'appui : à ce régime, on
-                        réussit une fois sur trois. Un tiers de seconde suffit
-                        à distinguer un appui d'un tap, et c'est ce que font
-                        les applications de plan.
-                      */
-                      delayLongPress={320}
-                      onLongPress={() => {
-                        setPier(null);
-                        onSelectWall(w.id);
-                      }}
-                    />
-                  );
-                }),
-              )}
+            {coucheDesRetours}
 
             {/* Le retour choisi : lui seul se colore, pour qu'on voie bien
                 que la sélection s'arrête au bout de la maçonnerie. */}
@@ -3799,8 +4671,9 @@ export function FloorplanEditor({
               (() => {
                 const w = walls.find((x) => x.id === selectedWallId);
                 if (!w) return null;
+                // Il suit le doigt quand on tire son coin ou qu'on le tourne.
                 return (
-                  <WallBody
+                  <SuitLeMur
                     wall={w}
                     quad={quads.get(w.id)}
                     mapping={mapping}
@@ -3818,47 +4691,7 @@ export function FloorplanEditor({
                 toucher l'ouvre. */}
             {/* Les photos prises et redressées par le scan n'ont pas de
                 punaise : chaque mur en a une, elles ne désignent rien. */}
-            {photos?.filter((ph) => !ph.auto).map((ph) => {
-              const w = wallById.get(ph.wallId);
-              if (!w) return null;
-              const face = wallFace(w, quads.get(w.id), interiorSide(w, walls));
-              const p = facePoint(face, faceX(face, ph.along), 0.14);
-              const q = mapping.toPx(p);
-              return (
-                /*
-                  LE REPÈRE D'UNE PHOTO — l'appareil du jeu commun.
-
-                  Relevé du patron, lien à l'appui :
-                  `svgrepo.com/svg/525723/camera`, « utilise cette icône là
-                  où il y a la photo en icône pour la photo de mur ». C'est
-                  `solar:camera-bold`, celle que porte déjà la sortie
-                  « Image » : le même objet, le même dessin.
-
-                  Il était dessiné à la main — un rectangle et un rond au
-                  trait — et c'était le seul pictogramme de l'app à ne pas
-                  venir du jeu : posé à côté des silhouettes pleines, il se
-                  lisait comme un cadre vide.
-
-                  La pastille claire dessous reste : la silhouette est
-                  pleine, et sur un mur poché en noir elle disparaîtrait.
-                */
-                <G key={`photo-${ph.id}`} onPress={() => onSelectPhoto?.(ph.id)}>
-                  <Circle cx={q.x} cy={q.y} r={12} fill="transparent" />
-                  <Circle
-                    cx={q.x}
-                    cy={q.y}
-                    r={10}
-                    fill={c.surface}
-                    stroke={c.line}
-                    strokeWidth={1}
-                  />
-                  <G
-                    transform={`translate(${q.x - 6.5} ${q.y - 6.5}) scale(${13 / 24})`}>
-                    <Path d={SOLAIRES.image} fill={c.ink} fillRule="evenodd" />
-                  </G>
-                </G>
-              );
-            })}
+            {coucheDesPhotos}
 
             {/*
               LES POINTS CARDINAUX, tout autour du plan.
@@ -3980,389 +4813,14 @@ export function FloorplanEditor({
 
             {/* Cotes de détail : retour de mur, baie, retour de mur. Elles
                 n'apparaissent qu'une fois le plan assez zoomé pour les lire. */}
-            {showMeasures && detail > 0.02 &&
-              walls.map((w) =>
-                wallRuns(w, openings).map((run, ri) => {
-                  const A = mapping.toPx(w.a);
-                  const B = mapping.toPx(w.b);
-                  const dx = B.x - A.x;
-                  const dy = B.y - A.y;
-                  let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
-                  if (angle > 90) angle -= 180;
-                  if (angle < -90) angle += 180;
-                  // Où elle s'écrit — et si elle s'écrit : le placement a
-                  // déjà tranché, valeur par valeur.
-                  const cle = `${w.id}#${ri}`;
-                  const pose = cotesArbitrees.poses.get(`r:${cle}`);
-                  if (!pose) return null;
-                  const px = pose.x;
-                  const py = pose.y;
-                  const texte = run.length.toFixed(2).replace('.', ',');
-                  const p = plaqueDeCote(texte, 9.5);
-                  return (
-                    <G key={`run-${w.id}-${ri}`} opacity={detail}>
-                      {pose.attache ? (
-                        <Line
-                          testID="attache-cote"
-                          x1={pose.attache.x}
-                          y1={pose.attache.y}
-                          x2={px}
-                          y2={py}
-                          stroke={c.inkFaint}
-                          strokeWidth={0.8}
-                        />
-                      ) : null}
-                      <Rect
-                        x={px - p.w / 2}
-                        y={py - p.h / 2}
-                        width={p.w}
-                        height={p.h}
-                        rx={3}
-                        fill={c.surface}
-                        opacity={0.92}
-                        transform={`rotate(${angle}, ${px}, ${py})`}
-                      />
-                      <SvgText
-                        x={px}
-                        y={py + 3.4}
-                        fill={run.kind === 'mur' ? c.inkSoft : c.blue}
-                        fontSize={9.5}
-                        fontWeight="700"
-                        textAnchor="middle"
-                        transform={`rotate(${angle}, ${px}, ${py})`}>
-                        {texte}
-                      </SvgText>
-                    </G>
-                  );
-                }),
-              )}
+            {coucheDesCotes}
 
             {/* Portes / fenêtres : trouée dans le mur, puis trait de repérage */}
-            {openings.map((o) => {
-              /*
-                LA BAIE EST UN VIDE DANS LE POCHÉ — plus un aplat posé sur le
-                noir pour l'effacer (voir `pocheDesMurs`). La menuiserie se
-                dessine DANS l'épaisseur réelle du mur, façade comprise : ses
-                deux faces, en traits fins, comme sur un plan d'architecte.
-              */
-              const baie = baieDuPoche.get(o.id);
-              const face = (cote: 1 | -1) =>
-                baie
-                  ? [baie.a, baie.b].map((p) =>
-                      mapping.toPx({
-                        x: p.x + baie.n.x * cote * (cote > 0 ? baie.plus : baie.moins),
-                        z: p.z + baie.n.z * cote * (cote > 0 ? baie.plus : baie.moins),
-                      }),
-                    )
-                  : null;
-              const vitre = (decalage: number) =>
-                baie
-                  ? [baie.a, baie.b].map((p) =>
-                      mapping.toPx({ x: p.x + baie.n.x * decalage, z: p.z + baie.n.z * decalage }),
-                    )
-                  : null;
-              const a = mapping.toPx(o.a);
-              const b = mapping.toPx(o.b);
-              const color = colorOpenings
-                ? o.type === 'door'
-                  ? c.amber
-                  : c.sky
-                : c.inkFaint;
-              const choisie = o.id === selectedOpeningId;
-              /*
-                OÙ S'OUVRE LE VANTAIL : vers la pièce, jamais vers le mur.
+            {coucheDesBaies}
+            {/* Les menuiseries qui suivent un mur en vol (voir `BaiesEnVol`). */}
+            <BaiesEnVol mapping={mapping} />
 
-                Le pivot se met du côté du dormant le plus proche d'un angle
-                — c'est ainsi qu'on pose une porte, pour que le battant se
-                range contre le mur. Faute de mieux, le premier bout fait
-                l'affaire : ce qui compte, c'est le SENS d'ouverture.
-              */
-              const battant = (() => {
-                // La porte de garage ne bat pas (voir `porteDeGarage`), la
-                // façade de placard coulisse (voir `facadesDePlacard`).
-                if (o.type !== 'door' || o.garage || o.placard) return null;
-                const ancre = partOf.get(roomOf(o))?.labelAt;
-                if (!ancre) return null;
-                const dedans = mapping.toPx(ancre);
-                const mx = (a.x + b.x) / 2;
-                const my = (a.y + b.y) / 2;
-                const ex = b.x - a.x;
-                const ey = b.y - a.y;
-                const r = Math.hypot(ex, ey);
-                if (r < 6) return null;
-                // La normale écran tournée vers l'intérieur de la pièce.
-                let n = { x: -ey / r, y: ex / r };
-                if ((dedans.x - mx) * n.x + (dedans.y - my) * n.y < 0) {
-                  n = { x: -n.x, y: -n.y };
-                }
-                // Une porte qui ouvre vers l'AUTRE pièce : le vantail
-                // bascule de l'autre côté du dormant. Fréquent sur un
-                // placard, un cellier, une porte palière.
-                if (o.versExterieur) n = { x: -n.x, y: -n.y };
-                /*
-                  LE PIVOT N'EST PLUS LE PREMIER BOUT VENU.
-
-                  Il l'était : celui que le scan avait livré en premier. Deux
-                  portes voisines tombant du même côté, leurs quarts de
-                  cercle se croisaient — le plan racontait un contact qui
-                  n'existe pas. `pivotsDesBattants` les range dos à dos.
-                */
-                const vantail = (pivot: { x: number; y: number }, opp: { x: number; y: number }) => {
-                  const rv = Math.hypot(opp.x - pivot.x, opp.y - pivot.y);
-                  const bout = { x: pivot.x + n.x * rv, y: pivot.y + n.y * rv };
-                  // Sens de l'arc : celui qui ramène le battant sur le dormant.
-                  const croix = n.x * (opp.y - pivot.y) - n.y * (opp.x - pivot.x);
-                  return { pivot, bout, autre: opp, r: rv, sens: croix > 0 ? 1 : 0 };
-                };
-                // La porte à deux vantaux : chacun de son tableau jusqu'au milieu.
-                if (o.vantaux === 2) return [vantail(a, { x: mx, y: my }), vantail(b, { x: mx, y: my })];
-                const cote = pivots.get(o.id) === 'b' ? b : a;
-                return [vantail(cote, cote === a ? b : a)];
-              })();
-              return (
-                <G
-                  key={o.id}
-                  testID={`baie-${o.id}`}
-                  onPress={
-                    editable && onSelectOpening
-                      ? () => toucher(cibleDeLaBaie(o.id), () => onSelectOpening(choisie ? null : o.id))
-                      : undefined
-                  }>
-                  {/* Cible tactile : une menuiserie fait 3 px d'épaisseur. */}
-                  <Line
-                    x1={a.x}
-                    y1={a.y}
-                    x2={b.x}
-                    y2={b.y}
-                    stroke="transparent"
-                    strokeWidth={26}
-                  />
-                  {/* Les deux faces du tableau : le dormant, en traits fins, dans
-                      le bleu doux des fenêtres (voir `ui/encreElec`). */}
-                  {o.type === 'window' &&
-                    [face(1), face(-1)].map((f, i) =>
-                      f ? (
-                        <Line
-                          key={`f${i}`}
-                          x1={f[0].x}
-                          y1={f[0].y}
-                          x2={f[1].x}
-                          y2={f[1].y}
-                          stroke={choisie ? c.blue : bleuFenetre(c)}
-                          strokeWidth={1.2}
-                        />
-                      ) : null,
-                    )}
-                  {/* Le vitrage : deux traits serrés au cœur du mur. */}
-                  {o.type === 'window' &&
-                    [0.015, -0.015].map((d, i) => {
-                      const v = vitre((baie?.coeur ?? 0) + d) ?? [a, b];
-                      return (
-                        <Line
-                          key={`v${i}`}
-                          x1={v[0].x}
-                          y1={v[0].y}
-                          x2={v[1].x}
-                          y2={v[1].y}
-                          stroke={choisie ? c.blue : bleuFenetre(c)}
-                          strokeWidth={choisie ? 2 : 1.1}
-                        />
-                      );
-                    })}
-                  {/* Un passage sans porte : son linteau, en tireté. */}
-                  {((o.type !== 'window' && o.type !== 'door') || o.garage) &&
-                    [face(1), face(-1)].map((f, i) =>
-                      f ? (
-                        <Line
-                          key={`p${i}`}
-                          x1={f[0].x}
-                          y1={f[0].y}
-                          x2={f[1].x}
-                          y2={f[1].y}
-                          stroke={c.inkFaint}
-                          strokeWidth={1}
-                          strokeDasharray="4,3"
-                        />
-                      ) : null,
-                    )}
-                  {/* La porte de garage : son tablier fermé, dans la trouée. */}
-                  {o.type === 'door' && o.garage && (
-                    <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={choisie ? c.blue : color} strokeWidth={1.4} />
-                  )}
-                  {/* La façade de placard : ses vantaux coulissants, deux traits décalés. */}
-                  {o.type === 'door' && o.placard && (() => {
-                    const ex = b.x - a.x;
-                    const ey = b.y - a.y;
-                    const l = Math.hypot(ex, ey) || 1;
-                    const nx = (-ey / l) * 2.5;
-                    const ny = (ex / l) * 2.5;
-                    const mx = (a.x + b.x) / 2;
-                    const my = (a.y + b.y) / 2;
-                    const trait = choisie ? c.blue : color;
-                    return (
-                      <>
-                        <Line x1={a.x + nx} y1={a.y + ny} x2={mx + ex * 0.06 + nx} y2={my + ey * 0.06 + ny} stroke={trait} strokeWidth={1.3} />
-                        <Line x1={mx - ex * 0.06 - nx} y1={my - ey * 0.06 - ny} x2={b.x - nx} y2={b.y - ny} stroke={trait} strokeWidth={1.3} />
-                      </>
-                    );
-                  })()}
-                  {/* La baie choisie : soulignée, quel que soit son genre. */}
-                  {choisie && o.type !== 'window' && (
-                    <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={c.blue} strokeWidth={4} strokeLinecap="butt" />
-                  )}
-                  {/*
-                    LE VANTAIL ET SON ARC.
-
-                    Une porte, sur un plan, ce n'est pas un trait dans un
-                    mur : c'est un battant et le quart de cercle qu'il
-                    balaie. C'est ce qui dit de quel côté elle s'ouvre — donc
-                    où l'on peut poser un interrupteur, et où rien ne doit
-                    traîner. Tous les plans du métier le dessinent ; le nôtre
-                    ne le faisait pas.
-                  */}
-                  {o.type === 'door' && battant && (
-                    <SuitLeVol
-                      render={(enVol) => {
-                        const bloquee = enVol && bloqueesEnVol ? bloqueesEnVol(enVol).has(o.id) : !!portesBloquees?.has(o.id);
-                        const arcs = battant.map(
-                          (f) => `M ${f.pivot.x} ${f.pivot.y} L ${f.bout.x} ${f.bout.y} A ${f.r} ${f.r} 0 0 ${f.sens} ${f.autre.x} ${f.autre.y}`,
-                        );
-                        const arc = arcs.join(' ');
-                        return (
-                          <>
-                            {/* Un meuble dans le battant : la surface balayée
-                                se teinte, la porte ne s'ouvre plus en grand. */}
-                            {bloquee && (
-                              <Path d={arcs.map((x) => `${x} Z`).join(' ')} fill={c.danger} fillOpacity={0.12} stroke="none" pointerEvents="none" />
-                            )}
-                            <Path
-                              d={arc}
-                              fill="none"
-                              stroke={choisie ? c.blue : bloquee ? c.danger : color}
-                              strokeWidth={bloquee ? 1.8 : 1.2}
-                              strokeLinecap="round"
-                              opacity={0.9}
-                            />
-                          </>
-                        );
-                      }}
-                    />
-                  )}
-                </G>
-              );
-            })}
-
-            {/*
-              LE DÉTECTEUR D'OUVERTURE : « DO » en bleu, dans la baie, côté
-              pièce — comme le plan d'architecte l'écrit.
-            */}
-            {showFixtures &&
-              openings
-                .filter((o) => o.detecteur)
-                .map((o) => {
-                  const g = mapping.toPx(placeDuDetecteur(o, partOf.get(roomOf(o))?.labelAt));
-                  const t = Math.max(6, Math.min(10, mapping.scale * 0.1));
-                  return (
-                    <G key={`do-${o.id}`} pointerEvents="none">
-                      <Rect
-                        x={g.x - t * 1.2}
-                        y={g.y - t * 0.65}
-                        width={t * 2.4}
-                        height={t * 1.3}
-                        rx={t * 0.3}
-                        fill={c.surface}
-                        stroke={C_LED}
-                        strokeWidth={0.9}
-                      />
-                      <SvgText x={g.x} y={g.y + t * 0.36} fontSize={t} fontWeight="800" fill={C_LED} textAnchor="middle">
-                        DO
-                      </SvgText>
-                    </G>
-                  );
-                })}
-
-            {/*
-              LES GAINES : un filet tireté qui longe les murs, du tableau à
-              chaque appareil. Son tracé est celui du métré porté au devis,
-              pas une illustration.
-
-              ELLES PASSENT SOUS LE PLAFOND, ET PLUS SEULEMENT SOUS LES
-              APPAREILS — relevé du patron : « les chiffres sont cachés par
-              le passage de la gaine, les pointillés gênent la lecture de la
-              cote entre spots ».
-
-              Elles étaient dessinées ENTRE le calque du plafond et celui des
-              appareils : les tiretés se peignaient donc par-dessus les cotes
-              de spots, qu'aucune plaque opaque ne pouvait protéger — une
-              plaque ne protège rien de ce qui vient après elle. Elles
-              remontent d'un cran. La règle ne change pas, elle s'applique
-              simplement à un calque de plus : un CHEMINEMENT passe sous ce
-              qui l'annote.
-            */}
-            {cableRoutes?.map((r) => (
-              <Polyline
-                key={`gaine-${r.id}`}
-                points={r.path
-                  .map((p) => {
-                    const q = mapping.toPx(p);
-                    return `${q.x},${q.y}`;
-                  })
-                  .join(' ')}
-                fill="none"
-                // La teinte du circuit, celle-là même que porte le schéma du
-                // PDF : on suit un tracé à l'œil avant de lire son repère.
-                stroke={
-                  circuitMarks?.get(r.id)
-                    ? markColor(circuitMarks.get(r.id)!)
-                    : c.blue
-                }
-                strokeWidth={1.6}
-                strokeDasharray="7 4"
-                strokeLinejoin="round"
-                strokeLinecap="round"
-                opacity={0.75}
-              />
-            ))}
-            <CeilingLayer
-              ecartsGardes={cotesArbitrees.ecarts}
-              ceiling={ceiling}
-              showCeiling={showCeiling}
-              selectedCeilingId={selectedCeilingId}
-              selectedCeilingRow={selectedCeilingRow}
-              /* Le bouton « Cotes » vaut aussi pour le plafond : les écarts
-                 d'une ligne de spots s'y lisent comme ceux d'un mur. */
-              showMeasures={showMeasures}
-              onSelectCeiling={
-                onSelectCeiling ? (id) => toucher(cibleDuPlafond(id), () => onSelectCeiling(id)) : undefined
-              }
-              fixtures={showFixtures ? fixtures : VIDE}
-              walls={walls}
-              quads={quads}
-              partOf={partOf}
-              mapping={mapping}
-              frame={frame}
-              encre={encre}
-              c={c}
-            />
-
-            <FixtureLayer
-              fixtures={showFixtures ? fixtures : VIDE}
-              circuitMarks={circuitMarks}
-              walls={walls}
-              quads={quads}
-              mapping={mapping}
-              viewRot={view.rot}
-              elecLod={elecLod}
-              navigating={false}
-              onSelectFixture={
-                onSelectFixture
-                  ? (id, wallId) => toucher(cibleDeLAppareil(id), () => onSelectFixture(id, wallId))
-                  : undefined
-              }
-              encre={encre}
-              dehors={dehorsDesMurs}
-              c={c}
-            />
+            {coucheElectrique}
 
             {/* Les ondées des poses : pièces, meubles, menuiseries. */}
             {parts
@@ -4418,170 +4876,11 @@ export function FloorplanEditor({
                 );
               })}
 
-            {/* Cartouche par pièce : nom encadré et surface au sol.
-                Chacun esquive les meubles de sa pièce pour rester lisible.
-                Il s'efface pendant qu'on règle un appareil de plafond : le
-                cartouche tombe au CENTRE de la pièce, c'est-à-dire là où se
-                pose un point lumineux. */}
-            {(selectedCeilingId ? [] : parts).map((part) => {
-              /*
-                LE CARTOUCHE NE SE CALCULE PLUS ICI — il se DESSINE.
-
-                Sa géométrie (les textes retenus, leur taille, la place
-                trouvée) vit dans le mémo `cartouches`, et pour une raison de
-                fond : il doit être posé AVANT les cotes, qui se rangent
-                ensuite autour de lui. Le calculer au rendu, c'était le
-                calculer après elles — et dans une pièce serrée, le dernier
-                arrivé n'avait plus de place et se posait dessus.
-
-                Une SEULE source pour la boîte qu'on réserve et celle qu'on
-                dessine : deux calculs de la même boîte finissent par
-                diverger, et l'arbitre protège alors une place que le dessin
-                n'occupe pas.
-
-                Ce qui reste ici est ce qui ne regarde que le dessin : les
-                couleurs, l'état de sélection, le geste de renommage.
-              */
-              const car = cartouches.get(part.roomId);
-              if (!car) return null;
-              const roomName = roomById.get(part.roomId)?.name ?? '';
-              const { pos, wpx, hpx, gene } = car;
-              const k = echelleDesNoms(view.zoom);
-              const PAD = 4 * k;
-              const LH = 12.5 * k;
-              const TAILLES = {
-                nom: 10.5 * k,
-                aire: (roomName !== '' ? 9.5 : 10.5) * k,
-                hors: 8.5 * k,
-                invite: 10.5 * k,
-              } as const;
-              const retenues = car.textes.map((t) => ({
-                t: t.t,
-                size: TAILLES[t.role],
-                fill:
-                  t.role === 'nom'
-                    ? selectedRoomId === part.roomId && editable
-                      ? c.blue
-                      : c.ink
-                    : t.role === 'aire'
-                      ? roomName !== ''
-                        ? c.inkSoft
-                        : c.ink
-                      : c.inkFaint,
-                bold: t.role === 'nom' || t.role === 'invite' || roomName === '',
-              }));
-              const p = mapping.toPx(pos);
-              const selected = editable && part.roomId === selectedRoomId;
-              return (
-                <G
-                  key={`label-${part.roomId}`}
-                  // Posé faute de mieux SUR un meuble : il se dessine, il ne
-                  // prend plus le doigt. Voir `gene` ci-dessus.
-                  pointerEvents={gene ? 'none' : 'auto'}
-                  // En édition, le cartouche EST le bouton de renommage :
-                  // on touche le nom là où il s'affiche.
-                  onPress={
-                    !gene
-                      ? () => {
-                          if (editable) {
-                            // Toucher le sol, c'est quitter le meuble.
-                            onSelectObject?.(null);
-                            onSelectRoom?.(part.roomId);
-                          }
-                          /*
-                            HORS ÉDITION AUSSI : toucher le nom d'une pièce
-                            ouvre ce qu'on peut en faire — sa fiche d'abord
-                            (correctif de l'audit : elle n'était accessible
-                            qu'en mode édition).
-                          */
-                          onEditRoomName?.(part.roomId);
-                        }
-                      : undefined
-                  }>
-                  {/*
-                    LE TRAIT DE RAPPEL d'un cartouche sorti de sa pièce trop
-                    petite : du bord de la boîte à un point dans la pièce.
-                  */}
-                  {car.rappel
-                    ? (() => {
-                        const r = mapping.toPx(car.rappel);
-                        const bx = Math.max(p.x - wpx / 2, Math.min(p.x + wpx / 2, r.x));
-                        const by = Math.max(p.y - hpx / 2, Math.min(p.y + hpx / 2, r.y));
-                        return (
-                          <G testID={`rappel-${part.roomId}`}>
-                            <Line x1={bx} y1={by} x2={r.x} y2={r.y} stroke={c.inkSoft} strokeWidth={0.8} />
-                            <Circle cx={r.x} cy={r.y} r={1.8} fill={c.inkSoft} />
-                          </G>
-                        );
-                      })()
-                    : null}
-                  <Rect
-                    x={p.x - wpx / 2}
-                    y={p.y - hpx / 2}
-                    width={wpx}
-                    height={hpx}
-                    rx={5}
-                    fill={c.surface}
-                    /*
-                      LE FOND LAISSE VOIR — relevé du patron. Il a été
-                      opaque (les meubles le traversaient) ; maintenant que
-                      le cartouche ESQUIVE meubles et spots, la
-                      transparence ne coûte plus la lisibilité, et ce qui
-                      passe dessous reste deviné.
-                    */
-                    /* Et son fond laisse voir davantage : sept dixièmes,
-                       pas huit et demi. Ce qui passe dessous — un meuble,
-                       une gaine — se devine sans qu'on ait à le déplacer. */
-                    fillOpacity={gene ? 0.92 : planElec ? 0 : 0.7}
-                    /*
-                      SUR LE PLAN ÉLECTRIQUE, LE NOM EST UN TEXTE NU — comme
-                      sur le plan de l'architecte. L'encadré, même à demi
-                      transparent, grisait la cloison qu'il chevauchait et
-                      pâlissait l'interrupteur posé dessous. Il garde le
-                      toucher (fond transparent) et le bleu de la sélection.
-                    */
-                    stroke={selected ? c.blue : planElec ? 'none' : c.lineStrong}
-                    strokeWidth={selected ? 2 : 1}
-                  />
-                  {/* Le point ambre de conformité a vécu ici — relevé du
-                      patron : rien sur le nom de la pièce. Les constats se
-                      lisent dans le dossier, où ils se chiffrent. */}
-                  {retenues.map((l, li) => (
-                    <SvgText
-                      key={li}
-                      x={p.x}
-                      y={p.y - hpx / 2 + PAD + li * LH + LH / 2 + l.size * 0.35}
-                      fill={l.fill}
-                      fontSize={l.size}
-                      fontWeight={l.bold ? '700' : '600'}
-                      textAnchor="middle">
-                      {l.t}
-                    </SvgText>
-                  ))}
-                  {/*
-                    PLUS D'ANNEAU À CÔTÉ DU NOM — relevé du patron : « enlève
-                    les points verts qui sélectionnent la pièce, le nom
-                    cliqué suffit ». L'anneau de progression (socles posés
-                    sur exigés, vert une fois la pièce conforme) se lisait
-                    comme un bouton collé au nom. Le nom, lui, reste le
-                    geste : on le touche, la pièce est prise.
-                  */}
-                </G>
-              );
-            })}
+            {coucheDesCartouches}
             {/* LES MOTS ÉCRITS SUR LE PLAN, par-dessus le reste : une
                 remarque à moitié cachée sous un canapé n'est pas une
                 remarque. */}
-            {!!notes?.length && (
-              <NotesLayer
-                notes={notes}
-                mapping={mapping}
-                niveau={niveauCourant}
-                selectedId={selectedNoteId ?? null}
-                onSelect={onSelectNote}
-                c={c}
-              />
-            )}
+            {coucheDesNotes}
             {/* Le calque de capture : au-dessus de TOUT, et seulement
                 pendant une pose. */}
             {/*
@@ -5042,56 +5341,19 @@ export function FloorplanEditor({
             (() => {
               const pts = partOf.get(selectedRoomId)?.surface?.pts;
               if (!pts || pts.length < 3) return null;
-              const xs = pts.map((q) => q.x);
-              const zs = pts.map((q) => q.z);
-              const x0 = Math.min(...xs);
-              const x1 = Math.max(...xs);
-              const z0 = Math.min(...zs);
-              const z1 = Math.max(...zs);
-              const cx = (x0 + x1) / 2;
-              const cz = (z0 + z1) / 2;
-              const centre = mapping.toPx({ x: cx, z: cz });
-              const bords = [
-                { cote: 'largeur+' as const, n: { x: 1, z: 0 }, mid: { x: x1, z: cz } },
-                { cote: 'largeur-' as const, n: { x: -1, z: 0 }, mid: { x: x0, z: cz } },
-                { cote: 'profondeur+' as const, n: { x: 0, z: 1 }, mid: { x: cx, z: z1 } },
-                { cote: 'profondeur-' as const, n: { x: 0, z: -1 }, mid: { x: cx, z: z0 } },
-              ];
+              const piece = roomById.get(selectedRoomId);
+              const ids = new Set(piece?.wallIds ?? []);
+              // Les murs de la pièce, comme les compte `resizeRoomSide`.
+              const sesMurs = walls.filter((w) =>
+                ids.size > 0 ? ids.has(w.id) : roomOf(w) === selectedRoomId,
+              );
               return (
-                <>
-                  {bords.map((b) => {
-                    // Le milieu du bord et un point voisin LE LONG du bord :
-                    // deux projections donnent son angle à l'écran, quelle
-                    // que soit la rotation du plan.
-                    const m = mapping.toPx(b.mid);
-                    const long = mapping.toPx({
-                      x: b.mid.x - b.n.z * 0.2,
-                      z: b.mid.z + b.n.x * 0.2,
-                    });
-                    const inclinaison =
-                      (Math.atan2(long.y - m.y, long.x - m.x) * 180) / Math.PI;
-                    // Juste DEHORS, comme pour un meuble : posées sur le
-                    // bord, les quatre zones de quarante points se
-                    // rejoignaient au milieu d'une petite pièce et
-                    // l'empêchaient de se pousser.
-                    const vers = Math.hypot(m.x - centre.x, m.y - centre.y) || 1;
-                    const at = {
-                      x: m.x + ((m.x - centre.x) / vers) * 12,
-                      y: m.y + ((m.y - centre.y) / vers) * 12,
-                    };
-                    return (
-                      <SideHandle
-                        key={b.cote}
-                        roomId={selectedRoomId}
-                        cote={b.cote}
-                        at={at}
-                        angle={inclinaison}
-                        normale={b.n}
-                        mapping={mapping}
-                      />
-                    );
-                  })}
-                </>
+                <PoigneesDeLaPiece
+                  roomId={selectedRoomId}
+                  contour={pts}
+                  murs={sesMurs}
+                  mapping={mapping}
+                />
               );
             })()}
 
@@ -5275,14 +5537,22 @@ export function FloorplanEditor({
       )}
     </View>
   );
-}
+}, memesProps);
 
 /**
  * Un mur au plan : corps poché dont les quatre coins viennent des onglets
  * partagés (`wallQuads`) — deux murs qui se rejoignent forment donc un angle
  * franc, sans recouvrement ni fente.
  */
-function WallBody({
+/*
+  MÉMOÏSÉ : DEUX TRACÉS PAR MUR, ET UN SEUL CHANGE QUAND ON EN CHOISIT UN.
+  Relevé des testeurs : « WallBody non plus (2 instances par mur, avec des
+  onPress en ligne) ». L'appui de chaque mur est désormais un relais stable
+  (`appuiDuMur`), et le choix d'un mur ne redessine que lui.
+*/
+// Le même nom dedans : les bancs comptent ses rendus dans les piles d'appels.
+// eslint-disable-next-line @typescript-eslint/no-shadow
+const WallBody = React.memo(function WallBody({
   wall,
   quad,
   mapping,
@@ -5296,6 +5566,7 @@ function WallBody({
   couche = 'trait',
   exterieur,
   onPress,
+  enVol,
 }: {
   wall: WallSeg;
   quad?: WallQuad;
@@ -5359,6 +5630,12 @@ function WallBody({
   couche?: 'halo' | 'trait';
   /** Le mur borde une pièce en défaut de conformité électrique. */
   onPress?: () => void;
+  /**
+   * LE MUR SUIT LE DOIGT — voir `store/planEnVol`. Le poché ne le dessine
+   * plus le temps du geste (voir `CoucheDuPoche`) : son corps se peint ici,
+   * plein, avec ses onglets en vol.
+   */
+  enVol?: boolean;
 }) {
   const c = useTheme();
   const a = mapping.toPx(wall.a);
@@ -5485,7 +5762,7 @@ function WallBody({
           strokeDasharray="7,5"
         />
       ) : body ? (
-        <Polygon points={body} fill={sansCorps && !selected ? 'transparent' : teinte} stroke="none" />
+        <Polygon points={body} fill={sansCorps && !selected && !enVol ? 'transparent' : teinte} stroke="none" />
       ) : (
         <Line
           x1={a.x}
@@ -5545,6 +5822,355 @@ function WallBody({
         </G>
       )}
     </G>
+  );
+});
+
+/**
+ * LE MUR QUI SUIT LE DOIGT — et lui seul se redessine.
+ *
+ * Le pendant de `SuitLeDoigt` pour les murs (voir `store/planEnVol`) : tant
+ * que son mur n'est pas en vol, il rend le mur du magasin, tel quel. Tiré,
+ * tourné, emporté avec sa pièce, il le rend à sa place en vol — son corps
+ * plein avec son onglet en vol (le poché ne le dessine plus le temps du
+ * geste), le bleu du mur choisi, le tireté d'une pièce neuve, et sa cote à
+ * jour posée au milieu (la place arbitrée était celle d'avant le geste). Les
+ * autres murs ne se rendent pas.
+ */
+const SuitLeMur = React.memo(function MurQuiSuitLeDoigt(props: React.ComponentProps<typeof WallBody>) {
+  const vol = usePlanEnVol((st) => st.plan?.murs.get(props.wall.id) ?? null);
+  const quad = usePlanEnVol((st) => st.plan?.quads.get(props.wall.id));
+  if (!vol) return <WallBody {...props} />;
+  return (
+    <WallBody
+      {...props}
+      wall={vol}
+      quad={quad}
+      measureAt={undefined}
+      // La cote affichée (au nu, voir `longueurCotee`) bouge de ce que bouge le mur.
+      longueur={props.longueur !== undefined ? props.longueur + segLength(vol) - segLength(props.wall) : undefined}
+      enVol
+    />
+  );
+});
+
+/**
+ * CE QUI EST RESTÉ À L'ANCIENNE PLACE S'EFFACE LE TEMPS DU GESTE — le
+ * symbole d'une menuiserie qui suit son mur, les cotes de détail d'un mur
+ * tiré, le sol et le cartouche de la pièce qu'on glisse. Ils reviennent au
+ * lâcher, recalculés à la nouvelle place. Une seule question au vol, par
+ * élément : seuls ceux dont la réponse change se rendent.
+ */
+function CacheEnVol({
+  mur,
+  baie,
+  piece,
+  children,
+}: {
+  mur?: string;
+  baie?: string;
+  piece?: string;
+  children: React.ReactNode;
+}) {
+  const cache = usePlanEnVol((st) => {
+    const p = st.plan;
+    if (!p) return false;
+    return (
+      (mur !== undefined && p.murs.has(mur)) ||
+      (baie !== undefined && p.baies.has(baie)) ||
+      (piece !== undefined && p.piece?.id === piece)
+    );
+  });
+  return cache ? null : <>{children}</>;
+}
+
+/**
+ * LE POCHÉ PENDANT UN GESTE — la maçonnerie d'un seul tenant (`pocheDesMurs`),
+ * SANS les murs qui bougent.
+ *
+ * Le refaire à chaque image pour le faire suivre le doigt coûtait onze
+ * millisecondes sur l'exemple (mesuré, voir `maj-plan2d`) : l'union de tous
+ * les murs, pour en déplacer deux. Il se refait donc UNE fois, à la première
+ * image du geste, sans les murs que le geste emporte — ils se peignent seuls,
+ * pleins, à leur place en vol (`SuitLeMur`, `MursNesEnVol`) — et ne bouge
+ * plus jusqu'au lâcher, où le plan entier se recalcule. Les murs emportés
+ * changent rarement en cours de geste ; s'ils changent, il se refait.
+ * La nature des murs (plaque, doublage, à démolir…) suit la même règle.
+ */
+const CoucheDuPoche = React.memo(function CoucheDuPoche({
+  murs,
+  baies,
+  rooms,
+  poche,
+  natures,
+  mapping,
+  c,
+}: {
+  /** Les murs posés (hors pièce neuve) : ceux que le poché dessine. */
+  murs: WallSeg[];
+  baies: WallSeg[];
+  rooms: Parameters<typeof pocheDesMurs>[2];
+  poche: ReturnType<typeof pocheDesMurs>;
+  natures: ReturnType<typeof dessinDesNatures>;
+  mapping: EffMapping;
+  c: Palette;
+}) {
+  // Ce que le geste emporte, en une clé : elle ne change pas d'une image à l'autre.
+  const emportes = usePlanEnVol((st) =>
+    st.plan ? JSON.stringify([[...st.plan.murs.keys()].sort(), [...st.plan.baies.keys()].sort()]) : null,
+  );
+  const vol = useMemo(() => {
+    if (emportes === null) return null;
+    const [m, b] = JSON.parse(emportes) as [string[], string[]];
+    const ids = new Set([...m, ...b]);
+    const restent = murs.filter((w) => !ids.has(w.id));
+    return {
+      poche: pocheDesMurs(restent, baies.filter((o) => !ids.has(o.id)), rooms),
+      natures: natures ? dessinDesNatures(restent, wallQuadsOf(restent), jonctionsDetaillees(restent)) : null,
+    };
+  }, [emportes, murs, baies, rooms, natures]);
+  const p = vol?.poche ?? poche;
+  const corpsDeNature = vol ? vol.natures : natures;
+  return (
+    <>
+      <Path
+        testID="poche-des-murs"
+        d={cheminDuPoche(p.contours, mapping.toPx)}
+        fill={c.ink}
+        fillRule="evenodd"
+      />
+      {corpsDeNature ? (
+        <G testID="nature-des-murs" pointerEvents="none">
+          <Defs>
+            <ClipPath id="clip-poche-nature">
+              <Path d={cheminDuPoche(p.contours, mapping.toPx)} clipRule="evenodd" />
+            </ClipPath>
+          </Defs>
+          <G clipPath="url(#clip-poche-nature)">
+            {corpsDeNature.coeurs.map((j, i) => (
+              <Polygon
+                key={`coeur-${i}`}
+                points={j.poly.map((q) => mapping.toPx(q)).map((q) => `${q.x},${q.y}`).join(' ')}
+                fill={renduNature(j.nature, c.ink, c.surface).fond}
+              />
+            ))}
+            {corpsDeNature.corps.map((m) => {
+              const r = renduNature(m.nature, c.ink, c.surface);
+              // Le trait est coupé de moitié par le poché : on le
+              // double pour garder le filet fin du plan d'architecte.
+              const trait = Math.min(2.4, Math.max(1.2, mapping.scale * 0.02));
+              return (
+                <G key={`nature-${m.id}`}>
+                  <Polygon
+                    testID={`nature-${m.nature}`}
+                    points={m.contour.map((q) => mapping.toPx(q)).map((q) => `${q.x},${q.y}`).join(' ')}
+                    fill={r.fond}
+                  />
+                  {m.filets.map((f, k) => (
+                    <Polyline
+                      key={k}
+                      points={f.map((q) => mapping.toPx(q)).map((q) => `${q.x},${q.y}`).join(' ')}
+                      fill="none"
+                      stroke={r.contour}
+                      strokeWidth={trait}
+                      strokeDasharray={r.tirets ? [5, 3] : undefined}
+                    />
+                  ))}
+                  {m.boucles ? (
+                    <Polyline
+                      points={m.boucles.map((q) => mapping.toPx(q)).map((q) => `${q.x},${q.y}`).join(' ')}
+                      fill="none"
+                      stroke={r.contour}
+                      strokeWidth={Math.max(0.6, trait * 0.45)}
+                    />
+                  ) : null}
+                </G>
+              );
+            })}
+            {/* La maçonnerie reprend la main aux butées : voir `dessinDesNatures`. */}
+            {corpsDeNature.maconnerie.map((poly, i) => (
+              <Polygon
+                key={`macon-${i}`}
+                points={poly.map((q) => mapping.toPx(q)).map((q) => `${q.x},${q.y}`).join(' ')}
+                fill={c.ink}
+              />
+            ))}
+          </G>
+        </G>
+      ) : null}
+    </>
+  );
+});
+
+/**
+ * LES MURS QUI NAISSENT EN VOL — la copie d'une cloison mitoyenne qu'une
+ * pièce emporte, le morceau d'un mur partagé qu'on coupe. Ils n'ont pas de
+ * tracé au plan : ce calque les peint, pleins (en tirets pour une pièce
+ * neuve), le temps du geste.
+ */
+function MursNesEnVol({
+  mapping,
+  roomById,
+}: {
+  mapping: EffMapping;
+  roomById: Map<string, { neuve?: boolean }>;
+}) {
+  const nes = usePlanEnVol((st) => st.plan?.nes);
+  const quads = usePlanEnVol((st) => st.plan?.quads);
+  if (!nes?.length) return null;
+  return (
+    <G pointerEvents="none">
+      {nes.map((w) => (
+        <WallBody
+          key={`ne-${w.id}`}
+          wall={w}
+          quad={quads?.get(w.id)}
+          mapping={mapping}
+          showMeasure={false}
+          selected={false}
+          neuve={!!roomById.get(roomOf(w) ?? '')?.neuve}
+          enVol
+        />
+      ))}
+    </G>
+  );
+}
+
+/**
+ * LES MENUISERIES EN VOL — elles suivent leur mur, au doigt. Une trouée
+ * claire dans le corps du mur en vol, et le trait de la baie, en bleu : le
+ * détail (battant, vitrage, dormant) revient au lâcher, avec le poché qui
+ * les loge.
+ */
+function BaiesEnVol({ mapping }: { mapping: EffMapping }) {
+  const c = useTheme();
+  const baies = usePlanEnVol((st) => st.plan?.baies);
+  if (!baies?.size) return null;
+  const trouee = Math.max(3, WALL_T * mapping.scale + 1);
+  return (
+    <G pointerEvents="none" testID="baies-en-vol">
+      {[...baies.values()].map((o) => {
+        const a = mapping.toPx(o.a);
+        const b = mapping.toPx(o.b);
+        return (
+          <G key={`vol-${o.id}`}>
+            <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={c.surface} strokeWidth={trouee} />
+            <Line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={c.blue} strokeWidth={1.6} />
+          </G>
+        );
+      })}
+    </G>
+  );
+}
+
+/**
+ * LE SOL DE LA PIÈCE QU'ON GLISSE — son contour, décalé de la course du
+ * doigt, en bleu léger : on voit où elle va se poser. Elle se recale sur
+ * ses voisines au lâcher (l'aimant), et son vrai sol revient avec le plan.
+ */
+function SolEnVol({ mapping, parts }: { mapping: EffMapping; parts: RoomPart[] }) {
+  const c = useTheme();
+  const piece = usePlanEnVol((st) => st.plan?.piece ?? null);
+  if (!piece) return null;
+  const pts = parts.find((p) => p.roomId === piece.id)?.surface?.pts;
+  if (!pts || pts.length < 3) return null;
+  const poly = pts
+    .map((p) => mapping.toPx({ x: p.x + piece.dx, z: p.z + piece.dz }))
+    .map((q) => `${q.x},${q.y}`)
+    .join(' ');
+  return (
+    <Polygon
+      testID="sol-en-vol"
+      points={poly}
+      fill={c.blue}
+      fillOpacity={0.1}
+      stroke={c.blue}
+      strokeWidth={1.5}
+      strokeDasharray="6 4"
+      pointerEvents="none"
+    />
+  );
+}
+
+/**
+ * LES QUATRE POIGNÉES D'UNE PIÈCE NEUVE — elles suivent leurs bords en vol.
+ *
+ * L'étirement se montre en vol (voir `SideHandle`) : le plan ne se rend
+ * plus, et des poignées calculées par lui resteraient où le geste a
+ * commencé pendant que le bord s'en va sous le doigt. Elles lisent donc le
+ * vol : le contour de la pièce se décale de ce dont ses murs ont bougé, bord
+ * par bord.
+ */
+function PoigneesDeLaPiece({
+  roomId,
+  contour,
+  murs,
+  mapping,
+}: {
+  roomId: string;
+  contour: Pt[];
+  murs: WallSeg[];
+  mapping: EffMapping;
+}) {
+  const vol = usePlanEnVol((st) => st.plan?.murs ?? null);
+  const boite = (pts: Pt[]) => {
+    const xs = pts.map((q) => q.x);
+    const zs = pts.map((q) => q.z);
+    return { x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs) };
+  };
+  const ici = boite(contour);
+  let { x0, x1, z0, z1 } = ici;
+  if (vol && murs.length > 0) {
+    const coins = (ws: WallSeg[]) => ws.flatMap((w) => [w.a, w.b]);
+    const avant = boite(coins(murs));
+    const apres = boite(coins(murs.map((w) => vol.get(w.id) ?? w)));
+    x0 += apres.x0 - avant.x0;
+    x1 += apres.x1 - avant.x1;
+    z0 += apres.z0 - avant.z0;
+    z1 += apres.z1 - avant.z1;
+  }
+  const cx = (x0 + x1) / 2;
+  const cz = (z0 + z1) / 2;
+  const centre = mapping.toPx({ x: cx, z: cz });
+  const bords = [
+    { cote: 'largeur+' as const, n: { x: 1, z: 0 }, mid: { x: x1, z: cz } },
+    { cote: 'largeur-' as const, n: { x: -1, z: 0 }, mid: { x: x0, z: cz } },
+    { cote: 'profondeur+' as const, n: { x: 0, z: 1 }, mid: { x: cx, z: z1 } },
+    { cote: 'profondeur-' as const, n: { x: 0, z: -1 }, mid: { x: cx, z: z0 } },
+  ];
+  return (
+    <>
+      {bords.map((b) => {
+        // Le milieu du bord et un point voisin LE LONG du bord :
+        // deux projections donnent son angle à l'écran, quelle
+        // que soit la rotation du plan.
+        const m = mapping.toPx(b.mid);
+        const long = mapping.toPx({
+          x: b.mid.x - b.n.z * 0.2,
+          z: b.mid.z + b.n.x * 0.2,
+        });
+        const inclinaison = (Math.atan2(long.y - m.y, long.x - m.x) * 180) / Math.PI;
+        // Juste DEHORS, comme pour un meuble : posées sur le
+        // bord, les quatre zones de quarante points se
+        // rejoignaient au milieu d'une petite pièce et
+        // l'empêchaient de se pousser.
+        const vers = Math.hypot(m.x - centre.x, m.y - centre.y) || 1;
+        const at = {
+          x: m.x + ((m.x - centre.x) / vers) * 12,
+          y: m.y + ((m.y - centre.y) / vers) * 12,
+        };
+        return (
+          <SideHandle
+            key={b.cote}
+            roomId={roomId}
+            cote={b.cote}
+            at={at}
+            angle={inclinaison}
+            normale={b.n}
+            mapping={mapping}
+          />
+        );
+      })}
+    </>
   );
 }
 
@@ -6271,18 +6897,31 @@ export function SideHandle({
     LE MAGASIN APPREND L'ÉTIREMENT AU LÂCHER : la dernière course, depuis
     le même état de départ — exactement ce qu'il recevait à la dernière
     image, sous la même clé d'historique.
+
+    LA PIÈCE AUSSI, désormais — relevé des testeurs : « chaque image d'un
+    côté tiré redessine deux fois tout l'écran et tout l'éditeur ». Son
+    étirement est montré en vol (`volerLAction`, voir `store/planEnVol`) et
+    `resizeRoomSide` n'est écrit qu'au lâcher, depuis la même emprise de
+    départ.
   */
   const poserLEtirement = useMemo(
     () => () => {
       const total = dernierEtirement.current;
-      const base = depart.current;
       dernierEtirement.current = null;
+      if (roomId) {
+        const dep = departPiece.current;
+        // Rien de montré en vol : ce n'est pas elle qui tient la pièce.
+        if (total === null) return;
+        atterrir(dep ? (st) => st.resizeRoomSide(roomId, cote, total, dep) : undefined);
+        return;
+      }
+      const base = depart.current;
       // Rien de montré en vol : ce n'est pas elle qui tient le meuble.
       if (!objectId || total === null) return;
       if (base) useScanStore.getState().resizeObjectSide(objectId, cote, total, base);
       if (useEnVol.getState().objet?.id === objectId) mettreEnVol(null);
     },
-    [objectId, cote],
+    [objectId, roomId, cote],
   );
   const pan = useMemo(
     () =>
@@ -6332,8 +6971,10 @@ export function SideHandle({
             const dep = departPiece.current;
             if (!dep) return;
             // Pas d'aimant sur une pièce : rien à faire sentir, donc rien
-            // à faire vibrer.
-            useScanStore.getState().resizeRoomSide(roomId, cote, total, dep);
+            // à faire vibrer. Montrée en vol, écrite au lâcher.
+            if (volerLAction((st) => st.resizeRoomSide(roomId, cote, total, dep))) {
+              dernierEtirement.current = total;
+            }
             return;
           }
           const base = depart.current;
@@ -6350,10 +6991,10 @@ export function SideHandle({
           else releaseHaptic('accroche');
         },
         onPanResponderRelease: () => {
+          // La pièce est posée ET son geste fermé par `atterrir`.
           poserLEtirement();
           // Un seul rendu au lâcher, analyses à jour (voir la poignée de
-          // déplacement). Une pièce qu'on étire écrit déjà à chaque image :
-          // son geste se ferme comme avant, au silence.
+          // déplacement).
           if (objectId) finirLeGeste();
           depart.current = null;
           departPiece.current = null;
@@ -6453,6 +7094,24 @@ function WallRotateHandle({
   const [angle, setAngle] = useState<number | null>(null);
   const vif = useRef({ wall, mapping, sens, borne });
   vif.current = { wall, mapping, sens, borne };
+  /*
+    LE MUR TOURNE EN VOL — comme le coin tiré : `setWallAngle` est montré à
+    chaque image (`volerLAction`) et n'est écrit qu'au lâcher, avec le
+    dernier angle montré. La poignée suit son mur en vol ; le plan, lui, ne
+    se rend plus.
+  */
+  const enVol = usePlanEnVol((st) => st.plan?.murs.get(wall.id) ?? null);
+  const dernierAngle = useRef<{ id: string; deg: number } | null>(null);
+  const poserLAngle = useMemo(
+    () => () => {
+      const d = dernierAngle.current;
+      if (!d) return;
+      dernierAngle.current = null;
+      atterrir((st) => st.setWallAngle(d.id, d.deg));
+    },
+    [],
+  );
+  useEffect(() => () => poserLAngle(), [poserLAngle]);
   /**
    * L'état du geste : d'où part le doigt, l'angle qu'il faisait alors, celui
    * du mur au même instant, et les crans sur lesquels s'arrêter.
@@ -6479,6 +7138,7 @@ function WallRotateHandle({
         onShouldBlockNativeResponder: () => true,
         onPanResponderGrant: () => {
           seuil.reprendre();
+          dernierAngle.current = null;
           const { wall: w, mapping: m } = vif.current;
           const mid = m.toPx({
             x: (w.a.x + w.b.x) / 2,
@@ -6522,18 +7182,29 @@ function WallRotateHandle({
           const colle = final !== vise;
           if (colle && !b.collait) haptic('accroche');
           b.collait = colle;
-          useScanStore.getState().setWallAngle(w.id, final);
-          const apres = useScanStore
-            .getState()
-            .walls.find((x) => x.id === w.id);
-          if (apres) setAngle(angleDe(apres));
+          if (volerLAction((st) => st.setWallAngle(w.id, final))) {
+            dernierAngle.current = { id: w.id, deg: final };
+            const apres = usePlanEnVol.getState().plan?.murs.get(w.id);
+            if (apres) setAngle(angleDe(apres));
+          } else {
+            // Revenu à son angle de départ : rien à poser, rien en vol.
+            if (dernierAngle.current) atterrir();
+            dernierAngle.current = null;
+            setAngle(angleDe(w));
+          }
         },
-        onPanResponderRelease: () => setAngle(null),
-        onPanResponderTerminate: () => setAngle(null),
+        onPanResponderRelease: () => {
+          poserLAngle();
+          setAngle(null);
+        },
+        onPanResponderTerminate: () => {
+          poserLAngle();
+          setAngle(null);
+        },
       }),
-    [seuil],
+    [seuil, poserLAngle],
   );
-  const at = poigneeAt(wall, mapping, sens, borne);
+  const at = poigneeAt(enVol ?? wall, mapping, sens, borne);
   return (
     <>
       <View
@@ -6633,6 +7304,27 @@ function CornerHandle({
   live.current = { corner, mapping, onTap };
   const cible = useRef({ wallId: corner.wallId, end: corner.end });
   const tire = useRef(false);
+  /*
+    LE COIN SE TIRE EN VOL — relevé des testeurs : « chaque image d'un coin
+    tiré redessine deux fois tout l'écran et tout l'éditeur ». Il écrivait
+    le magasin à chaque image ; il montre maintenant ce qu'écrirait
+    `moveWallPoint` (`volerLAction`), et ne l'écrit qu'au lâcher — depuis le
+    même coin de départ, donc exactement ce que montrait la dernière image.
+    Le coin visé n'est plus repris d'une image sur l'autre : une soudure
+    frôlée en chemin ne colle plus le coin au mur d'à côté.
+  */
+  const vise = useRef<Pt | null>(null);
+  const poser = useMemo(
+    () => () => {
+      const p = vise.current;
+      // Rien de montré : ce n'est pas elle qui tient le plan en vol.
+      if (!p) return;
+      vise.current = null;
+      const { wallId, end } = cible.current;
+      atterrir((st) => st.moveWallPoint(wallId, end, p));
+    },
+    [],
+  );
   const pan = useMemo(
     () =>
       PanResponder.create({
@@ -6647,28 +7339,34 @@ function CornerHandle({
         onPanResponderGrant: () => {
           seuil.reprendre();
           tire.current = false;
+          vise.current = null;
           const c = live.current.corner;
           startRef.current = { x: c.x, z: c.z };
           cible.current = { wallId: c.wallId, end: c.end };
         },
         // Un appui n'a rien tiré : c'est un appui sur le mur, il le relâche.
         onPanResponderRelease: () => {
+          poser();
           if (!tire.current) live.current.onTap?.();
         },
+        onPanResponderTerminate: () => poser(),
         onPanResponderMove: (_e, g) => {
           if (!seuil.franchi(g.dx, g.dy)) return;
           tire.current = true;
           const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
-          useScanStore.getState().moveWallPoint(cible.current.wallId, cible.current.end, {
-            x: startRef.current.x + d.x,
-            z: startRef.current.z + d.z,
-          });
+          const p = { x: startRef.current.x + d.x, z: startRef.current.z + d.z };
+          const { wallId, end } = cible.current;
+          if (volerLAction((st) => st.moveWallPoint(wallId, end, p))) vise.current = p;
         },
       }),
-    [seuil],
+    [seuil, poser],
   );
+  // Une poignée qui s'en va en plein geste pose ce qu'elle montrait.
+  useEffect(() => () => poser(), [poser]);
+  // Le coin suit le doigt sans que le plan se rende : il lit son mur en vol.
+  const enVol = usePlanEnVol((st) => st.plan?.murs.get(corner.wallId)?.[corner.end] ?? null);
 
-  const px = mapping.toPx(corner);
+  const px = mapping.toPx(enVol ?? corner);
   /*
     UN POINT QU'ON VOIT : ce qu'on peut tirer se montre. Invisible, la
     poignée prenait le doigt sans prévenir.
