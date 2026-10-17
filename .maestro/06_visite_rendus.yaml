@@ -6,6 +6,18 @@ name: Visite — quatre rendus
 ---
 - launchApp
 - runFlow: commun/vers-accueil.yaml
+# Les lampes de l'exemple n'existent qu'en mode Électricité.
+- tapOn: "Mon compte"
+- waitForAnimationToEnd:
+    timeout: 5000
+- scrollUntilVisible:
+    element: "Mode Électricité"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: "interrupteur-electricite"
+- waitForAnimationToEnd:
+    timeout: 3000
 - runFlow: commun/ouvrir-exemple.yaml
 - tapOn: "Explorer"
 - extendedWaitUntil:
@@ -14,6 +26,14 @@ name: Visite — quatre rendus
     timeout: 20000
 - waitForAnimationToEnd:
     timeout: 8000
+# Vers le séjour meublé : on tourne le regard (pouce droit), ce qui retire
+# aussi la consigne du premier pas.
+- swipe:
+    start: "85%,60%"
+    end: "55%,60%"
+    duration: 900
+- waitForAnimationToEnd:
+    timeout: 5000
 
 # Rendu A
 - takeScreenshot: ${THEME}-60-rendu-A-eteint
@@ -78,3 +98,17 @@ name: Visite — quatre rendus
 # Retour au rendu A pour les parcours suivants.
 - tapOn:
     id: "rendu-visite"
+
+# Retour au grand public pour les parcours suivants.
+- tapOn: "Terminer"
+- launchApp
+- runFlow: commun/vers-accueil.yaml
+- tapOn: "Mon compte"
+- waitForAnimationToEnd:
+    timeout: 5000
+- scrollUntilVisible:
+    element: "Mode Électricité"
+    direction: DOWN
+    timeout: 10000
+- tapOn:
+    id: "interrupteur-electricite"
