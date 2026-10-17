@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="iPhone 17 - iOS 26.2 - 22970779-4A47-463E-8B6D-CC012359B320" tests="1" failures="1" time="93.209" timestamp="2026-10-17T19:31:25">
+    <testcase id="Export" name="Export" classname="Export" file=".maestro/03_export.yaml" time="93.146" timestamp="2026-10-17T19:31:25" status="ERROR">
+      <failure>Assertion is false: "Page de garde" is visible</failure>
+    </testcase>
+  </testsuite>
+</testsuites>

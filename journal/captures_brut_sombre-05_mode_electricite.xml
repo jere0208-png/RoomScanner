@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="iPhone 17 - iOS 26.2 - 22970779-4A47-463E-8B6D-CC012359B320" tests="1" failures="0" time="144.509" timestamp="2026-10-17T19:36:51">
+    <testcase id="Mode Électricité" name="Mode Électricité" classname="Mode Électricité" file=".maestro/05_mode_electricite.yaml" time="144.303" timestamp="2026-10-17T19:36:51" status="SUCCESS"/>
+  </testsuite>
+</testsuites>
