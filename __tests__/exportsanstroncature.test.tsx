@@ -81,12 +81,15 @@ describe('la croix', () => {
         n.props?.accessibilityLabel === 'Fermer' &&
         n.props.accessibilityRole === 'button' &&
         typeof n.props.onPress === 'function' &&
-        n.props.testID !== 'voile-export',
+        n.props.testID !== 'voile-feuille',
     )[0];
     expect(croix).toBeTruthy();
+    // La croix de la coquille commune (`SheetShell`) : son dessin, et la
+    // marge de toucher qui l'entoure.
     const st = StyleSheet.flatten(croix.props.style) as { width?: number; height?: number };
-    expect(st.width).toBeGreaterThanOrEqual(44);
-    expect(st.height).toBeGreaterThanOrEqual(44);
+    const marge = typeof croix.props.hitSlop === 'number' ? croix.props.hitSlop : 0;
+    expect((st.width ?? 0) + 2 * marge).toBeGreaterThanOrEqual(44);
+    expect((st.height ?? 0) + 2 * marge).toBeGreaterThanOrEqual(44);
     act(() => croix.props.onPress());
     expect(fermetures).toHaveLength(1);
     act(() => t.unmount());

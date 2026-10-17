@@ -86,7 +86,8 @@ describe('le voile a cote de la carte, pas autour', () => {
           onImage={() => {}}
         />
       ),
-      'voile-export',
+      // La coquille commune des feuilles (`SheetShell`), son voile compris.
+      'voile-feuille',
     );
   });
 

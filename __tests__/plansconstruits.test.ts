@@ -791,10 +791,12 @@ describe('le meuble collé de Théo', () => {
 
 describe('les fichiers de Léa', () => {
   it('le même dossier donne le même nom de fichier, quel que soit le format', () => {
+    // Une seule règle pour tous les exports (voir `nomDeFichier`) : le
+    // titre, le niveau, ce que contient le fichier.
     const nom = 'Plan du 12/10/2026';
-    expect(pdfFilename(nom)).toBe('Plan-du-12-10-2026.pdf');
-    expect(objFilename(`${nom} R+1`)).toBe('Plan-du-12-10-2026-R+1.obj');
-    expect(dxfFilename(`${nom} R+1`)).toBe('Plan-du-12-10-2026-R+1.dxf');
+    expect(pdfFilename(nom, 'R+1')).toBe('Plan du 12-10-2026 - R+1 - Plan.pdf');
+    expect(objFilename(`${nom} R+1`)).toBe('Plan du 12-10-2026 R+1 - Modèle 3D.obj');
+    expect(dxfFilename(nom, 'R+1')).toBe('Plan du 12-10-2026 - R+1 - Plan.dxf');
   });
 });
 

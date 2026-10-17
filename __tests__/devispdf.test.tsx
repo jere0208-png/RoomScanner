@@ -274,12 +274,12 @@ describe('sur la page du devis', () => {
     });
     expect(partager).toHaveBeenCalledTimes(1);
     const annee = new Date().getFullYear();
-    expect(partager.mock.calls[0][1]).toBe(`Devis D-${annee}-0042 — Chantier Martin.pdf`);
+    expect(partager.mock.calls[0][1]).toBe(`Chantier Martin - Devis D-${annee}-0042.pdf`);
     expect(useScanStore.getState().devisNumero).toBe(`D-${annee}-0042`);
     // Un second envoi du même devis garde son numéro.
     await act(async () => {
       await bouton('Exporter le devis').props.onPress();
     });
-    expect(partager.mock.calls[1][1]).toBe(`Devis D-${annee}-0042 — Chantier Martin.pdf`);
+    expect(partager.mock.calls[1][1]).toBe(`Chantier Martin - Devis D-${annee}-0042.pdf`);
   });
 });

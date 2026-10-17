@@ -156,7 +156,9 @@ describe('le métré en tableur', () => {
   });
 
   it('nomme le fichier sans caractère interdit', () => {
-    expect(metreFilename('Chantier 12/08')).toBe('Métré - Chantier 12-08.csv');
-    expect(metreFilename('')).toBe('Métré - Scan.csv');
+    // La règle commune (voir `nomDeFichier`) : le titre, puis le contenu.
+    expect(metreFilename('Chantier 12/08')).toBe('Chantier 12-08 - Métré.csv');
+    expect(metreFilename('Chantier', '1er étage')).toBe('Chantier - 1er étage - Métré.csv');
+    expect(metreFilename('')).toBe('Métré.csv');
   });
 });

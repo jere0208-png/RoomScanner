@@ -20,7 +20,7 @@ import type { Fixture } from '../geometry/electrical';
 import { buildScene, type Face3D } from './../geometry/scene3d';
 import { MAQUETTE, matieresDesSols } from '../ui/maquette';
 import { accentsDesPieces, peinturesDesPieces, solsDesPieces } from '../ui/habillage';
-import { deplierLigatures } from '../ui/mots';
+import { nomDeFichier } from './nomDeFichier';
 
 /** Palette neutre : l'OBJ ne porte pas les couleurs, seule la forme compte. */
 /**
@@ -159,16 +159,7 @@ function ecrireObj(
   return `${lines.join('\n')}\n`;
 }
 
-/** Nom de fichier propre pour un export de modèle. */
+/** « Dupont - Modèle 3D.obj » : la règle commune (voir `nomDeFichier`). */
 export function objFilename(name: string): string {
-  // « œ », « æ », « ß » : deux lettres, pas zéro (voir `deplierLigatures`).
-  const clean = deplierLigatures(name)
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    // « 12/10/2026 » devient « 12-10-2026 », comme dans le DXF (revue « Léa »).
-    .replace(/[\\/:]+/g, ' ')
-    .replace(/[^\w\-+ ]/g, '')
-    .trim()
-    .replace(/\s+/g, '-');
-  return `${clean || 'echoplan'}.obj`;
+  return nomDeFichier(name, 'obj', { genre: 'Modèle 3D' });
 }

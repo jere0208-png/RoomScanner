@@ -1144,7 +1144,9 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   exportAutresTextes: { flex: 1 },
   exportAutresTexte: { color: c.ink, fontSize: 17, fontWeight: '600', letterSpacing: -0.2 },
   exportAutresDetail: { color: c.inkSoft, fontSize: 13, lineHeight: 17, marginTop: 3 },
-  exportAutresChevron: { color: c.inkFaint, fontSize: 22, fontWeight: '600' },
+  // Le chevron de l'app (tracé vers la gauche), tourné vers le bas : la
+  // liste se déplie sur place.
+  exportAutresChevron: { transform: [{ rotate: '-90deg' }] },
   /*
     LA FEUILLE D'EXPORT, EN SOMBRE, SE DÉTACHE DU PLAN — revue « sombre-20 » :
     la carte avait la surface du plan sous un voile léger, et l'œil ne
@@ -1160,18 +1162,10 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
         borderColor: c.lineStrong,
       }
     : {},
-  /* L'en-tête porte la croix, à droite du titre, comme les autres feuilles. */
+  /* L'en-tête : la croix est celle de la coquille commune (`SheetShell`),
+     posée en haut à droite, comme sur les autres feuilles. */
   exportEntete: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   exportEnteteTextes: { flex: 1, minWidth: 0 },
-  // Quarante-quatre points sous le doigt, le dessin en fait vingt.
-  exportCroix: {
-    width: 44,
-    height: 44,
-    marginTop: -10,
-    marginRight: -10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   /* Une hauteur MINIMALE : le texte fait grandir la carte, il n'est plus
      coupé (« à envoyer… »). Le rembourrage garde l'air quand il grandit. */
   exportCarte: {

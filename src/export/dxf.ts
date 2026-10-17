@@ -41,12 +41,15 @@ import { FIXTURES, type Fixture } from '../geometry/electrical';
 import { CEILINGS, type CeilingFixture } from '../geometry/ceiling';
 import { longueurDuRuban } from '../geometry/ruban';
 import { deplierLigatures } from '../ui/mots';
+import { nomDeFichier } from './nomDeFichier';
 
 /** Un calque du fichier : son nom, et sa couleur d'index AutoCAD. */
 export interface CalqueDxf {
   nom: string;
   /** Index de couleur : 7 = noir/blanc selon le fond, 1 = rouge, 5 = bleu… */
   couleur: number;
+  /** Le calque se trace en tireté (`DASHED`) : les murs à démolir. */
+  tirete?: boolean;
 }
 
 /**
@@ -82,7 +85,11 @@ export const DXF_CALQUES: CalqueDxf[] = [
   */
   { nom: 'ECHOPLAN-CLOISONS', couleur: 8 },
   { nom: 'ECHOPLAN-DOUBLAGES', couleur: 9 },
-  { nom: 'ECHOPLAN-A-DEMOLIR', couleur: 2 },
+  /*
+    À DÉMOLIR, EN TIRETÉ — comme sur le PDF : en trait continu, le DXF
+    disait « mur » là où le dossier disait « mur qui part ».
+  */
+  { nom: 'ECHOPLAN-A-DEMOLIR', couleur: 2, tirete: true },
   { nom: 'ECHOPLAN-A-CREER', couleur: 1 },
   { nom: 'ECHOPLAN-MEUBLES', couleur: 8 },
   { nom: 'ECHOPLAN-ELEC', couleur: 1 },
@@ -165,10 +172,35 @@ const MM = 1000;
   murs sortent d'aplomb. Posée à chaque `buildDxf`.
 */
 let tourner: (p: Pt) => Pt = (p) => p;
+/*
+  L'ÉTENDUE DU DESSIN, relevée au passage — chaque point écrit passe par
+  `pt`. Remise à zéro à chaque `buildDxf`, elle remplit $EXTMIN et $EXTMAX
+  (voir l'en-tête).
+*/
+let etendue = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
 const pt = (p: Pt) => {
   const q = tourner(p);
-  return { x: q.x * MM, y: -q.z * MM };
+  const r = { x: q.x * MM, y: -q.z * MM };
+  if (Number.isFinite(r.x) && Number.isFinite(r.y)) {
+    if (r.x < etendue.x0) etendue.x0 = r.x;
+    if (r.x > etendue.x1) etendue.x1 = r.x;
+    if (r.y < etendue.y0) etendue.y0 = r.y;
+    if (r.y > etendue.y1) etendue.y1 = r.y;
+  }
+  return r;
 };
+
+/**
+ * LE TIRETÉ, EN MILLIMÈTRES DU BÂTIMENT — le fichier est en millimètres :
+ * un motif de 0,5 unité (celui des gabarits d'AutoCAD, pensé en pouces de
+ * papier) ferait des traits d'un demi-millimètre sur un mur de quatre
+ * mètres, et la ligne paraîtrait continue. 150 mm de trait, 75 mm de blanc :
+ * au 1:50, trois millimètres et un et demi sur la feuille, comme au PDF.
+ */
+export const TIRETE_MM = { trait: 150, blanc: 75 };
+
+/** La marge autour du dessin dans l'étendue déclarée : 5 % de chaque côté. */
+const MARGE_ETENDUE = 0.05;
 
 /** Une paire code/valeur, la brique unique du format. */
 const paire = (code: number | string, valeur: string | number) =>
@@ -290,28 +322,13 @@ export function buildDxf(plan: PlanPourDxf): string {
   const cosT = Math.cos(-trame);
   const sinT = Math.sin(-trame);
   tourner = (p: Pt) => ({ x: p.x * cosT - p.z * sinT, z: p.x * sinT + p.z * cosT });
+  etendue = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
 
-  /* ------------------------------------------------------------ en-tête */
-  out += paire(0, 'SECTION') + paire(2, 'HEADER');
-  out += paire(9, '$ACADVER') + paire(1, 'AC1009');
-  // 4 = millimètres. Le logiciel d'accueil sait alors mettre le dessin à
-  // l'échelle de son projet sans qu'on ait à le dire dans un courriel.
-  out += paire(9, '$INSUNITS') + paire(70, 4);
-  out += paire(0, 'ENDSEC');
-
-  /* ------------------------------------------------------------ calques */
-  out += paire(0, 'SECTION') + paire(2, 'TABLES');
-  out += paire(0, 'TABLE') + paire(2, 'LAYER') + paire(70, DXF_CALQUES.length);
-  for (const c of DXF_CALQUES) {
-    out +=
-      paire(0, 'LAYER') +
-      paire(2, c.nom) +
-      paire(70, 0) +
-      paire(62, c.couleur) +
-      paire(6, 'CONTINUOUS');
-  }
-  out += paire(0, 'ENDTAB') + paire(0, 'ENDSEC');
-
+  /*
+    LES ENTITÉS D'ABORD, L'EN-TÊTE ENSUITE — l'en-tête déclare l'étendue du
+    dessin, qu'on ne connaît qu'une fois tout tracé. Il est posé devant au
+    moment de rendre le fichier (voir `enTeteEtTables`).
+  */
   /* ----------------------------------------------------------- entités */
   out += paire(0, 'SECTION') + paire(2, 'ENTITIES');
 
@@ -567,13 +584,91 @@ export function buildDxf(plan: PlanPourDxf): string {
 
   out += paire(0, 'ENDSEC');
   out += paire(0, 'EOF');
+  return enTeteEtTables() + out;
+}
+
+/**
+ * L'EN-TÊTE ET LES TABLES — la version, l'unité, l'étendue, les types de
+ * trait et les calques.
+ *
+ * L'ÉTENDUE — revue de l'export : sans $EXTMIN/$EXTMAX ni $LIMMIN/$LIMMAX,
+ * bien des visionneuses (iPhone, eDrawings, logiciels de menuiserie)
+ * ouvraient la vue par défaut, 12 × 9 unités, sur un dessin qui en fait huit
+ * mille : le destinataire voyait un écran vide tant qu'il n'avait pas fait
+ * un « zoom étendu ». Le dessin est déclaré avec 5 % de marge.
+ */
+function enTeteEtTables(): string {
+  let out = '';
+  /* ------------------------------------------------------------ en-tête */
+  out += paire(0, 'SECTION') + paire(2, 'HEADER');
+  out += paire(9, '$ACADVER') + paire(1, 'AC1009');
+  // 4 = millimètres. Le logiciel d'accueil sait alors mettre le dessin à
+  // l'échelle de son projet sans qu'on ait à le dire dans un courriel.
+  // (Variable venue après le R12 : un lecteur R12 strict l'ignore, les
+  // logiciels récents la lisent — on la garde.)
+  out += paire(9, '$INSUNITS') + paire(70, 4);
+  if (Number.isFinite(etendue.x0) && Number.isFinite(etendue.y0)) {
+    // Un dessin réduit à un point garde une étendue d'un mètre.
+    const mx = Math.max(etendue.x1 - etendue.x0, 1000) * MARGE_ETENDUE;
+    const my = Math.max(etendue.y1 - etendue.y0, 1000) * MARGE_ETENDUE;
+    const x0 = (etendue.x0 - mx).toFixed(2);
+    const y0 = (etendue.y0 - my).toFixed(2);
+    const x1 = (etendue.x1 + mx).toFixed(2);
+    const y1 = (etendue.y1 + my).toFixed(2);
+    out += paire(9, '$EXTMIN') + paire(10, x0) + paire(20, y0) + paire(30, '0.0');
+    out += paire(9, '$EXTMAX') + paire(10, x1) + paire(20, y1) + paire(30, '0.0');
+    out += paire(9, '$LIMMIN') + paire(10, x0) + paire(20, y0);
+    out += paire(9, '$LIMMAX') + paire(10, x1) + paire(20, y1);
+  }
+  // L'échelle des types de trait : 1, le motif est déjà en millimètres.
+  out += paire(9, '$LTSCALE') + paire(40, '1.0');
+  out += paire(0, 'ENDSEC');
+
+  out += paire(0, 'SECTION') + paire(2, 'TABLES');
+  /* ---------------------------------------------------- types de trait */
+  // Le R12 range les types de trait AVANT les calques qui les nomment.
+  const { trait, blanc } = TIRETE_MM;
+  out += paire(0, 'TABLE') + paire(2, 'LTYPE') + paire(70, 2);
+  out +=
+    paire(0, 'LTYPE') +
+    paire(2, 'CONTINUOUS') +
+    paire(70, 0) +
+    paire(3, 'Solid line') +
+    paire(72, 65) +
+    paire(73, 0) +
+    paire(40, '0.0');
+  out +=
+    paire(0, 'LTYPE') +
+    paire(2, 'DASHED') +
+    paire(70, 0) +
+    paire(3, 'Dashed __ __ __') +
+    paire(72, 65) +
+    paire(73, 2) +
+    paire(40, (trait + blanc).toFixed(1)) +
+    paire(49, trait.toFixed(1)) +
+    paire(49, (-blanc).toFixed(1));
+  out += paire(0, 'ENDTAB');
+
+  /* ------------------------------------------------------------ calques */
+  out += paire(0, 'TABLE') + paire(2, 'LAYER') + paire(70, DXF_CALQUES.length);
+  for (const c of DXF_CALQUES) {
+    out +=
+      paire(0, 'LAYER') +
+      paire(2, c.nom) +
+      paire(70, 0) +
+      paire(62, c.couleur) +
+      paire(6, c.tirete ? 'DASHED' : 'CONTINUOUS');
+  }
+  out += paire(0, 'ENDTAB') + paire(0, 'ENDSEC');
   return out;
 }
 
-/** Le nom du fichier : celui du dossier, débarrassé de ce qu'un disque refuse. */
-export function dxfFilename(nom: string): string {
-  // Le « + » reste : « R+1 » devenait « R-1 », lu comme un sous-sol (revue « Inès »).
-  const base = sansAccent(nom).trim().replace(/[^A-Za-z0-9 _+-]/g, ' ');
-  const propre = base.replace(/\s+/g, '-').replace(/^-+|-+$/g, '');
-  return `${propre || 'plan'}.dxf`;
+/**
+ * « Dupont - Plan.dxf » : la règle commune à tous les exports (voir
+ * `nomDeFichier`), accents dépliés — le fichier part chez des logiciels de
+ * dessin qui n'en veulent pas. Le « + » reste : « R+1 » devenait « R-1 »,
+ * lu comme un sous-sol (revue « Inès »).
+ */
+export function dxfFilename(nom: string, niveau?: string): string {
+  return nomDeFichier(nom, 'dxf', { genre: 'Plan', niveau, ascii: true });
 }

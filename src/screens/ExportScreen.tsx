@@ -634,13 +634,56 @@ const styles = getStyles(c);
     if (exportEnCours.current) return;
     if (!particulier && !client.trim() && net) {
       alerte('Le client n’est pas renseigné', 'Son nom et l’adresse du chantier s’impriment sur chaque feuille.', [
-        { label: 'Le renseigner' },
+        { label: 'Le renseigner', onPress: renseignerPuisExporter },
         { label: 'Exporter quand même', onPress: () => exporterLeDossier() },
       ]);
       return;
     }
     exporterLeDossier();
   };
+
+  /*
+    « LE RENSEIGNER » RENSEIGNE — revue de l'export : le bouton ne faisait
+    que fermer l'alerte. Il fallait remonter chercher la case « Client », la
+    toucher, puis réappuyer sur « Exporter ». Il ouvre maintenant la saisie
+    du nom, enchaîne sur l'adresse du chantier si elle manque, et l'export
+    repart de lui-même à l'enregistrement. Refermer une saisie sans
+    l'enregistrer n'envoie rien : c'est un renoncement.
+
+    LA RELANCE PASSE PAR UN ÉTAT, pas par un appel direct : appelé depuis la
+    saisie, `exporterLeDossier` serait celui du rendu où le client était
+    encore vide, et le dossier partirait sans lui. L'effet, lui, tourne au
+    rendu qui suit l'enregistrement — client compris.
+  */
+  const [relancerExport, setRelancerExport] = useState(false);
+  const renseignerPuisExporter = () =>
+    setPrompt({
+      title: 'Nom du client',
+      subtitle: 'Il paraît dans le cartouche de chaque feuille.',
+      value: useScanStore.getState().client,
+      okLabel: 'Enregistrer',
+      onSubmit: (nom: string) => {
+        if (!nom.trim()) return;
+        const adresse = useScanStore.getState().address;
+        setClientInfo(nom, adresse);
+        if (adresse.trim()) {
+          setRelancerExport(true);
+          return;
+        }
+        // La saisie suivante attend que celle-ci soit partie : `onSubmit`
+        // ne vient qu'une fois la feuille descendue (voir `PromptSheet`).
+        setPrompt({
+          title: 'Adresse du chantier',
+          subtitle: 'Elle paraît dans le cartouche de chaque feuille.',
+          value: '',
+          okLabel: 'Exporter',
+          onSubmit: (a: string) => {
+            setClientInfo(useScanStore.getState().client, a);
+            setRelancerExport(true);
+          },
+        });
+      },
+    });
 
   const exporterLeDossier = async (sansLesIntrouvables = false) => {
     /* L'aperçu est libre, l'export est Pro : la barrière est ici — voir
@@ -706,7 +749,11 @@ const styles = getStyles(c);
         pret.current && pret.current.cle === empreinte && vignettes.length === 0
           ? pret.current.bytes
           : batir(vignettes);
-      await RoomScan.sharePDF(toBase64(bytes), pdfFilename(titreDuDossier));
+      await RoomScan.sharePDF(
+        toBase64(bytes),
+        // Le niveau à part, écrit comme au tableur et au DXF (voir `nomDeFichier`).
+        pdfFilename(scanName, niveaux.length > 1 && !multi ? nomDuNiveau(niveauCourant) : undefined),
+      );
     } catch (e: any) {
       const p = signaler('export', e, 'export');
       alerte(p.titre, p.message);
@@ -715,6 +762,13 @@ const styles = getStyles(c);
       setPreparation(false);
     }
   };
+  // Le client vient d'être renseigné : l'export repart, avec lui.
+  useEffect(() => {
+    if (!relancerExport) return;
+    setRelancerExport(false);
+    exporterLeDossier();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [relancerExport]);
 
   /** Une vue de l'écran, dans les unités du document. */
   const conv = (v: View3DParams, b: { w: number; h: number }) => ({
@@ -1266,6 +1320,39 @@ const styles = getStyles(c);
             />
           )}
 
+          {/*
+            LES CARTES DANS L'ORDRE DES FEUILLES — revue de l'export : cocher
+            « Plan des gaines », avant-dernière carte, faisait paraître sa
+            feuille en cinquième place de l'aperçu, avant les murs de face
+            listés au-dessus. L'écran se lit maintenant comme le sommaire du
+            dossier (voir `planifierLeDossier`) : métré, achats, tableau
+            existant, gaines, vues 3D, murs de face, schémas.
+          */}
+          {/* ------------------------------------------ le tableau existant */}
+          {combien(sommaire, 'existant') > 0 && (
+            <Carte
+              icone={EXPORT_ICONS.cotesElec}
+              titre="Tableau existant"
+              dit="Le tableau relevé sur place, et ce qu’il faut reprendre."
+              pages="Inclus d’office"
+            />
+          )}
+
+          {/* ------------------------------------------ le plan des gaines */}
+          {cheminements && (
+            <Carte
+              icone={EXPORT_ICONS.gaines}
+              titre="Plan des gaines"
+              // Le passage en plafond se dit dès la carte (relevé du patron,
+              // voir `routing.ts`) : c'est lui qui fait le métré.
+              dit="Passage en plafond, retombées le long des murs, et le tirage circuit par circuit."
+              pages={pagesDe(gaines, combien(sommaire, 'gaines'), 1)}
+              actif={gaines}
+              label="Plan des gaines"
+              onChange={(v) => basculer(() => setGaines(v))}
+            />
+          )}
+
           {/* ---------------------------------------------- les vues 3D */}
           <Carte
             icone={EXPORT_ICONS.vues3d}
@@ -1321,21 +1408,6 @@ const styles = getStyles(c);
             )}
           </Carte>
 
-          {/* ------------------------------------------ le plan des gaines */}
-          {cheminements && (
-            <Carte
-              icone={EXPORT_ICONS.gaines}
-              titre="Plan des gaines"
-              // Le passage en plafond se dit dès la carte (relevé du patron,
-              // voir `routing.ts`) : c'est lui qui fait le métré.
-              dit="Passage en plafond, retombées le long des murs, et le tirage circuit par circuit."
-              pages={pagesDe(gaines, combien(sommaire, 'gaines'), 1)}
-              actif={gaines}
-              label="Plan des gaines"
-              onChange={(v) => basculer(() => setGaines(v))}
-            />
-          )}
-
           {/* ------------------------------------------- les schémas */}
           {schemas && (
             <Carte
@@ -1346,16 +1418,6 @@ const styles = getStyles(c);
               actif={schema}
               label="Schémas"
               onChange={(v) => basculer(() => setSchema(v))}
-            />
-          )}
-
-          {/* ------------------------------------------ le tableau existant */}
-          {combien(sommaire, 'existant') > 0 && (
-            <Carte
-              icone={EXPORT_ICONS.cotesElec}
-              titre="Tableau existant"
-              dit="Le tableau relevé sur place, et ce qu’il faut reprendre."
-              pages="Inclus d’office"
             />
           )}
 

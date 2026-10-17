@@ -144,8 +144,10 @@ describe('les coordonnées', () => {
       droite. C'est le genre d'erreur qui ne se voit qu'une fois le mobilier
       commandé.
     */
-    const dxf = buildDxf(PLAN);
-    const ys = paires(dxf)
+    // Les entités seules : l'en-tête déclare l'étendue avec sa marge.
+    const toutes = paires(buildDxf(PLAN));
+    const ys = toutes
+      .slice(toutes.findIndex(([c, v]) => c === '2' && v === 'ENTITIES'))
       .filter(([code]) => code === '20')
       .map(([, v]) => parseFloat(v));
     // La pièce va de z = 0 à z = 3 m : en DXF, de −3000 à 0. Le contour des
@@ -185,7 +187,7 @@ describe('les textes', () => {
 
 describe('le nom du fichier', () => {
   it('reprend celui du dossier, sans caractère interdit', () => {
-    expect(dxfFilename('Chantier Dupont')).toBe('Chantier-Dupont.dxf');
+    expect(dxfFilename('Chantier Dupont')).toBe('Chantier Dupont - Plan.dxf');
     expect(dxfFilename('T3 / rue Pasteur')).not.toMatch(/[/\\:]/);
     expect(dxfFilename('')).toMatch(/\.dxf$/);
   });

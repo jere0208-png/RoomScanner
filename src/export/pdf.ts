@@ -71,7 +71,7 @@ import {
 } from '../geometry/travaux';
 import { surfacesHabitables } from '../geometry/habitable';
 import type { PlafondDeLaPiece } from '../geometry/fichePiece';
-import { wallLabel, type DeviceName } from '../geometry/naming';
+import { wallCardinal, wallLabel, type DeviceName } from '../geometry/naming';
 import {
   FIXTURES,
   FIXTURE_TAG,
@@ -172,7 +172,7 @@ import {
   type PrixDuDevis,
 } from '../geometry/mainDOeuvre';
 import { nomDeTeinte } from '../ui/peintures';
-import { deplierLigatures } from '../ui/mots';
+import { nomDeFichier } from './nomDeFichier';
 
 const PAGE_W = 595;
 const PAGE_H = 842;
@@ -451,7 +451,55 @@ function bytesOf(s: string): Uint8Array {
 }
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/*
+  LE BASE64 PAR LE MOTEUR, PAS PAR UNE BOUCLE — revue de performance : la
+  boucle ci-dessous encodait le PDF octet par octet, quatre concaténations
+  pour trois octets, d'un bloc sur le fil JS — après chaque option de
+  l'export (l'aperçu) et à chaque « Partager ». Sur un dossier de 500 Ko,
+  sans JIT, cela figeait l'écran une centaine de millisecondes ; photos
+  comprises, bien plus. Hermes fournit `btoa` et `atob` (React Native 0.74
+  et après) : on les prend quand ils sont là, la boucle reste en repli. La
+  sortie est la même, octet pour octet.
+
+  Des tranches de 3 × 8 192 octets : un multiple de trois, pour que chaque
+  tranche s'encode sans « = » de bourrage et que les morceaux se recollent
+  tels quels. Chaque tranche se lit en trois appels de 8 192 signes, la
+  taille que `fluxDePage` donne déjà à `String.fromCharCode.apply`.
+*/
+const SIGNES_PAR_APPEL = 8192;
+const TRANCHE_B64 = 3 * SIGNES_PAR_APPEL;
+const btoaNatif = (): ((s: string) => string) | null =>
+  typeof (globalThis as { btoa?: unknown }).btoa === 'function'
+    ? (globalThis as unknown as { btoa: (s: string) => string }).btoa
+    : null;
+const atobNatif = (): ((s: string) => string) | null =>
+  typeof (globalThis as { atob?: unknown }).atob === 'function'
+    ? (globalThis as unknown as { atob: (s: string) => string }).atob
+    : null;
+
 export function toBase64(bytes: Uint8Array): string {
+  const encoder = btoaNatif();
+  if (encoder) {
+    try {
+      let out = '';
+      for (let i = 0; i < bytes.length; i += TRANCHE_B64) {
+        const fin = Math.min(i + TRANCHE_B64, bytes.length);
+        let bin = '';
+        for (let k = i; k < fin; k += SIGNES_PAR_APPEL) {
+          bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(k, Math.min(k + SIGNES_PAR_APPEL, fin))));
+        }
+        out += encoder(bin);
+      }
+      return out;
+    } catch {
+      // Un moteur qui refuserait : la boucle fait le même travail.
+    }
+  }
+  return toBase64Boucle(bytes);
+}
+
+function toBase64Boucle(bytes: Uint8Array): string {
   let out = '';
   for (let i = 0; i < bytes.length; i += 3) {
     const a = bytes[i];
@@ -495,6 +543,21 @@ for (let i = 0; i < 64; i++) {
 /** Base64 → chaîne d'octets. Tolère un préfixe `data:` et les sauts de ligne. */
 export function fromBase64(b64: string): string {
   const src = b64.slice(b64.indexOf(',') + 1).replace(/[^A-Za-z0-9+/]/g, '');
+  /*
+    Le décodeur du moteur d'abord (voir `toBase64`), le bourrage rétabli :
+    le nettoyage ci-dessus retire les « = », et tous les moteurs n'acceptent
+    pas une chaîne sans eux. Une longueur impossible (4k + 1) n'a pas de
+    bourrage valable : la boucle la décode comme elle l'a toujours fait.
+  */
+  const decodeur = atobNatif();
+  const reste = src.length % 4;
+  if (decodeur && reste !== 1) {
+    try {
+      return decodeur(reste === 0 ? src : src + (reste === 2 ? '==' : '='));
+    } catch {
+      // Repli : la boucle.
+    }
+  }
   let out = '';
   for (let i = 0; i < src.length; i += 4) {
     const a = B64_INV[src[i]] ?? 0;
@@ -576,8 +639,60 @@ export function pdfImage(name: string, base64: string): PdfImage | null {
 function buildDocument(
   pageStreams: string[],
   images: PdfImage[] = [],
+  infos?: InfosDuDocument,
 ): Uint8Array {
-  return assemblerLeDocument(pageStreams.map(fluxDePage), images);
+  return assemblerLeDocument(pageStreams.map(fluxDePage), images, infos);
+}
+
+/**
+ * LE TITRE ET L'AUTEUR DU DOCUMENT — revue de l'export : le PDF n'avait ni
+ * dictionnaire /Info ni langue. Aperçu, Acrobat et la file d'impression
+ * AirPrint n'affichaient que « Appartement-exemple.pdf », et Fichiers comme
+ * Spotlight n'avaient ni titre ni auteur à indexer. Le dossier porte
+ * maintenant son vrai titre et, quand l'artisan l'a renseignée, son
+ * entreprise comme auteur.
+ */
+export interface InfosDuDocument {
+  /** « Appartement exemple — Dossier du logement ». */
+  titre: string;
+  /** L'entreprise de l'artisan, si elle est renseignée. */
+  auteur?: string;
+}
+
+/**
+ * Une chaîne de texte du PDF hors des pages : en UTF-16 (gros-boutiste,
+ * marquée), la seule écriture que tous les lecteurs lisent pour les
+ * métadonnées — le WinAnsi des pages n'y vaut pas, et « — » s'y perdrait.
+ */
+function chaineDeTexte(s: string): string {
+  let hex = 'FEFF';
+  for (let i = 0; i < s.length; i++) {
+    hex += s.charCodeAt(i).toString(16).toUpperCase().padStart(4, '0');
+  }
+  return `<${hex}>`;
+}
+
+/**
+ * La date du document, AU JOUR — celle que le cartouche imprime. À la
+ * seconde, deux constructions du même dossier (l'aperçu, puis l'envoi)
+ * n'auraient plus été identiques octet pour octet.
+ */
+function dateDuDocument(): string {
+  const d = new Date();
+  const deux = (v: number) => String(v).padStart(2, '0');
+  return `D:${d.getFullYear()}${deux(d.getMonth() + 1)}${deux(d.getDate())}`;
+}
+
+/** Les métadonnées du dossier : son titre, et l'artisan qui le remet. */
+function infosDuDossier(scan: ScanForPdf): InfosDuDocument {
+  // Le même mot que la page de garde (voir `gardePage`).
+  const chantier = !scan.particulier && !!scan.modeElec;
+  const nom = scan.name.trim();
+  const genre = chantier ? 'Dossier de chantier' : 'Dossier du logement';
+  return {
+    titre: nom ? `${nom} \u2014 ${genre}` : genre,
+    auteur: scan.entreprise?.nom?.trim() || undefined,
+  };
 }
 
 /**
@@ -590,6 +705,7 @@ function buildDocument(
 function assemblerLeDocument(
   fluxDesPages: string[],
   images: PdfImage[] = [],
+  infos?: InfosDuDocument,
 ): Uint8Array {
   const objects: string[] = [];
   const add = (body: string) => {
@@ -640,7 +756,23 @@ function assemblerLeDocument(
   const pagesId = add(
     `<< /Type /Pages /Kids [${pageIds.map((i) => `${i} 0 R`).join(' ')}] /Count ${pageIds.length} >>`,
   );
-  const catalogId = add(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+  /*
+    LA LANGUE ET LE TITRE À L'OUVERTURE : /Lang dit au lecteur d'écran et à
+    la recherche que le texte est français ; /DisplayDocTitle fait afficher
+    le titre du document, pas le nom du fichier, dans la barre du lecteur.
+  */
+  const catalogId = add(
+    infos
+      ? `<< /Type /Catalog /Pages ${pagesId} 0 R /Lang (fr-FR) /ViewerPreferences << /DisplayDocTitle true >> >>`
+      : `<< /Type /Catalog /Pages ${pagesId} 0 R >>`,
+  );
+  const infoId = infos
+    ? add(
+        `<< /Title ${chaineDeTexte(infos.titre)}` +
+          (infos.auteur ? ` /Author ${chaineDeTexte(infos.auteur)}` : '') +
+          ` /Creator (EchoPlan) /Producer (EchoPlan) /CreationDate (${dateDuDocument()}) >>`,
+      )
+    : 0;
   for (const i of pageIds) {
     objects[i - 1] = objects[i - 1].replace('@P', String(pagesId));
   }
@@ -657,7 +789,7 @@ function assemblerLeDocument(
     out += `${String(off).padStart(10, '0')} 00000 n \n`;
   }
   out +=
-    `trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\n` +
+    `trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R${infoId ? ` /Info ${infoId} 0 R` : ''} >>\n` +
     `startxref\n${xref}\n%%EOF`;
   return bytesOf(out);
 }
@@ -1328,8 +1460,27 @@ function drawSheetChrome(
     LE PARTICULIER N'A PAS DE CLIENT — relevé du patron, point 1 de la
     réflexion « grand public » : le dossier parlait métier (« Client »,
     « Chantier ») à quelqu'un qui relève son propre logement.
+
+    L'ÉTIQUETTE DIT CE QUI EST ÉCRIT DESSOUS — revue de l'export : l'adresse
+    seule s'imprimait « PROPRIÉTAIRE : 12 rue des Lilas », et, rien de
+    rempli, « FICHIER Appartement-exemple.pdf » sur chaque feuille — un nom
+    technique, tirets compris, sur le dossier qu'on remet à un acheteur.
+    Le nom renseigné : CLIENT ou PROPRIÉTAIRE. L'adresse seule : CHANTIER
+    ou ADRESSE. Rien : PROJET ou LOGEMENT, et le nom du projet tel qu'on
+    l'a écrit — ni la date (elle a sa case), ni une case vide.
   */
-  etiquette(aQui ? (info.particulier ? 'PROPRIÉTAIRE' : 'CLIENT') : 'FICHIER', cols[0] + 12, ty + 24);
+  const libelle = info.client
+    ? info.particulier
+      ? 'PROPRIÉTAIRE'
+      : 'CLIENT'
+    : info.address
+      ? info.particulier
+        ? 'ADRESSE'
+        : 'CHANTIER'
+      : info.particulier
+        ? 'LOGEMENT'
+        : 'PROJET';
+  etiquette(libelle, cols[0] + 12, ty + 24);
   /*
     SANS COUPER — relevé des revues du dossier : « 12 rue des Lila… » sur
     toutes les feuilles. Quand la ligne ne tient pas, le client et
@@ -1341,7 +1492,7 @@ function drawSheetChrome(
     d.text(fitText(info.client!, 7, width(0)), cols[0] + 12, ty + 14, 7, GREY, { align: 'left' });
     d.text(fitText(info.address!, 7, width(0)), cols[0] + 12, ty + 5.5, 7, GREY, { align: 'left' });
   } else {
-    d.text(fitText(aQui || info.filename, 8, width(0)), cols[0] + 12, ty + 12, 8, GREY, {
+    d.text(fitText(aQui || info.project, 8, width(0)), cols[0] + 12, ty + 12, 8, GREY, {
       align: 'left',
     });
   }
@@ -7573,7 +7724,7 @@ export function buildMaterialPdf(
       'douche a été relevée, et la puissance réellement raccordée ne l’est pas.',
   );
 
-  const filename = pdfFilename(`${name} - materiel`);
+  const filename = materialFilename(name);
   pages.forEach((p, i) =>
     drawSheetChrome(p, {
       project: name,
@@ -7583,7 +7734,11 @@ export function buildMaterialPdf(
       scaleLabel: null,
     }),
   );
-  return buildDocument(pages.map((p) => p.stream()));
+  return buildDocument(
+    pages.map((p) => p.stream()),
+    [],
+    { titre: name.trim() ? `${name.trim()} \u2014 Liste du matériel` : 'Liste du matériel' },
+  );
 }
 
 /**
@@ -7639,9 +7794,9 @@ const enEuros = (v: number) => {
   return `${e.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')},${c} €`;
 };
 
+/** « Dupont - Devis 2026-014.pdf » : la règle commune (voir `nomDeFichier`). */
 export function devisFilename(numero: string, chantier: string): string {
-  const nom = chantier.replace(/[\\/:*?"<>|]/g, ' ').trim();
-  return `Devis ${numero}${nom ? ` — ${nom}` : ''}.pdf`;
+  return nomDeFichier(chantier, 'pdf', { genre: `Devis ${numero}` });
 }
 
 export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
@@ -7912,30 +8067,24 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   feuilles.forEach((f, i) => {
     f.text(fitText(`${signe} · Devis n° ${e.numero} — page ${i + 1} / ${feuilles.length}`, 7.5, X1 - X0), PAGE_W / 2, 30, 7.5, GREY_LIGHT);
   });
-  return buildDocument(feuilles.map((f) => f.stream()));
+  return buildDocument(feuilles.map((f) => f.stream()), [], {
+    titre: `Devis ${e.numero}${e.chantier.trim() ? ` \u2014 ${e.chantier.trim()}` : ''}`,
+    auteur: ent?.nom?.trim() || undefined,
+  });
 }
 
+/** « Dupont - Liste du matériel.pdf » — plus de « ---materiel ». */
 export function materialFilename(name: string): string {
-  return pdfFilename(`${name} - materiel`);
+  return nomDeFichier(name, 'pdf', { genre: 'Liste du matériel' });
 }
 
-export function pdfFilename(name: string): string {
-  /*
-    « É » DEVIENT « E », IL NE DISPARAÎT PAS — revue « Inès » : « 1er étage »
-    donnait « 1er-tage », « Rez-de-chaussée » « Rez-de-chausse ». Et le
-    « + » de « R+1 » reste.
-  */
-  // « œ », « æ », « ß » se déplient AVANT `latin1`, qui fait de « œ » un
-  // octet WinAnsi que le filtre effaçait (voir `deplierLigatures`).
-  const clean = latin1(deplierLigatures(name))
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    // « 12/10/2026 » devient « 12-10-2026 », comme dans le DXF (revue « Léa »).
-    .replace(/[\\/:]+/g, ' ')
-    .replace(/[^\w\-+ ]/g, '')
-    .trim()
-    .replace(/\s+/g, '-');
-  return `${clean || 'echoplan'}.pdf`;
+/**
+ * « Dupont - Plan.pdf », « Dupont - 1er étage - Plan.pdf » : la règle
+ * commune à tous les exports (voir `nomDeFichier`). Les accents restent —
+ * « 1er étage » ne devient plus « 1er-etage » —, le « + » de « R+1 » aussi.
+ */
+export function pdfFilename(name: string, niveau?: string): string {
+  return nomDeFichier(name, 'pdf', { genre: 'Plan', niveau });
 }
 
 /**
@@ -8581,6 +8730,36 @@ function planifierUnNiveau(
     const pire = e[0].ratio >= e[1].ratio ? e[0] : e[1];
     return pire.ratio <= 50 ? pire : null;
   };
+  /*
+    UNE LÉGENDE QUI DIT QUELLE PIÈCE — revue de l'export : dans l'aperçu,
+    les murs de face s'appelaient « Mur 1 », « Murs 2 et 3 »… jusqu'à
+    « Murs 20 et 21 », sans rien qui dise de quelle pièce il s'agissait ; il
+    fallait ouvrir les feuilles une à une pour trouver la bonne. Le sommaire
+    porte maintenant la pièce et l'orientation, en court : « Mur 1 · Séjour
+    N », « Murs 2-3 · Chambre », « Murs 4-5 · deux faces ». La feuille, elle,
+    garde son titre complet.
+  */
+  // Le découpage des pièces, calculé au premier mur nommé seulement : sans
+  // murs de face, le sommaire ne le paie pas.
+  let parties: ReturnType<typeof roomParts> | null = null;
+  const partiesDesPieces = () => (parties ??= roomParts(ctx.walls, ctx.rooms));
+  const AIRE_COURTE: Record<string, string> = {
+    nord: 'N',
+    'nord-est': 'NE',
+    est: 'E',
+    'sud-est': 'SE',
+    sud: 'S',
+    'sud-ouest': 'SO',
+    ouest: 'O',
+    'nord-ouest': 'NO',
+  };
+  const pieceDeLaFace = (f: FaceAElever) => pieceDe(f) ?? roomOf(f.wall);
+  const nomDeLaPiece = (f: FaceAElever) => ctx.roomNames[pieceDeLaFace(f)] ?? '';
+  const legendeDeLaFace = (f: FaceAElever) => {
+    const centre = partiesDesPieces().find((p) => p.roomId === pieceDeLaFace(f))?.labelAt;
+    const aire = centre ? wallCardinal(f.wall, centre, ctx.north ?? null, f.cote) : null;
+    return [nomDeLaPiece(f), aire ? AIRE_COURTE[aire] ?? '' : ''].filter(Boolean).join(' ');
+  };
   let numeroDeFace = 0;
   for (let i = 0; i < murs.length; i++) {
     const a = murs[i];
@@ -8595,7 +8774,10 @@ function planifierUnNiveau(
     if (b && commune) {
       feuilles.push({
         genre: 'elevation',
-        titre: `Murs ${numeroDeFace} et ${numeroDeFace + 1}`,
+        titre: (() => {
+          const quoi = a.wall.id === b.wall.id ? 'deux faces' : nomDeLaPiece(a);
+          return `Murs ${numeroDeFace}-${numeroDeFace + 1}${quoi ? ` · ${quoi}` : ''}`;
+        })(),
         fabriquer: (n) => elevationsDeDeuxFaces(ctx, n, a, b, commune),
         depend: { ctx, lit: LU_PAR_LES_FACES, args: [a, b, commune] },
       });
@@ -8606,7 +8788,10 @@ function planifierUnNiveau(
     const cliches = avecCliches[i];
     feuilles.push({
       genre: 'elevation',
-      titre: `Mur ${numeroDeFace}`,
+      titre: (() => {
+        const quoi = legendeDeLaFace(a);
+        return `Mur ${numeroDeFace}${quoi ? ` · ${quoi}` : ''}`;
+      })(),
       fabriquer: (n) => elevationPage(ctx, n, a.wall, cliches, a.cote),
       // Une photo compte par ce que la page en écrit : son nom, sa taille,
       // sa cote — pas ses octets, qui vont au document, pas à la page.
@@ -8748,7 +8933,7 @@ export function buildScanPdf(
   const { feuilles, images } = planifierLeDossier(scan, include3D, opts);
   const total = feuilles.length;
   const pages = feuilles.map((f, i) => f.fabriquer(`${i + 1} / ${total}`));
-  return buildDocument(pages, images);
+  return buildDocument(pages, images, infosDuDossier(scan));
 }
 
 /*
@@ -8942,7 +9127,7 @@ export function chantierDuDossier(
     pages[i] = null;
   };
   const assembler = () => {
-    fini = assemblerLeDocument(flux as string[], images);
+    fini = assemblerLeDocument(flux as string[], images, infosDuDossier(scan));
     // Le cache ne garde que les deux derniers dossiers achevés.
     for (const m of [cache.dessins, cache.flux, cache.empreintes] as Map<string, unknown>[]) {
       for (const k of [...m.keys()]) if (!vus.has(k) && !cache.precedent.has(k)) m.delete(k);

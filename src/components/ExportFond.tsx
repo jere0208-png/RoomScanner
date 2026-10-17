@@ -261,10 +261,17 @@ const DESSINS: Record<ExportArtKind, Dessin> = {
   dxf: (_c, zone, murs) => {
     // L'écran noir est une fenêtre DANS l'image, pas le fond de la carte :
     // la carte garde le fond commun à toutes (voir `TEINTE_DU_FOND`).
+    /*
+      L'ÉCRAN COMMENCE OÙ LE TEXTE S'ARRÊTE — revue UX, capture clair-21 :
+      le texte de la carte court jusqu'à 58 % de sa largeur
+      (`exportCarteTextes`), l'écran partait à 52 % et « architecte »
+      passait dessous. Il part à 58 % (0,4 + 0,3 × 0,6), et rétrécit
+      d'autant pour garder sa marge à droite.
+    */
     const ecran = {
-      x: zone.x + zone.w * 0.2,
+      x: zone.x + zone.w * 0.3,
       y: zone.y + zone.h * 0.12,
-      w: zone.w * 0.76,
+      w: zone.w * 0.66,
       h: zone.h * 0.76,
     };
     const z = ecran;

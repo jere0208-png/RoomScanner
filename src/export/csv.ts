@@ -29,6 +29,7 @@ import type {
 import { nombre, type Achats, type CoutAchats } from '../geometry/travaux';
 import type { BuyRow } from '../geometry/conduits';
 import { nomDeTeinte } from '../ui/peintures';
+import { nomDeFichier } from './nomDeFichier';
 
 /** Le métré d'une pièce, tel que le plan le connaît. */
 export interface RoomMetre {
@@ -282,8 +283,10 @@ export function buildMetreCsv(
   return `﻿${out.join('\r\n')}\r\n`;
 }
 
-/** Nom du fichier, sans caractère qui fâche un système de fichiers. */
-export function metreFilename(name: string): string {
-  const propre = (name || 'Scan').replace(/[\\/:*?"<>|]/g, '-').trim();
-  return `Métré - ${propre}.csv`;
+/**
+ * « Dupont - Métré.csv », « Dupont - 1er étage - Métré.csv » : la règle
+ * commune à tous les exports (voir `nomDeFichier`).
+ */
+export function metreFilename(name: string, niveau?: string): string {
+  return nomDeFichier(name, 'csv', { genre: 'Métré', niveau });
 }

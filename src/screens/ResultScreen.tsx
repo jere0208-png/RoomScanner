@@ -1947,8 +1947,9 @@ export function ResultScreen() {
             : null,
         ),
         // Un niveau parmi plusieurs se dit dans le nom (revue « Sébastien » :
-        // les deux niveaux sortaient sous le même nom de fichier).
-        metreFilename(niveaux.length > 1 ? `${scanName} — ${nomDuNiveau(niveauCourant)}` : scanName),
+        // les deux niveaux sortaient sous le même nom de fichier) — écrit
+        // comme au PDF et au DXF (voir `nomDeFichier`).
+        metreFilename(scanName, niveaux.length > 1 ? nomDuNiveau(niveauCourant) : undefined),
       );
     } catch (e: any) {
       const p = signaler('export', e, 'result');
@@ -1976,11 +1977,8 @@ export function ResultScreen() {
       await RoomScan.shareText(
         // Le plafond (rubans LED compris) en mode Électricité, là où il existe.
         buildDxf({ walls, openings, rooms, fixtures, objects, ceiling: modeElec ? ceiling : [] }),
-        dxfFilename(
-          niveaux.length > 1
-            ? `${scanName} ${abregerNiveau(niveauCourant)}`
-            : scanName,
-        ),
+        // Le niveau s'écrit comme au PDF et au tableur (voir `nomDeFichier`).
+        dxfFilename(scanName, niveaux.length > 1 ? nomDuNiveau(niveauCourant) : undefined),
       );
     } catch (e: any) {
       const p = signaler('export', e, 'result');

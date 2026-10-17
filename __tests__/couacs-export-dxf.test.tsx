@@ -288,11 +288,12 @@ describe('le DXF', () => {
 describe('les noms de fichiers', () => {
   it('gardent « oe », « ae », « ss »', () => {
     expect(deplierLigatures('Œuvre æ Æ ß œ')).toBe('OEuvre ae AE ss oe');
-    expect(dxfFilename('Œil-de-bœuf')).toBe('OEil-de-boeuf.dxf');
-    expect(pdfFilename('Sœur Straße')).toBe('Soeur-Strasse.pdf');
-    expect(objFilename('Ex æquo')).toBe('Ex-aequo.obj');
-    // Les accents, eux, se translittèrent toujours comme avant.
-    expect(pdfFilename('1er étage')).toBe('1er-etage.pdf');
+    expect(dxfFilename('Œil-de-bœuf')).toBe('OEil-de-boeuf - Plan.dxf');
+    expect(pdfFilename('Sœur Straße')).toBe('Soeur Strasse - Plan.pdf');
+    expect(objFilename('Ex æquo')).toBe('Ex aequo - Modèle 3D.obj');
+    // Les accents restent hors du DXF (voir `nomDeFichier`), qui les déplie.
+    expect(pdfFilename('1er étage')).toBe('1er étage - Plan.pdf');
+    expect(dxfFilename('1er étage')).toBe('1er etage - Plan.dxf');
   });
 });
 

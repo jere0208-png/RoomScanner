@@ -91,6 +91,7 @@ describe('le DXF', () => {
 describe('le tableur d’une maison à étages', () => {
   it('dit son niveau dans le nom du fichier', () => {
     const ecran = readFileSync(join(__dirname, '..', 'src', 'screens', 'ResultScreen.tsx'), 'utf8');
-    expect(ecran).toContain('metreFilename(niveaux.length > 1 ? `${scanName} — ${nomDuNiveau(niveauCourant)}` : scanName)');
+    // Le niveau passe à part, écrit comme au PDF et au DXF (voir `nomDeFichier`).
+    expect(ecran).toContain('metreFilename(scanName, niveaux.length > 1 ? nomDuNiveau(niveauCourant) : undefined)');
   });
 });

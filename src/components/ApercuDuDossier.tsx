@@ -27,6 +27,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  FlatList,
   Image,
   Modal,
   Pressable,
@@ -288,7 +289,98 @@ function PageImage({ base64, style }: { base64: string; style: object }) {
   );
 }
 
-/** Les feuilles en grand, l'une après l'autre, du doigt. */
+/** Le grossissement le plus fort d'une feuille : une cote de 7 pt se lit. */
+export const ZOOM_MAX = 3;
+/** Deux appuis plus rapprochés que ceci font un double-tap. */
+const DOUBLE_TAP_MS = 280;
+
+/**
+ * UNE FEUILLE QU'ON PINCE — revue de l'export : ouverte en grand, l'image de
+ * 1 100 px restait figée, et l'on ne pouvait pas relire une cote ou un sigle
+ * avant d'envoyer le dossier. Elle vit maintenant dans un défilement iOS qui
+ * zoome : on pince jusqu'à trois fois, un double-tap grossit là où l'on a
+ * touché, un autre revient à la feuille entière. Tout est natif — c'est le
+ * zoom de Photos, sans dépendance. Non grossie, la feuille ne défile pas :
+ * le glissé horizontal reste à la rangée, qui passe à la suivante.
+ */
+function PageZoomable({
+  larg,
+  haut,
+  hauteurPage,
+  largeurPage,
+  children,
+}: {
+  larg: number;
+  haut: number;
+  hauteurPage: number;
+  largeurPage: number;
+  children: React.ReactNode;
+}) {
+  const zoom = useRef<ScrollView | null>(null);
+  const echelle = useRef(1);
+  const dernierAppui = useRef(0);
+  const doubleTap = (x: number, y: number) => {
+    const sv = zoom.current;
+    if (!sv?.scrollResponderZoomTo) return;
+    if (echelle.current > 1.05) {
+      // Déjà grossie : on revient à la feuille entière.
+      sv.scrollResponderZoomTo({ x: 0, y: 0, width: larg, height: haut, animated: true });
+      return;
+    }
+    // Le point touché au centre, grossi de moitié du maximum et plus.
+    const w = larg / (ZOOM_MAX * 0.8);
+    const h = haut / (ZOOM_MAX * 0.8);
+    sv.scrollResponderZoomTo({
+      x: Math.min(Math.max(0, x - w / 2), larg - w),
+      y: Math.min(Math.max(0, y - h / 2), haut - h),
+      width: w,
+      height: h,
+      animated: true,
+    });
+  };
+  return (
+    <ScrollView
+      ref={zoom}
+      style={{ width: largeurPage, height: hauteurPage }}
+      contentContainerStyle={{ width: larg, height: haut }}
+      minimumZoomScale={1}
+      maximumZoomScale={ZOOM_MAX}
+      centerContent
+      bouncesZoom
+      alwaysBounceVertical={false}
+      showsHorizontalScrollIndicator={false}
+      showsVerticalScrollIndicator={false}
+      scrollEventThrottle={64}
+      onScroll={(e) => {
+        echelle.current = e.nativeEvent.zoomScale ?? 1;
+      }}>
+      <Pressable
+        accessible={false}
+        style={{ width: larg, height: haut }}
+        onPress={(e) => {
+          const t = Date.now();
+          if (t - dernierAppui.current < DOUBLE_TAP_MS) {
+            dernierAppui.current = 0;
+            doubleTap(e.nativeEvent.locationX, e.nativeEvent.locationY);
+            return;
+          }
+          dernierAppui.current = t;
+        }}>
+        {children}
+      </Pressable>
+    </ScrollView>
+  );
+}
+
+/**
+ * Les feuilles en grand, l'une après l'autre, du doigt.
+ *
+ * UNE LISTE QUI NE CHARGE QUE LES VOISINES — revue de performance : les 19
+ * à 40 images de 1 100 px étaient montées et décodées d'un coup dans la
+ * rangée horizontale. Une liste paginée ne garde que la feuille vue et ses
+ * deux voisines (`windowSize` 3) : la mémoire d'un gros dossier ne dépend
+ * plus de son nombre de feuilles.
+ */
 function Visionneuse({
   sommaire,
   images,
@@ -310,14 +402,18 @@ function Visionneuse({
   const s = getStyles(c);
   const { width, height } = useWindowDimensions();
   const [ici, setIci] = useState(0);
-  const defile = useRef<ScrollView | null>(null);
+  /*
+    L'OUVERTURE EN COURS : la feuille de départ, et un numéro qui remonte la
+    liste à chaque ouverture — elle repart de la feuille touchée, pas de
+    celle où l'on avait laissé la précédente. Elle survit à la fermeture le
+    temps du fondu : la visionneuse ne se vide pas sous les yeux.
+  */
+  const [ouverture, setOuverture] = useState<{ n: number; depart: number } | null>(null);
   useEffect(() => {
     if (depart === null) return;
     setIci(depart);
-    // La feuille touchée d'abord : on y est déjà en ouvrant.
-    const t = setTimeout(() => defile.current?.scrollTo({ x: depart * width, animated: false }), 0);
-    return () => clearTimeout(t);
-  }, [depart, width]);
+    setOuverture((o) => ({ n: (o?.n ?? 0) + 1, depart }));
+  }, [depart]);
   // Debout, c'est la HAUTEUR qui plafonne : la feuille garde ses
   // proportions et rétrécit en largeur, la miniature dessinée tient dedans.
   const larg = Math.min(width - 24, height * 0.62 * FORMAT_FEUILLE);
@@ -333,29 +429,43 @@ function Visionneuse({
             <Text style={s.voileCroix}>✕</Text>
           </TouchableOpacity>
         </View>
-        <ScrollView
-          ref={defile}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={(e) => setIci(Math.round(e.nativeEvent.contentOffset.x / Math.max(1, width)))}>
-          {sommaire.map((f, i) => (
-            <View key={`${i}-${f.titre}`} style={[s.page, { width }]}>
-              {images?.[i] ? (
-                <Image
-                  source={{ uri: `data:image/jpeg;base64,${images[i]}` }}
-                  resizeMode="contain"
-                  style={{ width: larg, height: haut, borderRadius: 6 }}
-                  accessibilityLabel={`Feuille ${i + 1} : ${f.titre}`}
-                />
-              ) : (
-                <View style={[s.pageVide, { width: larg, height: haut }]}>
-                  <MiniatureFeuille feuille={f} murs={murs} net={net} largeur={larg} />
-                </View>
-              )}
-            </View>
-          ))}
-        </ScrollView>
+        {ouverture !== null && (
+          <FlatList
+            key={ouverture.n}
+            testID="visionneuse-feuilles"
+            style={s.visionneuse}
+            data={sommaire}
+            keyExtractor={(f, i) => `${i}-${f.titre}`}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            // La feuille touchée d'abord : on y est déjà en ouvrant.
+            initialScrollIndex={Math.min(ouverture.depart, Math.max(0, sommaire.length - 1))}
+            getItemLayout={(_d, i) => ({ length: width, offset: width * i, index: i })}
+            initialNumToRender={1}
+            maxToRenderPerBatch={2}
+            windowSize={3}
+            onMomentumScrollEnd={(e) => setIci(Math.round(e.nativeEvent.contentOffset.x / Math.max(1, width)))}
+            renderItem={({ item: f, index: i }) => (
+              <View style={[s.page, { width }]}>
+                <PageZoomable larg={larg} haut={haut} largeurPage={width} hauteurPage={haut}>
+                  {images?.[i] ? (
+                    <Image
+                      source={{ uri: `data:image/jpeg;base64,${images[i]}` }}
+                      resizeMode="contain"
+                      style={{ width: larg, height: haut, borderRadius: 6 }}
+                      accessibilityLabel={`Feuille ${i + 1} : ${f.titre}`}
+                    />
+                  ) : (
+                    <View style={[s.pageVide, { width: larg, height: haut }]}>
+                      <MiniatureFeuille feuille={f} murs={murs} net={net} largeur={larg} />
+                    </View>
+                  )}
+                </PageZoomable>
+              </View>
+            )}
+          />
+        )}
         {!net && (
           <View style={s.voilePied}>
             <Text style={s.voileArgument}>
@@ -560,6 +670,9 @@ const getStyles = (c: Palette) =>
     voileTete: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, marginBottom: 14 },
     voileTitre: { color: '#FFFFFF', fontSize: 15, fontWeight: '700', flex: 1 },
     voileCroix: { color: '#FFFFFF', fontSize: 19, fontWeight: '700' },
+    // La rangée prend la place qui reste entre l'en-tête et le pied ; la
+    // feuille s'y centre.
+    visionneuse: { flex: 1 },
     page: { alignItems: 'center', justifyContent: 'center' },
     pageVide: { backgroundColor: '#FFFFFF', borderRadius: 6, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
     voilePied: { paddingHorizontal: 18, gap: 12 },

@@ -33,6 +33,8 @@ import {
   Text,
   TextInput,
   View,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -257,6 +259,8 @@ export function SheetShell({
   onClosed,
   defile = true,
   sansHoteAlerte = false,
+  styleFeuille,
+  styleVoile,
   children,
 }: {
   visible: boolean;
@@ -284,6 +288,14 @@ export function SheetShell({
    * s'ouvrir ensuite attend ici, et pas derrière un délai deviné.
    */
   onClosed?: () => void;
+  /**
+   * LA TEINTE D'UNE FEUILLE QUI DOIT SE DÉTACHER DU PLAN — la feuille
+   * d'export, en sombre (revue « sombre-20 ») : une surface un cran plus
+   * claire et un liseré. La forme, le geste et la croix restent communs.
+   */
+  styleFeuille?: StyleProp<ViewStyle>;
+  /** Et son voile, plus profond. */
+  styleVoile?: StyleProp<ViewStyle>;
   children: React.ReactNode;
 }) {
   const c = useTheme();
@@ -405,7 +417,7 @@ export function SheetShell({
           {/* Le voile s'allume et s'éteint avec la feuille. */}
           <Animated.View
             pointerEvents="none"
-            style={[StyleSheet.absoluteFill, styles.veil, { opacity: monte }]}
+            style={[StyleSheet.absoluteFill, styles.veil, styleVoile, { opacity: monte }]}
           />
         </Pressable>
         {/* La feuille se pose SUR le clavier, jamais dessous. */}
@@ -436,6 +448,7 @@ export function SheetShell({
               style={[
                 styles.sheet,
                 carte && styles.sheetCarte,
+                styleFeuille,
                 { maxHeight: hauteurMax },
                 // Clavier ouvert, la barre d'accueil est dessous : sa marge
                 // ne sert plus à rien, et elle coûte une ligne.

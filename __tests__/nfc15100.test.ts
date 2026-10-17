@@ -512,9 +512,11 @@ describe('le client dans le cartouche', () => {
     expect(src).toContain('12 rue Pasteur');
   });
 
-  it('et garde le nom du fichier quand ils ne le sont pas', () => {
+  // Revue de l'export : plus de « FICHIER nom.pdf » — le nom du projet.
+  it('et écrit le nom du projet quand ils ne le sont pas', () => {
     const src = doc();
-    expect(src).toContain('FICHIER');
+    expect(src).not.toContain('FICHIER');
+    expect(src).toContain('(PROJET) Tj');
     expect(src).not.toContain('CLIENT');
   });
 });

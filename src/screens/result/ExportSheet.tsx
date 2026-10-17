@@ -7,10 +7,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Modal,
-  Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TouchableOpacity,
   View,
@@ -22,8 +19,8 @@ import { ExportFond, type MurDuFond } from '../../components/ExportFond';
 import { getStyles } from './styles';
 import { useAccountStore } from '../../store/accountStore';
 import { useScanStore } from '../../store/scanStore';
-import { AlerteHote } from '../../components/AlerteHote';
-import { CloseCross } from '../../components/CloseCross';
+import { SheetShell } from '../../components/Sheet';
+import { BackChevron } from '../../components/BackChevron';
 
 /**
  * La hauteur d'une carte : assez pour que l'image se lise. C'est un
@@ -227,144 +224,137 @@ export function ExportSheet({
   const secondaires = modeElec ? [] : visibles.filter(([art]) => art !== 'pdf' && art !== 'image');
   /*
     LA LARGEUR DES CARTES. L'image se dessine à la taille de la carte : elle
-    est déduite de l'écran dès la première image (la feuille garde 28 points
-    de marge de part et d'autre, la carte 20 de rembourrage), puis précisée
-    à la pose.
+    est déduite de l'écran dès la première image (la feuille du bas garde
+    18 points de rembourrage de part et d'autre ; sur tablette, elle est
+    bornée à 560), puis précisée à la pose.
   */
   const ecran = useWindowDimensions();
-  const [largeur, setLargeur] = useState(Math.max(200, ecran.width - 96));
+  const [largeur, setLargeur] = useState(
+    Math.max(200, (ecran.width > 620 ? 560 : ecran.width) - 36),
+  );
   /* La hauteur réelle de chaque carte, pour que l'image de fond la couvre
      entière quand le texte l'a fait grandir. */
   const [hauteurs, setHauteurs] = useState<Record<string, number>>({});
 
   return (
-    <Modal
+    /*
+      LA MÊME FEUILLE QUE LES AUTRES MENUS — revue UX : le choix d'export
+      était le seul menu présenté en carte centrée, en fondu, sans poignée
+      ni geste de fermeture. Il monte maintenant du bas dans la coquille
+      commune (`SheetShell`) : poignée qu'on tire, croix, voile, même
+      animation. Le contenu ne change pas — une sortie par ligne, chacune
+      avec son image. La fenêtre native partie, `onDismiss` lance ce qui
+      attendait (le partage, l'offre Pro, la page du devis) : iOS ne
+      présente pas deux fenêtres à la fois.
+    */
+    <SheetShell
       visible={visible}
-      transparent
-      animationType="fade"
-      onDismiss={() => {
+      onClose={onClose}
+      onClosed={() => {
         onDismiss();
         lancerApres();
       }}
-      onRequestClose={onClose}>
-      {/*
-        LE VOILE À CÔTÉ DE LA CARTE, PAS AUTOUR — revue VoiceOver : la carte
-        vivait dans le Pressable du voile, et iOS cache au lecteur d'écran
-        tout ce que contient un élément accessible. Aucune sortie n'était
-        activable. Même geste au doigt : l'appui hors de la carte ferme.
-      */}
-      <View style={[styles.modalBackdrop, styles.exportVoile]}>
-        <Pressable
-          testID="voile-export"
-          accessibilityRole="button"
-          accessibilityLabel="Fermer"
-          style={StyleSheet.absoluteFill}
-          onPress={onClose}
-        />
-        <View style={[styles.modalCard, styles.exportFeuille]} testID="feuille-export" accessibilityViewIsModal>
-          <View style={styles.exportEntete}>
-            <View style={styles.exportEnteteTextes}>
-              <Text style={styles.modalTitle}>Exporter</Text>
-              <Text style={styles.modalSubtitle}>
-                Un document à remettre, ou un fichier à envoyer.
-              </Text>
-            </View>
-            {/* La croix des autres feuilles — on ne sortait qu'en visant
-                le voile, invisible sous une carte qui remplit l'écran. */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Fermer"
-              style={styles.exportCroix}
-              onPress={onClose}>
-              <CloseCross size={20} color={teinte.inkSoft} />
-            </Pressable>
+      // La liste défile d'elle-même : deux défilements l'un dans l'autre se
+      // disputeraient le doigt.
+      defile={false}
+      styleFeuille={styles.exportFeuille}
+      styleVoile={styles.exportVoile}>
+      <View testID="feuille-export">
+        <View style={styles.exportEntete}>
+          <View style={styles.exportEnteteTextes}>
+            <Text style={styles.modalTitle}>Exporter</Text>
+            <Text style={styles.modalSubtitle}>
+              Un document à remettre, ou un fichier à envoyer.
+            </Text>
           </View>
-          {/*
-            UNE SORTIE PAR LIGNE, ET CHACUNE MONTRE CE QU'ELLE DONNE.
-
-            Relevé du patron : « revois le menu exporter pour afficher des
-            options dans un listing vertical 1 par 1, avec des images de fond
-            pour une compréhension visuelle ». La grille de deux tenait dans
-            l'écran, mais chaque tuile ne portait qu'une icône de 44 points :
-            on lisait le format, on ne voyait pas le résultat. Chaque carte
-            prend maintenant la largeur, et son fond MONTRE ce qu'on obtient
-            — avec le plan qu'on vient de relever (voir `ExportFond`). La
-            liste défile si l'écran est court : six cartes, c'est plus haut
-            qu'un petit iPhone.
-          */}
-          <ScrollView
-            style={{ maxHeight: ecran.height * 0.66 }}
-            contentContainerStyle={styles.exportListe}
-            showsVerticalScrollIndicator={false}
-            onLayout={(e) => {
-              const w = e.nativeEvent.layout.width;
-              if (w > 0 && Math.abs(w - largeur) > 1) setLargeur(w);
-            }}>
-            {[...principales, ...(autres ? secondaires : [])].map(([art, titre, detail, action]) => {
-              /* Le badge se voit, il doit aussi se dire : « PRO » posé sur
-                 la carte n'était pas lu par VoiceOver. */
-              const statut = pro ? '' : art === 'image' ? ', gratuit' : ', réservé à l’abonnement Pro';
-              return (
-                <TouchableOpacity
-                  key={titre}
-                  style={styles.exportCarte}
-                  activeOpacity={0.85}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${titre}${statut}`}
-                  accessibilityHint={detail}
-                  onLayout={(e) => {
-                    const h = Math.round(e.nativeEvent.layout.height);
-                    if (h > 0 && hauteurs[art] !== h) setHauteurs((x) => ({ ...x, [art]: h }));
-                  }}
-                  onPress={action}>
-                  <View style={styles.exportCarteFond} pointerEvents="none">
-                    <ExportFond
-                      kind={art}
-                      c={teinte}
-                      largeur={largeur}
-                      hauteur={Math.max(HAUTEUR_CARTE, hauteurs[art] ?? 0)}
-                      murs={murs}
-                    />
-                  </View>
-                  <View style={styles.exportCarteTextes} pointerEvents="none">
-                    <View style={styles.exportCarteLigne}>
-                      <Text style={styles.exportCarteTitre}>{titre}</Text>
-                      {!pro && art !== 'image' && (
-                        <View style={styles.exportBadgePro} testID={`badge-pro-${art}`}>
-                          <Text style={styles.exportBadgeProTexte}>PRO</Text>
-                        </View>
-                      )}
-                      {!pro && art === 'image' && (
-                        <View style={styles.exportBadgeGratuit} testID="badge-gratuit-image">
-                          <Text style={styles.exportBadgeProTexte}>GRATUIT</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.exportCarteDetail}>{detail}</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-            {secondaires.length > 0 && !autres && (
-              <TouchableOpacity
-                style={styles.exportAutres}
-                accessibilityRole="button"
-                accessibilityLabel="Autres formats"
-                accessibilityHint="Modèle 3D, plan DXF, tableau des surfaces"
-                onPress={() => setAutres(true)}>
-                <View style={styles.exportAutresTextes}>
-                  <Text style={styles.exportAutresTexte}>Autres formats</Text>
-                  <Text style={styles.exportAutresDetail}>3D, DXF pour l’architecte, tableau des surfaces</Text>
-                </View>
-                <Text style={styles.exportAutresChevron}>›</Text>
-              </TouchableOpacity>
-            )}
-          </ScrollView>
+          {/* Pas de croix ici : la coquille commune la porte. */}
         </View>
+        {/*
+          UNE SORTIE PAR LIGNE, ET CHACUNE MONTRE CE QU'ELLE DONNE.
+
+          Relevé du patron : « revois le menu exporter pour afficher des
+          options dans un listing vertical 1 par 1, avec des images de fond
+          pour une compréhension visuelle ». La grille de deux tenait dans
+          l'écran, mais chaque tuile ne portait qu'une icône de 44 points :
+          on lisait le format, on ne voyait pas le résultat. Chaque carte
+          prend maintenant la largeur, et son fond MONTRE ce qu'on obtient
+          — avec le plan qu'on vient de relever (voir `ExportFond`). La
+          liste défile si l'écran est court : six cartes, c'est plus haut
+          qu'un petit iPhone.
+        */}
+        <ScrollView
+          style={{ maxHeight: ecran.height * 0.66 }}
+          contentContainerStyle={styles.exportListe}
+          showsVerticalScrollIndicator={false}
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            if (w > 0 && Math.abs(w - largeur) > 1) setLargeur(w);
+          }}>
+          {[...principales, ...(autres ? secondaires : [])].map(([art, titre, detail, action]) => {
+            /* Le badge se voit, il doit aussi se dire : « PRO » posé sur
+               la carte n'était pas lu par VoiceOver. */
+            const statut = pro ? '' : art === 'image' ? ', gratuit' : ', réservé à l’abonnement Pro';
+            return (
+              <TouchableOpacity
+                key={titre}
+                style={styles.exportCarte}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={`${titre}${statut}`}
+                accessibilityHint={detail}
+                onLayout={(e) => {
+                  const h = Math.round(e.nativeEvent.layout.height);
+                  if (h > 0 && hauteurs[art] !== h) setHauteurs((x) => ({ ...x, [art]: h }));
+                }}
+                onPress={action}>
+                <View style={styles.exportCarteFond} pointerEvents="none">
+                  <ExportFond
+                    kind={art}
+                    c={teinte}
+                    largeur={largeur}
+                    hauteur={Math.max(HAUTEUR_CARTE, hauteurs[art] ?? 0)}
+                    murs={murs}
+                  />
+                </View>
+                <View style={styles.exportCarteTextes} pointerEvents="none">
+                  <View style={styles.exportCarteLigne}>
+                    <Text style={styles.exportCarteTitre}>{titre}</Text>
+                    {!pro && art !== 'image' && (
+                      <View style={styles.exportBadgePro} testID={`badge-pro-${art}`}>
+                        <Text style={styles.exportBadgeProTexte}>PRO</Text>
+                      </View>
+                    )}
+                    {!pro && art === 'image' && (
+                      <View style={styles.exportBadgeGratuit} testID="badge-gratuit-image">
+                        <Text style={styles.exportBadgeProTexte}>GRATUIT</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.exportCarteDetail}>{detail}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+          {secondaires.length > 0 && !autres && (
+            <TouchableOpacity
+              style={styles.exportAutres}
+              accessibilityRole="button"
+              accessibilityLabel="Autres formats"
+              accessibilityHint="Modèle 3D, plan DXF, tableau des surfaces"
+              onPress={() => setAutres(true)}>
+              <View style={styles.exportAutresTextes}>
+                <Text style={styles.exportAutresTexte}>Autres formats</Text>
+                <Text style={styles.exportAutresDetail}>3D, DXF pour l’architecte, tableau des surfaces</Text>
+              </View>
+              {/* Le chevron de l'app, tourné vers le bas : la liste se
+                  déplie sur place, on ne change pas d'écran. */}
+              <View style={styles.exportAutresChevron}>
+                <BackChevron size={18} color={teinte.inkFaint} />
+              </View>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
       </View>
-      {/* Une alerte levée la feuille ouverte s'affiche dans sa fenêtre :
-          voir la pile d'hôtes de `src/ui/alerte.ts`. */}
-      <AlerteHote imbrique actif={visible} />
-    </Modal>
+    </SheetShell>
   );
 }

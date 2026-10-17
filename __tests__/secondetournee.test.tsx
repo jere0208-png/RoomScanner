@@ -88,10 +88,11 @@ describe('les exports d’Inès', () => {
   });
 
   it('les noms de fichiers gardent « R+1 » et les accents lisibles', () => {
-    expect(dxfFilename('Maison Dupont R+1')).toBe('Maison-Dupont-R+1.dxf');
-    expect(objFilename('Maison Dupont R+1')).toBe('Maison-Dupont-R+1.obj');
-    expect(pdfFilename('Maison Dupont 1er étage')).toBe('Maison-Dupont-1er-etage.pdf');
-    expect(pdfFilename('Rez-de-chaussée')).toBe('Rez-de-chaussee.pdf');
+    // La règle commune (voir `nomDeFichier`) : accents gardés, sauf au DXF.
+    expect(dxfFilename('Maison Dupont', 'R+1')).toBe('Maison Dupont - R+1 - Plan.dxf');
+    expect(objFilename('Maison Dupont R+1')).toBe('Maison Dupont R+1 - Modèle 3D.obj');
+    expect(pdfFilename('Maison Dupont', '1er étage')).toBe('Maison Dupont - 1er étage - Plan.pdf');
+    expect(pdfFilename('Rez-de-chaussée')).toBe('Rez-de-chaussée - Plan.pdf');
   });
 
   it('l’OBJ d’une maison à étages porte tous ses niveaux, chacun dans ses groupes', () => {

@@ -17,7 +17,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 }));
 
 import React from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ExportSheet } from '../src/screens/result/ExportSheet';
 import { ExportFond, FOND_SOMBRE, TEINTE_DU_FOND } from '../src/components/ExportFond';
@@ -29,29 +29,41 @@ import { useScanStore } from '../src/store/scanStore';
 const KINDS = ['pdf', 'obj', 'materiel', 'csv', 'dxf', 'image', 'devis'] as const;
 
 let fermetures = 0;
+const feuille = (visible: boolean, modeElec: boolean, onDevis?: () => void) => (
+  <ExportSheet
+    visible={visible}
+    modeElec={modeElec}
+    onClose={() => {
+      fermetures++;
+    }}
+    onDismiss={() => {}}
+    onPdf={() => {}}
+    onObj={() => {}}
+    onMaterial={() => {}}
+    onCsv={() => {}}
+    onDxf={() => {}}
+    onImage={() => {}}
+    onDevis={onDevis}
+  />
+);
 const monter = (modeElec: boolean, onDevis?: () => void) => {
   fermetures = 0;
   let t!: TestRenderer.ReactTestRenderer;
   act(() => {
-    t = TestRenderer.create(
-      <ExportSheet
-        visible
-        modeElec={modeElec}
-        onClose={() => {
-          fermetures++;
-        }}
-        onDismiss={() => {}}
-        onPdf={() => {}}
-        onObj={() => {}}
-        onMaterial={() => {}}
-        onCsv={() => {}}
-        onDxf={() => {}}
-        onImage={() => {}}
-        onDevis={onDevis}
-      />,
-    );
+    t = TestRenderer.create(feuille(true, modeElec, onDevis));
   });
   return t;
+};
+/*
+  LA FEUILLE SE REFERME COMME L'ÉCRAN LA REFERME : `visible` repasse à faux,
+  la descente se joue, et la fenêtre native partie (`onClosed` de la
+  coquille commune) lance ce qui attendait.
+*/
+const refermer = (t: TestRenderer.ReactTestRenderer, modeElec: boolean) => {
+  act(() => t.update(feuille(false, modeElec)));
+  act(() => {
+    jest.advanceTimersByTime(400);
+  });
 };
 const tuiles = (t: TestRenderer.ReactTestRenderer) =>
   t.root.findAllByType(TouchableOpacity).filter((n) => typeof n.props.onPress === 'function');
@@ -120,15 +132,19 @@ describe('en sombre, la fenêtre se détache du plan', () => {
   });
 
   it('la feuille porte bien ces styles', () => {
+    // La coquille commune (`SheetShell`) reçoit la teinte de l'export.
     const t = monter(true);
-    const feuille = t.root.findAll((n) => n.props.testID === 'feuille-export')[0];
-    const st = Array.isArray(feuille.props.style) ? feuille.props.style : [feuille.props.style];
+    const carte = t.root.findAll((n) => n.props.testID === 'carte-feuille' && typeof n.type === 'string')[0];
+    expect(t.root.findAll((n) => n.props.testID === 'feuille-export').length).toBeGreaterThan(0);
+    const st = (Array.isArray(carte.props.style) ? carte.props.style : [carte.props.style]).flat(3);
     expect(st).toContain(getStyles(light).exportFeuille);
     act(() => t.unmount());
   });
 });
 
 describe('le devis, en tête de l’export en mode électricité', () => {
+  beforeAll(() => jest.useFakeTimers());
+  afterAll(() => jest.useRealTimers());
   it('première carte, à vue, et pas sous « Autres formats »', () => {
     const t = monter(true);
     const liste = tuiles(t);
@@ -156,7 +172,7 @@ describe('le devis, en tête de l’export en mode électricité', () => {
     expect(fermetures).toBe(1);
     // iOS ne présente pas deux fenêtres : rien ne part avant la fermeture.
     expect(useScanStore.getState().screen).toBe('result');
-    act(() => t.root.findByType(Modal).props.onDismiss());
+    refermer(t, true);
     expect(useScanStore.getState().screen).toBe('devis');
     act(() => t.unmount());
   });
@@ -170,7 +186,7 @@ describe('le devis, en tête de l’export en mode électricité', () => {
     const devis = tuiles(t).find((n) => String(n.props.accessibilityLabel).startsWith('Devis'))!;
     expect(devis.props.accessibilityLabel).toMatch(/Pro/);
     act(() => devis.props.onPress());
-    act(() => t.root.findByType(Modal).props.onDismiss());
+    refermer(t, true);
     expect(surprise).toHaveBeenCalledTimes(1);
     expect(useScanStore.getState().screen).toBe('result');
     act(() => t.unmount());
