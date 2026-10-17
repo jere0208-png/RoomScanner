@@ -21,13 +21,17 @@ const swift = readFileSync(
   'utf8',
 );
 
-describe('les murs côté pièce sont beiges', () => {
-  it('la palette a son beige, plus chaud que le blanc cassé de la façade', () => {
+describe('les murs côté pièce : un blanc cassé, plus blanc que beige, jamais blanc pur', () => {
+  it('la palette a son blanc cassé chaud', () => {
     expect(MAQUETTE.wallInside).toBeDefined();
     const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-    const [r, , b] = rgb(MAQUETTE.wallInside!);
-    // Beige : le rouge passe nettement le bleu.
-    expect(r - b).toBeGreaterThan(20);
+    const [r, g, b] = rgb(MAQUETTE.wallInside!);
+    // Chaud, à peine : le rouge passe le bleu, sans tourner au beige.
+    expect(r - b).toBeGreaterThan(4);
+    expect(r - b).toBeLessThan(16);
+    // Clair, mais pas le blanc d'écran.
+    expect(Math.min(r, g, b)).toBeGreaterThan(220);
+    expect(MAQUETTE.wallInside!.toUpperCase()).not.toBe('#FFFFFF');
   });
 
   it('la face côté pièce prend le beige, la façade garde son blanc cassé', () => {
@@ -71,15 +75,41 @@ describe('l’appareillage se voit sans lampe', () => {
 describe('la lampe du plafond, sur les meubles et l’appareillage : au plus 10 %', () => {
   const nombre = (re: RegExp, src = swift) => Number((src.match(re) ?? [])[1]);
 
-  it('la lueur des meubles reste sous le dixième de l’ambiance', () => {
+  it('la lueur des meubles reste sous le dixième de l’ambiance la plus sombre', () => {
     const lueur = nombre(/l\.intensity = (\d+)/, swift.slice(swift.indexOf('private func lueurDesMeubles')));
-    const ambiance = nombre(/ambiante\.intensity = (\d+)/);
-    expect(lueur).toBeLessThanOrEqual(ambiance * 0.1);
+    const eteint = nombre(/JOUR_ETEINT: \(ambiance: CGFloat, jour: CGFloat, contre: CGFloat\) = \((\d+)/);
+    expect(eteint).toBeGreaterThan(0);
+    expect(lueur).toBeLessThanOrEqual(eteint * 0.1);
   });
 
-  it('allumer ne touche ni à l’ambiance, ni au jour', () => {
+  it('allumer AJOUTE de la lumière, en fondu — jamais n’assombrit', () => {
     const bloc = swift.slice(swift.indexOf('private func appliquerLampes'), swift.indexOf('private func reglerLeJour'));
-    expect(bloc).not.toMatch(/ambiante\.|jour\.|contre\./);
+    // Les lampes ne touchent pas elles-mêmes au jour : elles passent par
+    // `reglerLeJour`, qui choisit entre l'éteint et l'allumé.
+    expect(bloc).not.toMatch(/ambiante\.|jour\.intensity|contre\./);
+    expect(bloc).toMatch(/lumiereAllumee = allumees > 0/);
+    const regle = swift.slice(swift.indexOf('private func reglerLeJour'));
+    expect(regle.slice(0, 600)).toMatch(/lumiereAllumee \? Self\.JOUR_ALLUME : Self\.JOUR_ETEINT/);
+    expect(regle.slice(0, 600)).toMatch(/SCNTransaction\.animationDuration = maquette \? 0 : 0\.45/);
+  });
+
+  it('la visite est plus sombre de base ; allumer lui rend la lumière d’avant (relevé du patron)', () => {
+    const jour = (nom: string) => {
+      const m = swift.match(new RegExp(nom + ': \\(ambiance: CGFloat, jour: CGFloat, contre: CGFloat\\) = \\((\\d+), (\\d+), (\\d+)\\)'));
+      return (m ?? []).slice(1).map(Number);
+    };
+    const eteint = jour('JOUR_ETEINT');
+    const allume = jour('JOUR_ALLUME');
+    expect(eteint).toHaveLength(3);
+    expect(allume).toHaveLength(3);
+    // L'ancienne visite, éteinte : 620, 420, 200. Allumée, on la retrouve
+    // à cinq pour cent près ; éteinte, on descend d'un bon tiers.
+    [620, 420, 200].forEach((avant, i) => {
+      expect(Math.abs(allume[i] - avant) / avant).toBeLessThanOrEqual(0.05);
+      expect(eteint[i]).toBeLessThanOrEqual(avant * 0.65);
+    });
+    // La vue s'ouvre éteinte.
+    expect(swift).toMatch(/ambiante\.intensity = Self\.JOUR_ETEINT\.ambiance/);
   });
 
   it('les faisceaux ne touchent que le bâti, meubles et appareils portent l’autre masque', () => {
@@ -119,5 +149,23 @@ describe('rien ne blanchit plus sous la lampe (relevé du patron : « tout devie
     expect(swift).toMatch(/_output\.color\.rgb = min\(_output\.color\.rgb, _surface\.diffuse\.rgb \* 1\.15 \+ _surface\.emission\.rgb\)/);
     const bloc = swift.slice(swift.indexOf('private func materiauDuMeuble'));
     expect(bloc).toMatch(/nuanceurPlafondDesMeubles/);
+  });
+});
+
+describe('le semi-réalisme de la visite (relevé du patron : « trop dessin animé »)', () => {
+  it('pas de liseré de dessin en visite ; il reste sur la maquette', () => {
+    expect(swift).toMatch(/for c in coques \{ c\.isHidden = !maquette \}/);
+    expect(swift).toMatch(/coque\.isHidden = modePose != true/);
+  });
+
+  it('les matières pleines prennent une teinte de matière réelle : au plus huit dixièmes', () => {
+    expect(swift).toMatch(/let k: CGFloat = l > 0\.8 \? 0\.8 \/ l : 1/);
+    const bloc = swift.slice(swift.indexOf('private func materiauDuMeuble'));
+    expect(bloc.slice(0, 600)).toMatch(/Self\.teinteReelle\(teinteRelevee\)/);
+  });
+
+  it('le plafond : un ton plus clair que les murs, jamais le blanc pur', () => {
+    const scene = readFileSync(join(__dirname, '../src/geometry/scene3d.ts'), 'utf8');
+    expect(scene).toMatch(/fill: mixHex\(pal\.wallInside \?\? pal\.wall, '#FFFFFF', 0\.3\)/);
   });
 });

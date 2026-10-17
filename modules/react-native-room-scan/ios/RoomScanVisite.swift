@@ -124,7 +124,39 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   }
 
   @objc var fond: String = "#DCE8F4" {
-    didSet { vue.backgroundColor = couleur(fond) ?? .white }
+    didSet {
+      vue.backgroundColor = couleur(fond) ?? .white
+      guard fond != oldValue else { return }
+      // Le ciel de la visite se refait sur la nouvelle teinte.
+      if modePose == false { scene.background.contents = Self.imageDuCiel(couleur(fond) ?? .white) }
+    }
+  }
+
+  /*
+    LA VISITE OU LA MAQUETTE — ce que la vue montre décide du ciel, du jour
+    et du liseré. `nil` tant que rien n'est posé ; `true` en maquette.
+  */
+  private var modePose: Bool?
+  /// Les liserés des meubles : montrés en maquette, cachés en visite.
+  private var coques: [SCNNode] = []
+  /// Au moins une lampe allumée dans le logement.
+  private var lumiereAllumee = false
+
+  /**
+   * LA VUE CHANGE DE MODE : visite (à hauteur d'œil) ou maquette (en orbite).
+   *
+   * EN VISITE, DU SEMI-RÉALISME — relevé du patron : « les meubles font trop
+   * dessin animé, on veut que les visiteurs se projettent ; le bleu uni des
+   * fenêtres et baies fait trop cartoon ». Le liseré des meubles — un trait
+   * de dessin, utile vu de loin sur la maquette — se retire ; derrière les
+   * baies, un vrai dehors : un ciel, un horizon voilé, un sol lointain.
+   */
+  private func regleLeMode(maquette: Bool) {
+    guard modePose != maquette else { return }
+    modePose = maquette
+    for c in coques { c.isHidden = !maquette }
+    scene.background.contents = maquette ? nil : Self.imageDuCiel(couleur(fond) ?? .white)
+    reglerLeJour()
   }
 
   /*
@@ -370,6 +402,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     for enfant in eclairage.childNodes { enfant.removeFromParentNode() }
     var i = 0
     let v = lampesPosees
+    var allumees = 0
     while i + 9 <= v.count {
       let rang = Int(v[i])
       let genre = Int(v[i + 1])
@@ -380,6 +413,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
         n.geometry?.materials = [matiere]
       }
       if allume {
+        allumees += 1
         let p = SCNVector3(x: v[i + 4], y: v[i + 5], z: v[i + 6])
         // Toute lampe allumée a son halo — même loin, même sans source.
         eclairage.addChildNode(halo(genre: genre, a: p, nx: v[i + 7], nz: v[i + 8]))
@@ -392,16 +426,42 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       }
       i += 9
     }
+    // Allumer rend sa lumière à la pièce (voir `reglerLeJour`).
+    if (allumees > 0) != lumiereAllumee {
+      lumiereAllumee = allumees > 0
+      reglerLeJour()
+    }
   }
 
-  /// Le jour de la vue : celui de la maquette, ou celui de la visite. Il ne
-  /// dépend plus des lampes.
+  /*
+    LE JOUR DE LA VUE — relevé du patron : « tout est déjà trop illuminé ;
+    fais en sorte que ce soit plus sombre de base, et que ce soit éclairé
+    comme sans lumière actuellement si on allume la lumière ».
+
+    En visite, la pièce éteinte est une pièce de jour tamisé : ambiance,
+    jour et contre-jour aux trois cinquièmes de ce qu'ils étaient. Les murs
+    blancs ne saturent plus, une face au jour se distingue d'une face à
+    l'ombre, et la nappe d'une lampe se voit enfin sur le mur. Une lampe
+    allumée rend à la pièce la lumière d'avant — sa lumière se diffuse, elle
+    rebondit sur les murs et le plafond : c'est l'ambiance qui monte, en un
+    fondu, et ses faisceaux posent la nappe par-dessus. La maquette garde le
+    sien : on la regarde de loin, en plein jour.
+  */
+  static let JOUR_ETEINT: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat) = (380, 250, 115)
+  static let JOUR_ALLUME: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat) = (600, 400, 190)
+  static let JOUR_MAQUETTE: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat) = (640, 380, 160)
+
   private func reglerLeJour() {
     let maquette = orbite.count >= 10
-    ambiante.intensity = maquette ? 640 : 620
-    jour.intensity = maquette ? 380 : 420
-    contre.intensity = maquette ? 160 : 200
+    let j = maquette ? Self.JOUR_MAQUETTE : lumiereAllumee ? Self.JOUR_ALLUME : Self.JOUR_ETEINT
+    SCNTransaction.begin()
+    SCNTransaction.animationDuration = maquette ? 0 : 0.45
+    ambiante.intensity = j.ambiance
+    jour.intensity = j.jour
+    contre.intensity = j.contre
+    SCNTransaction.commit()
     noeudDuContre?.light = contre
+    reveiller(0.6)
   }
 
   /**
@@ -753,7 +813,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     // d'un côté, un contre-jour plus faible de l'autre — assez pour que
     // deux murs d'une même teinte se distinguent à l'angle.
     ambiante.type = .ambient
-    ambiante.intensity = 620
+    ambiante.intensity = Self.JOUR_ETEINT.ambiance
     ambiante.color = UIColor.white
     let noeudAmbiant = SCNNode()
     noeudAmbiant.light = ambiante
@@ -776,7 +836,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     */
 
     jour.type = .directional
-    jour.intensity = 420
+    jour.intensity = Self.JOUR_ETEINT.jour
     jour.castsShadow = false
     let noeudJour = SCNNode()
     noeudJour.light = jour
@@ -784,7 +844,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     scene.rootNode.addChildNode(noeudJour)
 
     contre.type = .directional
-    contre.intensity = 200
+    contre.intensity = Self.JOUR_ETEINT.contre
     contre.castsShadow = false
     let noeudContre = SCNNode()
     noeudContre.light = contre
@@ -915,6 +975,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       return
     }
     oeil.camera?.usesOrthographicProjection = false
+    regleLeMode(maquette: false)
     regleLeContour(0.003)
     guard camera.count >= 6 else { return }
     let x = camera[0].floatValue
@@ -977,7 +1038,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       cassé des murs. On rend au dessus SA couleur, et les flancs gardent
       assez d'écart pour qu'un angle se lise.
     */
-    reglerLeJour()
+    regleLeMode(maquette: true)
     oeil.position = SCNVector3(
       x: cible.x + vers.x * recul, y: cible.y + vers.y * recul, z: cible.z + vers.z * recul)
     oeil.look(at: cible, up: haut, localFront: SCNVector3(x: 0, y: 0, z: -1))
@@ -1062,6 +1123,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     if s.contains(.meubles) {
       Self.vider(gMeubles)
       diffuseurs.removeAll()
+      coques.removeAll()
       for n in noeudsDesMeubles() {
         // Les faisceaux des lampes ne les touchent pas : voir `MASQUE_MEUBLE`.
         n.enumerateHierarchy { m, _ in m.categoryBitMask = Self.MASQUE_MEUBLE }
@@ -1263,6 +1325,9 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       if code != 9 && code != 3 && code != 4 && code != 5 && code != 6 {
         if let coque = noeudDeContour(v, debut: debut, nS: nS, indices: indices,
                                       positions: positions, element: element) {
+          // En visite, pas de trait de dessin (voir `regleLeMode`).
+          coque.isHidden = modePose != true
+          coques.append(coque)
           out.append(coque)
         }
       }
@@ -1380,10 +1445,13 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
 
   /** Une matière physique : teinte, rugosité, métal — et ce que son code ajoute. */
   private func materiauDuMeuble(
-    _ code: Int, _ teinte: UIColor, _ rugosite: CGFloat, _ metal: CGFloat
+    _ code: Int, _ teinteRelevee: UIColor, _ rugosite: CGFloat, _ metal: CGFloat
   ) -> SCNMaterial {
     let m = SCNMaterial()
     m.lightingModel = .physicallyBased
+    // Les matières pleines prennent une teinte de matière réelle (voir
+    // `teinteReelle`) ; le verre, la lumière, l'ombre et l'appareillage non.
+    let teinte = [0, 1, 2, 4].contains(code) && metal < 0.5 ? Self.teinteReelle(teinteRelevee) : teinteRelevee
     m.diffuse.contents = teinte
     m.roughness.contents = NSNumber(value: Float(rugosite))
     m.metalness.contents = NSNumber(value: Float(metal))
@@ -1426,13 +1494,20 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       // peint donc de sa propre teinte, sans ombre, comme une lampe allumée.
       m.lightingModel = .constant
     case 6:
-      // LE VITRAGE : le bleu du dehors. Il montre le jour au lieu de prendre
-      // l'ombre de la pièce, et laisse deviner ce qu'il y a derrière.
+      /*
+        LE VITRAGE, UN VRAI VERRE — relevé du patron : « le bleu uni des
+        fenêtres et baies est à revoir, ça fait trop cartoon ; on veut du
+        semi-réalisme ». Il n'est plus peint : on voit À TRAVERS, le ciel et
+        l'horizon que la visite pose dehors (`imageDuCiel`). Face à lui, il
+        est presque invisible — un voile vert d'eau, la teinte d'un double
+        vitrage ; de biais, il renvoie le jour comme une vitre (Fresnel).
+      */
       m.lightingModel = .constant
-      m.transparency = 0.82
-      m.transparencyMode = .dualLayer
+      m.diffuse.contents = UIColor.white
+      m.blendMode = .alpha
       m.isDoubleSided = true
       m.writesToDepthBuffer = false
+      m.shaderModifiers = [.fragment: Self.nuanceurVerre]
     case 9:
       m.lightingModel = .constant
       m.diffuse.contents = RoomScanVisite.imageDOmbre
@@ -1447,6 +1522,100 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       m.shaderModifiers = [.fragment: Self.nuanceurPlafondDesMeubles]
     }
     return m
+  }
+
+  /*
+    UNE TEINTE DE MATIÈRE RÉELLE — relevé du patron : « les meubles font trop
+    dessin animé ». Rien de ce qu'on pose dans une pièce ne renvoie toute la
+    lumière : un drap blanc en rend huit dixièmes, une laque un peu moins.
+    Un meuble d'un blanc parfait, d'un aplat franc, est ce qui signe le
+    dessin. La teinte relevée garde sa couleur, plafonnée à ces huit
+    dixièmes, et perd un soupçon de sa saturation — celle des catalogues.
+  */
+  static func teinteReelle(_ c: UIColor) -> UIColor {
+    var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+    c.getRed(&r, green: &g, blue: &b, alpha: &a)
+    let l = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    let k: CGFloat = l > 0.8 ? 0.8 / l : 1
+    let gris = l * k
+    let d: CGFloat = 0.08
+    return UIColor(
+      red: (r * k) * (1 - d) + gris * d,
+      green: (g * k) * (1 - d) + gris * d,
+      blue: (b * k) * (1 - d) + gris * d,
+      alpha: 1)
+  }
+
+  /*
+    LE VERRE — presque rien de face, un reflet de biais. La normale et la
+    position sont dans le repère de l'œil : le cosinus entre la normale et
+    le regard dit à quel point on le voit de face. Couleur prémultipliée,
+    comme le voile de l'écorché.
+  */
+  static let nuanceurVerre = """
+    #pragma transparent
+    #pragma body
+    float3 n = normalize(_surface.normal);
+    float3 v = normalize(-_surface.position);
+    float f = pow(1.0 - clamp(abs(dot(n, v)), 0.0, 1.0), 4.0);
+    float3 verre = float3(0.80, 0.88, 0.87);
+    float3 reflet = float3(0.95, 0.96, 0.97);
+    float a = 0.10 + 0.50 * f;
+    _output.color = float4(mix(verre, reflet, float3(f)) * a, a);
+    """
+
+  /**
+   * LE DEHORS DE LA VISITE — un ciel, un horizon voilé, un sol lointain.
+   *
+   * Une image « équirectangulaire » posée en fond de scène : SceneKit la
+   * tend tout autour de l'œil, et elle tourne avec le regard. Par une baie,
+   * on voit donc le ciel en levant les yeux, l'horizon à hauteur d'œil, un
+   * sol de campagne en les baissant — au lieu d'un aplat bleu. La teinte de
+   * la scène (`fond`) donne celle du ciel.
+   */
+  static func imageDuCiel(_ fond: UIColor) -> UIImage {
+    var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+    fond.getRed(&r, green: &g, blue: &b, alpha: &a)
+    func vers(_ t: CGFloat, _ cr: CGFloat, _ cg: CGFloat, _ cb: CGFloat) -> CGColor {
+      UIColor(red: r + (cr - r) * t, green: g + (cg - g) * t, blue: b + (cb - b) * t, alpha: 1).cgColor
+    }
+    let taille = CGSize(width: 1024, height: 512)
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    format.preferredRange = .standard
+    return UIGraphicsImageRenderer(size: taille, format: format).image { ctx in
+      let c = ctx.cgContext
+      let couleurs = [
+        vers(0.55, 0.40, 0.60, 0.84),  // le zénith, d'un bleu plus profond
+        vers(0.15, 0.62, 0.76, 0.90),
+        vers(0.55, 0.93, 0.94, 0.94),  // l'horizon, voilé de brume
+        UIColor(red: 0.80, green: 0.81, blue: 0.77, alpha: 1).cgColor,  // le lointain
+        UIColor(red: 0.62, green: 0.65, blue: 0.56, alpha: 1).cgColor,
+        UIColor(red: 0.46, green: 0.50, blue: 0.40, alpha: 1).cgColor,  // le sol, sous les pieds
+      ] as CFArray
+      let positions: [CGFloat] = [0, 0.32, 0.497, 0.503, 0.58, 1]
+      if let degrade = CGGradient(
+        colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: couleurs, locations: positions)
+      {
+        c.drawLinearGradient(degrade, start: .zero, end: CGPoint(x: 0, y: taille.height), options: [])
+      }
+      // Quelques nuages, très doux : un ciel n'est jamais un dégradé parfait.
+      var graine: UInt64 = 0x2545_F491_4F6C_DD1D
+      func hasard() -> CGFloat {
+        graine = graine &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+        return CGFloat((graine >> 33) & 0xFF_FFFF) / CGFloat(0xFF_FFFF)
+      }
+      for _ in 0..<26 {
+        let largeur = 60 + hasard() * 180
+        let hauteur = largeur * (0.18 + hasard() * 0.15)
+        let x = hasard() * taille.width
+        let y = 60 + hasard() * 170
+        c.setFillColor(UIColor(white: 1, alpha: 0.05 + hasard() * 0.08).cgColor)
+        for dx in [-taille.width, 0, taille.width] {
+          c.fillEllipse(in: CGRect(x: x + dx - largeur / 2, y: y - hauteur / 2, width: largeur, height: hauteur))
+        }
+      }
+    }
   }
 
   /** Le fil du bois (code 1) ou la trame d'un tissu (code 2), à la teinte donnée. */
@@ -1529,8 +1698,9 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
         let u = abs((Double(x) + 0.5) / Double(n) * 2 - 1)
         let w = abs((Double(y) + 0.5) / Double(n) * 2 - 1)
         let d = pow(pow(u, 4) + pow(w, 4), 0.25)
-        let a = max(0, min(1, (1 - d) / 0.2))
-        pixels[(y * n + x) * 4 + 3] = UInt8(pow(a, 1.5) * 0.38 * 255)
+        // Plus large et plus posée : un meuble s'ancre au sol sans cerne.
+        let a = max(0, min(1, (1 - d) / 0.3))
+        pixels[(y * n + x) * 4 + 3] = UInt8(pow(a, 1.8) * 0.5 * 255)
       }
     }
     guard let fournisseur = CGDataProvider(data: Data(pixels) as CFData),

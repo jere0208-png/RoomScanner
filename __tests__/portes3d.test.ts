@@ -311,7 +311,7 @@ describe('les fenêtres et les baies en volume, au bleu du dehors', () => {
     expect(tout(mSans)).toBeLessThan(tout(mAvec));
   });
 
-  it('le natif peint le vitrage de sa propre teinte, un rien transparent, sans liseré', () => {
+  it('le natif fait du vitrage un vrai verre : on voit à travers, reflet de biais, sans liseré', () => {
     const v = readFileSync(
       join(
         __dirname,
@@ -320,9 +320,17 @@ describe('les fenêtres et les baies en volume, au bleu du dehors', () => {
       ),
       'utf8',
     );
-    expect(v).toMatch(
-      /case 6:[\s\S]{0,260}m\.lightingModel = \.constant[\s\S]{0,80}m\.transparency = 0\.82/,
-    );
+    // Relevé du patron : « le bleu uni des fenêtres et baies fait trop
+    // cartoon ». Un verre presque invisible de face, qui reflète de biais.
+    const bloc = v.slice(v.indexOf('case 6:'), v.indexOf('case 9:'));
+    expect(bloc).toMatch(/m\.shaderModifiers = \[\.fragment: Self\.nuanceurVerre\]/);
+    expect(bloc).not.toMatch(/m\.transparency = 0\.82/);
+    const verre = v.slice(v.indexOf('static let nuanceurVerre'));
+    expect(verre).toMatch(/#pragma transparent/);
+    // De face, une opacité d'un dixième ; de biais, jusqu'aux six dixièmes.
+    expect(verre).toMatch(/float a = 0\.10 \+ 0\.50 \* f;/);
+    // Derrière, un vrai dehors : le ciel posé en fond de la visite.
+    expect(v).toMatch(/scene\.background\.contents = maquette \? nil : Self\.imageDuCiel/);
     expect(v).toContain('if code == 3 || code == 6 { n.renderingOrder = 6 }');
     expect(v).toContain('code != 5 && code != 6 {');
   });

@@ -2006,7 +2006,9 @@ export function buildScene(
       const hp = hauteurDeLaPiece(part) || 2.5;
       faces.push({
         pts: [...surface.pts].reverse().map((p) => ({ x: p.x, y: hp, z: p.z })),
-        fill: mixHex(pal.wall, '#FFFFFF', 0.35),
+        // Le blanc du plafond : un ton plus clair que les murs côté pièce,
+        // jamais le blanc pur (relevé du patron : « sans blanc pur »).
+        fill: mixHex(pal.wallInside ?? pal.wall, '#FFFFFF', 0.3),
         stroke: null,
         normal: { x: 0, y: -1, z: 0 },
         isCeiling: true,
