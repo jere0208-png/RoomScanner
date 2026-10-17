@@ -127,6 +127,50 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     didSet { vue.backgroundColor = couleur(fond) ?? .white }
   }
 
+  /*
+    LA TEMPÉRATURE DES LAMPES, EN KELVINS — relevé du patron : « offre la
+    possibilité de choisir entre 2700, 3000, 4000 K ». Elle teinte les
+    faisceaux, la lueur, le halo et le diffuseur allumé.
+  */
+  @objc var temperature: NSNumber = 3000 {
+    didSet {
+      guard temperature != oldValue else { return }
+      teinteDesLampes = Self.teinteDeKelvin(temperature.doubleValue)
+      diffuseurAllume = Self.fabriquerDiffuseur(allume: true, teinte: teinteDesLampes)
+      matiereDuHalo.multiply.contents = teinteDesLampes
+      for (rang, noeuds) in diffuseurs where lampeAllumee(rang) {
+        for n in noeuds { n.geometry?.materials = [diffuseurAllume] }
+      }
+      appliquerLampes()
+    }
+  }
+
+  /// La teinte des lampes, tirée de la température (voir `teinteDeKelvin`).
+  private var teinteDesLampes: UIColor = RoomScanVisite.teinteDeKelvin(3000)
+
+  /**
+   * LA COULEUR D'UNE TEMPÉRATURE, ADOUCIE — l'approximation classique du
+   * corps noir (Tanner Helland), puis rapprochée du blanc aux six dixièmes :
+   * la lumière garde sa chaleur sans repeindre la pièce en orange (le 2700 K
+   * brut est un ambre franc qui teint tout ce qu'il touche).
+   */
+  static func teinteDeKelvin(_ k: Double) -> UIColor {
+    let t = max(1000, min(12000, k)) / 100
+    var r: Double, g: Double, b: Double
+    if t <= 66 {
+      r = 255
+      g = 99.4708025861 * log(t) - 161.1195681661
+      b = t <= 19 ? 0 : 138.5177312231 * log(t - 10) - 305.0447927307
+    } else {
+      r = 329.698727446 * pow(t - 60, -0.1332047592)
+      g = 288.1221695283 * pow(t - 60, -0.0755148492)
+      b = 255
+    }
+    let c = { (v: Double) -> CGFloat in CGFloat(max(0, min(255, v)) / 255) }
+    let doux = { (v: CGFloat) -> CGFloat in v + (1 - v) * 0.6 }
+    return UIColor(red: doux(c(r)), green: doux(c(g)), blue: doux(c(b)), alpha: 1)
+  }
+
   @objc var orientes: [NSNumber] {
     get { [] }
     set { if Self.recevoir(newValue, dans: &fOrientes) { rebatir(.bati) } }
@@ -283,21 +327,24 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     SceneKit devait préparer à nouveau, et l'image sautait au moment même où
     la lumière s'allume.
   */
-  private lazy var diffuseurAllume: SCNMaterial = Self.fabriquerDiffuseur(allume: true)
-  private lazy var diffuseurEteint: SCNMaterial = Self.fabriquerDiffuseur(allume: false)
+  private lazy var diffuseurAllume: SCNMaterial = Self.fabriquerDiffuseur(allume: true, teinte: teinteDesLampes)
+  private lazy var diffuseurEteint: SCNMaterial = Self.fabriquerDiffuseur(allume: false, teinte: teinteDesLampes)
 
   private func materiauDeDiffuseur(allume: Bool) -> SCNMaterial {
     allume ? diffuseurAllume : diffuseurEteint
   }
 
   /** Éteint : un blanc opalin. Allumé : il rayonne, de sa teinte chaude. */
-  private static func fabriquerDiffuseur(allume: Bool) -> SCNMaterial {
+  private static func fabriquerDiffuseur(allume: Bool, teinte: UIColor) -> SCNMaterial {
     let m = SCNMaterial()
     m.isDoubleSided = false
     m.cullMode = .back
     if allume {
       m.lightingModel = .constant
-      m.diffuse.contents = UIColor(red: 1.0, green: 0.95, blue: 0.84, alpha: 1)
+      // La teinte des lampes, plus claire encore : c'est la source.
+      var r: CGFloat = 1, g: CGFloat = 1, b: CGFloat = 1, a: CGFloat = 1
+      teinte.getRed(&r, green: &g, blue: &b, alpha: &a)
+      m.diffuse.contents = UIColor(red: r + (1 - r) * 0.5, green: g + (1 - g) * 0.5, blue: b + (1 - b) * 0.5, alpha: 1)
     } else {
       m.lightingModel = .physicallyBased
       m.diffuse.contents = UIColor(red: 0.92, green: 0.91, blue: 0.88, alpha: 1)
@@ -388,9 +435,10 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
    nappe sur le mur et le sol — pas un meuble poussé au blanc.
    */
   private func lumieres(genre: Int, a p: SCNVector3, nx: Float, nz: Float) -> [SCNNode] {
-    let chaud = UIColor(red: 1.0, green: 0.91, blue: 0.79, alpha: 1)
-    let blanc = UIColor(red: 1.0, green: 0.94, blue: 0.86, alpha: 1)
-    let neutre = UIColor(red: 1.0, green: 0.97, blue: 0.92, alpha: 1)
+    // La température choisie par l'utilisateur, pour tous les luminaires.
+    let chaud = teinteDesLampes
+    let blanc = teinteDesLampes
+    let neutre = teinteDesLampes
     func faisceau(
       versLeHaut: Bool, interieur: CGFloat, exterieur: CGFloat, intensite: CGFloat,
       portee: CGFloat, teinte: UIColor, en q: SCNVector3
@@ -479,7 +527,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   private func lueurDesMeubles(genre: Int, a p: SCNVector3, nx: Float, nz: Float) -> SCNNode {
     let l = SCNLight()
     l.type = .omni
-    l.color = UIColor(red: 1.0, green: 0.95, blue: 0.88, alpha: 1)
+    l.color = teinteDesLampes
     /*
       AU PLUS DIX POUR CENT — relevé du patron : « la lumière doit être
       perceptible sur les murs mais très peu sur les meubles et éléments,
@@ -488,7 +536,11 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       12, pleine au pied de la lampe et qui s'éteint en trois mètres, n'y
       ajoute jamais plus de 2 %. Les faisceaux, eux, ne touchent que le bâti.
     */
-    l.intensity = 12
+    // RÉDUITE ENCORE, d'un tiers de ce qu'elle était — relevé du patron :
+    // « la lumière sur les meubles est toujours trop élevée, tout devient
+    // blanc ; réduis considérablement ». Et le plafond de couleur des meubles
+    // (voir `nuanceurPlafondDesMeubles`) tient la règle quoi qu'il arrive.
+    l.intensity = 4
     l.attenuationStartDistance = 0.2
     l.attenuationEndDistance = 3.2
     l.attenuationFalloffExponent = 2
@@ -506,9 +558,9 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     let cote: CGFloat = 128
     return UIGraphicsImageRenderer(size: CGSize(width: cote, height: cote)).image { ctx in
       let couleurs = [
-        UIColor(red: 1.0, green: 0.9, blue: 0.7, alpha: 0.7).cgColor,
-        UIColor(red: 1.0, green: 0.86, blue: 0.62, alpha: 0.28).cgColor,
-        UIColor(red: 1.0, green: 0.84, blue: 0.58, alpha: 0).cgColor,
+        UIColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.5).cgColor,
+        UIColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.16).cgColor,
+        UIColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0).cgColor,
       ] as CFArray
       guard let g = CGGradient(
         colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: couleurs, locations: [0, 0.32, 1])
@@ -530,8 +582,38 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     m.writesToDepthBuffer = false
     m.readsFromDepthBuffer = true
     m.isDoubleSided = true
+    // Blanc dans l'image, teinté ici par la température des lampes.
+    m.multiply.contents = self.teinteDesLampes
+    /*
+      LE HALO S'EFFACE QUAND ON S'EN APPROCHE — relevé du patron : « tout
+      devient blanc ». Une ampoule de DCL pend à hauteur d'œil : en passant
+      près d'elle, son halo couvrait l'écran et voilait tout ce qu'il y avait
+      derrière, meubles compris. Il disparaît sous un mètre, et ne retrouve
+      tout son éclat qu'à deux mètres et demi.
+    */
+    m.shaderModifiers = [
+      .fragment: """
+      #pragma body
+      float k = smoothstep(1.0, 2.5, length(_surface.position));
+      _output.color *= k;
+      """
+    ]
     return m
   }()
+
+  /*
+    LA COULEUR D'UN MEUBLE NE DÉPASSE PAS SA TEINTE — relevé du patron : « la
+    lumière sur les meubles est toujours trop élevée, tout devient blanc ;
+    ils doivent gagner au plus 10 % de leur couleur de base ». Quelle que
+    soit la lumière qui l'atteint — lampes, jour, environnement —, un meuble
+    ne peut plus devenir plus clair que sa teinte relevée majorée de 15 %
+    (la marge du jour sur une face bien éclairée), plus sa propre émission
+    (l'appareillage). Un tissu beige reste beige sous la lampe.
+  */
+  private static let nuanceurPlafondDesMeubles = """
+    #pragma body
+    _output.color.rgb = min(_output.color.rgb, _surface.diffuse.rgb * 1.15 + _surface.emission.rgb);
+    """
 
   /*
     LA LUMIÈRE SE VOIT À SA SOURCE. Une lampe allumée se reconnaît d'abord à
@@ -1358,6 +1440,11 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       m.writesToDepthBuffer = false
     default:
       break
+    }
+    // Le plafond de couleur : les matières pleines, ni verre, ni lumière,
+    // ni ombre, ni métal (un chrome vit de ses reflets).
+    if [0, 1, 2, 4, 7].contains(code) && metal < 0.5 {
+      m.shaderModifiers = [.fragment: Self.nuanceurPlafondDesMeubles]
     }
     return m
   }

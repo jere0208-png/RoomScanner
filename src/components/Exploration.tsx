@@ -78,6 +78,8 @@ import { useFigePendantLeGeste } from '../store/geste';
 import { useImageSansLogo } from '../store/accountStore';
 import { usePriseDeVue } from '../ui/partageRendu';
 import { AlerteHote } from './AlerteHote';
+import { nomDeTemperature, useTemperatureLampes } from '../store/temperatureLampes';
+import { astuce } from '../ui/astuce';
 
 /**
  * LE PAS — 1,65 m/s à fond de manette : celui de quelqu'un qui visite d'un
@@ -436,6 +438,15 @@ export function Exploration({
     if (!visible) setAllumees(new Set());
   }, [visible]);
   const lampes: Lampe[] = useMemo(() => maille?.lampes ?? [], [maille]);
+  /*
+    LA TEMPÉRATURE DES LAMPES — relevé du patron : « offre la possibilité de
+    choisir entre 2700, 3000, 4000 K ». Une préférence de l'appareil (voir
+    `temperatureLampes`), lue à l'ouverture de la visite.
+  */
+  const kelvin = useTemperatureLampes((s) => s.kelvin);
+  useEffect(() => {
+    if (visible) void useTemperatureLampes.getState().charger();
+  }, [visible]);
 
   // Derrière les baies : un ciel clair, dans la teinte du thème.
   const fond = useMemo(() => mixHex(teinte.sky, '#FFFFFF', 0.55), [teinte.sky]);
@@ -914,6 +925,7 @@ export function Exploration({
               camera={cameraPlate}
               cle={cle}
               fond={fond}
+              temperature={kelvin}
             />
           )}
           {/* Sans le natif (banc d'essai), la vue en JavaScript tient lieu. */}
@@ -1005,6 +1017,30 @@ export function Exploration({
             son fond, sa hauteur et son rembourrage : ce qu'on voit est ce
             qu'on touche, et le mot ne peut plus en sortir.
           */}
+          <View style={styles.hautDroite} pointerEvents="box-none">
+          {/*
+            LA TEINTE DES LAMPES, D'UN APPUI — 2700 K, 3000 K, 4000 K, lumière
+            du jour, et on recommence. Seulement s'il y a des lampes à allumer.
+          */}
+          {lampes.length > 0 && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Température des lampes : ${kelvin} kelvins, ${nomDeTemperature(kelvin)}`}
+              accessibilityHint="Passe à la température suivante"
+              testID="temperature-lampes"
+              style={({ pressed }) => [styles.temperature, pressed && styles.enfonce]}
+              hitSlop={8}
+              onPress={() => {
+                const k = useTemperatureLampes.getState().suivante();
+                haptic('leger');
+                astuce(`Lampes : ${nomDeTemperature(k)}, ${k} K`, { icone: 'lumiere' });
+              }}>
+              <View style={[styles.temperaturePastille, { backgroundColor: teinteDeKelvin(kelvin) }]} />
+              <Text style={styles.temperatureTexte} numberOfLines={1}>
+                {kelvin} K
+              </Text>
+            </Pressable>
+          )}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Terminer l’exploration"
@@ -1018,6 +1054,7 @@ export function Exploration({
               Terminer
             </Text>
           </Pressable>
+          </View>
         </View>
 
         {/*
@@ -1104,6 +1141,14 @@ export function Exploration({
   );
 }
 
+/** La pastille de la température : la teinte de la lumière, adoucie. */
+function teinteDeKelvin(k: number): string {
+  if (k <= 2700) return '#FFD9A8';
+  if (k <= 3000) return '#FFE4BE';
+  if (k <= 4000) return '#FFF1DE';
+  return '#EEF4FF';
+}
+
 const getStyles = themedStyles((c: Palette) =>
   StyleSheet.create({
     fond: { flex: 1, backgroundColor: c.bg },
@@ -1132,6 +1177,19 @@ const getStyles = themedStyles((c: Palette) =>
       ...ombreBouton,
     },
     terminerTexte: { color: c.blue, fontSize: 16, fontWeight: '600' },
+    hautDroite: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    temperature: {
+      height: 40,
+      paddingHorizontal: 12,
+      borderRadius: 20,
+      backgroundColor: c.surface,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      ...ombreBouton,
+    },
+    temperaturePastille: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: c.line },
+    temperatureTexte: { color: c.ink, fontSize: 14, fontWeight: '700' },
     /* Une colonne contre le bord droit : pas plus de deux cinquièmes de l'écran. */
     pieces: { position: 'absolute', right: 14, maxHeight: '42%', maxWidth: 150 },
     piecesFond: { alignItems: 'flex-end', gap: 6, paddingBottom: 4 },

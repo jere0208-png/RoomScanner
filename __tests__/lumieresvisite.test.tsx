@@ -268,3 +268,35 @@ describe('dans la visite, l’appui allume, puis éteint', () => {
     act(() => t.unmount());
   });
 });
+
+describe('la température des lampes, choisie dans la visite', () => {
+  it('la pastille paraît s’il y a des lampes, et chaque appui passe à la température suivante', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { useTemperatureLampes } = require('../src/store/temperatureLampes');
+    const ceiling: CeilingFixture[] = [{ id: 'd', kind: 'dcl', roomId: 'room-1', at: { x: 2, z: 1.5 } }];
+    act(() => {
+      useUsage.setState({ modeElec: true, choisi: true, charge: true } as never);
+      useTemperatureLampes.setState({ kelvin: 3000, charge: true });
+      useScanStore.setState({
+        walls: MURS,
+        openings: [],
+        objects: [],
+        rooms: ROOMS as never,
+        fixtures: [],
+        ceiling,
+        niveauCourant: 0,
+      } as never);
+    });
+    let t!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      t = TestRenderer.create(<Exploration visible onClose={() => {}} />);
+    });
+    const vue = () => t.root.findAll((n) => n.type === ('RoomScanVisite' as never))[0];
+    expect(vue().props.temperature).toBe(3000);
+    const pastille = t.root.findAll((n) => n.props?.testID === 'temperature-lampes' && typeof n.props?.onPress === 'function')[0];
+    expect(pastille).toBeDefined();
+    act(() => pastille.props.onPress());
+    expect(vue().props.temperature).toBe(4000);
+    act(() => t.unmount());
+  });
+});

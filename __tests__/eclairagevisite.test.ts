@@ -87,3 +87,37 @@ describe('la lampe du plafond, sur les meubles et l’appareillage : au plus 10 
     expect(swift).toMatch(/m\.categoryBitMask = Self\.MASQUE_MEUBLE/);
   });
 });
+
+describe('la température des lampes (relevé du patron : 2700, 3000, 4000 K, et autre)', () => {
+  it('le natif reçoit la température, et en tire la teinte de toutes les lampes', () => {
+    const m = readFileSync(join(__dirname, '../modules/react-native-room-scan/ios/RoomScan.m'), 'utf8');
+    expect(m).toMatch(/RCT_EXPORT_VIEW_PROPERTY\(temperature, NSNumber\)/);
+    expect(swift).toMatch(/@objc var temperature: NSNumber/);
+    expect(swift).toMatch(/static func teinteDeKelvin/);
+    // Les faisceaux prennent la teinte choisie.
+    const bloc = swift.slice(swift.indexOf('private func lumieres'), swift.indexOf('private func lumieres') + 600);
+    expect(bloc).toMatch(/teinteDesLampes/);
+  });
+
+  it('le réglage passe de 2700 à 3000, 4000, 6500 K, puis recommence', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { useTemperatureLampes, TEMPERATURES } = require('../src/store/temperatureLampes');
+    expect(TEMPERATURES.map((t: { k: number }) => t.k)).toEqual([2700, 3000, 4000, 6500]);
+    useTemperatureLampes.setState({ kelvin: 2700 });
+    const vus = [1, 2, 3, 4].map(() => useTemperatureLampes.getState().suivante());
+    expect(vus).toEqual([3000, 4000, 6500, 2700]);
+  });
+});
+
+describe('rien ne blanchit plus sous la lampe (relevé du patron : « tout devient blanc »)', () => {
+  it('le halo s’efface quand on s’en approche', () => {
+    const bloc = swift.slice(swift.indexOf('private lazy var matiereDuHalo'));
+    expect(bloc.slice(0, 2000)).toMatch(/smoothstep\(1\.0, 2\.5, length\(_surface\.position\)\)/);
+  });
+
+  it('la couleur d’un meuble ne dépasse pas sa teinte de plus de 15 %', () => {
+    expect(swift).toMatch(/_output\.color\.rgb = min\(_output\.color\.rgb, _surface\.diffuse\.rgb \* 1\.15 \+ _surface\.emission\.rgb\)/);
+    const bloc = swift.slice(swift.indexOf('private func materiauDuMeuble'));
+    expect(bloc).toMatch(/nuanceurPlafondDesMeubles/);
+  });
+});
