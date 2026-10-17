@@ -71,9 +71,20 @@ export interface MaillageDeVisite {
  * Chaque segment est décollé de quatre millimètres le long de la moyenne des
  * normales de ses faces : vers l'œil qui le regarde, il passe devant elles.
  */
-export function aretesDuBati(polys: { pts: P3[]; n: P3 }[]): number[] {
+export function aretesDuBati(polysBruts: { pts: P3[]; n: P3 }[]): number[] {
   const TOL = 0.005;
   const CASE = 0.5;
+  /*
+    DES NORMALES DE LONGUEUR UN — relevé du patron, sur capture : « il y a
+    toujours au-dessus des ouvrants les traits verticaux ». La normale d'un
+    contour (`normaleDuContour`) a la longueur de son aire : deux pans d'un
+    même plan, petits, avaient un produit scalaire bien sous le seuil — ils
+    passaient pour un angle, et chaque joint de linteau laissait son trait.
+  */
+  const polys = polysBruts.map(({ pts, n }) => {
+    const l = Math.hypot(n.x, n.y, n.z) || 1;
+    return { pts, n: { x: n.x / l, y: n.y / l, z: n.z / l } };
+  });
   // Tous les côtés de toutes les faces, avec la normale de leur face.
   const cotes: { a: P3; b: P3; n: P3; f: number }[] = [];
   const centres: P3[] = polys.map(({ pts }) => {

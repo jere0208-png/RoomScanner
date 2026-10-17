@@ -57,3 +57,29 @@ describe('le blanc des murs', () => {
     expect(meuble).not.toMatch(/nuanceurClarte/);
   });
 });
+
+describe('pas de trait au-dessus des ouvertures (relevé du patron, capture 20:38)', () => {
+  it('avec les vraies faces de la scène (normales non unitaires), les joints des linteaux ne laissent aucun trait', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { buildScene } = require('../src/geometry/scene3d');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { maillageDeLaVisite } = require('../src/geometry/visite3d');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { appartementExemple } = require('../src/data/exemple');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { MAQUETTE } = require('../src/ui/maquette');
+    const ex = appartementExemple();
+    const { faces } = buildScene(ex.walls, ex.openings, ex.objects, { palette: MAQUETTE, showSurfaces: true, plafonds: true, rooms: ex.rooms });
+    const { aretes } = maillageDeLaVisite(faces, { sansMeubles: true });
+    // Les linteaux : entre le haut des baies et le plafond. Les seules
+    // verticales qui y restent sont les angles et les fins de mur (qui
+    // descendent jusqu'au sol, donc plus bas que le linteau).
+    const surLesLinteaux: number[][] = [];
+    for (let k = 0; k < aretes.length / 6; k++) {
+      const s = aretes.slice(k * 6, k * 6 + 6);
+      const vertical = Math.abs(s[0] - s[3]) < 0.01 && Math.abs(s[2] - s[5]) < 0.01;
+      if (vertical && Math.min(s[1], s[4]) > 1.95) surLesLinteaux.push(s);
+    }
+    expect(surLesLinteaux).toEqual([]);
+  });
+});
