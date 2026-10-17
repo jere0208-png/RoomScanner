@@ -44,6 +44,16 @@ export interface DonneesAstuce {
    * c'est enregistré. Sans appui, elle passe comme les autres.
    */
   action?: { label: string; faire: () => void };
+  /**
+   * UNE FAMILLE SE REMPLACE, ELLE NE FAIT PAS LA QUEUE.
+   *
+   * « Annulé : longueur du mur », puis « Annulé : épaisseur du mur » trois
+   * appuis plus tard : c'est la dernière qui dit vrai. Une astuce de la
+   * même famille que celle affichée (ou qu'une autre en attente) prend sa
+   * place au lieu de s'empiler derrière — sans quoi la file raconterait,
+   * pendant des secondes, des annulations déjà dépassées.
+   */
+  famille?: string;
 }
 
 interface EtatAstuce {
@@ -76,6 +86,16 @@ export const useAstuce = create<EtatAstuce>((set, get) => ({
   },
   poser: (a) => {
     const st = get();
+    if (a.famille) {
+      if (st.courante?.famille === a.famille) {
+        set({ courante: a, file: st.file.filter((x) => x.famille !== a.famille) });
+        return;
+      }
+      if (st.file.some((x) => x.famille === a.famille)) {
+        set({ file: [...st.file.filter((x) => x.famille !== a.famille), a] });
+        return;
+      }
+    }
     /*
       LA MÊME PHRASE NE S'EMPILE PAS SUR ELLE-MÊME. Deux gestes rapides qui
       lèvent la même astuce — deux liens noués coup sur coup — la feraient
@@ -124,6 +144,7 @@ export function astuce(
     icone?: keyof typeof SOLAIRES;
     fete?: boolean;
     action?: DonneesAstuce['action'];
+    famille?: string;
   },
 ) {
   useAstuce.getState().poser({ texte, ...options });

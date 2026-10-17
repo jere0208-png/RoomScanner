@@ -57,6 +57,7 @@ import { Toolbar2D, Toolbar3D } from './result/ResultToolbar';
 import {
   FloorplanEditor,
   SuitLeDoigt,
+  vueDroiteDuPlan,
   type VuePlan,
   type ViseurPlan,
 } from '../components/FloorplanEditor';
@@ -191,7 +192,7 @@ import {
   pieceDuCote,
 } from '../geometry/electrical';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NOM_PIECE_MAX, duReleve, niveauDeDepart, nomDePieceLibre, nomDeVersion, useScanStore } from '../store/scanStore';
+import { NOM_PIECE_MAX, cleDuDernierRetour, duReleve, niveauDeDepart, nomDePieceLibre, nomDeVersion, useScanStore } from '../store/scanStore';
 import { useAccountStore, useImageSansLogo } from '../store/accountStore';
 import { demarrerComplement, demarrerEtage, lancerUnScan } from '../native/useRoomScan';
 import { DiagnosticSheet, type Constat } from '../components/DiagnosticSheet';
@@ -239,6 +240,8 @@ import { celebrerSiAuxNormes, resetCelebration } from '../ui/auxNormes';
 import { useModeElec, useUsage } from '../store/usage';
 import { usePremieresFois } from '../store/premieresFois';
 import { useFigePendantLeGeste } from '../store/geste';
+import { direLeRetour } from '../store/libelleDuGeste';
+import { poserLeRecadreur, useRecadrage } from '../store/recadrage';
 
 type Tab = '2d' | '3d';
 
@@ -293,6 +296,38 @@ export function lignesDeLaLegende<T>(lignes: T[], max = PIECES_DE_LA_LEGENDE): {
     lignes: reste > 0 ? lignes.slice(0, max) : lignes,
     autres: reste > 0 ? `+ ${reste} autre${reste > 1 ? 's' : ''} pièce${reste > 1 ? 's' : ''}` : null,
   };
+}
+
+/**
+ * LA PASTILLE « RECADRER » se rend SEULE quand le plan devient recadrable
+ * (voir `store/recadrage`) : l'écran entier ne se rend pas au lâcher d'un
+ * geste pour elle. La rangée qui la porte se mesure (`onLayout`) : si elle
+ * déborde, elle se resserre d'un cran comme pour toute autre pastille.
+ */
+function PastilleRecadrer({
+  style,
+  teinte,
+}: {
+  style: React.ComponentProps<typeof TouchableOpacity>['style'];
+  teinte: string;
+}) {
+  const recadrer = useRecadrage((s) => s.recadrer);
+  if (!recadrer) return null;
+  return (
+    <TouchableOpacity
+      style={style}
+      hitSlop={HIT_PASTILLE}
+      accessibilityLabel="Recadrer"
+      accessibilityHint="Remettre le plan droit et entier à l’écran"
+      onPress={() => {
+        haptic('leger');
+        recadrer();
+      }}>
+      <Svg width={18} height={18} viewBox="0 0 24 24">
+        <Trace d={SOLAIRES.centrer} fill={teinte} fillRule="evenodd" />
+      </Svg>
+    </TouchableOpacity>
+  );
 }
 
 export function ResultScreen() {
@@ -760,9 +795,8 @@ export function ResultScreen() {
   */
   const [vueDeDepart] = useState((): VuePlan => {
     const st = useScanStore.getState();
-    const t = planFrameAngle(st.walls.filter((w) => niveauDe(w) === st.niveauCourant));
-    const rot = t <= Math.PI / 4 ? -t : Math.PI / 2 - t;
-    return { zoom: 1, ox: 0, oy: 0, rot: Math.abs(rot) < 1e-3 ? 0 : rot };
+    // La même règle que « Recadrer » : voir `vueDroiteDuPlan`.
+    return vueDroiteDuPlan(st.walls.filter((w) => niveauDe(w) === st.niveauCourant));
   });
   const vuePlanRef = useRef<VuePlan>(vueDeDepart);
   const memoriserVuePlan = useCallback((v: VuePlan) => {
@@ -4746,6 +4780,7 @@ export function ResultScreen() {
             vueInitiale={vuePlanRef.current}
             marges={capturing ? undefined : MARGES_DU_PLAN}
             onView={memoriserVuePlan}
+            onRecadreur={poserLeRecadreur}
             /* De quoi lâcher un meuble du catalogue à l'endroit du doigt. */
             onViseur={recevoirViseur}
             cableRoutes={showRoutes ? cheminements?.traces : undefined}
@@ -5604,10 +5639,16 @@ export function ResultScreen() {
                   haptic('leger');
                   sortirLaRegle(!mesurant);
                 }}>
-                {/* L'icône seule : la rangée tient dans un téléphone, et la
-                    règle se reconnaît d'elle-même. */}
+                {/*
+                  SON ICÔNE À ELLE — revue experte « Édition 2D » : elle
+                  portait la règle de « Dimensions » (le calque des cotes, en
+                  bas), et l'on voyait deux règles bleues à l'écran pour deux
+                  fonctions. L'outil prend la règle au crayon du jeu commun.
+                  Toujours sans mot : la rangée tient dans un téléphone
+                  (`pointsacorriger.test.tsx`).
+                */}
                 <Svg width={18} height={18} viewBox="0 0 24 24">
-                  <Trace d={SOLAIRES.ruler} fill={mesurant ? '#FFFFFF' : teinte.blue} fillRule="evenodd" />
+                  <Trace d={SOLAIRES.cotes3d} fill={mesurant ? '#FFFFFF' : teinte.blue} fillRule="evenodd" />
                 </Svg>
               </TouchableOpacity>
             )}
@@ -5656,6 +5697,14 @@ export function ResultScreen() {
                 </Svg>
                 {!rangeeEnIcones && <Text style={styles.vuePastilleTexte}>Sur la table</Text>}
               </TouchableOpacity>
+            )}
+            {/*
+              RECADRER — le plan droit et entier, d'un appui. Elle ne paraît
+              que quand le plan a été déplacé, zoomé ou tourné (voir
+              `onRecadreur`) : un plan déjà cadré n'a rien à recadrer.
+            */}
+            {walls.length > 0 && tab === '2d' && (
+              <PastilleRecadrer style={[styles.vuePastille, styles.pastilleIcone]} teinte={teinte.blue} />
             )}
             <TouchableOpacity
               style={styles.vuePastille}
@@ -5755,7 +5804,11 @@ export function ResultScreen() {
                 rangée du sélecteur de vue : un verdict se consulte d'un
                 coup d'œil, il ne fait pas la queue avec les outils. */}
             <SidePill visible={editMode && canUndo} index={0}>
-              <ToolPill icon="undo" label="Annuler" active={false} onPress={undo} />
+              {/* « Annuler » dit ce qu'il vient de défaire : voir `direLeRetour`. */}
+              <ToolPill icon="undo" label="Annuler" active={false} onPress={() => {
+                  undo();
+                  direLeRetour('annule', cleDuDernierRetour());
+                }} />
             </SidePill>
             {/*
               « REFAIRE » NE PARAÎT QU'APRÈS UNE ANNULATION.
@@ -5774,7 +5827,10 @@ export function ResultScreen() {
                 icon="redo"
                 label="Refaire"
                 active={false}
-                onPress={redo}
+                onPress={() => {
+                  redo();
+                  direLeRetour('retabli', cleDuDernierRetour());
+                }}
               />
             </SidePill>
           </View>

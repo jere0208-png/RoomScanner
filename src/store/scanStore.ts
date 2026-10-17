@@ -2297,6 +2297,12 @@ interface Snapshot {
   ceiling: CeilingFixture[];
   notes: PlanNote[];
   mesures: Mesure[];
+  /**
+   * La clé du geste qui a mené à l'état SUIVANT (celle de `pushHistory`) :
+   * « Annuler » dit ce qu'il défait, « Refaire » ce qu'il rétablit (voir
+   * `store/libelleDuGeste`). Elle ne part jamais dans l'état du magasin.
+   */
+  cle?: string;
 }
 const HISTORY_MAX = 40;
 const history: Snapshot[] = [];
@@ -2308,6 +2314,16 @@ const history: Snapshot[] = [];
  * geste de plus.
  */
 let ouverturePosee: { id: string; reprise: Snapshot | undefined } | null = null;
+/** La clé du geste que le dernier « Annuler » ou « Refaire » a traversé ; `null` s'il n'y avait rien. */
+let dernierRetour: string | null = null;
+/**
+ * CE QUE LE DERNIER « ANNULER » (OU « REFAIRE ») VIENT DE TRAVERSER : la clé
+ * de son geste (voir `Snapshot.cle` et `store/libelleDuGeste`), `null` s'il
+ * n'y avait plus rien à défaire.
+ */
+export function cleDuDernierRetour(): string | null {
+  return dernierRetour;
+}
 let lastKey = '';
 let lastAt = 0;
 
@@ -3030,7 +3046,10 @@ export interface ScanState {
   lierPlafond: (id: string, voisin: string) => void;
   delierPlafond: (id: string) => void;
   removeFixture: (id: string) => void;
-  /** Annule la dernière retouche. Vide = plus rien à annuler. */
+  /**
+   * Annule la dernière retouche. Vide = plus rien à annuler. La clé du
+   * geste défait se lit ensuite par `cleDuDernierRetour`.
+   */
   undo: () => void;
   /** Refait ce qu'une annulation vient de retirer. Voir `avenir`. */
   redo: () => void;
@@ -3778,6 +3797,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       ceiling: st.ceiling,
       notes: st.notes,
       mesures: st.mesures,
+      cle: key,
     });
     if (history.length > HISTORY_MAX) {
       history.shift();
@@ -7862,8 +7882,11 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     },
 
     undo: () => {
-      const prev = history.pop();
-      if (!prev) return;
+      const instantane = history.pop();
+      dernierRetour = instantane ? instantane.cle ?? '' : null;
+      if (!instantane) return;
+      // La clé reste à l'historique : l'état du magasin ne la porte pas.
+      const { cle, ...prev } = instantane;
       const st = get();
       // Ce qu'on quitte part dans l'avenir : « Refaire » le ressortira.
       avenir.push({
@@ -7876,6 +7899,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         ceiling: st.ceiling,
         notes: st.notes,
         mesures: st.mesures,
+        cle,
       });
       set({
         ...prev,
@@ -7889,8 +7913,10 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     },
 
     redo: () => {
-      const suite = avenir.pop();
-      if (!suite) return;
+      const instantane = avenir.pop();
+      dernierRetour = instantane ? instantane.cle ?? '' : null;
+      if (!instantane) return;
+      const { cle, ...suite } = instantane;
       const st = get();
       // Et le voyage se fait dans les deux sens : ce qu'on quitte en
       // avançant redevient annulable.
@@ -7904,6 +7930,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         ceiling: st.ceiling,
         notes: st.notes,
         mesures: st.mesures,
+        cle,
       });
       set({
         ...suite,

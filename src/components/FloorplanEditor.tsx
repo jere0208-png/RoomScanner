@@ -143,6 +143,74 @@ export function cartoucheHeurte(
   );
 }
 
+/**
+ * LE QUART DE CERCLE DE CHAQUE BATTANT, du côté où la porte s'ouvre : ses
+ * quatre coins, en mètres (les deux bouts de la baie, puis les mêmes
+ * avancés du rayon du vantail dans la pièce).
+ *
+ * UNE SEULE SOURCE pour les deux qui doivent le laisser libre : les cotes
+ * (`encombrants`) et les cartouches des pièces (`obstacles`). Le sens
+ * d'ouverture est une information de base d'un plan — un nom posé dessus
+ * le cachait (capture clair-11 : « Bureau » et « Entrée » sur leurs
+ * portes).
+ */
+export function battantsDuPlan(openings: WallSeg[], partOf: Map<string, RoomPart>): Pt[][] {
+  const out: Pt[][] = [];
+  for (const o of openings) {
+    if (o.type !== 'door' || o.garage || o.placard) continue;
+    const ancre = partOf.get(roomOf(o))?.labelAt;
+    if (!ancre) continue;
+    const lx = o.b.x - o.a.x;
+    const lz = o.b.z - o.a.z;
+    const l = Math.hypot(lx, lz);
+    if (l < 0.05) continue;
+    let nx = -lz / l;
+    let nz = lx / l;
+    const mx = (o.a.x + o.b.x) / 2;
+    const mz = (o.a.z + o.b.z) / 2;
+    if ((ancre.x - mx) * nx + (ancre.z - mz) * nz < 0) {
+      nx = -nx;
+      nz = -nz;
+    }
+    if (o.versExterieur) {
+      nx = -nx;
+      nz = -nz;
+    }
+    const r = o.vantaux === 2 ? l / 2 : l;
+    out.push([o.a, o.b, { x: o.a.x + nx * r, z: o.a.z + nz * r }, { x: o.b.x + nx * r, z: o.b.z + nz * r }]);
+  }
+  return out;
+}
+
+/** Au-delà, les tronçons de mur se cotent (px par mètre). */
+export const SEUIL_TRONCONS = 80;
+/** En deçà, on revient aux cotes globales (px par mètre). */
+export const SEUIL_GLOBALES = 70;
+
+/**
+ * QUELLE FAMILLE DE COTES S'ÉCRIT : 0, les cotes globales des murs ; 1,
+ * celles de leurs tronçons.
+ *
+ * Entre 55 et 95 px/m, les deux familles s'échangeaient en fondu : les
+ * globales s'effaçaient pendant que les tronçons paraissaient. Mais le plan
+ * ne se redessine qu'au lâcher, et l'on s'arrête souvent dans cette plage
+ * (l'exemple s'ouvre vers 30 px/m : un zoom ×2,5 tombe à 75) — les deux
+ * jeux s'affichaient alors à moitié, en gris doux : des chiffres fantômes,
+ * illisibles au soleil sur un chantier.
+ *
+ * C'est donc une BASCULE NETTE, avec une marge (hystérésis) : les tronçons
+ * au-dessus de `SEUIL_TRONCONS`, les globales sous `SEUIL_GLOBALES`, et
+ * entre les deux, la famille d'avant reste — un zoom qui hésite autour du
+ * seuil ne fait pas clignoter les cotes. Les tronçons qui n'ont pas la
+ * place à ce seuil sont écartés par l'arbitre (`placerEtiquettes`) : ils
+ * ne se chevauchent jamais, la valeur reste au métré.
+ */
+export function familleDesCotes(echelle: number, precedente: 0 | 1): 0 | 1 {
+  if (echelle >= SEUIL_TRONCONS) return 1;
+  if (echelle <= SEUIL_GLOBALES) return 0;
+  return precedente;
+}
+
 /** Un cadrage du plan : ce que le geste fait varier. */
 export interface CadragePlan {
   zoom: number;
@@ -351,6 +419,28 @@ export interface VuePlan {
 }
 
 /**
+ * LE PLAN DROIT ET ENTIER : zoom 1, centré, et tourné juste ce qu'il faut
+ * pour que ses murs soient droits à l'écran (`planFrameAngle`). C'est le
+ * cadrage d'ouverture de l'écran du plan, et celui que rend « Recadrer ».
+ */
+export function vueDroiteDuPlan(walls: WallSeg[]): VuePlan {
+  const t = planFrameAngle(walls);
+  const rot = t <= Math.PI / 4 ? -t : Math.PI / 2 - t;
+  return { zoom: 1, ox: 0, oy: 0, rot: Math.abs(rot) < 1e-3 ? 0 : rot };
+}
+
+/** Le cadrage `v` est-il déjà le plan droit et entier `droite` ? */
+export function estRecadre(v: VuePlan, droite: VuePlan): boolean {
+  const d = Math.atan2(Math.sin(v.rot - droite.rot), Math.cos(v.rot - droite.rot));
+  return (
+    Math.abs(v.zoom - droite.zoom) < 1e-3 &&
+    Math.abs(v.ox - droite.ox) < 0.5 &&
+    Math.abs(v.oy - droite.oy) < 0.5 &&
+    Math.abs(d) < 1e-3
+  );
+}
+
+/**
  * DE QUOI VISER LE PLAN DEPUIS L'EXTÉRIEUR — le glisser-poser du catalogue.
  *
  * Le plan est le seul à savoir où il est à l'écran et quelle échelle il
@@ -399,6 +489,12 @@ interface Props {
    * catalogue. Appelé une fois au montage, et avec `null` au démontage.
    */
   onViseur?: (v: ViseurPlan | null) => void;
+  /**
+   * « RECADRER » : remonte de quoi remettre le plan droit et entier — une
+   * fonction quand le plan a été déplacé, tourné ou zoomé, `null` quand il
+   * l'est déjà (et au démontage). Voir `vueDroiteDuPlan`.
+   */
+  onRecadreur?: (recadrer: (() => void) | null) => void;
   /** Mode édition : sélection des murs + poignées de coin. */
   editable: boolean;
   selectedWallId: string | null;
@@ -897,6 +993,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
   marges,
   onView,
   onViseur,
+  onRecadreur,
   editable,
   selectedWallId,
   onSelectWall,
@@ -1353,20 +1450,27 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
    * la seule mesure que le geste connaît.
    */
   const contourChoisi = useRef<{ x: number; y: number }[] | null>(null);
+  /*
+    LE DOIGT SE SITUE PAR LA PAGE ET LA PLACE DU CADRE, PAS PAR
+    `locationX` — comme `dernierToucher`. `locationX` se lit par rapport à
+    la vue TOUCHÉE : ici le SVG du dessin, dont la toile déborde du cadre
+    de sa marge fixe (voir `margeFixeDeToile`). Le cadrage (`mapping`), lui,
+    est en pixels du cadre : lu tel quel, le doigt tombait à côté — de la
+    pièce choisie, du meuble tenu, et des points de la règle, des spots et
+    des notes, posés à toute la marge du doigt.
+    `origineDuCadre` est mesuré à la pose du doigt (`onTouchStart`).
+
+    UNE SEULE FONCTION pour tous les calques qui situent un appui : un
+    calque oublié retombait dans l'ancien décalage.
+  */
+  const pointDuCadre = (e: GestureResponderEvent) => {
+    const org = origineDuCadre.current;
+    return { x: e.nativeEvent.pageX - org.x, y: e.nativeEvent.pageY - org.y };
+  };
   const pieceSousLeDoigt = (e: GestureResponderEvent) => {
     const poly = contourChoisi.current;
     if (!poly || poly.length < 3) return false;
-    /*
-      LE DOIGT SE SITUE PAR LA PAGE ET LA PLACE DU CADRE, PAS PAR
-      `locationX` — comme `dernierToucher`. `locationX` se lit par rapport à
-      la vue TOUCHÉE : ici le SVG du dessin, dont la toile déborde du cadre
-      de sa marge fixe (voir `margeFixeDeToile`). Le contour, lui, est en
-      pixels du cadre : lu tel quel, le doigt tombait à côté de la pièce.
-      `origineDuCadre` est mesuré à la pose du doigt (`onTouchStart`).
-    */
-    const org = origineDuCadre.current;
-    const x = e.nativeEvent.pageX - org.x;
-    const y = e.nativeEvent.pageY - org.y;
+    const { x, y } = pointDuCadre(e);
     let dedans = false;
     for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
       if (
@@ -1503,7 +1607,8 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
         if (pieceSousLeDoigt(e)) return false;
         const b = objBox.current;
         if (b) {
-          const { locationX: x, locationY: y } = e.nativeEvent;
+          // L'emprise est en pixels du cadre : le doigt aussi.
+          const { x, y } = pointDuCadre(e);
           if (
             Math.abs(x - b.x) < b.hw + 14 &&
             Math.abs(y - b.y) < b.hh + 14
@@ -1676,6 +1781,33 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
   const auRepos =
     Math.abs(view.zoom - 1) < 1e-3 && Math.abs(view.ox) < 0.5 && Math.abs(view.oy) < 0.5 && Math.abs(view.rot) < 1e-3;
   const plafondDEchelle = pleinCadre && auRepos ? Infinity : ECHELLE_MAX_PLAN;
+  /*
+    RECADRER — UN APPUI, ET LE PLAN REVIENT DROIT ET ENTIER.
+
+    Le pincement fait aussi tourner librement le plan, et un quart de degré
+    s'introduit vite en zoomant : cotes et cartouches s'écrivent alors de
+    travers. Rien ne ramenait le plan droit et entier à l'écran, il fallait
+    le redresser à deux doigts sans repère. L'écran porte donc une pastille
+    « Recadrer » tant que le cadrage n'est pas celui d'ouverture.
+
+    LE RECADRAGE PREND LE CHEMIN DU LÂCHER (`poserLeGeste`) : la vue visée
+    devient `vueVive`, et le lâcher pose couche neuve et cadrage dans le
+    même rendu, exactement comme au bout d'un pincement. Le pincer-relâcher
+    lui-même n'en est pas touché.
+  */
+  const vueDroite = useMemo(() => vueDroiteDuPlan(walls), [walls]);
+  const recadre = estRecadre(view, vueDroite);
+  const recadrerMaintenant = useRef(() => {});
+  recadrerMaintenant.current = () => {
+    vueVive.current = vueDroite;
+    poserLeGeste();
+  };
+  const recadrer = useCallback(() => recadrerMaintenant.current(), []);
+  useEffect(() => {
+    if (!onRecadreur) return;
+    onRecadreur(recadre ? null : recadrer);
+    return () => onRecadreur(null);
+  }, [onRecadreur, recadre, recadrer]);
   const baseMapping = useMemo(() => {
     if (layout.w === 0 || layout.h === 0) return null;
     const haut = marges?.haut ?? 0;
@@ -1771,17 +1903,16 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
 
 
   /**
-   * Niveau de détail des cotes, de 0 à 1, piloté par le zoom.
+   * Niveau de détail des cotes, 0 ou 1, piloté par le zoom.
    *
    * Coter chaque retour de mur en même temps que la longueur totale
-   * surchargerait le plan. On les échange donc : en dessous de 55 px/m, seule
-   * la cote globale du mur s'affiche ; au-delà de 95 px/m, seuls les
-   * tronçons. Entre les deux, les unes s'effacent pendant que les autres
-   * apparaissent.
+   * surchargerait le plan. On les échange donc : la cote globale de chaque
+   * mur de loin, ses tronçons de près — UNE SEULE FAMILLE À LA FOIS, à
+   * 100 % d'opacité. Voir `familleDesCotes`.
    */
-  const detail = mapping
-    ? Math.min(1, Math.max(0, (mapping.scale - 55) / 40))
-    : 0;
+  const detailPrecedent = useRef<0 | 1>(0);
+  const detail = mapping ? familleDesCotes(mapping.scale, detailPrecedent.current) : detailPrecedent.current;
+  detailPrecedent.current = detail;
 
   /**
    * Niveau de détail de l'appareillage, de 0 à 1.
@@ -2156,7 +2287,39 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
         rx: 0.3,
         rz: 0.3,
       })),
+      /*
+        LES SYMBOLES ÉLECTRIQUES AUSSI — en mode Électricité, une prise ou un
+        interrupteur sous un nom de pièce ne se lit plus. Le symbole se pose
+        à l'écran (sa sortie du mur dépend de l'échelle) : on le ramène en
+        mètres, avec son rayon dessiné et trois points d'air.
+      */
+      ...(showFixtures
+        ? unitesDesAppareils(fixtures ?? [], walls, quads).map((u) => {
+            const q = mapping.toMeters(poseDeLUnite(u, mapping, walls, dehorsDesMurs, elecLod).p);
+            const r = (rayonDAppareil(mapping.scale) + 3) / mapping.scale;
+            return { x: q.x, z: q.z, rx: r, rz: r };
+          })
+        : []),
     ];
+    /*
+      LES BATTANTS PASSENT AVANT TOUT — avis de l'architecte : « battant et
+      baie, puis cotes, puis nom, puis surface ». On voit dans quel sens
+      ouvrent les portes de l'entrée, du bureau, de la salle d'eau. Même le
+      repli « par-dessus un meuble » ne se pose pas sur une porte : dans un
+      WC ou un placard trop petits, le cartouche abrégé sort avec son trait
+      de rappel plutôt que de masquer la porte. (La baie elle-même est déjà
+      gardée : le cartouche reste à une demi-épaisseur des murs.)
+    */
+    const portes = battantsDuPlan(openings, partOf).map((coins) => {
+      const xs = coins.map((q) => q.x);
+      const zs = coins.map((q) => q.z);
+      const x0 = Math.min(...xs);
+      const x1 = Math.max(...xs);
+      const z0 = Math.min(...zs);
+      const z1 = Math.max(...zs);
+      return { x: (x0 + x1) / 2, z: (z0 + z1) / 2, rx: (x1 - x0) / 2, rz: (z1 - z0) / 2 };
+    });
+    obstacles.push(...portes);
     /* Les noms suivent le dézoom : voir `echelleDesNoms`. */
     const k = echelleDesNoms(view.zoom);
     const PAD = 4 * k;
@@ -2377,7 +2540,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
       if (!place) {
         for (const essai of variantes) {
           if (avecAire && !essai.some((l) => l.role === 'aire')) continue;
-          const trouve = chercher(essai, () => true);
+          const trouve = chercher(essai, (cand, lw, lh) => !cartoucheHeurte(cand, lw / 2, lh / 2, portes));
           if (!trouve) continue;
           pos = trouve.cand;
           retenues = essai;
@@ -2430,8 +2593,15 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
     facesPlan,
     roomById,
     objects,
+    openings,
     ceiling,
     showCeiling,
+    showFixtures,
+    fixtures,
+    walls,
+    quads,
+    dehorsDesMurs,
+    elecLod,
     showSurfaces,
     showMeasures,
     editable,
@@ -2743,34 +2913,10 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
           ])
         : [o.a, o.b];
       encombrants.push(boiteDePoints(coins.map((p) => mapping.toPx(p))));
-      // Et le quart de cercle du battant, du côté où il s'ouvre.
-      if (o.type !== 'door' || o.garage || o.placard) continue;
-      const ancre = partOf.get(roomOf(o))?.labelAt;
-      if (!ancre) continue;
-      const lx = o.b.x - o.a.x;
-      const lz = o.b.z - o.a.z;
-      const l = Math.hypot(lx, lz);
-      if (l < 0.05) continue;
-      let nx = -lz / l;
-      let nz = lx / l;
-      const mx = (o.a.x + o.b.x) / 2;
-      const mz = (o.a.z + o.b.z) / 2;
-      if ((ancre.x - mx) * nx + (ancre.z - mz) * nz < 0) {
-        nx = -nx;
-        nz = -nz;
-      }
-      if (o.versExterieur) {
-        nx = -nx;
-        nz = -nz;
-      }
-      const r = o.vantaux === 2 ? l / 2 : l;
-      encombrants.push(
-        boiteDePoints(
-          [o.a, o.b, { x: o.a.x + nx * r, z: o.a.z + nz * r }, { x: o.b.x + nx * r, z: o.b.z + nz * r }].map((p) =>
-            mapping.toPx(p),
-          ),
-        ),
-      );
+    }
+    // Et le quart de cercle de chaque battant, du côté où il s'ouvre.
+    for (const coins of battantsDuPlan(openings, partOf)) {
+      encombrants.push(boiteDePoints(coins.map((p) => mapping.toPx(p))));
     }
     // Trois points de jeu : deux plaques ne se touchent pas (captures du simulateur).
     const poses = placerEtiquettes(items, prises, 3, encombrants);
@@ -4930,7 +5076,6 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                 fill="transparent"
                 accessibilityLabel="Tirer une piece"
                 onPressIn={(e) => {
-                  const { locationX, locationY } = e.nativeEvent;
                   /*
                     LES DEUX COINS SE COLLENT AUX MURS QUI SONT LA.
 
@@ -4940,18 +5085,11 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                     la reprise — sinon il collerait la ou le magasin ne
                     reconnait plus rien, et l'on doublerait le mur.
                   */
-                  const p = aimanterCoin(
-                    mapping.toMeters({ x: locationX, y: locationY }),
-                    walls,
-                  );
+                  const p = aimanterCoin(mapping.toMeters(pointDuCadre(e)), walls);
                   setTirage({ a: p, b: p });
                 }}
                 onResponderMove={(e) => {
-                  const { locationX, locationY } = e.nativeEvent;
-                  const p = aimanterCoin(
-                    mapping.toMeters({ x: locationX, y: locationY }),
-                    walls,
-                  );
+                  const p = aimanterCoin(mapping.toMeters(pointDuCadre(e)), walls);
                   setTirage((t) => (t ? { a: t.a, b: p } : t));
                 }}
                 onPressOut={() => {
@@ -5066,8 +5204,8 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                 height={layout.h}
                 fill="transparent"
                 onPress={(e) => {
-                  const { locationX, locationY } = e.nativeEvent;
-                  onRegleTap?.(mapping.toMeters({ x: locationX, y: locationY }), 18 / mapping.scale);
+                  // Le point tombe sous le doigt : voir `pointDuCadre`.
+                  onRegleTap?.(mapping.toMeters(pointDuCadre(e)), 18 / mapping.scale);
                 }}
               />
             )}
@@ -5079,10 +5217,9 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                 height={layout.h}
                 fill="transparent"
                 onPress={(e) => {
-                  const { locationX, locationY } = e.nativeEvent;
-                  onPlaceAt?.(
-                    mapping.toMeters({ x: locationX, y: locationY }),
-                  );
+                  // Le spot, le point lumineux ou la note tombe sous le
+                  // doigt : voir `pointDuCadre`.
+                  onPlaceAt?.(mapping.toMeters(pointDuCadre(e)));
                 }}
               />
             )}
