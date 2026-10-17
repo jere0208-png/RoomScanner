@@ -33,7 +33,7 @@ export interface Peinture {
 export const PEINTURE_DEFAUT = 'blanc';
 
 /**
- * LES DOUZE.
+ * LES TREIZE — les douze d'origine, et le blanc pur que le patron a demandé.
  *
  * Six clairs pour agrandir, quatre teintes sourdes qui passent partout, et
  * deux foncés — parce qu'un pan sombre est la seule façon de montrer à quoi
@@ -41,6 +41,8 @@ export const PEINTURE_DEFAUT = 'blanc';
  */
 export const PEINTURES: Peinture[] = [
   { cle: 'blanc', nom: 'Blanc cassé', hex: '#FFFCF6' },
+  // Relevé du patron : « ajoute la couleur blanc pur sur la teinte des murs ».
+  { cle: 'blancPur', nom: 'Blanc pur', hex: '#FFFFFF' },
   { cle: 'craie', nom: 'Craie', hex: '#F4F1EA' },
   { cle: 'lin', nom: 'Lin', hex: '#EFE6D6' },
   { cle: 'sable', nom: 'Sable', hex: '#E8DCC6' },

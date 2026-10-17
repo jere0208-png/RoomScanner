@@ -90,6 +90,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   private var fEcorche: [Float] = []
   private var fMeubles: [Float] = []
   private var fTexturees: [Float] = []
+  private var fAretes: [Float] = []
 
   /// Convertit et compare : vrai si les nombres ont changé (ils sont alors gardés).
   private static func recevoir(_ nombres: [NSNumber], dans cible: inout [Float]) -> Bool {
@@ -105,6 +106,19 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   @objc var maillage: [NSNumber] {
     get { [] }
     set { if Self.recevoir(newValue, dans: &fMaillage) { rebatir(.bati) } }
+  }
+
+  /*
+    LES ARÊTES DU BÂTI — relevé du patron : « ajoute des arêtes légères sur les
+    murs et plafonds, plus visibles, et autour des ouvrants sans porte ; on
+    doit mieux voir les fins de chaque pan de mur ». Six nombres par segment
+    (deux extrémités), calculés par le JavaScript (voir `aretesDuBati`) : les
+    fins de mur, les angles, les jonctions avec le plafond et le sol, les
+    tableaux des ouvertures. Un trait fin, gris, à peine posé.
+  */
+  @objc var aretes: [NSNumber] {
+    get { [] }
+    set { if Self.recevoir(newValue, dans: &fAretes) { rebatir(.bati) } }
   }
 
   @objc var sols: [NSNumber] {
@@ -140,9 +154,30 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
    * de dessin, utile vu de loin sur la maquette — se retire ; derrière les
    * baies, un vrai dehors : un ciel, un horizon voilé, un sol lointain.
    */
+  /*
+    LE BLANC D'UN MUR RESTE BLANC EN VISITE — relevé du patron : « en visite,
+    le plus blanc donne un gris ». Sous la lumière fixe de la pièce, un mur
+    vertical ne reçoit que l'ambiance et un peu du jour : il sortait aux deux
+    tiers de sa teinte, un blanc pur en gris. Murs et plafonds reçoivent en
+    plus un quart de leur propre teinte — la lumière que les murs se renvoient
+    entre eux : un blanc reste blanc, une couleur reste elle-même. Les meubles
+    et les sols n'en reçoivent rien. La maquette garde son rendu.
+  */
+  static let CLARTE_DES_MURS: CGFloat = 0.25
+  static let nuanceurClarte = """
+    #pragma arguments
+    float clarte;
+    #pragma body
+    _output.color.rgb += _surface.diffuse.rgb * clarte;
+    """
+  /// Les matières du bâti, qui reçoivent la clarté des murs.
+  private var matieresDuBati: [SCNMaterial] = []
+  private var clarteDesMurs: CGFloat { modePose == false ? Self.CLARTE_DES_MURS : 0 }
+
   private func regleLeMode(maquette: Bool) {
     guard modePose != maquette else { return }
     modePose = maquette
+    for m in matieresDuBati { m.setValue(NSNumber(value: Float(clarteDesMurs)), forKey: "clarte") }
     /*
       UN LISERÉ LÉGER, FINALEMENT — relevé du patron, après l'avoir vu
       retiré : « les meubles se fondent dans le mur, peut-être qu'un léger
@@ -733,9 +768,11 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     if s.contains(.bati) {
       Self.vider(gBati)
       matiereEcorche = nil
+      matieresDuBati.removeAll()
       if let g = geometrie(fMaillage, deuxFaces: true) {
         gBati.addChildNode(SCNNode(geometry: g))
       }
+      if let a = noeudDesAretes() { gBati.addChildNode(a) }
       if let g = geometrie(fOrientes, deuxFaces: false) {
         gBati.addChildNode(SCNNode(geometry: g))
       }
@@ -788,7 +825,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       m.writesToDepthBuffer = false
     } else {
       // Sans voile, la façade redevient un mur comme les autres.
-      m.shaderModifiers = nil
+      m.shaderModifiers = [.fragment: Self.nuanceurClarte]
       m.writesToDepthBuffer = true
     }
   }
@@ -1387,8 +1424,39 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     // parcours s'est trompé reste un mur, pas un trou.
     m.isDoubleSided = deuxFaces
     m.cullMode = .back
+    m.shaderModifiers = [.fragment: Self.nuanceurClarte]
+    m.setValue(NSNumber(value: Float(clarteDesMurs)), forKey: "clarte")
+    matieresDuBati.append(m)
     g.materials = [m]
     return g
+  }
+
+  /** Les arêtes : des segments, un trait fin et léger, un peu décollé des faces. */
+  private func noeudDesAretes() -> SCNNode? {
+    let v = fAretes
+    let n = v.count / 6
+    guard n > 0 else { return nil }
+    var sommets: [SCNVector3] = []
+    sommets.reserveCapacity(n * 2)
+    for k in 0..<(n * 2) {
+      sommets.append(SCNVector3(x: v[k * 3], y: v[k * 3 + 1], z: v[k * 3 + 2]))
+    }
+    let indices = (0..<Int32(n * 2)).map { $0 }
+    let g = SCNGeometry(
+      sources: [SCNGeometrySource(vertices: sommets)],
+      elements: [SCNGeometryElement(indices: indices, primitiveType: .line)])
+    let m = SCNMaterial()
+    m.lightingModel = .constant
+    m.diffuse.contents = UIColor(red: 0.33, green: 0.31, blue: 0.29, alpha: 1)
+    m.transparency = 0.42
+    m.blendMode = .alpha
+    m.writesToDepthBuffer = false
+    m.isDoubleSided = true
+    g.materials = [m]
+    let noeud = SCNNode(geometry: g)
+    // Après les faces : un trait se pose sur ce qu'il souligne.
+    noeud.renderingOrder = 3
+    return noeud
   }
 
   // --------------------------------------------------------------- sols

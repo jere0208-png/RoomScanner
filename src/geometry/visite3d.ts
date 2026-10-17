@@ -52,6 +52,66 @@ export interface MaillageDeVisite {
   textures: string[];
   /** Les faces habillées : seize nombres par triangle (voir `Habilleur`). */
   texturees: number[];
+  /** Les arêtes du bâti : six nombres par segment (voir `aretesDuBati`). */
+  aretes: number[];
+}
+
+/**
+ * LES ARÊTES DU BÂTI — relevé du patron : « ajoute des arêtes légères sur les
+ * murs et plafonds, plus visibles, et autour des ouvrants sans porte ; on doit
+ * mieux voir les fins de chaque pan de mur ».
+ *
+ * Chaque côté de chaque face est une arête candidate. On garde celles qui
+ * marquent une FORME : deux faces qui s'y rejoignent en faisant un angle (un
+ * angle de pièce, la fin d'un mur, son chant, le tableau d'une ouverture), ou
+ * un bord qui n'appartient qu'à une face (la jonction avec le plafond, avec
+ * le sol). Deux pans d'un même mur, côte à côte et dans le même plan — au-
+ * dessus et au-dessous d'une fenêtre —, ne laissent pas de trait.
+ *
+ * Chaque segment est décollé de quatre millimètres le long de la moyenne des
+ * normales de ses faces : vers l'œil qui le regarde, il passe devant elles.
+ */
+export function aretesDuBati(polys: { pts: P3[]; n: P3 }[]): number[] {
+  const cle = (p: P3) => `${Math.round(p.x * 100)},${Math.round(p.y * 100)},${Math.round(p.z * 100)}`;
+  const parArete = new Map<string, { a: P3; b: P3; normales: P3[] }>();
+  for (const { pts, n } of polys) {
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      if (Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) < 0.02) continue;
+      const ka = cle(a);
+      const kb = cle(b);
+      const k = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+      const e = parArete.get(k);
+      if (e) e.normales.push(n);
+      else parArete.set(k, { a, b, normales: [n] });
+    }
+  }
+  const out: number[] = [];
+  for (const { a, b, normales } of parArete.values()) {
+    if (normales.length >= 2) {
+      // Toutes dans le même plan (à 20° près) : un joint de pans, pas une arête.
+      let pli = false;
+      for (let i = 1; i < normales.length && !pli; i++) {
+        const p = normales[0];
+        const q = normales[i];
+        if (p.x * q.x + p.y * q.y + p.z * q.z < 0.94) pli = true;
+      }
+      if (!pli) continue;
+    }
+    let mx = 0;
+    let my = 0;
+    let mz = 0;
+    for (const q of normales) {
+      mx += q.x;
+      my += q.y;
+      mz += q.z;
+    }
+    const l = Math.hypot(mx, my, mz) || 1;
+    const d = 0.004 / l;
+    out.push(a.x + mx * d, a.y + my * d, a.z + mz * d, b.x + mx * d, b.y + my * d, b.z + mz * d);
+  }
+  return out;
 }
 
 /**
@@ -206,6 +266,8 @@ export function maillageDeLaVisite(faces: Face3D[], o: { sansMeubles?: boolean }
   const sols: number[] = [];
   // Les murs et les sols en vraies images (voir `habillage`).
   const habilleur = new Habilleur();
+  // Les faces du bâti et leur normale tournée, pour les arêtes.
+  const polys: { pts: P3[]; n: P3 }[] = [];
   const pousser = (cible: number[], pts: P3[], tri: [number, number, number]) => {
     for (const i of tri) {
       const p = pts[i];
@@ -234,6 +296,11 @@ export function maillageDeLaVisite(faces: Face3D[], o: { sansMeubles?: boolean }
       }
     }
     if (tris.length === 0) continue;
+    if (!face.meuble && !face.appareil) {
+      const n = normaleDuContour(face.pts);
+      const tournee = voulue && n.x * voulue.x + n.y * voulue.y + n.z * voulue.z < 0 ? { x: -n.x, y: -n.y, z: -n.z } : n;
+      polys.push({ pts: face.pts, n: tournee });
+    }
     const [r, g, b] = composantes(face.fill);
     if (face.isFloor) {
       sols.push(
@@ -256,7 +323,13 @@ export function maillageDeLaVisite(faces: Face3D[], o: { sansMeubles?: boolean }
       }
     }
   }
-  return { maillage, sols, textures: habilleur.textures, texturees: habilleur.texturees };
+  return {
+    maillage,
+    sols,
+    textures: habilleur.textures,
+    texturees: habilleur.texturees,
+    aretes: aretesDuBati(polys),
+  };
 }
 
 /** La caméra, à plat : position, lacet, tangage, ouverture verticale (°). */

@@ -392,6 +392,8 @@ export const RoomScanVisite = UIManager.getViewManagerConfig?.(
   ? requireNativeComponent<
       ViewProps & {
         maillage: number[];
+        /* Les arêtes du bâti : six nombres par segment (voir `aretesDuBati`). */
+        aretes?: number[];
         sols: number[];
         camera?: number[];
         fond: string;

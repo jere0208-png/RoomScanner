@@ -835,6 +835,7 @@ export function Exploration({
             <RoomScanVisite
               style={StyleSheet.absoluteFill}
               maillage={maille.maillage}
+              aretes={maille.aretes}
               sols={maille.sols}
               textures={maille.textures}
               texturees={maille.texturees}

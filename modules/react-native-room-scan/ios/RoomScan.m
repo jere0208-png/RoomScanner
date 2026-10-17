@@ -163,6 +163,7 @@ RCT_EXTERN_METHOD(realiteAugmentee:(NSString *)cle
 @interface RCT_EXTERN_MODULE(RoomScanVisiteManager, RCTViewManager)
 RCT_EXPORT_VIEW_PROPERTY(cle, NSString)
 RCT_EXPORT_VIEW_PROPERTY(maillage, NSArray)
+RCT_EXPORT_VIEW_PROPERTY(aretes, NSArray)
 RCT_EXPORT_VIEW_PROPERTY(sols, NSArray)
 RCT_EXPORT_VIEW_PROPERTY(camera, NSArray)
 RCT_EXPORT_VIEW_PROPERTY(fond, NSString)
