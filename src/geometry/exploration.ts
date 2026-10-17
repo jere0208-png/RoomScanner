@@ -263,16 +263,24 @@ function plusProcheSurBord(p: Pt, poly: Pt[]): Pt {
 export function estLibre(p: Pt, obstacles: Obstacle[], rayon = RAYON_VISITEUR): boolean {
   if (!fini(p.x) || !fini(p.z)) return false;
   for (const o of obstacles) {
-    if (o.kind === 'mur') {
-      const c = plusProcheSurSegment(p, o.a, o.b);
-      if (Math.hypot(p.x - c.x, p.z - c.z) < o.demi + rayon - 1e-4) return false;
-    } else {
-      if (dedans(p, o.coins)) return false;
-      const c = plusProcheSurBord(p, o.coins);
-      if (Math.hypot(p.x - c.x, p.z - c.z) < rayon - 1e-4) return false;
-    }
+    if (bloque(p, o, rayon)) return false;
   }
   return true;
+}
+
+/**
+ * CET OBSTACLE-LÀ ARRÊTE-T-IL LE POINT ? — le test d'`estLibre`, pour un seul
+ * obstacle, au calcul près : le lancer de rayons de `pointDeDepart` le rejoue
+ * obstacle par obstacle et doit trancher EXACTEMENT comme lui.
+ */
+function bloque(p: Pt, o: Obstacle, rayon: number): boolean {
+  if (o.kind === 'mur') {
+    const c = plusProcheSurSegment(p, o.a, o.b);
+    return Math.hypot(p.x - c.x, p.z - c.z) < o.demi + rayon - 1e-4;
+  }
+  if (dedans(p, o.coins)) return true;
+  const c = plusProcheSurBord(p, o.coins);
+  return Math.hypot(p.x - c.x, p.z - c.z) < rayon - 1e-4;
 }
 
 /**
@@ -386,6 +394,331 @@ export function deplacer(
   return p;
 }
 
+// ------------------------------------------------------- le choix du regard
+
+/*
+  LE CHOIX DU POINT DE VUE GELAIT L'ENTRÉE EN VISITE.
+
+  Relevé des testeurs (« entrée en visite et pont natif lourds ») : trente-
+  deux directions, des pas de 5 cm jusqu'à 15 m, et à chaque pas un
+  `estLibre` sur TOUS les obstacles du niveau — jusqu'à 9 600 tests, de
+  0,27 à 0,79 s sous Node, une seconde ou plus sur l'iPhone, à l'ouverture
+  comme à chaque pastille « Aller dans ».
+
+  LE CHOIX RESTE LE MÊME, AU BIT PRÈS. On ne change ni les directions, ni
+  les jalons, ni le test qui tranche : on cesse seulement de le poser là où
+  il ne peut rien arrêter. Chaque obstacle proche ne peut gêner le rayon que
+  sur un tronçon que l'on calcule d'un coup (intersection rayon/boîte) ;
+  hors de ce tronçon, aucun jalon n'est consulté. Dedans, le jalon passe le
+  test d'origine, obstacle par obstacle (`bloque`). Le tronçon est pris un
+  peu LARGE — une boîte plutôt qu'une capsule, un micron de marge — : il
+  peut faire tester un jalon pour rien, jamais en oublier un.
+
+  Mesuré (banc `maj-visite`, sous Node) : l'appartement d'exemple passe de
+  22 à 1 ms ; un plan de douze pièces très meublé (408 obstacles), de 250 à
+  8 ms — de 520 à 13 ms sans compilateur à la volée, plus près de Hermes.
+*/
+
+/** La portée du regard (m) : au-delà, une pièce n'est plus « plus profonde ». */
+const PORTEE_REGARD = 15;
+/** Le pas entre deux jalons du regard (m). */
+const PAS_REGARD = 0.05;
+/**
+ * LES JALONS DU REGARD — les distances éprouvées, CUMULÉES comme le faisait
+ * la boucle d'origine (`course += 0.05` tant que `course < 15`) : à
+ * l'arrondi près, les mêmes nombres, donc les mêmes points, donc le même
+ * choix.
+ */
+const JALONS: number[] = (() => {
+  const c = [0];
+  while (c[c.length - 1] < PORTEE_REGARD) c.push(c[c.length - 1] + PAS_REGARD);
+  return c;
+})();
+/**
+ * Le rayon (m) autour du centre de la pièce où tombent tous les points que
+ * `pointDeDepart` éprouve : la spirale (4 m) puis le recul (1,5 m), et un
+ * peu de jeu pour les arrondis de leurs pas cumulés.
+ */
+const PORTEE_DU_CHOIX = 5.6;
+/** La marge d'un tronçon de rayon (m) : bien plus large que tout arrondi. */
+const JEU = 1e-6;
+
+/** Tous ses nombres sont-ils finis ? Sinon on ne le juge que par le test d'origine. */
+function finitude(o: Obstacle): boolean {
+  if (o.kind === 'mur') {
+    return fini(o.a.x) && fini(o.a.z) && fini(o.b.x) && fini(o.b.z) && fini(o.demi);
+  }
+  if (o.coins.length === 0) return false;
+  for (let i = 0; i < o.coins.length; i++) {
+    if (!fini(o.coins[i].x) || !fini(o.coins[i].z)) return false;
+  }
+  return true;
+}
+
+/** La boîte (alignée sur les axes) d'un obstacle, sans son épaisseur. */
+function boiteDe(o: Obstacle): { x0: number; x1: number; z0: number; z1: number } {
+  const pts = o.kind === 'mur' ? [o.a, o.b] : o.coins;
+  let x0 = Infinity;
+  let x1 = -Infinity;
+  let z0 = Infinity;
+  let z1 = -Infinity;
+  for (let i = 0; i < pts.length; i++) {
+    x0 = Math.min(x0, pts[i].x);
+    x1 = Math.max(x1, pts[i].x);
+    z0 = Math.min(z0, pts[i].z);
+    z1 = Math.max(z1, pts[i].z);
+  }
+  return { x0, x1, z0, z1 };
+}
+
+/**
+ * La distance de `c` à la boîte d'un obstacle — 0 pour un obstacle aux
+ * nombres non finis : on le garde, et le test d'origine tranche.
+ */
+function distanceABoite(o: Obstacle, c: Pt): number {
+  if (!finitude(o)) return 0;
+  const b = boiteDe(o);
+  return Math.hypot(Math.max(b.x0 - c.x, 0, c.x - b.x1), Math.max(b.z0 - c.z, 0, c.z - b.z1));
+}
+
+/**
+ * LES OBSTACLES QUI PEUVENT ARRÊTER UN POINT À MOINS DE `portee` DE `c`.
+ *
+ * Un point à `portee` de `c` est au moins à (distance de `c` à la boîte de
+ * l'obstacle) − `portee` de l'obstacle : au-delà de son épaisseur plus la
+ * marge, il ne l'arrête pas. On n'écarte que ce qui est SÛREMENT trop loin ;
+ * l'ordre est gardé.
+ */
+function obstaclesProches(obstacles: Obstacle[], c: Pt, portee: number, marge: number): Obstacle[] {
+  return obstacles.filter((o) => {
+    const loin = portee + (o.kind === 'mur' ? Math.abs(o.demi) : 0) + Math.abs(marge) + JEU;
+    return !(distanceABoite(o, c) >= loin);
+  });
+}
+
+/** Le côté d'une case de `casesDesObstacles` (m). */
+const CASE = 0.5;
+/** Au-delà de ce numéro de case (25 km), ou de ce nombre de cases, on ne range plus. */
+const CASE_MAX = 50000;
+const CASES_PAR_OBSTACLE = 10000;
+
+/**
+ * LES OBSTACLES RANGÉS PAR CASES DE 50 CM — pour un point, ceux qui peuvent
+ * l'arrêter avec une marge d'au plus `margeMax`, sans consulter les autres.
+ *
+ * Chaque obstacle est inscrit dans toutes les cases que touche sa boîte
+ * gonflée de son épaisseur et de `margeMax` : un point qu'il arrête tombe
+ * forcément dans l'une d'elles, et la seule case du point suffit. Un
+ * obstacle aux nombres non finis, ou démesuré, est rendu pour tout point.
+ */
+function casesDesObstacles(obstacles: Obstacle[], margeMax: number): (p: Pt) => Obstacle[] {
+  const cases = new Map<number, Obstacle[]>();
+  const partout: Obstacle[] = [];
+  const cle = (i: number, j: number) => (i + CASE_MAX) * (2 * CASE_MAX + 1) + (j + CASE_MAX);
+  for (const o of obstacles) {
+    const g = (o.kind === 'mur' ? Math.abs(o.demi) : 0) + Math.abs(margeMax) + JEU;
+    const b = boiteDe(o);
+    const i0 = Math.floor((b.x0 - g) / CASE);
+    const i1 = Math.floor((b.x1 + g) / CASE);
+    const j0 = Math.floor((b.z0 - g) / CASE);
+    const j1 = Math.floor((b.z1 + g) / CASE);
+    const range =
+      finitude(o) &&
+      fini(g) &&
+      Math.max(-i0, i1, -j0, j1) < CASE_MAX &&
+      (i1 - i0 + 1) * (j1 - j0 + 1) <= CASES_PAR_OBSTACLE;
+    if (!range) {
+      partout.push(o);
+      continue;
+    }
+    for (let i = i0; i <= i1; i++) {
+      for (let j = j0; j <= j1; j++) {
+        const k = cle(i, j);
+        const liste = cases.get(k);
+        if (liste) liste.push(o);
+        else cases.set(k, [o]);
+      }
+    }
+  }
+  return (p: Pt) => {
+    const i = Math.floor(p.x / CASE);
+    const j = Math.floor(p.z / CASE);
+    const ici = Math.max(-i, i, -j, j) < CASE_MAX ? cases.get(cle(i, j)) : undefined;
+    if (partout.length === 0) return ici ?? [];
+    return ici ? partout.concat(ici) : partout;
+  };
+}
+
+/** Un obstacle apprêté pour les rayons partis d'un même point. */
+interface Appret {
+  o: Obstacle;
+  /** En deçà de cette distance le long d'un rayon, il n'arrête rien. */
+  proche: number;
+  /**
+   * Ses tranches, cinq nombres chacune — f0, nx, nz, bas, haut : le point du
+   * rayon à la distance s y est quand bas ≤ f0 + s·(u·n) ≤ haut. Null : des
+   * nombres non finis, et tout le rayon est éprouvé.
+   */
+  tranches: number[] | null;
+}
+
+/**
+ * APPRÊTER UN OBSTACLE POUR LES RAYONS PARTIS DE `at` — une fois, pas une
+ * fois par direction : ce qui ne dépend pas de la direction est calculé ici.
+ *
+ * Un mur arrête dans une capsule (son axe gonflé de demi-épaisseur + rayon) :
+ * on garde la boîte qui l'enveloppe, alignée sur le mur. Un meuble arrête
+ * dans son emprise gonflée d'un rayon (coins arrondis) : on garde l'emprise
+ * dont chaque côté recule d'un rayon (coins vifs). Plus large, jamais plus
+ * étroit.
+ */
+function apprete(o: Obstacle, at: Pt, rayon: number): Appret {
+  if (!finitude(o) || !fini(rayon)) return { o, proche: 0, tranches: null };
+  const tranches: number[] = [];
+  const tranche = (q: Pt, nx: number, nz: number, bas: number, haut: number) => {
+    tranches.push((at.x - q.x) * nx + (at.z - q.z) * nz, nx, nz, bas, haut);
+  };
+  const boite = (gonfle: number) => {
+    const b = boiteDe(o);
+    tranches.push(at.x, 1, 0, b.x0 - gonfle, b.x1 + gonfle);
+    tranches.push(at.z, 0, 1, b.z0 - gonfle, b.z1 + gonfle);
+  };
+  let gonfle: number;
+  if (o.kind === 'mur') {
+    gonfle = Math.max(o.demi + rayon, 0) + JEU;
+    const lx = o.b.x - o.a.x;
+    const lz = o.b.z - o.a.z;
+    const l = Math.hypot(lx, lz);
+    if (l < 1e-9) {
+      boite(gonfle);
+    } else {
+      const vx = lx / l;
+      const vz = lz / l;
+      tranche(o.a, vx, vz, -gonfle, l + gonfle);
+      tranche(o.a, -vz, vx, -gonfle, gonfle);
+    }
+  } else {
+    // Même un rayon nul arrête DANS l'emprise : on ne la rogne jamais.
+    gonfle = Math.max(rayon, 0) + JEU;
+    const c = o.coins;
+    let aire = 0;
+    for (let i = 0; i < c.length; i++) {
+      const p = c[i];
+      const q = c[(i + 1) % c.length];
+      aire += p.x * q.z - q.x * p.z;
+    }
+    const sens = aire > 0 ? 1 : -1;
+    // Convexe ? Chaque coin tourne du même côté (une emprise l'est toujours).
+    let convexe = c.length === 4 && Math.abs(aire) >= 1e-9;
+    for (let i = 0; i < c.length && convexe; i++) {
+      const p = c[i];
+      const q = c[(i + 1) % c.length];
+      const n = c[(i + 2) % c.length];
+      const virage = (q.x - p.x) * (n.z - q.z) - (q.z - p.z) * (n.x - q.x);
+      if (virage * sens < -1e-12) convexe = false;
+    }
+    if (!convexe) {
+      // Écrasée, ou pas une emprise convexe de quatre coins : sa boîte suffit.
+      boite(gonfle);
+    } else {
+      // Normales sortantes : à droite d'un tour direct, à gauche sinon.
+      for (let i = 0; i < 4; i++) {
+        const p = c[i];
+        const q = c[(i + 1) % 4];
+        const ex = q.x - p.x;
+        const ez = q.z - p.z;
+        const le = Math.hypot(ex, ez);
+        if (le < 1e-9) continue;
+        tranche(p, (sens * ez) / le, (-sens * ex) / le, -Infinity, gonfle);
+      }
+    }
+  }
+  return { o, proche: Math.max(0, distanceABoite(o, at) - gonfle), tranches };
+}
+
+/**
+ * LES OBSTACLES À PORTÉE DU REGARD DEPUIS `at`, apprêtés et rangés du plus
+ * proche au plus lointain — c'est le filtrage spatial : ce qui commence
+ * au-delà du dernier jalon n'est pas même gardé.
+ */
+function appretsDuRegard(obstacles: Obstacle[], at: Pt, rayon: number): Appret[] {
+  const loin = JALONS[JALONS.length - 1] + JEU;
+  const out: Appret[] = [];
+  for (let i = 0; i < obstacles.length; i++) {
+    const a = apprete(obstacles[i], at, rayon);
+    if (!(a.proche > loin)) out.push(a);
+  }
+  return out.sort((x, y) => x.proche - y.proche);
+}
+
+/**
+ * LA COURSE LIBRE LE LONG DU RAYON (ux, uz) — la distance du dernier jalon
+ * franchi avant le premier qui bute, comme la boucle d'origine :
+ *
+ *   course = 0 ; tant que course < 15 : si le jalon course + 0,05 bute,
+ *   on s'arrête ; sinon course += 0,05.
+ *
+ * Le premier jalon qui bute est cherché obstacle par obstacle, dans le seul
+ * tronçon que l'obstacle peut barrer, jamais au-delà du premier déjà trouvé.
+ * Rangés du plus proche au plus lointain, les obstacles s'arrêtent d'être
+ * consultés dès qu'ils commencent après lui.
+ */
+function courseLeLong(at: Pt, ux: number, uz: number, apprets: Appret[], rayon: number): number {
+  const dernier = JALONS.length - 1;
+  const loin = JALONS[dernier] + JEU;
+  let premier = dernier + 1;
+  for (let j = 0; j < apprets.length; j++) {
+    const ap = apprets[j];
+    if (ap.proche > JALONS[premier - 1] + JEU) break;
+    let de = 0;
+    let a = loin;
+    const tr = ap.tranches;
+    if (tr) {
+      let vide = false;
+      for (let k = 0; k < tr.length && !vide; k += 5) {
+        const f0 = tr[k];
+        const f1 = ux * tr[k + 1] + uz * tr[k + 2];
+        if (Math.abs(f1) < 1e-12) {
+          // Parallèle à la tranche : dedans tout du long, ou jamais.
+          vide = !(f0 >= tr[k + 3] && f0 <= tr[k + 4]);
+        } else {
+          const s1 = (tr[k + 3] - f0) / f1;
+          const s2 = (tr[k + 4] - f0) / f1;
+          de = Math.max(de, Math.min(s1, s2));
+          a = Math.min(a, Math.max(s1, s2));
+          vide = de > a;
+        }
+      }
+      if (Number.isNaN(de) || Number.isNaN(a)) {
+        // Un calcul qui déraille : tout le rayon, et le test d'origine tranche.
+        de = 0;
+        a = loin;
+      } else if (vide) {
+        continue;
+      }
+    }
+    // Un jalon de part et d'autre : l'arrondi des pas cumulés est loin d'en valoir un.
+    const i0 = Math.max(1, Math.floor(de / PAS_REGARD) - 1);
+    const i1 = Math.min(premier - 1, Math.ceil(a / PAS_REGARD) + 1);
+    for (let i = i0; i <= i1; i++) {
+      const q = { x: at.x + ux * JALONS[i], z: at.z + uz * JALONS[i] };
+      if (bloque(q, ap.o, rayon)) {
+        premier = i;
+        break;
+      }
+    }
+  }
+  return JALONS[premier - 1];
+}
+
+/**
+ * LA COURSE LIBRE DANS LA DIRECTION `t` (radians, angle du plan) depuis
+ * `at` — celle que `pointDeDepart` compare d'une direction à l'autre.
+ */
+export function courseLibre(at: Pt, t: number, obstacles: Obstacle[], rayon = RAYON_VISITEUR): number {
+  return courseLeLong(at, Math.cos(t), Math.sin(t), appretsDuRegard(obstacles, at, rayon), rayon);
+}
+
 /**
  * OÙ L'ON ENTRE, ET OÙ L'ON REGARDE.
  *
@@ -425,8 +758,21 @@ export function pointDeDepart(
         z: walls.reduce((t, w) => t + (w.a.z + w.b.z) / 2, 0) / walls.length,
       };
   const contour = grande?.surface?.pts;
+  /*
+    SEULS COMPTENT LES OBSTACLES PROCHES DU CENTRE. Tout ce que l'on éprouve
+    ici — la spirale (quatre mètres au plus), puis le recul (un mètre et
+    demi de plus) — tient dans 5,5 m autour du centre : un meuble de l'autre
+    bout d'un grand logement n'y arrêtera jamais rien, inutile de le
+    reconsulter mille fois. Voir `obstaclesProches`.
+
+    Et dans un salon très meublé, où le centre tombe dans la table et la
+    spirale éprouve des centaines de points, chacun ne consulte que la case
+    de 50 cm où il tombe (voir `casesDesObstacles`).
+  */
+  const autourDuCentre = obstaclesProches(obstacles, centre, PORTEE_DU_CHOIX, rayon * 2);
+  const aCote = casesDesObstacles(autourDuCentre, rayon * 2);
   const recevable = (p: Pt, marge: number) =>
-    estLibre(p, obstacles, marge) && (!contour || dedans(p, contour));
+    estLibre(p, aCote(p), marge) && (!contour || dedans(p, contour));
 
   let at: Pt | null = null;
   for (const marge of [rayon * 2, rayon]) {
@@ -450,16 +796,12 @@ export function pointDeDepart(
   if (!at) return null;
 
   // Le regard : trente-deux directions, la plus longue course libre.
+  const apprets = appretsDuRegard(obstacles, at, rayon);
   let yaw = 0;
   let mieux = -1;
   for (let k = 0; k < 32; k++) {
     const t = (k / 32) * Math.PI * 2;
-    let course = 0;
-    while (course < 15) {
-      const q = { x: at.x + Math.cos(t) * (course + 0.05), z: at.z + Math.sin(t) * (course + 0.05) };
-      if (!estLibre(q, obstacles, rayon)) break;
-      course += 0.05;
-    }
+    const course = courseLeLong(at, Math.cos(t), Math.sin(t), apprets, rayon);
     if (course > mieux + 1e-6) {
       mieux = course;
       yaw = t;

@@ -150,7 +150,9 @@ describe('côté natif : le jour d’avant, fixe', () => {
   });
 
   it('le diffuseur d’un luminaire prend toujours la matière éteinte', () => {
-    expect(swift).toContain('if code == 5 && lampe >= 0 { g.materials = [diffuseurEteint] }');
+    // Nommé sur la file de fond, habillé à l'accrochage (relevé « pont natif lourd »).
+    expect(swift).toContain('if code == 5 && lampe >= 0 { n.name = Self.NOEUD_DIFFUSEUR }');
+    expect(swift).toContain('if noeud.name == Self.NOEUD_DIFFUSEUR { noeud.geometry?.materials = [diffuseurEteint] }');
     expect(swift).not.toMatch(/diffuseurAllume/);
   });
 

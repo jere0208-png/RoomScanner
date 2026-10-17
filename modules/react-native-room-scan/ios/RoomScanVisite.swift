@@ -664,7 +664,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   }
 
   /** `a` tiré vers `b` d'une fraction `t`. */
-  private func melange(_ a: UIColor, _ b: UIColor, _ t: CGFloat) -> UIColor {
+  private static func melange(_ a: UIColor, _ b: UIColor, _ t: CGFloat) -> UIColor {
     var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
     var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
     a.getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
@@ -801,40 +801,196 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     for enfant in n.childNodes { enfant.removeFromParentNode() }
   }
 
+  /*
+    LE LOGEMENT SE BÂTIT HORS DU FIL DE L'INTERFACE — relevé des testeurs
+    (« entrée en visite et pont natif lourds ») : « sur un plan très meublé,
+    1,6 million de nombres traversent ensuite le pont vers SceneKit, avec la
+    construction de la géométrie sur le fil principal : l'interface gèle
+    visiblement ». Les géométries — sommets, normales, coques des liserés,
+    images des sols et des murs — se fabriquent désormais sur une file de
+    fond ; le fil principal ne fait plus qu'accrocher les nœuds finis, et
+    garde l'ancien logement à l'écran pendant que le nouveau se bâtit.
+
+    - CE QUE LA FILE LIT EST COPIÉ AVANT DE PARTIR (`Commande`) : les
+      tableaux — des valeurs : une propriété réécrite pendant la
+      construction ne touche pas la copie —, les chemins des images et le
+      rendu. Les fabriques sont statiques : elles ne peuvent rien lire
+      d'autre de la vue.
+    - LES DEUX MATIÈRES PARTAGÉES NE PASSENT PAS LA FRONTIÈRE : le liseré
+      (réécrit à chaque pincement de la maquette) et le diffuseur éteint
+      (une propriété paresseuse, qui ne s'initialise pas sans risque depuis
+      deux fils). La file nomme les nœuds qui les portent ; le fil principal
+      les leur pose en accrochant.
+    - LA FILE NE TIENT JAMAIS LA VUE. Elle ne reçoit qu'une référence
+      faible, qu'elle ne lit pas : seul le fil principal la lit, au moment
+      d'accrocher. Une vue fermée en pleine construction n'est donc jamais
+      libérée depuis la file — UIKit ne le supporte pas.
+    - UNE SEULE FILE, EN SÉRIE, POUR TOUTES LES VUES : les caches statiques
+      qu'elle touche (`ombres`) ne voient jamais deux fils à la fois.
+    - UNE RECONSTRUCTION PLUS RÉCENTE ANNULE LA PRÉCÉDENTE : elle prend un
+      numéro neuf ; l'ancienne s'arrête à la famille suivante, ou se jette à
+      l'arrivée. Ses familles ne se perdent pas : la nouvelle les reprend
+      (`enChantier`), avec les tableaux du moment.
+    - LA PREMIÈRE IMAGE ne s'annonce qu'une fois le bâti ACCROCHÉ : avant,
+      la silhouette d'attente se retirerait sur une scène vide.
+  */
+  private static let chantier = DispatchQueue(label: "echoplan.visite.chantier", qos: .userInitiated)
+
+  /// Le numéro de la dernière reconstruction demandée — lu aussi par la file, d'où le verrou.
+  private final class Numero {
+    private let verrou = NSLock()
+    private var valeur = 0
+
+    func suivant() -> Int {
+      verrou.lock()
+      defer { verrou.unlock() }
+      valeur += 1
+      return valeur
+    }
+
+    func estToujours(_ n: Int) -> Bool {
+      verrou.lock()
+      defer { verrou.unlock() }
+      return valeur == n
+    }
+  }
+
+  private let numero = Numero()
+  /// Les familles parties à la file et pas encore accrochées (fil principal seulement).
+  private var enChantier: Sale = []
+
+  /// Ce que la file reçoit : des copies, jamais la vue.
+  private struct Commande {
+    let numero: Int
+    let sale: Sale
+    let maillage: [Float]
+    let aretes: [Float]
+    let orientes: [Float]
+    let ecorche: [Float]
+    let sols: [Float]
+    let meubles: [Float]
+    let texturees: [Float]
+    let textures: [String]
+    let choix: Rendu
+  }
+
+  /// Les nœuds qui attendent une matière partagée, posée à l'accrochage.
+  private static let NOEUD_LISERE = "lisere"
+  private static let NOEUD_DIFFUSEUR = "diffuseur-eteint"
+
+  /// Ce qu'elle rend : des nœuds finis, par famille — `nil`, famille non rebâtie.
+  private struct Ouvrage {
+    var bati: [SCNNode]?
+    var matieresDuBati: [SCNMaterial] = []
+    var ecorche: SCNMaterial?
+    var sols: [SCNNode]?
+    var images: [SCNNode]?
+    var meubles: [SCNNode]?
+  }
+
   private func rebatirMaintenant() {
-    let s = sale
+    // Ce qui est encore sur le chantier repart avec : la commande précédente sera jetée.
+    let s = sale.union(enChantier)
     sale = []
-    if s.contains(.bati) {
-      Self.vider(gBati)
-      matiereEcorche = nil
-      matieresDuBati.removeAll()
-      if let g = geometrie(fMaillage, deuxFaces: true) {
-        gBati.addChildNode(SCNNode(geometry: g))
+    guard !s.isEmpty else { return }
+    enChantier = s
+    let compteur = numero
+    let commande = Commande(
+      numero: compteur.suivant(), sale: s,
+      maillage: fMaillage, aretes: fAretes, orientes: fOrientes, ecorche: fEcorche,
+      sols: fSols, meubles: fMeubles, texturees: fTexturees,
+      textures: textures.map { $0 as String },
+      choix: choix)
+    // Une boîte faible, capturée telle quelle : la file ne la lit jamais (voir plus haut).
+    weak var vue = self
+    // Le type nommé en toutes lettres : rien, dans ce qui part, ne renvoie à la vue.
+    RoomScanVisite.chantier.async {
+      // Déjà remplacée avant d'avoir commencé : rien à bâtir.
+      guard compteur.estToujours(commande.numero) else { return }
+      let ouvrage = RoomScanVisite.construire(commande, numero: compteur)
+      DispatchQueue.main.async {
+        vue?.accrocher(ouvrage, numero: commande.numero)
       }
-      if let a = noeudDesAretes() { gBati.addChildNode(a) }
-      if let g = geometrie(fOrientes, deuxFaces: false) {
-        gBati.addChildNode(SCNNode(geometry: g))
+    }
+  }
+
+  /** La construction, sur la file de fond : rien qu'à partir de la commande. */
+  private static func construire(_ c: Commande, numero: Numero) -> Ouvrage? {
+    // Un fil sans boucle d'événements : la transaction se ferme à la main.
+    SCNTransaction.begin()
+    SCNTransaction.disableActions = true
+    defer { SCNTransaction.commit() }
+    var o = Ouvrage()
+    if c.sale.contains(.bati) {
+      var noeuds: [SCNNode] = []
+      if let g = geometrie(c.maillage, deuxFaces: true) {
+        o.matieresDuBati.append(contentsOf: g.materials)
+        noeuds.append(SCNNode(geometry: g))
       }
-      if let g = geometrie(fEcorche, deuxFaces: false) {
-        matiereEcorche = g.firstMaterial
-        appliquerVoile()
+      if let a = noeudDesAretes(c.aretes) { noeuds.append(a) }
+      if let g = geometrie(c.orientes, deuxFaces: false) {
+        o.matieresDuBati.append(contentsOf: g.materials)
+        noeuds.append(SCNNode(geometry: g))
+      }
+      if let g = geometrie(c.ecorche, deuxFaces: false) {
+        o.matieresDuBati.append(contentsOf: g.materials)
+        o.ecorche = g.firstMaterial
         let n = SCNNode(geometry: g)
         // Peint après le reste : un voile se pose sur ce qu'il voile.
         n.renderingOrder = 10
-        gBati.addChildNode(n)
+        noeuds.append(n)
       }
+      o.bati = noeuds
     }
-    if s.contains(.sols) {
+    // Entre deux familles : une commande plus récente rend celle-ci inutile.
+    guard numero.estToujours(c.numero) else { return nil }
+    if c.sale.contains(.sols) {
+      o.sols = noeudsDesSols(c.sols, choix: c.choix)
+    }
+    guard numero.estToujours(c.numero) else { return nil }
+    if c.sale.contains(.images) {
+      o.images = noeudsTextures(c.texturees, textures: c.textures)
+    }
+    guard numero.estToujours(c.numero) else { return nil }
+    if c.sale.contains(.meubles) {
+      o.meubles = noeudsDesMeubles(c.meubles, choix: c.choix)
+    }
+    return o
+  }
+
+  /** L'accrochage, sur le fil principal : la seule étape qui touche la scène affichée. */
+  private func accrocher(_ ouvrage: Ouvrage?, numero n: Int) {
+    // Une reconstruction plus récente est partie : elle contient celle-ci.
+    guard let o = ouvrage, numero.estToujours(n) else { return }
+    enChantier = []
+    if let noeuds = o.bati {
+      Self.vider(gBati)
+      // La clarté du mode de CET instant : il a pu changer pendant la construction.
+      matieresDuBati = o.matieresDuBati
+      for m in matieresDuBati {
+        m.setValue(NSNumber(value: Float(clarteDesMurs)), forKey: "clarte")
+        m.setValue(NSNumber(value: Float(clarteDesFlancs)), forKey: "clarteFlancs")
+      }
+      matiereEcorche = o.ecorche
+      appliquerVoile()
+      for noeud in noeuds { gBati.addChildNode(noeud) }
+    }
+    if let noeuds = o.sols {
       Self.vider(gSols)
-      for n in noeudsDesSols() { gSols.addChildNode(n) }
+      for noeud in noeuds { gSols.addChildNode(noeud) }
     }
-    if s.contains(.images) {
+    if let noeuds = o.images {
       Self.vider(gImages)
-      for n in noeudsTextures() { gImages.addChildNode(n) }
+      for noeud in noeuds { gImages.addChildNode(noeud) }
     }
-    if s.contains(.meubles) {
+    if let noeuds = o.meubles {
       Self.vider(gMeubles)
-      for n in noeudsDesMeubles() { gMeubles.addChildNode(n) }
+      for noeud in noeuds {
+        // Les matières partagées, posées ici : la file ne les a jamais touchées.
+        if noeud.name == Self.NOEUD_LISERE { noeud.geometry?.materials = [matiereContour] }
+        if noeud.name == Self.NOEUD_DIFFUSEUR { noeud.geometry?.materials = [diffuseurEteint] }
+        gMeubles.addChildNode(noeud)
+      }
     }
     if !premiereAnnoncee && !gBati.childNodes.isEmpty { guetteLaPremiere = true }
     reveiller()
@@ -884,8 +1040,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
    part de son éclat lui revient en émission, pour qu'elle ne s'assombrisse
    pas une seconde fois sous l'éclairage de la scène.
    */
-  private func noeudsTextures() -> [SCNNode] {
-    let v = fTexturees
+  private static func noeudsTextures(_ v: [Float], textures: [String]) -> [SCNNode] {
     let n = v.count / 16
     guard n > 0, !textures.isEmpty else { return [] }
     var parImage: [Int: [Int]] = [:]
@@ -894,7 +1049,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     }
     var noeuds: [SCNNode] = []
     for (k, liste) in parImage {
-      guard k >= 0, k < textures.count, let image = Self.image(textures[k] as String) else { continue }
+      guard k >= 0, k < textures.count, let image = Self.image(textures[k]) else { continue }
       var sommets: [SCNVector3] = []
       var normales: [SCNVector3] = []
       var uvs: [CGPoint] = []
@@ -978,8 +1133,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   // ------------------------------------------------------------- meubles
 
   /** Les meubles : un nœud par matière, toutes les pièces de la scène dedans. */
-  private func noeudsDesMeubles() -> [SCNNode] {
-    let v = fMeubles
+  private static func noeudsDesMeubles(_ v: [Float], choix: Rendu) -> [SCNNode] {
     var k = 0
     var out: [SCNNode] = []
     while k + 8 <= v.count {
@@ -1017,10 +1171,11 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       k += nI
       let element = SCNGeometryElement(indices: indices, primitiveType: .triangles)
       let g = SCNGeometry(sources: [positions, normales, uvs], elements: [element])
-      g.materials = [materiauDuMeuble(code, teinte, rugosite, metal)]
+      g.materials = [materiauDuMeuble(code, teinte, rugosite, metal, choix: choix)]
       let n = SCNNode(geometry: g)
-      // Le diffuseur d'un luminaire du plan : toujours éteint (voir `diffuseurEteint`).
-      if code == 5 && lampe >= 0 { g.materials = [diffuseurEteint] }
+      // Le diffuseur d'un luminaire du plan : toujours éteint (voir `diffuseurEteint`),
+      // matière posée à l'accrochage, sur le fil principal (voir `accrocher`).
+      if code == 5 && lampe >= 0 { n.name = Self.NOEUD_DIFFUSEUR }
       // Ce qui se pose PAR-DESSUS le reste — l'ombre, le verre — passe après.
       if code == 9 { n.renderingOrder = 5 }
       if code == 3 || code == 6 { n.renderingOrder = 6 }
@@ -1053,7 +1208,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
    * normales des sommets confondus) — sans quoi la coque se fendrait à chaque
    * arête vive d'une boîte.
    */
-  private func noeudDeContour(
+  private static func noeudDeContour(
     _ v: [Float], debut: Int, nS: Int, indices: [UInt32],
     positions: SCNGeometrySource, element: SCNGeometryElement
   ) -> SCNNode? {
@@ -1097,8 +1252,10 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       soudees.append(l > 1e-6 ? SCNVector3(x: w.x / l, y: w.y / l, z: w.z / l) : SCNVector3(x: 0, y: 1, z: 0))
     }
     let g = SCNGeometry(sources: [positions, SCNGeometrySource(normals: soudees)], elements: [element])
-    g.materials = [matiereContour]
+    // Sa matière, `matiereContour`, partagée par tous les liserés : posée à
+    // l'accrochage, sur le fil principal (voir `accrocher`).
     let noeud = SCNNode(geometry: g)
+    noeud.name = Self.NOEUD_LISERE
     // Après le reste : un voile se pose sur ce qui est déjà peint.
     noeud.renderingOrder = 4
     return noeud
@@ -1147,8 +1304,8 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   }
 
   /** Une matière physique : teinte, rugosité, métal — et ce que son code ajoute. */
-  private func materiauDuMeuble(
-    _ code: Int, _ teinteRelevee: UIColor, _ rugosite: CGFloat, _ metal: CGFloat
+  private static func materiauDuMeuble(
+    _ code: Int, _ teinteRelevee: UIColor, _ rugosite: CGFloat, _ metal: CGFloat, choix: Rendu
   ) -> SCNMaterial {
     let m = SCNMaterial()
     m.lightingModel = .physicallyBased
@@ -1381,7 +1538,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   }
 
   /** La normale d'un triangle, par son sens de parcours. */
-  private func normale(_ a: SCNVector3, _ b: SCNVector3, _ c: SCNVector3) -> SCNVector3 {
+  private static func normale(_ a: SCNVector3, _ b: SCNVector3, _ c: SCNVector3) -> SCNVector3 {
     let ux = b.x - a.x, uy = b.y - a.y, uz = b.z - a.z
     let vx = c.x - a.x, vy = c.y - a.y, vz = c.z - a.z
     let nx = uy * vz - uz * vy
@@ -1402,7 +1559,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
    * elles, ne montrent jamais leur dos : vu de l'extérieur, le mur du devant
    * ne cache pas la pièce.
    */
-  private func geometrie(_ source: [Float], deuxFaces: Bool) -> SCNGeometry? {
+  private static func geometrie(_ source: [Float], deuxFaces: Bool) -> SCNGeometry? {
     let v = source
     let parTriangle = 12
     let n = v.count / parTriangle
@@ -1465,16 +1622,13 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     m.isDoubleSided = deuxFaces
     m.cullMode = .back
     m.shaderModifiers = [.fragment: Self.nuanceurClarte]
-    m.setValue(NSNumber(value: Float(clarteDesMurs)), forKey: "clarte")
-    m.setValue(NSNumber(value: Float(clarteDesFlancs)), forKey: "clarteFlancs")
-    matieresDuBati.append(m)
+    // La clarté du mode se pose à l'accrochage, sur le fil principal (voir `accrocher`).
     g.materials = [m]
     return g
   }
 
   /** Les arêtes : des segments, un trait fin et léger, un peu décollé des faces. */
-  private func noeudDesAretes() -> SCNNode? {
-    let v = fAretes
+  private static func noeudDesAretes(_ v: [Float]) -> SCNNode? {
     let n = v.count / 6
     guard n > 0 else { return nil }
     var sommets: [SCNVector3] = []
@@ -1503,7 +1657,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   // --------------------------------------------------------------- sols
 
   /** La tuile d'une matière, en mètres : le long des lames, puis en travers. */
-  private func tuile(_ matiere: Int) -> (CGFloat, CGFloat) {
+  private static func tuile(_ matiere: Int) -> (CGFloat, CGFloat) {
     switch matiere {
     case 1: return (1.35, 0.44)  // une lame de long, deux lames de large
     case 2: return (0.6, 0.6)  // un carreau
@@ -1515,7 +1669,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
    * L'IMAGE D'UN SOL, à répéter. Elle se dessine une fois par sol, dans la
    * teinte relevée : parquet ou carrelage, le sol garde SA couleur.
    */
-  private func imageDuSol(_ matiere: Int, _ teinte: UIColor) -> UIImage? {
+  private static func imageDuSol(_ matiere: Int, _ teinte: UIColor, choix: Rendu) -> UIImage? {
     // Dessinée une fois par matière et par teinte, pour toutes les vues.
     var r: CGFloat = 0
     var g: CGFloat = 0
@@ -1524,7 +1678,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     teinte.getRed(&r, green: &g, blue: &b, alpha: &a)
     let cle = "\(matiere)-\(entier(r * 255))-\(entier(g * 255))-\(entier(b * 255))-\(choix.veinage)"
     if let deja = Self.imagesDesSols.object(forKey: cle as NSString) { return deja }
-    let image = dessinerLeSol(matiere, teinte)
+    let image = dessinerLeSol(matiere, teinte, choix: choix)
     if let image = image {
       let cout: Int = image.cgImage.map { $0.bytesPerRow * $0.height } ?? 0
       Self.imagesDesSols.setObject(image, forKey: cle as NSString, cost: cout)
@@ -1532,7 +1686,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     return image
   }
 
-  private func dessinerLeSol(_ matiere: Int, _ teinte: UIColor) -> UIImage? {
+  private static func dessinerLeSol(_ matiere: Int, _ teinte: UIColor, choix: Rendu) -> UIImage? {
     let format = UIGraphicsImageRendererFormat.default()
     format.scale = 1
     format.preferredRange = .standard
@@ -1564,7 +1718,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
           plus clairs d'un rien, serrés par endroits, et de loin en loin un
           nœud. Le tirage est fixe : le même parquet à chaque visite.
         */
-        let avecVeinage = self.choix.veinage
+        let avecVeinage = choix.veinage
         var graine: UInt64 = 0x51_7CC1_B727_220A
         func hasard() -> CGFloat {
           graine = graine &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
@@ -1633,8 +1787,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     return nil
   }
 
-  private func noeudsDesSols() -> [SCNNode] {
-    let v = fSols
+  private static func noeudsDesSols(_ v: [Float], choix: Rendu) -> [SCNNode] {
     var i = 0
     var out: [SCNNode] = []
     while i + 6 <= v.count {
@@ -1683,7 +1836,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       m.lightingModel = .lambert
       m.isDoubleSided = true
       m.locksAmbientWithDiffuse = true
-      if let image = imageDuSol(matiere, teinte) {
+      if let image = imageDuSol(matiere, teinte, choix: choix) {
         m.diffuse.contents = image
         m.diffuse.wrapS = .repeat
         m.diffuse.wrapT = .repeat

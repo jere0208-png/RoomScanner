@@ -53,7 +53,7 @@ describe('le blanc des murs', () => {
     expect(swift).toMatch(/_output\.color\.rgb \+= _surface\.diffuse\.rgb \* clarte;/);
     // Pas cette clarté-là en maquette (elle a la sienne, sur les flancs), ni sur les meubles.
     expect(swift).toMatch(/modePose == false \? Self\.CLARTE_DES_MURS : 0/);
-    const meuble = swift.slice(swift.indexOf('private func materiauDuMeuble'), swift.indexOf('static func teinteReelle'));
+    const meuble = swift.slice(swift.indexOf('private static func materiauDuMeuble'), swift.indexOf('static func teinteReelle'));
     expect(meuble).not.toMatch(/nuanceurClarte/);
   });
 });

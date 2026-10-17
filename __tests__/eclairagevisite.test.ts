@@ -76,7 +76,7 @@ describe('l’appareillage se voit sans lampe', () => {
 describe('les meubles ne blanchissent pas (relevé du patron : « tout devient blanc »)', () => {
   it('la couleur d’un meuble ne dépasse pas sa teinte de plus de 15 %', () => {
     expect(swift).toMatch(/_output\.color\.rgb = min\(_output\.color\.rgb, _surface\.diffuse\.rgb \* 1\.15 \+ _surface\.emission\.rgb\)/);
-    const bloc = swift.slice(swift.indexOf('private func materiauDuMeuble'));
+    const bloc = swift.slice(swift.indexOf('private static func materiauDuMeuble'));
     expect(bloc).toMatch(/nuanceurPlafondDesMeubles/);
   });
 });
@@ -107,12 +107,13 @@ describe('le rendu retenu : C, « Chaleureux du soir », sans ses lampes', () =>
 
   it('« enlève les textures sur les meubles » : plus de fil de bois ni de trame dessinés', () => {
     expect(swift).not.toMatch(/textureDuMeuble/);
-    const meuble = swift.slice(swift.indexOf('private func materiauDuMeuble'), swift.indexOf('static func teinteReelle'));
+    const meuble = swift.slice(swift.indexOf('private static func materiauDuMeuble'), swift.indexOf('static func teinteReelle'));
     expect(meuble).not.toMatch(/contentsTransform/);
   });
 
   it('le parquet garde son veinage, les meubles leur teinte de matière et leur ombre de contact', () => {
-    expect(swift).toMatch(/let avecVeinage = self\.choix\.veinage/);
+    // Le sol se dessine sur la file de fond : le rendu y arrive en paramètre.
+    expect(swift).toMatch(/let avecVeinage = choix\.veinage/);
     expect(swift).toMatch(/teinte = Self\.teinteReelle\(teinteRelevee, plafond: plafond\)/);
     expect(swift).toMatch(/RoomScanVisite\.imageDOmbre\(choix\.ombre\)/);
     expect(swift).toMatch(/matiereContour\.transparency = maquette \? 0\.32 : choix\.lisere/);
@@ -120,6 +121,8 @@ describe('le rendu retenu : C, « Chaleureux du soir », sans ses lampes', () =>
 
   it('plus de lumière diffuse ajoutée aux murs : le bâti revient à sa matière Lambert d’avant', () => {
     expect(swift).not.toMatch(/nuanceurRebond|rebond/);
-    expect(swift).toMatch(/if let g = geometrie\(fMaillage, deuxFaces: true\) \{\n\s*gBati\.addChildNode\(SCNNode\(geometry: g\)\)/);
+    // Bâti sur la file de fond (relevé « pont natif lourd »), accroché ensuite.
+    expect(swift).toMatch(/if let g = geometrie\(c\.maillage, deuxFaces: true\) \{\n\s*o\.matieresDuBati\.append\(contentsOf: g\.materials\)\n\s*noeuds\.append\(SCNNode\(geometry: g\)\)/);
+    expect(swift).toMatch(/for noeud in noeuds \{ gBati\.addChildNode\(noeud\) \}/);
   });
 });
