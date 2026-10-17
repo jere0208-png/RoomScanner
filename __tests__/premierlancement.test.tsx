@@ -307,7 +307,10 @@ describe('le premier lancement : la question, sans film', () => {
     const t = premier(fini);
     act(() => bouton(t, 'Passer la question').props.onPress());
     expect(fini).toHaveBeenCalledTimes(1);
-    expect(useUsage.getState().choisi).toBe(false);
+    // Passer laisse le grand public, et c'est une réponse (relevé
+    // « renovation ») : voir `couacs-electricite.test.tsx`.
+    expect(useUsage.getState().modeElec).toBe(false);
+    expect(useUsage.getState().choisi).toBe(true);
   });
 
   it('déjà répondu : rien ne s’affiche, et l’accueil reprend la main', () => {

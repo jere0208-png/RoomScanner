@@ -3855,8 +3855,11 @@ export function ResultScreen() {
       : []),
     // L'appareillage ne se compte que pour l'électricien : le particulier
     // ouvrant l'exemple lisait « 23 élec. » sans savoir de quoi.
-    ...(modeElec && fixtures.length > 0
-      ? [{ value: `${fixtures.length}`, label: 'élec.' }]
+    // LE PLAFOND COMPTE AUSSI — relevé « electricien » : « 27 élec. » sur un
+    // plan qui portait huit points au plafond. Un DCL, un spot, un DAAF se
+    // posent et se chiffrent comme une prise : ils entrent dans le compte.
+    ...(modeElec && fixtures.length + ceiling.length > 0
+      ? [{ value: `${fixtures.length + ceiling.length}`, label: 'élec.' }]
       : []),
   ];
 

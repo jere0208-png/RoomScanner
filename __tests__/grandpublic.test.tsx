@@ -133,7 +133,9 @@ describe('1 — le particulier ne voit pas l’établi de l’électricien', () 
 
   it('le bandeau ne compte les appareils qu’en mode électricité', () => {
     const src = lire('src/screens/ResultScreen.tsx');
-    expect(src).toContain("...(modeElec && fixtures.length > 0\n      ? [{ value: `${fixtures.length}`, label: 'élec.' }]");
+    expect(src).toContain(
+      "...(modeElec && fixtures.length + ceiling.length > 0\n      ? [{ value: `${fixtures.length + ceiling.length}`, label: 'élec.' }]",
+    );
   });
 
   it('un mur se photographie d’un appui, sans passer par l’établi', () => {

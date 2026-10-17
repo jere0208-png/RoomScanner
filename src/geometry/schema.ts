@@ -254,12 +254,25 @@ export function circuitMarks(circuits: Circuit[]): Map<string, string> {
   return new Map(circuits.map((c, i) => [c.id, `C${i + 1}`]));
 }
 
-/** Le repère de chaque APPAREIL : c'est lui qu'on lit sur le plan. */
+/**
+ * Le repère de chaque APPAREIL : c'est lui qu'on lit sur le plan.
+ *
+ * LA PLAQUE RJ45 + PRISE RESTE SUR SON CIRCUIT DE PRISES — relevé
+ * « electricien » : sur l'unifilaire, les socles des ensembles RJ45 + prise
+ * se rangeaient sous le coffret de communication. Une telle plaque est
+ * desservie par deux départs (ses socles 16 A, son RJ45) ; le départ des
+ * courants faibles, compté en dernier, écrasait le repère du circuit de
+ * puissance. C'est le disjoncteur qui commande la plaque : il garde le
+ * repère, et le coffret ne nomme que les appareils qui ne sont qu'à lui.
+ */
 export function fixtureMarks(circuits: Circuit[]): Map<string, string> {
   const marks = circuitMarks(circuits);
   const out = new Map<string, string>();
   for (const c of circuits) {
-    for (const id of c.fixtureIds) out.set(id, marks.get(c.id) ?? '');
+    for (const id of c.fixtureIds) {
+      if (c.nature === 'vdi' && out.has(id)) continue;
+      out.set(id, marks.get(c.id) ?? '');
+    }
   }
   return out;
 }

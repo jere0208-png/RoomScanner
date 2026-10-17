@@ -197,7 +197,11 @@ export function DiagnosticSheet({
             ? issues.some((i) => i.fix)
               ? 'La baguette règle un point d’un appui ; une carte vous emmène le voir.'
               : 'Touchez une carte pour aller voir l’élément sur le plan.'
-            : `${infos} remarque${infos > 1 ? 's' : ''} à vérifier, rien d’obligatoire.`;
+            : // « RIEN D'OBLIGATOIRE » TROP AFFIRMATIF — relevé « electricien » :
+              // une remarque est ce que le plan ne sait pas trancher (les
+              // volumes d'une salle d'eau, un plan de travail non relevé) ;
+              // c'est sur place qu'on le décide, pas ici.
+              `${infos} point${infos > 1 ? 's' : ''} à vérifier sur place.`;
 
   return (
     <SheetShell defile={false} visible={visible} onClose={onClose}>

@@ -135,7 +135,13 @@ export function ExportSheet({
     [
       'pdf',
       'Plan PDF',
-      'Coté, métré, vues 3D.',
+      /*
+        L'UNIFILAIRE SE DIT SUR LA CARTE — relevé « electricien » : en mode
+        Électricité, la carte ne parlait que de cotes et de 3D, et l'on
+        cherchait le schéma ailleurs. Le dossier de l'électricien porte, coché
+        d'office, le schéma unifilaire et les murs de face où il perce.
+      */
+      modeElec ? 'Coté, métré, schéma unifilaire, murs de face.' : 'Coté, métré, vues 3D.',
       onPdf,
     ],
     [

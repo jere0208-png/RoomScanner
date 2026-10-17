@@ -93,13 +93,26 @@ export function PremierLancement({ onFini }: { onFini: () => void }) {
     choisir(elec);
     onFini();
   };
+  /*
+    « PASSER » EST UNE RÉPONSE : LE GRAND PUBLIC — relevé « renovation » :
+    « Passer » au premier lancement allumait ensuite le mode Électricité.
+    Laissée sans réponse, la question ouvrait la porte à `deduireDuPasse` :
+    au lancement suivant, le plan d'exemple enregistré (qui porte des
+    prises) suffisait à tout passer en électricité, dans le dos de celui qui
+    avait justement refusé de choisir. Passer laisse le grand public, et le
+    dit au stockage ; le profil rallume le mode à qui le cherche.
+  */
+  const passer = () => {
+    choisir(false);
+    onFini();
+  };
 
   if (dejaRepondu) return null;
   return (
-    <Modal visible transparent={false} animationType="fade" onRequestClose={onFini}>
+    <Modal visible transparent={false} animationType="fade" onRequestClose={passer}>
       <View style={[styles.fond, { paddingTop: marges.top + 8, paddingBottom: Math.max(marges.bottom, 14) + 6 }]}>
         <View style={styles.barre}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Passer la question" hitSlop={12} onPress={onFini}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Passer la question" hitSlop={12} onPress={passer}>
             <Text style={styles.passer}>Passer</Text>
           </Pressable>
         </View>

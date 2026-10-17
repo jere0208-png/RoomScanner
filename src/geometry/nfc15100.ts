@@ -942,6 +942,9 @@ export function checkElectrical(
   const cuisineIci = (r: RoomInput) => estCuisine(r.name, r.kind, equipees.has(r.id));
 
   // -------------------------------------------------- hauteurs de pose
+  // SANS ACCORD À FAIRE — relevé « electricien » : « Tableau électrique
+  // posée à 160 cm ». Le libellé est tantôt féminin (prise), tantôt
+  // masculin (tableau, interrupteur) : « à 160 cm du sol » se lit pour tous.
   for (const f of fixtures) {
     const surLeMur = worktops?.get(f.wallId);
     const rule = surLeMur
@@ -969,7 +972,7 @@ export function checkElectrical(
         fixtureId: f.id,
         severity: 'alerte',
         code: 'hauteur',
-        message: `${spec.label} posée à ${cm} cm : trop bas`,
+        message: `${spec.label} à ${cm} cm du sol : trop bas`,
         regle: rule.regle,
         fix: remise,
       });
@@ -983,8 +986,8 @@ export function checkElectrical(
         severity: info ? 'info' : 'alerte',
         code: 'hauteur',
         message: info
-          ? `${spec.label} posée à ${cm} cm : hors de portée d’un fauteuil`
-          : `${spec.label} posée à ${cm} cm : trop haut`,
+          ? `${spec.label} à ${cm} cm du sol : hors de portée d’un fauteuil`
+          : `${spec.label} à ${cm} cm du sol : trop haut`,
         regle: rule.regle,
         fix: remise,
       });

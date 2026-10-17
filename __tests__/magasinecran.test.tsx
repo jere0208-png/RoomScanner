@@ -127,7 +127,7 @@ describe('le caddie remplit le devis', () => {
       diverger, et l'électricien paierait la différence.
     */
     const t = ouvrir();
-    const plus = bouton(t, 'Ajouter un');
+    const plus = bouton(t, 'Ajouter :');
     expect(plus).toBeDefined();
     act(() => plus.props.onPress());
     const ajouts = useScanStore.getState().devisAjouts;
@@ -137,7 +137,7 @@ describe('le caddie remplit le devis', () => {
 
   it('et le compte du caddie s’affiche, avec son total', () => {
     const t = ouvrir();
-    act(() => bouton(t, 'Ajouter un').props.onPress());
+    act(() => bouton(t, 'Ajouter :').props.onPress());
     const lus = mots(t);
     expect(lus.some((m) => m.includes('article ajouté'))).toBe(true);
     expect(lus.some((m) => /\d+,\d{2} €/.test(m))).toBe(true);
@@ -145,11 +145,11 @@ describe('le caddie remplit le devis', () => {
 
   it('« − » ne descend pas sous zéro : il s’éteint', () => {
     const t = ouvrir();
-    const moins = bouton(t, 'Retirer un');
+    const moins = bouton(t, 'Retirer :');
     expect(moins.props.disabled).toBe(true);
     // Et il s'allume dès qu'il y a quelque chose à retirer.
-    act(() => bouton(t, 'Ajouter un').props.onPress());
-    expect(bouton(t, 'Retirer un').props.disabled).toBe(false);
+    act(() => bouton(t, 'Ajouter :').props.onPress());
+    expect(bouton(t, 'Retirer :').props.disabled).toBe(false);
   });
 
   it('et retirer le dernier fait disparaître l’article du devis', () => {
@@ -160,8 +160,8 @@ describe('le caddie remplit le devis', () => {
       oublié.
     */
     const t = ouvrir();
-    act(() => bouton(t, 'Ajouter un').props.onPress());
-    act(() => bouton(t, 'Retirer un').props.onPress());
+    act(() => bouton(t, 'Ajouter :').props.onPress());
+    act(() => bouton(t, 'Retirer :').props.onPress());
     expect(useScanStore.getState().devisAjouts).toEqual([]);
   });
 });

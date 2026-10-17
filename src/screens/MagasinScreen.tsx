@@ -138,10 +138,12 @@ function LigneArticle({
         </View>
         <View style={styles.droite}>
           <Text style={styles.prix}>{euros(article.tarif.pu)}</Text>
-          <Text style={styles.unite}>{`l’${article.unite}`.replace(
-            'l’u',
-            'l’unité',
-          )}</Text>
+          {/*
+            L'UNITÉ SANS ARTICLE — relevé « electricien » : « l’couronne »,
+            « l’barre ». L'élision ne valait que pour « l’unité » ; une barre
+            sous le prix dit « le prix par » pour toutes les unités.
+          */}
+          <Text style={styles.unite}>{`/ ${article.unite === 'u' ? 'unité' : article.unite}`}</Text>
         </View>
       </View>
 
@@ -155,14 +157,15 @@ function LigneArticle({
         <Pas
           signe="-"
           actif={quantite > 0}
-          nom={`Retirer un ${article.libelle}`}
+          // Sans « un » : « Retirer un Gaine… » faisait la faute à voix haute.
+          nom={`Retirer : ${article.libelle}`}
           onPress={onMoins}
         />
         <Text style={styles.nombre}>{quantite}</Text>
         <Pas
           signe="+"
           actif
-          nom={`Ajouter un ${article.libelle}`}
+          nom={`Ajouter : ${article.libelle}`}
           onPress={onPlus}
         />
         {quantite > 0 && (

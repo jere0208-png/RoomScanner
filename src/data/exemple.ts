@@ -368,7 +368,9 @@ const FIXTURES_EXEMPLE: Fixture[] = [
   // ── Salle d'eau — tout hors des volumes de la douche.
   // Le 20 A du lave-linge AU-DESSUS de la machine, qu'on débranche sans la
   // tirer ; la prise du rasoir à côté du miroir, l'applique au-dessus.
-  appareil('prise-lave-linge', 'prise20', 6.3, 6, 'nord', 1.1),
+  // Nommé « LL » comme ses voisins (relevé « electricien ») : sans sigle,
+  // son départ s'appelait « Spécialisé 20 A » sur l'unifilaire.
+  appareil('prise-lave-linge', 'prise20', 6.3, 6, 'nord', 1.1, undefined, 'LL'),
   appareil('prise-miroir', 'prise', 5.45, 3.6, 'sud', 1.1),
   appareil('applique-miroir', 'applique', 6.15, 3.6, 'sud', 1.9, ['inter-sde']),
   appareil('inter-sde', 'inter2', 5, 5.55, 'est', 1.1),

@@ -708,6 +708,12 @@ export function DevisScreen() {
   */
   const tableauAbsent = !fixtures.some((f) => f.kind === 'tableau');
   const manquesNfc = useMemo(() => {
+    /*
+      LES SEULES ALERTES — relevé « electricien » : le devis disait « à
+      revoir » quand le plan disait « conforme ». On comptait aussi les
+      remarques (`info`), que le contrôle du plan range sous « Rien de
+      bloquant » ; une réserve, c'est un point à corriger.
+    */
     // Niveau par niveau, comme le devis (revue « Mehdi »).
     const { entrees, placement } = placerAuxNiveaux(walls, rooms, fixtures);
     return checkElectrical(
@@ -719,7 +725,7 @@ export function DevisScreen() {
       undefined,
       ceiling,
       { walls, openings },
-    ).length;
+    ).filter((i) => i.severity === 'alerte').length;
   }, [walls, rooms, fixtures, ceiling, openings]);
   /* Le taux de l'artisan et la nature du chantier : voir `reglagesPose`. */
   const taux = useReglagesPose((r) => r.taux);
