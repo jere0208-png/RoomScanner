@@ -170,3 +170,7 @@ try {
 } catch {
   // Le module bouge ? Le banc du mode le dira mieux que ce setup.
 }
+
+// Les bancs lisent le texte des pages du dossier PDF : flux laissés en clair
+// (voir `fluxDePage` dans `src/export/pdf.ts` et `pdfcompresse.test.ts`).
+process.env.ECHOPLAN_PDF_BRUT = '1';

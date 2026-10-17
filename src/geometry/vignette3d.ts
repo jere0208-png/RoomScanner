@@ -17,6 +17,7 @@
  * fine, ramenée ensuite à sa taille (les bords s'adoucissent), et rendue en
  * PNG. Une image par meuble, calculée une fois.
  */
+import { zlibSync } from 'fflate';
 import { fabriquer, graineDe, PAR_SOMMET } from './modeles3d';
 
 /** Le meuble à dessiner : ce que le catalogue en sait. */
@@ -229,8 +230,8 @@ function crc32(octets: Uint8Array, debut: number, fin: number): number {
 }
 
 /**
- * Un PNG sans compression : des blocs « stockés » de zlib. L'image est
- * petite, et un compresseur n'apporterait qu'une dépendance de plus.
+ * Un PNG compressé par fflate (zlib, niveau 6) : la vignette part dans le
+ * dossier PDF et par mail, chaque octet compte.
  */
 export function encoderPng(img: ImageRGBA): Uint8Array {
   const { largeur, hauteur, pixels } = img;
@@ -240,33 +241,7 @@ export function encoderPng(img: ImageRGBA): Uint8Array {
     brut[y * ligne] = 0;
     brut.set(pixels.subarray(y * largeur * 4, (y + 1) * largeur * 4), y * ligne + 1);
   }
-  const blocs = Math.max(1, Math.ceil(brut.length / 65535));
-  const zlib = new Uint8Array(2 + blocs * 5 + brut.length + 4);
-  zlib[0] = 0x78;
-  zlib[1] = 0x01;
-  let o = 2;
-  for (let b = 0; b < blocs; b++) {
-    const debut = b * 65535;
-    const taille = Math.min(65535, brut.length - debut);
-    zlib[o++] = b === blocs - 1 ? 1 : 0;
-    zlib[o++] = taille & 255;
-    zlib[o++] = taille >>> 8;
-    zlib[o++] = ~taille & 255;
-    zlib[o++] = (~taille >>> 8) & 255;
-    zlib.set(brut.subarray(debut, debut + taille), o);
-    o += taille;
-  }
-  let s1 = 1;
-  let s2 = 0;
-  for (let i = 0; i < brut.length; i++) {
-    s1 = (s1 + brut[i]) % 65521;
-    s2 = (s2 + s1) % 65521;
-  }
-  const adler = ((s2 << 16) | s1) >>> 0;
-  zlib[o++] = adler >>> 24;
-  zlib[o++] = (adler >>> 16) & 255;
-  zlib[o++] = (adler >>> 8) & 255;
-  zlib[o++] = adler & 255;
+  const zlib = zlibSync(brut, { level: 6 });
 
   const morceaux: { type: string; donnees: Uint8Array }[] = [];
   const ihdr = new Uint8Array(13);

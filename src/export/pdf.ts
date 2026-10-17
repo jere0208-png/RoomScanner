@@ -6,6 +6,7 @@
  * de vues 3D avec les mesures portées sur les murs.
  * PDF 1.4 non compressé, A4, polices Helvetica (WinAnsi).
  */
+import { zlibSync } from 'fflate';
 import {
   aDesTravaux,
   mursDeLaPhase,
@@ -422,6 +423,25 @@ export interface PdfOptions {
   } | null;
 }
 
+/**
+ * LES FLUX DE PAGE COMPRESSÉS (FlateDecode, par fflate) : un dossier de
+ * vingt feuilles passait de quelques mégaoctets à quelques centaines de
+ * kilo-octets — c'est lui qui part par mail. Les bancs lisent le texte des
+ * pages : `ECHOPLAN_PDF_BRUT=1` (posé par `jest.setup.js`) les laisse en
+ * clair ; `pdfcompresse.test.ts` vérifie la version compressée.
+ */
+export function fluxDePage(s: string): string {
+  const brut = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
+    ?.ECHOPLAN_PDF_BRUT === '1';
+  if (brut) return `<< /Length ${s.length} >>\nstream\n${s}\nendstream`;
+  const z = zlibSync(bytesOf(s), { level: 6 });
+  let bin = '';
+  for (let i = 0; i < z.length; i += 8192) {
+    bin += String.fromCharCode.apply(null, Array.from(z.subarray(i, i + 8192)));
+  }
+  return `<< /Length ${z.length} /Filter /FlateDecode >>\nstream\n${bin}\nendstream`;
+}
+
 function bytesOf(s: string): Uint8Array {
   const b = new Uint8Array(s.length);
   for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 0xff;
@@ -581,9 +601,7 @@ function buildDocument(
       return `/GA${i + 1} << /ca ${a} /CA ${a} >>`;
     }).join(' ') +
     ' >>';
-  const contentIds = pageStreams.map((s) =>
-    add(`<< /Length ${s.length} >>\nstream\n${s}\nendstream`),
-  );
+  const contentIds = pageStreams.map((s) => add(fluxDePage(s)));
   const pageIds = contentIds.map((cid) =>
     add(
       `<< /Type /Page /Parent @P 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] ` +
