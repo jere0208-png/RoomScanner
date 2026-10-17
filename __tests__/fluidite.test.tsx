@@ -434,9 +434,17 @@ describe('le plan glisse sans se redessiner', () => {
     expect(empreinte(tree)).toBe(avant);
   });
 
-  it('un plan qui déborde : la toile s’ouvre le temps du geste, pour qu’il puisse revenir', () => {
+  /*
+    LA TOILE A SES MARGES DÈS LE REPOS — diagnostic du patron : sur un plan
+    zoomé, l'écran se figeait au début du geste, le temps de repeindre une
+    toile agrandie à la prise du doigt. Elle s'agrandit désormais au rendu,
+    avec le cadrage, du seul côté où le plan dépasse ; le geste n'a plus rien
+    à peindre, et le plan peut toujours revenir sans être coupé.
+  */
+  it('un plan qui déborde : la toile est déjà ouverte au repos, et le geste n’y touche pas', () => {
     const tree = planEquipe();
-    // Un premier geste le pousse à moitié hors de l'écran.
+    const auCentre = toileDe(tree).props.bbWidth;
+    // Un premier geste le pousse à moitié hors de l'écran, vers la droite.
     act(() => {
       const zone = zoneDuPlan(tree);
       zone.props.onMoveShouldSetResponder?.(doigt(400, 300));
@@ -445,26 +453,17 @@ describe('le plan glisse sans se redessiner', () => {
       zone.props.onResponderRelease?.(doigtDepuis(400, 300, 800, 300));
     });
     const auRepos = toileDe(tree).props.bbWidth;
+    // Au repos, la toile a déjà de quoi ramener ce qui est sorti à droite…
+    expect(auRepos).toBeGreaterThan(auCentre);
+    // … et rien à gauche, où le plan ne dépasse pas : sa fenêtre ne s'ouvre
+    // que du côté utile.
+    expect(toileDe(tree).props.minX).toBe(0);
     const avant = empreinte(tree);
 
     glisser(tree);
-    const enGeste = toileDe(tree).props.bbWidth;
-    // Nettement plus large : de quoi ramener au centre ce qui était sorti.
-    expect(enGeste).toBeGreaterThan(auRepos * 1.5);
-    // Et la toile reste calée sur le dessin : c'est sa FENÊTRE qui s'ouvre,
-    // pas le plan qui se décale. `react-native-svg` éclate le `viewBox` en
-    // quatre props : c'est `minX` qui porte le décalage du cadrage.
-    expect(toileDe(tree).props.minX).toBe(-(enGeste - auRepos) / 2);
-    // Le dessin n'a pas été repris pour autant : mêmes coordonnées.
-    expect(empreinte(tree)).toBe(avant);
-
-    act(() => {
-      zoneDuPlan(tree).props.onResponderRelease?.(
-        doigtDepuis(400, 300, 460, 330),
-      );
-    });
-    // Au repos, la toile reprend sa taille.
+    // Pendant le geste, rien ne change : ni la toile, ni le dessin.
     expect(toileDe(tree).props.bbWidth).toBe(auRepos);
+    expect(empreinte(tree)).toBe(avant);
   });
 
   it('pose le cadrage pour de bon quand le doigt se lève', () => {

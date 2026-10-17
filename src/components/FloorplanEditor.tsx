@@ -1,4 +1,4 @@
-import React, { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { texteDeMesure, type Mesure } from '../geometry/regle';
 import {
   Animated,
@@ -628,64 +628,85 @@ interface Props {
  * et coins déplaçables (les murs soudés au même coin suivent).
  */
 /**
- * LA TOILE DU PLAN, ET SA MARGE — un état À ELLE.
+ * LES MARGES DE LA TOILE — ce qu'on peint au-delà de l'écran, côté par côté
+ * (gauche, haut, droite, bas, en points).
  *
- * Relevé du patron : « le plan 2D sur l'exemple saccade en le bougeant ».
- * Le geste lui-même ne coûtait rien (une transformation native), mais la
- * PRISE du doigt, si : pour ouvrir la toile (voir « LA TOILE S'OUVRE LE
- * TEMPS DU GESTE »), l'éditeur passait un état à vrai — et se rendait tout
- * entier, six cent quatre-vingt-dix balises sur l'exemple, au moment même où
- * le doigt commençait à glisser. Le plan restait figé un instant, puis
- * sautait sous le doigt.
+ * Relevé du patron, diagnostic à l'appui : « encore des bugs au zoom,
+ * pincer, relâcher ; ça devrait être fluide, c'est juste de la 2D ». La
+ * vidéo, image par image : sur un plan zoomé qui déborde de l'écran,
+ * l'écran se FIGEAIT de trois à six dixièmes de seconde au début du geste —
+ * aucune image, les doigts déjà en route —, puis le plan sautait d'un coup
+ * pour les rattraper. Sur un plan qui tient dans l'écran, rien : le geste
+ * coulait dès la première image.
  *
- * La marge ne vit donc pas dans l'éditeur. L'ouvrir ne rend que la couche
- * et la toile : leurs enfants sont les MÊMES éléments qu'au rendu d'avant,
- * et React ne les reprend pas.
+ * La différence, c'était la toile. Elle s'ouvrait à la PRISE du doigt, de
+ * huit dixièmes d'écran de chaque côté : six cents balises à repeindre sur
+ * une surface sept fois plus grande que l'écran, au moment exact où le
+ * doigt commence à bouger.
+ *
+ * Elle ne s'ouvre donc plus au geste. Ses marges se calculent AU RENDU,
+ * avec le cadrage — au lâcher du geste précédent, quand le dessin se refait
+ * de toute façon — et un geste qui commence n'a plus rien à peindre. Elles
+ * sont taillées au plus juste : seulement du côté où le plan dépasse
+ * vraiment, plus l'air d'une cote, et bornées. Le vide n'a pas besoin d'être
+ * peint.
  */
-const MargeDeLaToile = React.createContext(0);
+export interface MargesDeToile {
+  g: number;
+  h: number;
+  d: number;
+  b: number;
+}
+const SANS_MARGE: MargesDeToile = { g: 0, h: 0, d: 0, b: 0 };
+const MargeDeLaToile = React.createContext<MargesDeToile>(SANS_MARGE);
 
 /**
- * LA MARGE DE LA TOILE VIT DANS LA COUCHE DU GESTE — tout ce qui se rend
- * SOUS la couche pendant un geste doit la rendre avec lui.
+ * LES MARGES QU'IL FAUT, pour des points du dessin déjà projetés à l'écran :
+ * ce qui dépasse de chaque bord, plus `air` (une cote, un cartouche), borné
+ * à `max` par côté. Pure : le banc la vérifie.
+ */
+export function margesDeToile(
+  points: { x: number; y: number }[],
+  largeur: number,
+  hauteur: number,
+  air = 48,
+  max = Math.round(0.6 * Math.max(largeur, hauteur)),
+): MargesDeToile {
+  if (points.length === 0 || largeur <= 0 || hauteur <= 0) return SANS_MARGE;
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const q of points) {
+    if (q.x < x0) x0 = q.x;
+    if (q.y < y0) y0 = q.y;
+    if (q.x > x1) x1 = q.x;
+    if (q.y > y1) y1 = q.y;
+  }
+  // Rien ne dépasse d'un côté : pas de marge de ce côté-là.
+  const cote = (depasse: number) => (depasse <= -air ? 0 : Math.min(max, Math.ceil(depasse + air)));
+  return { g: cote(-x0), h: cote(-y0), d: cote(x1 - largeur), b: cote(y1 - hauteur) };
+}
+
+/**
+ * LA COUCHE DU GESTE, QUI PORTE LA TOILE.
  *
- * Relevé du patron, vidéo image par image : le plan qui réapparaît
- * « exactement à sa position d'avant le geste ». Voici l'un des chemins qui
- * y mènent, propre à Fabric. Les valeurs de la couche, pilotées en JS,
- * partent à l'écran par `setNativeProps` — hors de React. React, lui, garde
- * pour la couche la transformation de SON dernier rendu : à plat, celle de
- * la prise. Tout commit React qui reprend la couche SANS la rendre (parce
- * qu'un de ses enfants a changé) recopie cette transformation-là, et le plan
- * revient d'un coup à sa place d'avant le geste.
- *
- * C'est exactement ce que faisait l'ouverture de la toile : elle part de la
- * prise du doigt, un événement de MOUVEMENT, que React rend une tâche plus
- * tard — APRÈS la première image poussée à la couche. La marge tenue par la
- * toile, ce commit rendait la toile seule, et ramenait le plan à sa
- * position de départ jusqu'à l'image suivante ; plus longtemps quand le fil
- * principal peignait la toile agrandie.
- *
- * Tenue ici, la marge rend aussi la couche, et une couche rendue relit ses
- * valeurs du moment : le commit porte la pose que l'écran montre déjà.
+ * Ses marges viennent du rendu de l'éditeur, avec le cadrage : elles ne
+ * changent jamais pendant un geste, et la couche n'est jamais reprise par
+ * un commit qui ne la rend pas (voir la revue experte : sous Fabric, un tel
+ * commit recopierait la transformation du dernier rendu React).
  */
 function CoucheDuPlan({
   style,
-  ouvrir,
+  marges,
   children,
 }: {
   style: React.ComponentProps<typeof Animated.View>['style'];
-  /** Où l'éditeur trouve de quoi ouvrir (ou refermer) la toile, en points. */
-  ouvrir: React.MutableRefObject<((marge: number) => void) | null>;
+  marges: MargesDeToile;
   children: React.ReactNode;
 }) {
-  const [marge, setMarge] = useState(0);
-  useLayoutEffect(() => {
-    ouvrir.current = setMarge;
-    return () => {
-      ouvrir.current = null;
-    };
-  }, [ouvrir]);
   return (
-    <MargeDeLaToile.Provider value={marge}>
+    <MargeDeLaToile.Provider value={marges}>
       <Animated.View collapsable={false} style={style} pointerEvents="box-none">
         {children}
       </Animated.View>
@@ -702,13 +723,15 @@ function ToileDuPlan({
   hauteur: number;
   children: React.ReactNode;
 }) {
-  const marge = React.useContext(MargeDeLaToile);
+  const { g, h, d, b } = React.useContext(MargeDeLaToile);
+  const l = largeur + g + d;
+  const t = hauteur + h + b;
   return (
     <Svg
-      width={largeur + 2 * marge}
-      height={hauteur + 2 * marge}
-      viewBox={`${-marge} ${-marge} ${largeur + 2 * marge} ${hauteur + 2 * marge}`}
-      style={marge ? { marginLeft: -marge, marginTop: -marge } : undefined}>
+      width={l}
+      height={t}
+      viewBox={`${-g} ${-h} ${l} ${t}`}
+      style={g || h ? { marginLeft: -g, marginTop: -h } : undefined}>
       {children}
     </Svg>
   );
@@ -1004,7 +1027,6 @@ export function FloorplanEditor({
     l'écran qui les tient, et c'est lui qui les repasse à la vue d'à côté.
   */
   /** De quoi ouvrir la toile le temps du geste (voir `ToileDuPlan`). */
-  const ouvrirLaToile = useRef<((marge: number) => void) | null>(null);
   /*
     LE MEUBLE QU'ON NE PEUT PAS POSER LÀ.
 
@@ -1100,7 +1122,6 @@ export function FloorplanEditor({
    */
   const poserLeGeste = () => {
     const vueAvant = viewRef.current;
-    ouvrirLaToile.current?.(0);
     const couche = nouvelleCouche();
     glisseRef.current = couche;
     setGlisse(couche);
@@ -1304,16 +1325,8 @@ export function FloorplanEditor({
         return true;
       },
       onPanResponderGrant: (e, g) => {
-        /*
-          LA TOILE NE S'OUVRE QUE SI LE DESSIN DÉBORDE. Un plan qui tient
-          tout entier à l'écran est déjà peint en entier : le glisser, le
-          pincer ou le tourner ne fait entrer aucun vide. Rien à rendre à la
-          prise — c'est le cas de l'exemple, cadré à l'ouverture.
-        */
-        if (debordeRef.current) {
-          const l = layoutRef.current;
-          ouvrirLaToile.current?.(Math.round(Math.max(l.w, l.h) * 0.8));
-        }
+        // Rien à peindre à la prise : la toile a ses marges depuis le rendu
+        // (voir `margesDeToile`).
         vueVive.current = viewRef.current;
         // Le recalage repart de zero a chaque prise : le decalage se compte
         // en petits pas, et un geste qui commence herite du precedent.
@@ -1569,8 +1582,18 @@ export function FloorplanEditor({
     }
     return false;
   }, [mapping, walls, filigrane, layout.w, layout.h]);
-  const debordeRef = useRef(deborde);
-  debordeRef.current = deborde;
+  /*
+    LES MARGES DE LA TOILE, AU RENDU — voir `margesDeToile`. Un plan qui
+    tient dans l'écran n'en a aucune : il est peint en entier.
+  */
+  const margesToile = useMemo(() => {
+    if (!mapping || !deborde) return SANS_MARGE;
+    const pts: { x: number; y: number }[] = [];
+    for (const w of [...walls, ...(filigrane ?? [])]) {
+      pts.push(mapping.toPx(w.a), mapping.toPx(w.b));
+    }
+    return margesDeToile(pts, layout.w, layout.h);
+  }, [mapping, deborde, walls, filigrane, layout.w, layout.h]);
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
 
@@ -3042,7 +3065,7 @@ export function FloorplanEditor({
         */}
       {mapping && (
         <CoucheDuPlan
-          ouvrir={ouvrirLaToile}
+          marges={margesToile}
           style={[
             StyleSheet.absoluteFill,
             {

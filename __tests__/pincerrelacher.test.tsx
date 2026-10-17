@@ -762,33 +762,34 @@ describe('le plan suit les doigts, et se pose d’une traite', () => {
     lacher(b, 0); // …et le doigt se lève sans avoir bougé depuis
   });
 
-  it('plan qui déborde : la toile s’ouvre à la prise sans décaler le dessin, et se referme au lâcher', () => {
+  /*
+    LA TOILE NE BOUGE PLUS AU GESTE — diagnostic du patron : l'écran se
+    figeait au début d'un geste sur un plan qui déborde, le temps de
+    repeindre la toile agrandie à la prise. Ses marges viennent désormais du
+    rendu (voir `margesDeToile`) : au repos, elle est déjà ouverte du côté où
+    le plan dépasse, et le geste n'y touche pas.
+  */
+  it('plan qui déborde : la toile est ouverte dès le repos, et ne change pas pendant le geste', () => {
     const b = monter();
-    // Un premier geste le pousse à moitié hors du cadre.
+    const toile = () =>
+      b.tree.root
+        .findAll((n) => typeof n.props?.bbWidth === 'number')
+        .sort((x, y) => y.props.bbWidth - x.props.bbWidth)[0].props.bbWidth as number;
+    // Un premier geste le pousse à moitié hors du cadre, vers la droite.
     b.poser(0, 100, 300);
     for (let i = 1; i <= 10; i++) b.bouger({ 0: { x: 100 + i * 22, y: 300 } });
     lacher(b, 0);
-    const auRepos = b.voir().toile;
-    expect(auRepos).toEqual({ x: 0, y: 0 });
-    // Le second l'y ramène, en pinçant : la toile doit être ouverte.
+    const auRepos = toile();
+    expect(auRepos).toBeGreaterThan(LARGEUR);
+    // Le second l'y ramène, en pinçant : la toile ne change pas d'un point.
     b.poser(0, 200, 250);
     b.poser(1, 300, 350);
     b.bouger({ 0: { x: 176, y: 240 } });
     expect(b.tient).toBe(true);
-    const ouverte = b.voir();
-    const svg = b.tree.root
-      .findAll((n) => typeof n.props?.bbWidth === 'number')
-      .sort((x, y) => y.props.bbWidth - x.props.bbWidth)[0];
-    expect(svg.props.bbWidth).toBeGreaterThan(LARGEUR * 1.5);
-    // Sa fenêtre s'ouvre, le dessin ne se décale pas.
-    expect(ouverte.toile.x).toBeCloseTo(0, 6);
-    expect(ouverte.toile.y).toBeCloseTo(0, 6);
+    expect(toile()).toBe(auRepos);
     for (let i = 1; i <= 8; i++) b.bouger({ 0: { x: 176 - i * 12, y: 240 }, 1: { x: 300 - i * 4, y: 350 + i * 3 } });
+    expect(toile()).toBe(auRepos);
     b.lever(0);
     lacher(b, 1);
-    const svgApres = b.tree.root
-      .findAll((n) => typeof n.props?.bbWidth === 'number')
-      .sort((x, y) => y.props.bbWidth - x.props.bbWidth)[0];
-    expect(svgApres.props.bbWidth).toBe(LARGEUR);
   });
 });

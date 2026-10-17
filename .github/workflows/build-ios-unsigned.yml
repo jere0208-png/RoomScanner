@@ -114,6 +114,8 @@ jobs:
           # LES ERREURS DU COMPILATEUR EN ANNOTATIONS : les journaux bruts ne
           # sont pas lisibles depuis toutes les sessions de développement ; les
           # annotations, si (API check-runs).
+          # LE NUMÉRO DE COMPILATION DANS L'APP : « 1.0 (412) » au lieu de
+          # « 1.0 (1) ». Le diagnostic l'envoie : on sait quelle IPA l'a émis.
           if ! xcodebuild \
             -workspace RoomScanner.xcworkspace \
             -scheme RoomScanner \
@@ -123,6 +125,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
             build 2>&1 | tee xcodebuild.log; then
             grep -E "(error|fatal error): " xcodebuild.log | sed 's|^.*/modules/|modules/|; s|^.*/src/|src/|' | sort -u | head -40 | while IFS= read -r l; do echo "::error::${l}"; done
             exit 65

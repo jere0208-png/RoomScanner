@@ -269,13 +269,14 @@ describe('le plan se pose d’une traite', () => {
   });
 
   /*
-    L'OUVERTURE DE LA TOILE NE RAMÈNE PAS LE PLAN À SA PLACE DE DÉPART.
-    Elle est demandée à la prise, mais React la rend APRÈS la première image
-    poussée à la couche (événement de mouvement, rendu une tâche plus tard ;
-    `act` reproduit cet ordre). Ce commit doit porter la pose que l'écran
-    montre déjà — pas celle, à plat, du dernier rendu de React.
+    UN GESTE SUR UN PLAN QUI DÉBORDE NE REND RIEN AVANT LE LÂCHER.
+    La toile s'ouvrait à la prise : un commit React en plein geste, qui
+    repeignait une toile sept fois plus grande que l'écran (l'écran figé du
+    diagnostic du patron) et risquait de recopier la couche du dernier rendu.
+    Ses marges viennent désormais du rendu : pendant le geste, React ne rend
+    rien — la couche bouge seule, la toile reste telle qu'au repos.
   */
-  it('la toile qui s’ouvre emporte la pose du moment, pas celle de la prise', () => {
+  it('sur un plan qui déborde, le geste ne rend rien : la toile est prête depuis le repos', () => {
     const tree = plan();
     // Un premier geste pousse le plan à moitié hors de l'écran.
     act(() => glisser(tree, [400, 300], [800, 300], true));
@@ -283,13 +284,12 @@ describe('le plan se pose d’une traite', () => {
     commeSurLeTelephone(() => {
       act(() => glisser(tree, [400, 300], [340, 280], false));
     });
-    // La toile s'est bien ouverte…
-    expect(toileDe(tree).props.bbWidth).toBeGreaterThan(auRepos * 1.5);
-    // … et le commit qui l'a ouverte montre la couche là où l'écran l'a.
+    // La toile n'a pas bougé…
+    expect(toileDe(tree).props.bbWidth).toBe(auRepos);
+    // … la couche, si — par le pilote, pas par un rendu React.
     const poses = posesDeLaCouche();
-    const aLEcran = poses[poses.length - 1];
-    expect(aLEcran).not.toEqual(A_PLAT);
-    expect(poseRendue(tree)).toEqual(aLEcran);
+    expect(poses[poses.length - 1]).not.toEqual(A_PLAT);
+    expect(poseRendue(tree)).toEqual(A_PLAT);
   });
 
   /*
