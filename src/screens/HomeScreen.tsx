@@ -662,7 +662,16 @@ export function HomeScreen() {
                     styles={styles}
                     onPress={() => {
                       if (refermer()) return;
-                      openSave(s.id);
+                      // Le relevé interrompu ne s'écrase pas en silence
+                      // (relevé « bug-données ») : voir `sansPerdreLeReleve`.
+                      sansPerdreLeReleve(
+                        () => {
+                          oublierBrouillon();
+                          openSave(s.id);
+                        },
+                        `Le plan « ${s.name} »`,
+                        'Ouvrir',
+                      );
                     }}
                   />
                 )}

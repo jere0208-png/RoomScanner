@@ -25,6 +25,7 @@ import {
   FolderGlyph,
   LibraryScreen,
   teintesDossier,
+  vueRetenue,
 } from '../src/screens/LibraryScreen';
 import { HOLD_MS, prendLeRelevé } from '../src/screens/LibraryScreen';
 import { useScanStore, type SavedScan } from '../src/store/scanStore';
@@ -66,6 +67,9 @@ let arbre: TestRenderer.ReactTestRenderer | null = null;
 afterEach(() => {
   act(() => arbre?.unmount());
   arbre = null;
+  // La bibliothèque retient dossier, recherche et tri d'un passage à l'autre
+  // (voir `vueRetenue`) : chaque épreuve repart d'une bibliothèque neuve.
+  Object.assign(vueRetenue, { quete: '', tri: 'date', inside: null });
 });
 
 const monter = (dossiers: { id: string; name: string }[] = []) => {

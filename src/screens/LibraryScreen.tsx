@@ -28,6 +28,7 @@ import {
 } from '../geometry/nfc15100';
 import { useAccountStore } from '../store/accountStore';
 import { astuce } from '../ui/astuce';
+import { sansPerdreLeReleve } from '../ui/releveInterrompu';
 import { horsCorbeille, niveauDeDepart, useScanStore, type SavedScan, type ScanFolder } from '../store/scanStore';
 import { haptic } from '../ui/haptic';
 import { alerte } from '../ui/alerte';
@@ -742,6 +743,19 @@ function ScanRow({
   );
 }
 
+/**
+ * LA BIBLIOTHÈQUE SE RETROUVE COMME ON L'A LAISSÉE — relevé « bug-données » :
+ * ouvrir un plan depuis un dossier, ou après une recherche, puis revenir,
+ * ramenait à la racine, recherche vide et tri par date. On refaisait le
+ * chemin à chaque plan d'un chantier. Le dossier ouvert, la recherche et le
+ * tri vivent donc hors de l'écran, le temps que l'app vit.
+ */
+export const vueRetenue: { quete: string; tri: 'date' | 'nom'; inside: string | null } = {
+  quete: '',
+  tri: 'date',
+  inside: null,
+};
+
 export function LibraryScreen() {
   const tousLesPlans = useScanStore((s) => s.saves);
   // La bibliothèque montre ce qui n'est pas à la corbeille ; la corbeille a sa ligne.
@@ -750,6 +764,7 @@ export function LibraryScreen() {
   const folders = useScanStore((s) => s.folders);
   const setScreen = useScanStore((s) => s.setScreen);
   const openSave = useScanStore((s) => s.openSave);
+  const oublierBrouillon = useScanStore((s) => s.oublierBrouillon);
 
   /*
     OUVRIR UN AUTRE PLAN NE JETTE PAS CELUI QU'ON TIENT — et ne demande rien.
@@ -759,8 +774,22 @@ export function LibraryScreen() {
     le premier dans la liste, avec son attente.
   */
   const ouvrirLeScan = (id: string) => {
-    rangerLeTravail();
-    openSave(id);
+    /*
+      UN RELEVÉ INTERROMPU NE S'EFFACE PAS SANS QU'ON LE DEMANDE — relevé
+      « bug-données » : ouvrir un plan d'ici laissait le filet réécrire le
+      brouillon par-dessus, sans un mot. La même garde que les portes de
+      l'accueil (voir `sansPerdreLeReleve`).
+    */
+    const nom = saves.find((x) => x.id === id)?.name;
+    sansPerdreLeReleve(
+      () => {
+        oublierBrouillon();
+        rangerLeTravail();
+        openSave(id);
+      },
+      nom ? `Le plan « ${nom} »` : 'Ce plan',
+      'Ouvrir',
+    );
   };
 
   const enregistrerRetouche = useScanStore((s) => s.enregistrerRetouche);
@@ -809,11 +838,17 @@ export function LibraryScreen() {
    * relevés — par date, un dossier repris hier remonte en tête et on ne
    * le retrouve plus où on l'avait laissé.
    */
-  const [quete, setQuete] = useState('');
-  const [tri, setTri] = useState<'date' | 'nom'>('date');
+  const [quete, setQuete] = useState(vueRetenue.quete);
+  const [tri, setTri] = useState<'date' | 'nom'>(vueRetenue.tri);
 
   // Dossier ouvert : on n'affiche plus que son contenu.
-  const [inside, setInside] = useState<string | null>(null);
+  const [inside, setInside] = useState<string | null>(vueRetenue.inside);
+  // Retenus pour le prochain passage : voir `vueRetenue`.
+  useEffect(() => {
+    vueRetenue.quete = quete;
+    vueRetenue.tri = tri;
+    vueRetenue.inside = inside;
+  }, [quete, tri, inside]);
   const byFolder = useMemo(() => {
     const m = new Map<string, SavedScan[]>();
     /*
@@ -1096,11 +1131,15 @@ export function LibraryScreen() {
           hint: 'Pour chiffrer deux variantes du même logement.',
           icon: 'scinder',
           onPress: () => {
-            duplicateSave(item.id);
+            const idCopie = duplicateSave(item.id);
             // Revue « Inès » : la copie arrivait sans un mot, quelque part
             // dans la liste. On dit qu'elle existe, et sous quel nom.
-            const copie = useScanStore.getState().saves[0];
-            astuce(copie && copie.id !== item.id ? `Copie créée : « ${copie.name} »` : 'Copie créée.', { icone: 'dupliquer' });
+            // SON nom (relevé « bug-données ») : elle se range juste après
+            // l'original, et `saves[0]` nommait un autre plan.
+            const copie = idCopie ? useScanStore.getState().saves.find((x) => x.id === idCopie) : undefined;
+            if (copie) astuce(`Copie créée : « ${copie.name} »`, { icone: 'dupliquer' });
+            // Refusée par le palier gratuit : on ne dit pas qu'elle existe.
+            else astuce('Pas de copie : votre offre ne permet pas un plan de plus.', { icone: 'dupliquer' });
           },
         },
         // Sortir d'un dossier n'a de sens que dedans : ailleurs, la ligne

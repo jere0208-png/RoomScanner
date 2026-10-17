@@ -27,6 +27,7 @@ interface PlanIndexable {
   name: string;
   updatedAt: number;
   supprimeLe?: number;
+  corbeille?: number;
   client?: string;
   address?: string;
   rooms?: readonly unknown[];
@@ -49,13 +50,15 @@ const MOIS = [
 
 /**
  * Les fiches des plans ENREGISTRÉS — un brouillon rangé en partant, qui
- * s'efface seul, n'a rien à faire dans la recherche du téléphone.
+ * s'efface seul, n'a rien à faire dans la recherche du téléphone. Un plan à
+ * la corbeille non plus (relevé « bug-fluidité ») : la bibliothèque le
+ * cache, Spotlight le trouvait et l'ouvrait.
  */
 export function fichesSpotlight(
   plans: readonly PlanIndexable[],
 ): FicheSpotlight[] {
   return plans
-    .filter(p => !p.supprimeLe)
+    .filter(p => !p.supprimeLe && !p.corbeille)
     .map(p => {
       const n = p.rooms?.length ?? 0;
       const d = new Date(p.updatedAt);

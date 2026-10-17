@@ -211,7 +211,11 @@ function Application() {
         if (st.screen !== 'home') st.setScreen('home');
         st.setRaccourciEnAttente(true);
       } else if (suite.faire === 'ouvrir') {
-        if (st.saves.some((p) => p.id === suite.id)) st.openSave(suite.id);
+        const plan = st.saves.find((p) => p.id === suite.id);
+        // À la corbeille, il ne s'ouvre pas d'un toucher Spotlight (relevé
+        // « bug-fluidité ») : la bibliothèque le cache, on dit où il est.
+        if (plan && !plan.corbeille) st.openSave(suite.id);
+        else if (plan) astuce('Ce plan est à la corbeille.', { icone: 'save' });
         else astuce('Ce plan n’est plus sur ce téléphone.', { icone: 'save' });
       } else if (suite.faire === 'dire') {
         astuce(suite.message, { icone: 'save' });

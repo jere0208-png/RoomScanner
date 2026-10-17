@@ -907,13 +907,24 @@ export function nomDePieceLibre(nom: string, pris: string[], max = 40): string {
  * Un nom de plan que personne ne porte encore : « Version A », sinon
  * « Version A — version 2 », « — version 3 »…
  */
-export function nomDeVersion(nom: string, pris: string[]): string {
+export function nomDeVersion(nom: string, pris: string[], max = NOM_PLAN_MAX): string {
   const deja = new Set(pris.map((x) => x.trim().toLowerCase()));
-  if (!deja.has(nom.trim().toLowerCase())) return nom.trim();
-  const base = nom.trim().replace(/ — version \d+$/, '');
+  /*
+    SOIXANTE SIGNES, SUFFIXE COMPRIS — relevé « bug-données » : la copie d'un
+    plan au nom de 60 signes en portait 68 (« … (copie) »), puis 80 avec
+    « — version 2 ». La base se coupe AVANT le numéro, comme pour les pièces
+    (voir `nomDePieceLibre`).
+  */
+  const propre = couperLeNom(nom.trim(), max);
+  if (!deja.has(propre.toLowerCase())) return propre;
+  const base = propre.replace(/ — version \d+$/, '');
+  const essai = (k: number) => {
+    const suffixe = ` — version ${k}`;
+    return `${couperLeNom(base, max - suffixe.length)}${suffixe}`;
+  };
   let k = 2;
-  while (deja.has(`${base} — version ${k}`.toLowerCase())) k++;
-  return `${base} — version ${k}`;
+  while (deja.has(essai(k).toLowerCase())) k++;
+  return essai(k);
 }
 
 /**
@@ -1147,6 +1158,30 @@ function migrateSave(brut: SavedScan): SavedScan {
   const propre = sansEclats(brut.walls ?? [], brut.rooms ?? []);
   let s: SavedScan =
     propre.walls === (brut.walls ?? []) ? brut : { ...brut, walls: propre.walls, rooms: propre.rooms };
+  /*
+    UN PLAN SANS NOM EN REÇOIT UN — relevé « bug-données » : un plan revenu
+    sans `name` (sauvegarde bancale, ancien format) faisait lever
+    « Dupliquer » et le tri par nom, qui lisent `name` comme un texte.
+  */
+  if (typeof s.name !== 'string') {
+    s = { ...s, name: defaultName(new Date(typeof s.createdAt === 'number' ? s.createdAt : Date.now())) };
+  }
+  /*
+    LES LISTES FACULTATIVES ABÎMÉES SONT ÉCARTÉES, PAS LE PLAN — relevé
+    « bug-données » : des `photos` qui n'étaient pas une liste faisaient
+    lever le ménage de `deleteSave`, qui parcourt les photos de TOUS les
+    plans : plus aucune suppression ne passait. Les murs, eux, sont gardés
+    par `planValide` ; une liste facultative illisible ne vaut pas qu'on
+    cache tout le relevé — elle repart vide.
+  */
+  const facultatives = ['fixtures', 'photos', 'ceiling', 'notes', 'mesures'] as const;
+  if (facultatives.some((champ) => s[champ] != null && !Array.isArray(s[champ]))) {
+    const repare: SavedScan = { ...s };
+    for (const champ of facultatives) {
+      if (repare[champ] != null && !Array.isArray(repare[champ])) delete repare[champ];
+    }
+    s = repare;
+  }
   /*
     D'ABORD, LES BAIES D'AVANT PRENNENT LE NIVEAU DE LEUR MUR — tout ce qui
     suit se fait étage par étage (revue « Nadia »).
@@ -1452,6 +1487,13 @@ async function loadLibrary(): Promise<SavedScan[] | null> {
         .filter((k) => k.startsWith(prefixe))
         .map((k) => k.slice(prefixe.length));
     }
+    /*
+      UN IDENTIFIANT, UN PLAN — relevé « bug-données » : un index qui citait
+      deux fois le même plan le chargeait deux fois, et la bibliothèque
+      montrait deux lignes au même identifiant (renommer l'une renommait
+      l'autre, supprimer l'une emportait les deux).
+    */
+    ids = [...new Set(ids)];
     // Tout ce que l'index connaît est gardé tant qu'il n'est pas chargé.
     for (const id of ids) gardes.add(id);
     const out: SavedScan[] = [];
@@ -2651,8 +2693,8 @@ interface ScanState {
   setClientInfo: (client: string, address: string) => void;
   /** Renomme une entrée de la bibliothèque sans l'ouvrir. */
   renameSave: (id: string, name: string) => void;
-  /** Copie une entrée : même plan, autre nom, autre vie. */
-  duplicateSave: (id: string) => void;
+  /** Copie une entrée : même plan, autre nom, autre vie. Rend l'id de la copie, ou null. */
+  duplicateSave: (id: string) => string | null;
   /**
    * Remet l'appareillage tel qu'il était — pour abandonner ce qu'on vient
    * de poser sur un mur sans toucher au reste du plan.
@@ -3363,6 +3405,14 @@ export const useScanStore = create<ScanState>((set, get) => {
     // Un geste neuf ferme l'avenir : voir `avenir`.
     if (avenir.length > 0) {
       avenir.length = 0;
+      /*
+        L'ÉTAT ENREGISTRÉ PART AVEC L'AVENIR — relevé « bug-données » :
+        enregistré à trois gestes, deux « Annuler », puis deux gestes neufs,
+        l'historique retombait à trois et le plan se disait « enregistré »
+        alors qu'il ne l'était plus. L'état enregistré était DANS l'avenir
+        qu'on vient de jeter : aucun « Annuler » ne le retrouvera.
+      */
+      if (history.length < savedDepth) savedDepth = -1;
       if (get().canRedo) set({ canRedo: false });
     }
     const st = get();
@@ -3615,6 +3665,9 @@ export const useScanStore = create<ScanState>((set, get) => {
             */
             supprimeLe: undefined,
             retouche: undefined,
+            // Et un plan qu'on enregistre n'est plus à la corbeille
+            // (relevé « bug-données ») : il se cachait, enregistré.
+            corbeille: undefined,
             updatedAt: Date.now(),
           }
         : s,
@@ -6779,9 +6832,19 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     renameSave: (id, name) => {
       // Soixante caractères, comme l'en-tête (revue « Hugo » : 300 passaient).
-      const clean = couperLeNom(name.trim(), NOM_PLAN_MAX);
-      if (!clean) return;
+      if (!couperLeNom(name.trim(), NOM_PLAN_MAX)) return;
       const st = get();
+      /*
+        UN NOM DÉJÀ PRIS DEVIENT « — VERSION 2 » — relevé « bug-données » :
+        « Renommer » acceptait le nom d'un autre plan, et la bibliothèque
+        montrait deux « Version A » sans dire laquelle était laquelle. Même
+        règle que la copie (`nomDeVersion`) ; le plan renommé ne se gêne pas
+        lui-même.
+      */
+      const clean = nomDeVersion(
+        name,
+        st.saves.filter((x) => x.id !== id).map((x) => x.name),
+      );
       const saves = st.saves.map((x) =>
         x.id === id ? { ...x, name: clean, updatedAt: Date.now() } : x,
       );
@@ -6805,9 +6868,9 @@ export const useScanStore = create<ScanState>((set, get) => {
     duplicateSave: (id) => {
       const st = get();
       const source = st.saves.find((x) => x.id === id);
-      if (!source) return;
+      if (!source) return null;
       // Une copie est un plan : voir `placePourUnPlanDePlus`.
-      if (!placePourUnPlanDePlus()) return;
+      if (!placePourUnPlanDePlus()) return null;
       const now = Date.now();
       const copie: SavedScan = {
         ...source,
@@ -6817,8 +6880,10 @@ export const useScanStore = create<ScanState>((set, get) => {
           s'appelaient « Plan (copie) », la copie d'une copie
           « Plan (copie) (copie) ».
         */
+        // Le « (copie) » tient dans les soixante signes : la base se coupe
+        // avant lui (relevé « bug-données »), comme avant un numéro.
         name: nomDeVersion(
-          `${source.name.replace(/ \(copie\)( — version \d+)?$/, '')} (copie)`,
+          `${couperLeNom(source.name.replace(/ \(copie\)( — version \d+)?$/, ''), NOM_PLAN_MAX - ' (copie)'.length)} (copie)`,
           st.saves.map((x) => x.name),
         ),
         createdAt: now,
@@ -6835,6 +6900,9 @@ export const useScanStore = create<ScanState>((set, get) => {
       persistSoon(saves);
       // La copie a sa sauvegarde en ligne, comme tout plan (revue « Fatou »).
       deposerPlusTard(copie.id);
+      // Son identifiant, pour dire SON nom : elle se range juste après
+      // l'original, pas en tête de liste (relevé « bug-données »).
+      return copie.id;
     },
 
     restoreFixtures: (list) => {
@@ -6913,6 +6981,15 @@ export const useScanStore = create<ScanState>((set, get) => {
         try {
           const lu = JSON.parse(plan.contenu) as SavedScan;
           if (!lu?.id || !Array.isArray(lu.walls)) continue;
+          /*
+            UN SEUL PLAN PAR IDENTIFIANT — relevé « bug-données » : le
+            catalogue citait deux fois le même plan, ou un contenu portait un
+            autre identifiant que sa fiche (un plan déjà ici) : la reprise
+            posait deux plans au même id. Un contenu qui ne dit pas le même
+            plan que sa fiche est laissé au serveur.
+          */
+          if (lu.id !== p.scan || ici.has(lu.id)) continue;
+          ici.add(lu.id);
           const saves = [migrateSave(lu), ...get().saves];
           set({ saves });
           persistSoon(saves);
@@ -8197,24 +8274,31 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (restants.length === 0) return;
       const aGarder = <T extends { niveau?: number }>(xs: T[]) =>
         xs.filter((x) => niveauDe(x) !== n);
-      const mursGardes = aGarder(st.walls);
-      const idsMurs = new Set(mursGardes.map((w) => w.id));
-      const piecesGardees = aGarder(st.rooms);
-      const idsPieces = new Set(piecesGardees.map((r) => r.id));
+      /*
+        CE QUI TIENT À UN SUPPORT SUIT L'ÉTAGE DE CE SUPPORT — et l'orphelin
+        est au rez-de-chaussée, comme dans le filtre (`filtrerAuNiveau`).
+        Relevé « bug-données » : retirer l'étage emportait aussi les meubles
+        SANS pièce, qu'on voyait pourtant en bas ; ils ne partent plus qu'avec
+        le rez-de-chaussée, là où on les montre.
+      */
+      const niveauDuMur = new Map(st.walls.map((w) => [w.id, niveauDe(w)]));
+      const niveauDeLaPiece = new Map(st.rooms.map((r) => [r.id, niveauDe(r)]));
+      const ailleurs = (table: Map<string, number>, cle: string | undefined) =>
+        (table.get(cle ?? '') ?? NIVEAU_RDC) !== n;
       pushHistory(`retirerNiveau:${n}`);
       set({
-        walls: mursGardes,
-        rooms: piecesGardees,
+        walls: aGarder(st.walls),
+        rooms: aGarder(st.rooms),
         openings: aGarder(st.openings),
         notes: aGarder(st.notes),
         mesures: aGarder(st.mesures),
         // Ce qui tient à un mur s'en va avec lui ; ce qui tient à une pièce
         // aussi. Aucun orphelin : un appareil sans mur ne se dessine nulle
         // part et fausse le métré en silence.
-        fixtures: st.fixtures.filter((f) => idsMurs.has(f.wallId)),
-        photos: st.photos.filter((ph) => idsMurs.has(ph.wallId)),
-        objects: st.objects.filter((o) => idsPieces.has(o.roomId ?? '')),
-        ceiling: st.ceiling.filter((cl) => idsPieces.has(cl.roomId)),
+        fixtures: st.fixtures.filter((f) => ailleurs(niveauDuMur, f.wallId)),
+        photos: st.photos.filter((ph) => ailleurs(niveauDuMur, ph.wallId)),
+        objects: st.objects.filter((o) => ailleurs(niveauDeLaPiece, o.roomId)),
+        ceiling: st.ceiling.filter((cl) => ailleurs(niveauDeLaPiece, cl.roomId)),
         // On ne reste pas sur un étage qui n'existe plus : on redescend au
         // plus proche de ce qui reste, en dessous de préférence.
         niveauCourant:
@@ -10567,14 +10651,21 @@ export const useScanStore = create<ScanState>((set, get) => {
         ...CALQUES_DE_BASE,
         screen: 'result',
         resultOrigin: 'scan',
-        scanName: b.name,
+        scanName: b.name ?? '',
         walls: b.walls,
         niveauCourant: niveauDeDepart(b.walls),
-        openings: b.openings,
-        objects: separerLeMobilier(b.objects, b.rooms),
-        rooms: b.rooms,
-        fixtures: b.fixtures,
-        ceiling: b.ceiling,
+        /*
+          UN BROUILLON INCOMPLET SE REPREND QUAND MÊME — relevé
+          « bug-données » : seul `walls` est vérifié à la lecture, et un
+          brouillon écrit sans meubles ni plafond (version d'avant, écriture
+          coupée) faisait lever « Reprendre » sur `separerLeMobilier`. Ce
+          qui manque repart vide.
+        */
+        openings: b.openings ?? [],
+        objects: separerLeMobilier(b.objects ?? [], b.rooms ?? []),
+        rooms: b.rooms ?? [],
+        fixtures: b.fixtures ?? [],
+        ceiling: b.ceiling ?? [],
         /*
           TOUT CE QUI A ÉTÉ ÉCRIT EST RENDU.
 
@@ -10591,8 +10682,8 @@ export const useScanStore = create<ScanState>((set, get) => {
         notes: b.notes ?? [],
         mesures: b.mesures ?? [],
         existant: b.existant ?? null,
-        photos: b.photos,
-        modelPath: b.modelPath,
+        photos: b.photos ?? [],
+        modelPath: b.modelPath ?? null,
         // Le chiffrage aussi : un filet qui retient la moitié de ce qui
         // tombe est un filet qui ment.
         ...devisRepose(b.devis),
@@ -10603,8 +10694,10 @@ export const useScanStore = create<ScanState>((set, get) => {
           ou dont le dossier a été supprimé entre-temps, redevient ce qu'il
           était : un plan à enregistrer.
         */
+        // Ni un dossier mis à la corbeille entre-temps (relevé
+        // « bug-données ») : la retouche s'y cachait avec lui.
         currentSaveId:
-          b.saveId && get().saves.some((s) => s.id === b.saveId)
+          b.saveId && get().saves.some((s) => s.id === b.saveId && !s.corbeille)
             ? b.saveId
             : null,
         dirty: true,
@@ -10673,7 +10766,13 @@ export const useScanStore = create<ScanState>((set, get) => {
         // qui fait lever la migration ne vide plus la bibliothèque.
         await chargerLaBibliotheque((saves) => set({ saves }));
         // Ce qui a passé ses douze heures pendant que l'app dormait s'en va.
-        get().purgerLesEchus();
+        // Dans SA garde (relevé « bug-données ») : un ménage qui lève ne
+        // coûte plus le relevé interrompu ni le balayage des modèles.
+        try {
+          get().purgerLesEchus();
+        } catch {
+          // Le ménage se refera à la prochaine minute (voir `useMaintenant`).
+        }
         /*
           LE RELEVÉ INTERROMPU, retrouvé au démarrage.
 
@@ -10847,7 +10946,12 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (!st.saves.some((x) => x.id === id && x.corbeille)) return;
       const saves = st.saves.map((x) => {
         if (x.id !== id) return x;
-        const rendu: SavedScan = { ...x, updatedAt: Date.now() };
+        /*
+          RESTAURER N'EST PAS MODIFIER — relevé « bug-données » : le plan
+          revenait « modifié aujourd'hui », remontait en tête du tri par
+          date et Spotlight le datait du jour. Il revient tel qu'il était.
+        */
+        const rendu: SavedScan = { ...x };
         delete rendu.corbeille;
         return rendu;
       });
@@ -10870,12 +10974,17 @@ export const useScanStore = create<ScanState>((set, get) => {
       // ce ménage, elles s'accumulent pour toujours, sans que personne
       // puisse les retrouver ni les effacer. On ne touche qu'à celles que
       // plus aucun scan ne réclame.
-      const gardees = new Set(
-        saves.flatMap((s) => (s.photos ?? []).map((p) => p.path)),
-      );
-      const aEffacer = (parti?.photos ?? [])
-        .map((p) => p.path)
-        .filter((p) => !gardees.has(p));
+      /*
+        UN PLAN ABÎMÉ NE BLOQUE PAS LE MÉNAGE DES AUTRES — relevé
+        « bug-données » : des `photos` qui n'étaient pas une liste, dans UN
+        plan, faisaient lever chaque suppression de la bibliothèque.
+      */
+      const cheminsDe = (s: SavedScan | undefined) =>
+        (Array.isArray(s?.photos) ? s.photos : [])
+          .map((p) => p?.path)
+          .filter((p): p is string => typeof p === 'string');
+      const gardees = new Set(saves.flatMap(cheminsDe));
+      const aEffacer = cheminsDe(parti).filter((p) => !gardees.has(p));
       deletePhotoFiles(aEffacer);
       /*
         LE MODÈLE 3D PART AVEC SON SCAN.
