@@ -147,7 +147,7 @@ describe('les quatre rendus de la visite (relevé du patron : « quatre proposit
     }
     const bloc = swift.slice(swift.indexOf('private func appliquerLampes'), swift.indexOf('private func rebondDuMoment'));
     expect(bloc).not.toMatch(/ambiante\.intensity|jour\.intensity|contre\.intensity/);
-    expect(bloc).toMatch(/lumiereAllumee = allumees > 0/);
+    expect(bloc).toMatch(/let eclairee = allumees > 0 \|\| v\.count < 9/);
     expect(swift).toMatch(/lumiereAllumee \? choix\.allume : choix\.eteint/);
   });
 
@@ -195,5 +195,14 @@ describe('les quatre rendus de la visite (relevé du patron : « quatre proposit
       expect(flow).toContain(`rendu-${l}-eteint`);
       expect(flow).toContain(`rendu-${l}-allume`);
     }
+  });
+});
+
+describe('sans aucune lampe, la visite est éclairée (relevé du patron : « éclairage allumé par défaut sans lampes »)', () => {
+  it('la vue part allumée, et ne s’assombrit que si des lampes sont posées, toutes éteintes', () => {
+    expect(swift).toMatch(/private var lumiereAllumee = true/);
+    expect(swift).toMatch(/ambiante\.intensity = RoomScanVisite\.RENDUS\[0\]\.allume\.ambiance/);
+    // Pas de fondu avant la première image.
+    expect(swift).toMatch(/SCNTransaction\.animationDuration = maquette \|\| !premiereAnnoncee \? 0 : 0\.45/);
   });
 });

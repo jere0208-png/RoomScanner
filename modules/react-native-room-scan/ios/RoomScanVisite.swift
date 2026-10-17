@@ -140,8 +140,15 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   /// Les matières du bâti (murs, plafonds) : elles reçoivent la lumière
   /// diffuse de la pièce (voir `nuanceurRebond`).
   private var matieresDuBati: [SCNMaterial] = []
-  /// Au moins une lampe allumée dans le logement.
-  private var lumiereAllumee = false
+  /*
+    AU MOINS UNE LAMPE ALLUMÉE — OU AUCUNE LAMPE DU TOUT. Relevé du patron :
+    « oui, éclairage allumé par défaut sans lampes ». Hors mode Électricité,
+    le logement n'a pas de luminaire : on ne pourrait jamais allumer, et la
+    visite resterait dans sa pénombre. Tant qu'aucune lampe n'est posée, la
+    pièce est donc éclairée ; dès que le JavaScript pose ses lampes, ce sont
+    elles qui décident.
+  */
+  private var lumiereAllumee = true
 
   /**
    * LA VUE CHANGE DE MODE : visite (à hauteur d'œil) ou maquette (en orbite).
@@ -499,9 +506,11 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       }
       i += 9
     }
-    // Allumer rend sa lumière à la pièce (voir `reglerLeJour`).
-    if (allumees > 0) != lumiereAllumee {
-      lumiereAllumee = allumees > 0
+    // Allumer rend sa lumière à la pièce (voir `reglerLeJour`) ; sans
+    // aucune lampe, la pièce reste éclairée (voir `lumiereAllumee`).
+    let eclairee = allumees > 0 || v.count < 9
+    if eclairee != lumiereAllumee {
+      lumiereAllumee = eclairee
       reglerLeJour()
     }
   }
@@ -550,7 +559,9 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     let maquette = orbite.count >= 10
     let j = maquette ? Self.JOUR_MAQUETTE : lumiereAllumee ? choix.allume : choix.eteint
     SCNTransaction.begin()
-    SCNTransaction.animationDuration = maquette ? 0 : 0.45
+    // Pas de fondu avant la première image : les lampes posées à l'ouverture
+    // ne doivent pas faire « tomber la nuit » sous les yeux.
+    SCNTransaction.animationDuration = maquette || !premiereAnnoncee ? 0 : 0.45
     ambiante.intensity = j.ambiance
     jour.intensity = j.jour
     contre.intensity = j.contre
@@ -913,7 +924,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     // d'un côté, un contre-jour plus faible de l'autre — assez pour que
     // deux murs d'une même teinte se distinguent à l'angle.
     ambiante.type = .ambient
-    ambiante.intensity = RoomScanVisite.RENDUS[0].eteint.ambiance
+    ambiante.intensity = RoomScanVisite.RENDUS[0].allume.ambiance
     ambiante.color = UIColor.white
     let noeudAmbiant = SCNNode()
     noeudAmbiant.light = ambiante
@@ -936,7 +947,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     */
 
     jour.type = .directional
-    jour.intensity = RoomScanVisite.RENDUS[0].eteint.jour
+    jour.intensity = RoomScanVisite.RENDUS[0].allume.jour
     jour.castsShadow = false
     let noeudJour = SCNNode()
     noeudJour.light = jour
@@ -944,7 +955,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     scene.rootNode.addChildNode(noeudJour)
 
     contre.type = .directional
-    contre.intensity = RoomScanVisite.RENDUS[0].eteint.contre
+    contre.intensity = RoomScanVisite.RENDUS[0].allume.contre
     contre.castsShadow = false
     let noeudContre = SCNNode()
     noeudContre.light = contre
