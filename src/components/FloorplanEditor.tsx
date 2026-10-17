@@ -941,14 +941,16 @@ export function FloorplanEditor({
   );
   /** Le dernier doigt posé, dans le cadre du plan (px). Voir `toucher`. */
   const dernierToucher = useRef<{ x: number; y: number } | null>(null);
+  /** Le coin du cadre du plan dans la fenêtre (px) : voir le pincement. */
+  const origineDuCadre = useRef({ x: 0, y: 0 });
   /** Plusieurs choses sous le doigt : la carte qui demande laquelle. */
   const [choixSousLeDoigt, setChoixSousLeDoigt] = useState<{
     x: number;
     y: number;
     cibles: CibleDuPlan[];
   } | null>(null);
-  // Le plan bouge : la carte, posée près d'un point, n'a plus de sens.
-  useEffect(() => setChoixSousLeDoigt(null), [view]);
+  // Le plan bouge : la carte, posée près d'un point, n'a plus de sens. Elle
+  // se ferme au lâcher du geste, dans le même rendu (voir `poserLeGeste`).
   /*
     LE PLAN DIT OÙ IL EN EST — et la 3D reprend exactement là.
 
@@ -1053,10 +1055,37 @@ export function FloorplanEditor({
    * La toile se referme dans ce même rendu (son état est groupé avec eux).
    */
   const poserLeGeste = () => {
+    const vueAvant = viewRef.current;
     ouvrirLaToile.current?.(0);
     const couche = nouvelleCouche();
     glisseRef.current = couche;
     setGlisse(couche);
+    /*
+      LA VUE QUI VA AVEC LA COUCHE NEUVE, DÈS LE LÂCHER — pas au rendu.
+
+      Relevé au banc du pincer-relâcher (`pincerrelacher.test.tsx`) : deux
+      gestes enchaînés, le second commencé AVANT que le rendu du premier
+      lâcher n'ait eu lieu — un téléphone occupé à monter le nouveau dessin
+      reçoit ses évènements tactiles par paquets. La prise du second geste
+      repartait de `viewRef.current`, encore à la vue d'AVANT le premier :
+      tout le premier geste était perdu, et le plan sautait au second lâcher
+      de toute sa longueur (cinquante points au banc) — l'apparition « à sa
+      position d'avant le geste » de la vidéo du patron, par un autre chemin.
+
+      La couche neuve sera montée AVEC `vueVive` : c'est donc elle, dès
+      maintenant, la vue dessinée sous la couche que le geste pousse. Le
+      rendu qui suit réécrit la même valeur.
+    */
+    viewRef.current = vueVive.current;
+    /*
+      LA CARTE « QU'Y A-T-IL SOUS LE DOIGT ? » SE FERME DANS LE MÊME RENDU.
+
+      Elle se fermait par un effet sur la vue : un `setState` APRÈS le
+      commit du lâcher, donc un second rendu de tout l'éditeur dans la
+      foulée — compté au banc, deux commits au lieu d'un, pendant que le
+      pilote natif monte le nouveau dessin. Fermée ici, elle part avec lui.
+    */
+    if (vueVive.current !== vueAvant) setChoixSousLeDoigt(null);
     setView(vueVive.current);
   };
   /** Les quatre valeurs de la couche, toujours ensemble : une couche est une pose entière. */
@@ -1283,10 +1312,40 @@ export function FloorplanEditor({
              « Impossible de le rendre plus petit que ça », relevé du
              patron. */
           const zoom = Math.min(6, Math.max(0.2, base.v.zoom * (d / base.d0)));
+          /*
+            LE PINCEMENT SE FAIT AUTOUR DES DOIGTS, PAS DU CENTRE DE L'ÉCRAN.
+
+            Relevé au banc du pincer-relâcher (`pincerrelacher.test.tsx`) :
+            le point du plan pris entre les deux doigts doit RESTER entre
+            les deux doigts — c'est tout ce que la main attend d'un
+            pincement. Le cadrage, lui, agrandit et tourne autour du centre
+            de la vue décalé (`C + o`) ; on n'y ajoutait que la course du
+            milieu des doigts. Le point sous les doigts fuyait donc de
+            `(échelle − 1) × sa distance à ce centre` : trois à cinq points
+            au banc pour un petit geste, cent cinquante pour un zoom ×2
+            commencé au bord — le plan glissait sous la main, et l'œil le
+            voyait « se décaler ».
+
+            Le décalage se recompose pour que le milieu des doigts de la
+            reprise (`M0`) aille au milieu des doigts d'aujourd'hui (`M`) :
+            o = (M − C) + k·R(torsion)·(C + o0 − M0), en coordonnées DU
+            CADRE — les doigts arrivent en coordonnées de page, d'où
+            `origineDuCadre` (mesuré à la pose du doigt). `k` est le rapport
+            de zoom EFFECTIF, butées comprises : en butée, le plan cesse de
+            grandir mais le point sous les doigts reste sous les doigts.
+          */
+          const k = zoom / base.v.zoom;
+          const org = origineDuCadre.current;
+          const cx = layoutRef.current.w / 2;
+          const cy = layoutRef.current.h / 2;
+          const ux = cx + base.v.ox - (base.mx0 - org.x);
+          const uy = cy + base.v.oy - (base.my0 - org.y);
+          const ct = Math.cos(twist);
+          const st = Math.sin(twist);
           vueVive.current = {
             zoom,
-            ox: base.v.ox + (mx - base.mx0),
-            oy: base.v.oy + (my - base.my0),
+            ox: mx - org.x - cx + k * (ux * ct - uy * st),
+            oy: my - org.y - cy + k * (ux * st + uy * ct),
             rot: base.v.rot + twist,
           };
           /*
@@ -2858,7 +2917,10 @@ export function FloorplanEditor({
         const vue = hote.current;
         if (vue && typeof vue.measureInWindow === 'function') {
           vue.measureInWindow((x, y) => {
-            if (Number.isFinite(x) && Number.isFinite(y)) dernierToucher.current = { x: pageX - x, y: pageY - y };
+            if (Number.isFinite(x) && Number.isFinite(y)) {
+              dernierToucher.current = { x: pageX - x, y: pageY - y };
+              origineDuCadre.current = { x, y };
+            }
           });
         }
       }}
