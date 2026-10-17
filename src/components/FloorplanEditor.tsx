@@ -1071,16 +1071,17 @@ export function FloorplanEditor({
     par image : six images (100 ms) du plan à sa position d'AVANT le geste,
     couche déjà à plat, avant que le nouveau dessin n'apparaisse.
 
-    La remise à plat se faisait par `setValue`, même dans un effet de mise
-    en page : une valeur animée part tout de suite à l'écran, tandis que le
-    nouveau dessin — six cents balises — met plusieurs images à y être
-    construit. Il n'y a pas d'ordre à trouver entre les deux : ils ne passent
-    pas par le même chemin.
+    La cause principale était ailleurs — la couche calculée depuis le repère
+    repris au changement du nombre de doigts (voir le pincement). Mais la
+    remise à plat par `setValue`, même dans un effet de mise en page, passe
+    par un autre chemin que le rendu (`setNativeProps`, revue experte sous
+    Fabric) : elle ne tombe dans la même image que le nouveau dessin que
+    parce que l'ordonnanceur les groupe aujourd'hui. On ne s'y fie plus.
 
-    On ne remet donc plus rien à plat. Au lâcher, l'éditeur prend une
-    couche NEUVE, à plat dès sa naissance, et la pose dans le MÊME rendu que
-    le nouveau cadrage : l'ancien dessin reste à l'écran, à sa place sous
-    l'ancienne couche, jusqu'à ce que le nouveau le remplace — d'un coup.
+    Au lâcher, l'éditeur prend une couche NEUVE, à plat dès sa naissance, et
+    la pose dans le MÊME rendu que le nouveau cadrage : l'ancien dessin reste
+    à l'écran, à sa place sous l'ancienne couche, jusqu'à ce que le nouveau
+    le remplace — d'un coup, par construction.
   */
   const nouvelleCouche = () => ({
     tx: new Animated.Value(0),

@@ -321,7 +321,9 @@ describe('le plan se pose d’une traite', () => {
     const echelle = valeur('scale');
     const tx = valeur('translateX');
     expect(echelle).toBeGreaterThan(1.5);
-    expect(tx).toBeGreaterThan(40);
+    // La couche a bien bougé (le pincement se fait autour des doigts : voir
+    // `pincerrelacher.test.tsx` pour la position exacte sous la main).
+    expect(Math.abs(tx)).toBeGreaterThan(10);
     act(() => {
       // Le second doigt part le premier ; l'autre traîne encore un peu.
       m.lever(1);
