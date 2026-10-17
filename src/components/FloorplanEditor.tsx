@@ -638,17 +638,41 @@ interface Props {
  * le doigt commençait à glisser. Le plan restait figé un instant, puis
  * sautait sous le doigt.
  *
- * La marge vit donc ici. L'ouvrir ne rend que la toile : ses enfants sont
- * les MÊMES éléments qu'au rendu d'avant, et React ne les reprend pas.
+ * La marge ne vit donc pas dans l'éditeur. L'ouvrir ne rend que la couche
+ * et la toile : leurs enfants sont les MÊMES éléments qu'au rendu d'avant,
+ * et React ne les reprend pas.
  */
-function ToileDuPlan({
-  largeur,
-  hauteur,
+const MargeDeLaToile = React.createContext(0);
+
+/**
+ * LA MARGE DE LA TOILE VIT DANS LA COUCHE DU GESTE — tout ce qui se rend
+ * SOUS la couche pendant un geste doit la rendre avec lui.
+ *
+ * Relevé du patron, vidéo image par image : le plan qui réapparaît
+ * « exactement à sa position d'avant le geste ». Voici l'un des chemins qui
+ * y mènent, propre à Fabric. Les valeurs de la couche, pilotées en JS,
+ * partent à l'écran par `setNativeProps` — hors de React. React, lui, garde
+ * pour la couche la transformation de SON dernier rendu : à plat, celle de
+ * la prise. Tout commit React qui reprend la couche SANS la rendre (parce
+ * qu'un de ses enfants a changé) recopie cette transformation-là, et le plan
+ * revient d'un coup à sa place d'avant le geste.
+ *
+ * C'est exactement ce que faisait l'ouverture de la toile : elle part de la
+ * prise du doigt, un événement de MOUVEMENT, que React rend une tâche plus
+ * tard — APRÈS la première image poussée à la couche. La marge tenue par la
+ * toile, ce commit rendait la toile seule, et ramenait le plan à sa
+ * position de départ jusqu'à l'image suivante ; plus longtemps quand le fil
+ * principal peignait la toile agrandie.
+ *
+ * Tenue ici, la marge rend aussi la couche, et une couche rendue relit ses
+ * valeurs du moment : le commit porte la pose que l'écran montre déjà.
+ */
+function CoucheDuPlan({
+  style,
   ouvrir,
   children,
 }: {
-  largeur: number;
-  hauteur: number;
+  style: React.ComponentProps<typeof Animated.View>['style'];
   /** Où l'éditeur trouve de quoi ouvrir (ou refermer) la toile, en points. */
   ouvrir: React.MutableRefObject<((marge: number) => void) | null>;
   children: React.ReactNode;
@@ -660,6 +684,25 @@ function ToileDuPlan({
       ouvrir.current = null;
     };
   }, [ouvrir]);
+  return (
+    <MargeDeLaToile.Provider value={marge}>
+      <Animated.View collapsable={false} style={style} pointerEvents="box-none">
+        {children}
+      </Animated.View>
+    </MargeDeLaToile.Provider>
+  );
+}
+
+function ToileDuPlan({
+  largeur,
+  hauteur,
+  children,
+}: {
+  largeur: number;
+  hauteur: number;
+  children: React.ReactNode;
+}) {
+  const marge = React.useContext(MargeDeLaToile);
   return (
     <Svg
       width={largeur + 2 * marge}
@@ -2997,8 +3040,8 @@ export function FloorplanEditor({
           parent à l'optimisation et la transformation n'a plus de support.
         */}
       {mapping && (
-        <Animated.View
-          collapsable={false}
+        <CoucheDuPlan
+          ouvrir={ouvrirLaToile}
           style={[
             StyleSheet.absoluteFill,
             {
@@ -3012,8 +3055,7 @@ export function FloorplanEditor({
                 { scale: glisse.ech },
               ],
             },
-          ]}
-          pointerEvents="box-none">
+          ]}>
           {/*
             LA TOILE S'OUVRE LE TEMPS DU GESTE.
 
@@ -3031,11 +3073,12 @@ export function FloorplanEditor({
 
             Et seulement PENDANT le geste : rastériser en permanence trois
             fois la surface de l'écran pour une seconde de glissement serait
-            le contraire d'une optimisation. Le rendu qui l'agrandit tombe à
-            la prise du doigt, avant le premier mouvement — là où personne
-            ne le voit.
+            le contraire d'une optimisation. L'agrandir est demandé à la
+            prise du doigt ; React le rend une tâche plus tard, quand la
+            couche a déjà bougé — d'où la marge tenue par la couche elle-même
+            (voir `CoucheDuPlan`).
           */}
-          <ToileDuPlan largeur={layout.w} hauteur={layout.h} ouvrir={ouvrirLaToile}>
+          <ToileDuPlan largeur={layout.w} hauteur={layout.h}>
             {/* Toucher le vide désélectionne. Posé tout au fond du dessin :
                 murs, meubles et cartouches gardent la priorité, et seul ce
                 qui n'appartient à rien tombe ici. `transparent` et non
@@ -5106,7 +5149,7 @@ export function FloorplanEditor({
                 </React.Fragment>
               );
             })()}
-        </Animated.View>
+        </CoucheDuPlan>
       )}
       {/* Plusieurs choses sous le doigt : laquelle ? (voir `toucher`) */}
       {choixSousLeDoigt && (
