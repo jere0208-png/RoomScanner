@@ -43,6 +43,17 @@ export class CarteDEncre {
   private readonly cols: number;
   private readonly rangs: number;
   private readonly cases: Uint8Array;
+  /**
+   * LES SOMMES CUMULÉES DE CHAQUE RANG — revue « bug-fluidité » : `sous`
+   * comptait case par case, et chaque étiquette du plan coté en interroge
+   * des dizaines de places. C'était la moitié du temps d'une feuille de
+   * plan, celle qui tient le plus longtemps le fil quand le dossier se
+   * rebâtit. Un rang se compte maintenant d'une soustraction ; il ne se
+   * recalcule que si un trait l'a touché depuis (`sale`). Même compte, à
+   * l'unité près : rien ne bouge sur la feuille.
+   */
+  private cumuls: Uint16Array | Uint32Array | null = null;
+  private readonly sale: Uint8Array;
 
   constructor(
     private readonly x0: number,
@@ -53,11 +64,32 @@ export class CarteDEncre {
     this.cols = Math.max(1, Math.ceil(largeur / PAS));
     this.rangs = Math.max(1, Math.ceil(hauteur / PAS));
     this.cases = new Uint8Array(this.cols * this.rangs);
+    this.sale = new Uint8Array(this.rangs).fill(1);
   }
 
   private marquer(i: number, j: number) {
     if (i < 0 || j < 0 || i >= this.cols || j >= this.rangs) return;
     this.cases[j * this.cols + i] = 1;
+    this.sale[j] = 1;
+  }
+
+  /** Le cumul du rang `j`, recalculé s'il a été encré depuis. */
+  private cumulDuRang(j: number): Uint16Array | Uint32Array {
+    // Un rang ne compte jamais plus de `cols` cases : 16 bits suffisent à
+    // une feuille A4 (moins de deux mille cases de large), 32 au-delà.
+    if (!this.cumuls) {
+      const n = this.rangs * (this.cols + 1);
+      this.cumuls = this.cols < 0xffff ? new Uint16Array(n) : new Uint32Array(n);
+    }
+    const c = this.cumuls;
+    if (this.sale[j]) {
+      const o = j * (this.cols + 1);
+      const k = j * this.cols;
+      c[o] = 0;
+      for (let i = 0; i < this.cols; i++) c[o + i + 1] = c[o + i] + this.cases[k + i];
+      this.sale[j] = 0;
+    }
+    return c;
   }
 
   /** Un trait, à son épaisseur (au moins un demi-point). */
@@ -114,14 +146,20 @@ export class CarteDEncre {
     for (let j = j0; j <= j1; j++) {
       const y = this.y0 + (j + 0.5) * PAS;
       const xs: number[] = [];
-      for (const [ax, ay, bx, by] of aretes) {
-        if (ay > y !== by > y) xs.push(ax + ((y - ay) * (bx - ax)) / (by - ay));
+      // Par indice, sans déstructurer : la boucle la plus parcourue de la
+      // carte (chaque arête, à chaque rang), le même calcul.
+      for (let e = 0; e < aretes.length; e++) {
+        const ar = aretes[e];
+        const ay = ar[1];
+        const by = ar[3];
+        if (ay > y !== by > y) xs.push(ar[0] + ((y - ay) * (ar[2] - ar[0])) / (by - ay));
       }
       xs.sort((p, q) => p - q);
       for (let k = 0; k + 1 < xs.length; k += 2) {
         const i0 = Math.max(0, Math.ceil((xs[k] - this.x0) / PAS - 0.5));
         const i1 = Math.min(this.cols - 1, Math.floor((xs[k + 1] - this.x0) / PAS - 0.5));
         for (let i = i0; i <= i1; i++) this.cases[j * this.cols + i] = 1;
+        if (i1 >= i0) this.sale[j] = 1;
       }
     }
   }
@@ -155,6 +193,32 @@ export class CarteDEncre {
    * plan.
    */
   sous(b: BoiteEncre): number {
+    const m = PAS / 2;
+    const i0 = Math.floor((b.x + m - this.x0) / PAS);
+    const i1 = Math.floor((b.x + b.w - m - this.x0) / PAS);
+    const j0 = Math.floor((b.y + m - this.y0) / PAS);
+    const j1 = Math.floor((b.y + b.h - m - this.y0) / PAS);
+    if (i1 < i0 || j1 < j0) return 0;
+    const large = i1 - i0 + 1;
+    // Les colonnes dans la carte ; celles d'à côté comptent pour de l'encre.
+    const ia = Math.max(i0, 0);
+    const ib = Math.min(i1, this.cols - 1);
+    const dedans = ib >= ia ? ib - ia + 1 : 0;
+    let n = 0;
+    for (let j = j0; j <= j1; j++) {
+      if (j < 0 || j >= this.rangs || dedans === 0) {
+        n += large;
+        continue;
+      }
+      const c = this.cumulDuRang(j);
+      const o = j * (this.cols + 1);
+      n += large - dedans + c[o + ib + 1] - c[o + ia];
+    }
+    return n;
+  }
+
+  /** Le compte d'avant, case par case : la référence de `sous` (bancs seulement). */
+  sousCaseParCase(b: BoiteEncre): number {
     const m = PAS / 2;
     const i0 = Math.floor((b.x + m - this.x0) / PAS);
     const i1 = Math.floor((b.x + b.w - m - this.x0) / PAS);

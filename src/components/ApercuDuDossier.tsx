@@ -24,6 +24,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Easing,
   Image,
@@ -76,6 +77,40 @@ export function resumeDuDossier(sommaire: FeuilleDuDossier[]): string {
   return bouts.join(' · ');
 }
 
+/**
+ * CHAQUE IMAGE SOUS SA FEUILLE — les feuilles rendues d'un dossier, rangées
+ * dans le sommaire d'un autre.
+ *
+ * Pendant que le dossier se rebâtit, l'ancien aperçu reste à l'écran (revue
+ * « électricien » : il se figeait, il se met maintenant à jour sans gêner).
+ * Mais cocher « Page de garde » décale toutes les feuilles d'un cran : rangée
+ * par son rang, chaque image se serait montrée sous la feuille voisine. Elle
+ * suit donc sa feuille — même genre, même titre, et la k-ième des feuilles
+ * de même titre sous la k-ième. Une feuille nouvelle n'a pas encore
+ * d'image : sa miniature dessinée la remplace (`''`).
+ */
+export function imagesAlignees(
+  sommaire: FeuilleDuDossier[],
+  rendues: FeuilleDuDossier[],
+  pages: string[],
+): string[] {
+  const parFeuille = new Map<string, string[]>();
+  rendues.forEach((f, i) => {
+    if (!pages[i]) return;
+    const k = `${f.genre}|${f.titre}`;
+    const lot = parFeuille.get(k) ?? [];
+    lot.push(pages[i]);
+    parFeuille.set(k, lot);
+  });
+  const deja = new Map<string, number>();
+  return sommaire.map((f) => {
+    const k = `${f.genre}|${f.titre}`;
+    const rang = deja.get(k) ?? 0;
+    deja.set(k, rang + 1);
+    return parFeuille.get(k)?.[rang] ?? '';
+  });
+}
+
 export function ApercuDuDossier({
   sommaire,
   images,
@@ -100,6 +135,8 @@ export function ApercuDuDossier({
   const s = getStyles(c);
   const [ouverte, setOuverte] = useState<number | null>(null);
   const total = sommaire.length;
+  /** Des feuilles déjà rendues, et le dossier qui se rebâtit : l'aperçu se met à jour. */
+  const miseAJour = enCours && !!images?.some(Boolean);
 
   /* LE COMPTE BAT QUAND IL CHANGE : on voit ce qu'une option ajoute. */
   const pulse = useRef(new Animated.Value(1)).current;
@@ -142,6 +179,14 @@ export function ApercuDuDossier({
           <Text style={s.resume} numberOfLines={2}>
             {resumeDuDossier(sommaire)}
           </Text>
+          {/* L'ANCIEN APERÇU RESTE, ET LE DIT — le nouveau se bâtit sans
+              figer l'écran ; on voit qu'il arrive. */}
+          {miseAJour && (
+            <View style={s.maj} accessibilityLiveRegion="polite" testID="apercu-mise-a-jour">
+              <ActivityIndicator size="small" color={c.inkFaint} style={s.majRoue} />
+              <Text style={s.majTexte}>Mise à jour…</Text>
+            </View>
+          )}
         </View>
         {/* UN COMPTE, PAS UN BOUTON — revue « clair-22 » : la pastille bleue
             pleine « 4 feuilles » appelait le doigt, et rien ne se passait.
@@ -170,7 +215,7 @@ export function ApercuDuDossier({
                 haptic('leger');
               }}
               style={s.carte}>
-              <View style={s.feuille}>
+              <View style={[s.feuille, miseAJour && im ? s.feuillePerimee : null]}>
                 {im ? (
                   <PageImage base64={im} style={s.image} />
                 ) : (
@@ -482,6 +527,11 @@ const getStyles = (c: Palette) =>
       ...shadowCard,
       shadowOpacity: 0.08,
     },
+    /** Une image d'avant la dernière option : encore là, un peu en retrait. */
+    feuillePerimee: { opacity: 0.6 },
+    maj: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+    majRoue: { transform: [{ scale: 0.75 }] },
+    majTexte: { color: c.inkFaint, fontSize: 12.5, fontWeight: '600' },
     image: { width: '100%', height: '100%' },
     attente: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
     verrou: {

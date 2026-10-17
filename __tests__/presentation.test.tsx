@@ -609,7 +609,9 @@ describe('la bascule entre le plan et le volume', () => {
 describe('le préchargement du dossier', () => {
   it('bâtit le PDF dès que les choix se posent, avant tout appui', () => {
     const pdf = require('../src/export/pdf');
-    const espion = jest.spyOn(pdf, 'buildScanPdf');
+    // L'écran bâtit son dossier par `chantierDuDossier` (feuille par feuille, sans
+    // figer) : mêmes trois premiers arguments que `buildScanPdf`.
+    const espion = jest.spyOn(pdf, 'chantierDuDossier');
     espion.mockClear();
     const tree = monter('export');
     arbre = tree;

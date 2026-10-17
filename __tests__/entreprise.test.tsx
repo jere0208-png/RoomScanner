@@ -149,7 +149,9 @@ describe('à l’export', () => {
     const { useScanStore } = require('../src/store/scanStore');
     const { appartementExemple } = require('../src/data/exemple');
     const pdf = require('../src/export/pdf');
-    const espion = jest.spyOn(pdf, 'buildScanPdf');
+    // L'écran bâtit son dossier par `chantierDuDossier` (feuille par feuille, sans
+    // figer) : mêmes trois premiers arguments que `buildScanPdf`.
+    const espion = jest.spyOn(pdf, 'chantierDuDossier');
     espion.mockClear();
     const ex = appartementExemple();
     let t!: TestRenderer.ReactTestRenderer;

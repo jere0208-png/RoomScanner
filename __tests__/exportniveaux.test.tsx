@@ -50,7 +50,9 @@ afterEach(() => {
 /** Monte l'export, laisse le dossier se bâtir, et rend le dernier appel. */
 function dossier(avant?: (t: TestRenderer.ReactTestRenderer) => void) {
   const pdf = require('../src/export/pdf');
-  const espion = jest.spyOn(pdf, 'buildScanPdf');
+  // L'écran bâtit son dossier par `chantierDuDossier` (feuille par feuille, sans
+  // figer) : mêmes trois premiers arguments que `buildScanPdf`.
+  const espion = jest.spyOn(pdf, 'chantierDuDossier');
   espion.mockClear();
   act(() => {
     useScanStore.setState({

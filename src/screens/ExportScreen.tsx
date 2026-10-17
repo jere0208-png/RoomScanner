@@ -26,8 +26,19 @@ import {
 } from '../theme';
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from '../components/Iso3DView';
-import { PHOTO_A_BLANC, buildScanPdf, nomsDesPieces, pdfFilename, sommaireDuDossier, toBase64 } from '../export/pdf';
-import { ApercuDuDossier } from '../components/ApercuDuDossier';
+import {
+  PHOTO_A_BLANC,
+  chantierDuDossier,
+  nomsDesPieces,
+  nouveauCacheDuDossier,
+  pdfFilename,
+  sommaireDuDossier,
+  toBase64,
+  type CacheDuDossier,
+  type FeuilleDuDossier,
+} from '../export/pdf';
+import { batirDUneTraite, batirSansFiger, type BatisseSansFiger } from '../export/batirSansFiger';
+import { ApercuDuDossier, imagesAlignees } from '../components/ApercuDuDossier';
 import { haptic } from '../ui/haptic';
 import { hasCapturedColors } from '../geometry/appearance';
 import {
@@ -774,8 +785,24 @@ const styles = getStyles(c);
       },
     ] as const;
 
+  /*
+    LES FEUILLES INCHANGÉES NE SE REFONT PAS — revue « électricien » : une
+    case cochée ne touche que quelques feuilles (« Cotes » : le plan ; « Plan
+    des gaines » : sa feuille, et le numéro des autres). Le cache garde
+    chaque feuille dessinée, par ce dont elle dépend (`chantierDuDossier`) ;
+    il sert à l'aperçu comme à l'envoi.
+  */
+  const cache = useRef<CacheDuDossier | null>(null);
+  const leCache = () => (cache.current ??= nouveauCacheDuDossier());
+  const chantier = (vignettes: { wallId: string; base64: string; along?: number }[]) =>
+    chantierDuDossier(...entrees(vignettes), leCache());
+  /**
+   * À L'ENVOI, D'UNE TRAITE : « Préparation… » est affiché, on attend le
+   * partage de toute façon — et le cache ne laisse à refaire que les murs
+   * dont la vraie photo remplace la photo à blanc de l'aperçu.
+   */
   const batir = (vignettes: { wallId: string; base64: string; along?: number }[]) =>
-    buildScanPdf(...entrees(vignettes));
+    batirDUneTraite(chantier(vignettes));
 
   /*
     LES PHOTOS COMPTENT DANS LE SOMMAIRE, PAS DANS L'APERÇU. Un mur
@@ -858,48 +885,71 @@ const styles = getStyles(c);
    * sur « Exporter » n'a plus qu'à partager des octets déjà prêts. Et ces
    * octets, on les MONTRE : le natif rend chaque feuille en image — nette
    * pour l'abonné, floutée et filigranée pour les autres (`apercuPdf`).
+   *
+   * SANS FIGER L'ÉCRAN — revue « électricien », « bug-exports », « bug-
+   * fluidité » : ce calcul se faisait d'un bloc, et chaque case cochée
+   * gelait les interrupteurs et le défilement une à quatre secondes. Il
+   * avance maintenant feuille par feuille en rendant la main entre deux
+   * (`batirSansFiger`), s'arrête dès qu'une option change, et l'ancien
+   * aperçu reste à l'écran, « Mise à jour… », jusqu'à ce que le nouveau
+   * soit prêt.
    */
   const pret = useRef<{ cle: string; bytes: Uint8Array } | null>(null);
-  const [images, setImages] = useState<string[] | null>(null);
+  /** Les feuilles rendues par le natif, et le sommaire du dossier qu'elles montrent. */
+  const [apercu, setApercu] = useState<{ feuilles: FeuilleDuDossier[]; pages: string[] } | null>(null);
+  /** Chaque image sous SA feuille, même quand le sommaire a bougé depuis. */
+  const images = useMemo(() => (apercu ? imagesAlignees(sommaire, apercu.feuilles, apercu.pages) : null), [sommaire, apercu]);
   const [enCours, setEnCours] = useState(true);
   const generation = useRef(0);
   useEffect(() => {
     let vivant = true;
     let tache: { cancel: () => void } | null = null;
+    let batisse: BatisseSansFiger | null = null;
+    let codage: ReturnType<typeof setTimeout> | null = null;
     setEnCours(true);
     const t = setTimeout(() => {
       tache = InteractionManager.runAfterInteractions(() => {
         if (!vivant) return;
         const ici = ++generation.current;
-        try {
-          const bytes = batir(photosVides);
-          pret.current = { cle: empreinte, bytes };
-          RoomScan.apercuPdf(toBase64(bytes), {
-            largeur: 1100,
-            flou: net ? 0 : FLOU_DE_L_APERCU,
-            filigrane: net ? '' : 'EchoPlan',
-            maxPages: 40,
-          })
-            .then((pages) => {
-              if (ici !== generation.current) return;
-              setImages(pages);
-              setEnCours(false);
-            })
-            .catch(() => {
-              if (ici === generation.current) setEnCours(false);
-            });
-        } catch {
-          // Un dossier qui refuse de se bâtir à blanc le dira à l'appui :
-          // ici, on ne dérange personne.
-          pret.current = null;
-          setEnCours(false);
-        }
+        const cle = empreinte;
+        batisse = batirSansFiger(() => chantier(photosVides), {
+          fini: (bytes, fait) => {
+            pret.current = { cle, bytes };
+            // Le base64 a sa tranche à lui : sur un gros dossier, il se sent.
+            codage = setTimeout(() => {
+              if (!vivant) return;
+              RoomScan.apercuPdf(toBase64(bytes), {
+                largeur: 1100,
+                flou: net ? 0 : FLOU_DE_L_APERCU,
+                filigrane: net ? '' : 'EchoPlan',
+                maxPages: 40,
+              })
+                .then((pages) => {
+                  if (ici !== generation.current) return;
+                  setApercu(pages ? { feuilles: fait.sommaire, pages } : null);
+                  setEnCours(false);
+                })
+                .catch(() => {
+                  if (ici === generation.current) setEnCours(false);
+                });
+            }, 0);
+          },
+          echec: () => {
+            // Un dossier qui refuse de se bâtir à blanc le dira à l'appui :
+            // ici, on ne dérange personne.
+            if (!vivant) return;
+            pret.current = null;
+            setEnCours(false);
+          },
+        });
       });
     }, 600);
     return () => {
       vivant = false;
       clearTimeout(t);
+      if (codage) clearTimeout(codage);
       tache?.cancel();
+      batisse?.annuler();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empreinte, net]);

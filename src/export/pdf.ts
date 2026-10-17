@@ -577,6 +577,20 @@ function buildDocument(
   pageStreams: string[],
   images: PdfImage[] = [],
 ): Uint8Array {
+  return assemblerLeDocument(pageStreams.map(fluxDePage), images);
+}
+
+/**
+ * LE DOCUMENT, À PARTIR DES FLUX DE PAGE DÉJÀ PRÊTS — ce que fait
+ * `buildDocument`, la compression en moins : le dossier bâti feuille par
+ * feuille (`chantierDuDossier`) compresse chaque page à son tour, et ne
+ * garde pour la fin que l'assemblage. Mêmes objets, même ordre, mêmes
+ * octets.
+ */
+function assemblerLeDocument(
+  fluxDesPages: string[],
+  images: PdfImage[] = [],
+): Uint8Array {
   const objects: string[] = [];
   const add = (body: string) => {
     objects.push(body);
@@ -615,7 +629,7 @@ function buildDocument(
       return `/GA${i + 1} << /ca ${a} /CA ${a} >>`;
     }).join(' ') +
     ' >>';
-  const contentIds = pageStreams.map((s) => add(fluxDePage(s)));
+  const contentIds = fluxDesPages.map((flux) => add(flux));
   const pageIds = contentIds.map((cid) =>
     add(
       `<< /Type /Page /Parent @P 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] ` +
@@ -8161,9 +8175,75 @@ export interface FeuilleDuDossier {
   titre: string;
 }
 
+/**
+ * LES CHAMPS DU CONTEXTE QUE TOUTES LES FEUILLES NE LISENT PAS — les
+ * réglages d'affichage, et ce qui relie le plan aux autres feuilles.
+ *
+ * Tout le reste du contexte (la maçonnerie, les pièces, l'appareillage, le
+ * plafond, le cartouche…) compte pour chaque feuille. Ceux-ci ne comptent
+ * que pour celles qui les lisent — relevé au code, champ par champ, et tenu
+ * par `maj-export.test.ts`, qui bascule chacun et vérifie que les autres
+ * feuilles n'ont pas bougé d'un octet :
+ *   — `planPage` (plan, avant/après, gaines) lit les surfaces, la couleur
+ *     des baies, les repères des menuiseries, les murs numérotés, le
+ *     cheminement et les repères de circuit ;
+ *   — `threeDPage` (perspectives) lit les surfaces, les textures, la couleur
+ *     des baies et les repères 3D ;
+ *   — `dessinerUneFace` (murs de face) lit les murs numérotés ;
+ *   — la page de garde est tenue pour tout lire.
+ */
+type ChampSelectif =
+  | 'showSurfaces'
+  | 'showTextures'
+  | 'colorOpenings'
+  | 'reperes3D'
+  | 'reperesMenuiseries'
+  | 'mursNumerotes'
+  | 'routes'
+  | 'circuitsDesAppareils';
+const CHAMPS_SELECTIFS: readonly ChampSelectif[] = [
+  'showSurfaces',
+  'showTextures',
+  'colorOpenings',
+  'reperes3D',
+  'reperesMenuiseries',
+  'mursNumerotes',
+  'routes',
+  'circuitsDesAppareils',
+];
+/** Ce que `planPage` lit de ces champs. */
+const LU_PAR_LE_PLAN: readonly ChampSelectif[] = [
+  'showSurfaces',
+  'colorOpenings',
+  'reperesMenuiseries',
+  'mursNumerotes',
+  'routes',
+  'circuitsDesAppareils',
+];
+/** Le plan coté et les avant/après passent `routes: undefined` : le cheminement n'y est pas. */
+const LU_PAR_LE_PLAN_SANS_GAINES = LU_PAR_LE_PLAN.filter((c) => c !== 'routes');
+const LU_PAR_LA_PERSPECTIVE: readonly ChampSelectif[] = ['showSurfaces', 'showTextures', 'colorOpenings', 'reperes3D'];
+const LU_PAR_LES_FACES: readonly ChampSelectif[] = ['mursNumerotes'];
+const RIEN_DE_SELECTIF: readonly ChampSelectif[] = [];
+
+/**
+ * CE DONT UNE FEUILLE DÉPEND — sa clé dans le cache du dossier.
+ *
+ * Le contexte qu'elle reçoit (sans les champs sélectifs qu'elle ne lit
+ * pas), et TOUT ce que sa fabrication capture d'autre : ses arguments.
+ * Une feuille dont la fabrication change doit changer ici aussi : une
+ * dépendance oubliée, c'est une feuille périmée dans le PDF.
+ */
+interface DependancesDeLaFeuille {
+  ctx: SheetContext;
+  lit: readonly ChampSelectif[] | 'tout';
+  args: unknown[];
+}
+
 /** Une feuille prévue, et la façon de la fabriquer une fois numérotée. */
 interface FeuillePlanifiee extends FeuilleDuDossier {
   fabriquer: (numero: string) => ReturnType<typeof planPage>;
+  depend: DependancesDeLaFeuille;
 }
 
 function planifierUnNiveau(
@@ -8281,6 +8361,7 @@ function planifierUnNiveau(
       genre: 'plan',
       titre: 'Plan coté',
       fabriquer: (n) => planPage({ ...ctx, routes: undefined }, n, opts.plan, opts.measures2D ?? true),
+      depend: { ctx, lit: LU_PAR_LE_PLAN_SANS_GAINES, args: [opts.plan, opts.measures2D ?? true] },
     },
   ];
   /*
@@ -8325,6 +8406,8 @@ function planifierUnNiveau(
               ? { title: 'État existant', sub: 'Avant travaux : les murs à démolir en jaune.', hideLegend: true }
               : { title: 'Projet', sub: 'Après travaux : les murs à créer en rouge, les murs démolis en tirets.', hideLegend: true },
           ),
+        // `m` et les repères du carnet se déduisent du contexte : la phase suffit.
+        depend: { ctx, lit: LU_PAR_LE_PLAN_SANS_GAINES, args: [phase, opts.plan, opts.measures2D ?? true] },
       });
     }
   }
@@ -8335,6 +8418,7 @@ function planifierUnNiveau(
         genre: 'metre',
         titre: page > 1 ? 'Métré (suite)' : 'Métré',
         fabriquer: (n) => metrePage(ctx, n, { page, pages }),
+        depend: { ctx, lit: RIEN_DE_SELECTIF, args: [page, pages] },
       });
     }
     // Les menuiseries suivent le métré : les baies de chaque pièce, cotées.
@@ -8344,13 +8428,19 @@ function planifierUnNiveau(
         genre: 'menuiseries',
         titre: page > 1 ? 'Menuiseries (suite)' : 'Menuiseries',
         fabriquer: (n) => menuiseriesPage(ctx, n, { page, pages: pagesMenuiseries }),
+        depend: { ctx, lit: RIEN_DE_SELECTIF, args: [page, pagesMenuiseries] },
       });
     }
   }
   // Les achats suivent le métré : ce qu'on a mesuré, puis ce qu'on achète.
   const achats = opts.achats && opts.achats.pieces.length > 0 ? opts.achats : null;
   if (achats) {
-    feuilles.push({ genre: 'achats', titre: titreDesAchats(ctx), fabriquer: (n) => achatsPage(ctx, n, achats) });
+    feuilles.push({
+      genre: 'achats',
+      titre: titreDesAchats(ctx),
+      fabriquer: (n) => achatsPage(ctx, n, achats),
+      depend: { ctx, lit: RIEN_DE_SELECTIF, args: [achats] },
+    });
   }
   /*
     L'EXISTANT VIENT JUSTE APRÈS LE MÉTRÉ.
@@ -8365,6 +8455,7 @@ function planifierUnNiveau(
       // Déduit du plan, il ne se présente pas comme un relevé (revue « Marc »).
       titre: existant.projete ? 'Tableau projeté (non relevé)' : 'Tableau existant',
       fabriquer: (n) => existantPage(ctx, n, existant),
+      depend: { ctx, lit: RIEN_DE_SELECTIF, args: [existant] },
     });
   }
   /*
@@ -8375,7 +8466,13 @@ function planifierUnNiveau(
     meme feuille — celui qui commande la couronne a tout sous les yeux.
   */
   if (withGaines) {
-    feuilles.push({ genre: 'gaines', titre: 'Plan des gaines', fabriquer: (n) => gainesPage(ctx, n, schemas?.rows ?? []) });
+    feuilles.push({
+      genre: 'gaines',
+      titre: 'Plan des gaines',
+      fabriquer: (n) => gainesPage(ctx, n, schemas?.rows ?? []),
+      // `gainesPage` dessine sur `planPage`, cheminement compris.
+      depend: { ctx, lit: LU_PAR_LE_PLAN, args: [schemas?.rows ?? []] },
+    });
   }
   if (include3D) {
     /*
@@ -8393,6 +8490,7 @@ function planifierUnNiveau(
         genre: 'perspective',
         titre: gardees.length > 1 ? `Perspective ${i + 1}` : 'Perspective',
         fabriquer: (n) => threeDPage(ctx, n, v, opts.measures3D ?? true, i + 1, gardees.length),
+        depend: { ctx, lit: LU_PAR_LA_PERSPECTIVE, args: [v, opts.measures3D ?? true, i + 1, gardees.length] },
       });
     });
   }
@@ -8437,6 +8535,7 @@ function planifierUnNiveau(
         genre: 'elevation',
         titre: `Murs ${numeroDeFace} et ${numeroDeFace + 1}`,
         fabriquer: (n) => elevationsDeDeuxFaces(ctx, n, a, b, commune),
+        depend: { ctx, lit: LU_PAR_LES_FACES, args: [a, b, commune] },
       });
       numeroDeFace += 1;
       i += 1;
@@ -8447,6 +8546,13 @@ function planifierUnNiveau(
       genre: 'elevation',
       titre: `Mur ${numeroDeFace}`,
       fabriquer: (n) => elevationPage(ctx, n, a.wall, cliches, a.cote),
+      // Une photo compte par ce que la page en écrit : son nom, sa taille,
+      // sa cote — pas ses octets, qui vont au document, pas à la page.
+      depend: {
+        ctx,
+        lit: LU_PAR_LES_FACES,
+        args: [a.wall, cliches.map((c) => ({ ...c.im, data: undefined, along: c.along })), a.cote],
+      },
     });
   }
   if (withSchema && schemas) {
@@ -8465,6 +8571,7 @@ function planifierUnNiveau(
       genre: 'unifilaire',
       titre: 'Schéma unifilaire',
       fabriquer: (n) => unifilairePage(ctx, n, sch.rows, sch.differentials, detailDesDeparts(scan, sch.marks, sch.rows, opts.ceiling ?? [])),
+      depend: { ctx, lit: RIEN_DE_SELECTIF, args: [sch.rows, sch.differentials, sch.marks, scan, opts.ceiling ?? []] },
     });
     /*
       PLUS DE FEUILLE MULTIFILAIRE — relevé unanime des revues du dossier :
@@ -8531,7 +8638,12 @@ function planifierLeDossier(
     const achats = opts.achats && opts.achats.pieces.length > 0 ? opts.achats : null;
     if (achats) {
       const pourTout = ctx;
-      feuilles.push({ genre: 'achats', titre: titreDesAchats(pourTout), fabriquer: (n) => achatsPage(pourTout, n, achats) });
+      feuilles.push({
+        genre: 'achats',
+        titre: titreDesAchats(pourTout),
+        fabriquer: (n) => achatsPage(pourTout, n, achats),
+        depend: { ctx: pourTout, lit: RIEN_DE_SELECTIF, args: [achats] },
+      });
     }
   }
   // La page de garde ouvre le dossier, et annonce les feuilles qui suivent.
@@ -8543,6 +8655,7 @@ function planifierLeDossier(
       genre: 'garde',
       titre: 'Page de garde',
       fabriquer: (n) => gardePage(duLogement, n, suite, parNiveau),
+      depend: { ctx: duLogement, lit: 'tout', args: [suite, parNiveau] },
     });
   }
   return { feuilles, images };
@@ -8574,4 +8687,222 @@ export function buildScanPdf(
   const total = feuilles.length;
   const pages = feuilles.map((f, i) => f.fabriquer(`${i + 1} / ${total}`));
   return buildDocument(pages, images);
+}
+
+/*
+  LE DOSSIER BÂTI FEUILLE PAR FEUILLE — revue « électricien », « bug-exports »
+  et « bug-fluidité » : chaque case cochée rebâtissait tout le dossier d'un
+  bloc, sur le fil JavaScript, et l'écran se figeait (0,8 s pour dix-neuf
+  feuilles sous Node ; une à quatre secondes estimées sur iPhone). Les
+  interrupteurs et le défilement ne répondaient plus, et l'électricien,
+  qui règle plusieurs options à la suite, en souffrait le plus.
+
+  Le chantier fait le MÊME document que `buildScanPdf`, octet pour octet,
+  mais un petit pas à la fois — dessiner une feuille, la compresser, puis
+  assembler —, et l'appelant rend la main entre deux pas (voir
+  `batirSansFiger`). Et il ne refait pas ce qui n'a pas changé : chaque
+  feuille dessinée se garde dans le cache, par ce dont elle dépend.
+*/
+
+/**
+ * LE NUMÉRO RÉSERVÉ — une feuille se dessine sans son numéro, qu'on pose
+ * ensuite.
+ *
+ * Cocher « Plan des gaines » ajoute une feuille, et renumérote toutes les
+ * autres : « 3 / 19 » devient « 3 / 20 ». Si le numéro faisait partie du
+ * dessin, aucune feuille ne se réutiliserait jamais. Or il ne s'écrit qu'à
+ * un endroit, calé à GAUCHE dans le cartouche (`drawSheetChrome`) : sa
+ * longueur ne déplace rien. La feuille se dessine donc avec ce repère, et
+ * le vrai numéro le remplace. Un repère qui n'apparaîtrait pas exactement
+ * une fois, et la feuille se refait avec son numéro, sans cache.
+ */
+const NUMERO_RESERVE = 'N§FEUILLE§N';
+const OP_DU_NUMERO_RESERVE = `(${escText(NUMERO_RESERVE)}) Tj`;
+
+function numeroter(dessin: string, numero: string): string | null {
+  const morceaux = dessin.split(OP_DU_NUMERO_RESERVE);
+  if (morceaux.length !== 2 || dessin.split(NUMERO_RESERVE).length !== 2) return null;
+  return `${morceaux[0]}(${escText(numero)}) Tj${morceaux[1]}`;
+}
+
+/**
+ * L'EMPREINTE D'UNE VALEUR — son JSON, sans rien perdre de ce qu'un JSON
+ * tait : une `Map` (les repères de circuit) ou un `Set` s'écriraient `{}`,
+ * un `NaN` s'écrirait `null`. Deux valeurs d'empreintes égales dessinent
+ * la même feuille.
+ */
+function empreinteDe(v: unknown): string {
+  return JSON.stringify(v, (_k, x: unknown) => {
+    if (x instanceof Map) return { '§Map': [...x.entries()] };
+    if (x instanceof Set) return { '§Set': [...x] };
+    if (typeof x === 'number' && !Number.isFinite(x)) return `§${x}`;
+    if (typeof x === 'function') return `§fn ${String(x)}`;
+    // `undefined` aussi se distingue : `[undefined]` et `[null]` ne disent
+    // pas la même chose à une fonction qui a une valeur par défaut.
+    if (x === undefined) return '§u';
+    return x;
+  });
+}
+
+/**
+ * LE CACHE DU DOSSIER — à garder d'une construction à l'autre (l'écran
+ * d'export le tient dans une référence).
+ *
+ * `dessins` : chaque feuille dessinée, numéro réservé, par ses dépendances ;
+ * `flux` : chaque page numérotée et compressée ; `empreintes` : chaque
+ * empreinte rencontrée et son numéro d'ordre, pour que la clé d'une feuille
+ * reste courte SANS condensé — deux empreintes ne se confondent que si
+ * elles sont égales, signe pour signe. Il ne garde que ce qui a servi aux
+ * deux derniers dossiers achevés : décocher puis recocher une case retrouve
+ * ses feuilles, sans que la mémoire grossisse à chaque geste.
+ */
+export interface CacheDuDossier {
+  dessins: Map<string, string>;
+  flux: Map<string, string>;
+  empreintes: Map<string, number>;
+  /** Le numéro de la prochaine empreinte. */
+  suivante: number;
+  /** Les clés du dernier dossier achevé. */
+  precedent: Set<string>;
+}
+
+export function nouveauCacheDuDossier(): CacheDuDossier {
+  return { dessins: new Map(), flux: new Map(), empreintes: new Map(), suivante: 0, precedent: new Set() };
+}
+
+/** Le chantier d'un dossier : ses feuilles, et le pas suivant. */
+export interface ChantierDuDossier {
+  /** Les feuilles prévues, dans l'ordre : le sommaire du document qu'il bâtit. */
+  readonly sommaire: FeuilleDuDossier[];
+  /** Le nombre de pas : deux par feuille (dessin, compression), et l'assemblage. */
+  readonly pas: number;
+  /** Fait UN pas. Rend `true` quand le document est prêt. */
+  avancer(): boolean;
+  /** Le document, une fois prêt ; `null` avant. */
+  octets(): Uint8Array | null;
+  /** Ce que le cache a épargné : feuilles reprises, pages reprises. */
+  readonly repris: { dessins: number; flux: number };
+}
+
+/**
+ * Prépare le dossier — la planification seule, le prix d'un sommaire — et
+ * rend son chantier. Mêmes arguments que `buildScanPdf`, même document.
+ */
+export function chantierDuDossier(
+  scan: ScanForPdf,
+  include3D: boolean,
+  opts: PdfOptions = {},
+  cache: CacheDuDossier = nouveauCacheDuDossier(),
+): ChantierDuDossier {
+  const { feuilles, images } = planifierLeDossier(scan, include3D, opts);
+  const total = feuilles.length;
+  const vus = new Set<string>();
+  const repris = { dessins: 0, flux: 0 };
+  /** Le numéro d'ordre d'une empreinte : le même pour deux empreintes égales. */
+  const numeroDe = (empreinte: string) => {
+    let n = cache.empreintes.get(empreinte);
+    if (n === undefined) {
+      n = cache.suivante++;
+      cache.empreintes.set(empreinte, n);
+    }
+    vus.add(empreinte);
+    return n;
+  };
+  /** Le contexte, hors champs sélectifs : une empreinte par contexte et par dossier. */
+  const fonds = new Map<SheetContext, number>();
+  const fondDe = (ctx: SheetContext) => {
+    let n = fonds.get(ctx);
+    if (n === undefined) {
+      const fond: Record<string, unknown> = { ...ctx };
+      for (const c of CHAMPS_SELECTIFS) delete fond[c];
+      n = numeroDe(empreinteDe(fond));
+      fonds.set(ctx, n);
+    }
+    return n;
+  };
+  const cleDe = (f: FeuillePlanifiee) => {
+    const { ctx, lit, args } = f.depend;
+    const champs = lit === 'tout' ? CHAMPS_SELECTIFS : lit;
+    const selectifs = champs.map((c) => ctx[c]);
+    return `${f.genre}|${fondDe(ctx)}|${numeroDe(empreinteDe([f.titre, champs, selectifs, args]))}`;
+  };
+  /** Les pages numérotées, puis compressées, à mesure. */
+  const pages: (string | null)[] = new Array(total).fill(null);
+  /*
+    Chaque page compressée est prise EN MAIN dès qu'on la trouve : entre
+    deux pas, un autre dossier (l'envoi, bâti d'une traite) peut achever le
+    sien et faire le ménage du cache. Ce dossier-ci ne relit jamais le cache
+    pour une feuille qu'il a déjà commencée.
+  */
+  const flux: (string | null)[] = new Array(total).fill(null);
+  const cles: (string | null)[] = new Array(total).fill(null);
+  let etape = 0;
+  let fini: Uint8Array | null = null;
+  const dessiner = (i: number) => {
+    const f = feuilles[i];
+    const numero = `${i + 1} / ${total}`;
+    const cle = cleDe(f);
+    cles[i] = cle;
+    vus.add(cle);
+    const prete = cache.flux.get(`${cle}|${numero}`);
+    if (prete !== undefined) {
+      // La page compressée attend déjà : rien à dessiner.
+      repris.flux += 1;
+      flux[i] = prete;
+      vus.add(`${cle}|${numero}`);
+      return;
+    }
+    let dessin = cache.dessins.get(cle);
+    if (dessin !== undefined) repris.dessins += 1;
+    else {
+      dessin = f.fabriquer(NUMERO_RESERVE);
+      cache.dessins.set(cle, dessin);
+    }
+    const page = numeroter(dessin, numero);
+    if (page === null) {
+      // Le repère n'est pas seul sur la feuille : elle se refait avec son
+      // numéro, et ne se garde pas.
+      cache.dessins.delete(cle);
+      cles[i] = null;
+      pages[i] = f.fabriquer(numero);
+    } else pages[i] = page;
+  };
+  const compresser = (i: number) => {
+    if (flux[i] !== null) return; // reprise telle quelle au dessin
+    const cle = cles[i];
+    const fait = fluxDePage(pages[i]!);
+    flux[i] = fait;
+    if (cle !== null) {
+      const k = `${cle}|${i + 1} / ${total}`;
+      cache.flux.set(k, fait);
+      vus.add(k);
+    }
+    pages[i] = null;
+  };
+  const assembler = () => {
+    fini = assemblerLeDocument(flux as string[], images);
+    // Le cache ne garde que les deux derniers dossiers achevés.
+    for (const m of [cache.dessins, cache.flux, cache.empreintes] as Map<string, unknown>[]) {
+      for (const k of [...m.keys()]) if (!vus.has(k) && !cache.precedent.has(k)) m.delete(k);
+    }
+    cache.precedent = vus;
+  };
+  return {
+    sommaire: feuilles.map(({ genre, titre }) => ({ genre, titre })),
+    pas: 2 * total + 1,
+    repris,
+    octets: () => fini,
+    avancer() {
+      if (fini) return true;
+      if (etape < 2 * total) {
+        const i = etape >> 1;
+        if (etape % 2 === 0) dessiner(i);
+        else compresser(i);
+        etape += 1;
+        return false;
+      }
+      assembler();
+      return true;
+    },
+  };
 }

@@ -36,7 +36,9 @@ afterEach(() => {
 /** Les pièces que le dossier compte dans « Ce qu'il faut acheter ». */
 function piecesDuDossier(): string[] {
   const pdf = require('../src/export/pdf');
-  const espion = jest.spyOn(pdf, 'buildScanPdf');
+  // L'écran bâtit son dossier par `chantierDuDossier` (feuille par feuille, sans
+  // figer) : mêmes trois premiers arguments que `buildScanPdf`.
+  const espion = jest.spyOn(pdf, 'chantierDuDossier');
   espion.mockClear();
   const ex = appartementExemple();
   act(() => {
@@ -74,7 +76,9 @@ describe('le décor de « Décorer » arrive aux achats du dossier', () => {
   it('la peinture choisie d’une pièce se compte à sa teinte', () => {
     useUsage.setState({ modeElec: false });
     const pdf = require('../src/export/pdf');
-    const espion = jest.spyOn(pdf, 'buildScanPdf');
+    // L'écran bâtit son dossier par `chantierDuDossier` (feuille par feuille, sans
+    // figer) : mêmes trois premiers arguments que `buildScanPdf`.
+    const espion = jest.spyOn(pdf, 'chantierDuDossier');
     espion.mockClear();
     const ex = appartementExemple();
     const peinte = ex.rooms[0].id;
