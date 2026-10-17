@@ -1,4 +1,4 @@
-import React, { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { texteDeMesure, type Mesure } from '../geometry/regle';
 import {
   Animated,
@@ -1103,6 +1103,27 @@ export function FloorplanEditor({
   const [glisse, setGlisse] = useState(nouvelleCouche);
   /** La couche que le geste pousse : celle du dernier rendu, relue à chaque image. */
   const glisseRef = useRef(glisse);
+  /*
+    LA MARQUE SE CHOISIT CONTRE LA COUCHE MONTÉE, PAS CONTRE LA DERNIÈRE NÉE.
+
+    Relevé au banc de l'écran fidèle (`ecranfidele.test.tsx`), qui rejoue
+    ce que l'écran natif affiche : deux lâchers dans la MÊME tâche — un
+    téléphone occupé à monter le dessin reçoit d'un seul paquet le lâcher
+    d'un coup de doigt et tout le coup suivant. La marque alternait d'une
+    couche NÉE à l'autre : la seconde couche du paquet reprenait la marque
+    de celle que React avait montée en dernier, il rendait « à plat » après
+    « à plat », n'envoyait rien — et le diagnostic 735 revenait tel quel :
+    le plan restait décalé de tout le premier geste (deux cent vingt-cinq
+    points au banc) jusqu'au premier mouvement du geste suivant.
+
+    La marque neuve diffère donc de celle du dernier COMMIT, relevée après
+    lui : React l'envoie toujours, quel que soit le nombre de lâchers
+    qu'un même rendu rattrape.
+  */
+  const marqueMontee = useRef(glisse.marque);
+  useLayoutEffect(() => {
+    marqueMontee.current = glisse.marque;
+  }, [glisse]);
   /** Le dernier cadrage calculé par le geste, posé pour de bon au lâcher. */
   const vueVive = useRef(view);
   /**
@@ -1111,7 +1132,7 @@ export function FloorplanEditor({
    */
   const poserLeGeste = () => {
     const vueAvant = viewRef.current;
-    const couche = nouvelleCouche(glisseRef.current.marque ? 0 : 0.001);
+    const couche = nouvelleCouche(marqueMontee.current ? 0 : 0.001);
     glisseRef.current = couche;
     setGlisse(couche);
     /*
@@ -1142,12 +1163,33 @@ export function FloorplanEditor({
     if (vueVive.current !== vueAvant) setChoixSousLeDoigt(null);
     setView(vueVive.current);
   };
-  /** Les quatre valeurs de la couche, toujours ensemble : une couche est une pose entière. */
+  /*
+    UNE POSE PART À L'ÉCRAN EN UNE FOIS — quatre valeurs, UN envoi.
+
+    Relevé au banc de l'écran fidèle (`ecranfidele.test.tsx`) : chaque
+    `setValue` d'une valeur pilotée en JS part à l'écran par SON
+    `setNativeProps`, et chacun est une révision à lui de l'arbre natif
+    (`UIManager::setNativeProps_DEPRECATED` : un commit par appel). Quatre
+    `setValue` à la file, c'étaient quatre révisions : l'échelle neuve sous
+    l'ancienne translation, puis X neuf avec Y ancien. Le fil principal
+    monte la dernière révision quand il est prêt, pas quand le geste a fini
+    d'écrire : une image pouvait montrer une pose qui n'a jamais existé —
+    au banc, jusqu'à soixante-dix points d'écart sur un glissé rapide en
+    diagonale, un demi-point sur un pincement lent. Un tremblement d'une
+    image, au hasard des vsyncs.
+
+    Les trois premières valeurs se posent donc SANS RIEN ENVOYER : un
+    `setOffset` ne pousse rien (`AnimatedValue.js` : seul `setValue` fait
+    partir la valeur), et chaque couche naît à sa valeur de repos, sans
+    décalage — le décalage EST la pose. La dernière part par `setValue` :
+    un seul `setNativeProps`, qui relit les quatre — la pose entière, en
+    une révision.
+  */
   const poserLaCouche = (pose: { tx: number; ty: number; ech: number; rot: number }) => {
     const c = glisseRef.current;
-    c.ech.setValue(pose.ech);
-    c.rot.setValue(pose.rot);
-    c.tx.setValue(pose.tx);
+    c.ech.setOffset(pose.ech - 1);
+    c.rot.setOffset(pose.rot);
+    c.tx.setOffset(pose.tx);
     c.ty.setValue(pose.ty);
   };
   const navBase = useRef({
