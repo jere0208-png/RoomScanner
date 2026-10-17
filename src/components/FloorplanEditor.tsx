@@ -1016,36 +1016,57 @@ export function FloorplanEditor({
     Elles portent le DELTA depuis la prise, jamais la position absolue : le
     dessin sous elles est déjà à la position de départ.
   */
-  const glisse = useRef({
+  /*
+    LA COUCHE EST NEUVE À CHAQUE LÂCHER — et elle arrive AVEC le dessin.
+
+    Relevés du patron : « au relâcher, on voit son ancienne position
+    rapidement avant celle qu'on lâche », puis, vidéo à l'appui, « le plan
+    au pincer-relâcher ne se pose pas toujours d'une traite : des
+    millisecondes où il se décale pour revenir à sa position ». Mesuré image
+    par image : six images (100 ms) du plan à sa position d'AVANT le geste,
+    couche déjà à plat, avant que le nouveau dessin n'apparaisse.
+
+    La remise à plat se faisait par `setValue`, même dans un effet de mise
+    en page : une valeur animée part tout de suite à l'écran, tandis que le
+    nouveau dessin — six cents balises — met plusieurs images à y être
+    construit. Il n'y a pas d'ordre à trouver entre les deux : ils ne passent
+    pas par le même chemin.
+
+    On ne remet donc plus rien à plat. Au lâcher, l'éditeur prend une
+    couche NEUVE, à plat dès sa naissance, et la pose dans le MÊME rendu que
+    le nouveau cadrage : l'ancien dessin reste à l'écran, à sa place sous
+    l'ancienne couche, jusqu'à ce que le nouveau le remplace — d'un coup.
+  */
+  const nouvelleCouche = () => ({
     tx: new Animated.Value(0),
     ty: new Animated.Value(0),
     ech: new Animated.Value(1),
     rot: new Animated.Value(0),
-  }).current;
+  });
+  const [glisse, setGlisse] = useState(nouvelleCouche);
+  /** La couche que le geste pousse : celle du dernier rendu, relue à chaque image. */
+  const glisseRef = useRef(glisse);
   /** Le dernier cadrage calculé par le geste, posé pour de bon au lâcher. */
   const vueVive = useRef(view);
-
-  /*
-    LA COUCHE REVIENT À PLAT QUAND LE DESSIN EST POSÉ — jamais avant.
-
-    Relevé du patron : « au relâcher sur une autre position, on voit son
-    ancienne position rapidement avant celle qu'on lâche ». La remise à plat
-    était faite dans le gestionnaire du lâcher, à côté du `setView` : or une
-    valeur animée se pose SUR-LE-CHAMP, hors du cycle de React, tandis que
-    le dessin attend le rendu suivant pour se recalculer. Entre les deux, il
-    restait une image du plan à son ancienne place, la couche déjà remise à
-    zéro — exactement le clignotement décrit.
-
-    L'effet de MISE EN PAGE la remet donc à plat après le commit du nouveau
-    cadrage et avant que l'écran ne soit peint : les deux ne peuvent plus se
-    désynchroniser, quel que soit le retard du rendu.
-  */
-  useLayoutEffect(() => {
-    glisse.tx.setValue(0);
-    glisse.ty.setValue(0);
-    glisse.ech.setValue(1);
-    glisse.rot.setValue(0);
-  }, [view, glisse]);
+  /**
+   * LE LÂCHER : le cadrage du geste, et sa couche neuve, dans le même rendu.
+   * La toile se referme dans ce même rendu (son état est groupé avec eux).
+   */
+  const poserLeGeste = () => {
+    ouvrirLaToile.current?.(0);
+    const couche = nouvelleCouche();
+    glisseRef.current = couche;
+    setGlisse(couche);
+    setView(vueVive.current);
+  };
+  /** Les quatre valeurs de la couche, toujours ensemble : une couche est une pose entière. */
+  const poserLaCouche = (pose: { tx: number; ty: number; ech: number; rot: number }) => {
+    const c = glisseRef.current;
+    c.ech.setValue(pose.ech);
+    c.rot.setValue(pose.rot);
+    c.tx.setValue(pose.tx);
+    c.ty.setValue(pose.ty);
+  };
   const navBase = useRef({
     v: { zoom: 1, ox: 0, oy: 0, rot: 0 },
     mode: 'pan' as 'pan' | 'pinch',
@@ -1232,14 +1253,8 @@ export function FloorplanEditor({
         plat avant que le dessin ne soit recalculé, le plan sauterait à sa
         position d'avant le temps d'une image.
       */
-      onPanResponderRelease: () => {
-        ouvrirLaToile.current?.(0);
-        setView(vueVive.current);
-      },
-      onPanResponderTerminate: () => {
-        ouvrirLaToile.current?.(0);
-        setView(vueVive.current);
-      },
+      onPanResponderRelease: () => poserLeGeste(),
+      onPanResponderTerminate: () => poserLeGeste(),
       onPanResponderMove: (e, g) => {
         const t = e.nativeEvent.touches;
         const mode = t.length >= 2 ? 'pinch' : 'pan';
@@ -1274,11 +1289,17 @@ export function FloorplanEditor({
             oy: base.v.oy + (my - base.my0),
             rot: base.v.rot + twist,
           };
-          const pose = transformeDuGeste(base.v, vueVive.current);
-          glisse.ech.setValue(pose.ech);
-          glisse.rot.setValue(pose.rot);
-          glisse.tx.setValue(pose.tx);
-          glisse.ty.setValue(pose.ty);
+          /*
+            LA COUCHE SE CALCULE DEPUIS LE DESSIN, PAS DEPUIS LA REPRISE.
+
+            Le repère du geste se reprend à chaque changement du nombre de
+            doigts (`snapshot`) ; le DESSIN, lui, est resté à la vue de la
+            prise. Calculée depuis la reprise, la couche perdait tout ce
+            qu'on avait déjà pincé : le plan sautait au moment où un second
+            doigt se posait ou se levait, et revenait au lâcher — la vidéo
+            du patron, images 311 à 318.
+          */
+          poserLaCouche(transformeDuGeste(viewRef.current, vueVive.current));
         } else if (recalageVif.current) {
           /*
             EN RECALAGE, LE DOIGT DÉPLACE L'ÉTAGE, PAS LA VUE.
@@ -1304,9 +1325,8 @@ export function FloorplanEditor({
             ox: base.v.ox + (g.dx - base.dx0),
             oy: base.v.oy + (g.dy - base.dy0),
           };
-          const pose = transformeDuGeste(base.v, vueVive.current);
-          glisse.tx.setValue(pose.tx);
-          glisse.ty.setValue(pose.ty);
+          // Depuis le dessin, comme le pincement : voir plus haut.
+          poserLaCouche(transformeDuGeste(viewRef.current, vueVive.current));
         }
       },
     }),
