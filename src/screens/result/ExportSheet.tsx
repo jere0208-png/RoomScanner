@@ -285,7 +285,6 @@ export function ExportSheet({
         <ScrollView
           style={{ maxHeight: ecran.height * 0.66 }}
           contentContainerStyle={styles.exportListe}
-          showsVerticalScrollIndicator={false}
           onLayout={(e) => {
             const w = e.nativeEvent.layout.width;
             if (w > 0 && Math.abs(w - largeur) > 1) setLargeur(w);

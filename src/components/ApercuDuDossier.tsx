@@ -348,8 +348,6 @@ function PageZoomable({
       centerContent
       bouncesZoom
       alwaysBounceVertical={false}
-      showsHorizontalScrollIndicator={false}
-      showsVerticalScrollIndicator={false}
       scrollEventThrottle={64}
       onScroll={(e) => {
         echelle.current = e.nativeEvent.zoomScale ?? 1;
