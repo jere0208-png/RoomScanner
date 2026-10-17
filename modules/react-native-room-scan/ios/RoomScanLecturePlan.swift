@@ -330,22 +330,32 @@ class RoomScanLecturePlan: NSObject, VNDocumentCameraViewControllerDelegate,
 
   // ------------------------------------------------------------ la page prête
 
+  /**
+   * LA PAGE PART EN PLEINE DÉFINITION — relevé du patron : « ne repère pas
+   * les cloisons, pas de porte ». À 2 000 pixels, une cloison de 7 cm d'une
+   * maison de 14 m tenait sur 4 pixels, et l'arc d'une porte sur un trait
+   * à peine visible. La page part à 3 200 pixels : le serveur la découpe en
+   * loupes que le lecteur regarde chacune en grand (voir `vuesDuPlan`,
+   * server/lecture-plan.php).
+   */
+  static let coteEnvoye: CGFloat = 3200
+
   /// Réduit la page, l'encode, lit ses textes — hors du fil principal.
   /// `lecture` : la finesse à laquelle les textes se lisent, quand l'image
-  /// en a plus que les 2000 pixels qui partent.
-  private func preparer(_ image: UIImage?, lecture: CGFloat = 2000, enPlus: [String: Any] = [:]) {
+  /// en a plus que les pixels qui partent.
+  private func preparer(_ image: UIImage?, lecture: CGFloat = RoomScanLecturePlan.coteEnvoye, enPlus: [String: Any] = [:]) {
     guard let image = image else {
       rendre(nil)
       return
     }
     DispatchQueue.global(qos: .userInitiated).async {
-      let reduite = Self.reduire(image, plusGrandCote: 2000)
-      guard let cg = reduite.cgImage, let jpeg = reduite.jpegData(compressionQuality: 0.82) else {
+      let reduite = Self.reduire(image, plusGrandCote: Self.coteEnvoye)
+      guard let cg = reduite.cgImage, let jpeg = reduite.jpegData(compressionQuality: 0.78) else {
         self.rendre(nil)
         return
       }
       let pourLire =
-        lecture > 2000 ? (Self.reduire(image, plusGrandCote: lecture).cgImage ?? cg) : cg
+        lecture > Self.coteEnvoye ? (Self.reduire(image, plusGrandCote: lecture).cgImage ?? cg) : cg
       var resultat: [String: Any] = [
         "base64": jpeg.base64EncodedString(),
         "largeur": cg.width,

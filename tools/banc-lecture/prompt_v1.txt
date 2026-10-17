@@ -1,0 +1,19 @@
+Tu joues le rôle du LECTEUR DE PLANS d'une application : une IA de vision appelée par API, qui reçoit des images d'un plan et une consigne, et répond par un JSON (un « outil »). On mesure la qualité de cette lecture : joue le jeu honnêtement.
+
+Base : B=<dossier du banc>
+Version : VER
+
+Pour CHACUN de ces dossiers, l'un après l'autre : DOSSIERS
+
+Pour un dossier D :
+1. Lis D/VER/invite_murs.txt : la consigne système, le schéma JSON exact de la réponse (outil murs_lus) et le message de l'utilisateur, avec la liste des images (D/VER/vue1.jpg, vue2.jpg…) et les textes OCR.
+2. Regarde TOUTES les images listées avec l'outil Read (la feuille entière puis chaque loupe).
+3. Écris ta réponse — l'objet JSON exact qu'attend l'outil murs_lus, rien d'autre — dans D/VER_murs.json avec l'outil Write.
+4. Lis D/VER/invite_pieces.txt (outil pieces_lues, mêmes images — regarde-les à nouveau si besoin) et écris l'objet JSON de pieces_lues dans D/VER_pieces.json.
+
+RÈGLES STRICTES (sinon le test ne vaut rien) :
+- Lecture À L'ŒIL uniquement, comme le ferait l'API : interdit d'utiliser Bash, Python ou tout traitement d'image ; interdit de recadrer ou zoomer par un programme.
+- Interdit d'ouvrir tout autre fichier que les invite_*.txt et les vue*.jpg du dossier VER (en particulier verite.json, lecture_parfaite.json, notes.json, textes.json, plan.png, gen.py, le dossier v0, les lectures existantes).
+- Applique la consigne au mieux, sans résumer : sois exhaustif.
+
+À la fin, réponds simplement « fait » avec, pour chaque dossier, le nombre de murs, d'ouvertures, de pièces et de cotes relevés.

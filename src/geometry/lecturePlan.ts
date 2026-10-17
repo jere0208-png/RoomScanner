@@ -304,6 +304,155 @@ function mediane(v: number[]): number {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
+// ------------------------------------------------------------------ la perspective
+
+/** Le vecteur propre de la plus petite valeur propre d'une matrice 3 × 3 symétrique (Jacobi). */
+function plusPetitVecteurPropre(M: number[][]): number[] {
+  const a = M.map((r) => [...r]);
+  const v = [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+  ];
+  for (let tour = 0; tour < 50; tour++) {
+    let p = 0;
+    let q = 1;
+    for (const [i, j] of [
+      [0, 1],
+      [0, 2],
+      [1, 2],
+    ]) {
+      if (Math.abs(a[i][j]) > Math.abs(a[p][q])) [p, q] = [i, j];
+    }
+    if (Math.abs(a[p][q]) < 1e-14) break;
+    const theta = (a[q][q] - a[p][p]) / (2 * a[p][q]);
+    const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+    const c = 1 / Math.sqrt(t * t + 1);
+    const s = t * c;
+    for (let k = 0; k < 3; k++) {
+      const akp = a[k][p];
+      const akq = a[k][q];
+      a[k][p] = c * akp - s * akq;
+      a[k][q] = s * akp + c * akq;
+    }
+    for (let k = 0; k < 3; k++) {
+      const apk = a[p][k];
+      const aqk = a[q][k];
+      a[p][k] = c * apk - s * aqk;
+      a[q][k] = s * apk + c * aqk;
+    }
+    for (let k = 0; k < 3; k++) {
+      const vkp = v[k][p];
+      const vkq = v[k][q];
+      v[k][p] = c * vkp - s * vkq;
+      v[k][q] = s * vkp + c * vkq;
+    }
+  }
+  let k = 0;
+  for (let i = 1; i < 3; i++) if (a[i][i] < a[k][k]) k = i;
+  return [v[0][k], v[1][k], v[2][k]];
+}
+
+/**
+ * LA FEUILLE PHOTOGRAPHIÉE DE BIAIS — une photo importée n'est pas redressée
+ * comme celle du scanner, et le scanner lui-même laisse un reste de
+ * perspective quand la feuille n'est pas à plat : les murs « horizontaux »
+ * d'un plan y convergent vers un point de fuite, et une même cote ne vaut
+ * plus la même longueur en haut et en bas de la feuille. La reconstruction,
+ * qui suppose une échelle unique, en tirait des cotes « contradictoires »
+ * et des murs déplacés.
+ *
+ * Les murs disent eux-mêmes la perspective : chaque famille (les murs d'un
+ * sens, ceux de l'autre) se coupe en son point de fuite ; la droite qui
+ * joint les deux points de fuite, renvoyée à l'infini, rend les murs de
+ * chaque famille parallèles. Rend l'homographie (dans le repère normalisé
+ * de l'image : centre en 0, demi-diagonale 1), ou null quand la feuille est
+ * déjà de face, ou quand les murs lus ne s'accordent pas assez pour en
+ * décider : on ne déforme pas un plan sur un soupçon.
+ */
+export function perspectiveDesMurs(
+  traits: { a: { x: number; y: number }; b: { x: number; y: number } }[],
+  W: number,
+  H: number,
+): ((p: { x: number; y: number }) => { x: number; y: number }) | null {
+  const cx = W / 2;
+  const cy = H / 2;
+  const k = 2 / Math.hypot(W, H);
+  const norm = (p: { x: number; y: number }) => [(p.x - cx) * k, (p.y - cy) * k, 1];
+  const longs = traits
+    .map((t) => ({ a: norm(t.a), b: norm(t.b) }))
+    .map((t) => ({ ...t, L: Math.hypot(t.b[0] - t.a[0], t.b[1] - t.a[1]) }))
+    .filter((t) => t.L > 0.08);
+  if (longs.length < 8) return null;
+  // Les deux familles, autour de la direction dominante (modulo l'équerre).
+  let C = 0;
+  let S = 0;
+  for (const t of longs) {
+    const ang = Math.atan2(t.b[1] - t.a[1], t.b[0] - t.a[0]);
+    C += t.L * Math.cos(4 * ang);
+    S += t.L * Math.sin(4 * ang);
+  }
+  const theta = Math.atan2(S, C) / 4;
+  const familles: (typeof longs)[] = [[], []];
+  for (const t of longs) {
+    const ang = Math.atan2(t.b[1] - t.a[1], t.b[0] - t.a[0]) - theta;
+    const r = ((ang % Math.PI) + Math.PI) % Math.PI;
+    if (r < 0.15 || r > Math.PI - 0.15) familles[0].push(t);
+    else if (Math.abs(r - Math.PI / 2) < 0.15) familles[1].push(t);
+  }
+  if (familles.some((f) => f.length < 4)) return null;
+  // Le point de fuite de chaque famille : au plus près de toutes ses droites.
+  const fuite = (f: typeof longs) => {
+    const M = [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+    ];
+    for (const t of f) {
+      const l = [t.a[1] - t.b[1], t.b[0] - t.a[0], t.a[0] * t.b[1] - t.b[0] * t.a[1]];
+      const n = Math.hypot(l[0], l[1]) || 1;
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) M[i][j] += (t.L * l[i] * l[j]) / (n * n);
+    }
+    return plusPetitVecteurPropre(M);
+  };
+  const v1 = fuite(familles[0]);
+  const v2 = fuite(familles[1]);
+  // La ligne de fuite, et l'homographie qui la renvoie à l'infini.
+  const L = [v1[1] * v2[2] - v1[2] * v2[1], v1[2] * v2[0] - v1[0] * v2[2], v1[0] * v2[1] - v1[1] * v2[0]];
+  if (Math.abs(L[2]) < 1e-9) return null;
+  const g = L[0] / L[2];
+  const h = L[1] / L[2];
+  const force = Math.hypot(g, h);
+  // De face (moins d'un demi pour cent d'un bord à l'autre), ou invraisemblable.
+  if (force < 0.005 || force > 0.25) return null;
+  const versNorm = (q: number[]) => {
+    const w = g * q[0] + h * q[1] + 1;
+    return [q[0] / w, q[1] / w];
+  };
+  // LE CONTRÔLE : redressés, les murs de chaque famille doivent être nettement
+  // plus parallèles qu'avant ; sinon les murs lus ne disent pas de perspective.
+  const dispersion = (f: typeof longs, redresser: boolean) => {
+    const angs = f.map((t) => {
+      const a = redresser ? versNorm(t.a) : t.a;
+      const b = redresser ? versNorm(t.b) : t.b;
+      const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+      return { ang: ((ang % Math.PI) + Math.PI) % Math.PI, L: t.L };
+    });
+    const m = angs.reduce((s, x) => s + x.L * Math.cos(2 * x.ang), 0);
+    const n = angs.reduce((s, x) => s + x.L * Math.sin(2 * x.ang), 0);
+    const tot = angs.reduce((s, x) => s + x.L, 0);
+    return 1 - Math.hypot(m, n) / tot;
+  };
+  const avant = dispersion(familles[0], false) + dispersion(familles[1], false);
+  const apres = dispersion(familles[0], true) + dispersion(familles[1], true);
+  if (!(apres < avant * 0.6)) return null;
+  // Le centre de l'image reste en place, à la même échelle.
+  return (p) => {
+    const [x, y] = versNorm(norm(p));
+    return { x: cx + x / k, y: cy + y / k };
+  };
+}
+
 /** Une équation de la trame : Σ coef × inconnue = d, avec son poids. */
 interface Equation {
   termes: [number, number][];
@@ -470,10 +619,18 @@ export function reconstruirePlan(lu: LectureBrute, image: ImageLue): ResultatDeL
   const brut = garderLePlanPrincipal(lu);
   const W = Math.max(1, image.largeur);
   const H = Math.max(1, image.hauteur);
-  /** Millièmes → pixels. */
-  const px = (p: PointLu | number[]): { x: number; y: number } => ({ x: (p[0] / 1000) * W, y: (p[1] / 1000) * H });
+  /** Millièmes → pixels de la photo. */
+  const pxBrut = (p: PointLu | number[]): { x: number; y: number } => ({ x: (p[0] / 1000) * W, y: (p[1] / 1000) * H });
   const mursBruts = (brut.murs ?? []).filter((m) => Array.isArray(m) && m.length >= 4 && m.slice(0, 4).every(Number.isFinite));
   const contours = contoursLus(brut);
+  // 0 bis. LA PERSPECTIVE — voir `perspectiveDesMurs` : la feuille, remise de face.
+  const deFace = perspectiveDesMurs(
+    mursBruts.map((m) => ({ a: pxBrut([m[0], m[1]]), b: pxBrut([m[2], m[3]]) })),
+    W,
+    H,
+  );
+  /** Millièmes → pixels, la feuille de face. */
+  const px = (p: PointLu | number[]): { x: number; y: number } => (deFace ? deFace(pxBrut(p)) : pxBrut(p));
   if (mursBruts.length < 3 && contours.length === 0) {
     return { ok: false, raison: 'Trop peu de murs lus : le plan est-il entier sur la photo ?' };
   }
@@ -521,6 +678,25 @@ export function reconstruirePlan(lu: LectureBrute, image: ImageLue): ResultatDeL
     const lu = lireCote(c.texte);
     const v = lu && (lu.unite || lu.decimal) ? metresCandidats(c.texte)[0] : c.metres;
     if (v && v > 0.05) sures.push(v / L);
+  }
+  /*
+    DES COTES TOUTES ENTIÈRES, ET AUCUNE UNITÉ DITE — « 552 », « 245 »,
+    « 10 » : le plan d'un constructeur, coté en centimètres (ou en
+    millimètres, « 3200 »). Rien ne fixait l'échelle, et le plan retombait
+    sur les surfaces écrites, ou échouait. L'ordre de grandeur tranche : un
+    logement se cote de quelques centimètres à quelques mètres, soit des
+    centaines en centimètres, des milliers en millimètres.
+  */
+  if (sures.length === 0) {
+    const entieres = cotesBrutes
+      .map((c) => ({ c, lu: lireCote(c.texte), L: longueurPx(c) }))
+      .filter((x) => x.lu && !x.lu.unite && !x.lu.decimal && x.L >= 5);
+    const med = mediane(entieres.map((x) => x.lu!.valeur));
+    const diviseur = med > 900 ? 1000 : med >= 15 ? 100 : 1;
+    for (const x of entieres) {
+      const v = x.lu!.valeur / diviseur;
+      if (v > 0.05) sures.push(v / x.L);
+    }
   }
   let echelle = mediane(sures);
   let echelleDepuis: RapportDeLecture['echelleDepuis'] = 'cotes';
@@ -879,12 +1055,128 @@ export function reconstruirePlan(lu: LectureBrute, image: ImageLue): ResultatDeL
     const med = mediane(dec);
     return { x: x.slice(0, n), ep, actives, tenue, ecartDessin: dec.map((d) => Math.abs(d - med)) };
   };
+  const epX0 = [...epX];
+  const epZ0 = [...epZ];
   const rx = resoudre(gx.centres, epX, cotesX);
   const rz = resoudre(gz.centres, epZ, cotesZ);
   const X = rx.x;
   const Z = rz.x;
   for (let k = 0; k < epX.length; k++) epX[k] = rx.ep[k];
   for (let k = 0; k < epZ.length; k++) epZ[k] = rz.ep[k];
+  surfacesEcritesDansLaTrame();
+
+  /*
+    5 bis. LES SURFACES ÉCRITES TIENNENT AUSSI LA TRAME — relevé du patron :
+    « se trompe souvent ». Une cloison que rien ne cote restait là où la
+    vision l'avait située, à 10 ou 20 cm près : la chambre prenait un mètre
+    carré à sa voisine. Or l'architecte écrit la surface de presque chaque
+    pièce, calculée par son logiciel au centimètre carré. Une pièce
+    rectangulaire de surface écrite S, entre les axes i, j (en x) et k, l
+    (en z), dit
+        (Xj − Tj − Xi − Ti) × (Zl − Tl − Zk − Tk) = S
+    — une équation de plus, qui couple les deux sens. Elle se résout avec
+    les cotes retenues, linéarisée autour de la trame et reprise quelques
+    fois (Gauss-Newton). Les cotes gardent le dernier mot sur ce qu'elles
+    tiennent ; les surfaces placent ce qu'elles ne tiennent pas. Et si la
+    trame en sortait bouleversée (un axe à plus d'un demi-mètre), c'est que
+    la pièce a été mal rattachée : on garde la trame des cotes.
+  */
+  function surfacesEcritesDansLaTrame() {
+    const n = X.length;
+    const m = Z.length;
+    const faceDe = (pos: number[], ep: number[], v: number, cote: 1 | -1) => {
+      let mieux = -1;
+      let ecart = 0.35;
+      pos.forEach((p, k) => {
+        const e = Math.abs(p + (cote * ep[k]) / 2 - v);
+        if (e < ecart) {
+          ecart = e;
+          mieux = k;
+        }
+      });
+      return mieux;
+    };
+    const pieces: { i: number; j: number; k: number; l: number; S: number }[] = [];
+    for (const p of brut.pieces ?? []) {
+      const S = p?.surface ? lireCote(p.surface.replace(/m\s*(²|2)/i, '').trim())?.valeur : undefined;
+      const c = Array.isArray(p?.contour) ? p.contour.filter((q) => Array.isArray(q) && q.length >= 2) : [];
+      if (!S || S < 0.8 || c.length !== 4) continue;
+      const pts = c.map((q) => enM(q));
+      const xs = pts.map((q) => q.x).sort((a, b) => a - b);
+      const zs = pts.map((q) => q.z).sort((a, b) => a - b);
+      // Un rectangle : deux abscisses, deux ordonnées.
+      if (xs[1] - xs[0] > 0.15 || xs[3] - xs[2] > 0.15 || zs[1] - zs[0] > 0.15 || zs[3] - zs[2] > 0.15) continue;
+      const i = faceDe(X, epX, (xs[0] + xs[1]) / 2, 1);
+      const j = faceDe(X, epX, (xs[2] + xs[3]) / 2, -1);
+      const k = faceDe(Z, epZ, (zs[0] + zs[1]) / 2, 1);
+      const l = faceDe(Z, epZ, (zs[2] + zs[3]) / 2, -1);
+      if (i < 0 || j < 0 || k < 0 || l < 0 || X[i] >= X[j] || Z[k] >= Z[l]) continue;
+      const w = X[j] - epX[j] / 2 - X[i] - epX[i] / 2;
+      const h = Z[l] - epZ[l] / 2 - Z[k] - epZ[k] / 2;
+      if (w <= 0.3 || h <= 0.3 || Math.abs(w * h - S) > S * 0.3) continue;
+      pieces.push({ i, j, k, l, S });
+    }
+    if (pieces.length === 0) return;
+    // Les inconnues : X (n), Tx (n), Z (m), Tz (m).
+    const cotes = (r: typeof rx, base: number, nn: number) =>
+      r.actives.map((c) => ({
+        termes: [
+          [base + c.j, 1],
+          [base + c.i, -1],
+          [base + nn + c.j, c.sj],
+          [base + nn + c.i, -c.si],
+        ].filter(([, coef]) => coef !== 0) as [number, number][],
+        d: c.d,
+        poids: 1,
+      }));
+    const rappels = [
+      ...gx.centres.map((v, k) => ({ termes: [[k, 1]] as [number, number][], d: v, poids: 1e-4 })),
+      ...epX0.map((e, k) => ({ termes: [[n + k, 1]] as [number, number][], d: e / 2, poids: 0.02 })),
+      ...gz.centres.map((v, k) => ({ termes: [[2 * n + k, 1]] as [number, number][], d: v, poids: 1e-4 })),
+      ...epZ0.map((e, k) => ({ termes: [[2 * n + m + k, 1]] as [number, number][], d: e / 2, poids: 0.02 })),
+      ...cotes(rx, 0, n),
+      ...cotes(rz, 2 * n, m),
+    ];
+    let v = [...X, ...epX.map((e) => e / 2), ...Z, ...epZ.map((e) => e / 2)];
+    for (let tour = 0; tour < 6; tour++) {
+      const aires = pieces.map(({ i, j, k, l, S }) => {
+        const w0 = v[j] - v[n + j] - v[i] - v[n + i];
+        const h0 = v[2 * n + l] - v[2 * n + m + l] - v[2 * n + k] - v[2 * n + m + k];
+        const s = Math.max(0.5, w0 + h0);
+        return {
+          termes: [
+            [j, h0 / s],
+            [n + j, -h0 / s],
+            [i, -h0 / s],
+            [n + i, -h0 / s],
+            [2 * n + l, w0 / s],
+            [2 * n + m + l, -w0 / s],
+            [2 * n + k, -w0 / s],
+            [2 * n + m + k, -w0 / s],
+          ] as [number, number][],
+          d: (S + w0 * h0) / s,
+          poids: 0.5,
+        };
+      });
+      v = moindresCarres(2 * n + 2 * m, [...rappels, ...aires], v);
+    }
+    const bouge = (a: number[], b: number[]) => a.some((x, k) => Math.abs(x - b[k]) > 0.5);
+    const nX = v.slice(0, n);
+    const nZ = v.slice(2 * n, 2 * n + m);
+    const ep = (t: number) => Math.round(Math.min(0.6, Math.max(0.05, 2 * t)) * 100) / 100;
+    // Une épaisseur hors de 3 à 65 cm : les surfaces ont été tenues en tordant un mur.
+    const epaisseurs = [...v.slice(n, 2 * n), ...v.slice(2 * n + m)];
+    if (epaisseurs.some((t) => 2 * t < 0.03 || 2 * t > 0.65)) return;
+    if (bouge(nX, X) || bouge(nZ, Z) || v.some((x) => !Number.isFinite(x))) return;
+    for (let k = 0; k < n; k++) {
+      X[k] = nX[k];
+      epX[k] = ep(v[n + k]);
+    }
+    for (let k = 0; k < m; k++) {
+      Z[k] = nZ[k];
+      epZ[k] = ep(v[2 * n + m + k]);
+    }
+  }
   const tenus = new Set<string>();
   for (const c of rx.actives) tenus.add(`x${c.i}`).add(`x${c.j}`);
   for (const c of rz.actives) tenus.add(`z${c.i}`).add(`z${c.j}`);

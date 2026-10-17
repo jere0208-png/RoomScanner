@@ -761,7 +761,8 @@ if ($action === 'retirer') {
   ni l'image, ni la lecture — seulement le compte des lectures.
 */
 if ($action === 'lire_plan') {
-  @set_time_limit(190);
+  // Trois lectures en parallèle, et au pire un second essai : voir lecture-plan.php.
+  @set_time_limit(340);
   $req = mysqli_prepare($db, 'SELECT lectures, lectures_jour, jour_lecture FROM comptes WHERE id = ?');
   if (!$req) {
     sortir(['ok' => false, 'raison' => 'La base n’est pas à jour : importez migration-lecture.sql.']);

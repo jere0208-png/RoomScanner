@@ -747,7 +747,7 @@ function Lecture({ s, c, page, etape }: { s: ReturnType<typeof themed>; c: Palet
       </View>
       <Text style={s.pied}>
         {patience < 20
-          ? 'La lecture prend de vingt secondes à une minute selon le plan.'
+          ? 'La lecture prend d’une à deux minutes selon le plan.'
           : 'Un plan chargé demande un peu plus : la lecture continue.'}
       </Text>
     </View>

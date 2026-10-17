@@ -47,7 +47,11 @@ const DEUX_PIECES: LectureBrute = {
 
 const aires = (r: ReturnType<typeof reconstruirePlan>) => {
   if (!r.ok) throw new Error(r.raison);
-  const parts = roomParts(r.plan.walls, r.plan.rooms);
+  // Comme `ouvrirPlanLu` : les murs d'un plan papier se comptent au nu.
+  const parts = roomParts(
+    r.plan.walls.map((w) => ({ ...w, auNu: true })),
+    r.plan.rooms,
+  );
   return new Map(r.plan.rooms.map((room) => [room.name, parts.find((p) => p.roomId === room.id)?.surface?.area ?? 0]));
 };
 
@@ -58,12 +62,10 @@ describe('les pièces tiennent les murs', () => {
     if (!r.ok) return;
     expect(r.plan.rooms.map((p) => p.name).sort()).toEqual(['Bureau', 'Chambre']);
     const a = aires(r);
-    // Les murs extérieurs sont posés sur les nus lus, la cloison au milieu :
-    // à la cloison près, la surface écrite.
-    expect(a.get('Chambre')!).toBeGreaterThan(8.6);
-    expect(a.get('Chambre')!).toBeLessThan(9.6);
-    expect(a.get('Bureau')!).toBeGreaterThan(8.0);
-    expect(a.get('Bureau')!).toBeLessThan(9.0);
+    // Les surfaces écrites tiennent la trame : chaque pièce, comptée au nu,
+    // retrouve la sienne.
+    expect(a.get('Chambre')!).toBeCloseTo(9.0, 1);
+    expect(a.get('Bureau')!).toBeCloseTo(8.4, 1);
     // L'échelle vient des surfaces écrites.
     expect(r.plan.rapport.echelleDepuis).toBe('surfaces');
   });
@@ -75,7 +77,7 @@ describe('les pièces tiennent les murs', () => {
     const xs = [...new Set(verticaux.map((w) => Math.round(w.a.x * 100) / 100))].sort((p, q) => p - q);
     // Trois files de murs verticaux : la façade gauche, la cloison, la façade droite.
     expect(xs).toHaveLength(3);
-    const cloison = verticaux.find((w) => Math.abs(w.a.x - xs[1]) < 1e-6)!;
+    const cloison = verticaux.find((w) => Math.abs(w.a.x - xs[1]) < 0.006)!;
     // 20 ‰ d'écart entre les deux nus : une cloison de 20 cm.
     expect(cloison.epaisseur).toBeCloseTo(0.2, 1);
   });

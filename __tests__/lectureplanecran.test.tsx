@@ -33,7 +33,7 @@ jest.mock('../src/native/lecturePlan', () => ({
 }));
 jest.mock('../src/net/lecturePlan', () => ({
   envoyerLePlan: (...a: unknown[]) => mockEnvoyer(...a),
-  DELAI_DE_LECTURE: 150000,
+  DELAI_DE_LECTURE: 200000,
 }));
 
 import { readFileSync } from 'node:fs';
@@ -446,12 +446,20 @@ describe('ce qui la porte', () => {
     expect(api).toContain("'raison' => 'pro'");
     expect(api).toContain('LECTURES_PAR_JOUR');
     const lecteur = lire('server', 'lecture-plan.php');
-    // Deux lectures ciblées, en parallèle : le bâti, puis l'électricité
-    // (relevé du patron : « manque beaucoup de murs » sur un plan chargé).
-    expect(lecteur).toContain("'name' => 'plan_lu'");
+    // Trois lectures ciblées, en parallèle : les murs et les ouvertures, les
+    // pièces et les cotes, l'électricité (relevés du patron : « manque
+    // beaucoup de murs », « ne repère pas les cloisons, pas de porte »).
+    expect(lecteur).toContain("'name' => 'murs_lus'");
+    expect(lecteur).toContain("'name' => 'pieces_lues'");
     expect(lecteur).toContain("'name' => 'electricite_lue'");
     expect(lecteur).toContain('function appelerEnParallele(');
     expect(lecteur).toContain("'tool_choice' => $impose ? ['type' => 'tool', 'name' => $l['outil']['name']] : ['type' => 'auto']");
+    // La lecture rendue à l'app garde la forme qu'elle attend.
+    expect(lecteur).toContain('function lectureAssemblee(');
+    // La feuille et ses loupes quadrillées, à la définition que regarde le lecteur.
+    expect(lecteur).toContain('function vuesDuPlan(');
+    expect(lecteur).toContain('const VUE_PIXELS = 1150000;');
+    expect(lecteur).toContain('QUADRILLAGE VIOLET');
     // Le contour de chaque pièce, et le cadre du plan principal.
     expect(lecteur).toContain("'contour' => ['type' => 'array', 'items' => $point, 'minItems' => 3]");
     expect(lecteur).toContain("'cadre' =>");

@@ -2,9 +2,10 @@
  * ENVOYER LE PLAN À LIRE — la page part sur le serveur, qui la fait lire par
  * Claude et rend ce qu'il a vu (voir `server/lecture-plan.php`).
  *
- * La lecture prend du temps : une IA qui regarde un plan chargé peut mettre
- * une minute. On l'attend deux minutes et demie, pas cinq secondes comme une
- * vérification de compte — et l'écran le dit pendant ce temps.
+ * La lecture prend du temps : une IA qui regarde un plan chargé et ses
+ * loupes, au millième, peut mettre deux minutes. On l'attend un peu plus de
+ * trois minutes, pas cinq secondes comme une vérification de compte — et
+ * l'écran le dit pendant ce temps.
  *
  * Nous ne gardons rien, ni ici ni sur le serveur : la page part, la lecture
  * revient. Anthropic, lui, la garde un temps limité (contrôles de sécurité) —
@@ -28,8 +29,8 @@ export type ReponseDeLecture =
       message: string;
     };
 
-/** Deux minutes et demie : le temps qu'il faut à la lecture d'un plan chargé. */
-export const DELAI_DE_LECTURE = 150_000;
+/** Trois minutes vingt : le temps qu'il faut à la lecture d'un plan chargé. */
+export const DELAI_DE_LECTURE = 200_000;
 
 export async function envoyerLePlan(
   page: PageDePlan,

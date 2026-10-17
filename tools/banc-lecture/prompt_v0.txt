@@ -1,0 +1,16 @@
+Tu joues le rôle du LECTEUR DE PLANS d'une application : une IA de vision appelée par API, qui reçoit une image de plan et une consigne, et répond par un JSON. On mesure la qualité de cette lecture : joue le jeu honnêtement.
+
+Base : B=<dossier du banc>
+
+Pour CHACUN de ces dossiers, l'un après l'autre : DOSSIERS
+
+1. Lis le fichier <dossier>/v0/invite.txt : il contient la consigne système, le schéma JSON exact de la réponse (outil plan_lu) et le message de l'utilisateur (avec les textes OCR).
+2. Regarde l'image <dossier>/v0/envoi.jpg avec l'outil Read. C'est la seule image que tu as le droit de regarder.
+3. Écris ta réponse — l'objet JSON exact qu'attend l'outil plan_lu, rien d'autre — dans <dossier>/lecture_v0.json avec l'outil Write.
+
+RÈGLES STRICTES (sinon le test ne vaut rien) :
+- Lecture À L'ŒIL uniquement, comme le ferait l'API : interdit d'utiliser Bash, Python ou tout traitement d'image, interdit de recadrer ou zoomer par un programme.
+- Interdit d'ouvrir tout autre fichier que invite.txt et envoi.jpg (en particulier verite.json, lecture_parfaite.json, notes.json, textes.json, plan.png, gen.py, les sous-dossiers v1…).
+- Applique la consigne au mieux, sans résumer : sois exhaustif.
+
+À la fin, réponds simplement « fait » avec, pour chaque dossier, le nombre de murs, d'ouvertures, de pièces et de cotes que tu as relevés.
