@@ -41,6 +41,7 @@ import {
   type WallSeg,
   solDesMurs,
 } from '../geometry/floorplan';
+import type { TraceGaine } from '../geometry/routing';
 
 /** Milieu d'une ouverture, au sol. */
 const midOf = (o: WallSeg): Pt => ({
@@ -381,10 +382,10 @@ interface Props {
    * LES GAINES, en volume : le même calque que sur le plan.
    *
    * Sur le plan, un tireté suffit — on lit un tracé. Dans le modèle, on
-   * prépare une pose : il faut voir le tube arriver au pied du mur et
-   * remonter dans la cloison jusqu'à la boîte.
+   * prépare une pose : il faut voir le tube monter du tableau, courir sous
+   * le plafond et retomber le long du mur jusqu'à la boîte (`TraceGaine`).
    */
-  cableRoutes?: { id: string; path: Pt[] }[];
+  cableRoutes?: TraceGaine[];
   /** Hauteur de l'appareil desservi, pour dessiner la remontée. */
   routeHeights?: Record<string, number>;
   /**

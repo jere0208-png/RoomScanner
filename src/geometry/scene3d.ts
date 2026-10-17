@@ -33,6 +33,7 @@ import { couleurMajoritaire, mixHex, pointInPolygon, sampleTexture } from './app
 import { AMBRE_MEUBLE, MEUBLE_MOELLEUX } from '../ui/maquette';
 import { furnitureParts, type FurnPart } from './furniture3d';
 import { CEILINGS, type CeilingFixture } from './ceiling';
+import type { TraceGaine } from './routing';
 import {
   FIXTURES,
   PLAQUE,
@@ -1473,10 +1474,12 @@ export interface SceneOptions {
    *
    * Le plan les montrait en tireté, la 3D pas du tout : on préparait un
    * chantier sur un modèle qui ne disait pas où passe le conduit. Ce sont
-   * des TUBES, posés dans la chape et remontés au nu du mur jusqu'à
-   * l'appareil — de quoi lire un cheminement sans le déduire.
+   * des TUBES — de quoi lire un cheminement sans le déduire. Avec sa pose
+   * (`TraceGaine`), le tube monte du tableau, court sous le plafond et
+   * retombe le long du mur ; sans elle, il court dans la chape et remonte
+   * à l'appareil, comme avant.
    */
-  routes?: { id: string; path: Pt[] }[];
+  routes?: TraceGaine[];
   /** Hauteur de l'appareil desservi par chaque gaine, pour la remontée. */
   routeHeights?: Record<string, number>;
   /**
@@ -2989,6 +2992,40 @@ export function buildScene(
   for (const route of opts.routes ?? []) {
     const pts = route.path;
     if (pts.length < 2) continue;
+    /*
+      PAR LE PLAFOND — relevé du patron : « très souvent on passe par le
+      plafond, et pas les murs, sauf pour les retombées vers les points
+      d'élec ». Le tube court quatre centimètres sous le plafond (son rayon
+      et un peu d'air : il ne traverse pas la dalle), monte du tableau au
+      départ, retombe le long du mur à l'arrivée. Un pontage de prises, lui,
+      court au mur à la hauteur des socles.
+    */
+    const pose = route.pose;
+    if (pose) {
+      const niveau =
+        floorY + (pose.kind === 'plafond' ? Math.max(0.1, pose.niveau - 0.04) : pose.niveau);
+      for (let i = 1; i < pts.length; i++) {
+        tronc(
+          { x: pts[i - 1].x, y: niveau, z: pts[i - 1].z },
+          { x: pts[i].x, y: niveau, z: pts[i].z },
+        );
+      }
+      const debut = pts[0];
+      const fin = pts[pts.length - 1];
+      if (pose.depuis !== undefined && floorY + pose.depuis < niveau - 0.05) {
+        tronc(
+          { x: debut.x, y: floorY + pose.depuis, z: debut.z },
+          { x: debut.x, y: niveau, z: debut.z },
+        );
+      }
+      if (pose.jusqua !== undefined && floorY + pose.jusqua < niveau - 0.05) {
+        tronc(
+          { x: fin.x, y: niveau, z: fin.z },
+          { x: fin.x, y: floorY + pose.jusqua, z: fin.z },
+        );
+      }
+      continue;
+    }
     const sol = floorY + 0.05;
     for (let i = 1; i < pts.length; i++) {
       tronc(

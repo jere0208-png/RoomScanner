@@ -3687,13 +3687,29 @@ par où passe la gaine et combien de mètres acheter. C'est la seule ligne du
 devis qu'on ne pouvait pas déduire du relevé, et celle qu'un électricien
 estime encore au pas dans le couloir.
 
-Le modèle est volontairement simple, et il le dit : la gaine longe le contour
-de la pièce à hauteur de plinthe (15 cm), tourne aux angles, remonte à
-l'appareil. `ringPath()` compare les deux sens de contournement et garde le
-plus court — jamais la diagonale à travers la pièce, jamais le tour complet
-quand un quart suffit. La longueur ajoute la descente du tableau, la remontée
-à l'appareil, 60 cm de mou d'about, et la traversée en ligne droite quand le
-tableau est dans une autre pièce.
+Le modèle est volontairement simple, et il le dit. **La gaine passe par le
+plafond** — relevé du patron : « Pour les gaines, très souvent on passe par le
+plafond, et pas les murs, sauf pour les retombées vers les points d'élec
+(inter, etc.) ». Chaque départ (`cableRuns`) compte trois tronçons : la
+**montée** du tableau jusqu'au plafond de sa pièce, la **traversée** en droite
+ligne jusqu'à l'aplomb de l'appareil (au-dessus des cloisons, rien ne
+s'interpose), et la **retombée** le long du mur, du plafond de la pièce
+desservie jusqu'à la boîte. Un point de plafond (DCL, spot) n'a pas de
+retombée. Les pontages ne changent pas : de prise en prise au mur, de spot en
+spot au plafond. On ajoute 60 cm de mou d'about au câble, pas à la gaine.
+
+Exemple, à la main : tableau à 1,30 m sous 2,50 m, interrupteur à 1,10 m à
+5 m en plan — 1,20 + 5,00 + 1,40 = 7,60 m de gaine, 8,20 m de câble. Sur
+l'appartement d'exemple, le total bouge peu (225,9 → 230,8 m de gaine) mais
+se redistribue : les prises paient leur retombée de 2,25 m, l'éclairage ne
+fait plus le tour des pièces pour rejoindre le plafond.
+
+Chaque tracé porte sa **pose** (`TraceGaine`) : la 3D monte le tube du
+tableau, le fait courir sous le plafond et le fait retomber au nu du mur ; le
+plan et la feuille « Plan des gaines » posent un petit triangle plein au pied
+de chaque retombée (le cercle barré, c'est le point lumineux). Les outils du
+contour (`ringPath`, `shortestPath`) restent, exacts, pour un tracé au sol ;
+le métré ne les appelle plus.
 
 Le calque « gaines » ne s'offre que si un tableau est posé : sans lui, on ne
 sait pas d'où part le câble, et une pastille qui n'allume rien est un piège.

@@ -46,8 +46,8 @@ import {
   niveauxPresents,
   nomDuNiveau,
   roomParts,
-  type Pt,
 } from '../geometry/floorplan';
+import type { TraceGaine } from '../geometry/routing';
 import {
   fixturePlacement,
   materialList,
@@ -113,7 +113,7 @@ function PlanPreview({
   ceiling,
 }: {
   cotes: boolean;
-  routes?: { id: string; path: Pt[] }[];
+  routes?: TraceGaine[];
   ceiling?: CeilingFixture[];
 }) {
   return (
@@ -1300,7 +1300,9 @@ const styles = getStyles(c);
             <Carte
               icone={EXPORT_ICONS.gaines}
               titre="Plan des gaines"
-              dit="Le chemin de chaque câble, et le tirage circuit par circuit."
+              // Le passage en plafond se dit dès la carte (relevé du patron,
+              // voir `routing.ts`) : c'est lui qui fait le métré.
+              dit="Passage en plafond, retombées le long des murs, et le tirage circuit par circuit."
               pages={pagesDe(gaines, combien(sommaire, 'gaines'), 1)}
               actif={gaines}
               label="Plan des gaines"

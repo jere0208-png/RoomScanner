@@ -169,8 +169,9 @@ export interface PullRow {
   cableLength: number;
   /**
    * Longueur approchée : la pièce desservie n'a pas été relevée en boucle
-   * fermée, son contour est reconstitué, et la gaine le longe. À chiffrer
-   * avec une marge, ou à re-scanner.
+   * fermée (ou l'appareil ne tombe dans aucune pièce), et la hauteur sous
+   * plafond d'où part la retombée est empruntée. À chiffrer avec une marge,
+   * ou à re-scanner.
    */
   approx: boolean;
   protection: string;
@@ -189,7 +190,7 @@ export function pullSchedule(
     string,
     { conduit: number; cable: number; runs: number; troncons?: TronconMetre[] }
   >,
-  /** Circuits dont le tracé longe un contour reconstitué (voir `ElecPlan`). */
+  /** Circuits dont un départ dessert une pièce reconstituée (voir `ElecPlan`). */
   approx?: Set<string>,
   /**
    * L'appareillage posé, quand on l'a : il donne le NOMBRE DE CONDUCTEURS,

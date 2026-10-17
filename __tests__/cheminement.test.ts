@@ -3,14 +3,14 @@
  *
  * C'est la seule donnée du devis qu'on ne pouvait pas déduire du relevé, et
  * celle qu'un électricien estime encore au pas dans le couloir. Le modèle
- * est simple et il le dit : la gaine longe le contour à hauteur de plinthe,
- * tourne aux angles, remonte à l'appareil. Ce qu'il doit garantir, c'est
- * qu'il prend TOUJOURS le chemin le plus court par le bâti — jamais la
- * diagonale à travers la pièce, jamais le tour complet quand un quart
- * suffit.
+ * est simple et il le dit : la gaine monte du tableau au plafond, le
+ * traverse en droite ligne et retombe le long du mur jusqu'à l'appareil
+ * (relevé du patron, voir `routing.ts`). Les outils du contour, eux,
+ * gardent leur garantie : le chemin le plus court AU SOL dans une pièce —
+ * jamais la diagonale hors de la pièce, jamais le tour complet quand un
+ * quart suffit.
  */
 import {
-  HAUTEUR_GAINE,
   MOU,
   cableRuns,
   circuitLength,
@@ -107,81 +107,80 @@ describe('longer le contour, du bon côté', () => {
 });
 
 describe('le métré d’un circuit', () => {
-  const tableau = { x: 0.4, z: 0 };
+  /*
+    PAR LE PLAFOND — relevé du patron : « très souvent on passe par le
+    plafond, et pas les murs, sauf pour les retombées vers les points
+    d'élec ». Montée du tableau, traversée en droite ligne, retombée.
+  */
+  const depart = { at: { x: 0.4, z: 0 }, height: 1.3, plafond: 2.5 };
   const devices = [
-    { id: 'a', at: { x: 3, z: 0 }, height: 0.25 },
-    { id: 'b', at: { x: 6, z: 2 }, height: 1.1 },
+    { id: 'a', at: { x: 3, z: 0 }, height: 0.25, plafond: 2.5 },
+    { id: 'b', at: { x: 6, z: 2 }, height: 1.1, plafond: 2.5 },
   ];
+  const montee = 2.5 - 1.3;
 
-  it('compte le parcours, la descente, la remontée et le mou', () => {
-    const runs = cableRuns(PIECE, tableau, 1.3, devices);
+  it('compte la montée, la traversée au plafond, la retombée et le mou', () => {
+    const runs = cableRuns(depart, devices);
     expect(runs).toHaveLength(2);
 
     const a = runs[0];
-    const parcours = 3 - 0.4;
-    const descente = 1.3 - HAUTEUR_GAINE;
-    const remontee = Math.abs(0.25 - HAUTEUR_GAINE);
-    expect(a.length).toBeCloseTo(parcours + descente + remontee + MOU, 6);
+    const traversee = 3 - 0.4;
+    const retombee = 2.5 - 0.25;
+    expect(a.length).toBeCloseTo(montee + traversee + retombee + MOU, 6);
 
     /**
-     * ET LE PARCOURS EST LE PLUS COURT, PAS LE TOUR DU PROPRIÉTAIRE.
+     * EN DROITE LIGNE, AU-DESSUS DES CLOISONS.
      *
-     * Cet appareil est sur le mur d'en face. La gaine longeait le contour
-     * — 5,60 m jusqu'au coin, puis 2 m — soit 7,60 m de conduit pour
-     * atteindre un point qui n'est qu'à 5,89 m en droite ligne. Une pièce
-     * carrée ne masque rien : le trajet est donc la droite, dans la dalle.
+     * Cet appareil est sur le mur d'en face. Au plafond rien ne
+     * s'interpose : la traversée est la droite jusqu'à son aplomb.
      */
     const b = runs[1];
-    const parcoursB = Math.hypot(6 - 0.4, 2);
     expect(b.length).toBeCloseTo(
-      parcoursB + descente + Math.abs(1.1 - HAUTEUR_GAINE) + MOU,
+      montee + Math.hypot(6 - 0.4, 2) + (2.5 - 1.1) + MOU,
       6,
     );
     expect(b.path).toHaveLength(2);
   });
 
   it('chaque départ est compté séparément : c’est ce qu’on tire', () => {
-    const runs = cableRuns(PIECE, tableau, 1.3, devices);
+    const runs = cableRuns(depart, devices);
     const total = runs[0].length + runs[1].length;
     expect(circuitLength(runs)).toBe(Math.ceil(total));
   });
 
   it('s’arrondit au mètre supérieur : on n’achète pas au centimètre', () => {
-    const runs = cableRuns(PIECE, tableau, 1.3, [devices[0]]);
+    const runs = cableRuns(depart, [devices[0]]);
     expect(Number.isInteger(circuitLength(runs))).toBe(true);
     expect(circuitLength(runs)).toBeGreaterThanOrEqual(runs[0].length);
     expect(circuitLength(runs) - runs[0].length).toBeLessThan(1);
   });
 
-  it('un appareil à l’aplomb du tableau ne coûte que ses abouts', () => {
-    const runs = cableRuns(PIECE, tableau, 1.3, [
-      { id: 'x', at: tableau, height: 1.3 },
+  it('un appareil à l’aplomb du tableau coûte sa montée et sa retombée', () => {
+    const runs = cableRuns(depart, [
+      { id: 'x', at: depart.at, height: 1.3, plafond: 2.5 },
     ]);
-    expect(runs[0].length).toBeCloseTo(2 * (1.3 - HAUTEUR_GAINE) + MOU, 6);
+    expect(runs[0].length).toBeCloseTo(2 * montee + MOU, 6);
   });
 
   it('un tableau hors de la pièce : la traversée est comptée, et tracée', () => {
     // Tableau dans le dégagement, à 1,50 m du mur nord.
-    const dehors = { x: 3, z: -1.5 };
-    const runs = cableRuns(PIECE, dehors, 1.3, [
-      { id: 'a', at: { x: 3, z: 0 }, height: 0.25 },
+    const dehors = { at: { x: 3, z: -1.5 }, height: 1.3, plafond: 2.5 };
+    const runs = cableRuns(dehors, [
+      { id: 'a', at: { x: 3, z: 0 }, height: 0.25, plafond: 2.5 },
     ]);
-    const descente = 1.3 - HAUTEUR_GAINE;
-    const remontee = Math.abs(0.25 - HAUTEUR_GAINE);
-    // 1,50 m de traversée, puis rien à longer : l'appareil est à l'aplomb.
-    expect(runs[0].length).toBeCloseTo(1.5 + descente + remontee + MOU, 6);
+    expect(runs[0].length).toBeCloseTo(montee + 1.5 + (2.5 - 0.25) + MOU, 6);
     // Et le tracé part bien du tableau.
-    expect(runs[0].path[0]).toEqual(dehors);
+    expect(runs[0].path[0]).toEqual(dehors.at);
   });
 
   it('la gaine se compte sans le mou : on tire du fil en plus, pas du tube', () => {
-    const runs = cableRuns(PIECE, tableau, 1.3, [devices[0]]);
+    const runs = cableRuns(depart, [devices[0]]);
     expect(runs[0].length - runs[0].conduit).toBeCloseTo(MOU, 6);
     expect(runs[0].conduit).toBeGreaterThan(0);
   });
 
   it('sans appareil, le circuit ne coûte rien', () => {
-    expect(circuitLength(cableRuns(PIECE, tableau, 1.3, []))).toBe(0);
+    expect(circuitLength(cableRuns(depart, []))).toBe(0);
   });
 });
 

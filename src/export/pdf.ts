@@ -156,7 +156,7 @@ import {
   type ScenePalette,
 } from '../geometry/scene3d';
 import { furnKind, furnitureStrokes, meridienneDe, nomDuMeuble, type RoomKind } from '../geometry/furniture';
-import { ecarterLesGaines } from '../geometry/routing';
+import { ecarterLesGaines, type PoseGaine } from '../geometry/routing';
 import { matieresDesSols } from '../ui/maquette';
 import { accentsDesPieces, peinturesDesPieces, solsDesPieces } from '../ui/habillage';
 import { cotesExterieures, ECART_DE_COTE } from '../geometry/cotes3d';
@@ -1850,8 +1850,11 @@ interface SheetContext {
   colorOpenings: boolean;
   showSurfaces: boolean;
   showTextures: boolean;
-  /** Cheminement des gaines, en coordonnées MONDE (`Pt` est ici la page). */
-  routes?: { id: string; path: { x: number; z: number }[] }[];
+  /**
+   * Cheminement des gaines, en coordonnées MONDE (`Pt` est ici la page) —
+   * avec leur pose : c'est elle qui dit où dessiner les retombées.
+   */
+  routes?: { id: string; path: { x: number; z: number }[]; pose?: PoseGaine }[];
   /**
    * Le PLAFOND, posé sur le plan d'ensemble.
    *
@@ -3943,6 +3946,27 @@ function planPage(
         const repere = ctx.circuitsDesAppareils?.get(r.id);
         d.dashedPath(r.path.map(px), 0.7, repere ? markColor(repere) : '#2F6BFF', [4, 3]);
       }
+      /*
+        LES RETOMBÉES, AU PIED DU TRACÉ — relevé du patron : « pour les
+        gaines, très souvent on passe par le plafond, et pas les murs, sauf
+        pour les retombées vers les points d'élec (inter, etc.) ».
+
+        Le plan ne montre que la projection : sans repère, rien ne dit que
+        la gaine descend le long du mur à cet endroit, et c'est pourtant là
+        qu'on fera la saignée. Un petit triangle plein, pointe en bas, se
+        pose sur le dernier point, à la couleur du circuit (voir
+        `symboleDeRetombee`). Les points de plafond n'en ont pas : la gaine
+        finit sur eux.
+
+        Après TOUS les tiretés : une gaine voisine ne barre pas le symbole.
+      */
+      for (const r of gainesDuPlan) {
+        if (r.path.length < 2 || r.pose?.kind !== 'plafond' || r.pose.jusqua === undefined) continue;
+        const pied = px(r.path[r.path.length - 1]);
+        if (!dansLeCadre(pied)) continue;
+        const repere = ctx.circuitsDesAppareils?.get(r.id);
+        symboleDeRetombee(d, pied, repere ? markColor(repere) : '#2F6BFF');
+      }
     }
 
     /*
@@ -5429,8 +5453,14 @@ function gainesPage(
     overlay: tirage,
     title: 'Plan des gaines',
     sub:
-      'Cheminement du tableau à chaque appareil. Diamètres calculés au ' +
-      'tiers de remplissage — le compte de fils est celui du schéma.',
+      /*
+        PASSAGE EN PLAFOND — relevé du patron (voir `routing.ts`) : le
+        sous-titre dit comment lire le tracé, et ce que veut le petit
+        triangle au pied de chaque gaine.
+      */
+      'Passage en plafond, retombées le long des murs (triangle au pied du ' +
+      'tracé). Diamètres calculés au tiers de remplissage — le compte de ' +
+      'fils est celui du schéma.',
     // La légende d'appareillage se tait : la feuille parle de tirage, et
     // deux boîtes cherchant le coin le plus libre finissent l'une sur
     // l'autre.
@@ -5440,6 +5470,31 @@ function gainesPage(
     hideCotesPose: true,
   });
   return page;
+}
+
+/**
+ * LE SYMBOLE D'UNE RETOMBÉE : un petit triangle plein, pointe en bas.
+ *
+ * Il dit « ça descend » sans emprunter un symbole qui a déjà un sens sur
+ * ce plan : le cercle barré, c'est le point lumineux (DCL). Plein, à la
+ * couleur du circuit, cerné de blanc pour se détacher d'un tireté voisin.
+ * Quatre points et demi de large — il se lit sans couvrir l'appareil,
+ * posé plus loin dans la pièce.
+ */
+const DEMI_RETOMBEE = 2.2;
+function symboleDeRetombee(d: Draw, c: Pt, teinte: string) {
+  const r = DEMI_RETOMBEE;
+  // L'axe vertical de la page monte : la pointe est en y − r.
+  d.poly(
+    [
+      { x: c.x - r, y: c.y + r * 0.75 },
+      { x: c.x + r, y: c.y + r * 0.75 },
+      { x: c.x, y: c.y - r },
+    ],
+    teinte,
+    '#FFFFFF',
+    0.4,
+  );
 }
 
 function unifilairePage(
@@ -6884,7 +6939,7 @@ export interface ScanForPdf {
   /** Appareillage électrique posé sur les murs. */
   fixtures?: Fixture[];
   /** Cheminement des gaines, du tableau à chaque appareil (repère monde). */
-  routes?: { id: string; path: { x: number; z: number }[] }[];
+  routes?: { id: string; path: { x: number; z: number }[]; pose?: PoseGaine }[];
   /**
    * LES MOTS ÉCRITS SUR LE PLAN.
    *
@@ -7440,10 +7495,17 @@ export function buildMaterialPdf(
       y -= 3;
     }
     y -= 4;
+    /*
+      LE MÉTRÉ DIT COMMENT IL PASSE — relevé du patron : « très souvent on
+      passe par le plafond, et pas les murs, sauf pour les retombées ». Une
+      longueur dont on ne sait pas comment elle a été prise ne se vérifie
+      pas au comptoir.
+    */
     note(
       '   Quantités établies sur le relevé, chutes non comprises. Les ' +
         'longueurs de conduit et de conducteur sont mesurées sur le plan, ' +
-        'pas estimées au mètre carré.',
+        'pas estimées au mètre carré : montée du tableau au plafond, ' +
+        'passage en plafond, retombée le long du mur jusqu’à chaque appareil.',
     );
   }
 

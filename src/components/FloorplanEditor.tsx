@@ -68,6 +68,7 @@ import {
   wallQuadsOf,
   jonctionsDetaillees,
 } from '../geometry/floorplan';
+import type { TraceGaine } from '../geometry/routing';
 import { dessinDesNatures, renduNature } from '../geometry/natureMurs';
 import { carnetDesMenuiseries } from '../geometry/menuiseries';
 import type { ObjectData } from 'react-native-room-scan';
@@ -405,8 +406,9 @@ interface Props {
   /**
    * Cheminement des gaines, du tableau à chaque appareil. Calque optionnel :
    * sans tableau posé, l'écran n'en fournit pas, et rien ne se dessine.
+   * La pose de chaque tracé dit où il retombe le long d'un mur.
    */
-  cableRoutes?: { id: string; path: Pt[] }[];
+  cableRoutes?: TraceGaine[];
   /**
    * Repère de circuit par appareil (C1, C2…) : ce qu'on donne à celui qui
    * tire les gaines. Absent = pas de repérage, le plan reste nu.
@@ -3964,9 +3966,9 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
             })}
 
         {/*
-          LES GAINES : un filet tireté qui longe les murs, du tableau à
-          chaque appareil. Son tracé est celui du métré porté au devis,
-          pas une illustration.
+          LES GAINES : un filet tireté, du tableau à chaque appareil, en
+          droite ligne au plafond. Son tracé est celui du métré porté au
+          devis, pas une illustration.
 
           ELLES PASSENT SOUS LE PLAFOND, ET PLUS SEULEMENT SOUS LES
           APPAREILS — relevé du patron : « les chiffres sont cachés par
@@ -4005,6 +4007,35 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
             opacity={0.75}
           />
         ))}
+        {/*
+          LES RETOMBÉES, AU PIED DU TRACÉ — relevé du patron : « très
+          souvent on passe par le plafond, et pas les murs, sauf pour les
+          retombées vers les points d'élec ». Le tireté est la traversée
+          au plafond ; le petit triangle plein, pointe en bas, dit qu'ici
+          la gaine DESCEND le long du mur, jusqu'à la boîte. Même symbole
+          que le PDF — et pas le cercle barré, qui est le point lumineux.
+        */}
+        {cableRoutes?.map((r) => {
+          if (r.pose?.kind !== 'plafond' || r.pose.jusqua === undefined) return null;
+          const fin = r.path[r.path.length - 1];
+          if (!fin) return null;
+          const q = mapping.toPx(fin);
+          const teinte = circuitMarks?.get(r.id)
+            ? markColor(circuitMarks.get(r.id)!)
+            : c.blue;
+          // L'axe vertical de l'écran descend : la pointe est en y + k.
+          const k = 4;
+          return (
+            <Polygon
+              key={`retombee-${r.id}`}
+              points={`${q.x - k},${q.y - k * 0.75} ${q.x + k},${q.y - k * 0.75} ${q.x},${q.y + k}`}
+              fill={teinte}
+              stroke={c.surface}
+              strokeWidth={0.8}
+              opacity={0.9}
+            />
+          );
+        })}
         <CeilingLayer
           ecartsGardes={cotesArbitrees.ecarts}
           ceiling={ceiling}

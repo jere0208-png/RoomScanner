@@ -6,28 +6,44 @@
  * seule donnée du devis qu'on ne pouvait pas déduire du relevé, et celle
  * qu'un électricien estime encore au pas dans le couloir.
  *
- * LE CHEMIN LE PLUS COURT, DANS LA PIÈCE.
+ * PAR LE PLAFOND, ET LES RETOMBÉES LE LONG DES MURS.
  *
- * La gaine faisait le tour du propriétaire : elle longeait le contour d'un
- * bout à l'autre, entrait dans chaque renfoncement, ressortait, et le métré
- * gonflait d'autant. Sur un séjour en L, atteindre une prise à six mètres
- * coûtait onze mètres de conduit — personne ne tire comme ça.
+ * Relevé du patron : « Pour les gaines, très souvent on passe par le
+ * plafond, et pas les murs, sauf pour les retombées vers les points d'élec
+ * (inter, etc.) ».
  *
- * On calcule désormais la GÉODÉSIQUE : le plus court trajet qui reste dans
- * la pièce. Dans une pièce carrée c'est la droite, dans la dalle ou sous la
- * chape ; dès qu'un retour de cloison s'interpose, le trajet vient
- * l'épouser — il contourne au plus juste, en frôlant l'angle, exactement
- * comme on déroule une gaine au sol.
+ * La gaine courait au sol, dans la chape, à hauteur de plinthe : un
+ * cheminement de dalle neuve, en diagonale à travers les pièces et sous les
+ * meubles. Un logement scanné est presque toujours une RÉNOVATION, et là on
+ * ne coule pas de chape : on passe au-dessus. D'où trois tronçons par
+ * départ, et chacun se compte :
+ *
+ *   — la MONTÉE du tableau jusqu'au plafond, le long de son mur ;
+ *   — la TRAVERSÉE au plafond, en droite ligne vers l'aplomb de l'appareil :
+ *     au-dessus des cloisons, rien ne s'interpose — c'est le tirage réel
+ *     d'un faux plafond ou d'un plénum ;
+ *   — la RETOMBÉE, verticale, du plafond de la pièce desservie jusqu'à la
+ *     boîte : 2,25 m pour une prise à 25 cm sous 2,50 m, 1,40 m pour un
+ *     interrupteur à 1,10 m. C'est elle que la chape oubliait — l'ancien
+ *     calcul comptait une remontée de dix centimètres.
+ *
+ * Un point AU PLAFOND (DCL, spot) n'a pas de retombée : la traversée finit
+ * sur lui. Les pontages restent ce qu'ils sont : de prise en prise le long
+ * du mur, de spot en spot au plafond (voir `planRoutes`).
  *
  * Ce que le modèle ne prétend toujours PAS connaître : ce qu'il y a dans les
- * cloisons, les réservations, les faux plafonds. Il donne un trajet
- * constructible et sa longueur ; on ne s'en écarte qu'en connaissance de
- * cause.
+ * cloisons et au-dessus du plafond — solives, réservations, trémies. Il
+ * donne un trajet constructible et sa longueur ; on ne s'en écarte qu'en
+ * connaissance de cause.
+ *
+ * Les outils du contour (`projectOnRing`, `ringPath`, `shortestPath`)
+ * restent : ce sont eux qui disaient le plus court chemin AU SOL, dans une
+ * pièce, et ils sont exacts. Le métré ne les appelle plus.
  */
 import type { Pt } from './floorplan';
 
-/** Hauteur de la boucle de distribution : la plinthe. */
-export const HAUTEUR_GAINE = 0.15;
+/** Hauteur sous plafond quand le relevé ne la donne pas (m). */
+export const HAUTEUR_SOUS_PLAFOND = 2.5;
 /** Mou laissé à chaque about (tableau, boîte) : 30 cm de chaque côté. */
 export const MOU = 0.6;
 
@@ -36,17 +52,66 @@ export interface RoutePoint extends Pt {
   y: number;
 }
 
+/**
+ * COMMENT LA GAINE EST POSÉE — ce que le tracé en plan ne dit pas.
+ *
+ * Le plan ne montre que la projection ; la 3D et le PDF ont besoin de
+ * savoir à quelle hauteur court le tube, d'où il monte et jusqu'où il
+ * retombe. Absent : un tracé à l'ancienne, au ras du sol.
+ */
+export interface PoseGaine {
+  /** Au plafond (montée, traversée, retombée), ou au mur (pontage de prises). */
+  kind: 'plafond' | 'mur';
+  /** Hauteur du tronçon horizontal (m) : sous plafond, ou celle des socles. */
+  niveau: number;
+  /** Hauteur du départ d'où la gaine MONTE (m) ; absent : elle part du plafond. */
+  depuis?: number;
+  /** Hauteur de l'appareil au pied de la RETOMBÉE (m) ; absent : point de plafond. */
+  jusqua?: number;
+}
+
+/** Un tracé du plan des gaines : la projection, et sa pose. */
+export interface TraceGaine {
+  id: string;
+  path: Pt[];
+  pose?: PoseGaine;
+}
+
 export interface CableRun {
   fixtureId: string;
-  /** Tracé au sol, du tableau à l'aplomb de l'appareil. */
+  /** Tracé en plan, du tableau à l'aplomb de l'appareil. */
   path: Pt[];
-  /** Longueur développée : parcours au sol + descente + remontée + mou. */
+  /** Longueur développée : montée + traversée + retombée + mou. */
   length: number;
   /**
    * Longueur de GAINE : le parcours physique, sans le mou d'about. On tire
    * du fil en plus, pas du conduit.
    */
   conduit: number;
+  /** La pose, pour la 3D et le PDF. */
+  pose?: PoseGaine;
+}
+
+/** Le départ des gaines : le tableau, sa hauteur, et le plafond de sa pièce. */
+export interface DepartGaine {
+  at: Pt;
+  /** Hauteur du tableau (m). */
+  height: number;
+  /** Hauteur sous plafond de la pièce du tableau (m). */
+  plafond: number;
+}
+
+/** Un appareil à desservir. */
+export interface Desservi {
+  id: string;
+  /** Sa position en plan (au nu du mur, ou sous le point de plafond). */
+  at: Pt;
+  /** Sa hauteur de pose (m). */
+  height: number;
+  /** Hauteur sous plafond de SA pièce (m) : la retombée part de là. */
+  plafond: number;
+  /** Un point de plafond (DCL, spot) : pas de retombée. */
+  auPlafond?: boolean;
 }
 
 /** Distance entre deux points du plan. */
@@ -258,34 +323,38 @@ export function shortestPath(
 }
 
 /**
- * Le cheminement d'un circuit : du tableau à chaque appareil.
+ * Le cheminement d'un circuit : du tableau à chaque appareil, PAR LE
+ * PLAFOND.
  *
  * Chaque départ est compté SÉPARÉMENT — c'est ce qu'on tire dans la gaine —
- * et la descente comme la remontée s'ajoutent au parcours au sol. Le mou
+ * et chacun paie sa montée depuis le tableau : en étoile, toutes les gaines
+ * remontent au tableau (relevé du patron, voir `TronconMetre`). Le mou
  * d'about est forfaitaire : 30 cm à chaque bout, ce qu'on laisse toujours
  * pour raccorder proprement.
+ *
+ * EXEMPLE, À LA MAIN : tableau à 1,30 m sous 2,50 m, interrupteur à 1,10 m
+ * à cinq mètres en plan. Montée 1,20 + traversée 5,00 + retombée 1,40 =
+ * 7,60 m de gaine ; 8,20 m de câble avec le mou.
  */
-export function cableRuns(
-  ring: Pt[],
-  panel: Pt,
-  panelHeight: number,
-  devices: { id: string; at: Pt; height: number }[],
-): CableRun[] {
-  // Le tableau n'est pas forcément dans la pièce desservie : la gaine
-  // traverse alors le dégagement. On compte ce trajet en ligne droite, et
-  // on le DIT — c'est une approximation, pas un cheminement relevé.
-  const entree = projectOnRing(ring, panel);
-  const traverse = dist(panel, entree.at);
+export function cableRuns(depart: DepartGaine, devices: Desservi[]): CableRun[] {
+  const montee = Math.max(0, depart.plafond - depart.height);
   return devices.map((d) => {
-    const { path, length } = shortestPath(ring, entree.at, d.at);
-    const descente = Math.abs(panelHeight - HAUTEUR_GAINE);
-    const remontee = Math.abs(d.height - HAUTEUR_GAINE);
-    const parcours = traverse + length + descente + remontee;
+    const traversee = dist(depart.at, d.at);
+    const retombee = d.auPlafond ? 0 : Math.max(0, d.plafond - d.height);
+    const parcours = montee + traversee + retombee;
     return {
       fixtureId: d.id,
-      path: traverse > 1e-6 ? [panel, ...path] : path,
+      path: [depart.at, d.at],
       length: parcours + MOU,
       conduit: parcours,
+      pose: {
+        kind: 'plafond',
+        niveau: d.plafond,
+        depuis: depart.height,
+        // Une retombée de moins d'un centimètre ne se dessine pas : c'est un
+        // appareil posé au ras du plafond.
+        jusqua: retombee > 0.01 ? d.height : undefined,
+      },
     };
   });
 }
@@ -301,11 +370,12 @@ export function circuitLength(runs: CableRun[]): number {
  * Relevé du patron, capture à l'appui : « plusieurs lignes se chevauchent, ça
  * doit être impossible (courber une ligne si le cas) ».
  *
- * Tous les départs partent du MÊME tableau et longent le MÊME contour : leurs
- * premiers mètres sont rigoureusement confondus. Tracés tels quels, trois
- * départs font un seul tireté — on ne voit plus ni combien il y en a, ni où
- * ils se séparent. Sur un plan de chantier, c'est justement ce qu'on cherche
- * à lire.
+ * Tous les départs partent du MÊME tableau. Au plafond, chacun file droit
+ * vers son appareil — mais un interrupteur posé au-dessus d'une prise a la
+ * même projection qu'elle, et les deux tracés sont rigoureusement
+ * confondus. Tracés tels quels, trois départs font un seul tireté — on ne
+ * voit plus ni combien il y en a, ni où ils se séparent. Sur un plan de
+ * chantier, c'est justement ce qu'on cherche à lire.
  *
  * On les écarte donc latéralement, comme un chemin de câbles : chaque départ
  * prend son rang, et se décale d'autant de fois le pas. L'ÉCART SE REFERME

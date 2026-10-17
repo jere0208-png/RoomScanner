@@ -17,7 +17,6 @@ import {
   segLength,
   wallQuadsOf,
   wallRuns,
-  type Pt,
   type RoomPart,
   type WallSeg,
 } from './floorplan';
@@ -25,11 +24,12 @@ import { planCircuits, priseDeCuisine, type Circuit } from './nfc15100';
 import { COMMANDES, LUMIERES } from './schema';
 import type { RoomKind } from './furniture';
 import {
-  HAUTEUR_GAINE,
+  HAUTEUR_SOUS_PLAFOND,
   MOU,
   cableRuns,
   circuitLength,
-  projectOnRing,
+  type CableRun,
+  type TraceGaine,
 } from './routing';
 import type { CeilingFixture } from './ceiling';
 
@@ -79,19 +79,23 @@ export interface ElecPlan {
     }
   >;
   /**
-   * Le métré repose-t-il sur des contours SÛRS ?
+   * Le métré repose-t-il sur des pièces SÛRES ?
    *
-   * La gaine longe le contour de la pièce desservie. Quand la pièce n'a pas
-   * été relevée en boucle fermée, ce contour est reconstitué : la surface
-   * l'annonce déjà par un « ≈ », la longueur de câble le taisait. Un métré
-   * qu'on croit exact part au devis tel quel — et c'est le genre d'erreur
-   * qui se paie au mètre de câble, pas au centimètre carré.
+   * La retombée se mesure depuis le plafond de la pièce desservie. Quand la
+   * pièce n'a pas été relevée en boucle fermée, ou qu'on ne sait pas dans
+   * quelle pièce tombe l'appareil, sa hauteur sous plafond est empruntée :
+   * la surface l'annonce déjà par un « ≈ », la longueur de câble le taisait.
+   * Un métré qu'on croit exact part au devis tel quel — et c'est le genre
+   * d'erreur qui se paie au mètre de câble, pas au centimètre carré.
    */
   exact: boolean;
-  /** Les circuits dont le tracé longe un contour reconstitué. */
+  /** Les circuits dont un départ dessert une pièce reconstituée ou introuvable. */
   approx: Set<string>;
-  /** Tracés au sol, un par appareil desservi. */
-  traces: { id: string; path: Pt[] }[];
+  /**
+   * Tracés en plan, un par appareil desservi — avec leur POSE : au plafond
+   * (montée, traversée, retombée) ou au mur (pontage).
+   */
+  traces: TraceGaine[];
   /**
    * LA CHUTE DE TENSION DE CHAQUE CIRCUIT, au point le plus éloigné du
    * tableau en suivant le câble — pontages compris (voir `chute.ts`).
@@ -132,8 +136,8 @@ export function planRoutes(
     const p = facePoint(fa, faceX(fa, f.along), 0.02);
     return { at: { x: p.x, z: p.z }, height: f.height };
   };
-  const depart = posDe(tableau);
-  if (!depart) return null;
+  const pose = posDe(tableau);
+  if (!pose) return null;
 
   const pieceDe = (f: Fixture) => rooms.find((r) => r.id === placement.get(f.id));
   const circuits = planCircuits(
@@ -144,12 +148,24 @@ export function planRoutes(
     ceiling,
   );
   const plafondParId = new Map(ceiling.map((c) => [c.id, c]));
-  /** Hauteur sous plafond de la pièce, pour la montée du fil. */
-  const hauteurDe = (roomId: string) =>
+  /**
+   * Hauteur sous plafond d'une pièce : la montée et la retombée en partent.
+   * Pièce inconnue : le plus haut mur du relevé, à défaut 2,50 m.
+   */
+  const hauteurDe = (roomId: string | undefined) =>
     (parts.find((p) => p.roomId === roomId)?.walls ?? walls).reduce(
       (h, w) => Math.max(h, w.height),
       0,
-    ) || 2.5;
+    ) || HAUTEUR_SOUS_PLAFOND;
+  /**
+   * LE DÉPART : le tableau, et le plafond de SA pièce — c'est jusque-là que
+   * chaque gaine monte avant de traverser.
+   */
+  const depart = {
+    at: pose.at,
+    height: pose.height,
+    plafond: hauteurDe(placement.get(tableau.id)),
+  };
 
   const parCircuit = new Map<string, number>();
   const metre = new Map<
@@ -161,7 +177,7 @@ export function planRoutes(
       troncons: TronconMetre[];
     }
   >();
-  const traces: { id: string; path: Pt[] }[] = [];
+  const traces: TraceGaine[] = [];
   const approx = new Set<string>();
   const chutes: ChuteDeTension[] = [];
 
@@ -241,7 +257,7 @@ export function planRoutes(
 
   for (const c of circuits) {
     const pontees = chaines(c);
-    const runs = c.fixtureIds.flatMap((id) => {
+    const runs = c.fixtureIds.flatMap((id): CableRun[] => {
       const f = fixtures.find((x) => x.id === id);
       if (!f || f.id === tableau.id) return [];
       const pos = posDe(f);
@@ -266,33 +282,37 @@ export function planRoutes(
                 path: [de.at, pos.at],
                 conduit: ecart,
                 length: ecart + MOU,
+                // Au mur, à la hauteur des socles : « c'est le seul élément
+                // qu'on ponte au mur ».
+                pose: { kind: 'mur', niveau: f.height },
               },
             ];
           }
         }
       }
-      // La gaine longe le contour de la pièce DESSERVIE ; à défaut, celui
-      // de la première pièce du plan — mieux vaut un tracé approché qu'une
-      // ligne droite à travers les cloisons.
-      const piece = parts.find((p) => p.roomId === placement.get(f.id));
-      const surface = piece?.surface ?? parts[0]?.surface;
-      const ring = surface?.pts ?? [];
-      if (ring.length < 3) return [];
-      // Contour reconstitué, ou pièce introuvable et contour emprunté à une
-      // autre : dans les deux cas le tracé est approché, et on le dit.
-      if (!surface?.exact || !piece) approx.add(c.id);
-      return cableRuns(ring, depart.at, depart.height, [
-        { id: f.id, at: pos.at, height: pos.height },
+      /*
+        PAR LE PLAFOND, PUIS LA RETOMBÉE — relevé du patron : « très souvent
+        on passe par le plafond, et pas les murs, sauf pour les retombées
+        vers les points d'élec ». La gaine monte du tableau, traverse au
+        plafond jusqu'à l'aplomb de l'appareil, et retombe le long de son
+        mur depuis le plafond de SA pièce.
+      */
+      const roomId = placement.get(f.id);
+      const piece = parts.find((p) => p.roomId === roomId);
+      // Pièce reconstituée, ou introuvable et hauteur empruntée : dans les
+      // deux cas la retombée est approchée, et on le dit.
+      if (!piece?.surface?.exact) approx.add(c.id);
+      return cableRuns(depart, [
+        { id: f.id, at: pos.at, height: pos.height, plafond: hauteurDe(roomId) },
       ]);
     });
     /**
-     * LE FIL MONTE AU PLAFOND.
+     * LE POINT DE PLAFOND N'A PAS DE RETOMBÉE.
      *
-     * Un point lumineux n'est pas sur un mur : la gaine longe le contour
-     * comme pour un appareil mural, puis MONTE le long du mur le plus
-     * proche du point, et traverse le plafond jusqu'à lui. Sans ces deux
-     * derniers segments, un circuit de six spots ne comptait que le tour
-     * de la pièce — et le métré sous-estimait tous les éclairages.
+     * La gaine monte du tableau et traverse le plafond jusqu'à lui : elle y
+     * est déjà. Elle longeait le contour au sol, montait le long du mur le
+     * plus proche puis traversait — trois tronçons pour un trajet qui, au
+     * plafond, n'en demande qu'un.
      */
     /*
       UNE LIGNE DE SPOTS EST UN PONTAGE — comme une rangée de prises.
@@ -350,30 +370,19 @@ export function planRoutes(
             path: [de.at, cl.at],
             conduit: saut,
             length: saut + MOU,
+            pose: { kind: 'plafond', niveau: hauteurDe(cl.roomId) },
           });
           continue;
         }
       }
       const piece = parts.find((p) => p.roomId === cl.roomId);
-      const ring = piece?.surface?.pts ?? parts[0]?.surface?.pts ?? [];
-      if (ring.length < 3) continue;
-      if (!piece?.surface?.exact || !piece) approx.add(c.id);
-      // Le point du contour le plus proche : c'est par là que le fil monte.
-      const pied = projectOnRing(ring, cl.at).at;
-      const [run] = cableRuns(ring, depart.at, depart.height, [
-        { id: cl.id, at: pied, height: HAUTEUR_GAINE },
-      ]);
-      if (!run) continue;
-      const montee = hauteurDe(cl.roomId) - HAUTEUR_GAINE;
-      const traversee = Math.hypot(cl.at.x - pied.x, cl.at.z - pied.z);
-      runs.push({
-        ...run,
-        // Le parcours physique gagne la montée et la traversée ; le câble
-        // aussi, avec son mou déjà compté par `cableRuns`.
-        conduit: run.conduit + montee + traversee,
-        length: run.length + montee + traversee,
-        path: [...run.path, cl.at],
-      });
+      if (!piece?.surface?.exact) approx.add(c.id);
+      const plafond = hauteurDe(cl.roomId);
+      runs.push(
+        ...cableRuns(depart, [
+          { id: cl.id, at: cl.at, height: plafond, plafond, auPlafond: true },
+        ]),
+      );
     }
     if (runs.length === 0) continue;
     /*
@@ -423,7 +432,7 @@ export function planRoutes(
         return { id: r.fixtureId, conduit: r.conduit, cable: r.length, role };
       }),
     });
-    for (const r of runs) traces.push({ id: r.fixtureId, path: r.path });
+    for (const r of runs) traces.push({ id: r.fixtureId, path: r.path, pose: r.pose });
   }
   return { parCircuit, metre, traces, exact: approx.size === 0, approx, chutes };
 }

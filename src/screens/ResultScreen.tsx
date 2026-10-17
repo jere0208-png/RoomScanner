@@ -2621,6 +2621,10 @@ export function ResultScreen() {
    * prise, un mètre dix pour un interrupteur, la hauteur sous plafond pour
    * un point lumineux. Sans elle, le modèle montrait des gaines qui
    * s'arrêtent au sol, sous des appareils alimentés par magie.
+   *
+   * Les tracés passés au plafond portent maintenant leurs hauteurs dans
+   * leur pose (montée, plafond, retombée — voir `TraceGaine`) : la table ne
+   * sert plus qu'à un tracé qui n'en aurait pas.
    */
   const hauteursDesservies = useMemo(() => {
     const t: Record<string, number> = {};
@@ -5296,7 +5300,8 @@ export function ResultScreen() {
             // Toucher le tableau sur la maquette ouvre son rendu réaliste.
             onTapTableau={modeElec ? () => setTableauFini(true) : undefined}
             /* Le même calque que sur le plan, mais en volume : le tube
-               court dans la chape et remonte au nu du mur. C'est ce
+               monte du tableau, court sous le plafond et retombe le long
+               du mur (relevé du patron, voir `routing.ts`). C'est ce
                dessin-là qu'on emporte sur le chantier. */
             cableRoutes={showRoutes ? cheminements?.traces : undefined}
             routeHeights={showRoutes ? hauteursDesservies : undefined}
@@ -5336,14 +5341,15 @@ export function ResultScreen() {
         {/*
           UN TRACÉ PROPOSÉ N'EST PAS UN CÂBLE — revue « Paul » : il cherchait
           où percer, et lisait dans les gaines le passage réel de ses câbles.
-          Ce sont des chemins CALCULÉS pour une installation neuve. Tant que
-          le calque est allumé, le plan le dit — l'image partagée aussi.
+          Ce sont des chemins CALCULÉS — passage en plafond, retombées le
+          long des murs. Tant que le calque est allumé, le plan le dit —
+          l'image partagée aussi.
         */}
         {showRoutes && !!cheminements?.traces?.length && (
           <View pointerEvents="none" style={styles.avisGaines}>
             <Text style={styles.avisGainesTexte}>
-              Tracé proposé pour une installation neuve : ce ne sont pas vos câbles,
-              ne vous y fiez pas pour percer.
+              Tracé proposé, passage en plafond et retombées le long des murs : ce ne
+              sont pas vos câbles, ne vous y fiez pas pour percer.
             </Text>
           </View>
         )}
