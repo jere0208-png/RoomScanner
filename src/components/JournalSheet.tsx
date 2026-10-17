@@ -25,6 +25,8 @@ import { datePanne, usePannes } from '../ui/journalPannes';
 import { phraseEnergie } from '../ui/energie';
 import { phraseMaillage } from '../geometry/maillage';
 import { RoomScan } from 'react-native-room-scan';
+import { alerte } from '../ui/alerte';
+import { panne as expliquer } from '../ui/panne';
 import {
   fichierDuReleveBrut,
   lesRelevesBruts,
@@ -111,8 +113,23 @@ export function JournalSheet({
               accessibilityLabel={`Envoyer le relevé brut du ${phraseDuReleveBrut(r)}`}
               style={s.partager}
               onPress={async () => {
+                /*
+                  UN APPUI QUI NE FAIT RIEN NE DIT RIEN — relevé des exports :
+                  relevé disparu ou partage refusé, le bouton restait muet
+                  et l'on tapait dessus trois fois. On dit ce qui se passe.
+                */
                 const f = await fichierDuReleveBrut(r);
-                if (f) RoomScan.shareText(f.contenu, f.nom).catch(() => {});
+                if (!f) {
+                  alerte(
+                    'Ce relevé n’est plus disponible',
+                    'Il n’est plus sur le téléphone. Les dix derniers scans sont gardés : un nouveau scan en ajoutera un.',
+                  );
+                  return;
+                }
+                RoomScan.shareText(f.contenu, f.nom).catch((e: unknown) => {
+                  const p = expliquer('export', e);
+                  alerte(p.titre, p.message);
+                });
               }}>
               <Text style={s.partagerMot}>Envoyer le relevé brut</Text>
               <Text style={s.releve}>{phraseDuReleveBrut(r)}</Text>

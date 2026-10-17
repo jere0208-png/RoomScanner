@@ -346,7 +346,7 @@ describe('l’écran du scan, refondu', () => {
     const tree = monter('scan');
     const icone = tree.root
       .findAllByType(TouchableOpacity)
-      .find((n) => n.props.accessibilityLabel === 'Exporter');
+      .find((n) => n.props.accessibilityLabel === 'Exporter ou imprimer le plan');
     expect(icone).toBeDefined();
     // Le bandeau bleu n'existe plus : plus aucun bouton n'écrit « Exporter ».
     expect(

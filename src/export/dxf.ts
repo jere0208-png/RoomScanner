@@ -40,6 +40,7 @@ import {
 import { FIXTURES, type Fixture } from '../geometry/electrical';
 import { CEILINGS, type CeilingFixture } from '../geometry/ceiling';
 import { longueurDuRuban } from '../geometry/ruban';
+import { deplierLigatures } from '../ui/mots';
 
 /** Un calque du fichier : son nom, et sa couleur d'index AutoCAD. */
 export interface CalqueDxf {
@@ -132,7 +133,8 @@ export interface PlanPourDxf {
  * devient « Sejour », ce qu'un dessinateur lit sans y penser.
  */
 export function sansAccent(s: string): string {
-  return s
+  // « œ », « æ », « ß » : deux lettres, pas zéro (voir `deplierLigatures`).
+  return deplierLigatures(s)
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/[«»]/g, '"')
@@ -413,17 +415,24 @@ export function buildDxf(plan: PlanPourDxf): string {
   /*
     LES PIÈCES : leur nom et leur surface, posés au même endroit que sur le
     plan imprimé. C'est ce qu'un économiste vient chercher en premier.
+
+    CENTRÉS, ET À DEUX DÉCIMALES — relevé de l'architecte : le nom partait
+    du point d'étiquette vers la droite (il débordait sur le mur d'une
+    pièce étroite), et la surface s'écrivait « 12,3 » quand le dossier PDF
+    écrit « 12,34 » (`frM2`, revue « Nadia »). Le même arrondi au centième,
+    pour que le DXF et le PDF disent le même chiffre.
   */
   for (const part of roomParts(plan.walls, plan.rooms)) {
     const nom = plan.rooms.find((r) => r.id === part.roomId)?.name ?? '';
     const aire = part.surface?.area ?? 0;
-    if (nom) out += texte(CALQUE.pieces, part.labelAt, 200, nom);
+    if (nom) out += texteCentre(CALQUE.pieces, part.labelAt, 200, 0, nom);
     if (aire > 0) {
-      out += texte(
+      out += texteCentre(
         CALQUE.pieces,
         { x: part.labelAt.x, z: part.labelAt.z + 0.3 },
         150,
-        `${aire.toFixed(1).replace('.', ',')} m2`,
+        0,
+        `${(Math.round(aire * 100) / 100).toFixed(2).replace('.', ',')} m2`,
       );
     }
   }

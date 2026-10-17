@@ -162,7 +162,8 @@ describe('les textes', () => {
   it('portent le nom des pièces et leur surface', () => {
     const dxf = buildDxf(PLAN);
     expect(dxf).toContain('Sejour');
-    expect(dxf).toMatch(/12[.,]0 m2|12 m2/);
+    // Deux décimales, comme le dossier PDF (relevé de l'architecte).
+    expect(dxf).toContain('12,00 m2');
   });
 
   it('sont sans accent : le R12 ne les transporte pas', () => {

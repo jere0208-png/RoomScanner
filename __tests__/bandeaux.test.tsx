@@ -1178,7 +1178,7 @@ describe('les feuilles de l’écran des résultats', () => {
    */
   it('ouvre le format d’export, avec ses cinq sorties', () => {
     const tree = monter();
-    const b = bouton(tree, 'Exporter');
+    const b = bouton(tree, 'Exporter ou imprimer le plan');
     expect(b).toBeDefined();
     act(() => b!.props.onPress());
     const vu = textes(tree);

@@ -55,6 +55,22 @@ export function resumeDuScan(x: {
 }
 
 /**
+ * LES LIGATURES SE DÉPLIENT, ELLES NE DISPARAISSENT PAS — relevé des
+ * exports : « Œil-de-bœuf » devenait « il-de-buf » dans le nom du fichier
+ * et sur le DXF. La décomposition NFD ôte les accents mais ne touche pas à
+ * « œ », « æ », « ß » : le filtre ASCII qui suit les effaçait. On les écrit
+ * donc en deux lettres AVANT, comme on les écrirait à la main.
+ */
+export function deplierLigatures(s: string): string {
+  return s
+    .replace(/œ/g, 'oe')
+    .replace(/Œ/g, 'OE')
+    .replace(/æ/g, 'ae')
+    .replace(/Æ/g, 'AE')
+    .replace(/ß/g, 'ss');
+}
+
+/**
  * LE TEXTE TEL QU'ON LE CHERCHE — sans casse, sans accents, sans apostrophes.
  *
  * Personne ne tape « Boîte d'encastrement » avec son accent circonflexe et

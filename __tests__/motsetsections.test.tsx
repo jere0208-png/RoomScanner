@@ -71,6 +71,8 @@ describe('le menu du plan', () => {
     expect(labels.length).toBeGreaterThanOrEqual(14);
     expect(entrees.map((e) => e.label).sort()).toEqual([...labels].sort());
     expect([...new Set(entrees.map((e) => e.section))]).toEqual([
+      // Relevé « senior » : l'export, nommé, ouvre le menu.
+      'Le dossier',
       'Électricité',
       'Votre projet',
       'Ajouter',

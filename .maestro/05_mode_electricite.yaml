@@ -41,7 +41,7 @@ name: Mode Électricité
     optional: true
 - waitForAnimationToEnd:
     timeout: 5000
-- tapOn: "Exporter"
+- tapOn: "Exporter ou imprimer le plan"
 - waitForAnimationToEnd:
     timeout: 5000
 - takeScreenshot: ${THEME}-44-export-formats-electricite

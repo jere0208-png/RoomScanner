@@ -42,8 +42,13 @@ import { light, radius, shadowCard, useTheme, type Palette } from '../theme';
 import { haptic } from '../ui/haptic';
 import { cadrerLePlan, type MurDuFond } from './ExportFond';
 
-/** Les feuilles du dossier sont des A4 couchés. */
-export const FORMAT_FEUILLE = 842 / 595;
+/**
+ * Les feuilles du dossier sont des A4 DEBOUT — relevé du testeur
+ * « rénovation » : l'aperçu montrait des feuilles couchées quand le PDF
+ * sort en portrait (595 × 842, voir `PAGE_W`/`PAGE_H` dans pdf.ts). C'est
+ * le rapport largeur / hauteur.
+ */
+export const FORMAT_FEUILLE = 595 / 842;
 
 const CADENAS =
   'M7 10V7a5 5 0 0 1 10 0v3h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h1Zm2 0h6V7a3 3 0 0 0-6 0v3Z';
@@ -268,8 +273,10 @@ function Visionneuse({
     const t = setTimeout(() => defile.current?.scrollTo({ x: depart * width, animated: false }), 0);
     return () => clearTimeout(t);
   }, [depart, width]);
-  const larg = width - 24;
-  const haut = Math.min(larg / FORMAT_FEUILLE, height * 0.62);
+  // Debout, c'est la HAUTEUR qui plafonne : la feuille garde ses
+  // proportions et rétrécit en largeur, la miniature dessinée tient dedans.
+  const larg = Math.min(width - 24, height * 0.62 * FORMAT_FEUILLE);
+  const haut = larg / FORMAT_FEUILLE;
   return (
     <Modal visible={depart !== null} animationType="fade" onRequestClose={onClose} transparent>
       <View style={s.voile}>
@@ -322,7 +329,9 @@ function Visionneuse({
   );
 }
 
-const CARTE = 196;
+// Une carte debout : 148 de large font 209 de haut, à peu près la surface
+// de l'ancienne carte couchée de 196 — la rangée ne mange pas l'écran.
+const CARTE = 148;
 
 /** Le filigrane de la miniature : le même mot que celui gravé par le natif. */
 export const FILIGRANE_MINIATURE = 'EchoPlan';

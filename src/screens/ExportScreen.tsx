@@ -702,7 +702,11 @@ const styles = getStyles(c);
         objects: showFurniture ? objects : [],
         rooms,
         fixtures,
-        routes: gaines || schema ? cheminements?.traces : undefined,
+        // LE TRACÉ SUIT SA SEULE CASE — relevé de l'électricien : « Plan des
+        // gaines » décoché, la feuille sortait encore dès que les schémas
+        // étaient cochés. Le PDF ne lit ces tracés que pour cette feuille-là
+        // (les schémas se tirent des circuits, pas du cheminement).
+        routes: gaines ? cheminements?.traces : undefined,
         // Les mots du relevé passent au dossier : c'est celui qui pose
         // qui les lit, et il lit cette feuille-là.
         notes,
@@ -753,7 +757,7 @@ const styles = getStyles(c);
                   objects: showFurniture ? x.objects : [],
                   rooms: x.rooms,
                   fixtures: x.fixtures,
-                  routes: courant && (gaines || schema) ? cheminements?.traces : undefined,
+                  routes: courant && gaines ? cheminements?.traces : undefined,
                   notes: x.notes,
                   mesures: toutesLesMesures.filter((m) => (m.niveau ?? 0) === x.nv),
                   floors: floorsOf(x.rooms),
@@ -1006,7 +1010,15 @@ const styles = getStyles(c);
           },
         ]}>
         <View style={styles.headerRow}>
-          <TouchableOpacity style={styles.roundButton} accessibilityLabel="Retour" onPress={() => setScreen('result')}>
+          {/* UN RETOUR QU'ON ATTRAPE — relevé du testeur « senior » : 38 points
+              sans rôle, en dessous des 44 d'Apple. La marge porte la cible
+              à 54 et VoiceOver l'annonce comme un bouton. */}
+          <TouchableOpacity
+            style={styles.roundButton}
+            accessibilityRole="button"
+            accessibilityLabel="Retour"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={() => setScreen('result')}>
             <BackChevron color={c.ink} />
           </TouchableOpacity>
           <Text style={styles.title}>Export PDF</Text>
@@ -1043,6 +1055,7 @@ const styles = getStyles(c);
             renommage caché au fond d'un menu. Il se change ici, où on le lit.
           */}
           <TouchableOpacity
+            accessibilityRole="button"
             accessibilityLabel="Renseigner : Titre du dossier"
             style={[styles.dossierCase, styles.dossierTitreCase]}
             onPress={() =>
@@ -1087,6 +1100,7 @@ const styles = getStyles(c);
             ).map(([titre, valeur, invite, poser]) => (
               <TouchableOpacity
                 key={titre}
+                accessibilityRole="button"
                 accessibilityLabel={`Renseigner : ${invite}`}
                 style={styles.dossierCase}
                 onPress={() =>
@@ -1339,7 +1353,7 @@ const styles = getStyles(c);
               </Text>
               <PlanPreview
                 cotes={measures2D}
-                routes={gaines || schema ? cheminements?.traces : undefined}
+                routes={gaines ? cheminements?.traces : undefined}
                 ceiling={avecPlafond ? ceiling : undefined}
               />
             </Carte>
@@ -1440,6 +1454,7 @@ const styles = getStyles(c);
         */}
         <TouchableOpacity
           style={[styles.exportButton, preparation && styles.exportButtonOccupe]}
+          accessibilityRole="button"
           accessibilityLabel={
             preparation ? 'Préparation du PDF' : net ? 'Exporter le PDF' : 'Débloquer le PDF'
           }

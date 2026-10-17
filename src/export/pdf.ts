@@ -172,6 +172,7 @@ import {
   type PrixDuDevis,
 } from '../geometry/mainDOeuvre';
 import { nomDeTeinte } from '../ui/peintures';
+import { deplierLigatures } from '../ui/mots';
 
 const PAGE_W = 595;
 const PAGE_H = 842;
@@ -7848,7 +7849,9 @@ export function pdfFilename(name: string): string {
     donnait « 1er-tage », « Rez-de-chaussée » « Rez-de-chausse ». Et le
     « + » de « R+1 » reste.
   */
-  const clean = latin1(name)
+  // « œ », « æ », « ß » se déplient AVANT `latin1`, qui fait de « œ » un
+  // octet WinAnsi que le filtre effaçait (voir `deplierLigatures`).
+  const clean = latin1(deplierLigatures(name))
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     // « 12/10/2026 » devient « 12-10-2026 », comme dans le DXF (revue « Léa »).

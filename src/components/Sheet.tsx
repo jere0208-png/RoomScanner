@@ -98,6 +98,8 @@ const ICONS = {
   dupliquer: SOLAIRES.dupliquer,
   revenir: SOLAIRES.undo,
   nouveau: SOLAIRES.plus,
+  // L'export, nommé dans le menu du plan : le dessin de l'icône d'en-tête.
+  partage: SOLAIRES.partage,
 } satisfies { [cle: string]: string };
 
 export interface SheetAction {

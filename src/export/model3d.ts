@@ -8,10 +8,11 @@
  * le PDF.
  *
  * Format OBJ : un seul fichier, lisible par Blender, SketchUp, Rhino et à peu
- * près tout le reste. Les couleurs ne survivent pas (elles demanderaient un
- * `.mtl` séparé, or on ne partage qu'un fichier) — mais les éléments sont
- * regroupés par nature, ce qui permet de les sélectionner et de les remettre
- * en matière d'un clic dans le logiciel de destination.
+ * près tout le reste. Les COULEURS VOYAGENT, une par sommet (« v x y z r g
+ * b »), sans `.mtl` à côté : Blender et MeshLab les lisent (voir
+ * `facesDuModele`) ; un logiciel qui les ignore garde la géométrie. Et les
+ * éléments sont regroupés par nature, ce qui permet de les sélectionner et
+ * de les remettre en matière d'un clic dans le logiciel de destination.
  */
 import type { ObjectData } from 'react-native-room-scan';
 import { abregerNiveau, type RoomShape, type WallSeg } from '../geometry/floorplan';
@@ -19,6 +20,7 @@ import type { Fixture } from '../geometry/electrical';
 import { buildScene, type Face3D } from './../geometry/scene3d';
 import { MAQUETTE, matieresDesSols } from '../ui/maquette';
 import { accentsDesPieces, peinturesDesPieces, solsDesPieces } from '../ui/habillage';
+import { deplierLigatures } from '../ui/mots';
 
 /** Palette neutre : l'OBJ ne porte pas les couleurs, seule la forme compte. */
 /**
@@ -159,7 +161,8 @@ function ecrireObj(
 
 /** Nom de fichier propre pour un export de modèle. */
 export function objFilename(name: string): string {
-  const clean = name
+  // « œ », « æ », « ß » : deux lettres, pas zéro (voir `deplierLigatures`).
+  const clean = deplierLigatures(name)
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     // « 12/10/2026 » devient « 12-10-2026 », comme dans le DXF (revue « Léa »).

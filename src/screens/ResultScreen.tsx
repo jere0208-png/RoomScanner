@@ -4206,6 +4206,24 @@ export function ResultScreen() {
                     bas, à un geste. La liste d'achats y reste (elle a quitté
                     la rangée du haut) : une fois chacun.
                   */
+                  /*
+                    EXPORTER OU IMPRIMER, EN TÊTE — relevé du testeur
+                    « senior » : il cherchait l'export dans ce menu, le seul
+                    du plan qui parle avec des mots ; l'icône de partage, en
+                    haut à droite, ne lui disait rien. C'est le même geste
+                    que l'icône, nommé — et seulement là où l'icône existe.
+                  */
+                  ...(Platform.OS === 'ios'
+                    ? [
+                        {
+                          section: 'Le dossier',
+                          label: 'Exporter ou imprimer',
+                          icon: 'partage' as const,
+                          hint: 'Le plan en PDF, à envoyer ou à imprimer.',
+                          onPress: () => setExporting(true),
+                        },
+                      ]
+                    : []),
                   ...(modeElec
                     ? [
                       {
@@ -4606,7 +4624,10 @@ export function ResultScreen() {
         {Platform.OS === 'ios' && (
           <TouchableOpacity
             style={styles.headerIcon}
-            accessibilityLabel="Exporter"
+            accessibilityRole="button"
+            // Un pictogramme muet se nomme en entier pour VoiceOver — même
+            // relevé « senior » que l'entrée du menu.
+            accessibilityLabel="Exporter ou imprimer le plan"
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             onPress={() => setExporting(true)}>
             {/* La silhouette Solar : centrée par construction — le dessin

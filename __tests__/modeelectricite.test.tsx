@@ -254,7 +254,7 @@ describe('sans le mode, l’électricité disparaît de l’écran', () => {
 
   it('l’export ne propose plus la liste du matériel électrique', () => {
     const t = monter(false);
-    presser(t, 'Exporter');
+    presser(t, 'Exporter ou imprimer le plan');
     const vu = textes(t);
     expect(vu).not.toContain('Liste du matériel');
     // Le plan, lui, s'exporte toujours.
