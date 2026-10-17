@@ -55,6 +55,7 @@ import { useRoomScan } from '../native/useRoomScan';
 import { SOLAIRES } from '../ui/solaires';
 import { haptic } from '../ui/haptic';
 import { alerte } from '../ui/alerte';
+import { panne as expliquer } from '../ui/panne';
 import { sansPerdreLeReleve } from '../ui/releveInterrompu';
 import { pourChercher } from '../ui/mots';
 import { PlanThumb, detailsDuScan } from './LibraryScreen';
@@ -199,6 +200,19 @@ export function HomeScreen() {
   const setRaccourciEnAttente = useScanStore((s) => s.setRaccourciEnAttente);
   const setSupported = useScanStore((s) => s.setSupported);
   const error = useScanStore((s) => s.error);
+  /*
+    L'ÉCHEC D'UN SCAN SE DIT COMME SUR L'ÉCRAN DU SCAN — la consigne d'abord,
+    le détail du système derrière (`panne`), et non le texte brut, souvent
+    anglais. Et il ne s'installe pas : quitter l'accueil l'efface, le
+    prochain geste repart d'une ardoise propre.
+  */
+  const panneDuReleve = error ? expliquer('releve', error) : null;
+  useEffect(
+    () => () => {
+      if (useScanStore.getState().error) useScanStore.getState().setError(null);
+    },
+    [],
+  );
   const saves = useScanStore((s) => s.saves);
   const brouillon = useScanStore((s) => s.brouillon);
   const reprendreBrouillon = useScanStore((s) => s.reprendreBrouillon);
@@ -395,7 +409,13 @@ export function HomeScreen() {
         hauteur={hauteur}
         icone={SOLAIRES.scanner}
         titre={'Scanner\nmon logement'}
-        sous={supported === null ? 'Vérification…' : 'Pièce après pièce'}
+        /*
+          LE BON GESTE DÈS LA TUILE. « Pièce après pièce » poussait le novice
+          à terminer après chaque pièce, puis à refaire « Scanner une autre
+          pièce ». Le meilleur plan sort d'un seul passage, de pièce en pièce :
+          même session ARKit, alignement natif.
+        */
+        sous={supported === null ? 'Vérification…' : 'Tout le logement, d’une traite'}
         label="Commencer le scan"
         desactivee={supported !== true}
         onLayout={onLayout}
@@ -583,9 +603,10 @@ export function HomeScreen() {
           </>
         )}
 
-        {error && (
+        {panneDuReleve && (
           <View style={styles.erreur}>
-            <Text style={styles.erreurTexte}>{error}</Text>
+            <Text style={[styles.erreurTexte, styles.erreurTitre]}>{panneDuReleve.titre}</Text>
+            <Text style={styles.erreurTexte}>{panneDuReleve.message}</Text>
           </View>
         )}
 
@@ -1029,6 +1050,7 @@ const getStyles = themedStyles((c: Palette) => {
       marginTop: 14,
     },
     erreurTexte: { color: c === dark ? '#F3A6A8' : '#A33A3E', fontSize: 13, lineHeight: 18 },
+    erreurTitre: { fontWeight: '700', marginBottom: 2 },
     sectionLigne: {
       flexDirection: 'row',
       alignItems: 'center',

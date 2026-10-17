@@ -47,6 +47,23 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   private var generationMaillage = 0
   /// La session est arrêtée par une PAUSE : « Terminer » livre ce qui est assemblé.
   private var enPause = false
+  /**
+   LA SESSION EST TOMBÉE EN PANNE (`didEndWith` avec une erreur). Arrêter une
+   session déjà close ne rappelle personne : « Terminer » attendait alors un
+   assemblage qui ne viendrait jamais, et l'écran tournait sans fin. Tant
+   que ce drapeau est levé, `stop` répond tout de suite. Une nouvelle
+   session (`start`) le baisse.
+   */
+  private var sessionEnPanne = false
+  /**
+   LE NUMÉRO DU RELEVÉ EN COURS — un de plus à chaque relevé commencé
+   (`start` sans reprise). Un assemblage lancé pour un relevé qu'on a QUITTÉ
+   peut finir après coup (l'écran d'attente offre de quitter au bout d'une
+   minute et demie) : il ne doit ni glisser son passage dans le relevé
+   suivant, ni lui livrer son résultat. Chaque tâche d'assemblage retient
+   le numéro de son relevé et se tait s'il a changé.
+   */
+  private var generationReleve = 0
   /// Le dernier passage post-traité, pour « Terminer » pendant une pause (iOS 16).
   private var dernierePiece: CapturedRoom?
   /**
@@ -200,6 +217,14 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   }
 
   func makeCaptureView() -> RoomCaptureView {
+    /*
+      LA VUE D'UN SCAN PRÉCÉDENT SE TAIT. Elle peut traîner, détachée de
+      l'écran, avec un assemblage encore en route (un scan quitté pendant
+      qu'il s'assemblait) : ses rappels tardifs parleraient au relevé neuf
+      comme si c'étaient les siens.
+    */
+    captureView?.delegate = nil
+    captureView?.captureSession.delegate = nil
     let view = RoomCaptureView(frame: .zero)
     view.delegate = self
     view.captureSession.delegate = self
@@ -233,14 +258,31 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       return
     }
     enPause = false
+    sessionEnPanne = false
     derniereInstruction = ""
     if fresh {
+      /*
+        UNE PROMESSE ABANDONNÉE NE S'ACCROCHE PAS AU SCAN SUIVANT. On peut
+        quitter un assemblage qui n'aboutit pas (l'écran offre la sortie au
+        bout d'une minute et demie) : sa promesse restait posée, et le
+        « Terminer » du relevé suivant s'y enchaînait — figé à son tour, ou
+        servi avec l'ancien relevé. Personne ne l'attend plus : on l'oublie.
+      */
+      clearPromise()
+      // Ce qui s'assemblait pour le relevé d'avant ne le concerne plus.
+      generationReleve &+= 1
+      dernierReleve = nil
+      embelli?.cancel()
+      embelli = nil
       RoomColorSampler.shared.reset()
       RoomScanCompass.shared.reset()
       // Un relevé tout neuf oublie les passages précédents ; un passage
       // ajouté les garde, ce sont eux qu'on va fusionner.
       if !additif {
         releves.removeAll()
+        // Le dernier passage d'un AUTRE relevé ne doit jamais être livré
+        // par le « Terminer » de celui-ci (voir `stop`, branche pause).
+        dernierePiece = nil
         ancresElec.removeAll()
         trajet.removeAll()
         torcheAuto = false
@@ -679,11 +721,14 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       if #available(iOS 17.0, *), !releves.isEmpty {
         lancerLeMaillage()
         let pieces = releves
+        let generation: Int = generationReleve
         Task { [weak self] in
           var fusion: CapturedStructure? = nil
           if pieces.count > 1 { fusion = await Self.fusionner(pieces) }
           await MainActor.run {
             guard let self = self else { return }
+            // Relevé quitté entre-temps : ce résultat n'est plus attendu.
+            guard self.generationReleve == generation else { return }
             if let structure = fusion {
               self.livrer(
                 walls: structure.walls,
@@ -709,6 +754,18 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         livrerPiece(piece)
         return
       }
+    }
+    /*
+      « TERMINER » APRÈS UNE SESSION TOMBÉE EN PANNE. Rien à arrêter, rien qui
+      s'assemble encore (sinon c'est cet assemblage qui livrera, en trouvant
+      la promesse) : on le dit tout de suite au lieu d'attendre pour
+      toujours. Le JS affiche alors le panneau d'échec et sa sortie.
+    */
+    if sessionEnPanne && dernierReleve == nil && embelli == nil {
+      RoomScanCompass.shared.detach()
+      stopRejecter?("SCAN_FAILED", "La session de scan s’est arrêtée avant la fin.", nil)
+      clearPromise()
+      return
     }
     // La session se fige : continuer à lire `currentFrame` ne ferait que
     // rejouer la dernière image et fausser les moyennes.
@@ -797,6 +854,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     let attendu: Bool = stopResolver != nil
     let tache = embelli
     embelli = nil
+    // Le relevé auquel appartient ce passage (voir `generationReleve`).
+    let generation: Int = generationReleve
     if let error = error {
       /*
         LA VUE A ÉCHOUÉ, MAIS LES DONNÉES BRUTES SONT LÀ : notre propre
@@ -809,6 +868,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
           if piece == nil { piece = await Self.embellir(brut) }
           await MainActor.run {
             guard let self = self else { return }
+            guard self.generationReleve == generation else { return }
             self.dernierReleve = nil
             if let piece = piece {
               self.releves.append(piece)
@@ -860,6 +920,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
         let fusion =
           anciens.isEmpty ? nil : await Self.fusionner(anciens + [piece])
         await MainActor.run {
+          // Un relevé quitté ne glisse pas son passage dans le suivant.
+          guard self.generationReleve == generation else { return }
           self.releves = anciens + [piece]
           self.dernierReleve = nil
           self.dernierePiece = piece
@@ -1285,6 +1347,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   func captureSession(_ session: RoomCaptureSession, didEndWith data: CapturedRoomData,
                       error: Error?) {
     if let error = error {
+      sessionEnPanne = true
       RoomScanEvents.shared?.emit(name: "onScanError",
                                   body: ["message": error.localizedDescription])
       /*

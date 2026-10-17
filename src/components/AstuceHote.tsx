@@ -31,6 +31,8 @@ import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../the
 import { SOLAIRES } from '../ui/solaires';
 import { useAstuce } from '../ui/astuce';
 import { useReduceMotion } from '../ui/useReduceMotion';
+import { useBilanStore } from '../store/bilanStore';
+import { useScanStore } from '../store/scanStore';
 
 /**
  * COMBIEN DE TEMPS ELLE RESTE.
@@ -63,11 +65,22 @@ export function AstuceHote() {
   const marges = useSafeAreaInsets();
   const ancreHaute = useAstuce((s) => s.ancreHaute);
   const immobile = useReduceMotion();
+  /*
+    LA FILE ATTEND QUE LE BILAN SE REFERME. Le bilan du relevé est une
+    fenêtre native, au-dessus de tout — et de cette pastille, montée à la
+    racine. Ce qui passait pendant qu'on lisait la note défilait dessous, et
+    personne ne le lisait. L'astuce courante garde sa place et ne commence
+    son temps qu'une fois la carte fermée. La carte ne vit que sur l'écran
+    du plan : ailleurs, un bilan resté en mémoire ne retient rien.
+  */
+  const bilanEnMemoire = useBilanStore((s) => s.bilan !== null);
+  const surLePlan = useScanStore((s) => s.screen === 'result');
+  const bilanOuvert = bilanEnMemoire && surLePlan;
   const vie = useRef(new Animated.Value(0)).current;
   const echo = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (!courante) return;
+    if (!courante || bilanOuvert) return;
     let vivant = true;
     vie.setValue(0);
     echo.setValue(immobile ? 1 : 0);
@@ -111,9 +124,9 @@ export function AstuceHote() {
       suite.stop();
       onde.stop();
     };
-  }, [courante, vie, echo, fermer, immobile]);
+  }, [courante, vie, echo, fermer, immobile, bilanOuvert]);
 
-  if (!courante) return null;
+  if (!courante || bilanOuvert) return null;
   const fete = !!courante.fete;
   const dessin = courante.icone ?? (fete ? 'etoile' : 'baguette');
   /*

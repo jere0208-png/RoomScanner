@@ -18,6 +18,7 @@ import { useScanStore } from '../src/store/scanStore';
 import { useAstuce } from '../src/ui/astuce';
 import { useUsage } from '../src/store/usage';
 import { usePremieresFois } from '../src/store/premieresFois';
+import { useBilanStore } from '../src/store/bilanStore';
 
 const SOL = -1.3;
 let n = 0;
@@ -52,6 +53,7 @@ async function terminerUnScan() {
     maillage: { ancres: 12, faces: 4000, sommets: 2100, classe: true },
   });
   act(() => useAstuce.setState({ courante: null, file: [] }));
+  act(() => useBilanStore.getState().fermer());
   act(() => {
     useScanStore.getState().reset();
     useScanStore.setState({ saves: [], screen: 'scan', scanning: true, paused: false, processing: false } as never);
@@ -65,8 +67,18 @@ async function terminerUnScan() {
   await act(async () => {
     await fin.props.onPress();
   });
+  /*
+    CE QUE LA FIN DU SCAN DIT, LÀ OÙ ON LE LIT : dans la carte du bilan
+    quand elle s'ouvre (la note énergie, la fête du premier plan), en
+    bandeaux sinon — voir gain-scan.
+  */
   const a = useAstuce.getState();
-  return [a.courante, ...a.file].filter(Boolean).map((x) => x!.texte);
+  const b = useBilanStore.getState().bilan;
+  return [
+    ...[a.courante, ...a.file].filter(Boolean).map((x) => x!.texte),
+    ...(b?.noteEnergie ? [b.noteEnergie] : []),
+    ...(b?.premier ? ['Votre premier logement est dans la poche.'] : []),
+  ];
 }
 
 describe('après le premier scan', () => {

@@ -130,7 +130,8 @@ describe('le bilan du relevé', () => {
 
   it('la fin du scan montre le bilan au lieu du simple bandeau', () => {
     const hook = lire('src/native/useRoomScan.ts');
-    expect(hook).toContain('montrerLeBilan();');
+    // Le bilan reçoit aussi ce que la fin du scan avait à dire (voir gain-scan).
+    expect(hook).toContain('montrerLeBilan({ etage, complement, avant, premier, depense, porte })');
     expect(hook).toContain('useBilanStore.getState().montrer(bilan)');
     const ecran = lire('src/screens/ResultScreen.tsx');
     expect(ecran).toContain('<BilanDuReleveCarte');

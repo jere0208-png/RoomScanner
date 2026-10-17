@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoomScan } from 'react-native-room-scan';
 import { radius, shadowCard, themedStyles, useTheme, type Palette } from '../theme';
 import { useScanStore } from '../store/scanStore';
@@ -33,6 +34,9 @@ export function CameraScreen() {
   const { begin } = useRoomScan();
   const c = useTheme();
   const styles = getStyles(c);
+  // Le haut suit la marge de l'iPhone, comme l'écran du scan (58 points en dur
+  // mordaient sur l'heure des iPhone Pro récents).
+  const marges = useSafeAreaInsets();
   const [denied, setDenied] = useState(false);
 
   useEffect(() => {
@@ -58,7 +62,7 @@ export function CameraScreen() {
   };
 
   return (
-    <RetourGlisse onRetour={() => setScreen('home')} style={styles.container}>
+    <RetourGlisse onRetour={() => setScreen('home')} style={[styles.container, { paddingTop: marges.top + 4 }]}>
       <TouchableOpacity
         style={styles.backButton}
         // Le chevron est un tracé : il ne dit rien à un lecteur d'écran,
@@ -77,6 +81,14 @@ export function CameraScreen() {
           EchoPlan scanne votre pièce avec la caméra et le LiDAR de l'iPhone.
           Sans cet accès, le scan est impossible. Aucune image n'est envoyée
           nulle part : tout reste sur votre appareil.
+        </Text>
+        {/*
+          LE BON GESTE, DIT UNE FOIS, sur la seule page vue avant le premier
+          scan — pas de tutoriel : une phrase. Un seul passage de pièce en
+          pièce donne le plan le mieux aligné.
+        */}
+        <Text style={styles.geste}>
+          Passez de pièce en pièce sans terminer : tout sera assemblé ensemble.
         </Text>
         {denied && (
           <Text style={styles.deniedText}>
@@ -132,6 +144,14 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     lineHeight: 22,
     textAlign: 'center',
     marginTop: 12,
+  },
+  geste: {
+    color: c.ink,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginTop: 12,
+    fontWeight: '600',
   },
   deniedText: {
     color: c.danger,

@@ -40,7 +40,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
-import type { BilanDuReleve, CleDuCritere } from '../geometry/bilan';
+import type { CleDuCritere } from '../geometry/bilan';
+import type { BilanAffiche } from '../store/bilanStore';
 import { haptic } from '../ui/haptic';
 import { SOLAIRES, type IconeSolaire } from '../ui/solaires';
 import { useTheme, type Palette } from '../theme';
@@ -338,7 +339,7 @@ export function BilanDuReleveCarte({
   onVoir3D,
   onRealiteAugmentee,
 }: {
-  bilan: BilanDuReleve | null;
+  bilan: BilanAffiche | null;
   onFermer: () => void;
   onVoir3D: () => void;
   onRealiteAugmentee: () => void;
@@ -376,7 +377,19 @@ export function BilanDuReleveCarte({
   ];
   // Le critère le plus faible : c'est lui que le conseil relève.
   const parts = bilan.criteres.map((x) => x.points / Math.max(1, x.sur));
-  const faible = bilan.conseil ? parts.reduce((m, p, i) => (p < parts[m] ? i : m), 0) : -1;
+  /*
+    LA PIÈCE VUE PAR LA PORTE PASSE DEVANT LE BARÈME. Ce n'est pas un
+    critère de la note : la bulle ne désigne alors aucune jauge.
+  */
+  const conseil = bilan.conseilPrioritaire ?? bilan.conseil;
+  const faible =
+    bilan.conseil && !bilan.conseilPrioritaire ? parts.reduce((m, p, i) => (p < parts[m] ? i : m), 0) : -1;
+  /*
+    LA PASTILLE DIT CE QU'ON VIENT DE FAIRE — le premier plan se fête ici
+    (le bandeau passait sous la fenêtre), un étage dit son nom, un passage
+    de plus dit s'il a ajouté une pièce.
+  */
+  const pastille = bilan.premier ? 'Premier relevé !' : bilan.titre ?? 'Relevé terminé';
   const apparition = (decalage: number) => ({
     opacity: monte,
     transform: [{ translateY: monte.interpolate({ inputRange: [0, 1], outputRange: [40 + decalage, 0] }) }],
@@ -388,7 +401,9 @@ export function BilanDuReleveCarte({
         <View style={[s.colonne, { gap: entre(k, 8, 12) }]}>
           <View style={s.haut}>
             <View style={s.pastille}>
-              <Text style={s.pastilleTexte}>Relevé terminé</Text>
+              <Text style={s.pastilleTexte} numberOfLines={1}>
+                {pastille}
+              </Text>
             </View>
             <Pressable
               accessibilityRole="button"
@@ -415,6 +430,12 @@ export function BilanDuReleveCarte({
               <Text style={s.resume} numberOfLines={1}>
                 {`${bilan.pieces} pièce${bilan.pieces > 1 ? 's' : ''} · ${String(bilan.surfaceAuDixieme ?? bilan.surface).replace('.', ',')} m²`}
               </Text>
+              {/* Ce qu'un passage de plus a apporté, par différence de totaux. */}
+              {!!bilan.apport && (
+                <Text style={s.resume} numberOfLines={1}>
+                  {bilan.apport}
+                </Text>
+              )}
             </View>
           </Animated.View>
 
@@ -447,12 +468,12 @@ export function BilanDuReleveCarte({
                 />
               ))}
             </View>
-            {bilan.conseil && (
+            {!!conseil && (
               <View style={s.conseil}>
                 {faible >= 0 && <View style={[s.conseilFleche, { left: `${((faible + 0.5) * 100) / bilan.criteres.length}%` }]} />}
-                <Icone nom="lumiere" taille={18} teinte={c.amber} />
+                <Icone nom={bilan.conseilPrioritaire ? 'ouvertures' : 'lumiere'} taille={18} teinte={c.amber} />
                 <Text style={s.conseilTexte} numberOfLines={3}>
-                  {bilan.conseil}
+                  {conseil}
                 </Text>
               </View>
             )}
@@ -505,6 +526,26 @@ export function BilanDuReleveCarte({
               <Path d="M5 12h13M13 6l6 6-6 6" stroke="#FFFFFF" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
             </Svg>
           </Pressable>
+          {/*
+            EN PETIT, AU BAS DE LA CARTE : tout le logement quand il a
+            plusieurs niveaux (« au sol », pas une surface réglementaire), et
+            ce que le scan a coûté — la ligne énergie que le patron veut lire
+            juste après le scan, et qui passait sous la fenêtre.
+          */}
+          {(!!bilan.logement || !!bilan.noteEnergie) && (
+            <View style={s.notes}>
+              {!!bilan.logement && (
+                <Text style={s.note} numberOfLines={1} adjustsFontSizeToFit>
+                  {bilan.logement}
+                </Text>
+              )}
+              {!!bilan.noteEnergie && (
+                <Text style={s.note} numberOfLines={1} adjustsFontSizeToFit>
+                  {bilan.noteEnergie}
+                </Text>
+              )}
+            </View>
+          )}
         </View>
         {/* Par-dessus tout : les cotillons tombent devant la page. */}
         <Cotillons actif={bilan.etoiles >= 2} c={c} />
@@ -647,5 +688,7 @@ const creer = (c: Palette) =>
       shadowOffset: { width: 0, height: 6 },
     },
     continuerTexte: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+    notes: { alignItems: 'center', gap: 2, marginTop: -2 },
+    note: { color: c.inkSoft, fontSize: 11.5, lineHeight: 14, fontWeight: '600', textAlign: 'center' },
     enfonce: { transform: [{ scale: 0.97 }], opacity: 0.92 },
   });

@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RoomScan, RoomScanView, scanEvents, type EtatDeVisee } from 'react-native-room-scan';
 import { themedStyles, useTheme, type Palette } from '../theme';
 import { consigneDuMur } from '../geometry/murDouteux';
@@ -25,9 +26,47 @@ import { aimanterHauteur, apercuDeHauteur, natureAuMur } from '../geometry/viseu
 import { PRODUITS_DU_SCAN, configurationDeLaPose, produitDuScan } from '../geometry/poseAR';
 import { VignetteProduit } from '../components/VignetteProduit';
 import { alerte } from '../ui/alerte';
+import { nomDuNiveau } from '../geometry/floorplan';
 
 /** Le guide de pose a été lu : on ne le remontre plus de lui-même. */
 const GUIDE_POSE_KEY = 'echoplan.guide-pose';
+
+/**
+ * L'ASSEMBLAGE QUI NE FINIT PAS — au-delà, l'écran d'attente offre une
+ * sortie. RoomPlan assemble en quelques secondes, StructureBuilder en
+ * quelques dizaines pour un grand logement : une minute et demie sans
+ * résultat, c'est une session qui ne rendra plus rien, et il fallait tuer
+ * l'application pour en sortir.
+ */
+export const ASSEMBLAGE_TROP_LONG = 90000;
+/** Le rappel de ce qu'on scanne s'efface seul : il se lit en entrant. */
+export const DUREE_CONTEXTE = 4000;
+
+/**
+ * CE QU'ON SCANNE, DIT EN ENTRANT — l'écran est le même pour un logement
+ * neuf, un étage et une pièce ajoutée. Pour la pièce, deux issues très
+ * différentes : raccordée toute seule si l'iPhone a encore les passages du
+ * plan (voir `passagesDuPlanOuvert`), sinon posée à côté, à recaler à la
+ * main. On le dit avant, pour qu'il n'y ait pas de surprise sur le plan.
+ * Rien pour un relevé neuf : il n'y a rien à rappeler.
+ */
+export function contexteDuScan(st: {
+  etageEnCours: number | null;
+  complementEnCours: boolean;
+  scanName?: string;
+  passagesDuPlanOuvert: () => boolean;
+}): string | null {
+  if (st.etageEnCours !== null) {
+    const nom = st.scanName?.trim();
+    return nom ? `${nomDuNiveau(st.etageEnCours)} · ${nom}` : nomDuNiveau(st.etageEnCours);
+  }
+  if (st.complementEnCours) {
+    return st.passagesDuPlanOuvert()
+      ? 'Pièce ajoutée · se raccordera au plan'
+      : 'Pièce ajoutée · à placer ensuite sur le plan';
+  }
+  return null;
+}
 
 /*
   CE QU'ON PEUT POSER AU VISEUR — en PHOTOS, et plus en symboles.
@@ -92,19 +131,73 @@ export function ScanScreen() {
   const processing = useScanStore((s) => s.processing);
   /* Ce que le post-traitement a refusé de faire : il faut bien le dire. */
   const error = useScanStore((s) => s.error);
+  /*
+    LE SCAN EN PANNE NE LAISSE QU'UNE SORTIE. La session RoomPlan est tombée
+    (le panneau « Le relevé n'a pas abouti » le dit) : « Terminer » sur une
+    session close lançait un assemblage qui ne venait jamais, et la croix
+    disparaissait avec lui — il fallait tuer l'application. Tant que le
+    panneau est là, « Quitter le scan » est la seule chose à toucher.
+  */
+  const enPanne = !!error && !processing;
   const { pause, resume, stop, cancel } = useRoomScan();
+  /*
+    LES MARGES DE L'IPHONE, ET NON 58 POINTS ÉCRITS EN DUR. Sur les iPhone
+    Pro récents (62 points de marge haute), la croix et la torche mordaient
+    sur l'heure et la batterie ; sur un iPhone SE, elles flottaient trop bas.
+    Les deux repères suivent le système, comme le reste de l'application ;
+    avec les marges d'un iPhone à encoche ordinaire, tout reste en place.
+  */
+  const marges = useSafeAreaInsets();
+  const haut = marges.top + 4;
+  const bas = marges.bottom + 12;
+  /*
+    L'ASSEMBLAGE QUI S'ÉTERNISE OFFRE UNE SORTIE — voir `ASSEMBLAGE_TROP_LONG`.
+    On n'arrête rien : s'il finit malgré tout, le plan s'ouvre ; si l'on
+    quitte avant, son résultat tardif est ignoré (`stop` lit `scanning`).
+  */
+  const [assemblageLong, setAssemblageLong] = useState(false);
+  useEffect(() => {
+    if (!processing) {
+      setAssemblageLong(false);
+      return;
+    }
+    const t = setTimeout(() => setAssemblageLong(true), ASSEMBLAGE_TROP_LONG);
+    return () => clearTimeout(t);
+  }, [processing]);
+  /*
+    CE QU'ON SCANNE, RAPPELÉ EN ENTRANT — voir `contexteDuScan`. Lu une fois,
+    à l'ouverture : l'étage et la pièce ajoutée sont décidés avant l'écran.
+    La pastille s'efface après quatre secondes, ou à la première trouvaille.
+  */
+  const [contexte] = useState(() => contexteDuScan(useScanStore.getState()));
+  const [contexteVisible, setContexteVisible] = useState(true);
+  useEffect(() => {
+    if (!contexte) return;
+    const t = setTimeout(() => setContexteVisible(false), DUREE_CONTEXTE);
+    return () => clearTimeout(t);
+  }, [contexte]);
+  const trouvaille = wallCount + doorCount + windowCount + objectCount > 0;
+  useEffect(() => {
+    if (trouvaille) setContexteVisible(false);
+  }, [trouvaille]);
   /*
     UN APPEL EN PLEIN SCAN — revue « Agathe ». Rien ne réagissait au passage
     en arrière-plan : au retour, la session était tombée, et le relevé avec.
     Le scan se met en pause dès que l'app quitte le premier plan ; au retour,
     l'écran de pause propose de reprendre ou de terminer, et les passages
     sont gardés.
+
+    SEULEMENT AU VRAI DÉPART EN ARRIÈRE-PLAN. iOS passe aussi par « inactive »
+    pour le Centre de contrôle (la lampe !), les notifications, Face ID ou le
+    début du geste vers le sélecteur d'apps — sans interrompre ARKit. Chaque
+    fois, la session s'arrêtait, assemblait un passage et repartait sur un
+    passage neuf, à recoller ensuite. On ne s'arrête plus qu'en quittant.
   */
   const pauseRef = useRef(pause);
   pauseRef.current = pause;
   useEffect(() => {
     const abonne = AppState.addEventListener('change', (etat) => {
-      if (etat === 'active') return;
+      if (etat !== 'background') return;
       const s = useScanStore.getState();
       if (s.scanning && !s.paused && !s.processing) pauseRef.current();
     });
@@ -229,7 +322,7 @@ export function ScanScreen() {
     pendant l'assemblage, rail rangé, il n'y a rien à viser — et une visée
     à vingt images par seconde pour rien, c'est de la batterie.
   */
-  const viseurActif = modeElec && railOuvert && !paused && !processing;
+  const viseurActif = modeElec && railOuvert && !paused && !processing && !enPanne;
   useEffect(() => {
     RoomScan.choisirAuViseur(viseurActif ? choisi : null);
   }, [viseurActif, choisi]);
@@ -406,11 +499,12 @@ export function ScanScreen() {
   };
 
   // Le dernier booléen : une ouverture, dont la trouvaille vibre plus franc.
+  // « Meubles », comme le bilan et la fin de scan : un même mot d'un écran à l'autre.
   const stats: [string, number, boolean][] = [
     ['Murs', wallCount, false],
     ['Portes', doorCount, true],
     ['Fenêtres', windowCount, true],
-    ['Objets', objectCount, false],
+    ['Meubles', objectCount, false],
   ];
 
   return (
@@ -430,7 +524,7 @@ export function ScanScreen() {
       */}
       {!processing && (
         <TouchableOpacity
-          style={styles.cancelButton}
+          style={[styles.cancelButton, { top: haut }]}
           // 40 pt de bouton, 52 de toucher (revue « Bernard »).
           hitSlop={6}
           accessibilityLabel="Arrêter le scan"
@@ -443,6 +537,7 @@ export function ScanScreen() {
       <TouchableOpacity
         style={[
           styles.torchButton,
+          { top: haut },
           torch && styles.torchButtonOn,
           processing && styles.cacheEnAssemblage,
         ]}
@@ -461,7 +556,7 @@ export function ScanScreen() {
       </TouchableOpacity>
 
       {/* RoomPlan affiche déjà ses propres instructions : pas de doublon. */}
-      <View style={styles.topHud} pointerEvents="none">
+      <View style={[styles.topHud, { top: haut }]} pointerEvents="none">
         <View style={styles.statsPill}>
           {/* Chaque trouvaille saute, monte en « +1 » et vibre : voir `CompteurVivant`. */}
           {stats.map(([label, n, ouverture], i) => (
@@ -487,11 +582,18 @@ export function ScanScreen() {
       */}
       <View
         testID="bandeaux"
-        style={[styles.bandeaux, modeElec && !paused && !processing && styles.bandeauxAvecPose]}
+        style={[
+          styles.bandeaux,
+          { top: haut + 54 },
+          modeElec && !paused && !processing && !enPanne && styles.bandeauxAvecPose,
+        ]}
         pointerEvents="none">
-        {paused && (
-          <View style={[styles.instructionPill, styles.pausedPill]}>
-            <Text style={styles.instructionText}>Scan en pause</Text>
+        {/* La pause a sa carte, au centre : voir plus bas. */}
+        {!paused && !enPanne && !!contexte && contexteVisible && (
+          <View style={[styles.instructionPill, styles.contextePill]} accessibilityLiveRegion="polite">
+            <Text style={styles.instructionText} numberOfLines={1}>
+              {contexte}
+            </Text>
           </View>
         )}
         {!paused && torcheAuto && (
@@ -558,7 +660,7 @@ export function ScanScreen() {
         — À GAUCHE, ce qu'on a posé : le compte, le dernier en photo, et la
           flèche qui le retire — on vise mal une fois sur dix.
       */}
-      {modeElec && !paused && !processing && railOuvert && (
+      {modeElec && !paused && !processing && !enPanne && railOuvert && (
         <>
           <View style={styles.viseur} pointerEvents="none">
             {(['viseurHG', 'viseurHD', 'viseurBG', 'viseurBD'] as const).map((coin) => (
@@ -577,7 +679,7 @@ export function ScanScreen() {
             </Text>
           </View>
 
-          <View style={styles.rail}>
+          <View style={[styles.rail, { top: haut + 50, bottom: bas + 158 }]}>
             <View style={styles.railTete}>
               <TouchableOpacity
                 style={styles.railBouton}
@@ -627,7 +729,7 @@ export function ScanScreen() {
 
           {/* Le déclencheur : la photo du produit choisi, sous le pouce. */}
           <TouchableOpacity
-            style={[styles.declencheur, !pret && styles.declencheurAttente]}
+            style={[styles.declencheur, { bottom: bas + 72 }, !pret && styles.declencheurAttente]}
             accessibilityRole="button"
             accessibilityLabel={`Poser ${produit.mot} à l’endroit visé`}
             onPress={() => poser(choisi)}>
@@ -637,7 +739,7 @@ export function ScanScreen() {
           </TouchableOpacity>
 
           {poses > 0 && (
-            <View style={styles.posees}>
+            <View style={[styles.posees, { bottom: bas + 86 }]}>
               <TouchableOpacity
                 style={styles.poseesRetirer}
                 accessibilityLabel="Retirer le dernier appareil posé"
@@ -660,9 +762,9 @@ export function ScanScreen() {
         </>
       )}
       {/* Rail rangé : une pastille pour le rouvrir, et rien d'autre sur la vue. */}
-      {modeElec && !paused && !processing && !railOuvert && (
+      {modeElec && !paused && !processing && !enPanne && !railOuvert && (
         <TouchableOpacity
-          style={styles.railFerme}
+          style={[styles.railFerme, { top: haut + 50 }]}
           accessibilityLabel="Afficher la pose"
           onPress={ouvrirLeRail}>
           <VignetteProduit code={produit.photo} libelle={produit.mot} taille={24} />
@@ -671,50 +773,83 @@ export function ScanScreen() {
       )}
 
       {/* Coins inférieurs uniquement : le centre-bas appartient à la
-          miniature 3D live de RoomPlan. */}
-      <View style={styles.bottomHud} pointerEvents="box-none">
-        <TouchableOpacity
-          style={styles.pauseButton}
-          accessibilityLabel={paused ? 'Reprendre le scan' : 'Mettre en pause'}
-          onPress={paused ? resume : pause}>
-          {/* Icône dessinée : même hauteur (18) que l'éclair et la croix. */}
-          <Svg width={18} height={18} viewBox="0 0 24 24">
-            {paused ? (
-              <Path
-                d="M8 4.5 L19.5 12 L8 19.5 z"
-                fill="#F4F6FA"
-                stroke="#F4F6FA"
-                strokeWidth={2}
-                strokeLinejoin="round"
-              />
-            ) : (
-              <>
+          miniature 3D live de RoomPlan. En panne, rien : voir `enPanne`. */}
+      {!enPanne && (
+        <View style={[styles.bottomHud, { bottom: bas }]} pointerEvents="box-none">
+          <TouchableOpacity
+            style={styles.pauseButton}
+            accessibilityLabel={paused ? 'Reprendre le scan' : 'Mettre en pause'}
+            onPress={paused ? resume : pause}>
+            {/* Icône dessinée : même hauteur (18) que l'éclair et la croix. */}
+            <Svg width={18} height={18} viewBox="0 0 24 24">
+              {paused ? (
                 <Path
-                  d="M8.5 5 v14"
+                  d="M8 4.5 L19.5 12 L8 19.5 z"
+                  fill="#F4F6FA"
                   stroke="#F4F6FA"
-                  strokeWidth={4}
-                  strokeLinecap="round"
+                  strokeWidth={2}
+                  strokeLinejoin="round"
                 />
-                <Path
-                  d="M15.5 5 v14"
-                  stroke="#F4F6FA"
-                  strokeWidth={4}
-                  strokeLinecap="round"
-                />
-              </>
-            )}
-          </Svg>
-        </TouchableOpacity>
-        {/* Pendant l'assemblage, « Terminer » s'efface et ne répond plus. */}
-        <TouchableOpacity
-          style={[styles.stopButton, processing && styles.cacheEnAssemblage]}
-          accessibilityLabel="Terminer"
-          accessibilityState={{ disabled: processing }}
-          disabled={processing}
-          onPress={terminer}>
-          <Text style={styles.stopText}>Terminer</Text>
-        </TouchableOpacity>
-      </View>
+              ) : (
+                <>
+                  <Path
+                    d="M8.5 5 v14"
+                    stroke="#F4F6FA"
+                    strokeWidth={4}
+                    strokeLinecap="round"
+                  />
+                  <Path
+                    d="M15.5 5 v14"
+                    stroke="#F4F6FA"
+                    strokeWidth={4}
+                    strokeLinecap="round"
+                  />
+                </>
+              )}
+            </Svg>
+          </TouchableOpacity>
+          {/* Pendant l'assemblage, « Terminer » s'efface et ne répond plus. */}
+          <TouchableOpacity
+            style={[styles.stopButton, processing && styles.cacheEnAssemblage]}
+            accessibilityLabel="Terminer"
+            accessibilityState={{ disabled: processing }}
+            disabled={processing}
+            onPress={terminer}>
+            <Text style={styles.stopText}>Terminer</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/*
+        LA PAUSE EXPLIQUE COMMENT REPRENDRE. Une pastille ambre « Scan en
+        pause » ne disait pas l'essentiel : au retour d'un appel, il faut
+        revenir où l'on était et viser un mur déjà relevé, pour que l'iPhone
+        s'y recale — c'est ce qui décide si le passage suivant se raccorde.
+        Les commandes du bas restent où elles sont.
+      */}
+      {paused && !processing && !enPanne && (
+        <View style={styles.pausePanneau}>
+          <Text style={styles.panneTitre}>Scan en pause</Text>
+          <Text style={styles.panneTexte}>
+            Revenez où vous étiez et visez un mur déjà relevé : l’iPhone s’y
+            recale avant de continuer.
+          </Text>
+          <TouchableOpacity
+            style={styles.repriseBouton}
+            accessibilityRole="button"
+            accessibilityLabel="Reprendre"
+            onPress={resume}>
+            <Text style={styles.repriseTexte}>Reprendre</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Terminer le scan"
+            hitSlop={10}
+            onPress={terminer}>
+            <Text style={styles.pauseLien}>Terminer</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/*
         L'EXPLICATION PASSE AVANT LE SCAN, pas pendant.
@@ -723,7 +858,7 @@ export function ScanScreen() {
         ces boutons —, et le scan continue derrière : RoomPlan tourne, la
         pièce se relève, rien n'est perdu à lire trois phrases.
       */}
-      <GuidePose visible={modeElec && guide && !processing} onFermer={fermerGuide} />
+      <GuidePose visible={modeElec && guide && !processing && !enPanne} onFermer={fermerGuide} />
 
       {/*
         UNE FIN DE SCAN QUI ÉCHOUE SE DIT ICI.
@@ -737,7 +872,7 @@ export function ScanScreen() {
 
         Le message se dit là où l'on est, et la sortie est à côté.
       */}
-      {!!error && !processing && (
+      {enPanne && (
         <View style={styles.pannePanneau}>
           {/*
             LE MÊME TEXTE QUE PARTOUT AILLEURS. Ce panneau disait déjà la
@@ -767,6 +902,21 @@ export function ScanScreen() {
             Murs et ouvertures sont en cours de calcul, puis les pièces sont
             reconnues et nommées d'après le mobilier trouvé dedans.
           </Text>
+          {assemblageLong && (
+            <>
+              <Text style={styles.processingText}>
+                C’est plus long que prévu. Vous pouvez encore attendre, ou
+                quitter le scan.
+              </Text>
+              <TouchableOpacity
+                style={styles.panneBouton}
+                accessibilityRole="button"
+                accessibilityLabel="Quitter le scan"
+                onPress={cancel}>
+                <Text style={styles.panneBoutonTexte}>Quitter le scan</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       )}
     </View>
@@ -803,6 +953,35 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     backgroundColor: '#F4F6FA',
   },
   panneBoutonTexte: { color: '#0B0D12', fontSize: 15, fontWeight: '700' },
+  /* La carte de pause : même allure que le panneau d'échec, au même endroit. */
+  pausePanneau: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+    top: '34%',
+    zIndex: 4,
+    backgroundColor: 'rgba(11,13,18,0.9)',
+    borderRadius: 18,
+    padding: 20,
+    alignItems: 'center',
+    gap: 8,
+  },
+  repriseBouton: {
+    marginTop: 8,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderRadius: 14,
+    backgroundColor: c.blue,
+  },
+  repriseTexte: { color: '#FFFFFF', fontSize: 17, fontWeight: '700' },
+  pauseLien: {
+    color: '#C6CDD8',
+    fontSize: 15,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+    paddingVertical: 6,
+  },
   cancelButton: {
     position: 'absolute',
     top: 58,
@@ -1031,7 +1210,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     paddingVertical: 8,
     marginTop: 10,
   },
-  pausedPill: { backgroundColor: 'rgba(232,161,59,0.85)' },
+  /* Le rappel de ce qu'on scanne : discret, ce n'est ni une alerte ni une fête. */
+  contextePill: { backgroundColor: c.scanPill },
   /* Ambre comme la pause : c'est un avertissement, pas une faute. */
   douteuxPill: { backgroundColor: 'rgba(232,161,59,0.9)' },
   torchePill: { backgroundColor: 'rgba(31,91,255,0.9)' },
@@ -1043,7 +1223,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     marginRight: 8,
   },
   instructionText: { color: c.scanInk, fontSize: 14, fontWeight: '600', flexShrink: 1 },
-  /* Sous les compteurs (58 + 44 + 10). */
+  /* Sous les compteurs (haut + 44 + 10) : le `top` suit les marges, voir l'écran. */
   bandeaux: { position: 'absolute', top: 112, left: 16, right: 16, alignItems: 'center' },
   /* La pastille « Poser » : right 10 + environ 81 pt ; la colonne ouverte, 10 + 68. */
   bandeauxAvecPose: { right: 100 },
