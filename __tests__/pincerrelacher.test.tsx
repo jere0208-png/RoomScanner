@@ -461,6 +461,9 @@ function monter() {
           }
         }
       }, groupe);
+      // Un doigt qui se pose pendant le geste : le plan reprend son repère
+      // ici même, et le mouvement suivant compte en entier.
+      if (tient) dernier = m.vivants();
       if (!groupe) verifier(`après poser ${id}`);
     },
     bouger(pas: Record<number, Pt>, groupe = false) {
@@ -508,6 +511,8 @@ function monter() {
           hote().onResponderRelease?.(e);
         }
       }, groupe);
+      // Un doigt qui se lève, les autres restant : même chose.
+      if (tient) dernier = m.vivants();
       if (!groupe) verifier(`après lever ${id}`);
     },
     interrompre(groupe = false) {

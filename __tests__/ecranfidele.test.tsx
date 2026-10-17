@@ -403,10 +403,13 @@ interface Doigt {
 function main() {
   let horloge = 1000;
   const bank: (Doigt | null)[] = [];
-  const evenement = () => {
+  const evenement = (inverse = false) => {
     const vivants = bank
       .map((t, id) => ({ t, id }))
       .filter((x): x is { t: Doigt; id: number } => !!x.t?.touchActive);
+    // Sous Fabric, `touches` sort d'un ensemble non ordonné : l'ordre peut
+    // changer d'une image à l'autre.
+    if (inverse) vivants.reverse();
     return {
       nativeEvent: {
         touches: vivants.map(({ t, id }) => ({
@@ -458,7 +461,7 @@ function main() {
       };
       return evenement();
     },
-    bouger(pas: Record<number, Pt>) {
+    bouger(pas: Record<number, Pt>, inverse = false) {
       horloge += 1;
       for (const [k, p] of Object.entries(pas)) {
         const id = Number(k);
@@ -474,7 +477,7 @@ function main() {
           currentTimeStamp: horloge,
         };
       }
-      return evenement();
+      return evenement(inverse);
     },
     lever(id: number) {
       horloge += 1;
@@ -670,15 +673,19 @@ function monter() {
             }
           }
         },
-        () => {},
+        () => {
+          // Un doigt de plus en plein geste : le repère se reprend ici, et
+          // le mouvement suivant compte EN ENTIER.
+          if (tient && dernier) dernier = m.vivants();
+        },
       );
     },
-    bouger(pas: Record<number, Pt>) {
+    bouger(pas: Record<number, Pt>, inverse = false) {
       let prise = false;
       tache(
         `bouger ${JSON.stringify(pas, (_k, v) => (typeof v === 'number' ? Math.round(v * 10) / 10 : v))}`,
         () => {
-          const e = m.bouger(pas);
+          const e = m.bouger(pas, inverse);
           if (tient) {
             hote().onResponderMove?.(e);
           } else {
@@ -737,6 +744,9 @@ function monter() {
             dernier = null;
             premierApresLacher = true;
             auRepos = true;
+          } else if (tient && dernier) {
+            // Un doigt de moins : même chose, le mouvement suivant compte.
+            dernier = m.vivants();
           }
         },
       );
@@ -1067,6 +1077,57 @@ describe('l’écran suit les doigts et se pose d’une traite', () => {
     b.lever(0);
     b.attendre(16);
     b.lever(1);
+    repos(b);
+    b.verdict();
+  });
+
+  it('pincement dont les doigts arrivent tantôt dans un ordre, tantôt dans l’autre : pas de demi-tour', () => {
+    const b = monter();
+    b.scene('doigts inversés');
+    b.poser(0, 120, 300);
+    b.attendre(16);
+    b.poser(1, 260, 320);
+    b.attendre(16);
+    b.bouger({ 0: { x: 90, y: 300 } });
+    expect(b.tient).toBe(true);
+    for (let i = 1; i <= 10; i++) {
+      b.attendre(16);
+      b.bouger({ 0: { x: 100 - i * 4, y: 300 - i * 2 }, 1: { x: 260 + i * 5, y: 320 + i * 3 } }, i % 2 === 1);
+    }
+    b.attendre(16);
+    b.lever(1);
+    b.attendre(16);
+    b.lever(0);
+    repos(b);
+    b.verdict();
+  });
+
+  it('trois doigts, puis deux : la paire suivie change sans que le plan saute', () => {
+    const b = monter();
+    b.scene('trois doigts à deux');
+    b.poser(0, 120, 280);
+    b.attendre(16);
+    b.poser(1, 250, 300);
+    b.attendre(16);
+    b.bouger({ 0: { x: 90, y: 280 } });
+    expect(b.tient).toBe(true);
+    b.attendre(16);
+    b.poser(2, 200, 420);
+    for (let i = 1; i <= 4; i++) {
+      b.attendre(16);
+      b.bouger({ 0: { x: 100 - i * 3, y: 280 }, 1: { x: 250 + i * 3, y: 300 + i }, 2: { x: 200, y: 420 + i * 2 } });
+    }
+    // Le premier doigt se lève : la paire suivie devient (1, 2).
+    b.attendre(16);
+    b.lever(0);
+    for (let i = 1; i <= 5; i++) {
+      b.attendre(16);
+      b.bouger({ 1: { x: 262 + i * 6, y: 304 + i * 2 }, 2: { x: 200 - i * 4, y: 428 + i * 5 } });
+    }
+    b.attendre(16);
+    b.lever(1);
+    b.attendre(16);
+    b.lever(2);
     repos(b);
     b.verdict();
   });

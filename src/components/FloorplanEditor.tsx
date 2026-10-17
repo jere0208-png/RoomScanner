@@ -1216,6 +1216,16 @@ export function FloorplanEditor({
   const touchAngle = (t: { pageX: number; pageY: number }[]) =>
     Math.atan2(t[1].pageY - t[0].pageY, t[1].pageX - t[0].pageX);
   /*
+    LES DOIGTS, TOUJOURS DANS LE MÊME ORDRE. Sous Fabric, la liste `touches`
+    d'un évènement sort d'un ensemble non ordonné : rien ne garantit que le
+    premier doigt d'une image soit le premier de la suivante. Deux doigts
+    qui s'échangent ne changent ni leur écart ni leur milieu — mais leur
+    ANGLE tourne d'un demi-tour, et le plan avec lui. Rangés par
+    identifiant, ils ne s'échangent jamais.
+  */
+  const doigtsDe = (e: GestureResponderEvent) =>
+    [...e.nativeEvent.touches].sort((a, b) => Number(a.identifier) - Number(b.identifier));
+  /*
     LE REPÈRE SE REPREND SUR CE QU'ON VOIT, PAS SUR CE QUI EST RANGÉ.
 
     Il repartait de `viewRef.current` — la vue POSÉE DANS L'ÉTAT, qui ne se
@@ -1230,8 +1240,8 @@ export function FloorplanEditor({
     entre-temps. À la prise, les deux sont égales — la ligne du `Grant` les
     aligne juste avant d'appeler ici.
   */
-  const snapshot = (e: any, g: any) => {
-    const t = e.nativeEvent.touches;
+  const snapshot = (e: GestureResponderEvent, g: { dx: number; dy: number }) => {
+    const t = doigtsDe(e);
     navBase.current = {
       v: vueVive.current,
       mode: t.length >= 2 ? 'pinch' : 'pan',
@@ -1245,6 +1255,13 @@ export function FloorplanEditor({
       my0: t.length >= 2 ? (t[0].pageY + t[1].pageY) / 2 : 0,
       a0: t.length >= 2 ? touchAngle(t) : 0,
     };
+    /*
+      Le recalage aussi repart d'ici : sa course se compte en petits pas
+      depuis le dernier évènement traité, et un pincement — qui ne les
+      compte pas — ne doit pas se retrouver d'un coup dans le premier pas
+      du glissement qui le suit.
+    */
+    dernierPas.current = { x: g.dx, y: g.dy };
   };
   // Pendant un déplacement du plan, les cotes sont masquées : leur recalcul
   // et leur rotation à chaque image faisaient saccader le geste.
@@ -1359,10 +1376,24 @@ export function FloorplanEditor({
         // Rien à peindre à la prise : la toile a sa taille fixe (voir
         // `margeFixeDeToile`).
         vueVive.current = viewRef.current;
-        // Le recalage repart de zero a chaque prise : le decalage se compte
-        // en petits pas, et un geste qui commence herite du precedent.
-        dernierPas.current = { x: g.dx, y: g.dy };
+        // Le recalage repart de zero a chaque prise (dans `snapshot`) : le
+        // decalage se compte en petits pas, et un geste qui commence
+        // n'herite pas du precedent.
         snapshot(e, g);
+      },
+      /*
+        UN DOIGT QUI SE POSE OU SE LÈVE : LE REPÈRE SE REPREND TOUT DE SUITE.
+
+        Il ne se reprenait qu'au mouvement SUIVANT, quand on s'apercevait
+        que le nombre de doigts avait changé : la course de ce mouvement-là
+        était perdue, et de trois doigts à deux, la paire suivie pouvait
+        changer sans reprise du tout. Repris à l'évènement même, le premier
+        mouvement compte en entier. Le contrôle au mouvement reste, en
+        filet : un doigt dont on n'aurait pas reçu la levée.
+      */
+      onPanResponderStart: (e, g) => snapshot(e, g),
+      onPanResponderEnd: (e, g) => {
+        if (e.nativeEvent.touches.length > 0) snapshot(e, g);
       },
       /*
         AU LÂCHER, LA VÉRITÉ — et la couche revient à zéro dans le MÊME
@@ -1373,7 +1404,7 @@ export function FloorplanEditor({
       onPanResponderRelease: () => poserLeGeste(),
       onPanResponderTerminate: () => poserLeGeste(),
       onPanResponderMove: (e, g) => {
-        const t = e.nativeEvent.touches;
+        const t = doigtsDe(e);
         const mode = t.length >= 2 ? 'pinch' : 'pan';
         if (mode !== navBase.current.mode) snapshot(e, g);
         const base = navBase.current;
