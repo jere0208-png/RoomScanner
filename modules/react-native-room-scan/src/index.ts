@@ -397,8 +397,6 @@ export const RoomScanVisite = UIManager.getViewManagerConfig?.(
         fond: string;
         /* La température des lampes de la visite, en kelvins (voir `temperatureLampes`). */
         temperature?: number;
-        /* Le rendu de la visite, de 0 à 3 (voir `renduVisite`). */
-        rendu?: number;
         /* LE MODE ORBITE — la maquette du plan (voir `geometry/maquette3d`). */
         orientes?: number[];
         ecorche?: number[];

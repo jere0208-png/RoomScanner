@@ -79,7 +79,6 @@ import { useImageSansLogo } from '../store/accountStore';
 import { usePriseDeVue } from '../ui/partageRendu';
 import { AlerteHote } from './AlerteHote';
 import { nomDeTemperature, useTemperatureLampes } from '../store/temperatureLampes';
-import { RENDUS_VISITE, useRenduVisite } from '../store/renduVisite';
 import { astuce } from '../ui/astuce';
 
 /**
@@ -279,6 +278,9 @@ function MiniCarte({
   );
 }
 
+/** Les murs côté pièce de la visite (voir `palette`). */
+export const MURS_DE_LA_VISITE = '#F6F1E8';
+
 export function Exploration({
   visible,
   onClose,
@@ -357,22 +359,19 @@ export function Exploration({
   */
   const natif = !!RoomScanVisite;
   /*
-    LE RENDU DE LA VISITE — quatre propositions (voir `renduVisite`) : il
-    donne la couleur des murs côté pièce ; le natif règle le reste.
+    LES MURS DE LA VISITE : le blanc chaud du rendu retenu par le patron
+    (« Chaleureux du soir », voir `RoomScanVisite.RENDU`) — un blanc à peine
+    crème, qui reste blanc dans la pénombre du soir.
   */
-  const rendu = useRenduVisite((s) => s.rendu);
-  useEffect(() => {
-    if (visible) void useRenduVisite.getState().charger();
-  }, [visible]);
   const palette = useMemo<ScenePalette>(
     () => ({
       ...MAQUETTE,
-      wallInside: RENDUS_VISITE[rendu]?.murs ?? MAQUETTE.wallInside,
+      wallInside: MURS_DE_LA_VISITE,
       door: teinte.amber,
       window: teinte.sky,
       passage: teinte.blue,
     }),
-    [teinte, rendu],
+    [teinte],
   );
   // Le sol choisi et les murs d'accent, pièce par pièce (point 9).
   const sols = useMemo(() => solsDesPieces(rooms), [rooms]);
@@ -941,7 +940,6 @@ export function Exploration({
               cle={cle}
               fond={fond}
               temperature={kelvin}
-              rendu={rendu}
             />
           )}
           {/* Sans le natif (banc d'essai), la vue en JavaScript tient lieu. */}
@@ -1074,36 +1072,10 @@ export function Exploration({
         </View>
 
         {/*
-          LES PIÈCES, EN MARGE — relevé du patron : « réduis les boutons de
-          pièces et place-les plus intelligemment en gênant moins la visite,
-          et donne une couleur à celui de la pièce où l'on se trouve ». Une
-          rangée de grosses pilules barrait le haut de la vue, en plein
-          regard. Elles se rangent en colonne, petites et voilées, sous
-          « Terminer », contre le bord droit : le regard passe au milieu.
-          Celle de la pièce où l'on est se teinte, et suit le visiteur.
-        */}
-        {/*
-          LE RENDU ET L'INTERRUPTEUR GÉNÉRAL, sous la mini-carte — relevé du
-          patron : « quatre propositions, lumières allumées et non allumées ».
-          Un appui change de rendu ; l'autre allume ou éteint tout le logement.
+          L'INTERRUPTEUR GÉNÉRAL, sous la mini-carte : un appui allume ou
+          éteint tout le logement.
         */}
         <View style={[styles.reglages, { top: marges.top + 8 + 112 + 10 }]} pointerEvents="box-none">
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Rendu ${RENDUS_VISITE[rendu]?.lettre} : ${RENDUS_VISITE[rendu]?.nom}`}
-            accessibilityHint="Passe au rendu suivant"
-            testID="rendu-visite"
-            style={({ pressed }) => [styles.temperature, pressed && styles.enfonce]}
-            hitSlop={8}
-            onPress={() => {
-              const r = useRenduVisite.getState().suivant();
-              haptic('leger');
-              astuce(`Rendu ${RENDUS_VISITE[r].lettre} · ${RENDUS_VISITE[r].nom}`, { icone: 'lumiere' });
-            }}>
-            <Text style={styles.temperatureTexte} numberOfLines={1}>
-              Rendu {RENDUS_VISITE[rendu]?.lettre}
-            </Text>
-          </Pressable>
           {lampes.length > 0 && (
             <Pressable
               accessibilityRole="button"
@@ -1122,6 +1094,15 @@ export function Exploration({
           )}
         </View>
 
+        {/*
+          LES PIÈCES, EN MARGE — relevé du patron : « réduis les boutons de
+          pièces et place-les plus intelligemment en gênant moins la visite,
+          et donne une couleur à celui de la pièce où l'on se trouve ». Une
+          rangée de grosses pilules barrait le haut de la vue, en plein
+          regard. Elles se rangent en colonne, petites et voilées, sous
+          « Terminer », contre le bord droit : le regard passe au milieu.
+          Celle de la pièce où l'on est se teinte, et suit le visiteur.
+        */}
         {piecesNommees.length > 1 && (
           <ScrollView
             testID="pieces-de-la-visite"

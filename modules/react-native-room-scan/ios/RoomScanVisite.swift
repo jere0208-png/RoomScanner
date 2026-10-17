@@ -193,13 +193,11 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   }
 
   /*
-    LE RENDU DE LA VISITE — quatre propositions à comparer, relevé du patron :
-    « fais une refonte de la visite plus propre et réaliste, et fais des
-    screens de quatre propositions, lumières allumées et non allumées ; je
-    devrai choisir ». Chacune règle le jour (éteint et allumé), la lumière
-    diffuse des murs, le liseré des meubles, la teinte de matière des meubles
-    et du sol, le veinage du parquet, l'ombre de contact et la force des
-    lampes. La couleur des murs, elle, vient du JavaScript (la palette).
+    LE RENDU DE LA VISITE — relevé du patron : « fais une refonte de la
+    visite plus propre et réaliste ». Il règle le jour (éteint et allumé), la
+    lumière diffuse des murs, le liseré des meubles, la teinte de matière des
+    meubles et du sol, le veinage du parquet, l'ombre de contact et la force
+    des lampes. La couleur des murs, elle, vient du JavaScript (la palette).
   */
   struct Rendu {
     let eteint: (ambiance: CGFloat, jour: CGFloat, contre: CGFloat)
@@ -220,42 +218,22 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     let ambianceTeintee: Bool
   }
 
-  static let RENDUS: [Rendu] = [
-    // A — COMME HIER : les matières d'avant aujourd'hui, la lumière et le ciel d'aujourd'hui.
-    Rendu(
-      eteint: (380, 250, 115), allume: (600, 400, 190), rebond: (0, 0), lisere: 0.32,
-      albedoMeubles: nil, albedoSol: nil, veinage: false, ombre: 0.38, lampes: 1,
-      ambianceTeintee: false),
-    // B — LUMINEUX NATUREL : une pièce de jour, claire et nette, des ombres posées.
-    Rendu(
-      eteint: (470, 330, 140), allume: (640, 440, 200), rebond: (0.16, 0.1), lisere: 0.24,
-      albedoMeubles: 0.86, albedoSol: 0.8, veinage: true, ombre: 0.5, lampes: 1,
-      ambianceTeintee: false),
-    // C — CHALEUREUX DU SOIR : pénombre douce éteint, lumière chaude et franche allumé.
-    Rendu(
-      eteint: (300, 180, 90), allume: (560, 330, 160), rebond: (0.22, 0.14), lisere: 0.24,
-      albedoMeubles: 0.84, albedoSol: 0.74, veinage: true, ombre: 0.55, lampes: 1.5,
-      ambianceTeintee: true),
-    // D — STUDIO DOUX : lumière enveloppante, peu d'ombres portées, tout lisible.
-    Rendu(
-      eteint: (540, 170, 110), allume: (720, 240, 150), rebond: (0.08, 0.05), lisere: 0.18,
-      albedoMeubles: 0.86, albedoSol: 0.78, veinage: true, ombre: 0.6, lampes: 0.8,
-      ambianceTeintee: false),
-  ]
+  /*
+    LE RENDU RETENU : « CHALEUREUX DU SOIR » — relevé du patron, sur les
+    captures des quatre propositions : « le rendu C est parfait en mode tout
+    éteint ; en mode allumé, la lumière est trop forte dans n'importe quelle
+    scène, les meubles deviennent pas agréables à regarder ». Éteint, il
+    reste tel quel. Allumé, la pièce ne gagne plus qu'un tiers de lumière
+    (au lieu de presque le double), les faisceaux reprennent leur force
+    d'origine, et l'ambiance ne prend qu'un soupçon de la teinte des lampes.
+  */
+  static let RENDU = Rendu(
+    eteint: (300, 180, 90), allume: (390, 235, 110), rebond: (0.22, 0.2), lisere: 0.24,
+    albedoMeubles: 0.84, albedoSol: 0.74, veinage: true, ombre: 0.55, lampes: 1,
+    ambianceTeintee: true)
 
-  /// Le rendu choisi (voir `RENDUS`).
-  private var choix: Rendu = RoomScanVisite.RENDUS[0]
-
-  @objc var rendu: NSNumber = 0 {
-    didSet {
-      guard rendu != oldValue else { return }
-      choix = Self.RENDUS[max(0, min(Self.RENDUS.count - 1, rendu.intValue))]
-      // Les matières des meubles et des sols dépendent du rendu : on rebâtit.
-      rebatir([.meubles, .sols])
-      reglerLeJour()
-      appliquerLampes()
-    }
-  }
+  /// Le rendu de la visite (voir `RENDU`).
+  private let choix: Rendu = RoomScanVisite.RENDU
 
   /// La teinte des lampes, tirée de la température (voir `teinteDeKelvin`).
   private var teinteDesLampes: UIColor = RoomScanVisite.teinteDeKelvin(3000)
@@ -566,7 +544,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     jour.intensity = j.jour
     contre.intensity = j.contre
     ambiante.color = !maquette && lumiereAllumee && choix.ambianceTeintee
-      ? melange(.white, teinteDesLampes, 0.35) : UIColor.white
+      ? melange(.white, teinteDesLampes, 0.2) : UIColor.white
     SCNTransaction.commit()
     let rebond = rebondDuMoment()
     for m in matieresDuBati { m.setValue(NSNumber(value: Float(rebond)), forKey: "rebond") }
@@ -822,10 +800,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     return n
   }
 
-  /// Le fil du bois et la trame des tissus, dessinés une fois par teinte —
-  /// pour toutes les vues : la visite et la maquette ne les redessinent plus
-  /// chacune (fil principal seulement).
-  private static var texturesDesMeubles: [String: UIImage] = [:]
   /// Le parquet et le carrelage, dessinés une fois par matière et par teinte.
   private static var imagesDesSols: [String: UIImage] = [:]
 
@@ -924,7 +898,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     // d'un côté, un contre-jour plus faible de l'autre — assez pour que
     // deux murs d'une même teinte se distinguent à l'angle.
     ambiante.type = .ambient
-    ambiante.intensity = RoomScanVisite.RENDUS[0].allume.ambiance
+    ambiante.intensity = RoomScanVisite.RENDU.allume.ambiance
     ambiante.color = UIColor.white
     let noeudAmbiant = SCNNode()
     noeudAmbiant.light = ambiante
@@ -947,7 +921,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     */
 
     jour.type = .directional
-    jour.intensity = RoomScanVisite.RENDUS[0].allume.jour
+    jour.intensity = RoomScanVisite.RENDU.allume.jour
     jour.castsShadow = false
     let noeudJour = SCNNode()
     noeudJour.light = jour
@@ -955,7 +929,7 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     scene.rootNode.addChildNode(noeudJour)
 
     contre.type = .directional
-    contre.intensity = RoomScanVisite.RENDUS[0].allume.contre
+    contre.intensity = RoomScanVisite.RENDU.allume.contre
     contre.castsShadow = false
     let noeudContre = SCNNode()
     noeudContre.light = contre
@@ -1576,18 +1550,14 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     m.cullMode = .back
     switch code {
     case 1, 2:
-      if let image = textureDuMeuble(code, teinte) {
-        m.diffuse.contents = image
-        m.diffuse.wrapS = .repeat
-        m.diffuse.wrapT = .repeat
-        m.diffuse.mipFilter = .linear
-        // De biais, le fil du bois et la trame restent nets.
-        m.diffuse.maxAnisotropy = 4
-        // Les coordonnées sont en mètres : le fil se répète tous les
-        // quatre-vingt-dix centimètres, la trame tous les trente.
-        let pas: Float = code == 1 ? 0.9 : 0.3
-        m.diffuse.contentsTransform = SCNMatrix4MakeScale(1 / pas, 1 / pas, 1)
-      }
+      /*
+        PLUS DE TEXTURE DESSINÉE SUR LES MEUBLES — relevé du patron : « enlève
+        les textures sur les meubles ». Le fil du bois et la trame du tissu,
+        dessinés à la main, faisaient des rayures plus que de la matière. Le
+        bois et le tissu gardent leur teinte et leur rugosité : c'est la
+        lumière qui fait la matière.
+      */
+      break
     case 3:
       m.transparency = 0.3
       m.transparencyMode = .dualLayer
@@ -1733,73 +1703,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
         }
       }
     }
-  }
-
-  /** Le fil du bois (code 1) ou la trame d'un tissu (code 2), à la teinte donnée. */
-  private func textureDuMeuble(_ code: Int, _ teinte: UIColor) -> UIImage? {
-    var r: CGFloat = 0
-    var g: CGFloat = 0
-    var b: CGFloat = 0
-    var a: CGFloat = 0
-    teinte.getRed(&r, green: &g, blue: &b, alpha: &a)
-    let cle = "\(code)-\(Int(r * 255))-\(Int(g * 255))-\(Int(b * 255))"
-    if let deja = Self.texturesDesMeubles[cle] { return deja }
-    let cote: CGFloat = code == 1 ? 512 : 256
-    let format = UIGraphicsImageRendererFormat()
-    format.scale = 1
-    // Huit bits par composante : sur un écran P3, le format « automatique »
-    // en prenait seize, pour un fil de bois qui n'en a pas besoin.
-    format.preferredRange = .standard
-    let rendu = UIGraphicsImageRenderer(size: CGSize(width: cote, height: cote), format: format)
-    let image = rendu.image { ctx in
-      let c = ctx.cgContext
-      c.setFillColor(teinte.cgColor)
-      c.fill(CGRect(x: 0, y: 0, width: cote, height: cote))
-      var graine: UInt64 = 0x9E37_79B9_7F4A_7C15
-      func hasard() -> CGFloat {
-        graine = graine &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
-        return CGFloat((graine >> 33) & 0xFF_FFFF) / CGFloat(0xFF_FFFF)
-      }
-      if code == 1 {
-        // Le fil : des veines sinueuses, un peu plus sombres, le long de u.
-        for k in 0..<70 {
-          let y0 = hasard() * cote
-          let amplitude = 1.5 + hasard() * 3
-          let periode = 40 + hasard() * 60
-          c.setStrokeColor(
-            UIColor(red: 0.32, green: 0.2, blue: 0.1, alpha: 0.05 + hasard() * 0.1).cgColor)
-          c.setLineWidth(0.6 + hasard() * 2.2)
-          c.beginPath()
-          var x: CGFloat = 0
-          while x <= cote {
-            let y = y0 + CGFloat(sin(Double(x / periode) + Double(k))) * amplitude
-            if x == 0 {
-              c.move(to: CGPoint(x: x, y: y))
-            } else {
-              c.addLine(to: CGPoint(x: x, y: y))
-            }
-            x += 16
-          }
-          c.strokePath()
-        }
-      } else {
-        // La trame : des fils sombres en travers, des fils clairs en long.
-        var y: CGFloat = 0
-        while y < cote {
-          c.setFillColor(UIColor(white: 0, alpha: 0.025 + hasard() * 0.03).cgColor)
-          c.fill(CGRect(x: 0, y: y, width: cote, height: 1))
-          y += 2
-        }
-        var x: CGFloat = 0
-        while x < cote {
-          c.setFillColor(UIColor(white: 1, alpha: 0.02 + hasard() * 0.03).cgColor)
-          c.fill(CGRect(x: x, y: 0, width: 1, height: cote))
-          x += 2
-        }
-      }
-    }
-    Self.texturesDesMeubles[cle] = image
-    return image
   }
 
   /**

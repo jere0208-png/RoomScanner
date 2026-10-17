@@ -45,8 +45,8 @@ export const MAQUETTE: ScenePalette = {
   wall: '#FFFCF6',
   /* Les murs côté pièce : le blanc cassé du bâti — relevé du patron, « la
      majorité des murs chez les particuliers sont blancs », puis « la visite
-     était mieux avant les changements d'aujourd'hui ». La visite choisit le
-     sien parmi ses quatre rendus (voir `renduVisite`). */
+     était mieux avant les changements d'aujourd'hui ». La visite a le sien
+     (voir `MURS_DE_LA_VISITE`). */
   wallInside: '#FFFCF6',
   wallStroke: '#E0D6C5',
   /* L'arase des murs, vue de dessus : c'est elle qui reçoit le plus de

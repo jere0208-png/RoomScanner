@@ -1,8 +1,8 @@
-# La visite 3D : les quatre rendus (A à D), lampes éteintes puis allumées —
-# relevé du patron : « fais des screens de quatre propositions, lumières
-# allumées et non allumées d'une scène avec meubles ; je devrai choisir ».
+# La visite 3D, lampes éteintes puis allumées — relevé du patron : « fais des
+# screens de quatre propositions, lumières allumées et non allumées ». Le
+# rendu C a été retenu ; les captures suivent ses réglages.
 appId: ${APP_ID}
-name: Visite — quatre rendus
+name: Visite — éteinte et allumée
 ---
 - launchApp
 - runFlow: commun/vers-accueil.yaml
@@ -22,7 +22,7 @@ name: Visite — quatre rendus
 - tapOn: "Explorer"
 - extendedWaitUntil:
     visible:
-      id: "rendu-visite"
+      id: "tout-allumer"
     timeout: 20000
 - waitForAnimationToEnd:
     timeout: 8000
@@ -35,69 +35,15 @@ name: Visite — quatre rendus
 - waitForAnimationToEnd:
     timeout: 5000
 
-# Rendu A
-- takeScreenshot: ${THEME}-60-rendu-A-eteint
+# Le rendu retenu (C, « Chaleureux du soir »), lampes éteintes puis allumées.
+- takeScreenshot: ${THEME}-60-visite-eteinte
 - tapOn:
     id: "tout-allumer"
 - waitForAnimationToEnd:
     timeout: 4000
-- takeScreenshot: ${THEME}-61-rendu-A-allume
+- takeScreenshot: ${THEME}-61-visite-allumee
 - tapOn:
     id: "tout-allumer"
-- tapOn:
-    id: "rendu-visite"
-- extendedWaitUntil:
-    notVisible: "Rendu B · Lumineux naturel"
-    timeout: 8000
-- waitForAnimationToEnd:
-    timeout: 4000
-
-# Rendu B
-- takeScreenshot: ${THEME}-62-rendu-B-eteint
-- tapOn:
-    id: "tout-allumer"
-- waitForAnimationToEnd:
-    timeout: 4000
-- takeScreenshot: ${THEME}-63-rendu-B-allume
-- tapOn:
-    id: "tout-allumer"
-- tapOn:
-    id: "rendu-visite"
-- extendedWaitUntil:
-    notVisible: "Rendu C · Chaleureux du soir"
-    timeout: 8000
-- waitForAnimationToEnd:
-    timeout: 4000
-
-# Rendu C
-- takeScreenshot: ${THEME}-64-rendu-C-eteint
-- tapOn:
-    id: "tout-allumer"
-- waitForAnimationToEnd:
-    timeout: 4000
-- takeScreenshot: ${THEME}-65-rendu-C-allume
-- tapOn:
-    id: "tout-allumer"
-- tapOn:
-    id: "rendu-visite"
-- extendedWaitUntil:
-    notVisible: "Rendu D · Studio doux"
-    timeout: 8000
-- waitForAnimationToEnd:
-    timeout: 4000
-
-# Rendu D
-- takeScreenshot: ${THEME}-66-rendu-D-eteint
-- tapOn:
-    id: "tout-allumer"
-- waitForAnimationToEnd:
-    timeout: 4000
-- takeScreenshot: ${THEME}-67-rendu-D-allume
-- tapOn:
-    id: "tout-allumer"
-# Retour au rendu A pour les parcours suivants.
-- tapOn:
-    id: "rendu-visite"
 
 # Retour au grand public pour les parcours suivants.
 - tapOn: "Terminer"
