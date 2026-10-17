@@ -230,6 +230,11 @@ function Application() {
         // Et la boîte se relit au retour : un message publié pendant que
         // l'app dormait doit allumer la pastille sans relancer l'app.
         useNotifications.getState().rafraichir().catch(() => {});
+        // Les suppressions faites sans réseau repartent : on revient souvent
+        // au premier plan en sortant de la cave (voir `rejouerLesSuppressions`).
+        if (useScanStore.getState().savesCharges) {
+          useScanStore.getState().rejouerLesSuppressions().catch(() => {});
+        }
       } else {
         // Un appel, la batterie, iOS qui ferme l'app : le filet s'écrit
         // maintenant, pas dans trente secondes.
@@ -282,6 +287,8 @@ function Application() {
   */
   useEffect(() => {
     if (!compte || !savesCharges) return;
+    // Les suppressions restées sans réseau la dernière fois partent d'abord.
+    useScanStore.getState().rejouerLesSuppressions().catch(() => {});
     repriseAuBesoin().catch(() => {
       // Un serveur muet ne se dit pas au lancement : les plans du téléphone
       // sont là, et la reprise se retentera au prochain démarrage.

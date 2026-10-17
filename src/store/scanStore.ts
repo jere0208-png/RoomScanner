@@ -549,6 +549,12 @@ export interface SavedScan {
   createdAt: number;
   updatedAt: number;
   /**
+   * LA VERSION DU FORMAT, écrite avec le plan (voir `SCHEMA_PLAN`). Un plan
+   * déjà à jour saute les migrations au chargement suivant. Absente des
+   * plans d'avant ce champ : ils sont migrés une fois, puis réécrits.
+   */
+  schema?: number;
+  /**
    * UN PLAN JAMAIS ENREGISTRÉ, rangé en partant : il s'efface seul à cette
    * date. Absent = un plan enregistré, qui ne s'efface jamais seul.
    */
@@ -1150,15 +1156,98 @@ function separerLeMobilier(
   return suite;
 }
 
-function migrateSave(brut: SavedScan): SavedScan {
+/**
+ * LA VERSION DU FORMAT DES PLANS — relevé « bug-fluidité » : à chaque
+ * lancement, toutes les migrations se rejouaient sur chaque plan (éclats,
+ * découpage des pièces pour les baies vitrées, portes d'angle). Deux cents
+ * plans, près de deux secondes de fil JavaScript bloqué, l'accueil affiché
+ * mais sourd au doigt.
+ *
+ * Un plan migré porte désormais `schema: SCHEMA_PLAN`, et le chargement
+ * suivant saute les migrations géométriques. À AUGMENTER À CHAQUE MIGRATION
+ * AJOUTÉE À `migrateSave` : c'est ce qui la fait jouer sur les plans déjà
+ * estampillés.
+ */
+export const SCHEMA_PLAN = 1;
+
+/** Un point du plan : deux coordonnées qui sont des nombres. */
+function pointSain(p: unknown): boolean {
+  if (!p || typeof p !== 'object') return false;
+  const q = p as { x?: unknown; z?: unknown };
+  return Number.isFinite(q.x) && Number.isFinite(q.z);
+}
+
+/** Un mur ou une ouverture qu'on peut dessiner : deux extrémités lisibles. */
+function segmentSain(x: unknown): boolean {
+  if (!x || typeof x !== 'object') return false;
+  const w = x as { a?: unknown; b?: unknown };
+  return pointSain(w.a) && pointSain(w.b);
+}
+
+/** Un meuble qu'on peut poser : une matrice de 16 nombres et trois cotes. */
+function meubleSain(x: unknown): boolean {
+  if (!x || typeof x !== 'object') return false;
+  const o = x as { transform?: unknown; width?: unknown; height?: unknown; depth?: unknown };
+  return (
+    Array.isArray(o.transform) &&
+    o.transform.length >= 16 &&
+    o.transform.every((v) => Number.isFinite(v)) &&
+    Number.isFinite(o.width) &&
+    Number.isFinite(o.height) &&
+    Number.isFinite(o.depth)
+  );
+}
+
+/** Une pièce : un objet qui porte son identifiant. */
+function pieceSaine(x: unknown): boolean {
+  return !!x && typeof x === 'object' && typeof (x as { id?: unknown }).id === 'string';
+}
+
+/**
+ * LES ÉLÉMENTS ABÎMÉS S'EN VONT, LE PLAN RESTE — relevé « bug-données » : un
+ * seul mur sans extrémité faisait lever la migration, et le plan ENTIER,
+ * seize murs sains compris, disparaissait de la bibliothèque sans un mot
+ * (« Aucun plan enregistré »). On écarte le mur, l'ouverture, le meuble ou
+ * la pièce illisible ; le reste du relevé s'ouvre. Rend la même liste quand
+ * rien n'est à écarter.
+ */
+function elementsSains<T>(liste: T[] | undefined, sain: (x: unknown) => boolean): T[] | undefined {
+  if (!Array.isArray(liste)) return liste;
+  return liste.every(sain) ? liste : liste.filter(sain);
+}
+
+/** Les quatre listes géométriques d'un contenu, sans leurs éléments abîmés. */
+function contenuSain<C extends Partial<Pick<SavedScan, 'walls' | 'openings' | 'objects' | 'rooms'>>>(c: C): C {
+  const walls = elementsSains(c.walls, segmentSain);
+  const openings = elementsSains(c.openings, segmentSain);
+  const objects = elementsSains(c.objects, meubleSain);
+  const rooms = elementsSains(c.rooms, pieceSaine);
+  if (walls === c.walls && openings === c.openings && objects === c.objects && rooms === c.rooms) return c;
+  return { ...c, walls, openings, objects, rooms };
+}
+
+/** Le plan porte-t-il déjà la version de ce format (ou d'un plus récent) ? */
+function estampille(s: { schema?: unknown }): boolean {
+  return typeof s.schema === 'number' && s.schema >= SCHEMA_PLAN;
+}
+
+function migrateSave(entree: SavedScan): SavedScan {
+  // D'abord ce qui ferait lever tout le reste : voir `elementsSains`.
+  let brut = contenuSain(entree);
+  if (brut.retouche?.plan) {
+    const plan = contenuSain(brut.retouche.plan);
+    if (plan !== brut.retouche.plan) brut = { ...brut, retouche: { ...brut.retouche, plan } };
+  }
+  // Déjà migré par cette version (ou une plus récente) : voir `SCHEMA_PLAN`.
+  const aJour = estampille(brut);
   /*
     LES ÉCLATS D'UN PLAN D'AVANT S'EN VONT À L'OUVERTURE — un « mur » de
     0 cm sur un coin empêchait sa pièce de se fermer (voir `ECLAT`). Le
     plan et ses retouches en attente.
   */
-  const propre = sansEclats(brut.walls ?? [], brut.rooms ?? []);
+  const propre = aJour ? null : sansEclats(brut.walls ?? [], brut.rooms ?? []);
   let s: SavedScan =
-    propre.walls === (brut.walls ?? []) ? brut : { ...brut, walls: propre.walls, rooms: propre.rooms };
+    !propre || propre.walls === (brut.walls ?? []) ? brut : { ...brut, walls: propre.walls, rooms: propre.rooms };
   /*
     UN PLAN SANS NOM EN REÇOIT UN — relevé « bug-données » : un plan revenu
     sans `name` (sauvegarde bancale, ancien format) faisait lever
@@ -1184,78 +1273,89 @@ function migrateSave(brut: SavedScan): SavedScan {
     s = repare;
   }
   /*
-    D'ABORD, LES BAIES D'AVANT PRENNENT LE NIVEAU DE LEUR MUR — tout ce qui
-    suit se fait étage par étage (revue « Nadia »).
+    LES MIGRATIONS GÉOMÉTRIQUES — les seules qui coûtent : sautées pour un
+    plan déjà à jour (voir `SCHEMA_PLAN`).
+  */
+  if (!aJour) {
+    /*
+      D'ABORD, LES BAIES D'AVANT PRENNENT LE NIVEAU DE LEUR MUR — tout ce qui
+      suit se fait étage par étage (revue « Nadia »).
 
-    LES BAIES D'AVANT PRENNENT LE NIVEAU DE LEUR MUR — revue « Léa » : posées
-    à l'étage, elles n'en portaient aucun et se rangeaient au
-    rez-de-chaussée. On ne tranche que quand un seul niveau a un mur sous la
-    baie ; deux niveaux superposés au même endroit, on ne devine pas.
-  */
-  if ((s.openings ?? []).some((o) => o.niveau === undefined) && (s.walls ?? []).some((w) => niveauDe(w) !== NIVEAU_RDC)) {
-    const murs = (s.walls ?? []).filter((w) => w.type === 'wall');
-    let change = false;
-    const baies = s.openings.map((o) => {
-      if (o.niveau !== undefined) return o;
-      const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
-      const niveaux = new Set(murs.filter((w) => pointOnSeg(mid, w.a, w.b).dist < 0.3).map((w) => niveauDe(w)));
-      if (niveaux.size !== 1) return o;
-      const n = [...niveaux][0];
-      if (n === NIVEAU_RDC) return o;
-      change = true;
-      return { ...o, niveau: n };
-    });
-    if (change) s = { ...s, openings: baies };
-  }
-  /*
-    LA BAIE VITRÉE D'UN PLAN D'AVANT, rangée parmi les portes : elle balayait
-    le séjour d'un vantail de 2,40 m (voir `baiesVitrees`). Les contours sont
-    ceux des pièces DE SON ÉTAGE : celles du dessous ne disent pas si elle
-    donne dehors.
-  */
-  if ((s.openings ?? []).some((o) => o.type === 'door' && segLength(o) >= LARGEUR_DE_BAIE)) {
-    const niveaux = [...new Set(s.openings.map((o) => niveauDe(o)))];
-    let ouvertures = s.openings;
-    for (const n of niveaux) {
-      const murs = (s.walls ?? []).filter((w) => niveauDe(w) === n);
-      const contours = roomParts(murs, (s.rooms ?? []).filter((r) => niveauDe(r) === n))
-        .map((p) => p.surface?.pts ?? [])
-        .filter((c) => c.length >= 3);
-      const ici = ouvertures.filter((o) => niveauDe(o) === n);
-      const revues = baiesVitrees(ici, murs, contours);
-      if (revues !== ici) {
-        const parId = new Map(revues.map((o) => [o.id, o]));
-        ouvertures = ouvertures.map((o) => parId.get(o.id) ?? o);
-      }
+      LES BAIES D'AVANT PRENNENT LE NIVEAU DE LEUR MUR — revue « Léa » : posées
+      à l'étage, elles n'en portaient aucun et se rangeaient au
+      rez-de-chaussée. On ne tranche que quand un seul niveau a un mur sous la
+      baie ; deux niveaux superposés au même endroit, on ne devine pas.
+    */
+    if ((s.openings ?? []).some((o) => o.niveau === undefined) && (s.walls ?? []).some((w) => niveauDe(w) !== NIVEAU_RDC)) {
+      const murs = (s.walls ?? []).filter((w) => w.type === 'wall');
+      let change = false;
+      const baies = s.openings.map((o) => {
+        if (o.niveau !== undefined) return o;
+        const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+        const niveaux = new Set(murs.filter((w) => pointOnSeg(mid, w.a, w.b).dist < 0.3).map((w) => niveauDe(w)));
+        if (niveaux.size !== 1) return o;
+        const n = [...niveaux][0];
+        if (n === NIVEAU_RDC) return o;
+        change = true;
+        return { ...o, niveau: n };
+      });
+      if (change) s = { ...s, openings: baies };
     }
-    if (ouvertures !== s.openings) s = { ...s, openings: ouvertures };
-  }
-  /*
-    LA PORTE D'UN PLAN D'AVANT, ENFONCÉE DANS LE MUR D'ANGLE — relevé du
-    patron : « la porte est imbriquée dans le mur, cachant une partie ». Elle
-    se dégage à l'ouverture du plan (voir `baiesHorsDesAngles`).
-  */
-  if ((s.openings ?? []).length > 0) {
-    const recalees = baiesHorsDesAngles(s.openings, s.walls ?? []);
-    if (recalees !== s.openings) s = { ...s, openings: recalees };
-  }
-  if (s.retouche?.plan?.walls) {
-    const r = sansEclats(s.retouche.plan.walls, s.retouche.plan.rooms ?? []);
-    if (r.walls !== s.retouche.plan.walls) {
-      s = { ...s, retouche: { ...s.retouche, plan: { ...s.retouche.plan, walls: r.walls, rooms: r.rooms } } };
+    /*
+      LA BAIE VITRÉE D'UN PLAN D'AVANT, rangée parmi les portes : elle balayait
+      le séjour d'un vantail de 2,40 m (voir `baiesVitrees`). Les contours sont
+      ceux des pièces DE SON ÉTAGE : celles du dessous ne disent pas si elle
+      donne dehors.
+    */
+    if ((s.openings ?? []).some((o) => o.type === 'door' && segLength(o) >= LARGEUR_DE_BAIE)) {
+      const niveaux = [...new Set(s.openings.map((o) => niveauDe(o)))];
+      let ouvertures = s.openings;
+      for (const n of niveaux) {
+        const murs = (s.walls ?? []).filter((w) => niveauDe(w) === n);
+        const contours = roomParts(murs, (s.rooms ?? []).filter((r) => niveauDe(r) === n))
+          .map((p) => p.surface?.pts ?? [])
+          .filter((c) => c.length >= 3);
+        const ici = ouvertures.filter((o) => niveauDe(o) === n);
+        const revues = baiesVitrees(ici, murs, contours);
+        if (revues !== ici) {
+          const parId = new Map(revues.map((o) => [o.id, o]));
+          ouvertures = ouvertures.map((o) => parId.get(o.id) ?? o);
+        }
+      }
+      if (ouvertures !== s.openings) s = { ...s, openings: ouvertures };
+    }
+    /*
+      LA PORTE D'UN PLAN D'AVANT, ENFONCÉE DANS LE MUR D'ANGLE — relevé du
+      patron : « la porte est imbriquée dans le mur, cachant une partie ». Elle
+      se dégage à l'ouverture du plan (voir `baiesHorsDesAngles`).
+    */
+    if ((s.openings ?? []).length > 0) {
+      const recalees = baiesHorsDesAngles(s.openings, s.walls ?? []);
+      if (recalees !== s.openings) s = { ...s, openings: recalees };
+    }
+    if (s.retouche?.plan?.walls) {
+      const r = sansEclats(s.retouche.plan.walls, s.retouche.plan.rooms ?? []);
+      if (r.walls !== s.retouche.plan.walls) {
+        s = { ...s, retouche: { ...s.retouche, plan: { ...s.retouche.plan, walls: r.walls, rooms: r.rooms } } };
+      }
     }
   }
   const fixtures = Array.isArray(s.fixtures) ? s.fixtures : [];
-  if (Array.isArray(s.rooms) && s.rooms.length > 0) {
-    return s.fixtures === fixtures ? s : { ...s, fixtures };
+  if (s.fixtures !== fixtures) s = { ...s, fixtures };
+  if (!Array.isArray(s.rooms) || s.rooms.length === 0) {
+    s = {
+      ...s,
+      rooms: [
+        { id: DEFAULT_ROOM_ID, name: s.roomName ?? '', floor: s.floor ?? null },
+      ],
+    };
   }
-  return {
-    ...s,
-    fixtures,
-    rooms: [
-      { id: DEFAULT_ROOM_ID, name: s.roomName ?? '', floor: s.floor ?? null },
-    ],
-  };
+  /*
+    ESTAMPILLÉ, IL NE SE MIGRE PLUS — un plan qui ne portait pas la version
+    devient un nouvel objet : le chargement le voit et le réécrit une fois
+    (voir `loadSaves`), et le lancement suivant saute tout ce qui précède.
+  */
+  return aJour ? s : { ...s, schema: SCHEMA_PLAN };
 }
 
 /**
@@ -1396,6 +1496,9 @@ export function resetPersistCache() {
   ecrits.clear();
   gardes.clear();
   bibliothequeChargee = true;
+  // La file des suppressions se relira du disque (voir `chargerLaFile`).
+  fileDesSuppressions = null;
+  rejouEnCours = null;
 }
 
 /**
@@ -1459,7 +1562,7 @@ async function lireLesCles(cles: string[]): Promise<(string | null)[]> {
  * migration qui efface avant d'avoir fini est une migration qui perd des
  * données le jour où le téléphone s'éteint au mauvais moment.
  */
-async function loadLibrary(): Promise<SavedScan[] | null> {
+async function loadLibrary(): Promise<{ plans: SavedScan[]; migres: number } | null> {
   const index = await AsyncStorage.getItem(INDEX_KEY);
   if (index) {
     let ids: string[] | null = null;
@@ -1498,6 +1601,8 @@ async function loadLibrary(): Promise<SavedScan[] | null> {
     // Tout ce que l'index connaît est gardé tant qu'il n'est pas chargé.
     for (const id of ids) gardes.add(id);
     const out: SavedScan[] = [];
+    // Les plans qui ne portaient pas la version : migrés, à réécrire.
+    let migres = 0;
     const bruts = await lireLesCles(ids.map(scanKey));
     for (let i = 0; i < ids.length; i++) {
       const id = ids[i];
@@ -1516,7 +1621,17 @@ async function loadLibrary(): Promise<SavedScan[] | null> {
         if (!planValide(lu, id)) continue;
         const plan = migrateSave(lu);
         out.push(plan);
-        ecrits.set(id, { ref: lu, quand: lu.updatedAt, empreinte: empreinteDe(raw) });
+        /*
+          PAS D'EMPREINTE AU CHARGEMENT — relevé « bug-fluidité » : un
+          hachage calculé caractère par caractère sur tout le JSON lu, 2,8 Mo
+          pour deux cents plans, plus de quatre cents millisecondes à chaque
+          lancement. Il ne servait qu'à éviter, au premier enregistrement,
+          la réécriture d'un plan modifié puis remis à l'identique : la
+          référence suffit à reconnaître un plan intact, et le pire que
+          coûte l'empreinte vide est une réécriture de trop, inoffensive.
+        */
+        ecrits.set(id, { ref: lu, quand: lu.updatedAt, empreinte: '' });
+        if (!estampille(lu)) migres += 1;
         gardes.delete(id);
       } catch {
         // Un scan corrompu est sauté, les autres restent lisibles — c'est
@@ -1534,7 +1649,7 @@ async function loadLibrary(): Promise<SavedScan[] | null> {
         JSON.stringify([...out.map((x) => x.id), ...ids.filter((id) => gardes.has(id))]),
       ).catch(() => {});
     }
-    return out;
+    return { plans: out, migres };
   }
 
   // --------------------------------------------- reprise de l'ancien format
@@ -1553,13 +1668,16 @@ async function loadLibrary(): Promise<SavedScan[] | null> {
     (s): s is SavedScan => !!s && typeof s === 'object' && typeof s.id === 'string' && s.id !== '',
   );
   const charges: SavedScan[] = [];
+  let migres = 0;
   for (const s of eclates) {
     const json = JSON.stringify(s);
     await AsyncStorage.setItem(scanKey(s.id), json);
     try {
       if (!planValide(s, s.id)) throw new Error('plan invalide');
-      charges.push(migrateSave(s));
+      const plan = migrateSave(s);
+      charges.push(plan);
       ecrits.set(s.id, { ref: s, quand: s.updatedAt, empreinte: empreinteDe(json) });
+      if (!estampille(s)) migres += 1;
     } catch {
       // Écrit à sa clé, gardé, mais pas chargé : voir `gardes`.
       gardes.add(s.id);
@@ -1567,7 +1685,7 @@ async function loadLibrary(): Promise<SavedScan[] | null> {
   }
   await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(eclates.map((s) => s.id)));
   if (eclates.length === saves.length) await AsyncStorage.removeItem(STORAGE_KEY);
-  return charges;
+  return { plans: charges, migres };
 }
 
 /**
@@ -1575,10 +1693,151 @@ async function loadLibrary(): Promise<SavedScan[] | null> {
  * « entièrement chargée » — ce qui autorise enfin les effacements — que si
  * tout s'est passé jusqu'au bout.
  */
-async function chargerLaBibliotheque(poser: (saves: SavedScan[]) => void): Promise<void> {
-  const saves = await loadLibrary();
-  if (saves) poser(saves);
+async function chargerLaBibliotheque(poser: (saves: SavedScan[]) => void): Promise<number> {
+  const lu = await loadLibrary();
+  if (lu) poser(lu.plans);
   bibliothequeChargee = true;
+  return lu?.migres ?? 0;
+}
+
+/**
+ * LES PLANS QUI N'ONT PAS PU ÊTRE LUS — sur le disque, gardés (voir
+ * `gardes`), mais absents de la bibliothèque. Relevé « bug-données » : rien
+ * ne le disait, et l'écran affichait « Aucun plan enregistré » à côté d'un
+ * plan bien présent. La bibliothèque les compte et propose de les envoyer.
+ */
+function plansGardes(): string[] {
+  return [...gardes];
+}
+
+/**
+ * LE CONTENU BRUT D'UN PLAN ILLISIBLE, tel qu'il est sur le disque — de quoi
+ * l'envoyer au support, qui saura peut-être le réparer. `nom` est celui que
+ * le plan porte encore, s'il se lit.
+ */
+export async function brutDuPlanIllisible(
+  id: string,
+): Promise<{ nom: string; fichier: string; contenu: string } | null> {
+  try {
+    const contenu = await AsyncStorage.getItem(scanKey(id));
+    if (!contenu) return null;
+    let nom = '';
+    try {
+      const lu = JSON.parse(contenu) as { name?: unknown };
+      if (lu && typeof lu.name === 'string') nom = lu.name;
+    } catch {
+      // Illisible jusqu'au nom : on l'envoie tel quel.
+    }
+    const sur = id.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 40) || 'plan';
+    return { nom, fichier: `plan-illisible-${sur}.json`, contenu };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * LES SUPPRESSIONS QUI N'ONT PAS ENCORE ATTEINT LE SERVEUR.
+ *
+ * Relevé « bug-données » : supprimer un plan retirait aussi sa copie en
+ * ligne — une seule tentative, dont l'échec était avalé. Supprimé dans une
+ * cave, sur un chantier sans réseau, le plan restait dans le coffre et
+ * revenait après une réinstallation. Pour l'électricien, c'est le dossier
+ * d'un client qu'il croyait jeté.
+ *
+ * Chaque suppression entre donc d'abord dans cette file, écrite sur le
+ * disque ; elle n'en sort que quand le serveur a dit « c'est fait ». La file
+ * se rejoue au lancement, au retour au premier plan, et dès qu'un échange
+ * avec le serveur réussit (voir `rejouerLesSuppressions`). Et la reprise du
+ * compte ne redescend jamais un plan qui y attend.
+ */
+interface SuppressionEnAttente {
+  scan: string;
+  /** Le compte qui l'a demandée : seul lui peut la rejouer. */
+  identifiant: string;
+  le: number;
+}
+const SUPPRESSIONS_KEY = 'roomscanner.suppressions.v1';
+/** Au-delà, les plus anciennes partent : un filet, pas un registre. */
+const SUPPRESSIONS_MAX = 500;
+let fileDesSuppressions: Promise<SuppressionEnAttente[]> | null = null;
+
+/** La file, lue une fois (puis tenue en mémoire). Ne lève jamais. */
+function chargerLaFile(): Promise<SuppressionEnAttente[]> {
+  if (!fileDesSuppressions) {
+    fileDesSuppressions = AsyncStorage.getItem(SUPPRESSIONS_KEY).then(
+      (brut) => {
+        try {
+          const lu: unknown = brut ? JSON.parse(brut) : [];
+          return Array.isArray(lu)
+            ? lu.filter(
+                (x): x is SuppressionEnAttente =>
+                  !!x &&
+                  typeof x === 'object' &&
+                  typeof (x as SuppressionEnAttente).scan === 'string' &&
+                  typeof (x as SuppressionEnAttente).identifiant === 'string',
+              )
+            : [];
+        } catch {
+          return [];
+        }
+      },
+      () => [],
+    );
+  }
+  return fileDesSuppressions;
+}
+
+/**
+ * Change la file, puis l'écrit. Les changements s'enchaînent l'un derrière
+ * l'autre : deux suppressions rapprochées ne s'écrasent pas sur le disque.
+ */
+function changerLaFile(
+  change: (file: SuppressionEnAttente[]) => SuppressionEnAttente[],
+): Promise<SuppressionEnAttente[]> {
+  fileDesSuppressions = chargerLaFile().then((file) => {
+    const suite = change(file).slice(-SUPPRESSIONS_MAX);
+    AsyncStorage.setItem(SUPPRESSIONS_KEY, JSON.stringify(suite)).catch(() => {});
+    return suite;
+  });
+  return fileDesSuppressions;
+}
+
+/** Les plans dont la suppression attend le serveur (tous comptes confondus). */
+async function scansASupprimer(): Promise<Set<string>> {
+  return new Set((await chargerLaFile()).map((x) => x.scan));
+}
+
+/** Une seule relance à la fois : deux rejoueurs enverraient tout en double. */
+let rejouEnCours: Promise<number> | null = null;
+
+/**
+ * REJOUE LES SUPPRESSIONS EN ATTENTE pour ce compte. Rend le nombre de
+ * suppressions que le serveur a confirmées. Au premier échec, on s'arrête :
+ * le réseau n'est pas revenu, inutile d'attendre cinq secondes par plan.
+ */
+function rejouerPour(qui: Identite | null): Promise<number> {
+  if (!qui) return Promise.resolve(0);
+  if (rejouEnCours) return rejouEnCours;
+  const tour = (async () => {
+    let faites = 0;
+    const file = await chargerLaFile();
+    for (const x of file.filter((e) => e.identifiant === qui.identifiant)) {
+      let ok = false;
+      try {
+        ok = (await retirerPlan(qui, x.scan)) === true;
+      } catch {
+        ok = false;
+      }
+      if (!ok) break;
+      faites += 1;
+      await changerLaFile((f) => f.filter((e) => !(e.scan === x.scan && e.identifiant === x.identifiant)));
+    }
+    return faites;
+  })();
+  rejouEnCours = tour.finally(() => {
+    rejouEnCours = null;
+  });
+  return rejouEnCours;
 }
 
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1899,9 +2158,22 @@ function persistSoon(saves: SavedScan[]) {
         const deja = ecrits.get(s.id);
         // Le même objet, à la même date : rien n'a bougé, rien à sérialiser.
         if (deja && deja.ref === s && deja.quand === s.updatedAt) continue;
-        const json = JSON.stringify(s);
-        const empreinte = empreinteDe(json);
-        if (deja && deja.empreinte === empreinte) {
+        /*
+          CE QUI EST EN MÉMOIRE EST À JOUR : chargé, il est passé par
+          `migrateSave` ; fait par cette version, il est à son format. Il
+          s'écrit donc estampillé (voir `SCHEMA_PLAN`), sans que chaque
+          chemin qui fabrique un plan ait à y penser.
+        */
+        const json = JSON.stringify(s.schema === SCHEMA_PLAN ? s : { ...s, schema: SCHEMA_PLAN });
+        /*
+          Un plan chargé sans empreinte (voir `loadLibrary`) n'en reçoit pas
+          ici non plus : la première écriture après une mise à jour réécrit
+          les deux cents plans estampillés, et les hacher tous referait, une
+          fois, les quatre cents millisecondes ôtées au chargement.
+        */
+        const empreinte = deja && deja.empreinte === '' ? '' : empreinteDe(json);
+        // Sans empreinte, rien à comparer : on écrit.
+        if (deja && empreinte !== '' && deja.empreinte === empreinte) {
           ecrits.set(s.id, { ref: s, quand: s.updatedAt, empreinte });
           continue;
         }
@@ -2755,6 +3027,23 @@ interface ScanState {
    * plans déjà là.
    */
   savesCharges: boolean;
+  /**
+   * LES PLANS QUI N'ONT PAS PU ÊTRE LUS — leurs identifiants. Ils restent
+   * sur le disque ; la bibliothèque le dit et propose de les envoyer au
+   * support (voir `brutDuPlanIllisible`).
+   */
+  plansIllisibles: string[];
+  /**
+   * Efface du téléphone un plan illisible, après qu'on l'a demandé. Sa copie
+   * en ligne, si elle existe, n'est PAS touchée : c'est peut-être la seule
+   * qui se lise encore.
+   */
+  oublierPlanIllisible: (id: string) => Promise<void>;
+  /**
+   * Renvoie au serveur les suppressions faites sans réseau. Rend le nombre
+   * de suppressions confirmées.
+   */
+  rejouerLesSuppressions: () => Promise<number>;
   /** Dossiers de la bibliothèque, dans l'ordre de création. */
   folders: ScanFolder[];
   /** Crée un dossier et renvoie son identifiant. */
@@ -4495,6 +4784,7 @@ export const useScanStore = create<ScanState>((set, get) => {
     canRedo: false,
     saves: [],
     savesCharges: false,
+    plansIllisibles: [],
     folders: [],
     themePref: 'system',
     accentPref: ACCENT_DEFAUT,
@@ -6956,12 +7246,15 @@ export const useScanStore = create<ScanState>((set, get) => {
       // Ce que le compte garde, c'est ce qu'on a ENREGISTRÉ : ni le plan
       // rangé pour douze heures, ni les modifications qui attendent.
       if (!save || save.supprimeLe) return;
-      await deposerPlan(qui, {
+      const depose = await deposerPlan(qui, {
         scan: save.id,
         nom: save.name,
         maj: save.updatedAt,
         contenu: JSON.stringify({ ...save, retouche: undefined }),
       });
+      // Le serveur répond : c'est le moment de lui renvoyer les suppressions
+      // faites sans réseau (voir `SuppressionEnAttente`).
+      if (depose === true) rejouerPour(qui).catch(() => {});
     },
 
     /*
@@ -6977,11 +7270,18 @@ export const useScanStore = create<ScanState>((set, get) => {
       const liste = await catalogueDesPlans(qui);
       // Le serveur n'a pas répondu : −1, pour que la reprise se retente.
       if (liste === null) return -1;
+      /*
+        LE SERVEUR A RÉPONDU : le réseau est là. Les suppressions faites sans
+        lui partent d'abord — et un plan dont la suppression attend encore
+        ne redescend pas (relevé « bug-données »).
+      */
+      await rejouerPour(qui);
       if (!liste.length) return 0;
+      const supprimes = await scansASupprimer();
       const ici = new Set(get().saves.map((s) => s.id));
       let repris = 0;
       for (const p of liste) {
-        if (ici.has(p.scan)) continue;
+        if (ici.has(p.scan) || supprimes.has(p.scan)) continue;
         const plan = await reprendrePlan(qui, p.scan);
         if (!plan) continue;
         try {
@@ -6997,7 +7297,9 @@ export const useScanStore = create<ScanState>((set, get) => {
           if (lu.id !== p.scan || ici.has(lu.id)) continue;
           ici.add(lu.id);
           const saves = [migrateSave(lu), ...get().saves];
-          set({ saves });
+          // Un plan illisible ici, lisible au compte : il revient, et la
+          // ligne « n'a pas pu être lu » le lâche.
+          set({ saves, plansIllisibles: get().plansIllisibles.filter((x) => x !== lu.id) });
           persistSoon(saves);
           repris += 1;
         } catch {
@@ -10777,7 +11079,17 @@ export const useScanStore = create<ScanState>((set, get) => {
         }
         // Chaque plan est migré dans SA garde (voir `loadLibrary`) : un plan
         // qui fait lever la migration ne vide plus la bibliothèque.
-        await chargerLaBibliotheque((saves) => set({ saves }));
+        const migres = await chargerLaBibliotheque((saves) => set({ saves }));
+        // Ce qui n'a pas pu être lu se dit (voir `plansGardes`).
+        set({ plansIllisibles: plansGardes() });
+        /*
+          LES PLANS MIGRÉS S'ÉCRIVENT UNE FOIS, estampillés — un instant après
+          le chargement, comme tout enregistrement. Le lancement suivant
+          saute leurs migrations (voir `SCHEMA_PLAN`).
+        */
+        if (migres > 0) persistSoon(get().saves);
+        // La file des suppressions à rejouer : lue avant toute reprise.
+        await chargerLaFile();
         // Ce qui a passé ses douze heures pendant que l'app dormait s'en va.
         // Dans SA garde (relevé « bug-données ») : un ménage qui lève ne
         // coûte plus le relevé interrompu ni le balayage des modèles.
@@ -10880,6 +11192,17 @@ export const useScanStore = create<ScanState>((set, get) => {
       return repris;
     },
 
+    rejouerLesSuppressions: () => rejouerPour(identiteDuCompte()),
+
+    oublierPlanIllisible: async (id) => {
+      if (!gardes.has(id)) return;
+      gardes.delete(id);
+      set({ plansIllisibles: plansGardes() });
+      await AsyncStorage.removeItem(scanKey(id)).catch(() => {});
+      // L'index le lâche aussi : la prochaine écriture le réécrit sans lui.
+      persistSoon(get().saves);
+    },
+
     openSave: (id) => {
       const found = get().saves.find((s) => s.id === id);
       if (!found) return;
@@ -10979,9 +11302,26 @@ export const useScanStore = create<ScanState>((set, get) => {
     deleteSave: (id) => {
       const st = get();
       const parti = st.saves.find((s) => s.id === id);
-      // Un plan supprimé du téléphone ne reste pas sur le serveur.
+      /*
+        UN PLAN SUPPRIMÉ DU TÉLÉPHONE NE RESTE PAS SUR LE SERVEUR — même
+        supprimé sans réseau (relevé « bug-données ») : la demande entre
+        d'abord dans la file écrite sur le disque, et n'en sort que quand le
+        serveur l'a confirmée (voir `SuppressionEnAttente`).
+      */
       const qui = identiteDuCompte();
-      if (qui) retirerPlan(qui, id).catch(() => {});
+      if (qui) {
+        const demande: SuppressionEnAttente = { scan: id, identifiant: qui.identifiant, le: Date.now() };
+        changerLaFile((f) => [...f.filter((e) => !(e.scan === id && e.identifiant === qui.identifiant)), demande])
+          .then(() => retirerPlan(qui, id))
+          .then((ok) => {
+            if (ok === true) {
+              return changerLaFile((f) => f.filter((e) => !(e.scan === id && e.identifiant === qui.identifiant)));
+            }
+          })
+          .catch(() => {
+            // Sans réseau : la demande attend dans la file, elle sera rejouée.
+          });
+      }
       const saves = st.saves.filter((s) => s.id !== id);
       // Les photos de repérage vivent dans les Documents de l'app : sans
       // ce ménage, elles s'accumulent pour toujours, sans que personne

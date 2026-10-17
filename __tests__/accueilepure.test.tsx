@@ -163,8 +163,11 @@ describe('« Mes plans », avant le premier', () => {
     const t = monter();
     const carte = t.root.findAll((n) => n.props?.testID === 'plans-vide' && typeof n.props?.onPress === 'function')[0];
     expect(carte).toBeDefined();
-    expect(carte.findAllByType(PlanThumb)).toHaveLength(1);
-    expect(carte.findByType(PlanThumb).props.scan.name).toBe(NOM_EXEMPLE);
+    // La vignette est un `React.memo` (lot « maj-plans ») : le moteur de test
+    // la range sous sa fonction intérieure.
+    const Vignette = (PlanThumb as unknown as { type: React.FC }).type;
+    expect(carte.findAllByType(Vignette)).toHaveLength(1);
+    expect(carte.findByType(Vignette).props.scan.name).toBe(NOM_EXEMPLE);
     act(() => carte.props.onPress());
     expect(useScanStore.getState().screen).toBe('result');
     expect(useScanStore.getState().scanName).toBe(NOM_EXEMPLE);

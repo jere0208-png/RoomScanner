@@ -59,11 +59,16 @@ beforeEach(() => {
   useScanStore.setState({ saves: [], folders: [], brouillon: null, savesCharges: false });
 });
 
-it('un plan que la migration ne sait pas lire : les deux autres se chargent, aucune clé ne part', async () => {
-  // Un mur « null » fait lever la migration (les éclats, les niveaux…).
-  const pourri = { ...scan('b', 'Maison B'), walls: [null] };
-  ranger(scan('a', 'Maison A'), pourri, scan('c', 'Maison C'));
+it('un plan qui ne se lit pas : les deux autres se chargent, aucune clé ne part', async () => {
+  /*
+    Un mur « null » faisait lever la migration ; il est désormais écarté et
+    le plan s'ouvre sans lui (lot « maj-plans »). Ce qui reste illisible,
+    c'est un JSON tronqué — une écriture coupée par une extinction.
+  */
+  ranger(scan('a', 'Maison A'), scan('b', 'Maison B'), scan('c', 'Maison C'));
+  mockMagasin.set(cle('b'), mockMagasin.get(cle('b'))!.slice(0, 40));
   await useScanStore.getState().loadSaves();
+  expect(useScanStore.getState().plansIllisibles).toEqual(['b']);
   expect(useScanStore.getState().saves.map((s) => s.name)).toEqual(['Maison A', 'Maison C']);
 
   jest.useFakeTimers();

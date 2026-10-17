@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { GlisserPourSupprimer } from '../components/GlisserPourSupprimer';
@@ -8,8 +8,8 @@ import { etatDAttente, rangerLeTravail, useMaintenant } from '../ui/miseDeCote';
 import {
   Animated,
   Easing,
+  FlatList,
   PanResponder,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -29,7 +29,15 @@ import {
 import { useAccountStore } from '../store/accountStore';
 import { astuce } from '../ui/astuce';
 import { sansPerdreLeReleve } from '../ui/releveInterrompu';
-import { horsCorbeille, niveauDeDepart, useScanStore, type SavedScan, type ScanFolder } from '../store/scanStore';
+import {
+  brutDuPlanIllisible,
+  horsCorbeille,
+  niveauDeDepart,
+  useScanStore,
+  type SavedScan,
+  type ScanFolder,
+} from '../store/scanStore';
+import { COURRIEL_SUPPORT, envoyerUnDiagnostic, infosDeLApp } from '../native/support';
 import { haptic } from '../ui/haptic';
 import { alerte } from '../ui/alerte';
 import { useModeElec } from '../store/usage';
@@ -145,6 +153,22 @@ function alertesDe(scan: SavedScan, parts: ReturnType<typeof roomParts>): Set<st
   return out;
 }
 
+/**
+ * CE QUE LA RECHERCHE BALAIE D'UN PLAN — nom, client, adresse, en
+ * minuscules — préparé une fois par plan (il est immuable, voir
+ * `decoupages`), et non à chaque lettre pour chacun des deux cents.
+ */
+const textesCherches = new WeakMap<SavedScan, string>();
+
+function texteCherche(item: SavedScan): string {
+  let t = textesCherches.get(item);
+  if (t === undefined) {
+    t = [item.name, item.client ?? '', item.address ?? ''].join(' ').toLowerCase();
+    textesCherches.set(item, t);
+  }
+  return t;
+}
+
 /** La ligne de détails d'un scan, mémoïsée — partagée avec l'accueil. */
 export function detailsDuScan(item: SavedScan): string {
   return decoupageDe(item).details;
@@ -209,6 +233,8 @@ export function prendLeRelevé(
  * par se croiser.
  */
 const RACINE = '@racine';
+/** La clé d'une ligne : l'identifiant de son plan. */
+const cleDeLigne = (s: SavedScan) => s.id;
 const THUMB_W = 78;
 const THUMB_H = 62;
 
@@ -219,7 +245,27 @@ const THUMB_H = 62;
  * quelques traits dans 54 px. Rien à stocker, rien à invalider — un scan
  * retouché montre son nouveau contour à l'ouverture suivante de la liste.
  */
-export function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
+/**
+ * CE QUE LA VIGNETTE TIRE DU PLAN, CALCULÉ UNE FOIS — comme son découpage
+ * (voir `decoupages`) : le niveau de départ, ses murs et ses baies, les
+ * pièces de chaque mur, le cadre. Relevé « bug-fluidité » : tout se
+ * recalculait à chaque rendu de chaque ligne.
+ */
+const vignettes = new WeakMap<
+  SavedScan,
+  {
+    niveaux: number;
+    parts: ReturnType<typeof roomParts>;
+    murs: SavedScan['walls'];
+    baies: SavedScan['openings'];
+    roomsOfWall: Map<string, string[]>;
+    b: ReturnType<typeof bounds>;
+  }
+>();
+
+function vignetteDe(scan: SavedScan) {
+  const vu = vignettes.get(scan);
+  if (vu) return vu;
   /*
     UN SEUL NIVEAU, CELUI QUI S'OUVRE — revue « Hugo » : la vignette
     superposait le rez-de-chaussée et l'étage (« ChambreChambre 2 »). Elle
@@ -231,14 +277,6 @@ export function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
   const parts = niveaux > 1 ? tousLesParts.filter((p) => p.walls.some((w) => niveauDe(w) === n0)) : tousLesParts;
   const murs = niveaux > 1 ? scan.walls.filter((w) => niveauDe(w) === n0) : scan.walls;
   const baies = niveaux > 1 ? scan.openings.filter((o) => niveauDe(o) === n0) : scan.openings;
-  const modeElec = useModeElec();
-  // Les mêmes constats que sur le plan : une pièce en défaut sort en rouge
-  // ici aussi, sinon la vignette raconterait autre chose que le plan.
-  //
-  // EN MODE ÉLECTRICITÉ SEULEMENT. Sans une prise posée, toutes les pièces
-  // manquent à la NF C 15-100 : la vignette du salon de quelqu'un venu le
-  // meubler sortait tout en rouge, pour une norme qu'il n'a jamais ouverte.
-  const alertes = modeElec ? alertesDe(scan, parts) : new Set<string>();
   const roomsOfWall = new Map<string, string[]>();
   for (const r of scan.rooms) {
     for (const id of r.wallIds ?? []) {
@@ -247,7 +285,29 @@ export function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
   }
   // Le plan ENTIER, vu de dessus, redressé sur sa trame : une vignette de
   // travers ne ressemble pas au plan qu'on va ouvrir.
-  const b = bounds(murs);
+  const calcule = { niveaux, parts, murs, baies, roomsOfWall, b: bounds(murs) };
+  vignettes.set(scan, calcule);
+  return calcule;
+}
+
+/** Aucune alerte : le même ensemble vide à chaque rendu. */
+const SANS_ALERTE: ReadonlySet<string> = new Set<string>();
+
+/*
+  EN `React.memo` — relevé « bug-fluidité » : la vignette se redessinait à
+  chaque lettre tapée, à chaque minute, à chaque survol d'un dossier. Son
+  plan est immuable : même plan, même palette, même dessin.
+*/
+export const PlanThumb = React.memo(function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
+  const { niveaux, parts, murs, baies, roomsOfWall, b } = vignetteDe(scan);
+  const modeElec = useModeElec();
+  // Les mêmes constats que sur le plan : une pièce en défaut sort en rouge
+  // ici aussi, sinon la vignette raconterait autre chose que le plan.
+  //
+  // EN MODE ÉLECTRICITÉ SEULEMENT. Sans une prise posée, toutes les pièces
+  // manquent à la NF C 15-100 : la vignette du salon de quelqu'un venu le
+  // meubler sortait tout en rouge, pour une norme qu'il n'a jamais ouverte.
+  const alertes = modeElec ? alertesDe(scan, parts) : SANS_ALERTE;
   const pad = 5;
   const w = Math.max(0.5, b.maxX - b.minX);
   const h = Math.max(0.5, b.maxZ - b.minZ);
@@ -324,7 +384,7 @@ export function PlanThumb({ scan, c }: { scan: SavedScan; c: Palette }) {
       )}
     </Svg>
   );
-}
+});
 
 /**
  * LES DEUX TEINTES D'UN DOSSIER, selon qu'on le vise ou non.
@@ -625,7 +685,13 @@ interface RowProps {
  * Décollée, elle RÉTRÉCIT et s'efface : elle devient le fantôme de ce qu'on
  * déplace, et laisse toute la place aux dossiers qui, eux, grossissent.
  */
-function ScanRow({
+/*
+  EN `React.memo`, AUX APPELS STABLES — relevé « bug-fluidité » : à deux cents
+  plans, chaque frappe dans la recherche, chaque minute et chaque survol
+  redessinaient toutes les lignes (1,2 à 1,4 s). Une ligne ne se redessine
+  plus que si SON plan, son compte à rebours ou l'état du glisser changent.
+*/
+const ScanRow = React.memo(function ScanRow({
   item,
   maintenant,
   pris,
@@ -741,7 +807,78 @@ function ScanRow({
       )}
     </Animated.View>
   );
+});
+
+/**
+ * Ce que l'écran fait d'une ligne — des fonctions qui ne changent JAMAIS
+ * d'identité (voir `LibraryScreen`), pour que `React.memo` serve à quelque
+ * chose.
+ */
+interface ActionsDeLigne {
+  ouvrir: (id: string) => void;
+  menu: (id: string) => void;
+  jeter: (id: string, nom: string) => void;
+  tenir: (id: string, at: { x: number; y: number }) => void;
+  bouger: (at: { x: number; y: number }) => void;
+  lacher: (deposer: boolean) => void;
 }
+
+/** Une ligne de la liste : le glissé qui jette, et le plan devant. */
+const LigneDePlan = React.memo(function LigneDePlan({
+  item,
+  maintenant,
+  pris,
+  fige,
+  lift,
+  styles,
+  palette,
+  actions,
+}: {
+  item: SavedScan;
+  maintenant: number;
+  pris: boolean;
+  fige: boolean;
+  lift: Animated.Value;
+  styles: ReturnType<typeof getStyles>;
+  palette: Palette;
+  actions: ActionsDeLigne;
+}) {
+  const { id, name } = item;
+  const onOpen = useCallback(() => actions.ouvrir(id), [actions, id]);
+  const onMenu = useCallback(() => actions.menu(id), [actions, id]);
+  const onHold = useCallback((at: { x: number; y: number }) => actions.tenir(id, at), [actions, id]);
+  const onSupprimer = useCallback(() => actions.jeter(id, name), [actions, id, name]);
+  return (
+    <GlisserPourSupprimer
+      libelle={name}
+      rayon={radius.md + 2}
+      style={styles.rowGlissante}
+      onSupprimer={onSupprimer}>
+      {(refermer) => (
+        <ScanRow
+          item={item}
+          maintenant={maintenant}
+          pris={pris}
+          fige={fige}
+          lift={lift}
+          styles={styles}
+          palette={palette}
+          onOpen={onOpen}
+          onMenu={onMenu}
+          onHold={onHold}
+          /*
+            LE DOIGT QUI GLISSE FAIT DÉFILER, il ne prend pas le relevé : le
+            compte à rebours s'arrête au premier vrai mouvement, sans
+            attendre que la liste réclame le geste.
+          */
+          onHoldMove={actions.bouger}
+          onRelease={actions.lacher}
+          refermer={refermer}
+        />
+      )}
+    </GlisserPourSupprimer>
+  );
+});
 
 /**
  * LA BIBLIOTHÈQUE SE RETROUVE COMME ON L'A LAISSÉE — relevé « bug-données » :
@@ -815,6 +952,28 @@ export function LibraryScreen() {
   const renameSave = useScanStore((s) => s.renameSave);
   const duplicateSave = useScanStore((s) => s.duplicateSave);
   const placeRendue = useScanStore((s) => s.placeRendue);
+  const plansIllisibles = useScanStore((s) => s.plansIllisibles);
+  /*
+    LE NOM QUE PORTE ENCORE UN PLAN ILLISIBLE — lu sur le disque, pour que
+    le menu dise « Maison Durand » plutôt qu'un identifiant.
+  */
+  const [nomsIllisibles, setNomsIllisibles] = useState<Record<string, string>>({});
+  useEffect(() => {
+    // Rien d'illisible, rien à lire : pas de rendu pour rien.
+    if (plansIllisibles.length === 0) return;
+    let vivant = true;
+    Promise.all(plansIllisibles.map((id) => brutDuPlanIllisible(id))).then((bruts) => {
+      if (!vivant) return;
+      const noms: Record<string, string> = {};
+      plansIllisibles.forEach((id, i) => {
+        if (bruts[i]?.nom) noms[id] = bruts[i]!.nom;
+      });
+      setNomsIllisibles(noms);
+    });
+    return () => {
+      vivant = false;
+    };
+  }, [plansIllisibles]);
   const palette = useTheme();
   const styles = getStyles(palette);
 
@@ -866,29 +1025,29 @@ export function LibraryScreen() {
     return m;
   }, [saves, folders]);
   const dossierOuvert = folders.find((f) => f.id === inside) ?? null;
+  /*
+    LA LETTRE TAPÉE S'AFFICHE TOUT DE SUITE, LA LISTE SUIT — relevé
+    « bug-fluidité » : 1,2 à 1,4 s par lettre à deux cents plans. Le champ
+    garde sa saisie sans attendre ; la liste filtrée suit la valeur DIFFÉRÉE,
+    qu'une frappe suivante interrompt au lieu de s'y ajouter.
+  */
+  const queteDifferee = useDeferredValue(quete);
   const liste = useMemo(() => {
     const brute = dossierOuvert
       ? byFolder.get(dossierOuvert.id) ?? []
       : byFolder.get('') ?? [];
-    const q = quete.trim().toLowerCase();
+    const q = queteDifferee.trim().toLowerCase();
     // Une recherche cherche PARTOUT : dans un dossier ouvert comme à la
     // racine, elle porte sur toute la bibliothèque — sinon il faudrait
     // savoir d'avance où chercher, ce qui est précisément le problème.
     const base = q ? saves : brute;
-    const filtre = q
-      ? base.filter((x) =>
-          [x.name, x.client ?? '', x.address ?? '']
-            .join(' ')
-            .toLowerCase()
-            .includes(q),
-        )
-      : base;
+    const filtre = q ? base.filter((x) => texteCherche(x).includes(q)) : base;
     return [...filtre].sort((a, b) =>
       tri === 'nom'
         ? a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
         : b.updatedAt - a.updatedAt,
     );
-  }, [byFolder, dossierOuvert, saves, quete, tri]);
+  }, [byFolder, dossierOuvert, saves, queteDifferee, tri]);
 
   // ------------------------------------------------------- glisser-déposer
   //
@@ -1175,6 +1334,134 @@ export function LibraryScreen() {
       ],
     });
 
+  /*
+    LES APPELS DES LIGNES NE CHANGENT JAMAIS D'IDENTITÉ — sans quoi
+    `React.memo` ne servirait à rien : des fonctions écrites dans le rendu
+    sont neuves à chaque frappe. Celles-ci lisent la dernière version de
+    l'écran par une référence, mise à jour après chaque rendu.
+  */
+  const dernieresActions = useRef<ActionsDeLigne | null>(null);
+  useLayoutEffect(() => {
+    dernieresActions.current = {
+      ouvrir: ouvrirLeScan,
+      menu: (id) => {
+        const item = saves.find((x) => x.id === id);
+        if (item) scanMenu(item);
+      },
+      jeter: (id, nom) => suppression.jeter(id, nom),
+      tenir: (id, at) => beginHold(id, at),
+      bouger: (at) => {
+        if (!dragRef.current && !prendLeRelevé(doigt.current, at)) stopHold();
+      },
+      lacher: releaseRow,
+    };
+  });
+  const actions = useMemo<ActionsDeLigne>(
+    () => ({
+      ouvrir: (id) => dernieresActions.current?.ouvrir(id),
+      menu: (id) => dernieresActions.current?.menu(id),
+      jeter: (id, nom) => dernieresActions.current?.jeter(id, nom),
+      tenir: (id, at) => dernieresActions.current?.tenir(id, at),
+      bouger: (at) => dernieresActions.current?.bouger(at),
+      lacher: (deposer) => dernieresActions.current?.lacher(deposer),
+    }),
+    [],
+  );
+  const lignes = useMemo(
+    () => liste.filter((x) => x.id !== suppression.masque),
+    [liste, suppression.masque],
+  );
+  /*
+    LE TIC DE MINUTE NE TOUCHE QUE LES COMPTES À REBOURS — relevé
+    « bug-fluidité » : il redessinait les deux cents lignes (1,4 s) pour un
+    texte que seules les lignes « Non enregistré » affichent. Les autres
+    reçoivent toujours 0, et `React.memo` les laisse en paix.
+  */
+  const rendreLigne = useCallback(
+    ({ item }: { item: SavedScan }) => (
+      <LigneDePlan
+        item={item}
+        maintenant={item.supprimeLe ? maintenant : 0}
+        pris={dragId === item.id}
+        fige={dragId !== null}
+        lift={lift}
+        styles={styles}
+        palette={palette}
+        actions={actions}
+      />
+    ),
+    [maintenant, dragId, lift, styles, palette, actions],
+  );
+
+  /**
+   * UN PLAN ILLISIBLE PART AU SUPPORT — relevé « bug-données » : il était sur
+   * le disque, mais ni l'écran ni le support ne pouvaient l'atteindre. Le
+   * courrier part avec le plan tel qu'il est écrit, en pièce jointe ; sans
+   * compte Mail, par la feuille de partage (voir `envoyerUnDiagnostic`).
+   */
+  const envoyerIllisible = async (id: string) => {
+    const brut = await brutDuPlanIllisible(id);
+    if (!brut) {
+      alerte('Ce plan n’est plus sur le téléphone', 'Il a été effacé entre-temps : il n’y a plus rien à envoyer.');
+      return;
+    }
+    const infos = await infosDeLApp();
+    const corps = [
+      'Bonjour,',
+      '',
+      'Un de mes plans ne s’ouvre plus dans EchoPlan : il est joint à ce message, tel qu’il est enregistré sur mon téléphone.',
+      '',
+      `Plan : ${brut.nom || '(sans nom)'} · ${id}`,
+      `Application : ${infos.version ?? 'inconnue'} · ${infos.appareil ?? ''} ${infos.systeme ?? ''}`.trim(),
+    ].join('\n');
+    const sortie = await envoyerUnDiagnostic(
+      `Plan illisible — ${brut.nom || id}`,
+      corps,
+      brut.fichier,
+      brut.contenu,
+    );
+    if (sortie === 'sent') astuce('Envoyé : merci, nous regardons s’il peut être réparé.', { icone: 'sirene', fete: true });
+    else if (sortie === 'partage') astuce(`Choisissez votre messagerie, et envoyez le fichier à ${COURRIEL_SUPPORT}.`, { icone: 'sirene' });
+    else if (sortie === 'unavailable') alerte('Impossible d’ouvrir une messagerie', `Écrivez-nous à ${COURRIEL_SUPPORT}.`);
+  };
+
+  const menuIllisibles = () => {
+    const n = plansIllisibles.length;
+    const nomDe = (id: string) => nomsIllisibles[id] || 'Plan sans nom lisible';
+    setMenu({
+      title: n > 1 ? `${n} plans n’ont pas pu être lus` : 'Un plan n’a pas pu être lu',
+      subtitle:
+        'Il est toujours sur le téléphone, tel qu’il a été écrit. Envoyez-le au support : nous verrons s’il peut être réparé.',
+      actions: [
+        ...plansIllisibles.map((id) => ({
+          label: n > 1 ? `Envoyer « ${nomDe(id)} »` : 'Envoyer au support',
+          hint: n > 1 ? 'Au support, en pièce jointe' : nomDe(id),
+          icon: 'diagnostic' as const,
+          onPress: () => {
+            envoyerIllisible(id).catch(() => {});
+          },
+        })),
+        ...plansIllisibles.map((id) => ({
+          label: n > 1 ? `Effacer « ${nomDe(id)} »` : 'Effacer du téléphone',
+          hint: 'Sa copie en ligne, s’il en a une, est gardée',
+          icon: 'supprimer' as const,
+          danger: true,
+          onPress: () =>
+            alerte('Effacer ce plan illisible ?', 'Il ne pourra plus être envoyé au support depuis ce téléphone.', [
+              { label: 'Annuler' },
+              {
+                label: 'Effacer',
+                danger: true,
+                onPress: () => {
+                  useScanStore.getState().oublierPlanIllisible(id).catch(() => {});
+                },
+              },
+            ]),
+        })),
+      ],
+    });
+  };
+
   const vide = saves.length === 0 && folders.length === 0;
 
   return (
@@ -1289,6 +1576,32 @@ export function LibraryScreen() {
         </View>
       )}
 
+      {/*
+        LES PLANS QUI N'ONT PAS PU ÊTRE LUS, DITS — relevé « bug-données » :
+        l'écran affichait « Aucun plan enregistré » à côté d'un plan bien
+        présent sur le disque. On le compte, et on propose de l'envoyer.
+      */}
+      {plansIllisibles.length > 0 && (
+        <TouchableOpacity
+          style={styles.menageRow}
+          accessibilityRole="button"
+          accessibilityLabel={
+            plansIllisibles.length > 1
+              ? `${plansIllisibles.length} plans n’ont pas pu être lus. Les envoyer au support`
+              : '1 plan n’a pas pu être lu. L’envoyer au support'
+          }
+          onPress={menuIllisibles}>
+          <Text style={styles.menageTexte} numberOfLines={2}>
+            {plansIllisibles.length > 1
+              ? `${plansIllisibles.length} plans n’ont pas pu être lus — `
+              : '1 plan n’a pas pu être lu — '}
+            <Text style={styles.illisibleAction}>
+              {plansIllisibles.length > 1 ? 'les envoyer au support' : 'l’envoyer au support'}
+            </Text>
+          </Text>
+        </TouchableOpacity>
+      )}
+
       {!vide && (
         <View style={styles.chercheRow}>
           <View style={styles.champ}>
@@ -1382,7 +1695,9 @@ export function LibraryScreen() {
       {vide ? (
         <View style={styles.empty}>
           <EmptyPlanArt c={palette} />
-          <Text style={styles.emptyTitle}>Aucun plan enregistré</Text>
+          <Text style={styles.emptyTitle}>
+            {plansIllisibles.length > 0 ? 'Aucun plan à afficher' : 'Aucun plan enregistré'}
+          </Text>
           {/*
             LES DEUX PORTES, PAS SEULEMENT LE SCAN. L'état vide ne parlait
             que du scan — or l'accueil offre aussi le tracé au doigt, et sur
@@ -1402,138 +1717,120 @@ export function LibraryScreen() {
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView
+        <FlatList
+          data={lignes}
+          keyExtractor={cleDeLigne}
+          renderItem={rendreLigne}
+          /*
+            UNE LISTE QUI NE MONTE QUE CE QUI SE VOIT — relevé « bug-fluidité » :
+            la ScrollView montait les deux cents lignes d'un coup, 5 200 traits
+            de vignette, 3,9 s avant le premier défilement. Une dizaine de
+            lignes d'abord, le reste à mesure qu'on descend.
+          */
+          initialNumToRender={10}
+          maxToRenderPerBatch={8}
+          windowSize={7}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           // Pendant qu'on tient un scan, la liste ne défile pas : les deux
           // gestes sont le même mouvement du doigt.
-          scrollEnabled={dragId === null}>
-          {/* Les dossiers d'abord, en grandes icônes : c'est le rangement,
-              il précède ce qui est rangé, et une icône se vise bien mieux
-              qu'une ligne quand on lui amène quelque chose. */}
-          {!dossierOuvert && folders.length > 0 && (
-            <View style={styles.grid}>
-              {folders.map((f) => (
-                <FolderTile
-                  key={f.id}
-                  folder={f}
-                  count={(byFolder.get(f.id) ?? []).length}
-                  over={over === f.id}
-                  recu={ranges[f.id] ?? 0}
-                  lift={lift}
-                  styles={styles}
-                  palette={palette}
-                  onOpen={() => setInside(f.id)}
-                  onMenu={() => folderMenu(f)}
-                  bind={(node) => {
-                    tileRefs.current.set(f.id, node);
-                  }}
-                />
-              ))}
-            </View>
-          )}
-
-          {liste.length === 0 && (
-            <View style={styles.emptyFolderBox}>
-              <EmptyPlanArt c={palette} />
-              <Text style={styles.emptyFolder}>
-                {dossierOuvert
-                  ? 'Ce dossier est vide. Revenez en arrière et amenez-y un plan.'
-                  : 'Tous vos plans sont rangés dans des dossiers.'}
-              </Text>
-            </View>
-          )}
-
-          {liste.filter((s) => s.id !== suppression.masque).map((s) => (
-            <GlisserPourSupprimer
-              key={s.id}
-              libelle={s.name}
-              rayon={radius.md + 2}
-              style={styles.rowGlissante}
-              onSupprimer={() => suppression.jeter(s.id, s.name)}>
-              {(refermer) => (
-            <ScanRow
-              key={s.id}
-              item={s}
-              maintenant={maintenant}
-              pris={dragId === s.id}
-              fige={dragId !== null}
-              lift={lift}
-              styles={styles}
-              palette={palette}
-              onOpen={() => ouvrirLeScan(s.id)}
-              onMenu={() => scanMenu(s)}
-              onHold={(at) => beginHold(s.id, at)}
-              /*
-                LE DOIGT QUI GLISSE FAIT DÉFILER, il ne prend pas le
-                relevé : le compte à rebours s'arrête au premier vrai
-                mouvement, sans attendre que la liste réclame le geste.
-              */
-              onHoldMove={(at) => {
-                if (!dragRef.current && !prendLeRelevé(doigt.current, at)) {
-                  stopHold();
-                }
-              }}
-              onRelease={releaseRow}
-              refermer={refermer}
-            />
+          scrollEnabled={dragId === null}
+          ListHeaderComponent={
+            <>
+              {/* Les dossiers d'abord, en grandes icônes : c'est le rangement,
+                  il précède ce qui est rangé, et une icône se vise bien mieux
+                  qu'une ligne quand on lui amène quelque chose. */}
+              {!dossierOuvert && folders.length > 0 && (
+                <View style={styles.grid}>
+                  {folders.map((f) => (
+                    <FolderTile
+                      key={f.id}
+                      folder={f}
+                      count={(byFolder.get(f.id) ?? []).length}
+                      over={over === f.id}
+                      recu={ranges[f.id] ?? 0}
+                      lift={lift}
+                      styles={styles}
+                      palette={palette}
+                      onOpen={() => setInside(f.id)}
+                      onMenu={() => folderMenu(f)}
+                      bind={(node) => {
+                        tileRefs.current.set(f.id, node);
+                      }}
+                    />
+                  ))}
+                </View>
               )}
-            </GlisserPourSupprimer>
-          ))}
 
-          {/*
-            LA CORBEILLE — revues « Fatou » et « Hugo ». Un plan supprimé y
-            attend 30 jours, avec sa copie en ligne : il se restaure d'un
-            geste, ou s'efface pour de bon.
-          */}
-          {!dossierOuvert && aLaCorbeille.length > 0 && (
-            <TouchableOpacity
-              accessibilityRole="button"
-              accessibilityLabel="Corbeille"
-              onPress={() =>
-                setMenu({
-                  title: 'Corbeille',
-                  subtitle: enLigne
-                    ? 'Effacés au bout de 30 jours, ici et de votre sauvegarde en ligne.'
-                    : 'Effacés au bout de 30 jours.',
-                  actions: [
-                    ...aLaCorbeille.map((x) => ({
-                      label: x.name,
-                      hint: `Restaurer · supprimé le ${new Date(x.corbeille!).toLocaleDateString('fr-FR')}`,
-                      onPress: () => {
-                        useScanStore.getState().restaurerDeLaCorbeille(x.id);
-                        haptic('succes');
-                      },
-                    })),
-                    {
-                      label: 'Vider la corbeille',
-                      hint: 'Efface ces plans pour de bon',
-                      danger: true,
-                      onPress: () =>
-                        alerte(
-                          'Vider la corbeille ?',
-                          `${aLaCorbeille.length} plan${aLaCorbeille.length > 1 ? 's' : ''} ${
-                            aLaCorbeille.length > 1 ? 'seront effacés' : 'sera effacé'
-                          } pour de bon${enLigne ? ', ici et de votre sauvegarde en ligne' : ''}.`,
-                          [
-                            { label: 'Annuler' },
-                            {
-                              label: 'Vider',
-                              danger: true,
-                              onPress: () => useScanStore.getState().viderLaCorbeille(),
-                            },
-                          ],
-                        ),
-                    },
-                  ],
-                })
-              }>
-              <Text style={styles.emptyFolder}>
-                {`Corbeille · ${aLaCorbeille.length} plan${aLaCorbeille.length > 1 ? 's' : ''}, restaurables 30 jours`}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </ScrollView>
+              {liste.length === 0 && (
+                <View style={styles.emptyFolderBox}>
+                  <EmptyPlanArt c={palette} />
+                  <Text style={styles.emptyFolder}>
+                    {dossierOuvert
+                      ? 'Ce dossier est vide. Revenez en arrière et amenez-y un plan.'
+                      : 'Tous vos plans sont rangés dans des dossiers.'}
+                  </Text>
+                </View>
+              )}
+            </>
+          }
+          ListFooterComponent={
+            <>
+              {/*
+                LA CORBEILLE — revues « Fatou » et « Hugo ». Un plan supprimé y
+                attend 30 jours, avec sa copie en ligne : il se restaure d'un
+                geste, ou s'efface pour de bon.
+              */}
+              {!dossierOuvert && aLaCorbeille.length > 0 && (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Corbeille"
+                  onPress={() =>
+                    setMenu({
+                      title: 'Corbeille',
+                      subtitle: enLigne
+                        ? 'Effacés au bout de 30 jours, ici et de votre sauvegarde en ligne.'
+                        : 'Effacés au bout de 30 jours.',
+                      actions: [
+                        ...aLaCorbeille.map((x) => ({
+                          label: x.name,
+                          hint: `Restaurer · supprimé le ${new Date(x.corbeille!).toLocaleDateString('fr-FR')}`,
+                          onPress: () => {
+                            useScanStore.getState().restaurerDeLaCorbeille(x.id);
+                            haptic('succes');
+                          },
+                        })),
+                        {
+                          label: 'Vider la corbeille',
+                          hint: 'Efface ces plans pour de bon',
+                          danger: true,
+                          onPress: () =>
+                            alerte(
+                              'Vider la corbeille ?',
+                              `${aLaCorbeille.length} plan${aLaCorbeille.length > 1 ? 's' : ''} ${
+                                aLaCorbeille.length > 1 ? 'seront effacés' : 'sera effacé'
+                              } pour de bon${enLigne ? ', ici et de votre sauvegarde en ligne' : ''}.`,
+                              [
+                                { label: 'Annuler' },
+                                {
+                                  label: 'Vider',
+                                  danger: true,
+                                  onPress: () => useScanStore.getState().viderLaCorbeille(),
+                                },
+                              ],
+                            ),
+                        },
+                      ],
+                    })
+                  }>
+                  <Text style={styles.emptyFolder}>
+                    {`Corbeille · ${aLaCorbeille.length} plan${aLaCorbeille.length > 1 ? 's' : ''}, restaurables 30 jours`}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </>
+          }
+        />
       )}
 
       <ActionSheet data={menu} onClose={() => setMenu(null)} />
@@ -1578,6 +1875,7 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   menageTexte: { flex: 1, color: c.inkSoft, fontSize: 13 },
   menageCroix: { color: c.inkFaint, fontSize: 15, fontWeight: '700' },
+  illisibleAction: { color: c.blue, fontWeight: '700' },
   chercheRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
   champ: {
     flex: 1,
