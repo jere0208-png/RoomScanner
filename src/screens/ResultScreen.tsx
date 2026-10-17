@@ -278,6 +278,22 @@ export function nomCourtDuNiveau(n: number): string {
 /** Les pastilles du haut et la rangée d’outils du bas, posées sur le plan (pt). */
 const MARGES_DU_PLAN = { haut: 48, bas: 170 };
 
+/** Les pièces que la légende de l'image partagée nomme, au plus. */
+const PIECES_DE_LA_LEGENDE = 14;
+
+/**
+ * LA LÉGENDE DE L'IMAGE DIT CE QU'ELLE TAIT — revue « immobilier » : au-delà
+ * de quatorze pièces, les suivantes disparaissaient sans un mot, et le total
+ * ne se refaisait plus avec la liste. Les premières, et « + 3 autres pièces ».
+ */
+export function lignesDeLaLegende<T>(lignes: T[], max = PIECES_DE_LA_LEGENDE): { lignes: T[]; autres: string | null } {
+  const reste = lignes.length - max;
+  return {
+    lignes: reste > 0 ? lignes.slice(0, max) : lignes,
+    autres: reste > 0 ? `+ ${reste} autre${reste > 1 ? 's' : ''} pièce${reste > 1 ? 's' : ''}` : null,
+  };
+}
+
 export function ResultScreen() {
   /**
    * CE QUE LE SYSTÈME OCCUPE EN BAS, et qu'on lui laisse.
@@ -2247,14 +2263,15 @@ export function ResultScreen() {
   /** La liste des surfaces que l'image partagée emporte (voir plus bas, `legendeImage`). */
   const legendeSurfaces = useMemo(() => {
     const virgule = (v: number) => v.toFixed(2).replace('.', ',');
-    const lignes = parts
-      .filter((p) => (p.surface?.area ?? 0) > 0)
-      .map((p, i) => ({
-        id: p.roomId,
-        nom: rooms.find((r) => r.id === p.roomId)?.name || `Pièce ${i + 1}`,
-        aire: `${p.surface!.exact ? '' : '≈ '}${virgule(p.surface!.area)}`,
-      }))
-      .slice(0, 14);
+    const { lignes, autres } = lignesDeLaLegende(
+      parts
+        .filter((p) => (p.surface?.area ?? 0) > 0)
+        .map((p, i) => ({
+          id: p.roomId,
+          nom: rooms.find((r) => r.id === p.roomId)?.name || `Pièce ${i + 1}`,
+          aire: `${p.surface!.exact ? '' : '≈ '}${virgule(p.surface!.area)}`,
+        })),
+    );
     const total = parts.reduce((t, p) => t + (p.surface?.area ?? 0), 0);
     /*
       L'HABITABLE PART AUSSI — revue « Bérénice » : l'image disait le sol
@@ -2264,7 +2281,7 @@ export function ResultScreen() {
       habitable.pieces.length > 0 && Math.abs(habitable.total - total) >= 0.05
         ? `${habitable.aVerifier > 0 ? '≈ ' : ''}${virgule(habitable.total)}`
         : null;
-    return { lignes, total: virgule(total), hab };
+    return { lignes, autres, total: virgule(total), hab };
   }, [parts, rooms, habitable]);
   /*
     LE TOTAL DE LA MAISON — revue « Léa » : l'en-tête ne disait que le niveau
@@ -7185,6 +7202,11 @@ export function ResultScreen() {
                 {`${l.nom} · ${l.aire} m²`}
               </Text>
             ))}
+            {legendeSurfaces.autres && (
+              <Text style={styles.legendeImageLigne} numberOfLines={1}>
+                {legendeSurfaces.autres}
+              </Text>
+            )}
             <Text style={[styles.legendeImageLigne, styles.legendeImageTotal]} numberOfLines={1}>
               {`Total au sol · ${legendeSurfaces.total} m²`}
             </Text>

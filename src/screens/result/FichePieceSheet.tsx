@@ -113,7 +113,9 @@ export function FichePieceSheet({
                   <Tuile
                     mot="Surface habitable"
                     valeur={`${fr(fiche.surfaceHabitable)} m²`}
-                    note={fiche.raisonHabitable ?? (modeElec ? `Sous ${fr(HAUTEUR_HABITABLE)} m exclu (loi Carrez)` : 'Celle d’une annonce')}
+                    // « Celle d'une annonce » promettait le chiffre d'une annonce, que
+                    // la loi Carrez veut mesuré par un pro (revue « immobilier »).
+                    note={fiche.raisonHabitable ?? (modeElec ? `Sous ${fr(HAUTEUR_HABITABLE)} m exclu (loi Carrez)` : 'Estimation, pas un mesurage Carrez certifié')}
                     accent
                   />
                 )}

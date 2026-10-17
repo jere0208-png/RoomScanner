@@ -22,7 +22,7 @@
  * face de la cloison, et chacun la perd sur la largeur de la porte.
  */
 import type { Pt, RoomPart, WallSeg } from './floorplan';
-import { hauteurDeLaPiece, solDesMurs } from './floorplan';
+import { epaisseurDe, hauteurDeLaPiece, solDesMurs } from './floorplan';
 
 /** Les hypothèses du calcul — dites à l'écran, sous les chiffres. */
 export interface HypothesesTravaux {
@@ -164,6 +164,8 @@ function distanceAuSegment(p: Pt, a: Pt, b: Pt): number {
 }
 
 const arrondi = (v: number, pas = 0.1) => Math.round(v / pas) * pas;
+/** Au centième, sans traîne de virgule flottante : 20,36 et non 20,360000000000003. */
+const auCentieme = (v: number) => Math.round(v * 100) / 100;
 /** Au dixième, sans traîne de virgule flottante : 27,5 et non 27,500000000000004. */
 const auDixieme = (v: number) => Math.round(v * 10) / 10;
 
@@ -265,10 +267,16 @@ function teintesDeLaPiece(
     const w = part.walls.find((x) => x.id === wallId);
     if (!w || !cle) continue;
     let longueur = 0;
+    /*
+      AU NU, LE CÔTÉ EST À UNE DEMI-ÉPAISSEUR DE L'AXE — et jusqu'à une
+      épaisseur entière contre le mur relevé d'une voisine (`contourAuNu`) :
+      un porteur de 30 cm sortait des 15 cm de l'axe, et son accent avec.
+    */
+    const pres = Math.max(0.15, epaisseurDe(w) + 0.05);
     for (let i = 0; i < contour.length; i++) {
       const a = contour[i];
       const b = contour[(i + 1) % contour.length];
-      if (distanceAuSegment(a, w.a, w.b) < 0.15 && distanceAuSegment(b, w.a, w.b) < 0.15) {
+      if (distanceAuSegment(a, w.a, w.b) < pres && distanceAuSegment(b, w.a, w.b) < pres) {
         longueur += Math.hypot(b.x - a.x, b.z - a.z);
       }
     }
@@ -315,10 +323,19 @@ export function travauxDesPieces(
     let seuils = 0;
     let portes = 0;
     let fenetres = 0;
+    const solDeLaPiece = solDesMurs(part.walls);
     for (const o of siennes) {
       const largeur = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z);
-      if (o.type === 'window') fenetres += 1;
-      else {
+      if (o.type === 'window') {
+        fenetres += 1;
+        /*
+          LA PORTE-FENÊTRE ARRÊTE AUSSI LA PLINTHE — revue de l'artisan :
+          une baie vitrée qui part du sol comptait sa largeur en plinthes.
+          Sans allège (moins de 15 cm, comme au carnet des menuiseries), on
+          y marche : c'est un seuil. Elle reste une fenêtre au compte.
+        */
+        if (o.yCenter - o.height / 2 - solDeLaPiece < 0.15) seuils += largeur;
+      } else {
         // Porte ou passage : on y marche, la plinthe s'arrête.
         portes += 1;
         seuils += largeur;
@@ -336,7 +353,7 @@ export function travauxDesPieces(
     */
     let faienceSelon: PieceTravaux['faienceSelon'];
     if (estPieceDEau(nom, decor?.kind)) {
-      const sol = solDesMurs(part.walls);
+      const sol = solDeLaPiece;
       const bande = (H: number) => {
         const haut = Math.min(H, hauteur);
         const coupees = siennes.map((o) => {
@@ -345,20 +362,27 @@ export function travauxDesPieces(
         });
         return arrondi(Math.min(murs, mursNetsDe(contour, haut, coupees, part.walls)));
       };
-      faienceSelon = { h120: bande(1.2), h200: bande(2), toute: arrondi(murs) };
+      faienceSelon = { h120: bande(1.2), h200: bande(2), toute: auCentieme(murs) };
     }
     out.push({
       roomId: part.roomId,
       nom,
-      sol: arrondi(surface.area),
-      plafond: arrondi(surface.area),
+      /*
+        LES SURFACES AU CENTIÈME, COMME AU MÉTRÉ — revues « rénovation » et
+        « artisan » : le même séjour faisait 20,36 m² au métré et 20,40 à
+        l'estimatif du même PDF, arrondi ici au dixième puis réécrit à deux
+        décimales. Les achats arrondissent leurs propres totaux.
+      */
+      sol: auCentieme(surface.area),
+      plafond: auCentieme(surface.area),
       perimetre: arrondi(tour),
       hauteur: arrondi(hauteur, 0.01),
-      murs: arrondi(murs),
+      murs: auCentieme(murs),
       plinthes: arrondi(Math.max(0, tour - seuils)),
       portes,
       fenetres,
-      ...(decor ? { teintes: teintesDeLaPiece(part, surface.pts, hauteur, murs, siennes, decor) } : {}),
+      // Le mur d'accent se mesure au nu, comme le reste des murs (revue de l'artisan).
+      ...(decor ? { teintes: teintesDeLaPiece(part, contour, hauteur, murs, siennes, decor) } : {}),
       ...(credence > 0.05 ? { credence: arrondi(credence, 0.01) } : {}),
       ...(faienceSelon ? { faienceSelon } : {}),
     });
@@ -505,7 +529,12 @@ export function achats(pieces: PieceTravaux[], h: HypothesesTravaux = HYPOTHESES
     },
     plinthes: {
       metres: arrondi(plinthes),
-      barres: plinthes > 0 ? Math.ceil(plinthes / h.barre - 1e-9) : 0,
+      /*
+        LES BARRES AVEC LEUR CHUTE — revue de l'artisan : chaque angle et
+        chaque bout de mur coupe une barre, et 4,70 m ne se posent pas avec
+        deux barres de 2,40. La même marge de coupe que le sol.
+      */
+      barres: plinthes > 0 ? Math.ceil((plinthes * (1 + h.chute)) / h.barre - 1e-9) : 0,
     },
     faience: (() => {
       const longueur = somme((p) => p.credence ?? 0);

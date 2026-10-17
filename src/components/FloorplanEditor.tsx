@@ -2099,9 +2099,10 @@ export function FloorplanEditor({
     };
     for (const part of parts) {
       const roomName = roomById.get(part.roomId)?.name ?? '';
+      // Au centième, comme la fiche, le métré et l'image partagée (revue « immobilier »).
       const areaText = part.surface
         ? `${part.surface.exact ? '' : '≈ '}${part.surface.area
-            .toFixed(1)
+            .toFixed(2)
             .replace('.', ',')} m²`
         : null;
       if (roomName === '' && !areaText && !editable) continue;

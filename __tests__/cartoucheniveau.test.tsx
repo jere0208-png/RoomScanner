@@ -133,7 +133,7 @@ describe('le nom d’une pièce ne paraît qu’avec son calque', () => {
     ET LA PORTE DU NOMMAGE RESTE OUVERTE, calque allumé.
 
     C'est ce qu'il fallait vérifier avant de couper quoi que ce soit : une
-    pièce SANS NOM garde son cartouche — il porte alors sa surface, « 20,0 m² »,
+    pièce SANS NOM garde son cartouche — il porte alors sa surface, « 20,00 m² »,
     et c'est lui qu'on touche pour la nommer. Le chemin n'a pas disparu, il
     passe par le calque qui porte justement les noms et les surfaces.
 
@@ -143,8 +143,8 @@ describe('le nom d’une pièce ne paraît qu’avec son calque', () => {
   */
   it('et une pièce sans nom garde son cartouche, donc sa porte', () => {
     const vu = mots(plan(true, true, ''));
-    expect(vu).toContain('20,0 m²');
+    expect(vu).toContain('20,00 m²');
     // Et calque éteint, plus rien — c'est bien le calque qui commande.
-    expect(mots(plan(false, true, ''))).not.toContain('20,0 m²');
+    expect(mots(plan(false, true, ''))).not.toContain('20,00 m²');
   });
 });

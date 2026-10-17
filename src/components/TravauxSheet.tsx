@@ -416,7 +416,7 @@ export function TravauxSheet({
           ))}
           <Text style={[s.explication, s.hypotheses]}>
             {`Calculé pour ${pluriel(hypotheses.couches, 'couche')}, 1 litre pour ${nombre(hypotheses.rendement)} m² ` +
-              `(regardez l’étiquette du pot), ${Math.round(hypotheses.chute * 100)} % de marge pour les coupes du sol. ` +
+              `(regardez l’étiquette du pot), ${Math.round(hypotheses.chute * 100)} % de marge pour les coupes du sol et des plinthes. ` +
               `Portes et fenêtres déduites.` +
               (cout ? ' Prix indicatifs, à ajuster.' : '')}
           </Text>

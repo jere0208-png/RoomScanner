@@ -101,7 +101,7 @@ describe('le cartouche d’un réduit', () => {
     const t = plan(320, 520);
     const ecrits = t.root.findAllByType(SvgText).map(texteDe);
     const wc = parts.find((p) => pointInPolygon({ x: 7.5, z: 0.4 }, p.surface!.pts))!;
-    expect(ecrits).toContain(`${wc.surface!.area.toFixed(1).replace('.', ',')} m²`);
+    expect(ecrits).toContain(`${wc.surface!.area.toFixed(2).replace('.', ',')} m²`);
     expect(ecrits).toContain('WC');
     const rappel = t.root.findAllByType(G).find((g) => g.props.testID === `rappel-${wc.roomId}`);
     expect(rappel).toBeDefined();

@@ -26,7 +26,7 @@ import {
 } from '../theme';
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { DEFAULT_VIEW3D, Iso3DView, type View3DParams } from '../components/Iso3DView';
-import { buildScanPdf, nomsDesPieces, pdfFilename, sommaireDuDossier, toBase64 } from '../export/pdf';
+import { PHOTO_A_BLANC, buildScanPdf, nomsDesPieces, pdfFilename, sommaireDuDossier, toBase64 } from '../export/pdf';
 import { ApercuDuDossier } from '../components/ApercuDuDossier';
 import { haptic } from '../ui/haptic';
 import { hasCapturedColors } from '../geometry/appearance';
@@ -717,6 +717,8 @@ const styles = getStyles(c);
         address,
         // Le particulier relève son propre logement : le cartouche le dit.
         particulier,
+        // L'électricien remet un dossier de chantier ; les autres, celui du logement.
+        modeElec,
         entreprise: entrepriseDuDossier,
       },
       include3D,
@@ -773,11 +775,14 @@ const styles = getStyles(c);
 
   /*
     LES PHOTOS COMPTENT DANS LE SOMMAIRE, PAS DANS L'APERÇU. Un mur
-    photographié a sa feuille : on la compte, avec une photo vide — la vraie
-    se relit sur le disque au moment d'envoyer.
+    photographié a sa feuille : on la compte, avec une photo à blanc — la
+    vraie se relit sur le disque au moment d'envoyer. À BLANC, PAS VIDE —
+    revue des exports : une photo vide était laissée de côté par le PDF,
+    son mur partageait une feuille avec un autre, et le compte des feuilles
+    tombait faux dès qu'il y avait des photos.
   */
   const photosVides = useMemo(
-    () => (multi ? toutesLesPhotos : photos).map((p) => ({ wallId: p.wallId, base64: '', along: p.along })),
+    () => (multi ? toutesLesPhotos : photos).map((p) => ({ wallId: p.wallId, base64: PHOTO_A_BLANC, along: p.along })),
     [multi, toutesLesPhotos, photos],
   );
 

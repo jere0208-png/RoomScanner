@@ -90,8 +90,20 @@ const COUVERTURE_SURE = 0.8;
  * surface habitable) ; l'en-tête est corrigé, et le cellier extérieur, une
  * dépendance, sort comme la buanderie extérieure.
  */
+/*
+  ET CE QU'ON OUBLIAIT — revue « immobilier » : l'escalier, la trémie, le
+  parking, le box, la cour, le patio, la dépendance, le pool house et la
+  cuisine d'été comptaient comme des chambres. « Abri » se lit en mot
+  entier : « Chambre abricot » n'est pas un abri de jardin.
+*/
 const HORS_LOGEMENT =
-  /garage|cave|cellier ext|local|chaufferie|buanderie ext|balcon|terrasse|loggia|v[ée]randa|jardin d.hiver|remise|sous-sol|combles?|grenier|abri|atelier ext/i;
+  /garage|cave|cellier ext|local|chaufferie|buanderie ext|balcon|terrasse|loggia|v[ée]randa|jardin|remise|sous-sol|combles?|grenier|\babri\b|atelier ext|escalier|tr[ée]mie|parking|stationnement|\bbox\b|\bcour\b|patio|d[ée]pendance|pool.?house|cuisine d.[ée]t[ée]/i;
+/*
+  DEHORS, MÊME AVEC UN NOM DE PIÈCE — la cuisine d'été est une cuisine, et
+  « Cuisine » suffisait à la faire compter ; la chambre du pool house est
+  dans une dépendance. Ceux-là sortent quoi que dise le reste du nom.
+*/
+const DEHORS = /cuisine d.[ée]t[ée]|pool.?house|d[ée]pendance/i;
 /*
   MAIS UNE PIÈCE HABITÉE LE RESTE — revue « Sébastien » : « Chambre sous
   combles », « Combles aménagés », « Grenier aménagé », « Bureau (ancien
@@ -100,7 +112,7 @@ const HORS_LOGEMENT =
 */
 const HABITEE =
   /chambre|s[ée]jour|salon|bureau|cuisine|salle|sdb|wc|toilette|entr[ée]e|couloir|d[ée]gagement|dressing|mezzanine|palier|am[ée]nag[ée]/i;
-const horsLogement = (nom: string) => HORS_LOGEMENT.test(nom) && !HABITEE.test(nom);
+const horsLogement = (nom: string) => DEHORS.test(nom) || (HORS_LOGEMENT.test(nom) && !HABITEE.test(nom));
 
 export interface PieceHabitable {
   roomId: string;

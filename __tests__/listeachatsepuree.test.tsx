@@ -108,14 +108,14 @@ const monter = (pieces = PIECES) => {
 describe('la faïence murale des pièces d’eau', () => {
   it('se calcule, ouvertures déduites, à chaque hauteur — pour les seules pièces d’eau', () => {
     const [sdb, chambre] = PIECES;
-    // 22,5 − porte 0,80 × 2,04 − fenêtre 0,36 = 20,508.
-    expect(sdb.murs).toBeCloseTo(20.5, 6);
+    // 22,5 − porte 0,80 × 2,04 − fenêtre 0,36 = 20,508 → 20,51, au centième.
+    expect(sdb.murs).toBeCloseTo(20.51, 6);
     expect(sdb.faienceSelon).toBeDefined();
     // 1,20 m : 10,8 − la porte sur 1,20 (0,96) ; la fenêtre est au-dessus.
     expect(sdb.faienceSelon!.h120).toBeCloseTo(9.8, 6);
     // 2 m : 18 − la porte sur 2 m (1,6) − la fenêtre entière (0,36).
     expect(sdb.faienceSelon!.h200).toBeCloseTo(16, 6);
-    expect(sdb.faienceSelon!.toute).toBeCloseTo(20.5, 6);
+    expect(sdb.faienceSelon!.toute).toBeCloseTo(20.51, 6);
     expect(chambre.faienceSelon).toBeUndefined();
     expect(estPieceDEau('Salle d’eau')).toBe(true);
     expect(estPieceDEau('WC')).toBe(true);

@@ -12,6 +12,7 @@ import {
   mursDeLaPhase,
   bouclesDuDoublage,
   dessinDesNatures,
+  estDevinee,
   libelleNature,
   naturesPresentes,
   renduNature,
@@ -548,6 +549,18 @@ export function jpegSize(
   }
   return null;
 }
+
+/**
+ * UNE PHOTO À BLANC — un JPEG gris de 2 × 2 px, le plus petit que `pdfImage`
+ * accepte. Le sommaire et l'aperçu de l'export la posent à la place de
+ * chaque vraie photo (relue sur le disque à l'envoi seulement) : une photo
+ * vide était laissée de côté, son mur se rangeait avec un autre sur une
+ * même feuille, et le nombre de feuilles annoncé était faux (revue des
+ * exports).
+ */
+export const PHOTO_A_BLANC =
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABALDA4MChAODQ4SERATGCgaGBYWGDEjJR0oOjM9PDkzODdASFxOQERXRTc4UG1RV19iZ2hnPk1xeXBkeFxlZ2P/' +
+  'wAALCAACAAIBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAABv/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AYv/Z';
 
 /** Prépare une photo pour le document, ou `null` si elle est illisible. */
 export function pdfImage(name: string, base64: string): PdfImage | null {
@@ -1270,8 +1283,15 @@ function drawSheetChrome(
     d.text('Scan 3D & plans', FRAME.x + 70, ty + 23, 7.5, GREY, { align: 'left' });
   }
 
+  /*
+    LES ÉTIQUETTES DU CARTOUCHE, LISIBLES IMPRIMÉES — revue « senior » :
+    « PROJET », « DATE », « FEUILLE » en 6,5 pt gris clair (contraste 2,6:1)
+    disparaissaient au tirage. 7,5 pt et le gris des textes (6:1).
+  */
+  const etiquette = (mot: string, x: number, y: number) => d.text(mot, x, y, 7.5, GREY, { align: 'left' });
+
   // Bloc projet
-  d.text('PROJET', cols[0] + 12, ty + 50, 6.5, GREY_LIGHT, { align: 'left' });
+  etiquette('PROJET', cols[0] + 12, ty + 50);
   // Le titre se resserre avant de se couper : « Plan du 12/10/2026 — Rez-d… »
   // perdait justement le niveau (revue « Léa »).
   const corpsProjet = [10.5, 9.5, 8.5].find((t) => fitText(info.project, t, width(0)) === info.project) ?? 8.5;
@@ -1294,9 +1314,7 @@ function drawSheetChrome(
     réflexion « grand public » : le dossier parlait métier (« Client »,
     « Chantier ») à quelqu'un qui relève son propre logement.
   */
-  d.text(aQui ? (info.particulier ? 'PROPRIÉTAIRE' : 'CLIENT') : 'FICHIER', cols[0] + 12, ty + 24, 6.5, GREY_LIGHT, {
-    align: 'left',
-  });
+  etiquette(aQui ? (info.particulier ? 'PROPRIÉTAIRE' : 'CLIENT') : 'FICHIER', cols[0] + 12, ty + 24);
   /*
     SANS COUPER — relevé des revues du dossier : « 12 rue des Lila… » sur
     toutes les feuilles. Quand la ligne ne tient pas, le client et
@@ -1316,7 +1334,7 @@ function drawSheetChrome(
   // Bloc date / échelle
   const now = new Date();
   const two = (v: number) => String(v).padStart(2, '0');
-  d.text('DATE', cols[1] + 12, ty + 50, 6.5, GREY_LIGHT, { align: 'left' });
+  etiquette('DATE', cols[1] + 12, ty + 50);
   d.text(
     `${two(now.getDate())}/${two(now.getMonth() + 1)}/${now.getFullYear()}`,
     cols[1] + 12,
@@ -1325,7 +1343,7 @@ function drawSheetChrome(
     INK,
     { align: 'left' },
   );
-  d.text('ÉCHELLE', cols[1] + 12, ty + 24, 6.5, GREY_LIGHT, { align: 'left' });
+  etiquette('ÉCHELLE', cols[1] + 12, ty + 24);
   d.text(fitText(info.scaleLabel ?? '—', 9.5, width(1)), cols[1] + 12, ty + 12, 9.5, INK, {
     align: 'left',
   });
@@ -1361,7 +1379,7 @@ function drawSheetChrome(
   }
 
   // Bloc feuille
-  d.text('DOCUMENT', cols[2] + 12, ty + 50, 6.5, GREY_LIGHT, { align: 'left' });
+  etiquette('DOCUMENT', cols[2] + 12, ty + 50);
   // Deux lignes quand le titre ne tient pas : « Élévation — côté Séjou… »
   // ne disait plus de quel mur il s'agissait.
   const titreDoc = wrapText(info.sheetTitle, 7.5, width(2));
@@ -1375,7 +1393,7 @@ function drawSheetChrome(
       align: 'left',
     });
   }
-  d.text('FEUILLE', cols[2] + 12, ty + 24, 6.5, GREY_LIGHT, { align: 'left' });
+  etiquette('FEUILLE', cols[2] + 12, ty + 24);
   d.text(info.sheet, cols[2] + 12, ty + 12, 10, INK, { bold: true, align: 'left' });
 }
 
@@ -1780,6 +1798,8 @@ interface SheetContext {
   address?: string;
   /** Un particulier : le cartouche dit « Propriétaire ». */
   particulier?: boolean;
+  /** Le dossier de l'électricien : la page de garde dit « chantier ». */
+  modeElec?: boolean;
   /** L'entreprise de l'artisan, pour le cartouche. */
   entreprise?: EntreprisePdf | null;
   /** Les perspectives portent-elles les repères d'appareillage ? */
@@ -1790,6 +1810,12 @@ interface SheetContext {
    * repère qui ne renvoie à aucun tableau ne dit rien.
    */
   reperesMenuiseries?: boolean;
+  /**
+   * LES REPÈRES DU CARNET, quand la feuille ne montre qu'une partie des
+   * baies (la feuille « Projet ») : le repère reste celui du carnet, calculé
+   * sur toutes, et ne se renumérote pas sur celles qui restent.
+   */
+  reperesDuCarnet?: ReadonlyMap<string, string>;
   walls: WallSeg[];
   openings: WallSeg[];
   objects: ObjectData[];
@@ -2129,7 +2155,18 @@ function planPage(
       seconde.push({
         titre: 'MURS',
         teinte: INK,
-        lignes: naturesDuPlan.map((n) => ({ texte: libelleNature(n), nature: n })),
+        /*
+          DEVINÉE, ELLE LE DIT — revue « immobilier » : un mur que l'app
+          suppose porteur (façade, épaisseur) s'imprimait « Mur porteur,
+          maçonnerie », comme un mur vérifié. Un acheteur y lit qu'on ne
+          peut pas l'abattre ; on écrit que c'est à confirmer.
+        */
+        lignes: naturesDuPlan.map((n) => ({
+          texte: walls.some((w) => w.type === 'wall' && w.nature === n && estDevinee(w))
+            ? `${libelleNature(n).split(',')[0]} (${n === 'cloison' ? 'supposée' : 'supposé'}, à confirmer)`
+            : libelleNature(n),
+          nature: n,
+        })),
       });
     }
     if (plafondLegende.length > 0) {
@@ -2803,9 +2840,12 @@ function planPage(
       s'écartent.
     */
     const reperesPoses: { texte: string; boite: Boite }[] = [];
-    if (ctx.reperesMenuiseries && !extra) {
+    // Pas sur la feuille des gaines (sa surcouche) ; sur le plan coté et
+    // sur la feuille « Projet », qui les demande (revue « architecte »).
+    if (ctx.reperesMenuiseries && !extra?.overlay) {
       const centreR = centreDesMurs(walls);
-      for (const l of carnetDesMenuiseries(walls, openings, ctx.rooms, ctx.roomNames)) {
+      for (const l0 of carnetDesMenuiseries(walls, openings, ctx.rooms, ctx.roomNames)) {
+        const l = { ...l0, repere: ctx.reperesDuCarnet?.get(l0.id) ?? l0.repere };
         const o = openings.find((x) => x.id === l.id);
         if (!o) continue;
         const L = segLength(o);
@@ -5773,6 +5813,9 @@ function elevationsDeDeuxFaces(
   return d.stream();
 }
 
+/** Les vignettes que porte la bande d'un mur : au-delà, des timbres. */
+const PHOTOS_PAR_MUR = 3;
+
 /** La face dessinée dans son cadre : le titre qu'elle donne, l'échelle tenue. */
 function dessinerUneFace(
   d: Draw,
@@ -6340,14 +6383,16 @@ function dessinerUneFace(
 
   // Un dossier sans électricité n'a pas à le dire, sur chaque feuille, au
   // milieu des baies et des meubles (revue « Thomas »).
-  if (poses.length === 0 && !sansElec) {
-    d.text(
-      'Aucun appareil sur ce mur.',
-      px(face.len / 2),
-      py(H / 2),
-      9,
-      GREY_LIGHT,
-    );
+  /*
+    SOUS LA CHAÎNE DE COTES, ET SEULEMENT SI ELLE TIENT — revues
+    « électricien » et des exports : écrite à mi-hauteur du mur, la mention
+    tombait dans la fenêtre, et sortait du dessin sur un trumeau étroit.
+    Sous la cote de longueur (son rond descend à 9 points sous la ligne),
+    rien ne l'attend ; plus large que le mur, elle se tait.
+  */
+  const aucun = 'Aucun appareil sur ce mur.';
+  if (poses.length === 0 && !sansElec && fitText(aucun, 8, face.len * scale) === aucun) {
+    d.text(aucun, px(face.len / 2), yb - 20, 8, GREY_LIGHT);
   }
 
   // ------------------------------------------------------------ la photo
@@ -6365,7 +6410,7 @@ function dessinerUneFace(
     // Trois vignettes de front tiennent encore la lecture ; au-delà, elles
     // deviennent des timbres. La bande n'en porte donc pas plus, et la
     // légende dit combien restent à l'app.
-    const montrees = cliches.slice(0, 3);
+    const montrees = cliches.slice(0, PHOTOS_PAR_MUR);
     const reste = cliches.length - montrees.length;
     const wMax = Math.min(
       210,
@@ -6849,6 +6894,11 @@ export interface ScanForPdf {
   address?: string;
   /** Un particulier : le cartouche dit « Propriétaire », pas « Client ». */
   particulier?: boolean;
+  /**
+   * LE DOSSIER DE L'ÉLECTRICIEN (mode Électricité) : sa page de garde dit
+   * « Dossier de chantier ». Hors de ce mode, c'est un logement.
+   */
+  modeElec?: boolean;
   /**
    * L'entreprise de l'artisan (voir `store/entreprise`) : elle prend la
    * place de la marque EchoPlan dans le cartouche de chaque feuille.
@@ -7932,7 +7982,14 @@ function gardePage(
   y -= 96;
   d.text(fitText(ctx.name, 26, w), x0, y, 26, INK, { bold: true, align: 'left' });
   y -= 22;
-  d.text(ctx.particulier ? 'Dossier du logement' : 'Dossier de chantier', x0, y, 12, GREY, { align: 'left' });
+  /*
+    UN CHANTIER POUR L'ÉLECTRICIEN, UN LOGEMENT POUR LES AUTRES — revue
+    « immobilier » : l'agente qui imprime son agence remettait à l'acheteur
+    un « Dossier de chantier », adresse sous « Chantier ». Le client reste
+    un client ; le dossier, hors mode Électricité, est celui du logement.
+  */
+  const chantier = !ctx.particulier && !!ctx.modeElec;
+  d.text(chantier ? 'Dossier de chantier' : 'Dossier du logement', x0, y, 12, GREY, { align: 'left' });
   if (niveaux && niveaux.length > 1) {
     y -= 15;
     d.text(fitText(`${niveaux.length} niveaux : ${niveaux.map((x) => x.nom).join(', ')}`, 10, w), x0, y, 10, GREY, {
@@ -7944,7 +8001,7 @@ function gardePage(
   const two = (v: number) => String(v).padStart(2, '0');
   const lignes: [string, string | undefined][] = [
     [ctx.particulier ? 'Propriétaire' : 'Client', ctx.client],
-    [ctx.particulier ? 'Adresse' : 'Chantier', ctx.address],
+    [chantier ? 'Chantier' : 'Adresse', ctx.address],
     ['Établi le', `${two(now.getDate())}/${two(now.getMonth() + 1)}/${now.getFullYear()}`],
   ];
   for (const [mot, valeur] of lignes) {
@@ -8147,13 +8204,20 @@ function planifierUnNiveau(
    */
   const photos = new Map<string, { im: PdfImage; along?: number }[]>();
   const images: PdfImage[] = [];
+  /*
+    N'EMBARQUE QUE CE QUI SE VOIT — revue des exports : la bande d'un mur
+    montre trois vignettes (« +2 » pour le reste, voir `dessinerUneFace`),
+    mais les cinq partaient dans le fichier, et celles d'un mur sans feuille
+    d'élévation aussi. Toutes restent comptées ; seules les montrées pèsent.
+  */
+  const avecFeuille = new Set(murs.map((m) => m.wall.id));
   (scan.photos ?? []).forEach((p, i) => {
     const im = pdfImage(`${prefixe}Im${i}`, p.base64);
     if (!im) return;
     const lot = photos.get(p.wallId) ?? [];
     lot.push({ im, along: p.along });
     photos.set(p.wallId, lot);
-    images.push(im);
+    if (lot.length <= PHOTOS_PAR_MUR && avecFeuille.has(p.wallId)) images.push(im);
   });
   // Trois feuilles : l'unifilaire hors sol, puis les deux schémas sur le
   // plan. Les tracés viennent des mêmes cheminements que le métré.
@@ -8180,6 +8244,7 @@ function planifierUnNiveau(
     client: scan.client,
     address: scan.address,
     particulier: scan.particulier,
+    modeElec: scan.modeElec,
     entreprise: scan.entreprise ?? null,
     reperes3D: opts.reperes3D ?? true,
     reperesMenuiseries: opts.metre ?? true,
@@ -8224,6 +8289,15 @@ function planifierUnNiveau(
     feuilles sont d'architecture : ni appareillage, ni plafond.
   */
   if (aDesTravaux(scan.walls)) {
+    /*
+      LES REPÈRES P1, F1, B1 SUR LA FEUILLE « PROJET » — revue « architecte » :
+      c'est elle qu'on lit avec le carnet des menuiseries (les baies à
+      poser y sont), et elle n'en portait aucun. Ceux du carnet, sur toutes
+      les baies : une baie du mur démoli ne décale pas la numérotation.
+    */
+    const reperesDuCarnet = new Map(
+      carnetDesMenuiseries(ctx.walls, ctx.openings, ctx.rooms, ctx.roomNames).map((l) => [l.id, l.repere] as const),
+    );
     for (const phase of ['existant', 'projet'] as const) {
       const m = mursDeLaPhase(ctx.walls, ctx.openings, phase, porteurDe);
       feuilles.push({
@@ -8231,7 +8305,16 @@ function planifierUnNiveau(
         titre: phase === 'existant' ? 'État existant' : 'Projet',
         fabriquer: (n) =>
           planPage(
-            { ...ctx, walls: m.walls, openings: m.openings, routes: undefined, fixtures: [], ceiling: [], reperesMenuiseries: false },
+            {
+              ...ctx,
+              walls: m.walls,
+              openings: m.openings,
+              routes: undefined,
+              fixtures: [],
+              ceiling: [],
+              reperesMenuiseries: phase === 'projet' ? ctx.reperesMenuiseries : false,
+              reperesDuCarnet,
+            },
             n,
             opts.plan,
             opts.measures2D ?? true,
@@ -8417,6 +8500,7 @@ function planifierLeDossier(
         client: scan.client,
         address: scan.address,
         particulier: scan.particulier,
+        modeElec: scan.modeElec,
         entreprise: scan.entreprise,
         north: scan.north,
       };

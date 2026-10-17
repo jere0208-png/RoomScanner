@@ -98,7 +98,7 @@ describe('la page de garde', () => {
 
   it('porte l’entreprise de l’artisan quand il en a une', () => {
     const garde = premiereFeuille(
-      buildScanPdf({ ...scan, particulier: false, entreprise: { nom: 'Électricité Dupont', telephone: '06 12 34 56 78' } }, false, {
+      buildScanPdf({ ...scan, particulier: false, modeElec: true, entreprise: { nom: 'Électricité Dupont', telephone: '06 12 34 56 78' } }, false, {
         garde: true,
       }),
     );

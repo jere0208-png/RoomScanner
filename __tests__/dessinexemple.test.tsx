@@ -184,7 +184,7 @@ const CADRAGES: [number, number][] = [
 
 const ex = appartementExemple();
 const PARTS = roomParts(ex.walls as WallSeg[], ex.rooms);
-const AIRES = PARTS.map((p) => `${p.surface!.area.toFixed(1).replace('.', ',')} m²`);
+const AIRES = PARTS.map((p) => `${p.surface!.area.toFixed(2).replace('.', ',')} m²`);
 
 describe('aucune surface retirée sur l’exemple', () => {
   for (const [w, h] of CADRAGES) {

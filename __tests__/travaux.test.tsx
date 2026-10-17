@@ -56,7 +56,9 @@ const baie = (type: 'door' | 'window' | 'opening', ax: number, az: number, bx: n
   a: { x: ax, z: az },
   b: { x: bx, z: bz },
   height,
-  yCenter: height / 2,
+  // Une fenêtre a son allège (90 cm) : partie du sol, ce serait une
+  // porte-fenêtre, qui arrête la plinthe.
+  yCenter: type === 'window' ? 0.9 + height / 2 : height / 2,
 });
 /** Une pièce rectangulaire, de (x0,z0) à (x1,z1). */
 const piece = (id: string, x0: number, z0: number, x1: number, z1: number, height = 2.5): RoomPart => {
@@ -94,8 +96,9 @@ describe('le métré des travaux, pièce par pièce', () => {
     expect(p.sol).toBeCloseTo(12, 6);
     expect(p.plafond).toBeCloseTo(12, 6);
     expect(p.perimetre).toBeCloseTo(14, 6);
-    // 14 × 2,5 = 35 m², moins 1,89 (porte) et 1,5 (fenêtre) = 31,61 → 31,6.
-    expect(p.murs).toBeCloseTo(31.6, 6);
+    // 14 × 2,5 = 35 m², moins 1,89 (porte) et 1,5 (fenêtre) = 31,61, au
+    // centième comme au métré.
+    expect(p.murs).toBeCloseTo(31.61, 6);
     // 14 m de tour, moins la porte (0,9) ; la fenêtre ne coupe pas la plinthe.
     expect(p.plinthes).toBeCloseTo(13.1, 6);
     expect(p.portes).toBe(1);
@@ -150,8 +153,8 @@ describe('ce qu’il faut acheter', () => {
     // 12 m² + 10 % = 13,2 m² → 7 paquets de 2 m².
     expect(a.sol.avecChute).toBeCloseTo(13.2, 6);
     expect(a.sol.paquets).toBe(7);
-    // 13,1 m / 2,4 m = 5,46 → 6 barres.
-    expect(a.plinthes.barres).toBe(6);
+    // 13,1 m + 10 % de coupes = 14,41 m / 2,4 m = 6,004 → 7 barres.
+    expect(a.plinthes.barres).toBe(7);
   });
 
   it('rien de choisi, rien à acheter — pas un pot fantôme', () => {
