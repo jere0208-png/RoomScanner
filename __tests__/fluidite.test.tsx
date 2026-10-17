@@ -385,11 +385,12 @@ describe('le plan glisse sans se redessiner', () => {
     const st = StyleSheet.flatten(c.props.style) as {
       transform: Record<string, unknown>[];
     };
+    // La dernière translation est la marque de la couche (un millième de
+    // point, voir `nouvelleCouche`) : à plat à l'œil.
     for (const t of st.transform) {
       for (const [k, v] of Object.entries(t)) {
-        expect(`${k}=${v}`).toBe(
-          k === 'scale' ? 'scale=1' : k === 'rotate' ? 'rotate=0deg' : `${k}=0`,
-        );
+        if (k === 'translateX' || k === 'translateY') expect(Math.abs(Number(v))).toBeLessThanOrEqual(0.001);
+        else expect(`${k}=${v}`).toBe(k === 'scale' ? 'scale=1' : 'rotate=0deg');
       }
     }
   });

@@ -1079,11 +1079,26 @@ export function FloorplanEditor({
     à l'écran, à sa place sous l'ancienne couche, jusqu'à ce que le nouveau
     le remplace — d'un coup, par construction.
   */
-  const nouvelleCouche = () => ({
+  /*
+    ET CHAQUE COUCHE NEUVE PORTE SA MARQUE — un millième de point, en
+    alternance. Diagnostic du patron sur la version 735, vidéo image par
+    image : au lâcher d'un glissé rapide, le plan partait plus loin, de toute
+    la longueur du geste, et n'en revenait qu'au premier mouvement du geste
+    suivant. Le dessin était juste ; c'est la COUCHE qui gardait la pose du
+    geste. Ses valeurs partent à l'écran sans passer par React : pour lui,
+    elle était à plat avant le lâcher et l'est encore après — rien à
+    envoyer, et l'écran gardait le déplacement en double.
+
+    La marque fait différer la transformation que React rend d'un lâcher à
+    l'autre : React l'envoie donc tout entière, à plat, DANS la mise à jour
+    qui monte le nouveau dessin. Un millième de point ne se voit pas.
+  */
+  const nouvelleCouche = (marque = 0) => ({
     tx: new Animated.Value(0),
     ty: new Animated.Value(0),
     ech: new Animated.Value(1),
     rot: new Animated.Value(0),
+    marque,
   });
   const [glisse, setGlisse] = useState(nouvelleCouche);
   /** La couche que le geste pousse : celle du dernier rendu, relue à chaque image. */
@@ -1096,7 +1111,7 @@ export function FloorplanEditor({
    */
   const poserLeGeste = () => {
     const vueAvant = viewRef.current;
-    const couche = nouvelleCouche();
+    const couche = nouvelleCouche(glisseRef.current.marque ? 0 : 0.001);
     glisseRef.current = couche;
     setGlisse(couche);
     /*
@@ -3016,6 +3031,8 @@ export function FloorplanEditor({
                     outputRange: ['-180deg', '180deg'],
                   }) },
                 { scale: glisse.ech },
+                // La marque de la couche : voir `nouvelleCouche`.
+                { translateX: glisse.marque },
               ],
             },
           ]}>

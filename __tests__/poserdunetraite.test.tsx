@@ -107,7 +107,8 @@ function commeSurLeTelephone(f: () => void) {
 const posesDeLaCouche = () =>
   pousses()
     .map((p) => p.style?.transform)
-    .filter((t): t is Pose => !!t?.some((x) => 'scale' in x && 'translateX' in (t[0] ?? {})));
+    .filter((t): t is Pose => !!t?.some((x) => 'scale' in x && 'translateX' in (t[0] ?? {})))
+    .map((t) => t.slice(0, 4));
 
 /** La transformation que React croit être celle de la couche. */
 const poseRendue = (t: TestRenderer.ReactTestRenderer): Pose => {
@@ -121,7 +122,9 @@ const poseRendue = (t: TestRenderer.ReactTestRenderer): Pose => {
       );
     })
     .pop()!;
-  return (StyleSheet.flatten(c.props.style) as { transform: Pose }).transform;
+  // La dernière translation est la MARQUE de la couche (un millième de point,
+  // voir `nouvelleCouche`) : la pose, ce sont les quatre premières.
+  return (StyleSheet.flatten(c.props.style) as { transform: Pose }).transform.slice(0, 4);
 };
 
 const A_PLAT: Pose = [
@@ -266,6 +269,36 @@ describe('le plan se pose d’une traite', () => {
     // … et le commit porte, ensemble, le dessin neuf et la couche à plat.
     expect(empreinte(tree)).not.toBe(avant);
     expect(poseRendue(tree)).toEqual(A_PLAT);
+  });
+
+  /*
+    LE LÂCHER CHANGE TOUJOURS LA TRANSFORMATION QUE REACT REND — diagnostic
+    du patron sur la version 735 : au lâcher d'un glissé, le plan partait de
+    toute la longueur du geste et n'en revenait qu'au geste suivant. Les
+    valeurs de la couche partent à l'écran sans passer par React : s'il rend
+    « à plat » après « à plat », il n'envoie rien, et l'écran garde la pose
+    du geste par-dessus le dessin neuf. La marque de la couche alterne d'un
+    lâcher à l'autre : React envoie donc toujours la couche à plat, avec le
+    dessin.
+  */
+  it('chaque lâcher rend une transformation différente de la précédente', () => {
+    const tree = plan();
+    const brute = () => {
+      const c = tree.root
+        .findAll((n) => {
+          if (typeof n.type !== 'string') return false;
+          const st = StyleSheet.flatten(n.props?.style) as { transform?: unknown[] } | undefined;
+          return Array.isArray(st?.transform) && st!.transform!.some((x) => 'scale' in (x as object));
+        })
+        .pop()!;
+      return JSON.stringify((StyleSheet.flatten(c.props.style) as { transform: unknown[] }).transform);
+    };
+    const vues: string[] = [brute()];
+    for (let k = 0; k < 3; k++) {
+      act(() => glisser(tree, [400, 300], [420 + k * 30, 310], true));
+      vues.push(brute());
+    }
+    for (let k = 1; k < vues.length; k++) expect(vues[k]).not.toBe(vues[k - 1]);
   });
 
   /*
