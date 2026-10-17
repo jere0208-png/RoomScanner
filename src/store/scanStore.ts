@@ -16,6 +16,7 @@ import {
   cleanModelFiles,
   deletePhotoFiles,
   reposerDuCoffre,
+  type IssueRepose,
 } from '../ui/photos';
 import { bornerCalage, CALAGE_NEUTRE, type Calage } from '../ui/calage';
 import { ACCENT_DEFAUT, estUnAccent } from '../ui/accents';
@@ -2621,8 +2622,13 @@ interface ScanState {
   /**
    * Redemande au coffre l'image d'une photo dont le fichier a disparu —
    * après une réinstallation, typiquement — et réécrit le cache.
+   *
+   * Rend l'issue, pour que la fiche de la photo l'explique : `repose`, ou
+   * pourquoi pas — accès refusé, accès limité (la photo est peut-être hors
+   * de la sélection), image effacée des Photos, ou photo jamais confiée à
+   * la photothèque.
    */
-  reposerPhoto: (id: string) => Promise<void>;
+  reposerPhoto: (id: string) => Promise<IssueRepose>;
   /**
    * Dépose un relevé sous le compte, pour qu'il survive au téléphone.
    *
@@ -7004,14 +7010,21 @@ export const useScanStore = create<ScanState>((set, get) => {
 
     reposerPhoto: async (id) => {
       const ph = get().photos.find((p) => p.id === id);
-      if (!ph?.asset) return;
-      const chemin = await reposerDuCoffre(ph.asset);
-      if (!chemin) return;
+      if (!ph?.asset) return 'sans-coffre';
+      const { chemin, acces } = await reposerDuCoffre(ph.asset);
+      if (!chemin) {
+        // Le POURQUOI compte autant que l'échec : un accès limité se
+        // répare d'un geste, une photo effacée des Photos, jamais.
+        if (acces === 'refuse') return 'refuse';
+        if (acces === 'limite') return 'limite';
+        return 'introuvable';
+      }
       set({
         photos: get().photos.map((p) =>
           p.id === id ? { ...p, path: chemin } : p,
         ),
       });
+      return 'repose';
     },
 
     addCeiling: (kind, roomId, at, ligne) => {

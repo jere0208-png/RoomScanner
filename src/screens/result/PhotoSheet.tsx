@@ -11,6 +11,12 @@ import { Image, Modal, Pressable, Text, TouchableOpacity, View } from 'react-nat
 import { useTheme } from '../../theme';
 import { segLength, type WallSeg } from '../../geometry/floorplan';
 import { useScanStore } from '../../store/scanStore';
+import {
+  choisirPhotosVisibles,
+  messagePhotoManquante,
+  ouvrirReglagesPhotos,
+  type IssueRepose,
+} from '../../ui/photos';
 import { fr } from './format';
 import { getStyles } from './styles';
 
@@ -31,8 +37,39 @@ export function PhotoSheet({
   const styles = getStyles(useTheme());
   /** La dernière photo qu'on est allé rechercher : une tentative, pas deux. */
   const repose = React.useRef<string | null>(null);
+  /**
+   * POURQUOI ELLE MANQUE, quand le coffre ne l'a pas rendue — accès
+   * refusé, accès limité, image effacée. Rattaché à SA photo : une réponse
+   * tardive ne s'affiche pas sous la suivante.
+   */
+  const [manque, setManque] = React.useState<{ id: string; issue: IssueRepose } | null>(null);
   const ph = photos.find((p) => p.id === photoId);
   const mur = ph ? walls.find((w) => w.id === ph.wallId) : undefined;
+  const aDire = ph && manque?.id === ph.id ? messagePhotoManquante(manque.issue) : null;
+
+  /** Va chercher l'image au coffre, et retient pourquoi s'il ne la rend pas. */
+  const rechercher = (id: string) => {
+    useScanStore
+      .getState()
+      .reposerPhoto(id)
+      .then((issue) => setManque(issue === 'repose' ? null : { id, issue }))
+      .catch(() => {});
+  };
+
+  /**
+   * LE GESTE QUI RÉPARE. Accès limité : la feuille du système où l'on
+   * coche ses photos, puis une nouvelle recherche. Refus : les Réglages —
+   * iOS ne repose jamais la question.
+   */
+  const reparer = (id: string, geste: 'choisir' | 'reglages') => {
+    if (geste === 'reglages') {
+      ouvrirReglagesPhotos();
+      return;
+    }
+    choisirPhotosVisibles()
+      .then(() => rechercher(id))
+      .catch(() => {});
+  };
   return (
     <Modal
       visible={!!photoId}
@@ -62,9 +99,25 @@ export function PhotoSheet({
               onError={() => {
                 if (repose.current === ph.id) return;
                 repose.current = ph.id;
-                useScanStore.getState().reposerPhoto(ph.id);
+                rechercher(ph.id);
               }}
             />
+            {aDire ? (
+              <View style={styles.photoManque}>
+                <Text style={styles.photoManqueTexte}>{aDire.texte}</Text>
+                {aDire.geste ? (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    onPress={() => reparer(ph.id, aDire.geste!)}>
+                    <Text style={styles.photoManqueGeste}>
+                      {aDire.geste === 'choisir'
+                        ? 'Choisir les photos'
+                        : 'Ouvrir les Réglages'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ) : null}
             <View style={styles.photoBarre}>
               <Text style={styles.photoLegende} numberOfLines={1}>
                 {mur ? `Mur de ${fr(segLength(mur), 2)} m` : 'Mur supprimé'}

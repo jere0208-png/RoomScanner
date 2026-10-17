@@ -4524,6 +4524,27 @@ local est écrit **avant** qu'on parle à la photothèque : accès refusé ou
 rangement en échec, le relevé garde sa photo. On ne perd jamais une image pour
 une question de permission.
 
+**L'accès demandé est l'accès complet** (`.readWrite`), à la première photo de
+repérage — jamais au lancement. L'ajout seul (`.addOnly`), demandé jusqu'ici,
+ne permettait ni de chercher l'album, ni de le créer, ni de relire une photo
+par son identifiant : l'album n'existait jamais et rien ne se retrouvait après
+une réinstallation (synthèse des testeurs, point 5). Les trois réponses
+possibles sont tenues :
+
+- **accès complet** : la photo entre dans l'album **EchoPlan**, cherché par son
+  nom — après une réinstallation, c'est l'album d'avant qu'on retrouve ;
+- **accès limité** : iOS ne permet pas d'album ; la photo va dans la pellicule
+  et entre d'elle-même dans la sélection de l'app. On ne relit **que nos
+  identifiants**, jamais le reste. Après une réinstallation, la sélection est
+  perdue : la fiche de la photo propose « Choisir les photos » (la feuille
+  d'iOS, `presentLimitedLibraryPicker`), et la page Confidentialité aussi ;
+- **refus** : la photo reste dans l'app ; un message le dit une fois par
+  lancement, avec un bouton vers les Réglages.
+
+`PHPhotoLibraryPreventAutomaticLimitedAccessAlert` coupe l'alerte qu'iOS
+relancerait sinon à chaque lancement en accès limité : c'est l'app qui propose
+le geste, au moment où il sert.
+
 La remise en cache se déclenche au bon moment : **quand l'affichage échoue**.
 C'est l'échec de chargement qui prouve que le fichier a disparu — plutôt que de
 tout relire à chaque ouverture d'un scan pour un cas qui n'arrive qu'après une

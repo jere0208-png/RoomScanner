@@ -105,6 +105,7 @@ import { RoomScan } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
 import { useModeElec } from '../store/usage';
 import { haptic } from '../ui/haptic';
+import { annoncerAccesPhotos } from '../ui/photos';
 import { CalquePhotoFond, CalquePhotoPoignee } from './CalquePhoto';
 import { SOLAIRES } from '../ui/solaires';
 import { CloseCross } from './CloseCross';
@@ -1425,6 +1426,9 @@ export function WallElevation({
               // qui retrouvera l'image après une réinstallation.
               addPhoto(wallId, fromFaceX(face, cible), prise.path, prise.asset);
               haptic('succes');
+              // Refus ou accès limité aux Photos : dit une fois, juste après
+              // la photo qui l'a révélé (voir `annoncerAccesPhotos`).
+              annoncerAccesPhotos(prise);
             }
           }}
         >

@@ -86,6 +86,8 @@ RCT_EXTERN_METHOD(readPhoto:(NSString *)path
 RCT_EXTERN_METHOD(restorePhoto:(NSString *)assetId
                   resolve:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(photoAccess:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(pickLimitedPhotos:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 @end
 
 /*

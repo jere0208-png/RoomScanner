@@ -1,6 +1,7 @@
 import Foundation
 import ImageIO
 import Photos
+import PhotosUI
 import UIKit
 import React
 
@@ -160,12 +161,103 @@ class RoomScanPhoto: NSObject {
    */
   private static let ALBUM = "EchoPlan"
 
-  /// L'album de l'application, cherché puis créé s'il manque.
+  /**
+   L'ACCÈS COMPLET, DEMANDÉ À LA PREMIÈRE PHOTO — relevé du patron : « fais
+   en sorte que l'album fonctionne vraiment ». On ne demandait que l'ajout
+   (`.addOnly`) : il laisse déposer une image, mais ni chercher l'album, ni
+   le créer, ni relire une photo par son identifiant. L'album n'existait
+   donc jamais, les photos tombaient en vrac dans la pellicule, et la
+   relecture d'après réinstallation ne retrouvait rien.
+
+   `.readWrite` est la seule autorisation qui permet les trois. Elle n'est
+   demandée qu'une fois, au moment où l'on en a besoin — la première photo
+   de repérage, ou la première photo à retrouver après une réinstallation —,
+   jamais au lancement : une question posée hors de son contexte est une
+   question à laquelle on répond « non ».
+
+   Le rappel arrive sur un fil quelconque : à l'appelant d'y revenir.
+   */
+  private static func autoriser(_ suite: @escaping (PHAuthorizationStatus) -> Void) {
+    let statut = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+    guard statut == .notDetermined else {
+      suite(statut)
+      return
+    }
+    PHPhotoLibrary.requestAuthorization(for: .readWrite) { nouveau in
+      suite(nouveau)
+    }
+  }
+
+  /// Le mot que le JS comprend pour un état d'accès (voir `AccesPhotos`).
+  private static func mot(_ statut: PHAuthorizationStatus) -> String {
+    switch statut {
+    case .authorized: return "complet"
+    case .limited: return "limite"
+    case .notDetermined: return "indetermine"
+    case .denied, .restricted: return "refuse"
+    @unknown default: return "refuse"
+    }
+  }
+
+  /// L'état de l'accès à la photothèque, SANS rien demander : la page
+  /// Confidentialité le montre, et une question n'a rien à faire là.
+  @objc func photoAccess(_ resolve: @escaping RCTPromiseResolveBlock,
+                         reject: @escaping RCTPromiseRejectBlock) {
+    resolve(Self.mot(PHPhotoLibrary.authorizationStatus(for: .readWrite)))
+  }
+
+  /**
+   ÉLARGIR UN ACCÈS LIMITÉ : la feuille du système où l'on coche les photos
+   que l'application a le droit de voir.
+
+   C'est le remède d'après une réinstallation en accès limité : la
+   sélection d'avant est partie avec l'application, et nos propres photos
+   n'y figurent plus. On les recoche, et elles se relisent. Hors accès
+   limité, la feuille n'a pas de sens (iOS ne la montrerait pas) : on rend
+   simplement l'état, et le JS envoie vers les Réglages.
+
+   Rend l'état d'accès une fois la feuille refermée.
+   */
+  @objc func pickLimitedPhotos(_ resolve: @escaping RCTPromiseResolveBlock,
+                               reject: @escaping RCTPromiseRejectBlock) {
+    DispatchQueue.main.async {
+      let statut = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+      guard statut == .limited, let haut = Self.ecranDuDessus() else {
+        resolve(Self.mot(statut))
+        return
+      }
+      PHPhotoLibrary.shared().presentLimitedLibraryPicker(from: haut) { _ in
+        resolve(Self.mot(PHPhotoLibrary.authorizationStatus(for: .readWrite)))
+      }
+    }
+  }
+
+  /// L'écran le plus haut qui ne soit pas en train de partir. Fil principal.
+  private static func ecranDuDessus() -> UIViewController? {
+    guard let racine = UIApplication.shared.connectedScenes
+      .compactMap({ ($0 as? UIWindowScene)?.keyWindow })
+      .first?.rootViewController else {
+      return nil
+    }
+    var haut = racine
+    while let presente = haut.presentedViewController, !presente.isBeingDismissed {
+      haut = presente
+    }
+    return haut
+  }
+
+  /**
+   L'album de l'application, cherché puis créé s'il manque.
+
+   Cherché PAR SON NOM : après une réinstallation, c'est l'album d'avant
+   qu'on retrouve, au lieu d'en créer un second « EchoPlan » à côté.
+   N'a de sens qu'en accès complet — voir `archiver`.
+   */
   private func album(_ suite: @escaping (PHAssetCollection?) -> Void) {
     let options = PHFetchOptions()
     options.predicate = NSPredicate(format: "title = %@", Self.ALBUM)
     let trouve = PHAssetCollection.fetchAssetCollections(
-      with: .album, subtype: .albumRegular, options: options,
+      with: .album, subtype: .albumRegular, options: options
     )
     if let deja = trouve.firstObject {
       suite(deja)
@@ -182,49 +274,72 @@ class RoomScanPhoto: NSObject {
         return
       }
       suite(PHAssetCollection.fetchAssetCollections(
-        withLocalIdentifiers: [id], options: nil,
+        withLocalIdentifiers: [id], options: nil
       ).firstObject)
     })
   }
 
   /**
-   Range l'image dans la photothèque et rend son identifiant durable.
+   Range l'image dans la photothèque et rend son identifiant durable, avec
+   l'état de l'accès — le JS en tire le message à montrer.
 
-   `nil` si l'utilisateur refuse l'accès : le relevé continue avec le seul
-   fichier local — on ne bloque JAMAIS un chantier sur une autorisation.
+   - ACCÈS COMPLET : la photo entre dans l'album « EchoPlan ».
+   - ACCÈS LIMITÉ : iOS ne laisse ni chercher ni créer d'album. La photo
+     entre dans la pellicule, et iOS l'ajoute de lui-même à la sélection
+     de l'application : on pourra la relire par son identifiant, comme
+     toutes celles qu'on a créées — et seulement celles-là.
+   - REFUS : `nil`. Le relevé continue avec le seul fichier local — on ne
+     bloque JAMAIS un chantier sur une autorisation.
    */
-  private func archiver(_ data: Data, suite: @escaping (String?) -> Void) {
-    PHPhotoLibrary.requestAuthorization(for: .addOnly) { statut in
-      guard statut == .authorized || statut == .limited else {
-        suite(nil)
-        return
-      }
-      self.album { collection in
-        var marque: String?
-        PHPhotoLibrary.shared().performChanges({
-          let req = PHAssetCreationRequest.forAsset()
-          req.addResource(with: .photo, data: data, options: nil)
-          marque = req.placeholderForCreatedAsset?.localIdentifier
-          // L'album n'est qu'un rangement : sans lui la photo existe
-          // quand même, dans la pellicule.
-          if let c = collection,
-             let ajout = PHAssetCollectionChangeRequest(for: c),
-             let p = req.placeholderForCreatedAsset {
-            ajout.addAssets([p] as NSArray)
-          }
-        }, completionHandler: { ok, _ in
-          suite(ok ? marque : nil)
-        })
+  private func archiver(_ data: Data,
+                        suite: @escaping (String?, PHAuthorizationStatus) -> Void) {
+    Self.autoriser { statut in
+      switch statut {
+      case .authorized:
+        self.album { collection in
+          self.deposer(data, dans: collection) { id in suite(id, statut) }
+        }
+      case .limited:
+        self.deposer(data, dans: nil) { id in suite(id, statut) }
+      default:
+        suite(nil, statut)
       }
     }
   }
 
-  /// L'image d'un identifiant durable, en JPEG, côté long borné.
+  /// Crée l'image dans la photothèque, dans l'album s'il y en a un.
+  private func deposer(_ data: Data,
+                       dans collection: PHAssetCollection?,
+                       suite: @escaping (String?) -> Void) {
+    var marque: String?
+    PHPhotoLibrary.shared().performChanges({
+      let req = PHAssetCreationRequest.forAsset()
+      req.addResource(with: .photo, data: data, options: nil)
+      marque = req.placeholderForCreatedAsset?.localIdentifier
+      // L'album n'est qu'un rangement : sans lui la photo existe
+      // quand même, dans la pellicule.
+      if let c = collection,
+         let ajout = PHAssetCollectionChangeRequest(for: c),
+         let p = req.placeholderForCreatedAsset {
+        ajout.addAssets([p] as NSArray)
+      }
+    }, completionHandler: { ok, _ in
+      suite(ok ? marque : nil)
+    })
+  }
+
+  /**
+   L'image d'un identifiant durable, en JPEG, côté long borné.
+
+   On ne relit QUE nos identifiants — ceux que le scan a retenus à la prise
+   de vue : jamais de parcours de la photothèque. En accès limité, c'est
+   d'ailleurs tout ce qu'iOS laisse voir.
+   */
   private func imageDe(_ id: String,
                        maxSide: CGFloat,
                        suite: @escaping (UIImage?) -> Void) {
     guard let asset = PHAsset.fetchAssets(
-      withLocalIdentifiers: [id], options: nil,
+      withLocalIdentifiers: [id], options: nil
     ).firstObject else {
       suite(nil)
       return
@@ -239,8 +354,20 @@ class RoomScanPhoto: NSObject {
       for: asset,
       targetSize: CGSize(width: maxSide, height: maxSide),
       contentMode: .aspectFit,
-      options: options,
+      options: options
     ) { image, _ in suite(image) }
+  }
+
+  /// La réponse de `restorePhoto`, typée une fois pour toutes : un littéral
+  /// mêlant `NSNull` et `String` ne s'infère pas tout seul.
+  private static func relue(_ chemin: String?, _ acces: String) -> [String: Any] {
+    var r: [String: Any] = ["acces": acces]
+    if let chemin = chemin {
+      r["path"] = chemin
+    } else {
+      r["path"] = NSNull()
+    }
+    return r
   }
 
   /**
@@ -250,19 +377,38 @@ class RoomScanPhoto: NSObject {
    plus, mais l'identifiant, lui, a voyagé avec le scan. On réécrit l'image
    dans Documents et l'on rend son nouveau chemin — le reste de
    l'application ne voit qu'un fichier, comme avant.
+
+   Rend `{ path, acces }` : `path` vaut `null` quand l'image n'a pas pu être
+   relue, et `acces` dit pourquoi — refus, accès limité (la photo existe
+   peut-être, mais hors de la sélection), ou accès complet (elle a été
+   effacée des Photos). L'accès est demandé ICI s'il ne l'a jamais été :
+   après une réinstallation, c'est la première fois qu'on en a besoin, et
+   c'est l'utilisateur qui vient d'ouvrir la photo — jamais une demande
+   implicite, cachée dans une lecture.
    */
   @objc func restorePhoto(_ id: String,
                           resolve: @escaping RCTPromiseResolveBlock,
                           reject: @escaping RCTPromiseRejectBlock) {
-    imageDe(id, maxSide: 1600) { image in
-      guard let image = image else {
-        resolve(nil)
+    Self.autoriser { statut in
+      let acces = Self.mot(statut)
+      guard statut == .authorized || statut == .limited else {
+        resolve(Self.relue(nil, acces))
         return
       }
-      // La photothèque rend l'image sur le fil principal : l'écriture part
-      // dans l'atelier (voir `atelier`).
-      Self.atelier.async {
-        resolve(self.save(image)?.chemin)
+      self.imageDe(id, maxSide: 1600) { image in
+        guard let image = image else {
+          resolve(Self.relue(nil, acces))
+          return
+        }
+        // La photothèque rend l'image sur le fil principal : l'écriture part
+        // dans l'atelier (voir `atelier`).
+        Self.atelier.async {
+          if let chemin = self.save(image)?.chemin {
+            resolve(Self.relue(chemin, acces))
+          } else {
+            resolve(Self.relue(nil, acces))
+          }
+        }
       }
     }
   }
@@ -312,16 +458,21 @@ class RoomScanPhoto: NSObject {
 
    `nil` d'un bloc quand l'utilisateur a renoncé. L'identifiant seul peut
    manquer — accès à la photothèque refusé — sans que le relevé en souffre :
-   la photo est alors simplement mortelle, comme avant.
+   la photo est alors simplement mortelle, comme avant. `acces` dit l'état
+   de l'autorisation (voir `mot`), pour que le JS l'explique.
    */
-  private func finish(_ path: String?, asset: String? = nil) {
+  private func finish(_ path: String?, asset: String? = nil, acces: String? = nil) {
     guard let path = path else {
       resolve?(nil)
       resolve = nil
       reject = nil
       return
     }
-    resolve?(["path": path, "asset": asset as Any])
+    // Les clés absentes plutôt que nulles : le JS lit `prise.asset?`.
+    var prise: [String: Any] = ["path": path]
+    if let asset = asset { prise["asset"] = asset }
+    if let acces = acces { prise["acces"] = acces }
+    resolve?(prise)
     resolve = nil
     reject = nil
   }
@@ -394,8 +545,11 @@ extension RoomScanPhoto: UIImagePickerControllerDelegate, UINavigationController
             échoue, le relevé garde sa photo. On ne perd jamais l'image pour
             une question de permission.
           */
-          self.archiver(fait.donnees) { id in
-            DispatchQueue.main.async { self.finish(fait.chemin, asset: id) }
+          self.archiver(fait.donnees) { id, statut in
+            let acces = Self.mot(statut)
+            DispatchQueue.main.async {
+              self.finish(fait.chemin, asset: id, acces: acces)
+            }
           }
         }
       }

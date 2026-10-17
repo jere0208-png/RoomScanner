@@ -203,6 +203,7 @@ import {
   type SpotAxis,
 } from '../geometry/ceiling';
 import { haptic } from '../ui/haptic';
+import { annoncerAccesPhotos } from '../ui/photos';
 import { CeilingIcon } from '../components/CeilingIcon';
 import { rubanLeLongDuMur, rubanPeripherique, rubanSousLesMeubles } from '../geometry/ruban';
 import {
@@ -3461,6 +3462,9 @@ export function ResultScreen() {
     if (!prise) return;
     useScanStore.getState().addPhoto(wallId, segLength(w) / 2, prise.path, prise.asset);
     haptic('succes');
+    // Refus ou accès limité aux Photos : on le dit (une fois), au lieu de
+    // laisser croire que la photo est dans l'album « EchoPlan ».
+    annoncerAccesPhotos(prise);
   };
 
   /**

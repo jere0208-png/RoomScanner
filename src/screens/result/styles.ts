@@ -394,6 +394,19 @@ export const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   },
   photoLegende: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', flex: 1 },
   photoSuppr: { color: '#FF6B6B', fontSize: 13, fontWeight: '600' },
+  /* Pourquoi la photo manque, posé sur le fond noir de la fiche. */
+  photoManque: {
+    position: 'absolute',
+    top: 72,
+    left: 20,
+    right: 20,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    gap: 10,
+  },
+  photoManqueTexte: { color: '#FFFFFF', fontSize: 14, lineHeight: 20 },
+  photoManqueGeste: { color: '#7FB2FF', fontSize: 14, fontWeight: '700' },
   /**
    * Le filigrane suit la forme du logotype : deux lignes, pas une bande.
    * Pas de teinte non plus — les ondes du dessin ne survivraient pas à un

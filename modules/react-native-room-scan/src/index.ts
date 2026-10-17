@@ -134,6 +134,29 @@ export interface FloorData {
   ortho?: { path: string; minX: number; minZ: number; maxX: number; maxZ: number; y?: number; couverture?: number };
 }
 
+/**
+ * L'ACCÈS À LA PHOTOTHÈQUE, tel que le natif le rend.
+ *
+ * - `complet` : les photos de repérage vont dans l'album « EchoPlan » ;
+ * - `limite` : elles vont dans la pellicule, et l'app ne relit que celles
+ *   qu'elle a créées (pas d'album : iOS ne le permet pas dans ce mode) ;
+ * - `refuse` : elles restent dans l'app, et partent avec elle ;
+ * - `indetermine` : la question n'a pas encore été posée.
+ *
+ * Même liste que dans `src/ui/photos.ts`, qui ne peut pas importer ce module.
+ */
+export type AccesPhotos = 'complet' | 'limite' | 'refuse' | 'indetermine';
+
+/** Ce que rend une photo de repérage (voir `RoomScan.takePhoto`). */
+export interface PriseDePhoto {
+  /** Le fichier de cache, dans les Documents de l'app. */
+  path: string;
+  /** L'identifiant durable dans la photothèque, quand elle l'a reçue. */
+  asset?: string;
+  /** L'état de l'accès aux Photos après la prise. */
+  acces?: AccesPhotos;
+}
+
 export interface ScanUpdate {
   wallCount: number;
   objectCount: number;
@@ -690,8 +713,12 @@ export const RoomScan = {
    *
    * `null` si l'utilisateur annule ou si l'appareil n'a pas de caméra
    * (simulateur).
+   *
+   * `acces` dit l'état de l'accès aux Photos après la prise — demandé, en
+   * accès complet, à la toute première photo (voir `RoomScanPhoto.swift`) :
+   * l'écran explique un refus ou un accès limité (`annoncerAccesPhotos`).
    */
-  async takePhoto(): Promise<{ path: string; asset?: string } | null> {
+  async takePhoto(): Promise<PriseDePhoto | null> {
     if (Platform.OS !== 'ios' || !NativeModules.RoomScanPhoto) return null;
     // La caméra a pu être refusée au scan : sans cette demande, le
     // sélecteur s'ouvrait sur un écran noir, sans un mot d'explication.

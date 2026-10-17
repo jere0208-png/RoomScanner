@@ -14,15 +14,42 @@
  * pas est un mensonge écrit noir sur blanc.
  */
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { useScanStore } from '../store/scanStore';
 import { radius, shadowCard, useTheme, type Palette } from '../theme';
+import {
+  choisirPhotosVisibles,
+  lireAccesPhotos,
+  ouvrirReglagesPhotos,
+  type AccesPhotos,
+} from '../ui/photos';
 
 /** L'adresse à qui l'on écrit — la même que le tchat du service client. */
 export const COURRIEL_SUPPORT = 'echoplansupport@gmail.com';
+
+/** Le titre de la section des photos : l'état de l'accès s'affiche dessous. */
+const TITRE_PHOTOS = 'Vos photos de repérage restent sur votre appareil';
+
+/**
+ * L'ÉTAT DE L'ACCÈS AUX PHOTOS, dit en clair — et le geste qui l'élargit.
+ *
+ * Relevé du patron : l'album « EchoPlan » doit fonctionner vraiment. Quand
+ * il ne peut pas — accès limité ou refusé —, c'est ici qu'on vient voir
+ * pourquoi, et d'ici qu'on le répare.
+ */
+export const ETAT_ACCES_PHOTOS: Record<AccesPhotos, string> = {
+  complet: 'Accès complet : vos photos vont dans l’album « EchoPlan ».',
+  limite:
+    'Accès limité : vos photos sont gardées, mais sans album. Donnez l’accès ' +
+    'complet dans les Réglages pour les ranger dans « EchoPlan ».',
+  refuse:
+    'Accès refusé : vos photos restent dans l’application, et seraient ' +
+    'perdues si vous la supprimiez.',
+  indetermine: 'Pas encore demandé : la question viendra à votre première photo.',
+};
 
 const SECTIONS: { titre: string; texte: string }[] = [
   {
@@ -34,14 +61,21 @@ const SECTIONS: { titre: string; texte: string }[] = [
       'c’est voulu — un chantier n’a pas toujours de réseau.',
   },
   {
-    titre: 'Vos photos de mur restent sur votre appareil',
+    titre: TITRE_PHOTOS,
     texte:
-      'Les photos de mur sont rangées dans votre photothèque, dans l’album ' +
-      '« EchoPlan ». Elles vous appartiennent : elles suivent vos ' +
-      'sauvegardes iCloud et survivent à une réinstallation. Aucune de ces ' +
-      'images n’est envoyée à nos serveurs, ni à personne d’autre. Une ' +
-      'seule exception, et seulement à votre demande : la page d’un plan ' +
-      'papier que vous faites lire (ci-dessous).',
+      'À votre première photo de repérage, EchoPlan vous demande l’accès à ' +
+      'vos Photos. Avec l’accès complet, vos photos sont rangées dans ' +
+      'l’album « EchoPlan » de votre photothèque : elles vous appartiennent, ' +
+      'suivent vos sauvegardes iCloud et survivent à une réinstallation. ' +
+      'EchoPlan ne relit que les photos qu’il a prises, et ne parcourt ' +
+      'jamais les autres. Avec l’accès limité, elles sont enregistrées dans ' +
+      'la pellicule, sans album (iOS ne le permet pas). Si vous refusez, ' +
+      'elles restent dans l’application et disparaissent avec elle. Les ' +
+      'photos prises automatiquement pendant le scan, elles, restent ' +
+      'toujours dans l’application. Aucune de ces images n’est envoyée à ' +
+      'nos serveurs, ni à personne d’autre. Une seule exception, et ' +
+      'seulement à votre demande : la page d’un plan papier que vous ' +
+      'faites lire (ci-dessous).',
   },
   {
     titre: 'La lecture d’un plan papier, et elle seule',
@@ -105,6 +139,52 @@ const SECTIONS: { titre: string; texte: string }[] = [
   },
 ];
 
+/**
+ * L'accès aux Photos, relu à l'ouverture et à chaque retour dans l'app :
+ * on revient des Réglages, la ligne doit déjà dire le nouvel état. Rien
+ * hors iOS — il n'y a alors pas de photothèque à expliquer.
+ */
+function AccesPhotosLigne({ s }: { s: ReturnType<typeof themed> }) {
+  const [acces, setAcces] = React.useState<AccesPhotos | null>(null);
+  React.useEffect(() => {
+    let vivant = true;
+    const relire = () => {
+      lireAccesPhotos().then((a) => {
+        if (vivant) setAcces(a);
+      });
+    };
+    relire();
+    const abo = AppState.addEventListener?.('change', (etat) => {
+      if (etat === 'active') relire();
+    });
+    return () => {
+      vivant = false;
+      abo?.remove?.();
+    };
+  }, []);
+  if (!acces) return null;
+  return (
+    <View style={s.acces}>
+      <Text style={s.accesTexte}>{ETAT_ACCES_PHOTOS[acces]}</Text>
+      {acces === 'limite' && (
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => {
+            choisirPhotosVisibles().then((a) => a && setAcces(a));
+          }}>
+          <Text style={s.accesGeste}>Choisir les photos visibles</Text>
+        </Pressable>
+      )}
+      {(acces === 'limite' || acces === 'refuse') && (
+        <Pressable accessibilityRole="button" hitSlop={8} onPress={ouvrirReglagesPhotos}>
+          <Text style={s.accesGeste}>Ouvrir les Réglages</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
 export function ConfidentialiteScreen() {
   const c = useTheme();
   const s = themed(c);
@@ -146,6 +226,7 @@ export function ConfidentialiteScreen() {
           <View key={sec.titre} style={s.bloc}>
             <Text style={s.blocTitre}>{sec.titre}</Text>
             <Text style={s.blocTexte}>{sec.texte}</Text>
+            {sec.titre === TITRE_PHOTOS && <AccesPhotosLigne s={s} />}
           </View>
         ))}
         <Text style={s.contact}>{COURRIEL_SUPPORT}</Text>
@@ -201,6 +282,15 @@ const themed = (c: Palette) =>
       lineHeight: 19,
       marginTop: 6,
     },
+    acces: {
+      marginTop: 10,
+      paddingTop: 10,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: c.line,
+      gap: 8,
+    },
+    accesTexte: { color: c.ink, fontSize: 13.5, lineHeight: 19, fontWeight: '600' },
+    accesGeste: { color: c.blue, fontSize: 13.5, fontWeight: '700' },
     contact: {
       color: c.blue,
       fontSize: 13.5,
