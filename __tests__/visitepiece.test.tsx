@@ -101,8 +101,9 @@ describe('dans la visite', () => {
     )[0];
     expect(aller).toBeDefined();
     act(() => aller.props.onPress());
+    // La caméra se pose sous le voile du fondu (voir `FONDU_PIECE_MONTEE`).
     act(() => {
-      jest.advanceTimersByTime(50);
+      jest.advanceTimersByTime(200);
     });
     expect(camera()[0]).toBeGreaterThan(6);
     expect(camera()[0]).toBeLessThan(9);

@@ -14,6 +14,13 @@
  * sort (meubles de biais, écrasés, murs obliques, rayons frôlant un coin).
  *
  * Puis il mesure : l'ancien calcul et le nouveau, sur le même plan lourd.
+ *
+ * LE RECUL D'ENTRÉE A CHANGÉ, VOLONTAIREMENT (revue « 3D / visite » : « on
+ * entre le nez contre un fauteuil ») : il ne va plus toujours au plus loin,
+ * il retient le recul qui éloigne le plus du meuble visible le plus proche
+ * (voir `reculDEntree`, éprouvé dans `gain-visite.test.ts`). L'ancien calcul
+ * recopié ici finit donc par le MÊME recul — ce banc juge le lancer de
+ * rayons et le tri des obstacles, pas le recul.
  */
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -23,6 +30,7 @@ import {
   courseLibre,
   obstaclesDeLaVisite,
   pointDeDepart,
+  reculDEntree,
   type Obstacle,
 } from '../src/geometry/exploration';
 import { roomParts, type Pt, type RoomShape, type WallSeg } from '../src/geometry/floorplan';
@@ -92,7 +100,7 @@ function ancienneCourse(at: Pt, t: number, obstacles: Obstacle[], rayon = RAYON_
   return course;
 }
 
-/** `pointDeDepart` d'avant (commit e155484), recopié sans y toucher. */
+/** `pointDeDepart` d'avant (commit e155484), recopié sans y toucher — sauf le recul, voir l'en-tête. */
 function ancienPointDeDepart(
   walls: WallSeg[],
   rooms: RoomShape[],
@@ -151,12 +159,8 @@ function ancienPointDeDepart(
     }
   }
 
-  let ici: Pt = at;
-  for (let recul = 0.05; recul <= 1.5 + 1e-9; recul += 0.05) {
-    const q: Pt = { x: ici.x - Math.cos(yaw) * 0.05, z: ici.z - Math.sin(yaw) * 0.05 };
-    if (!recevable(q, rayon * 2)) break;
-    ici = q;
-  }
+  // Le recul : le nouveau, sur l'ancien test de recevabilité (voir l'en-tête).
+  const ici = reculDEntree(at, yaw, (q) => recevable(q, rayon * 2), obstacles, contour);
   return { at: ici, yaw };
 }
 

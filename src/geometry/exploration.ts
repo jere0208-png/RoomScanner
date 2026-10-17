@@ -102,8 +102,16 @@ const fini = (n: number) => Number.isFinite(n);
  * comptée que si elle est VRAIMENT sur ce mur — à moins de 35 cm de son axe,
  * et dans sa longueur — : un relevé place parfois une porte sur un retour
  * voisin, et elle percerait sinon le mauvais pan.
+ *
+ * La mini-carte de la visite s'en sert aussi, pour couper son trait aux
+ * portes (voir `traitsDeLaCarte`) : la même règle, sans la marge des
+ * collisions — le trou dessiné a la largeur de la porte.
  */
-function trousDuMur(w: WallSeg, openings: WallSeg[]): { de: number; a: number }[] {
+export function trousDuMur(
+  w: WallSeg,
+  openings: WallSeg[],
+  marge = MARGE_EMBRASURE,
+): { de: number; a: number }[] {
   const len = segLength(w);
   if (len < 1e-6) return [];
   const ux = (w.b.x - w.a.x) / len;
@@ -116,8 +124,8 @@ function trousDuMur(w: WallSeg, openings: WallSeg[]): { de: number; a: number }[
     if (ecart > 0.35) continue;
     const ta = (o.a.x - w.a.x) * ux + (o.a.z - w.a.z) * uz;
     const tb = (o.b.x - w.a.x) * ux + (o.b.z - w.a.z) * uz;
-    const de = Math.max(0, Math.min(ta, tb) - MARGE_EMBRASURE);
-    const a = Math.min(len, Math.max(ta, tb) + MARGE_EMBRASURE);
+    const de = Math.max(0, Math.min(ta, tb) - marge);
+    const a = Math.min(len, Math.max(ta, tb) + marge);
     if (a - de > 0.05) out.push({ de, a });
   }
   return out.sort((x, y) => x.de - y.de);
@@ -296,11 +304,14 @@ function bloque(p: Pt, o: Obstacle, rayon: number): boolean {
  * plus proche. Repoussé « depuis ses bords » comme un point du dehors, un
  * point du dedans serait renvoyé vers l'intérieur, et enfermé.
  */
-function resoudre(p0: Pt, precedent: Pt, obstacles: Obstacle[], rayon: number): Pt {
+function resoudre(p0: Pt, precedent: Pt, obstacles: Obstacle[], rayon: number, garde: Garde | null = null): Pt {
   let p = p0;
+  if (horsDeLaGarde(garde, p)) return p;
   for (let passe = 0; passe < 8; passe++) {
     let bouge = false;
     for (const o of obstacles) {
+      // Repoussé hors de la zone triée : le calcul repartira sur tout le niveau.
+      if (bouge && horsDeLaGarde(garde, p)) return p;
       if (o.kind === 'mur') {
         const c = plusProcheSurSegment(p, o.a, o.b);
         const dx = p.x - c.x;
@@ -347,8 +358,27 @@ function resoudre(p0: Pt, precedent: Pt, obstacles: Obstacle[], rayon: number): 
       }
     }
     if (!bouge) break;
+    if (horsDeLaGarde(garde, p)) return p;
   }
   return p;
+}
+
+/**
+ * LA ZONE OÙ LES OBSTACLES ONT ÉTÉ TRIÉS — voir `deplacer`. Un point qui en
+ * sort la fait lever : le pas est alors refait sur tous les obstacles.
+ */
+interface Garde {
+  c: Pt;
+  portee: number;
+  sorti: boolean;
+}
+
+/** Ce point sort-il de la zone triée ? (Un nombre non fini en sort toujours.) */
+function horsDeLaGarde(garde: Garde | null, p: Pt): boolean {
+  if (!garde) return false;
+  if (Math.hypot(p.x - garde.c.x, p.z - garde.c.z) <= garde.portee) return false;
+  garde.sorti = true;
+  return true;
 }
 
 /**
@@ -373,13 +403,54 @@ export function deplacer(
 ): Pt {
   if (!fini(depuis.x) || !fini(depuis.z)) return depuis;
   if (!fini(vers.x) || !fini(vers.z)) return { x: depuis.x, z: depuis.z };
-  let p = resoudre({ x: depuis.x, z: depuis.z }, depuis, obstacles, rayon);
+  /*
+    SEULS LES OBSTACLES PROCHES DU PAS — revue « 3D / visite » : chaque image
+    de marche éprouvait TOUS les obstacles du niveau, jusqu'à huit passes,
+    puis deux `estLibre` ; sur un grand logement meublé (408 obstacles),
+    4 ms par image sous Node, le double sous Hermes.
+
+    LE RÉSULTAT RESTE LE MÊME, AU BIT PRÈS. On ne garde que les obstacles
+    dont la boîte est à moins de la longueur du pas, plus deux épaules, plus
+    leur épaisseur, du point de départ (`obstaclesAPortee`) : tant que tous
+    les points éprouvés restent dans cette portée, un obstacle écarté n'en
+    arrête aucun — il ne repousse rien, ne bloque rien, et l'ordre des autres
+    est gardé. Si un point en sort (un visiteur repoussé de loin, hors d'un
+    meuble glissé sous ses pieds), la garde le voit et le pas est refait sur
+    tout le niveau, comme avant.
+  */
+  const portee = Math.hypot(vers.x - depuis.x, vers.z - depuis.z) + 2 * Math.abs(rayon);
+  if (fini(portee) && fini(rayon)) {
+    const proches = obstaclesAPortee(obstacles, depuis, portee, rayon);
+    if (proches.length < obstacles.length) {
+      const garde: Garde = { c: depuis, portee, sorti: false };
+      const p = deplacerParmi(depuis, vers, proches, rayon, garde);
+      if (!garde.sorti) return p;
+    }
+  }
+  return deplacerParmi(depuis, vers, obstacles, rayon, null);
+}
+
+/**
+ * LE PAS SUR TOUS LES OBSTACLES, sans tri — la référence de `deplacer`, que
+ * le banc compare au bit près.
+ */
+export function deplacerParTous(depuis: Pt, vers: Pt, obstacles: Obstacle[], rayon = RAYON_VISITEUR): Pt {
+  if (!fini(depuis.x) || !fini(depuis.z)) return depuis;
+  if (!fini(vers.x) || !fini(vers.z)) return { x: depuis.x, z: depuis.z };
+  return deplacerParmi(depuis, vers, obstacles, rayon, null);
+}
+
+/** Le pas lui-même, en tronçons — sous la garde éventuelle d'une zone triée. */
+function deplacerParmi(depuis: Pt, vers: Pt, obstacles: Obstacle[], rayon: number, garde: Garde | null): Pt {
+  let p = resoudre({ x: depuis.x, z: depuis.z }, depuis, obstacles, rayon, garde);
+  if (garde?.sorti) return p;
   const dx = vers.x - depuis.x;
   const dz = vers.z - depuis.z;
   const n = Math.max(1, Math.ceil(Math.hypot(dx, dz) / (rayon / 2)));
   for (let i = 0; i < n; i++) {
     const precedent = p;
-    p = resoudre({ x: p.x + dx / n, z: p.z + dz / n }, precedent, obstacles, rayon);
+    p = resoudre({ x: p.x + dx / n, z: p.z + dz / n }, precedent, obstacles, rayon, garde);
+    if (garde?.sorti) return p;
     /*
       UN PASSAGE PLUS ÉTROIT QUE SOI NE S'OUVRE PAS — entre le dos d'un
       canapé et le mur, 35 cm pour une carrure de 36 : chaque appui repousse
@@ -494,6 +565,54 @@ function obstaclesProches(obstacles: Obstacle[], c: Pt, portee: number, marge: n
     const loin = portee + (o.kind === 'mur' ? Math.abs(o.demi) : 0) + Math.abs(marge) + JEU;
     return !(distanceABoite(o, c) >= loin);
   });
+}
+
+/**
+ * LES BOÎTES DES OBSTACLES, CALCULÉES UNE FOIS PAR LISTE — cinq nombres
+ * chacune (x0, x1, z0, z1, épaisseur), NaN pour un obstacle aux nombres non
+ * finis. La marche les relit à chaque image : les recalculer, ce serait
+ * recréer des centaines de petits objets soixante fois par seconde.
+ */
+const boitesEnCache = new WeakMap<Obstacle[], Float64Array>();
+function boitesDesObstacles(obstacles: Obstacle[]): Float64Array {
+  const deja = boitesEnCache.get(obstacles);
+  if (deja && deja.length === obstacles.length * 5) return deja;
+  const out = new Float64Array(obstacles.length * 5);
+  for (let i = 0; i < obstacles.length; i++) {
+    const o = obstacles[i];
+    if (!finitude(o)) {
+      out.fill(NaN, i * 5, i * 5 + 5);
+      continue;
+    }
+    const b = boiteDe(o);
+    out[i * 5] = b.x0;
+    out[i * 5 + 1] = b.x1;
+    out[i * 5 + 2] = b.z0;
+    out[i * 5 + 3] = b.z1;
+    out[i * 5 + 4] = o.kind === 'mur' ? Math.abs(o.demi) : 0;
+  }
+  boitesEnCache.set(obstacles, out);
+  return out;
+}
+
+/**
+ * `obstaclesProches`, sur les boîtes gardées en cache — le même tri, au
+ * nombre près (même distance, même seuil), pour la marche.
+ */
+function obstaclesAPortee(obstacles: Obstacle[], c: Pt, portee: number, marge: number): Obstacle[] {
+  const b = boitesDesObstacles(obstacles);
+  const out: Obstacle[] = [];
+  for (let i = 0; i < obstacles.length; i++) {
+    const x0 = b[i * 5];
+    if (Number.isNaN(x0)) {
+      out.push(obstacles[i]);
+      continue;
+    }
+    const loin = portee + b[i * 5 + 4] + Math.abs(marge) + JEU;
+    const d = Math.hypot(Math.max(x0 - c.x, 0, c.x - b[i * 5 + 1]), Math.max(b[i * 5 + 2] - c.z, 0, c.z - b[i * 5 + 3]));
+    if (!(d >= loin)) out.push(obstacles[i]);
+  }
+  return out;
 }
 
 /** Le côté d'une case de `casesDesObstacles` (m). */
@@ -816,13 +935,117 @@ export function pointDeDepart(
     cloison. Les visites des agences commencent autrement — depuis le seuil,
     la pièce entière dans le champ. On recule donc dans le dos du regard,
     tant qu'on reste dans la pièce et à deux épaules de tout, jusqu'à un mètre
-    et demi : la profondeur devant soi grandit d'autant.
+    et demi : la profondeur devant soi grandit d'autant — sans finir le nez
+    contre un fauteuil (voir `reculDEntree`).
   */
+  return { at: reculDEntree(at, yaw, (q) => recevable(q, rayon * 2), obstacles, contour), yaw };
+}
+
+/**
+ * AU-DELÀ DE 1,80 M, UN MEUBLE DEVANT SOI NE BOUCHE PLUS LA VUE : il est
+ * dans la pièce, pas dans l'objectif. Tous les reculs qui en sont là se
+ * valent, et le plus profond l'emporte.
+ */
+export const DEGAGEMENT_SUFFISANT = 1.8;
+/**
+ * LE CHAMP OÙ UN MEUBLE SE VOIT — ±50° autour du regard. L'écran en montre
+ * ±34° à l'horizon (68° de large), davantage au bas de l'image, où un
+ * accoudoir proche s'étire sous le grand angle.
+ */
+const DEMI_CHAMP_VU = (50 * Math.PI) / 180;
+/** Le pas auquel on parcourt le bord d'un meuble pour savoir s'il se voit (m). */
+const PAS_DU_BORD = 0.1;
+/**
+ * CE QUE VAUT UN MÈTRE DE RECUL, en mètres de dégagement : 20 cm. Reculer
+ * d'un mètre et demi vaut qu'un meuble soit 30 cm plus près — pas qu'il
+ * remplisse la moitié de l'image.
+ */
+const POIDS_DU_RECUL = 0.2;
+
+/**
+ * LE MEUBLE VISIBLE LE PLUS PROCHE — sa distance (m) depuis `at`, en
+ * regardant vers `yaw` (angle du plan), plafonnée à `DEGAGEMENT_SUFFISANT`.
+ *
+ * Seuls comptent les meubles (un mur ne « bouche » pas une pièce : il la
+ * borde), ceux de la pièce quand on la connaît (un meuble de la chambre
+ * voisine est derrière la cloison), et les points de leur bord qui tombent
+ * dans le champ.
+ */
+export function degagementDevant(at: Pt, yaw: number, obstacles: Obstacle[], contour?: Pt[]): number {
+  const ux = Math.cos(yaw);
+  const uz = Math.sin(yaw);
+  const champ = Math.cos(DEMI_CHAMP_VU);
+  let mieux = DEGAGEMENT_SUFFISANT;
+  if (!fini(at.x) || !fini(at.z) || !fini(ux) || !fini(uz)) return mieux;
+  for (const o of obstacles) {
+    if (o.kind !== 'meuble' || !finitude(o)) continue;
+    if (!(distanceABoite(o, at) < mieux)) continue;
+    const c = o.coins;
+    if (contour) {
+      let cx = 0;
+      let cz = 0;
+      for (const q of c) {
+        cx += q.x / c.length;
+        cz += q.z / c.length;
+      }
+      if (!dedans({ x: cx, z: cz }, contour)) continue;
+    }
+    for (let i = 0; i < c.length; i++) {
+      const a = c[i];
+      const b = c[(i + 1) % c.length];
+      const n = Math.min(400, Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / PAS_DU_BORD)));
+      for (let k = 0; k < n; k++) {
+        const px = a.x + ((b.x - a.x) * k) / n - at.x;
+        const pz = a.z + ((b.z - a.z) * k) / n - at.z;
+        const d = Math.hypot(px, pz);
+        if (!(d < mieux)) continue;
+        if (d < 1e-9 || (px * ux + pz * uz) / d >= champ) mieux = d;
+      }
+    }
+  }
+  return mieux;
+}
+
+/**
+ * LE RECUL D'ENTRÉE — revue « 3D / visite » : « premier regard, on entre le
+ * nez contre un fauteuil ». Le recul allait toujours au plus loin (1,5 m)
+ * tant que le point restait recevable ; il s'arrêtait souvent juste à côté
+ * d'un fauteuil, qui prenait le quart bas de la première image, déformé par
+ * le grand angle. Beaucoup de meuble, peu de pièce.
+ *
+ * On ne se contente pas d'un seuil : parmi tous les reculs recevables (les
+ * mêmes qu'avant, de 5 cm en 5 cm), on retient celui qui ÉLOIGNE LE PLUS du
+ * meuble visible le plus proche, en gardant de la profondeur — chaque mètre
+ * reculé compte pour `POIDS_DU_RECUL` de dégagement, et à égalité le plus
+ * profond l'emporte. Sans meuble à moins de 1,80 m dans le champ, c'est le
+ * recul d'avant, au plus loin.
+ */
+export function reculDEntree(
+  at: Pt,
+  yaw: number,
+  recevable: (p: Pt) => boolean,
+  obstacles: Obstacle[],
+  contour?: Pt[],
+): Pt {
+  const reculs: Pt[] = [at];
   let ici: Pt = at;
   for (let recul = 0.05; recul <= 1.5 + 1e-9; recul += 0.05) {
     const q: Pt = { x: ici.x - Math.cos(yaw) * 0.05, z: ici.z - Math.sin(yaw) * 0.05 };
-    if (!recevable(q, rayon * 2)) break;
+    if (!recevable(q)) break;
     ici = q;
+    reculs.push(q);
   }
-  return { at: ici, yaw };
+  if (reculs.length === 1) return at;
+  // Les meubles qui peuvent tomber à moins de 1,80 m d'un des reculs.
+  const proches = obstaclesProches(obstacles, at, 1.5 + DEGAGEMENT_SUFFISANT, 0);
+  let choisi = ici;
+  let meilleur = -Infinity;
+  for (let i = reculs.length - 1; i >= 0; i--) {
+    const note = degagementDevant(reculs[i], yaw, proches, contour) + POIDS_DU_RECUL * 0.05 * i;
+    if (note > meilleur + 1e-9) {
+      meilleur = note;
+      choisi = reculs[i];
+    }
+  }
+  return choisi;
 }

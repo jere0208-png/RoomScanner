@@ -25,8 +25,9 @@
  * l'intérieur. La marche, elle, vit dans `geometry/exploration`, et s'éprouve
  * à la règle.
  */
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Image,
   Modal,
   Pressable,
@@ -44,7 +45,7 @@ import { Iso3DView } from './Iso3DView';
 import { SOLAIRES } from '../ui/solaires';
 import { floorsOf, useScanStore } from '../store/scanStore';
 import { useModeElec } from '../store/usage';
-import { filtrerAuNiveau, roomParts, type Pt } from '../geometry/floorplan';
+import { filtrerAuNiveau, roomParts, type Pt, type WallSeg } from '../geometry/floorplan';
 import { buildScene, type ScenePalette } from '../geometry/scene3d';
 import { cameraNative, maillageDeLaVisite } from '../geometry/visite3d';
 import { maillageDesMeubles } from '../geometry/modeles3d';
@@ -61,6 +62,7 @@ import {
   deplacer,
   obstaclesDeLaVisite,
   pointDeDepart,
+  trousDuMur,
 } from '../geometry/exploration';
 import { haptic, releaseHaptic } from '../ui/haptic';
 import { ombreBouton, radius, themedStyles, useTheme, type Palette } from '../theme';
@@ -161,6 +163,28 @@ const ARRET = 0.05;
 const VITESSE_NULLE = 0.05;
 /** La mini-carte suit à dix images par seconde : c'est un repère, pas un film. */
 const PERIODE_CARTE = 100;
+/**
+ * L'ENTRÉE ATTEND LA PREMIÈRE IMAGE — revue « 3D / visite » : sur un grand
+ * logement, la vue native reçoit tout le maillage et le bâtit avant sa
+ * première image ; on ne voyait qu'un fond uni, qu'on prenait pour une
+ * panne. Un voile de la couleur du ciel, la mini-carte et une ligne
+ * « Préparation de la visite… » tiennent la place, puis la 3D apparaît en
+ * fondu. Un binaire qui n'annonce pas sa première image lève le voile au
+ * bout de deux secondes et demie : il ne doit jamais masquer une visite
+ * déjà là.
+ */
+export const SECOURS_PREMIERE_IMAGE = 2500;
+/** Le fondu d'entrée : bref, de quoi ne pas voir la scène surgir d'un coup. */
+const FONDU_ENTREE = 180;
+/**
+ * « ALLER DANS » UNE PIÈCE : UN FONDU, PAS UN SAUT — revue « 3D / visite ».
+ * Le voile monte en 120 ms, la caméra se pose dessous, il redescend en
+ * 180 ms : 300 ms en tout, et l'œil comprend qu'il a changé de pièce.
+ */
+export const FONDU_PIECE_MONTEE = 120;
+const FONDU_PIECE_DESCENTE = 180;
+/** Le nom de la pièce d'arrivée reste affiché une seconde. */
+export const DUREE_NOM_DE_PIECE = 1000;
 /** Au centre, la manette ne fait rien : le pouce posé tremble toujours —
  *  quatre points, pas davantage, sur une manette plus courte. */
 const ZONE_MORTE = 0.09;
@@ -206,6 +230,138 @@ const reperes = (lacet: number) => ({
   droite: { x: -Math.cos(lacet), z: Math.sin(lacet) },
 });
 
+/** La vignette de la mini-carte : carrée, 112 points, et sa marge intérieure. */
+const TAILLE_CARTE = 112;
+const MARGE_CARTE = 10;
+
+/**
+ * LE CADRE DE LA MINI-CARTE — le plan CENTRÉ dans la vignette.
+ *
+ * Revue « 3D / visite » : le cadre prenait le plus grand côté du logement et
+ * ancrait le plan en haut à gauche ; un logement plus large que haut
+ * laissait vide le tiers bas de la vignette. L'échelle ne change pas (le plus
+ * grand côté tient toujours dans la vignette) ; c'est l'axe court qui se
+ * centre, de la moitié de l'espace libre.
+ */
+export function cadreDeLaCarte(
+  murs: { a: Pt; b: Pt }[],
+  taille = TAILLE_CARTE,
+  marge = MARGE_CARTE,
+): { x0: number; z0: number; k: number; dx: number; dy: number } {
+  const xs = murs.flatMap((m) => [m.a.x, m.b.x]);
+  const zs = murs.flatMap((m) => [m.a.z, m.b.z]);
+  const x0 = Math.min(...xs);
+  const z0 = Math.min(...zs);
+  const lx = Math.max(...xs) - x0;
+  const lz = Math.max(...zs) - z0;
+  const l = Math.max(lx, lz, 1);
+  const k = (taille - marge * 2) / l;
+  return { x0, z0, k, dx: marge + (taille - marge * 2 - lx * k) / 2, dy: marge + (taille - marge * 2 - lz * k) / 2 };
+}
+
+/**
+ * LES TRAITS DE LA MINI-CARTE — les murs, COUPÉS AUX PORTES.
+ *
+ * On cherche d'abord sur la carte où est la porte. Le trait s'interrompt
+ * donc là où l'on passe — une porte, ou un passage sans battant —, et c'est
+ * tout : ni arc de battant, ni fenêtre, qui chargeraient une vignette de
+ * onze centimètres (avis de l'architecte).
+ */
+export function traitsDeLaCarte(murs: WallSeg[], ouvertures: WallSeg[]): { a: Pt; b: Pt }[] {
+  const portes = ouvertures.filter((o) => o.type === 'door' || o.type === 'opening');
+  const out: { a: Pt; b: Pt }[] = [];
+  for (const w of murs) {
+    const len = Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z);
+    const trous = portes.length > 0 && len > 1e-6 ? trousDuMur(w, portes, 0) : [];
+    if (trous.length === 0) {
+      out.push({ a: w.a, b: w.b });
+      continue;
+    }
+    const point = (t: number): Pt => ({
+      x: w.a.x + ((w.b.x - w.a.x) * t) / len,
+      z: w.a.z + ((w.b.z - w.a.z) * t) / len,
+    });
+    let curseur = 0;
+    for (const trou of trous) {
+      if (trou.de > curseur + 1e-3) out.push({ a: point(curseur), b: point(trou.de) });
+      curseur = Math.max(curseur, trou.a);
+    }
+    if (curseur < len - 1e-3) out.push({ a: point(curseur), b: point(len) });
+  }
+  return out;
+}
+
+type CadreDeCarte = ReturnType<typeof cadreDeLaCarte>;
+const versLaCarte = (cadre: CadreDeCarte, p: Pt) => ({
+  x: cadre.dx + (p.x - cadre.x0) * cadre.k,
+  y: cadre.dy + (p.z - cadre.z0) * cadre.k,
+});
+
+/**
+ * LE FOND DE LA CARTE — la pièce où l'on est, puis les murs. Il ne change
+ * qu'avec le plan ou la pièce : pendant la marche, seuls le point et le
+ * cône se redessinent.
+ */
+const FondDeCarte = React.memo(function FondDeCarte({
+  traits,
+  cadre,
+  pieceIci,
+  teinte,
+}: {
+  traits: { a: Pt; b: Pt }[];
+  cadre: CadreDeCarte;
+  pieceIci: Pt[] | null;
+  teinte: Palette;
+}) {
+  const sol =
+    pieceIci && pieceIci.length >= 3
+      ? pieceIci
+          .map((p, i) => {
+            const q = versLaCarte(cadre, p);
+            return `${i === 0 ? 'M' : 'L'}${q.x} ${q.y}`;
+          })
+          .join(' ') + ' Z'
+      : null;
+  return (
+    <>
+      {/* La pièce où l'on se tient : une teinte très légère, sous les murs —
+          le point bleu reste ce qu'on voit d'abord. */}
+      {sol && <Path testID="carte-piece-ici" d={sol} fill={teinte.blue} opacity={0.1} />}
+      {traits.map((m, i) => {
+        const a = versLaCarte(cadre, m.a);
+        const b = versLaCarte(cadre, m.b);
+        return (
+          <Line
+            key={i}
+            x1={a.x}
+            y1={a.y}
+            x2={b.x}
+            y2={b.y}
+            stroke={teinte.ink}
+            strokeWidth={2}
+            strokeLinecap="round"
+            opacity={0.7}
+          />
+        );
+      })}
+    </>
+  );
+});
+
+/**
+ * CE QUE LA MINI-CARTE ÉCOUTE — la dernière pose, et qui la suit.
+ *
+ * Revue « 3D / visite » : la pose de la carte vivait dans l'état de tout
+ * l'écran ; dix fois par seconde, pendant la marche, React redessinait les
+ * 1 100 lignes de la visite — styles, mémos, pastilles, boutons, chaque
+ * trait de la carte — sur le fil même qui pose la caméra. Désormais la
+ * boucle remet la pose ici, et seule la carte se redessine.
+ */
+interface SourceDeCarte {
+  pose: Pose;
+  ecoute: ((p: Pose) => void) | null;
+}
+
 /**
  * LE POINT QUI SE BALADE — la mini-carte.
  *
@@ -213,32 +369,33 @@ const reperes = (lacet: number) => ({
  * le cône du regard. Elle ne tourne pas avec la tête, et c'est voulu : une
  * carte qui tourne ne se compare plus au plan qu'on vient de quitter.
  */
-function MiniCarte({
+const MiniCarte = React.memo(function MiniCarte({
   murs,
-  pose,
+  ouvertures,
+  pieceIci,
+  source,
   styles,
   teinte,
 }: {
-  murs: { a: Pt; b: Pt }[];
-  pose: Pose;
+  murs: WallSeg[];
+  ouvertures: WallSeg[];
+  pieceIci: Pt[] | null;
+  source: React.MutableRefObject<SourceDeCarte>;
   styles: ReturnType<typeof getStyles>;
   teinte: Palette;
 }) {
-  const T = 112;
-  const marge = 10;
-  const cadre = useMemo(() => {
-    const xs = murs.flatMap((m) => [m.a.x, m.b.x]);
-    const zs = murs.flatMap((m) => [m.a.z, m.b.z]);
-    const x0 = Math.min(...xs);
-    const z0 = Math.min(...zs);
-    const l = Math.max(Math.max(...xs) - x0, Math.max(...zs) - z0, 1);
-    return { x0, z0, k: (T - marge * 2) / l };
-  }, [murs]);
-  const px = (p: Pt) => ({
-    x: marge + (p.x - cadre.x0) * cadre.k,
-    y: marge + (p.z - cadre.z0) * cadre.k,
-  });
-  const ici = px(pose);
+  const [pose, setPose] = useState<Pose>(source.current.pose);
+  useEffect(() => {
+    const s = source.current;
+    s.ecoute = setPose;
+    setPose(s.pose);
+    return () => {
+      if (s.ecoute === setPose) s.ecoute = null;
+    };
+  }, [source]);
+  const cadre = useMemo(() => cadreDeLaCarte(murs), [murs]);
+  const traits = useMemo(() => traitsDeLaCarte(murs, ouvertures), [murs, ouvertures]);
+  const ici = versLaCarte(cadre, pose);
   const { avant } = reperes(pose.lacet);
   const demi = ((OUVERTURE_LARGEUR / 2) * Math.PI) / 180;
   const cone = (s: number) => {
@@ -253,35 +410,19 @@ function MiniCarte({
   const d = cone(1);
   return (
     <View style={styles.carte} pointerEvents="none" accessibilityLabel="Plan">
-      <Svg width={T} height={T}>
-        {murs.map((m, i) => {
-          const a = px(m.a);
-          const b = px(m.b);
-          return (
-            <Line
-              key={i}
-              x1={a.x}
-              y1={a.y}
-              x2={b.x}
-              y2={b.y}
-              stroke={teinte.ink}
-              strokeWidth={2}
-              strokeLinecap="round"
-              opacity={0.7}
-            />
-          );
-        })}
+      <Svg width={TAILLE_CARTE} height={TAILLE_CARTE}>
+        <FondDeCarte traits={traits} cadre={cadre} pieceIci={pieceIci} teinte={teinte} />
         <Path
           d={`M${ici.x} ${ici.y} L${g.x} ${g.y} L${d.x} ${d.y} Z`}
           fill={teinte.blue}
           opacity={0.22}
         />
-        <Circle cx={ici.x} cy={ici.y} r={6} fill="#FFFFFF" />
+        <Circle testID="carte-ici" cx={ici.x} cy={ici.y} r={6} fill="#FFFFFF" />
         <Circle cx={ici.x} cy={ici.y} r={4.5} fill={teinte.blue} />
       </Svg>
     </View>
   );
-}
+});
 
 /** Les murs côté pièce de la visite (voir `palette`). */
 export const MURS_DE_LA_VISITE = '#F6F1E8';
@@ -349,6 +490,15 @@ export function Exploration({
   const obstacles = useMemo(
     () => obstaclesDeLaVisite(walls, openings, objects, rooms),
     [walls, openings, objects, rooms],
+  );
+  const partiesDesPieces = useMemo(() => roomParts(walls, rooms).filter((p) => p.surface), [walls, rooms]);
+  const piecesNommees = useMemo(
+    () =>
+      partiesDesPieces.map((p, i) => ({
+        id: p.roomId,
+        nom: rooms.find((r) => r.id === p.roomId)?.name || `Pièce ${i + 1}`,
+      })),
+    [partiesDesPieces, rooms],
   );
 
   /*
@@ -465,8 +615,10 @@ export function Exploration({
   const manette = useRef({ x: 0, y: 0 });
   /** La vue en JavaScript (sans natif) : sa caméra vit dans l'état. */
   const [vue, setVue] = useState<Pose & { geste?: boolean }>(pose.current);
-  /** La mini-carte : la pose, dix fois par seconde. */
-  const [carte, setCarte] = useState<Pose>(pose.current);
+  /** La mini-carte : la pose, dix fois par seconde — remise à elle seule. */
+  const sourceCarte = useRef<SourceDeCarte>({ pose: pose.current, ecoute: null });
+  /** La pièce où l'on se tient : sa pastille se teinte, et suit le visiteur. */
+  const [pieceIci, setPieceIci] = useState<string | null>(null);
   /** La caméra d'ENTRÉE de la vue native — elle ne change qu'en entrant. */
   const [entree, setEntree] = useState<Pose>(pose.current);
   /** Sans régie native (ancien binaire), la caméra repasse par la propriété. */
@@ -479,6 +631,21 @@ export function Exploration({
     `visite-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
   ).current;
   const natifPret = natif && !!maille;
+
+  /*
+    LA CARTE SUIT SANS REDESSINER L'ÉCRAN — voir `SourceDeCarte`. La pose
+    part à la mini-carte seule ; l'écran ne se redessine que le jour où l'on
+    change de pièce (la pastille se teinte) — React ne fait rien d'un état
+    qui ne change pas.
+  */
+  const poserCarte = (p: Pose) => {
+    const src = sourceCarte.current;
+    src.pose = p;
+    src.ecoute?.(p);
+    setPieceIci(
+      partiesDesPieces.find((q) => q.surface && pointInPolygon({ x: p.x, z: p.z }, q.surface.pts))?.roomId ?? null,
+    );
+  };
 
   const { width: largeur, height: hauteur } = useWindowDimensions();
   const ouverture = ouvertureVerticale(largeur, hauteur);
@@ -580,7 +747,7 @@ export function Exploration({
     if (bouge) publier(false);
     if (bouge && ts - derniereCarte.current >= PERIODE_CARTE) {
       derniereCarte.current = ts;
-      setCarte({ ...pose.current });
+      poserCarte({ ...pose.current });
     }
 
     const actif = doigts.current.size > 0 || v.avant !== 0 || v.droite !== 0;
@@ -589,7 +756,7 @@ export function Exploration({
       enCours.current = false;
       releaseHaptic('butee');
       publier(true);
-      setCarte({ ...pose.current });
+      poserCarte({ ...pose.current });
       return;
     }
     requestAnimationFrame((t) => tic.current(t));
@@ -621,7 +788,7 @@ export function Exploration({
     // les z croissants. La conversion se fait ici, une fois.
     pose.current = { x: d.at.x, z: d.at.z, lacet: Math.PI / 2 - d.yaw, tangage: TANGAGE_DEPART };
     setVue({ ...pose.current });
-    setCarte({ ...pose.current });
+    poserCarte({ ...pose.current });
     setEntree({ ...pose.current });
     setSecours(null);
     setABouge(false);
@@ -629,40 +796,117 @@ export function Exploration({
     // doit pas téléporter le visiteur.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
+  /*
+    L'ENTRÉE ATTEND LA PREMIÈRE IMAGE — voir `SECOURS_PREMIERE_IMAGE`. Le
+    voile tient tant que la vue native n'a pas annoncé sa première image
+    (`onPremiereImage`, déjà émis pour la maquette), puis se lève en fondu.
+    Avec « Réduire les animations », il se retire d'un coup.
+  */
+  const reduit = useReduceMotion();
+  const vueNativeMontee = visible && walls.length > 0 && !!RoomScanVisite && !!maille;
+  const [premiereImage, setPremiereImage] = useState(false);
+  const [voileLeve, setVoileLeve] = useState(false);
+  const voileEntree = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!vueNativeMontee) {
+      setPremiereImage(false);
+      setVoileLeve(false);
+      voileEntree.setValue(1);
+      return;
+    }
+    const h = setTimeout(() => setPremiereImage(true), SECOURS_PREMIERE_IMAGE);
+    return () => clearTimeout(h);
+  }, [vueNativeMontee, voileEntree]);
+  useEffect(() => {
+    if (!premiereImage) return;
+    if (reduit) {
+      voileEntree.setValue(0);
+      setVoileLeve(true);
+      return;
+    }
+    const fondu = Animated.timing(voileEntree, { toValue: 0, duration: FONDU_ENTREE, useNativeDriver: true });
+    fondu.start(({ finished }) => {
+      if (finished) setVoileLeve(true);
+    });
+    return () => fondu.stop();
+    // `reduit` est lu à l'instant du fondu : le changer ensuite ne le rejoue pas.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [premiereImage, voileEntree]);
+  // Stable : la vue native ne doit recevoir aucune propriété nouvelle pour rien.
+  const surPremiereImage = useCallback(() => setPremiereImage(true), []);
+
+  /*
+    « ALLER DANS » : UN VOILE, LA POSE DESSOUS, LE NOM DE LA PIÈCE — voir
+    `FONDU_PIECE_MONTEE`. Le voile a la couleur du ciel de la visite, pas le
+    noir d'un écran qui s'éteint ; le nom de la pièce d'arrivée reste une
+    seconde. Avec « Réduire les animations » : une coupure franche.
+  */
+  const voilePiece = useRef(new Animated.Value(0)).current;
+  const [nomDeLaPiece, setNomDeLaPiece] = useState<string | null>(null);
+  const minuteurs = useRef<{ pose?: ReturnType<typeof setTimeout>; nom?: ReturnType<typeof setTimeout> }>({});
+  const oublierLesMinuteurs = () => {
+    if (minuteurs.current.pose) clearTimeout(minuteurs.current.pose);
+    if (minuteurs.current.nom) clearTimeout(minuteurs.current.nom);
+    minuteurs.current = {};
+  };
+
   // Démonté en pleine marche : la boucle s'arrête avec l'écran.
-  useEffect(() => () => arreterTout(), []);
+  useEffect(
+    () => () => {
+      arreterTout();
+      oublierLesMinuteurs();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+  // Refermée pendant un fondu : rien ne doit se poser, ni s'afficher, après.
+  useEffect(() => {
+    if (visible) return;
+    oublierLesMinuteurs();
+    voilePiece.stopAnimation();
+    voilePiece.setValue(0);
+    setNomDeLaPiece(null);
+  }, [visible, voilePiece]);
 
   /*
     ALLER DANS UNE PIÈCE, D'UN APPUI — correctif de l'audit : on ne
     choisissait pas la pièce de départ. Le visiteur s'y pose comme à
     l'entrée : au cœur de la pièce, face à sa profondeur.
   */
-  const allerDans = (roomId: string) => {
+  const allerDans = (roomId: string, nom: string) => {
     const d = pointDeDepart(walls, rooms, obstacles, undefined, roomId);
     if (!d) return;
     haptic('leger');
     arreterTout();
-    pose.current = { x: d.at.x, z: d.at.z, lacet: Math.PI / 2 - d.yaw, tangage: TANGAGE_DEPART };
-    setVue({ ...pose.current });
-    setCarte({ ...pose.current });
-    setEntree({ ...pose.current });
-    setSecours(null);
+    oublierLesMinuteurs();
+    voilePiece.stopAnimation();
+    const arriver = () => {
+      // Un pouce posé pendant le voile est oublié : la pose repart d'ici.
+      arreterTout();
+      pose.current = { x: d.at.x, z: d.at.z, lacet: Math.PI / 2 - d.yaw, tangage: TANGAGE_DEPART };
+      setVue({ ...pose.current });
+      poserCarte({ ...pose.current });
+      setEntree({ ...pose.current });
+      setSecours(null);
+      setNomDeLaPiece(nom);
+      minuteurs.current.nom = setTimeout(() => setNomDeLaPiece(null), DUREE_NOM_DE_PIECE);
+    };
+    if (reduit) {
+      voilePiece.setValue(0);
+      arriver();
+      return;
+    }
+    Animated.timing(voilePiece, { toValue: 1, duration: FONDU_PIECE_MONTEE, useNativeDriver: true }).start();
+    minuteurs.current.pose = setTimeout(() => {
+      minuteurs.current.pose = undefined;
+      arriver();
+      Animated.timing(voilePiece, { toValue: 0, duration: FONDU_PIECE_DESCENTE, useNativeDriver: true }).start();
+    }, FONDU_PIECE_MONTEE);
   };
-  const partiesDesPieces = useMemo(() => roomParts(walls, rooms).filter((p) => p.surface), [walls, rooms]);
-  const piecesNommees = useMemo(
-    () =>
-      partiesDesPieces.map((p, i) => ({
-        id: p.roomId,
-        nom: rooms.find((r) => r.id === p.roomId)?.name || `Pièce ${i + 1}`,
-      })),
-    [partiesDesPieces, rooms],
-  );
-  /** La pièce où l'on se tient : sa pastille se teinte, et suit le visiteur. */
-  const pieceIci = useMemo(
-    () =>
-      partiesDesPieces.find((p) => p.surface && pointInPolygon({ x: carte.x, z: carte.z }, p.surface.pts))?.roomId ??
-      null,
-    [partiesDesPieces, carte.x, carte.z],
+  /** La pièce où l'on est, sur la mini-carte : son contour, ou rien. */
+  const contourIci = useMemo(
+    () => partiesDesPieces.find((p) => p.roomId === pieceIci)?.surface?.pts ?? null,
+    [partiesDesPieces, pieceIci],
   );
 
   /*
@@ -841,7 +1085,6 @@ export function Exploration({
     chaque changement de pièce, la colonne glisse juste ce qu'il faut pour
     que le bouton teinté soit visible.
   */
-  const reduit = useReduceMotion();
   const colonne = useRef<ScrollView>(null);
   const hautsDesPieces = useRef(new Map<string, number>());
   const decalageColonne = useRef(0);
@@ -898,6 +1141,7 @@ export function Exploration({
               camera={cameraPlate}
               cle={cle}
               fond={fond}
+              onPremiereImage={surPremiereImage}
             />
           )}
           {/* Sans le natif (banc d'essai), la vue en JavaScript tient lieu. */}
@@ -921,6 +1165,29 @@ export function Exploration({
             </View>
           )}
         </View>
+
+        {/* L'entrée : le ciel de la visite, et ce qui se prépare dessous. */}
+        {vueNativeMontee && !voileLeve && (
+          <Animated.View
+            testID="voile-entree"
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, styles.voileEntree, { backgroundColor: fond, opacity: voileEntree }]}>
+            {!premiereImage && <Text style={styles.voileTexte}>Préparation de la visite…</Text>}
+          </Animated.View>
+        )}
+        {/* « Aller dans » : le voile du changement de pièce, transparent au repos. */}
+        <Animated.View
+          testID="voile-piece"
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: fond, opacity: voilePiece }]}
+        />
+        {nomDeLaPiece && (
+          <View style={styles.nomDePiece} pointerEvents="none" testID="nom-de-la-piece">
+            <Text style={styles.nomDePieceTexte} numberOfLines={1}>
+              {nomDeLaPiece}
+            </Text>
+          </View>
+        )}
 
         {/* Les deux pouces, une seule vue : voir « UN SEUL GESTE ». */}
         <View
@@ -984,7 +1251,9 @@ export function Exploration({
           {walls.length > 0 ? (
             <MiniCarte
               murs={walls}
-              pose={carte}
+              ouvertures={openings}
+              pieceIci={contourIci}
+              source={sourceCarte}
               styles={styles}
               teinte={teinte}
             />
@@ -1046,7 +1315,7 @@ export function Exploration({
                   hitSlop={{ top: PIECE_DEBORD, bottom: PIECE_DEBORD, left: 8, right: 8 }}
                   onLayout={(e) => hautsDesPieces.current.set(p.id, e.nativeEvent.layout.y)}
                   style={({ pressed }) => [styles.piece, ici && styles.pieceIci, pressed && styles.enfonce]}
-                  onPress={() => allerDans(p.id)}>
+                  onPress={() => allerDans(p.id, p.nom)}>
                   <Text style={[styles.pieceTexte, ici && styles.pieceTexteIci]} numberOfLines={1}>
                     {p.nom}
                   </Text>
@@ -1195,18 +1464,38 @@ const getStyles = themedStyles((c: Palette) =>
       paddingHorizontal: 14,
       paddingVertical: 8,
     },
-    /* Les repères de verre au repos : petits, dans les coins, translucides. */
+    /*
+      LES REPÈRES DISENT UN GESTE, PAS UN BOUTON — revue « 3D / visite » :
+      deux ronds blancs ombrés de 52 points, identiques au bouton photo du
+      milieu ; on s'attendait à pouvoir les toucher. Ils deviennent une
+      indication : un contour fin, un fond à peine teinté, sans ombre, un
+      peu plus petits. Seule la photo garde l'allure d'un bouton.
+    */
     repere: { position: 'absolute' },
-    repereGauche: { left: 26 },
-    repereDroit: { right: 26 },
+    repereGauche: { left: 30 },
+    repereDroit: { right: 30 },
     repereRond: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
-      backgroundColor: c.surface,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1.5,
+      borderColor: c.blue,
+      backgroundColor: `${c.blueSoft}8C`,
       alignItems: 'center',
       justifyContent: 'center',
-      ...ombreBouton,
     },
+    voileEntree: { alignItems: 'center', justifyContent: 'center' },
+    voileTexte: { color: c.inkSoft, fontSize: 15, fontWeight: '600' },
+    nomDePiece: {
+      position: 'absolute',
+      top: '42%',
+      alignSelf: 'center',
+      paddingHorizontal: 16,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: c.surfaceVoile,
+      justifyContent: 'center',
+    },
+    nomDePieceTexte: { color: c.ink, fontSize: 16, fontWeight: '700' },
   }),
 );

@@ -221,8 +221,9 @@ describe('les pièces de la visite', () => {
 
     // On va dans la chambre : la couleur la suit.
     act(() => bouton('Chambre').props.onPress());
+    // La caméra se pose sous le voile du fondu (voir `FONDU_PIECE_MONTEE`).
     act(() => {
-      jest.advanceTimersByTime(50);
+      jest.advanceTimersByTime(200);
     });
     expect(bouton('Chambre').props.accessibilityState).toEqual({ selected: true });
     expect(bouton('Séjour').props.accessibilityState).toEqual({ selected: false });
