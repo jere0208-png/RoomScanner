@@ -46,7 +46,6 @@ import { HomeScreen } from '../src/screens/HomeScreen';
 import { ProfilScreen } from '../src/screens/ProfilScreen';
 import { useScanStore } from '../src/store/scanStore';
 import { useAccountStore } from '../src/store/accountStore';
-import { usePremieresFois } from '../src/store/premieresFois';
 import type { LectureBrute, PointLu } from '../src/geometry/lecturePlan';
 
 const lire = (...p: string[]) => readFileSync(join(__dirname, '..', ...p), 'utf8');
@@ -127,15 +126,12 @@ describe('l’accueil y mène', () => {
     act(() => t.unmount());
   });
 
-  it('et le film se revoit depuis le profil', () => {
-    act(() => usePremieresFois.setState({ charge: true, vues: ['accueil', 'allumer'] } as never));
+  it('et le profil ne propose plus de présentation (il n’y en a plus)', () => {
     let t!: TestRenderer.ReactTestRenderer;
     act(() => {
       t = TestRenderer.create(<ProfilScreen />);
     });
-    act(() => bouton(t, 'Revoir la présentation').props.onPress());
-    expect(usePremieresFois.getState().vues).toEqual(['allumer']);
-    expect(useScanStore.getState().screen).toBe('home');
+    expect(bouton(t, 'Revoir la présentation')).toBeUndefined();
     act(() => t.unmount());
   });
 });

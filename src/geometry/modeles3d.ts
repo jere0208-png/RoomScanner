@@ -1574,7 +1574,10 @@ function caisson(a: Atelier, { W, D, H }: Gabarit) {
 function meubleChaussures(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   const zF = -D / 2 + SAILLIE_POIGNEE;
   a.boite(-W / 2, W / 2, 0, 0.05, zF + 0.04, D / 2, 'noir', TEINTES.anthracite);
-  a.boite(-W / 2, W / 2, 0.05, H, zF + 0.019, D / 2, 'laque', TEINTES.laque, { r: 0.003 });
+  // Le caisson s'arrête sous le plateau : leurs dessus confondus se
+  // disputaient l'écran, et le haut clignotait d'une matière à l'autre
+  // (diagnostic du patron, version 746).
+  a.boite(-W / 2, W / 2, 0.05, H - 0.022, zF + 0.019, D / 2, 'laque', TEINTES.laque, { r: 0.003 });
   a.boite(-W / 2, W / 2, H - 0.022, H, -D / 2, D / 2, 'bois', c.dessus ?? c.cotes ?? TEINTES.chene, { r: 0.003 });
   tiroirs(a, -W / 2, W / 2, 0.05, H - 0.022, zF, [1, 1, 1].slice(0, Math.max(2, Math.round((H - 0.07) / 0.38))), TEINTES.laque);
 }
