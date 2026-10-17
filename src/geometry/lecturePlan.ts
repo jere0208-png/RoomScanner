@@ -522,6 +522,25 @@ export function reconstruirePlan(lu: LectureBrute, image: ImageLue): ResultatDeL
     const v = lu && (lu.unite || lu.decimal) ? metresCandidats(c.texte)[0] : c.metres;
     if (v && v > 0.05) sures.push(v / L);
   }
+  /*
+    DES COTES TOUTES ENTIÈRES, ET AUCUNE UNITÉ DITE — « 552 », « 245 »,
+    « 10 » : le plan d'un constructeur, coté en centimètres (ou en
+    millimètres, « 3200 »). Rien ne fixait l'échelle, et le plan retombait
+    sur les surfaces écrites, ou échouait. L'ordre de grandeur tranche : un
+    logement se cote de quelques centimètres à quelques mètres, soit des
+    centaines en centimètres, des milliers en millimètres.
+  */
+  if (sures.length === 0) {
+    const entieres = cotesBrutes
+      .map((c) => ({ c, lu: lireCote(c.texte), L: longueurPx(c) }))
+      .filter((x) => x.lu && !x.lu.unite && !x.lu.decimal && x.L >= 5);
+    const med = mediane(entieres.map((x) => x.lu!.valeur));
+    const diviseur = med > 900 ? 1000 : med >= 15 ? 100 : 1;
+    for (const x of entieres) {
+      const v = x.lu!.valeur / diviseur;
+      if (v > 0.05) sures.push(v / x.L);
+    }
+  }
   let echelle = mediane(sures);
   let echelleDepuis: RapportDeLecture['echelleDepuis'] = 'cotes';
   if (!Number.isFinite(echelle)) {
