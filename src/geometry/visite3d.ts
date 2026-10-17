@@ -56,6 +56,10 @@ export interface MaillageDeVisite {
   aretes: number[];
 }
 
+/** Combien de jeux d'arêtes se gardent : maquette, visite, et un peu de marge. */
+const ARETES_GARDEES = 4;
+const aretesGardees: { empreinte: Float64Array; aretes: number[] }[] = [];
+
 /**
  * LES ARÊTES DU BÂTI — relevé du patron : « ajoute des arêtes légères sur les
  * murs et plafonds, plus visibles, et autour des ouvrants sans porte ; on doit
@@ -70,8 +74,74 @@ export interface MaillageDeVisite {
  *
  * Chaque segment est décollé de quatre millimètres le long de la moyenne des
  * normales de ses faces : vers l'œil qui le regarde, il passe devant elles.
+ *
+ * LE CALCUL SE GARDE TANT QUE LE BÂTI NE BOUGE PAS — relevé de l'expert 3D :
+ * la visite, montée même fermée, refaisait ses arêtes à chaque lâcher d'un
+ * meuble dans le plan 2D, environ deux cents millisecondes sous Node, le
+ * double sur l'iPhone, pour des traits qui ne dépendent QUE du bâti (les
+ * meubles n'entrent pas dans `polys`). Les dernières faces reçues sont donc
+ * comparées, nombre à nombre, à celles des derniers calculs : les mêmes, et
+ * l'on rend les mêmes arêtes, sans rien refaire. La maquette (sans plafond)
+ * et la visite (avec) ont chacune leur place dans la réserve.
+ *
+ * Le tableau rendu est PARTAGÉ entre les appels : il se lit, il ne se
+ * modifie pas.
  */
 export function aretesDuBati(polysBruts: { pts: P3[]; n: P3 }[]): number[] {
+  const empreinte = empreinteDesFaces(polysBruts);
+  const i = aretesGardees.findIndex((g) => memesNombres(g.empreinte, empreinte));
+  if (i >= 0) {
+    const g = aretesGardees[i];
+    // La plus récente en tête : c'est la dernière que l'on chassera.
+    if (i > 0) {
+      aretesGardees.splice(i, 1);
+      aretesGardees.unshift(g);
+    }
+    return g.aretes;
+  }
+  const aretes = calculerLesAretes(polysBruts);
+  aretesGardees.unshift({ empreinte, aretes });
+  if (aretesGardees.length > ARETES_GARDEES) aretesGardees.length = ARETES_GARDEES;
+  return aretes;
+}
+
+/**
+ * TOUT CE QUE LIT LE CALCUL, À PLAT : pour chaque face, son nombre de
+ * sommets, sa normale, puis ses sommets. Deux empreintes égales nombre à
+ * nombre donnent forcément les mêmes arêtes — le calcul ne lit rien d'autre.
+ */
+function empreinteDesFaces(polys: { pts: P3[]; n: P3 }[]): Float64Array {
+  let taille = 0;
+  for (const { pts } of polys) taille += 4 + pts.length * 3;
+  const out = new Float64Array(taille);
+  let k = 0;
+  for (const { pts, n } of polys) {
+    out[k++] = pts.length;
+    out[k++] = n.x;
+    out[k++] = n.y;
+    out[k++] = n.z;
+    for (const p of pts) {
+      out[k++] = p.x;
+      out[k++] = p.y;
+      out[k++] = p.z;
+    }
+  }
+  return out;
+}
+
+/** Les mêmes nombres, au bit près (`Object.is` : −0 n'est pas 0). */
+function memesNombres(a: Float64Array, b: Float64Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) return false;
+  return true;
+}
+
+/** Vide la réserve des arêtes (bancs d'essai). */
+export function oublierLesAretesGardees(): void {
+  aretesGardees.length = 0;
+}
+
+function calculerLesAretes(polysBruts: { pts: P3[]; n: P3 }[]): number[] {
   const TOL = 0.005;
   const CASE = 0.5;
   /*
@@ -155,11 +225,29 @@ export function aretesDuBati(polysBruts: { pts: P3[]; n: P3 }[]): number[] {
   const vus = new Set<string>();
   const cle = (p: P3) => `${Math.round(p.x * 100)},${Math.round(p.y * 100)},${Math.round(p.z * 100)}`;
   const out: number[] = [];
+  /*
+    LE PRÉFILTRE PAR BOÎTE — relevé de l'expert 3D : quatre-vingt mille
+    voisins éprouvés sur l'exemple, et presque tout le temps du calcul passé
+    dans `distAuSegment`. Un sommet à moins de TOL du côté est forcément
+    dans la boîte du côté gonflée de TOL : le point le plus proche est sur
+    le côté, donc dans sa boîte, et chaque coordonnée n'en est écartée que de
+    la distance au plus. Ceux qui sortent de la boîte ne se mesurent plus.
+    La marge est DOUBLÉE, pour que l'arrondi ne rejette jamais un sommet que
+    la mesure aurait gardé : les coupes, et donc les traits, sont les mêmes.
+  */
+  const MARGE = 2 * TOL;
   for (const c of cotes) {
     const proches = voisins(c.a, c.b);
     const coupes = [0, 1];
+    const x0 = Math.min(c.a.x, c.b.x) - MARGE;
+    const x1 = Math.max(c.a.x, c.b.x) + MARGE;
+    const y0 = Math.min(c.a.y, c.b.y) - MARGE;
+    const y1 = Math.max(c.a.y, c.b.y) + MARGE;
+    const z0 = Math.min(c.a.z, c.b.z) - MARGE;
+    const z1 = Math.max(c.a.z, c.b.z) + MARGE;
     for (const idx of proches) {
       for (const p of [cotes[idx].a, cotes[idx].b]) {
+        if (p.x < x0 || p.x > x1 || p.y < y0 || p.y > y1 || p.z < z0 || p.z > z1) continue;
         const { d, t } = distAuSegment(p, c.a, c.b);
         if (d < TOL && t > 0.001 && t < 0.999) coupes.push(t);
       }

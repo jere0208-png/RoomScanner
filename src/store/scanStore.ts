@@ -1531,22 +1531,33 @@ export function empreinteDe(texte: string): string {
  *
  * Un `getItem` par plan, l'un après l'autre : trente plans, trente
  * allers-retours au stockage natif avant que l'accueil puisse les montrer.
- * `multiGet` les demande d'un coup ; sans lui (banc d'essai), on retombe sur
- * la boucle.
+ *
+ * `getMany` D'ABORD — relevé de l'expert fiabilité : la bibliothèque cherchait
+ * `multiGet`, qu'AsyncStorage 3 n'expose plus (son stockage par défaut n'a
+ * que `getMany`, qui rend un objet clé → valeur). Le lot ne partait donc
+ * jamais, et chaque lancement retombait dans la boucle. `multiGet` reste
+ * compris (anciennes versions, doublures des bancs) ; sans l'un ni l'autre,
+ * ou si le stockage refuse le lot, la boucle, plus lente, reste sûre.
  */
 async function lireLesCles(cles: string[]): Promise<(string | null)[]> {
-  const multi = (
-    AsyncStorage as {
-      multiGet?: (k: string[]) => Promise<readonly (readonly [string, string | null])[]>;
-    }
-  ).multiGet;
-  if (multi && cles.length > 1) {
+  const stockage = AsyncStorage as {
+    getMany?: (k: string[]) => Promise<Record<string, string | null | undefined>>;
+    multiGet?: (k: string[]) => Promise<readonly (readonly [string, string | null])[]>;
+  };
+  if (cles.length > 1 && typeof stockage.getMany === 'function') {
     try {
-      const paires = await multi(cles);
+      const parCle = await stockage.getMany(cles);
+      if (parCle && typeof parCle === 'object') return cles.map((k) => parCle[k] ?? null);
+    } catch {
+      // Le stockage refuse le lot : la boucle, plus lente, reste sûre.
+    }
+  } else if (cles.length > 1 && typeof stockage.multiGet === 'function') {
+    try {
+      const paires = await stockage.multiGet(cles);
       const parCle = new Map(paires.map(([k, v]) => [k, v] as const));
       return cles.map((k) => parCle.get(k) ?? null);
     } catch {
-      // Le stockage refuse le lot : la boucle, plus lente, reste sûre.
+      // Même repli.
     }
   }
   const out: (string | null)[] = [];
@@ -11116,33 +11127,45 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       // Une relecture commence : rien ne s'efface avant qu'elle aboutisse.
       bibliothequeChargee = false;
       try {
-        const pref = await AsyncStorage.getItem(THEME_KEY);
+        /*
+          LES RÉGLAGES EN UNE SEULE LECTURE, ET UN SEUL `set` — relevé de
+          l'expert performance : sept `getItem` l'un après l'autre (thème,
+          accent, icône, couleurs, meubles, surfaces, textures), chacun avec
+          son aller-retour natif et son `set` qui réveillait tous les
+          abonnés, avant même la lecture des plans. Chaque valeur se valide
+          comme avant ; seules les valables entrent dans l'unique `set`.
+        */
+        const [pref, accent, icone, colors, furn, surf, tex] = await lireLesCles([
+          THEME_KEY,
+          ACCENT_KEY,
+          ICONE_KEY,
+          COLORS_KEY,
+          FURNITURE_KEY,
+          SURFACES_KEY,
+          TEXTURES_KEY,
+        ]);
+        const reglages: Partial<ScanState> = {};
         if (pref === 'light' || pref === 'dark' || pref === 'system') {
-          set({ themePref: pref });
+          reglages.themePref = pref;
         }
-        const accent = await AsyncStorage.getItem(ACCENT_KEY);
-        if (estUnAccent(accent)) set({ accentPref: accent as string });
+        if (estUnAccent(accent)) reglages.accentPref = accent as string;
         /* L'icône, elle, n'est PAS reposée au démarrage : elle est déjà sur
            l'écran d'accueil, et la reposer déclencherait l'alerte du système
            à chaque lancement. On ne lit que le réglage, pour le montrer. */
-        const icone = await AsyncStorage.getItem(ICONE_KEY);
-        if (estUneIcone(icone)) set({ iconePref: icone as string });
-        const colors = await AsyncStorage.getItem(COLORS_KEY);
+        if (estUneIcone(icone)) reglages.iconePref = icone as string;
         if (colors === '1' || colors === '0') {
-          set({ showOpeningColors: colors === '1' });
+          reglages.showOpeningColors = colors === '1';
         }
-        const furn = await AsyncStorage.getItem(FURNITURE_KEY);
         if (furn === '1' || furn === '0') {
-          set({ showFurniture: furn === '1' });
+          reglages.showFurniture = furn === '1';
         }
-        const surf = await AsyncStorage.getItem(SURFACES_KEY);
         if (surf === '1' || surf === '0') {
-          set({ showSurfaces: surf === '1' });
+          reglages.showSurfaces = surf === '1';
         }
-        const tex = await AsyncStorage.getItem(TEXTURES_KEY);
         if (tex === '1' || tex === '0') {
-          set({ showTextures: tex === '1' });
+          reglages.showTextures = tex === '1';
         }
+        if (Object.keys(reglages).length > 0) set(reglages);
         /*
           CHAQUE CLÉ DANS SA GARDE. Tout se lisait dans le même try/catch,
           et les dossiers de rangement se lisent AVANT les scans : trois

@@ -407,7 +407,24 @@ export function ResultScreen() {
   const scanName = useScanStore((s) => s.scanName);
   /** L'appareil sait-il scanner ? `null` tant que l'accueil n'a pas vérifié. */
   const scanSupporte = useScanStore((s) => s.supported);
-  const saves = useScanStore((s) => s.saves);
+  /*
+    LE NOMBRE DE PLANS ET L'ÉTAT DU PLAN OUVERT, PAS TOUTE LA BIBLIOTHÈQUE —
+    relevé de l'expert performance : l'écran lisait `saves` entier, et toute
+    écriture de la bibliothèque le redessinait en entier (reprise du compte
+    au lancement, plans migrés, copie, corbeille, purge, synchronisation),
+    même quand le plan ouvert n'avait pas bougé. Il n'en lit que trois
+    valeurs simples : le compte (la fête du premier plan), la date et la
+    corbeille du plan ouvert (« Dernière MAJ »). `null` : pas de plan ouvert
+    enregistré. Les noms, eux, se lisent au moment voulu (`getState`).
+  */
+  const nombreDePlans = useScanStore((s) => s.saves.length);
+  const majDuPlanOuvert = useScanStore(
+    (s) => s.saves.find((x) => x.id === s.currentSaveId)?.updatedAt ?? null,
+  );
+  const planOuvertALaCorbeille = useScanStore((s) => {
+    const x = s.saves.find((y) => y.id === s.currentSaveId);
+    return x ? !!x.supprimeLe : null;
+  });
   const toutesLesPhotos = useScanStore((s) => s.photos);
   const removePhoto = useScanStore((s) => s.removePhoto);
   const currentSaveId = useScanStore((s) => s.currentSaveId);
@@ -1171,12 +1188,12 @@ export function ResultScreen() {
   const combienDePlans = useRef<number | null>(null);
   useEffect(() => {
     const avant = combienDePlans.current;
-    combienDePlans.current = saves.length;
-    if (avant === null || saves.length <= avant) return;
+    combienDePlans.current = nombreDePlans;
+    if (avant === null || nombreDePlans <= avant) return;
     if (!premiereFois.estNeuve('planGarde')) return;
     premiereFois.marquer('planGarde');
     astuce('Votre premier logement est dans la poche.', { fete: true });
-  }, [saves.length, premiereFois]);
+  }, [nombreDePlans, premiereFois]);
 
   /**
    * LA FICHE D'UN APPAREIL, HORS ÉDITION.
@@ -2173,7 +2190,6 @@ export function ResultScreen() {
    * moment-là. Aujourd'hui et hier se nomment, au-delà on date.
    */
   const majTexte = (() => {
-    const save = saves.find((s) => s.id === currentSaveId);
     // Un plan qui n'a jamais été enregistré n'a pas de « modifications » :
     // c'est lui tout entier qui attend.
     if (dirty) {
@@ -2181,12 +2197,12 @@ export function ResultScreen() {
       // tout seul — il croyait devoir faire quelque chose. Quand
       // l'enregistrement automatique s'en charge, on le dit.
       if (!modeElec || planJamaisEnregistre()) return 'Enregistrement automatique…';
-      return !save || save.supprimeLe
+      return planOuvertALaCorbeille !== false
         ? 'Plan non enregistré'
         : 'Modifications non enregistrées';
     }
-    if (!save) return null;
-    const d = new Date(save.updatedAt);
+    if (majDuPlanOuvert === null) return null;
+    const d = new Date(majDuPlanOuvert);
     const heure = `${String(d.getHours()).padStart(2, '0')}h${String(
       d.getMinutes(),
     ).padStart(2, '0')}`;

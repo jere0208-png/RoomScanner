@@ -254,19 +254,7 @@ function Vignette({ ligne }: { ligne: { code: string; libelle?: string } }) {
  * d'une liste, sur un chantier, avec des gants, ne marche pas. La case dit ce
  * qui se passe ; c'est la ligne qui le fait.
  */
-function Article({
-  ligne,
-  styles,
-  couleurs,
-  onBasculer,
-  onMoins,
-  onPlus,
-  onPrix,
-  pro,
-  distributeur,
-  vente,
-  coefficient,
-}: {
+interface ArticleProps {
   ligne: LigneDevis;
   /**
    * SON PRIX DE VENTE HT — relevé d'un électricien artisan : il pense en
@@ -278,15 +266,80 @@ function Article({
   coefficient?: number | null;
   styles: ReturnType<typeof getStyles>;
   couleurs: Palette;
-  onBasculer: () => void;
-  onMoins: () => void;
-  onPlus: () => void;
+  /*
+    LES RAPPELS REÇOIVENT LA LIGNE — ils sont les mêmes pour toutes les
+    lignes et d'un rendu à l'autre (voir `rappelsDesLignes`).
+  */
+  onBasculer: (ligne: LigneDevis) => void;
+  onMoins: (ligne: LigneDevis) => void;
+  onPlus: (ligne: LigneDevis) => void;
   /** Corriger le prix unitaire (voir `prixAjuste`). */
-  onPrix?: () => void;
+  onPrix?: (ligne: LigneDevis) => void;
   /** Le prix d'achat de l'électricien, quand son tarif reconnaît l'article. */
   pro?: PrixPro;
   distributeur?: string;
-}) {
+}
+
+/**
+ * DEUX VALEURS PAREILLES, champ à champ, jusqu'à `profondeur` niveaux.
+ * Au-delà, seule la même référence compte : dans le doute, on redessine.
+ */
+function pareil(a: unknown, b: unknown, profondeur: number): boolean {
+  if (Object.is(a, b)) return true;
+  if (profondeur <= 0 || !a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  const ka = Object.keys(a);
+  if (ka.length !== Object.keys(b).length) return false;
+  for (const k of ka) {
+    if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
+    if (!pareil((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k], profondeur - 1)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/*
+  CE QUE LA LIGNE MONTRE, ET JUSQU'OÙ LE COMPARER. Le devis se rechiffre à
+  chaque « + » : TOUTES les lignes sont des objets neufs, et leurs prix de
+  vente aussi — une comparaison des seules références redessinerait tout.
+  On compare donc leur contenu : la ligne et ses offres, le prix de vente et
+  sa ligne, le prix d'achat. Le reste (styles, palette, rappels) est stable.
+*/
+const PROFONDEUR_DES_PROPS: Partial<Record<keyof ArticleProps, number>> = {
+  ligne: 2,
+  vente: 3,
+  pro: 1,
+};
+
+/**
+ * LA LIGNE NE SE REDESSINE QUE SI ELLE CHANGE — relevé de l'expert
+ * performance : un appui sur « + », une lettre dans « Chercher un article »,
+ * et les trente-sept lignes d'un logement complet se redessinaient, chacune
+ * avec ses boutons animés — cent millisecondes par appui devant le client,
+ * pour un chiffrage qui en coûte quarante. Seule la ligne touchée change.
+ */
+export function memeArticle(avant: ArticleProps, apres: ArticleProps): boolean {
+  const cles = new Set([...Object.keys(avant), ...Object.keys(apres)]) as Set<keyof ArticleProps>;
+  for (const k of cles) {
+    if (!pareil(avant[k], apres[k], PROFONDEUR_DES_PROPS[k] ?? 0)) return false;
+  }
+  return true;
+}
+
+const Article = React.memo(function Article({
+  ligne,
+  styles,
+  couleurs,
+  onBasculer,
+  onMoins,
+  onPlus,
+  onPrix,
+  pro,
+  distributeur,
+  vente,
+  coefficient,
+}: ArticleProps) {
   const hors = !!ligne.ecarte;
   const puHt = vente?.puHt ?? null;
   return (
@@ -295,7 +348,7 @@ function Article({
       accessibilityRole="button"
       activeOpacity={0.7}
       style={styles.article}
-      onPress={onBasculer}>
+      onPress={() => onBasculer(ligne)}>
       <View style={[styles.vignette, hors && styles.efface]}>
         <Vignette ligne={ligne} />
       </View>
@@ -313,7 +366,7 @@ function Article({
             accessibilityRole="button"
             accessibilityLabel={`Modifier le prix : ${ligne.libelle}`}
             hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-            onPress={onPrix}>
+            onPress={() => onPrix(ligne)}>
             <Text style={styles.articleDetail}>
               {puHt === null ? `${ligne.quantite} ${ligne.unite} — ` : `${ligne.quantite} ${ligne.unite} × `}
               <Text style={styles.articlePrixTouchable}>
@@ -403,7 +456,7 @@ function Article({
               accessibilityLabel={`Un ${ligne.libelle} de moins`}
               disabled={ligne.quantite <= 0}
               style={[styles.pas, ligne.quantite <= 0 && styles.pasEteint]}
-              onPress={onMoins}>
+              onPress={() => onMoins(ligne)}>
               <Svg width={14} height={14} viewBox="0 0 24 24">
                 <Path
                   d="M5 12 h14"
@@ -417,7 +470,7 @@ function Article({
               accessibilityRole="button"
               accessibilityLabel={`Un ${ligne.libelle} de plus`}
               style={styles.pas}
-              onPress={onPlus}>
+              onPress={() => onPlus(ligne)}>
               <Svg width={14} height={14} viewBox="0 0 24 24">
                 <Path
                   d="M12 5 v14 M5 12 h14"
@@ -432,7 +485,7 @@ function Article({
       </View>
     </TouchableOpacity>
   );
-}
+}, memeArticle);
 
 /** « 12,5 », « 12.5 », « 1 200 » : un nombre français, ou rien. */
 function nombreSaisi(t: string): number | null {
@@ -1006,6 +1059,36 @@ export function DevisScreen() {
   };
 
   /*
+    DES RAPPELS STABLES POUR LES LIGNES — la recette de l'enveloppe de
+    `FloorplanEditor` : un relais créé une fois, qui appelle la fonction du
+    DERNIER rendu. Quatre fermetures neuves par ligne et par rendu faisaient
+    redessiner tout le ticket (voir `memeArticle`).
+
+    LA LIGNE REÇUE EST RAMENÉE À CELLE DU DEVIS COURANT. Une ligne qui ne
+    s'est pas redessinée garde l'objet de son dernier rendu — pareil en tout,
+    mais plus celui que `ventes` connaît : on la retrouve par son rayon, son
+    libellé et son code (la clé de la ligne à l'écran).
+  */
+  const vif = useRef({ reglerLaQuantite, corrigerLePrix, basculer, lignes: devis.lignes });
+  vif.current = { reglerLaQuantite, corrigerLePrix, basculer, lignes: devis.lignes };
+  const rappelsDesLignes = useMemo(() => {
+    const actuelle = (l: LigneDevis): LigneDevis => {
+      const { lignes } = vif.current;
+      if (lignes.includes(l)) return l;
+      return lignes.find((x) => x.famille === l.famille && x.libelle === l.libelle && x.code === l.code) ?? l;
+    };
+    return {
+      basculer: (l: LigneDevis) => {
+        haptic('leger');
+        vif.current.basculer(cleDeLigne(actuelle(l)));
+      },
+      moins: (l: LigneDevis) => vif.current.reglerLaQuantite(actuelle(l), -1),
+      plus: (l: LigneDevis) => vif.current.reglerLaQuantite(actuelle(l), 1),
+      prix: (l: LigneDevis) => vif.current.corrigerLePrix(actuelle(l)),
+    };
+  }, []);
+
+  /*
     CORRIGER LES HEURES D'UNE FAMILLE DE POSE — relevé d'un électricien
     artisan : les temps du barème étaient figés. Vider rend l'estimation.
   */
@@ -1566,13 +1649,10 @@ export function DevisScreen() {
                     distributeur={tarifPro?.distributeur}
                     vente={ventes.get(l)}
                     coefficient={coefficient}
-                    onBasculer={() => {
-                      haptic('leger');
-                      basculer(cleDeLigne(l));
-                    }}
-                    onMoins={() => reglerLaQuantite(l, -1)}
-                    onPlus={() => reglerLaQuantite(l, 1)}
-                    onPrix={() => corrigerLePrix(l)}
+                    onBasculer={rappelsDesLignes.basculer}
+                    onMoins={rappelsDesLignes.moins}
+                    onPlus={rappelsDesLignes.plus}
+                    onPrix={rappelsDesLignes.prix}
                   />
                 ))
               : devis.parFamille.map((f) => (
@@ -1593,13 +1673,10 @@ export function DevisScreen() {
                           distributeur={tarifPro?.distributeur}
                           vente={ventes.get(l)}
                           coefficient={coefficient}
-                          onMoins={() => reglerLaQuantite(l, -1)}
-                          onPlus={() => reglerLaQuantite(l, 1)}
-                          onPrix={() => corrigerLePrix(l)}
-                          onBasculer={() => {
-                            haptic('leger');
-                            basculer(cleDeLigne(l));
-                          }}
+                          onMoins={rappelsDesLignes.moins}
+                          onPlus={rappelsDesLignes.plus}
+                          onPrix={rappelsDesLignes.prix}
+                          onBasculer={rappelsDesLignes.basculer}
                         />
                       ))}
                   </View>
