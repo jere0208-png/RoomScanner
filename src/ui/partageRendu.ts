@@ -27,7 +27,7 @@ import { captureRef } from 'react-native-view-shot';
 import { RoomScan } from 'react-native-room-scan';
 import { haptic } from './haptic';
 import { alerte } from './alerte';
-import { panne } from './panne';
+import { signaler } from './panne';
 
 /** Le cadre de l'image : carré pour les réseaux, 4:3 pour une annonce. */
 export type FormatImage = 'carre' | 'paysage';
@@ -125,7 +125,7 @@ export function usePriseDeVue() {
       await RoomScan.shareFile(uri);
     } catch (e) {
       if (vivant.current) setCapturant(null);
-      const p = panne('capture', e);
+      const p = signaler('capture', e, 'image');
       alerte(p.titre, p.message);
     } finally {
       if (garde) clearTimeout(garde);

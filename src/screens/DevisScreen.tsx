@@ -76,7 +76,7 @@ import { buildDevisPdf, devisFilename, toBase64 } from '../export/pdf';
 import { useAccountStore } from '../store/accountStore';
 import { PAIEMENT_MAX, entrepriseAImprimer, useEntreprise } from '../store/entreprise';
 import { alerte } from '../ui/alerte';
-import { panne as expliquer } from '../ui/panne';
+import { signaler } from '../ui/panne';
 import { RetourGlisse } from '../components/RetourGlisse';
 import { FloorplanEditor } from '../components/FloorplanEditor';
 import { DevisAttention } from '../components/DevisAttention';
@@ -1124,7 +1124,8 @@ export function DevisScreen() {
         });
         await RoomScan.sharePDF(toBase64(bytes), devisFilename(numero, st.scanName));
       } catch (e) {
-        alerte(expliquer('export', e).titre, expliquer('export', e).message);
+        const p = signaler('export', e, 'devis');
+        alerte(p.titre, p.message);
       }
     };
     // Sans entreprise, le devis partirait sans en-tête : on le dit avant.

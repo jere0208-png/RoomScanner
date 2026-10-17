@@ -30,7 +30,7 @@ import { connexionWeb } from '../native/account';
 import { SERVEUR } from '../config/serveur';
 import { dark, useTheme, type Palette } from '../theme';
 import { alerte } from '../ui/alerte';
-import { panne as expliquer } from '../ui/panne';
+import { signaler } from '../ui/panne';
 
 /** Le logo Apple (règles de « Se connecter avec Apple »). */
 const LOGO_APPLE =
@@ -70,10 +70,15 @@ export function SignInScreen() {
     ou la saisie donnent une raison, c'est elle qu'on lit ; le conseil du
     réseau ne vient que quand on n'en sait pas plus.
   */
-  const refuse = (raison?: string) =>
-    raison
-      ? alerte('La connexion n’a pas abouti', raison)
-      : alerte(expliquer('connexion', raison).titre, expliquer('connexion', raison).message);
+  const refuse = (raison?: string) => {
+    if (raison) {
+      alerte('La connexion n’a pas abouti', raison);
+      return;
+    }
+    // Sans raison connue : c'est celle-là qui mérite le journal.
+    const p = signaler('connexion', raison, 'connexion');
+    alerte(p.titre, p.message);
+  };
 
   const viaApple = async () => {
     const r = await connecterApple();

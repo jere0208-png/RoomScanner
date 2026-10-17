@@ -62,7 +62,7 @@ export const URL_CONDITIONS = 'https://www.apple.com/legal/internet-services/itu
 import { dark, radius, shadowCard, useTheme, type Palette } from '../theme';
 import { alerte } from '../ui/alerte';
 import { AlerteHote } from '../components/AlerteHote';
-import { panne as expliquer } from '../ui/panne';
+import { signaler } from '../ui/panne';
 
 /**
  * CE QU'ON ACHÈTE, ÉNUMÉRÉ.
@@ -250,7 +250,8 @@ export function PaywallScreen() {
         );
       }
     } catch (e) {
-      alerte(expliquer('achat', e).titre, expliquer('achat', e).message);
+      const p = signaler('achat', e, 'paywall');
+      alerte(p.titre, p.message);
     }
   };
 
@@ -455,10 +456,8 @@ export function PaywallScreen() {
                     );
                   }
                 } catch (e) {
-                  alerte(
-                    expliquer('restauration', e).titre,
-                    expliquer('restauration', e).message,
-                  );
+                  const p = signaler('restauration', e, 'paywall');
+                  alerte(p.titre, p.message);
                 }
               }}>
               <Text style={s.lien}>Restaurer l’achat</Text>

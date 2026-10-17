@@ -27,6 +27,7 @@
  * d'appel de six lignes collée sous la phrase, c'est la phrase qu'on ne lit
  * plus.
  */
+import { enregistrerPanne } from './journalPannes';
 
 /** Les moments où l'application peut échouer devant quelqu'un. */
 export const SUJETS = [
@@ -51,8 +52,13 @@ export type Sujet = (typeof SUJETS)[number];
 const DIT: Record<Sujet, { titre: string; faire: string }> = {
   export: {
     titre: 'Le fichier n’est pas parti',
-    faire:
-      'Vérifiez qu’il reste de la place sur le téléphone, puis réessayez.',
+    /*
+      PAS DE « PLACE SUR LE TÉLÉPHONE » PAR DÉFAUT — revue « fiabilité » :
+      la consigne accusait toujours le stockage, même quand le dossier
+      n'avait pas pu se calculer. On faisait vider son iPhone pour rien. Le
+      stockage n'est accusé que quand le système le dit (`PLACE_EXPORT`).
+    */
+    faire: 'Un problème est survenu en préparant le fichier. Réessayez dans un instant.',
   },
   capture: {
     titre: 'L’image n’a pas été prise',
@@ -89,6 +95,17 @@ const DIT: Record<Sujet, { titre: string; faire: string }> = {
   },
 };
 
+/** L'export qui manque vraiment de place : là, et là seulement, on le dit. */
+const PLACE_EXPORT =
+  'Vérifiez qu’il reste de la place sur le téléphone, puis réessayez.';
+
+/**
+ * LE STOCKAGE PLEIN, TEL QUE LE SYSTÈME LE DIT — `ENOSPC` côté fichiers,
+ * `NSFileWriteOutOfSpaceError` côté Foundation, et leurs traductions.
+ */
+const MANQUE_DE_PLACE =
+  /ENOSPC|OutOfSpace|out of space|no space|not enough space|disk full|storage full|espace insuffisant|plus assez d.espace|stockage (est )?plein/i;
+
 /**
  * La longueur au-delà de laquelle un détail technique cesse d'aider.
  *
@@ -108,6 +125,20 @@ function texteDe(cause: unknown): string {
   return '';
 }
 
+/** Le message et le code d'une cause (`WRITE_FAILED`…), pour y chercher. */
+function texteEtCode(cause: unknown): string {
+  const code =
+    cause && typeof cause === 'object' && 'code' in cause
+      ? String((cause as { code?: unknown }).code ?? '')
+      : '';
+  return `${texteDe(cause)} ${code}`;
+}
+
+/** Le système dit-il que le stockage est plein ? */
+function manqueDePlace(cause: unknown): boolean {
+  return MANQUE_DE_PLACE.test(texteEtCode(cause));
+}
+
 /**
  * Le titre et le message d'une panne, prêts pour `alerte`.
  *
@@ -119,9 +150,47 @@ export function panne(
   sujet: Sujet,
   cause?: unknown,
 ): { titre: string; message: string } {
-  const { titre, faire } = DIT[sujet];
+  const { titre } = DIT[sujet];
+  const faire =
+    sujet === 'export' && manqueDePlace(cause) ? PLACE_EXPORT : DIT[sujet].faire;
   const detail = texteDe(cause);
   const utile =
     detail.length > 0 && detail.length <= DETAIL_MAX && !faire.includes(detail);
   return { titre, message: utile ? `${faire} (${detail})` : faire };
+}
+
+/**
+ * Une annulation n'est pas une panne : le geste de quelqu'un qui a changé
+ * d'avis n'a rien à faire dans le journal.
+ */
+function estUneAnnulation(cause: unknown): boolean {
+  return /cancel|annul/i.test(texteEtCode(cause));
+}
+
+/**
+ * LA PANNE MONTRÉE VA AUSSI AU JOURNAL — revue « fiabilité » : seul le
+ * garde-fou écrivait dans le journal. Les erreurs attrapées puis montrées
+ * (export, capture, achat, connexion…) n'y laissaient rien, et quand le
+ * patron disait « le PDF ne part pas », le diagnostic du profil était vide.
+ *
+ * Même titre et même message que `panne`, qui reste pour ce qui s'affiche
+ * en continu (un panneau redessiné ne s'écrit pas au journal à chaque
+ * image). À n'appeler qu'UNE FOIS PAR INCIDENT, là où l'erreur est attrapée.
+ */
+export function signaler(
+  sujet: Sujet,
+  cause: unknown,
+  ecran: string,
+): { titre: string; message: string } {
+  if (!estUneAnnulation(cause)) {
+    try {
+      enregistrerPanne(cause ?? `${sujet} : aucun détail`, {
+        ecran: `${ecran} · ${sujet}`,
+        fatale: false,
+      });
+    } catch {
+      // Le journal ne fait jamais tomber ce qu'il observe.
+    }
+  }
+  return panne(sujet, cause);
 }

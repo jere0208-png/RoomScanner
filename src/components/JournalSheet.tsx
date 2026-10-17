@@ -26,7 +26,7 @@ import { phraseEnergie } from '../ui/energie';
 import { phraseMaillage } from '../geometry/maillage';
 import { RoomScan } from 'react-native-room-scan';
 import { alerte } from '../ui/alerte';
-import { panne as expliquer } from '../ui/panne';
+import { signaler } from '../ui/panne';
 import {
   fichierDuReleveBrut,
   lesRelevesBruts,
@@ -127,7 +127,7 @@ export function JournalSheet({
                   return;
                 }
                 RoomScan.shareText(f.contenu, f.nom).catch((e: unknown) => {
-                  const p = expliquer('export', e);
+                  const p = signaler('export', e, 'diagnostic');
                   alerte(p.titre, p.message);
                 });
               }}>

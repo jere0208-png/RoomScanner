@@ -2142,114 +2142,142 @@ function apresEcriture(): Promise<boolean> {
   return ecritureEnVol;
 }
 
+/** Les plans de la dernière demande d'écriture, tant qu'elle attend. */
+let plansEnAttente: SavedScan[] | null = null;
+
 function persistSoon(saves: SavedScan[]) {
   if (persistTimer) clearTimeout(persistTimer);
-  persistTimer = setTimeout(() => {
-    persistTimer = null;
-    const attente = enAttenteDEcriture;
-    enAttenteDEcriture = [];
-    const ecritures: Promise<boolean>[] = [];
-    try {
-      const vus = new Set<string>();
-      for (const s of saves) {
-        vus.add(s.id);
-        // Revenu dans la bibliothèque (repris du compte…) : plus à garder.
-        gardes.delete(s.id);
-        const deja = ecrits.get(s.id);
-        // Le même objet, à la même date : rien n'a bougé, rien à sérialiser.
-        if (deja && deja.ref === s && deja.quand === s.updatedAt) continue;
-        /*
-          CE QUI EST EN MÉMOIRE EST À JOUR : chargé, il est passé par
-          `migrateSave` ; fait par cette version, il est à son format. Il
-          s'écrit donc estampillé (voir `SCHEMA_PLAN`), sans que chaque
-          chemin qui fabrique un plan ait à y penser.
-        */
-        const json = JSON.stringify(s.schema === SCHEMA_PLAN ? s : { ...s, schema: SCHEMA_PLAN });
-        /*
-          Un plan chargé sans empreinte (voir `loadLibrary`) n'en reçoit pas
-          ici non plus : la première écriture après une mise à jour réécrit
-          les deux cents plans estampillés, et les hacher tous referait, une
-          fois, les quatre cents millisecondes ôtées au chargement.
-        */
-        const empreinte = deja && deja.empreinte === '' ? '' : empreinteDe(json);
-        // Sans empreinte, rien à comparer : on écrit.
-        if (deja && empreinte !== '' && deja.empreinte === empreinte) {
-          ecrits.set(s.id, { ref: s, quand: s.updatedAt, empreinte });
-          continue;
-        }
+  plansEnAttente = saves;
+  persistTimer = setTimeout(() => ecrirePlans(saves), 600);
+}
+
+/**
+ * L'ÉCRITURE EN ATTENTE PART TOUT DE SUITE — revue « fiabilité » : quand
+ * l'app passe en arrière-plan, seul le brouillon s'écrivait. Un
+ * « Enregistrer » suivi d'un appel ou d'un verrouillage attendait encore ses
+ * six cents millisecondes, et iOS pouvait fermer l'app avant : la
+ * bibliothèque n'était pas à jour, le plan revenait « à reprendre ». Rien à
+ * faire quand aucune écriture n'attend.
+ */
+export function ecrirePlansMaintenant(): void {
+  if (!persistTimer || !plansEnAttente) return;
+  clearTimeout(persistTimer);
+  ecrirePlans(plansEnAttente);
+}
+
+function ecrirePlans(saves: SavedScan[]) {
+  persistTimer = null;
+  plansEnAttente = null;
+  const attente = enAttenteDEcriture;
+  enAttenteDEcriture = [];
+  const ecritures: Promise<boolean>[] = [];
+  try {
+    const vus = new Set<string>();
+    for (const s of saves) {
+      vus.add(s.id);
+      // Revenu dans la bibliothèque (repris du compte…) : plus à garder.
+      gardes.delete(s.id);
+      const deja = ecrits.get(s.id);
+      // Le même objet, à la même date : rien n'a bougé, rien à sérialiser.
+      if (deja && deja.ref === s && deja.quand === s.updatedAt) continue;
+      /*
+        CE QUI EST EN MÉMOIRE EST À JOUR : chargé, il est passé par
+        `migrateSave` ; fait par cette version, il est à son format. Il
+        s'écrit donc estampillé (voir `SCHEMA_PLAN`), sans que chaque
+        chemin qui fabrique un plan ait à y penser.
+      */
+      /*
+        JAMAIS EN ARRIÈRE — revue « fiabilité » : un plan venu d'un appareil
+        déjà mis à jour porte un format plus récent. Le réécrire au nôtre
+        ferait croire à la version récente qu'il n'est pas migré, et elle
+        rejouerait ses migrations sur des données déjà migrées.
+      */
+      const schema = Math.max(Number.isFinite(s.schema) ? (s.schema as number) : 0, SCHEMA_PLAN);
+      const json = JSON.stringify(s.schema === schema ? s : { ...s, schema });
+      /*
+        Un plan chargé sans empreinte (voir `loadLibrary`) n'en reçoit pas
+        ici non plus : la première écriture après une mise à jour réécrit
+        les deux cents plans estampillés, et les hacher tous referait, une
+        fois, les quatre cents millisecondes ôtées au chargement.
+      */
+      const empreinte = deja && deja.empreinte === '' ? '' : empreinteDe(json);
+      // Sans empreinte, rien à comparer : on écrit.
+      if (deja && empreinte !== '' && deja.empreinte === empreinte) {
         ecrits.set(s.id, { ref: s, quand: s.updatedAt, empreinte });
-        ecritures.push(
-          AsyncStorage.setItem(scanKey(s.id), json).then(
-            () => true,
-            (e) => {
-              // Écriture perdue : on oublie ce qu'on croyait avoir écrit, la
-              // prochaine sauvegarde réessaiera — et on le DIT.
-              ecrits.delete(s.id);
-              // « Enregistrer » revient : la consigne du message se suit.
-              surEchecDEcriture(s.id);
-              signalerPanne({
-                quand: Date.now(),
-                message:
-                  `« ${s.name} » n'a pas pu être enregistré : ` +
-                  `${e?.message ?? 'stockage indisponible'}. ` +
-                  'Libérez de la place, puis touchez Enregistrer.',
-              });
-              return false;
-            },
-          ),
-        );
+        continue;
       }
-      // Un plan disparu de la bibliothèque s'efface — mais JAMAIS avant
-      // qu'elle soit entièrement chargée, ni un plan gardé (voir `gardes`).
-      if (bibliothequeChargee) {
-        for (const id of [...ecrits.keys()]) {
-          if (vus.has(id) || gardes.has(id)) continue;
-          ecrits.delete(id);
-          AsyncStorage.removeItem(scanKey(id)).catch(() => {});
-        }
-      }
-      const liste = [...saves.map((s) => s.id), ...[...gardes].filter((id) => !vus.has(id))];
-      // Pas encore tout lu : l'index sur le disque ne perd aucun de ses ids.
-      const ecrireIndex = (ids: string[]) =>
-        AsyncStorage.setItem(INDEX_KEY, JSON.stringify(ids));
-      const index = bibliothequeChargee
-        ? ecrireIndex(liste)
-        : AsyncStorage.getItem(INDEX_KEY).then(
-            (brut) => {
-              let avant: unknown = null;
-              try {
-                avant = brut ? JSON.parse(brut) : null;
-              } catch {
-                avant = null;
-              }
-              const anciens = Array.isArray(avant)
-                ? avant.filter((x): x is string => typeof x === 'string' && !liste.includes(x))
-                : [];
-              return [...liste, ...anciens];
-            },
-            () => liste,
-          ).then(ecrireIndex);
+      ecrits.set(s.id, { ref: s, quand: s.updatedAt, empreinte });
       ecritures.push(
-        index.then(
+        AsyncStorage.setItem(scanKey(s.id), json).then(
           () => true,
           (e) => {
+            // Écriture perdue : on oublie ce qu'on croyait avoir écrit, la
+            // prochaine sauvegarde réessaiera — et on le DIT.
+            ecrits.delete(s.id);
+            // « Enregistrer » revient : la consigne du message se suit.
+            surEchecDEcriture(s.id);
             signalerPanne({
               quand: Date.now(),
               message:
-                `La liste des scans n'a pas pu être écrite : ` +
-                `${e?.message ?? 'stockage indisponible'}.`,
+                `« ${s.name} » n'a pas pu être enregistré : ` +
+                `${e?.message ?? 'stockage indisponible'}. ` +
+                'Libérez de la place, puis touchez Enregistrer.',
             });
             return false;
           },
         ),
       );
-    } catch {
-      // Un scan illisible ne doit pas emporter les autres.
-      ecritures.push(Promise.resolve(false));
     }
-    ecritureEnVol = Promise.all(ecritures).then((oks) => oks.every(Boolean));
-    ecritureEnVol.then((ok) => attente.forEach((f) => f(ok)));
-  }, 600);
+    // Un plan disparu de la bibliothèque s'efface — mais JAMAIS avant
+    // qu'elle soit entièrement chargée, ni un plan gardé (voir `gardes`).
+    if (bibliothequeChargee) {
+      for (const id of [...ecrits.keys()]) {
+        if (vus.has(id) || gardes.has(id)) continue;
+        ecrits.delete(id);
+        AsyncStorage.removeItem(scanKey(id)).catch(() => {});
+      }
+    }
+    const liste = [...saves.map((s) => s.id), ...[...gardes].filter((id) => !vus.has(id))];
+    // Pas encore tout lu : l'index sur le disque ne perd aucun de ses ids.
+    const ecrireIndex = (ids: string[]) =>
+      AsyncStorage.setItem(INDEX_KEY, JSON.stringify(ids));
+    const index = bibliothequeChargee
+      ? ecrireIndex(liste)
+      : AsyncStorage.getItem(INDEX_KEY).then(
+          (brut) => {
+            let avant: unknown = null;
+            try {
+              avant = brut ? JSON.parse(brut) : null;
+            } catch {
+              avant = null;
+            }
+            const anciens = Array.isArray(avant)
+              ? avant.filter((x): x is string => typeof x === 'string' && !liste.includes(x))
+              : [];
+            return [...liste, ...anciens];
+          },
+          () => liste,
+        ).then(ecrireIndex);
+    ecritures.push(
+      index.then(
+        () => true,
+        (e) => {
+          signalerPanne({
+            quand: Date.now(),
+            message:
+              `La liste des scans n'a pas pu être écrite : ` +
+              `${e?.message ?? 'stockage indisponible'}.`,
+          });
+          return false;
+        },
+      ),
+    );
+  } catch {
+    // Un scan illisible ne doit pas emporter les autres.
+    ecritures.push(Promise.resolve(false));
+  }
+  ecritureEnVol = Promise.all(ecritures).then((oks) => oks.every(Boolean));
+  ecritureEnVol.then((ok) => attente.forEach((f) => f(ok)));
 }
 
 /**

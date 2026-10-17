@@ -22,6 +22,13 @@
  * technique s'AJOUTE à la phrase au lieu de la remplacer — un développeur en a
  * besoin, l'utilisateur n'en a pas besoin en premier.
  */
+// `signaler` écrit au journal des pannes, qui vit sur le disque.
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(async () => null),
+  setItem: jest.fn(async () => undefined),
+  removeItem: jest.fn(async () => undefined),
+}));
+
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { SUJETS, panne } from '../src/ui/panne';
@@ -62,10 +69,12 @@ describe('chaque panne dit quoi faire', () => {
 
 describe('le détail technique s’ajoute, il ne remplace pas', () => {
   it('la phrase reste, le détail suit', () => {
+    // Une cause qui n'est pas le stockage : la consigne de l'export reste la
+    // même (le stockage plein a la sienne, voir `gain-fiabilite`).
     const nu = panne('export').message;
-    const avec = panne('export', new Error('disk full')).message;
+    const avec = panne('export', new Error('calcul du dossier')).message;
     expect(avec.startsWith(nu)).toBe(true);
-    expect(avec).toContain('disk full');
+    expect(avec).toContain('calcul du dossier');
   });
 
   it('sans détail, aucune parenthèse vide', () => {

@@ -12,6 +12,7 @@ import { useTheme } from '../../theme';
 import { segLength, type WallSeg } from '../../geometry/floorplan';
 import { useScanStore } from '../../store/scanStore';
 import {
+  cheminVivant,
   choisirPhotosVisibles,
   messagePhotoManquante,
   ouvrirReglagesPhotos,
@@ -93,7 +94,7 @@ export function PhotoSheet({
               ne boucle pas sur une image qui n'existe nulle part.
             */}
             <Image
-              source={{ uri: `file://${ph.path}` }}
+              source={{ uri: `file://${cheminVivant(ph.path)}` }}
               style={styles.photoPleine}
               resizeMode="contain"
               onError={() => {

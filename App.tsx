@@ -25,13 +25,14 @@ import { AstuceHote } from './src/components/AstuceHote';
 import { BulleHote } from './src/components/BulleHote';
 import { GardeFou } from './src/components/GardeFou';
 import { usePannes } from './src/ui/journalPannes';
+import { chargerDocuments } from './src/ui/photos';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { useNotifications } from './src/store/notifications';
 import { PremierLancement } from './src/components/PremierLancement';
 import { Scene } from './src/components/Scene';
 import { usePremieresFois } from './src/store/premieresFois';
 import { useUsage } from './src/store/usage';
-import { brouillonAuDepart, useScanStore } from './src/store/scanStore';
+import { brouillonAuDepart, ecrirePlansMaintenant, useScanStore } from './src/store/scanStore';
 import { prendreLaDemande, suiteDuRaccourci } from './src/ui/raccourci';
 import { indexerLesPlans } from './src/ui/spotlight';
 import { astuce } from './src/ui/astuce';
@@ -56,7 +57,13 @@ import { activerDiagnostic, desactiverDiagnostic } from './src/diagnostic/contro
  */
 export default function App() {
   return (
-    <GardeFou ecran={() => useScanStore.getState().screen}>
+    <GardeFou
+      ecran={() => useScanStore.getState().screen}
+      mettreALAbri={() => {
+        // Le relevé en cours et un « Enregistrer » qui attendait encore.
+        brouillonAuDepart();
+        ecrirePlansMaintenant();
+      }}>
       <Application />
     </GardeFou>
   );
@@ -89,6 +96,9 @@ function Application() {
   useEffect(() => {
     loadSaves();
     chargerCompte();
+    // Où sont les Documents aujourd'hui : les photos d'un ancien conteneur
+    // s'y retrouvent (voir `cheminVivant`).
+    chargerDocuments();
     /*
       CE QU'ON N'A PAS ENCORE DIT, LU AU LANCEMENT.
 
@@ -239,6 +249,8 @@ function Application() {
         // Un appel, la batterie, iOS qui ferme l'app : le filet s'écrit
         // maintenant, pas dans trente secondes.
         brouillonAuDepart();
+        // Et un « Enregistrer » qui attendait ses 600 ms part tout de suite.
+        ecrirePlansMaintenant();
       }
     });
     return () => {

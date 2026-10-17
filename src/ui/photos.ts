@@ -37,8 +37,92 @@ const natif = ():
       restorePhoto?: (asset: string) => Promise<Relue>;
       photoAccess?: () => Promise<AccesPhotos>;
       pickLimitedPhotos?: () => Promise<AccesPhotos>;
+      documentsDir?: () => Promise<string | null>;
     }
   | undefined => (Platform.OS === 'ios' ? NativeModules.RoomScanPhoto : undefined);
+
+/**
+ * LE DOSSIER DOCUMENTS D'AUJOURD'HUI — revue « fiabilité ».
+ *
+ * Le plan garde le chemin ABSOLU de chaque photo, et ce chemin porte l'UUID
+ * du conteneur de l'app. Une mise à jour, une restauration ou un nouvel
+ * iPhone changent cet UUID : le fichier est toujours là, mais le chemin ne
+ * mène plus à rien, et la photo disparaissait de l'écran et du PDF sans un
+ * mot. On demande donc une fois, au lancement, où sont les Documents
+ * aujourd'hui, et l'on y rebranche les chemins au moment de s'en servir.
+ *
+ * LE PLAN N'EST PAS RÉÉCRIT : le chemin stocké reste celui d'origine (il
+ * voyage aussi par le compte, vers d'autres appareils). Seul l'usage change.
+ */
+let documents: string | null = null;
+
+/** Demande le dossier au natif ; sans lui, les chemins restent tels quels. */
+export function chargerDocuments(): Promise<void> {
+  try {
+    const p = natif()?.documentsDir?.();
+    if (!p) return Promise.resolve();
+    return p
+      .then((d) => {
+        if (typeof d === 'string' && d) documents = d.replace(/\/+$/, '');
+      })
+      .catch(() => {});
+  } catch {
+    return Promise.resolve();
+  }
+}
+
+/** Pour les bancs : fixe (ou oublie) le dossier Documents d'aujourd'hui. */
+export function retenirDocuments(d: string | null): void {
+  documents = d ? d.replace(/\/+$/, '') : null;
+}
+
+/**
+ * Le chemin d'un fichier de l'app, rebranché sur les Documents
+ * d'aujourd'hui : « …/Application/<ancien UUID>/Documents/photos/p-1.jpg »
+ * devient « …/<UUID d'aujourd'hui>/Documents/photos/p-1.jpg ». Rendu tel
+ * quel s'il ne vit pas dans des Documents, ou tant qu'on ne sait pas où ils
+ * sont.
+ */
+export function cheminVivant(chemin: string): string {
+  if (!documents || typeof chemin !== 'string') return chemin;
+  const brut = chemin.startsWith('file://') ? chemin.slice(7) : chemin;
+  const i = brut.indexOf('/Documents/');
+  if (i < 0) return chemin;
+  return documents + brut.slice(i + '/Documents'.length);
+}
+
+/**
+ * CE QU'ON DIT AVANT D'EXPORTER SANS ELLES — avis de l'architecte : une photo
+ * qui ne se relit plus était omise du dossier EN SILENCE. On prévient, en
+ * nommant les murs comme la fiche de la photo les nomme (« mur de 3,20 m »),
+ * et l'on laisse choisir. `longueurs` : celle du mur de chaque photo
+ * manquante, `null` pour un mur supprimé.
+ */
+export function phrasePhotosIntrouvables(
+  longueurs: (number | null)[],
+): { titre: string; message: string } {
+  const n = longueurs.length;
+  const murs = [
+    ...new Set(
+      longueurs.map((l) =>
+        l === null ? 'mur supprimé' : `mur de ${l.toFixed(2).replace('.', ',')} m`,
+      ),
+    ),
+  ];
+  const liste =
+    murs.length <= 1
+      ? murs[0] ?? ''
+      : `${murs.slice(0, -1).join(', ')} et ${murs[murs.length - 1]}`;
+  return {
+    titre: n > 1 ? `${n} photos introuvables` : 'Une photo introuvable',
+    message:
+      n > 1
+        ? `Elles ne figureront pas dans le dossier${liste ? ` (${liste})` : ''}. ` +
+          'Ouvrez-les depuis le plan pour les retrouver dans vos Photos, ou exportez sans elles.'
+        : `Elle ne figurera pas dans le dossier${liste ? ` (${liste})` : ''}. ` +
+          'Ouvrez-la depuis le plan pour la retrouver dans vos Photos, ou exportez sans elle.',
+  };
+}
 
 /**
  * Efface des photos de repérage devenues inutiles.

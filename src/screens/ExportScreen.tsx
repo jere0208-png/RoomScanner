@@ -46,6 +46,7 @@ import {
   niveauxPresents,
   nomDuNiveau,
   roomParts,
+  segLength,
 } from '../geometry/floorplan';
 import type { TraceGaine } from '../geometry/routing';
 import {
@@ -69,7 +70,8 @@ import { deviceNames } from '../geometry/naming';
 import { PromptSheet, type PromptData } from '../components/Sheet';
 import type { CeilingFixture } from '../geometry/ceiling';
 import { alerte } from '../ui/alerte';
-import { panne as expliquer } from '../ui/panne';
+import { signaler } from '../ui/panne';
+import { cheminVivant, phrasePhotosIntrouvables } from '../ui/photos';
 
 
 /**
@@ -640,7 +642,7 @@ const styles = getStyles(c);
     exporterLeDossier();
   };
 
-  const exporterLeDossier = async () => {
+  const exporterLeDossier = async (sansLesIntrouvables = false) => {
     /* L'aperçu est libre, l'export est Pro : la barrière est ici — voir
        `exportOuvert`. */
     if (!exportOuvert('le dossier PDF')) return;
@@ -665,17 +667,40 @@ const styles = getStyles(c);
         base64: string;
         along?: number;
       }[] = [];
+      /** La longueur du mur de chaque photo qui ne se relit plus. */
+      const introuvables: (number | null)[] = [];
       if (elevations || cotesElec) {
         for (const ph of [...(multi ? toutesLesPhotos : photos)].sort((a, b) => a.at - b.at)) {
-          const b64 = await RoomScan.readPhoto(ph.path, 900);
+          // Rebranchée sur les Documents d'aujourd'hui : voir `cheminVivant`.
+          const b64 = await RoomScan.readPhoto(cheminVivant(ph.path), 900);
           if (b64) {
             vignettes.push({
               wallId: ph.wallId,
               base64: b64,
               along: ph.along,
             });
+          } else if (!ph.auto) {
+            // On ne prévient que pour les photos de repérage : celles que le
+            // scan prend seul (`auto`, rangées hors du dossier des photos)
+            // ne se relisent pas par ce chemin, et n'y sont pas attendues.
+            const mur = tousLesMurs.find((w) => w.id === ph.wallId);
+            introuvables.push(mur ? segLength(mur) : null);
           }
         }
+      }
+      /*
+        UNE PHOTO QUI MANQUE SE DIT AVANT L'ENVOI — avis de l'architecte :
+        elle était omise du dossier EN SILENCE. On prévient, on laisse
+        choisir. Le verrou se libère en `finally` : « Exporter quand même »
+        repart d'un appui neuf.
+      */
+      if (introuvables.length > 0 && !sansLesIntrouvables) {
+        const dit = phrasePhotosIntrouvables(introuvables);
+        alerte(dit.titre, dit.message, [
+          { label: 'Annuler' },
+          { label: 'Exporter quand même', onPress: () => exporterLeDossier(true) },
+        ]);
+        return;
       }
       const bytes =
         pret.current && pret.current.cle === empreinte && vignettes.length === 0
@@ -683,7 +708,8 @@ const styles = getStyles(c);
           : batir(vignettes);
       await RoomScan.sharePDF(toBase64(bytes), pdfFilename(titreDuDossier));
     } catch (e: any) {
-      alerte(expliquer('export', e).titre, expliquer('export', e).message);
+      const p = signaler('export', e, 'export');
+      alerte(p.titre, p.message);
     } finally {
       exportEnCours.current = false;
       setPreparation(false);

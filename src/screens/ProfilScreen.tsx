@@ -46,7 +46,7 @@ import { ACCENTS } from '../ui/accents';
 import { ICONES } from '../ui/icone';
 import { alerte } from '../ui/alerte';
 import { haptic } from '../ui/haptic';
-import { panne as expliquer } from '../ui/panne';
+import { signaler } from '../ui/panne';
 
 /**
  * LES TROIS APPARENCES, DANS L'ORDRE DU DESIGN.
@@ -161,10 +161,8 @@ export function ProfilScreen() {
           : 'L’App Store ne connaît pas d’abonnement pour ce compte Apple.',
       );
     } catch (e) {
-      alerte(
-        expliquer('restauration', e).titre,
-        expliquer('restauration', e).message,
-      );
+      const p = signaler('restauration', e, 'profil');
+      alerte(p.titre, p.message);
     }
   };
 

@@ -401,7 +401,8 @@ describe('le démarrage ne refait pas les migrations', () => {
   it('tout plan écrit porte la version, et le chargement ne hache plus le JSON', () => {
     const source = lire('src/store/scanStore.ts');
     expect(source).toContain("ecrits.set(id, { ref: lu, quand: lu.updatedAt, empreinte: '' });");
-    expect(source).toContain('JSON.stringify(s.schema === SCHEMA_PLAN ? s : { ...s, schema: SCHEMA_PLAN })');
+    // Jamais en arrière : un format plus récent se garde (voir `gain-fiabilite`).
+    expect(source).toContain('JSON.stringify(s.schema === schema ? s : { ...s, schema })');
   });
 });
 

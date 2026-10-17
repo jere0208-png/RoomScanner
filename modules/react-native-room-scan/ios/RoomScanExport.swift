@@ -54,7 +54,10 @@ class RoomScanExport: NSObject {
     if FileManager.default.fileExists(atPath: url.path) { return url }
     let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     let candidate = docs.appendingPathComponent(url.lastPathComponent)
-    return FileManager.default.fileExists(atPath: candidate.path) ? candidate : nil
+    if FileManager.default.fileExists(atPath: candidate.path) { return candidate }
+    // Les photos de repérage vivent dans leur sous-dossier : on les y
+    // cherche aussi (voir `RoomScanPhoto.resolvePhoto`).
+    return RoomScanPhoto.resolvePhoto(clean)
   }
 
   /// Partage un fichier local existant (image, .usdz…) via la feuille iOS.

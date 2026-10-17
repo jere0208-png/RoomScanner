@@ -47,15 +47,52 @@ class RoomScanPhoto: NSObject {
                           reject: @escaping RCTPromiseRejectBlock) {
     var n = 0
     for p in paths {
-      // On ne sort JAMAIS du dossier des photos : un chemin venu du disque
-      // ne doit pas pouvoir désigner autre chose.
-      let url = URL(fileURLWithPath: p)
-      guard url.deletingLastPathComponent().lastPathComponent == "photos" else {
-        continue
-      }
+      // Même garde qu'avant, et le chemin d'un ancien conteneur retrouvé :
+      // voir `resolvePhoto`.
+      guard let url = RoomScanPhoto.resolvePhoto(p) else { continue }
       if (try? FileManager.default.removeItem(at: url)) != nil { n += 1 }
     }
     resolve(n)
+  }
+
+  /**
+   RETROUVE UNE PHOTO DONT LE CHEMIN DATE D'UN AUTRE CONTENEUR — revue
+   « fiabilité » : le plan garde le chemin absolu, qui porte l'UUID du
+   conteneur de l'app. Une mise à jour, une restauration, un nouvel iPhone
+   changent cet UUID : le fichier est toujours dans `Documents/photos`, mais
+   le chemin ne mène plus à rien. On le cherche alors par son nom, dans le
+   dossier des photos d'AUJOURD'HUI.
+
+   On ne sort JAMAIS du dossier des photos : un chemin venu du disque ne
+   doit pas pouvoir désigner autre chose, ni remonter d'un cran (« .. »).
+   `nil` si le fichier n'est nulle part. Le chemin arrive nu, sans préfixe
+   de schéma (voir `RoomScanExport.resolveFile`, qui l'ôte avant).
+   */
+  static func resolvePhoto(_ path: String) -> URL? {
+    let url = URL(fileURLWithPath: path)
+    let nom = url.lastPathComponent
+    guard !nom.isEmpty, nom != ".", nom != "..",
+          url.deletingLastPathComponent().lastPathComponent == "photos" else {
+      return nil
+    }
+    let fm = FileManager.default
+    if fm.fileExists(atPath: url.path) { return url }
+    guard let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first else {
+      return nil
+    }
+    let candidat = docs
+      .appendingPathComponent("photos", isDirectory: true)
+      .appendingPathComponent(nom)
+    return fm.fileExists(atPath: candidat.path) ? candidat : nil
+  }
+
+  /// Le dossier Documents de CE conteneur : le JS y rebranche, pour les
+  /// afficher, les chemins écrits par une installation précédente (voir
+  /// `cheminVivant` dans `src/ui/photos.ts`).
+  @objc func documentsDir(_ resolve: @escaping RCTPromiseResolveBlock,
+                          reject: @escaping RCTPromiseRejectBlock) {
+    let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+    resolve(docs?.path)
   }
 
   /**
@@ -117,9 +154,9 @@ class RoomScanPhoto: NSObject {
                        maxSide: NSNumber,
                        resolve: @escaping RCTPromiseResolveBlock,
                        reject: @escaping RCTPromiseRejectBlock) {
-    let url = URL(fileURLWithPath: path)
-    // Même garde que pour l'effacement : on ne lit que NOS photos.
-    guard url.deletingLastPathComponent().lastPathComponent == "photos",
+    // Même garde que pour l'effacement : on ne lit que NOS photos, même
+    // écrites par un ancien conteneur (voir `resolvePhoto`).
+    guard let url = RoomScanPhoto.resolvePhoto(path),
           let source = CGImageSourceCreateWithURL(url as CFURL, nil) else {
       resolve(nil)
       return

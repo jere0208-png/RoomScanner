@@ -231,7 +231,7 @@ import {
   type PromptData,
 } from '../components/Sheet';
 import { alerte } from '../ui/alerte';
-import { panne as expliquer } from '../ui/panne';
+import { signaler } from '../ui/panne';
 import { ficheElec } from './result/ficheElec';
 import { astuce, useAstuce } from '../ui/astuce';
 import { teinteDePorteSuivante } from '../ui/teintesPortes';
@@ -322,7 +322,7 @@ export function ResultScreen() {
       OfSpaceError » et ses cousins — n'apprenait rien à personne. Il est
       toujours là, derrière la consigne, entre parenthèses.
     */
-    const dit = expliquer('enregistrement', panne.message);
+    const dit = signaler('enregistrement', panne.message, 'result');
     alerte(dit.titre, dit.message, [
       {
         label: 'Compris',
@@ -1728,7 +1728,8 @@ export function ResultScreen() {
     } catch (e: any) {
       setCapturing(false);
       if (!cotesAvant) setShowMeasures(false);
-      alerte(expliquer('capture', e).titre, expliquer('capture', e).message);
+      const p = signaler('capture', e, 'result');
+      alerte(p.titre, p.message);
     } finally {
       if (garde) clearTimeout(garde);
       captureRendue.current = null;
@@ -1782,7 +1783,8 @@ export function ResultScreen() {
       );
       await RoomScan.shareText(obj, objFilename(scanName));
     } catch (e: any) {
-      alerte(expliquer('export', e).titre, expliquer('export', e).message);
+      const p = signaler('export', e, 'result');
+      alerte(p.titre, p.message);
     }
   };
 
@@ -1828,7 +1830,8 @@ export function ResultScreen() {
       const bytes = buildMaterialPdf(scanName, list, tirage);
       await RoomScan.sharePDF(toBase64(bytes), materialFilename(scanName));
     } catch (e: any) {
-      alerte(expliquer('export', e).titre, expliquer('export', e).message);
+      const p = signaler('export', e, 'result');
+      alerte(p.titre, p.message);
     }
   };
 
@@ -1914,7 +1917,8 @@ export function ResultScreen() {
         metreFilename(niveaux.length > 1 ? `${scanName} — ${nomDuNiveau(niveauCourant)}` : scanName),
       );
     } catch (e: any) {
-      alerte(expliquer('export', e).titre, expliquer('export', e).message);
+      const p = signaler('export', e, 'result');
+      alerte(p.titre, p.message);
     }
   };
 
@@ -1945,7 +1949,8 @@ export function ResultScreen() {
         ),
       );
     } catch (e: any) {
-      alerte(expliquer('export', e).titre, expliquer('export', e).message);
+      const p = signaler('export', e, 'result');
+      alerte(p.titre, p.message);
     }
   };
 
@@ -3022,8 +3027,10 @@ export function ResultScreen() {
     reset();
   };
   /** Un scan qui ne démarre pas le DIT — il échouait sans un mot. */
-  const refusDuScan = (e: any) =>
-    alerte(expliquer('releve', e).titre, expliquer('releve', e?.message ?? 'Le scan n’a pas pu démarrer.').message);
+  const refusDuScan = (e: any) => {
+    const p = signaler('releve', e?.message != null ? e : 'Le scan n’a pas pu démarrer.', 'result');
+    alerte(p.titre, p.message);
+  };
   /*
     « NOUVEAU SCAN » SCANNE — correctif de l'audit : il ramenait à l'accueil.
     Il demande d'abord : le plan ouvert est rangé, pas perdu, mais on quitte.
@@ -4173,15 +4180,14 @@ export function ResultScreen() {
   */
   const scanPossible = scanSupporte !== false;
   const scannerUnePiece = () => {
-    demarrerComplement().catch((e: any) =>
-      alerte(
-        expliquer('releve', e).titre,
-        expliquer(
-          'releve',
-          e?.message ?? 'La réunion de plusieurs relevés demande iOS 17.',
-        ).message,
-      ),
-    );
+    demarrerComplement().catch((e: any) => {
+      const p = signaler(
+        'releve',
+        e?.message != null ? e : 'La réunion de plusieurs relevés demande iOS 17.',
+        'result',
+      );
+      alerte(p.titre, p.message);
+    });
   };
   /**
    * DESSINER UNE PIÈCE, sans tout recommencer — elle se POSE aux cotes qu'on

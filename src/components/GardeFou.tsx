@@ -46,7 +46,16 @@ interface Etat {
 }
 
 export class GardeFou extends React.Component<
-  { children: React.ReactNode; ecran?: () => string },
+  {
+    children: React.ReactNode;
+    ecran?: () => string;
+    /**
+     * MET LE TRAVAIL À L'ABRI, tout de suite : le brouillon et l'écriture en
+     * attente partent sur le disque avant que l'écran ne s'affiche. Passé
+     * par l'application, pour que ce composant ne dépende d'aucun magasin.
+     */
+    mettreALAbri?: () => void;
+  },
   Etat
 > {
   state: Etat = { panne: null };
@@ -86,9 +95,21 @@ export class GardeFou extends React.Component<
         encore, et l'interrompre pour un incident qu'elle a digéré serait
         pire que le silence d'avant.
       */
-      if (fatale) this.setState({ panne });
+      if (fatale) {
+        this.aLAbri();
+        this.setState({ panne });
+      }
       try {
-        avant?.(erreur, fatale);
+        /*
+          EN PRODUCTION, ON NE LA TRANSMET PLUS COMME FATALE — revue
+          « fiabilité ». Hors développement, React Native fait d'une erreur
+          fatale une exception native que personne n'attrape (`RCTFatal`) :
+          l'application se fermait AVANT que l'écran « Reprendre » ait pu
+          s'afficher, et ce garde-fou ne gardait rien. Transmise comme non
+          fatale, elle part toujours à la console et aux rapports. En
+          développement, rien ne change : l'écran rouge reste.
+        */
+        avant?.(erreur, fatale && !__DEV__ ? false : fatale);
       } catch {
         // L'ancien gestionnaire qui tombe ne doit pas emporter le nôtre.
       }
@@ -99,6 +120,15 @@ export class GardeFou extends React.Component<
 
   componentWillUnmount() {
     this.rendreLaMain?.();
+  }
+
+  /** Le travail sur le disque, sans que cette précaution puisse tomber. */
+  private aLAbri() {
+    try {
+      this.props.mettreALAbri?.();
+    } catch {
+      // Le filet qui casse ne doit pas empêcher l'écran de s'afficher.
+    }
   }
 
   /**
@@ -130,6 +160,7 @@ export class GardeFou extends React.Component<
   }
 
   componentDidCatch(erreur: Error) {
+    this.aLAbri();
     this.setState({
       panne: enregistrerPanne(erreur, {
         ecran: this.props.ecran?.() ?? '?',

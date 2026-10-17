@@ -105,7 +105,7 @@ import { RoomScan } from 'react-native-room-scan';
 import { useScanStore } from '../store/scanStore';
 import { useModeElec } from '../store/usage';
 import { haptic } from '../ui/haptic';
-import { annoncerAccesPhotos } from '../ui/photos';
+import { annoncerAccesPhotos, cheminVivant } from '../ui/photos';
 import { CalquePhotoFond, CalquePhotoPoignee } from './CalquePhoto';
 import { SOLAIRES } from '../ui/solaires';
 import { CloseCross } from './CloseCross';
@@ -1548,7 +1548,7 @@ export function WallElevation({
           {calqueVisible && (
             <CalquePhotoFond
               cadre={cadreDuMur!}
-              uri={`file://${photoDuCalque!.path}`}
+              uri={`file://${cheminVivant(photoDuCalque!.path)}`}
               calage={photoDuCalque!.calage}
               rideau={rideau}
             />
