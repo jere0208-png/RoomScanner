@@ -12,10 +12,15 @@
  * DE COULEUR libre. Des sols qu'on trouve en magasin, des teintes de meubles
  * qu'on trouve en magasin — une maquette fuchsia ne se montre à personne.
  *
+ * (Depuis, le patron a demandé un sélecteur RGB : les nuanciers restent en
+ * raccourcis, et une couleur libre se pose en plus — `solTeinte` pour le
+ * sol, un hexa hors nuancier pour un meuble. Voir `ui/peintures`.)
+ *
  * Tout cela habille la 3D et ne change rien au relevé : les clés s'enregistrent
  * avec la pièce, la teinte avec le meuble.
  */
 import { hexDePeinture, type Peinture } from './peintures';
+import { lireHex } from './couleurLibre';
 
 /** Un revêtement de sol : sa teinte, et le dessin de ses joints. */
 export interface Sol extends Peinture {
@@ -62,7 +67,15 @@ function meler(a: string, b: string, part: number): string {
  * décor était invisible sur le plan. Sa teinte, mêlée à moitié au fond du
  * plan, pour que les noms et les cotes restent lisibles. `null` sans choix.
  */
-export function solSurLePlan(cle: string | null | undefined, fond: string, part = 0.5): string | null {
+export function solSurLePlan(
+  cle: string | null | undefined,
+  fond: string,
+  part = 0.5,
+  /** La teinte libre du sol (`solTeinte`) : elle passe devant celle du nuancier. */
+  teinteLibre?: string | null,
+): string | null {
+  const libre = lireHex(teinteLibre);
+  if (libre) return meler(libre, fond, part);
   const s = solDe(cle);
   return s ? meler(s.hex, fond, part) : null;
 }
@@ -94,13 +107,27 @@ export function hexDeTeinte(cle: string | null | undefined): string | null {
   return TEINTE_PAR_CLE.get(cle)?.hex ?? null;
 }
 
+/**
+ * La clé de la teinte libre d'un meuble : aucune pastille du nuancier ne la
+ * porte, et « D'origine » ne se coche plus sur un meuble peint d'une couleur
+ * choisie au sélecteur.
+ */
+export const TEINTE_LIBRE = 'libre';
+
 /** La clé d'une teinte posée sur un meuble (il garde l'hexa, pas la clé). */
 export function cleDeTeinte(hex: string | null | undefined): string {
   if (!hex) return TEINTE_ORIGINE;
-  return TEINTES_MEUBLES.find((t) => t.hex.toLowerCase() === hex.toLowerCase())?.cle ?? TEINTE_ORIGINE;
+  return TEINTES_MEUBLES.find((t) => t.hex.toLowerCase() === hex.toLowerCase())?.cle ?? TEINTE_LIBRE;
 }
 
-type PieceHabillee = { id: string; peinture?: string; sol?: string; accents?: Record<string, string> };
+type PieceHabillee = {
+  id: string;
+  peinture?: string;
+  sol?: string;
+  /** La teinte libre du sol, `#RRGGBB` : la matière (`sol`) ne change pas. */
+  solTeinte?: string;
+  accents?: Record<string, string>;
+};
 
 /**
  * La peinture choisie de chaque pièce, prête pour la scène : pièce → teinte.
@@ -116,12 +143,23 @@ export function peinturesDesPieces(rooms: PieceHabillee[]): Record<string, strin
   return out;
 }
 
-/** Le sol choisi de chaque pièce, prêt pour la scène : teinte et joints. */
-export function solsDesPieces(rooms: PieceHabillee[]): Record<string, { hex: string; motif: Sol['motif'] }> {
-  const out: Record<string, { hex: string; motif: Sol['motif'] }> = {};
+/**
+ * Le sol choisi de chaque pièce, prêt pour la scène : teinte et joints.
+ *
+ * UNE TEINTE LIBRE GARDE LA MATIÈRE — un parquet reste un parquet, repeint
+ * de la couleur choisie au sélecteur. Sur un sol « selon la pièce », le
+ * motif reste INDÉFINI (`undefined`, pas `null`) : la scène garde alors la
+ * matière que le nom de la pièce suggère (`matieresDesSols`).
+ */
+export function solsDesPieces(
+  rooms: PieceHabillee[],
+): Record<string, { hex: string; motif?: Sol['motif'] }> {
+  const out: Record<string, { hex: string; motif?: Sol['motif'] }> = {};
   for (const r of rooms) {
     const s = solDe(r.sol);
-    if (s) out[r.id] = { hex: s.hex, motif: s.motif };
+    const libre = lireHex(r.solTeinte);
+    if (libre) out[r.id] = s ? { hex: libre, motif: s.motif } : { hex: libre };
+    else if (s) out[r.id] = { hex: s.hex, motif: s.motif };
   }
   return out;
 }

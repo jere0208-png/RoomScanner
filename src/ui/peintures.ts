@@ -17,9 +17,19 @@
  * marchand, choisies pour se tenir ensemble : quel que soit le tirage, la
  * maquette reste montrable.
  *
+ * LA DOCTRINE A BOUGÉ — relevé du patron, plus tard : « donne la
+ * possibilité de choisir beaucoup de couleurs pour meubles, murs, sols, dans
+ * une palette de sélection RGB ». Les treize restent EN TÊTE, comme des
+ * raccourcis montrables ; « Autre couleur… » ouvre le sélecteur libre
+ * (`components/NuancierLibre`), dont la couleur s'enregistre en `#RRGGBB`
+ * à la place de la clé. Une couleur libre n'a pas de pot au rayon : la liste
+ * d'achats écrit « Teinte sur mesure » et son code.
+ *
  * LE BLANC CASSÉ OUVRE LA LISTE parce qu'il est l'état de départ d'un mur —
  * choisir le premier de la liste, c'est revenir à ce qu'on avait.
  */
+
+import { estHex } from './couleurLibre';
 
 export interface Peinture {
   /** Ce qui s'enregistre dans le dossier. */
@@ -68,12 +78,32 @@ const PAR_CLE = new Map(PEINTURES.map((p) => [p.cle, p]));
  */
 export function hexDePeinture(cle: string | null | undefined): string | null {
   if (!cle) return null;
+  /*
+    UNE COULEUR LIBRE SE REND TELLE QUELLE — relevé du patron : « donne la
+    possibilité de choisir beaucoup de couleurs (...) dans une palette de
+    sélection RGB ». Le nuancier reste en raccourcis ; la clé d'une couleur
+    choisie au sélecteur EST son hexa (`#RRGGBB`), et aucune clé de palette
+    ne commence par « # ». Un hexa mal formé ne donne rien, comme une clé
+    inconnue.
+  */
+  if (cle.startsWith('#')) return estCouleurLibre(cle) ? cle : null;
   return PAR_CLE.get(cle)?.hex ?? null;
 }
+
+/** Une couleur libre, choisie au sélecteur RGB : `#RRGGBB`. */
+export function estCouleurLibre(cle: string | null | undefined): cle is string {
+  return estHex(cle);
+}
+
+/** Ce qu'on dit d'une couleur libre, partout où une teinte a un nom. */
+export const COULEUR_PERSONNALISEE = 'Couleur personnalisée';
+/** Une couleur libre ne se vend pas en pot : elle se fait faire. */
+export const TEINTE_SUR_MESURE = 'Teinte sur mesure';
 
 /** Le nom d'une clé, pour le dire à l'écran. */
 export function nomDePeinture(cle: string | null | undefined): string | null {
   if (!cle) return null;
+  if (cle.startsWith('#')) return estCouleurLibre(cle) ? COULEUR_PERSONNALISEE : null;
   return PAR_CLE.get(cle)?.nom ?? null;
 }
 
@@ -89,5 +119,11 @@ export function nomDeTeinte(cle: string): string {
     la liste d'achats écrivait « Sans teinte choisie ». Le mur, lui, est
     bien peint en blanc cassé : on le dit.
   */
+  /*
+    PAS DE POT DU COMMERCE POUR UNE COULEUR LIBRE — elle se fait teinter à
+    la machine, chez le marchand : la liste d'achats le dit, avec le code
+    à lui donner.
+  */
+  if (estCouleurLibre(cle)) return `${TEINTE_SUR_MESURE} ${cle.toUpperCase()}`;
   return nomDePeinture(cle || PEINTURE_DEFAUT) ?? 'Sans teinte choisie';
 }

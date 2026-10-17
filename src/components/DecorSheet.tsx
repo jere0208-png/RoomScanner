@@ -16,8 +16,11 @@ import type { ObjectData } from 'react-native-room-scan';
 import { SheetShell } from './Sheet';
 import { haptic } from '../ui/haptic';
 import { SOLAIRES } from '../ui/solaires';
-import { PEINTURES, type Peinture } from '../ui/peintures';
+import { COULEUR_PERSONNALISEE, PEINTURES, estCouleurLibre, hexDePeinture, type Peinture } from '../ui/peintures';
 import { SOLS, SOL_DEFAUT, TEINTES_MEUBLES, TEINTE_ORIGINE, cleDeTeinte, hexDeTeinte } from '../ui/habillage';
+import { lireHex } from '../ui/couleurLibre';
+import { NuancierLibre } from './NuancierLibre';
+import { VignetteMeuble } from './VignetteMeuble';
 import { nomDuMeuble } from '../geometry/furniture';
 import { useScanStore } from '../store/scanStore';
 import { niveauDe, nomDuNiveau, roomParts } from '../geometry/floorplan';
@@ -190,8 +193,32 @@ export const AMBIANCES: { cle: string; nom: string; peinture: string; sol: strin
   { cle: 'origine', nom: 'D’origine', peinture: ORIGINE, sol: SOL_DEFAUT },
 ];
 
-const hexPeinture = (cle: string) => PEINTURES.find((p) => p.cle === cle)?.hex ?? MUR_RELEVE.hex;
-const hexSol = (cle: string) => SOLS.find((p) => p.cle === cle)?.hex ?? '#D9CBB4';
+// Une clé du nuancier, ou une couleur libre (`#RRGGBB`) : `hexDePeinture` lit les deux.
+const hexPeinture = (cle: string) => hexDePeinture(cle) ?? MUR_RELEVE.hex;
+const hexSol = (cle: string, teinteLibre?: string) =>
+  lireHex(teinteLibre) ?? SOLS.find((p) => p.cle === cle)?.hex ?? '#D9CBB4';
+
+/*
+  « AUTRE COULEUR… » — relevé du patron : « donne la possibilité de choisir
+  beaucoup de couleurs pour meubles, murs, sols, dans une palette de
+  sélection RGB ». La dernière pastille de chaque nuancier ouvre le
+  sélecteur (`NuancierLibre`), posé sur la couleur du moment ; les teintes
+  du nuancier restent devant, en raccourcis.
+*/
+/** La clé qu'aucune pastille du nuancier ne porte : la couleur est libre. */
+const PRISE_LIBRE = '#libre';
+/** Les six quartiers de l'arc-en-ciel de la pastille « Autre couleur… ». */
+const ARC_EN_CIEL = ['#FF4D4D', '#FFB23F', '#F5E663', '#4CD07D', '#3E8BFF', '#A35BFF'];
+const quartier = (i: number, n: number) => {
+  const a0 = (i / n) * Math.PI * 2 - Math.PI / 2;
+  const a1 = ((i + 1) / n) * Math.PI * 2 - Math.PI / 2;
+  const p = (a: number) => `${(12 + 12 * Math.cos(a)).toFixed(3)} ${(12 + 12 * Math.sin(a)).toFixed(3)}`;
+  return `M12 12 L${p(a0)} A12 12 0 0 1 ${p(a1)} Z`;
+};
+
+/** La taille des vignettes de meuble, en points : dans la carte, et en grand. */
+export const VIGNETTE_CARTE = { largeur: 92, hauteur: 54 };
+export const VIGNETTE_GRANDE = { largeur: 168, hauteur: 104 };
 
 export function DecorSheet({
   visible,
@@ -320,27 +347,53 @@ export function DecorSheet({
     ]);
   };
   const [meubleId, setMeubleId] = useState<string | null>(null);
+  /** Le sélecteur libre ouvert, et pour quoi. */
+  const [libre, setLibre] = useState<Onglet | null>(null);
+  /** Un doigt dans le sélecteur : la liste ne défile pas sous lui. */
+  const [geste, setGeste] = useState(false);
+  const corps = useRef<ScrollView>(null);
+  const versLeSelecteur = useRef(false);
   // Une autre pièce : on repart des murs, sans meuble choisi.
   useEffect(() => {
     setOnglet((o) => (o === 'ambiances' ? o : 'murs'));
     setMeubleId(null);
   }, [piece?.id]);
+  // Un autre onglet, un autre meuble, une autre pièce : le sélecteur se referme.
+  useEffect(() => {
+    setLibre(null);
+    setGeste(false);
+  }, [onglet, meubleId, piece?.id, visible]);
   const meuble = meubles.find((o) => o.id === meubleId) ?? meubles[0] ?? null;
   const peinture = piece
     ? piece.peinture
-      ? PEINTURES.find((p) => p.cle === piece.peinture) ?? { cle: piece.peinture, nom: 'Teinte inconnue', hex: MUR_RELEVE.hex }
+      ? estCouleurLibre(piece.peinture)
+        ? { cle: piece.peinture, nom: COULEUR_PERSONNALISEE, hex: piece.peinture }
+        : PEINTURES.find((p) => p.cle === piece.peinture) ?? { cle: piece.peinture, nom: 'Teinte inconnue', hex: MUR_RELEVE.hex }
       : MUR_RELEVE
     : undefined;
-  const sol = piece
+  const solDuNuancier = piece
     ? SOLS.find((p) => p.cle === (piece.sol ?? SOL_DEFAUT)) ?? { cle: piece.sol ?? '', nom: 'Sol inconnu', hex: '#D9CBB4', motif: null }
     : undefined;
+  /*
+    LA TEINTE LIBRE DU SOL garde sa matière : « Chêne clair, teinte libre »
+    reste un parquet, repeint.
+  */
+  const solLibre = lireHex(piece?.solTeinte);
+  const sol =
+    solDuNuancier && solLibre
+      ? {
+          ...solDuNuancier,
+          hex: solLibre,
+          nom: solDuNuancier.cle === SOL_DEFAUT ? COULEUR_PERSONNALISEE : `${solDuNuancier.nom}, teinte libre`,
+        }
+      : solDuNuancier;
   /*
     UNE TEINTE HORS NUANCIER SE DIT — revue « Hugo » : « D’origine » se
     cochait sur un meuble peint d'une couleur que le nuancier ne connaît pas.
   */
   const pastilleDe = (o: ObjectData) => {
     if (o.teinte && !TEINTES_MEUBLES.some((t) => t.hex.toLowerCase() === o.teinte!.toLowerCase())) {
-      return { cle: '', nom: 'Teinte personnalisée', hex: o.teinte };
+      return { cle: PRISE_LIBRE, nom: COULEUR_PERSONNALISEE, hex: o.teinte };
     }
     return TEINTES_MEUBLES.find((p) => p.cle === (o.teinte ? cleDeTeinte(o.teinte) : TEINTE_ORIGINE));
   };
@@ -352,10 +405,16 @@ export function DecorSheet({
     fait();
     if (st().rooms !== avant || st().objects !== avantMeubles) setFaits((n) => n + 1);
   };
+  /*
+    « TOUT LE LOGEMENT » VAUT AUSSI POUR LES MURS ET LE SOL — et pour une
+    couleur libre : la même teinte partout, en UN geste qu'« Annuler » défait.
+  */
+  const visees = (roomId: string) => (partout ? nommees.map((r) => r.id) : [roomId]);
   const peindre = (roomId: string, cle: string) =>
-    compter(() => st().setRoomPeinture(roomId, cle === ORIGINE ? null : cle));
+    compter(() => st().setPeintureDesPieces(visees(roomId), cle === ORIGINE ? null : cle));
   const poserSol = (roomId: string, cle: string) =>
-    compter(() => st().setRoomSol(roomId, cle === SOL_DEFAUT ? null : cle));
+    compter(() => st().setSolDesPieces(visees(roomId), cle === SOL_DEFAUT ? null : cle));
+  const teinterSol = (roomId: string, hex: string) => compter(() => st().setSolTeinteDesPieces(visees(roomId), hex));
   /** L'ambiance, sur la pièce — ou sur tout le logement. */
   const appliquer = (a: { peinture: string; sol: string }) => {
     if (!piece) return;
@@ -408,7 +467,9 @@ export function DecorSheet({
     return pots > 0 ? { pots, pot: hypotheses.pot } : null;
   }, [piece, teintePosee, walls, openings, rooms, hypotheses]);
   const ambianceActuelle = piece
-    ? AMBIANCES.find((a) => a.peinture === (piece.peinture ?? ORIGINE) && a.sol === (piece.sol ?? SOL_DEFAUT))
+    ? AMBIANCES.find(
+        (a) => !piece.solTeinte && a.peinture === (piece.peinture ?? ORIGINE) && a.sol === (piece.sol ?? SOL_DEFAUT),
+      )
     : undefined;
 
   /** Une grille de pastilles : la coche sur celle qui est prise, qui grossit. */
@@ -418,6 +479,7 @@ export function DecorSheet({
     dire: (p: Peinture) => string,
     choisir: (cle: string) => void,
     taille = 46,
+    autre?: { hex: string; actif: boolean; quoi: string; ouvert: boolean; ouvrir: () => void },
   ) => (
     <View style={s.nuancier}>
       {liste.map((p) => {
@@ -473,8 +535,118 @@ export function DecorSheet({
           </View>
         );
       })}
+      {autre ? (
+        <View style={s.teinte}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${autre.quoi} : autre couleur…`}
+            accessibilityHint="Ouvre le sélecteur de couleur RGB"
+            accessibilityState={{ selected: autre.actif, expanded: autre.ouvert }}
+            hitSlop={4}
+            testID={`autre-couleur-${onglet}`}
+            onPress={() => {
+              haptic('leger');
+              autre.ouvrir();
+            }}
+            style={({ pressed }) => [
+              s.pastille,
+              { width: taille, height: taille, borderRadius: taille / 2 },
+              (autre.actif || autre.ouvert) && { borderColor: c.blue, borderWidth: 3, transform: [{ scale: 1.08 }] },
+              pressed && { transform: [{ scale: 0.92 }] },
+            ]}>
+            {/* L'arc-en-ciel, et la couleur libre du moment au cœur. */}
+            <Svg width={taille} height={taille} viewBox="0 0 24 24" style={StyleSheet.absoluteFill}>
+              {ARC_EN_CIEL.map((t, i) => (
+                <Path key={t} d={quartier(i, ARC_EN_CIEL.length)} fill={t} />
+              ))}
+            </Svg>
+            <View
+              style={[
+                s.autreCoeur,
+                { width: taille * 0.5, height: taille * 0.5, borderRadius: taille * 0.25 },
+                { backgroundColor: autre.actif ? autre.hex : c.surface },
+              ]}>
+              {autre.actif ? null : (
+                <Svg width={taille * 0.3} height={taille * 0.3} viewBox="0 0 24 24">
+                  <Path d="M12 5v14M5 12h14" stroke={c.ink} strokeWidth={3} strokeLinecap="round" />
+                </Svg>
+              )}
+            </View>
+          </Pressable>
+          <Text style={[s.teinteNom, autre.actif && s.teinteNomPrise]} numberOfLines={2}>
+            {autre.actif ? autre.hex.toUpperCase() : 'Autre couleur…'}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
+
+  /** Ouvre (ou referme) le sélecteur libre de l'onglet, et y fait défiler la liste. */
+  const basculerLibre = (quoi: Onglet) => {
+    setLibre((l) => {
+      const ouvre = l !== quoi;
+      versLeSelecteur.current = ouvre;
+      return ouvre ? quoi : null;
+    });
+  };
+  /** Le sélecteur libre, sous le nuancier de l'onglet. */
+  const selecteur = (titre: string, initiale: string, appliquerTel: (hex: string) => void) => {
+    /*
+      LA MÊME COULEUR NE CHANGE RIEN — ouvrir le sélecteur sur « Vert sauge »
+      et valider sans y toucher ne doit pas changer la clé du nuancier en
+      couleur libre (ni compter un geste). Sauf sur « Tout le logement » :
+      c'est alors étendre la couleur aux autres pièces.
+    */
+    const appliquer = (hex: string) => {
+      if (!partout && hex.toUpperCase() === initiale.toUpperCase()) return;
+      appliquerTel(hex);
+    };
+    return (
+      <View
+        key={`libre-${onglet}-${piece?.id ?? ''}-${meuble?.id ?? ''}`}
+        onLayout={(e) => {
+          if (!versLeSelecteur.current) return;
+          versLeSelecteur.current = false;
+          corps.current?.scrollTo?.({ y: Math.max(0, e.nativeEvent.layout.y - 8), animated: true });
+        }}>
+        <NuancierLibre
+          titre={titre}
+          initiale={initiale}
+          onGeste={setGeste}
+          onLacher={appliquer}
+          onAppliquer={(hex) => {
+            appliquer(hex);
+            setLibre(null);
+            setGeste(false);
+          }}
+          onFermer={() => {
+            setLibre(null);
+            setGeste(false);
+          }}
+          enTete={onglet !== 'meubles' ? portee() : null}
+        />
+      </View>
+    );
+  };
+
+  /** « Cette pièce » / « Tout le logement » : là où l'on choisit une ambiance, une peinture, un sol. */
+  const portee = () =>
+    nommees.length > 1 ? (
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityLabel="Tout le logement"
+        accessibilityState={{ checked: partout }}
+        hitSlop={7}
+        style={[s.portee, partout && s.porteeOn]}
+        onPress={() => {
+          haptic('leger');
+          setPartout((v) => !v);
+        }}>
+        <Text style={[s.porteeTexte, partout && s.porteeTexteOn]}>
+          {partout ? `Tout le logement · ${nommees.length} pièces` : 'Cette pièce'}
+        </Text>
+      </Pressable>
+    ) : null;
 
   /*
     QUATRE TUILES, CE QU'ON CHANGE — la refonte. Les puces des pièces, les
@@ -598,7 +770,7 @@ export function DecorSheet({
                     }}>
                     <View style={s.puceTeintes}>
                       <View style={[s.puceTeinte, { backgroundColor: hexPeinture(r.peinture ?? ORIGINE) }]} />
-                      <View style={[s.puceTeinte, s.puceTeinte2, { backgroundColor: hexSol(r.sol ?? SOL_DEFAUT) }]} />
+                      <View style={[s.puceTeinte, s.puceTeinte2, { backgroundColor: hexSol(r.sol ?? SOL_DEFAUT, r.solTeinte) }]} />
                     </View>
                     <View style={s.puceMots}>
                       <Text style={[s.puceTexte, prise && s.puceTextePris]} numberOfLines={1}>
@@ -695,9 +867,11 @@ export function DecorSheet({
           )}
 
           <ScrollView
+            ref={corps}
             style={s.corps}
             contentContainerStyle={s.corpsFond}
             showsVerticalScrollIndicator={false}
+            scrollEnabled={!geste}
             keyboardShouldPersistTaps="handled"
             onTouchStart={() => (repos.current = Date.now())}
             onScrollBeginDrag={() => (repos.current = Date.now())}>
@@ -705,21 +879,7 @@ export function DecorSheet({
               <>
                 <View style={s.ligneTitre}>
                   <Text style={s.section}>Une ambiance, en un appui</Text>
-                  {nommees.length > 1 && (
-                    <Pressable
-                      accessibilityRole="switch"
-                      accessibilityLabel="Tout le logement"
-                      accessibilityState={{ checked: partout }}
-                      style={[s.portee, partout && s.porteeOn]}
-                      onPress={() => {
-                        haptic('leger');
-                        setPartout((v) => !v);
-                      }}>
-                      <Text style={[s.porteeTexte, partout && s.porteeTexteOn]}>
-                        {partout ? `Tout le logement · ${nommees.length} pièces` : 'Cette pièce'}
-                      </Text>
-                    </Pressable>
-                  )}
+                  {portee()}
                 </View>
                 <View style={s.ambiances}>
                   <Pressable
@@ -763,8 +923,10 @@ export function DecorSheet({
                   <View style={s.pots} testID="pots-de-la-piece">
                     <Text
                       style={s.potsTexte}
-                      accessibilityLabel={`Environ ${potsDeLaPiece.pots} pot${potsDeLaPiece.pots > 1 ? 's' : ''} de ${nombre(potsDeLaPiece.pot)} litres pour les murs de cette pièce`}>
+                      accessibilityLabel={`Environ ${potsDeLaPiece.pots} pot${potsDeLaPiece.pots > 1 ? 's' : ''} de ${nombre(potsDeLaPiece.pot)} litres pour les murs de cette pièce${estCouleurLibre(teintePosee) ? ', teinte sur mesure' : ''}`}>
                       {`≈ ${potsDeLaPiece.pots} pot${potsDeLaPiece.pots > 1 ? 's' : ''} de ${nombre(potsDeLaPiece.pot)}\u00A0L`}
+                      {/* Une couleur libre n'a pas de pot au rayon : elle se fait teinter. */}
+                      {estCouleurLibre(teintePosee) ? ' · teinte sur mesure' : ''}
                     </Text>
                     {onAchats ? (
                       <Pressable
@@ -777,13 +939,28 @@ export function DecorSheet({
                     ) : null}
                   </View>
                 ) : null}
-                <Text style={s.section}>{nbsp(`Les murs : ${peinture?.nom ?? ''}`)}</Text>
+                <View style={s.ligneTitre}>
+                  <Text style={s.section}>
+                    {nbsp(`Les murs : ${peinture?.nom ?? ''}${estCouleurLibre(piece.peinture) ? ` ${piece.peinture}` : ''}`)}
+                  </Text>
+                  {libre === 'murs' ? null : portee()}
+                </View>
                 {nuancier(
                   [MUR_RELEVE, ...PEINTURES],
-                  piece.peinture ?? ORIGINE,
+                  estCouleurLibre(piece.peinture) ? PRISE_LIBRE : piece.peinture ?? ORIGINE,
                   (p) => `Murs : ${p.nom}`,
                   (cle) => peindre(piece.id, cle),
+                  46,
+                  {
+                    hex: peinture?.hex ?? MUR_RELEVE.hex,
+                    actif: estCouleurLibre(piece.peinture),
+                    quoi: 'Murs',
+                    ouvert: libre === 'murs',
+                    ouvrir: () => basculerLibre('murs'),
+                  },
                 )}
+                {libre === 'murs' &&
+                  selecteur('Couleur des murs', peinture?.hex ?? MUR_RELEVE.hex, (hex) => peindre(piece.id, hex))}
                 {/*
                   LA COULEUR MÈNE AUX POTS — revue « Bernard » : choisir la
                   teinte et compter les pots vivaient à deux endroits sans
@@ -805,8 +982,35 @@ export function DecorSheet({
             )}
             {piece && onglet === 'sol' && (
               <>
-                <Text style={s.section}>{nbsp(`Le sol : ${sol?.nom ?? ''}`)}</Text>
-                {nuancier(SOLS, piece.sol ?? SOL_DEFAUT, (p) => `Sol : ${p.nom}`, (cle) => poserSol(piece.id, cle))}
+                <View style={s.ligneTitre}>
+                  <Text style={s.section}>{nbsp(`Le sol : ${sol?.nom ?? ''}${solLibre ? ` ${solLibre}` : ''}`)}</Text>
+                  {libre === 'sol' ? null : portee()}
+                </View>
+                {nuancier(
+                  SOLS,
+                  solLibre ? PRISE_LIBRE : piece.sol ?? SOL_DEFAUT,
+                  (p) => `Sol : ${p.nom}`,
+                  (cle) => poserSol(piece.id, cle),
+                  46,
+                  {
+                    hex: sol?.hex ?? '#D9CBB4',
+                    actif: !!solLibre,
+                    quoi: 'Sol',
+                    ouvert: libre === 'sol',
+                    ouvrir: () => basculerLibre('sol'),
+                  },
+                )}
+                {libre === 'sol' &&
+                  selecteur(
+                    solDuNuancier && solDuNuancier.cle !== SOL_DEFAUT
+                      ? `Teinte du sol · ${solDuNuancier.nom}`
+                      : 'Teinte du sol',
+                    sol?.hex ?? '#D9CBB4',
+                    (hex) => teinterSol(piece.id, hex),
+                  )}
+                <Text style={s.aide}>
+                  Une autre couleur garde la matière du sol : un parquet reste un parquet, teinté.
+                </Text>
               </>
             )}
             {piece && onglet === 'meubles' && (
@@ -841,7 +1045,19 @@ export function DecorSheet({
                             haptic('leger');
                             setMeubleId(o.id);
                           }}>
+                          {/*
+                            LE MODÈLE DU MEUBLE, À SA TEINTE — relevé du patron :
+                            « le choix des meubles dans Décorer doit afficher le
+                            modèle du meuble choisi ». La pastille reste, en
+                            petit, par-dessus : la teinte se lit d'un coup d'œil.
+                          */}
                           <View style={s.meubleHaut}>
+                            <VignetteMeuble
+                              objet={o}
+                              largeur={VIGNETTE_CARTE.largeur}
+                              hauteur={VIGNETTE_CARTE.hauteur}
+                              testID={`vignette-meuble-${o.id}`}
+                            />
                             <View style={[s.meubleTeinte, { backgroundColor: teinte?.hex ?? c.surface }]} />
                             {rang ? (
                               <View style={s.meubleRang}>
@@ -858,16 +1074,41 @@ export function DecorSheet({
                   </ScrollView>
                   {(() => {
                     const nom = nomsDesMeubles.get(meuble.id) ?? nomDuMeuble(meuble);
+                    const pastille = pastilleDe(meuble);
+                    const horsNuancier = pastille?.cle === PRISE_LIBRE;
                     return (
                       <>
-                        <Text style={s.section}>{nbsp(`${nom} : ${pastilleDe(meuble)?.nom ?? ''}`)}</Text>
+                        <Text style={s.section}>
+                          {nbsp(`${nom} : ${pastille?.nom ?? ''}${horsNuancier ? ` ${pastille.hex.toUpperCase()}` : ''}`)}
+                        </Text>
+                        {/* Le meuble choisi, en grand, au-dessus de son nuancier. */}
+                        <View style={s.meubleGrand} testID="vignette-meuble-choisi">
+                          <VignetteMeuble
+                            objet={meuble}
+                            largeur={VIGNETTE_GRANDE.largeur}
+                            hauteur={VIGNETTE_GRANDE.hauteur}
+                            devant
+                            testID={`vignette-grande-${meuble.id}`}
+                          />
+                        </View>
                         {nuancier(
                           TEINTES_MEUBLES,
-                          meuble.teinte ? cleDeTeinte(meuble.teinte) : TEINTE_ORIGINE,
+                          horsNuancier ? PRISE_LIBRE : meuble.teinte ? cleDeTeinte(meuble.teinte) : TEINTE_ORIGINE,
                           (p) => `${nom} : ${p.nom}`,
                           (cle) => compter(() => st().setObjectTeinte(meuble.id, hexDeTeinte(cle))),
                           44,
+                          {
+                            hex: pastille?.hex ?? '#D8E1F2',
+                            actif: horsNuancier,
+                            quoi: nom,
+                            ouvert: libre === 'meubles',
+                            ouvrir: () => basculerLibre('meubles'),
+                          },
                         )}
+                        {libre === 'meubles' &&
+                          selecteur(`Couleur · ${nom}`, meuble.teinte ?? pastille?.hex ?? '#D8E1F2', (hex) =>
+                            compter(() => st().setObjectTeinte(meuble.id, hex)),
+                          )}
                       </>
                     );
                   })()}
@@ -1024,6 +1265,7 @@ const getStyles = themedStyles((c: Palette) =>
     corpsFond: { paddingBottom: 18 },
     ligneTitre: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
     section: {
+      flexShrink: 1,
       color: c.inkSoft,
       fontSize: 12,
       fontWeight: '800',
@@ -1076,21 +1318,35 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
       overflow: 'hidden',
     },
-    meublesBande: { flexGrow: 0, flexShrink: 0, height: 96, marginTop: 12 },
+    meublesBande: { flexGrow: 0, flexShrink: 0, height: 120, marginTop: 12 },
     meubles: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingRight: 8 },
     meubleCarte: {
-      width: 104,
-      height: 88,
+      width: 112,
+      height: 112,
       borderRadius: radius.md,
       backgroundColor: c.surfaceSunken,
-      padding: 10,
+      padding: 8,
       borderWidth: 2,
       borderColor: 'transparent',
       justifyContent: 'space-between',
     },
     meubleCartePrise: { borderColor: c.blue, backgroundColor: c.surface },
-    meubleHaut: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    meubleHaut: { width: 92, height: 54, alignSelf: 'center' },
+    meubleGrand: {
+      alignSelf: 'center',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '100%',
+      height: 120,
+      marginBottom: 12,
+      borderRadius: radius.md,
+      backgroundColor: c.surfaceSunken,
+    },
+    autreCoeur: { borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
     meubleRang: {
+      position: 'absolute',
+      top: -2,
+      right: -2,
       minWidth: 22,
       height: 22,
       borderRadius: 11,
@@ -1100,7 +1356,17 @@ const getStyles = themedStyles((c: Palette) =>
       justifyContent: 'center',
     },
     meubleRangTexte: { color: c.surface, fontSize: 12, fontWeight: '800' },
-    meubleTeinte: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: c.line, alignItems: 'center', justifyContent: 'center' },
+    // La pastille de teinte, en petit, sur la vignette.
+    meubleTeinte: {
+      position: 'absolute',
+      top: -2,
+      left: -2,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      borderWidth: 2,
+      borderColor: c.surface,
+    },
     meubleNom: { color: c.ink, fontSize: 13, fontWeight: '600' },
     meubleNomPris: { fontWeight: '800' },
     vide: { color: c.inkSoft, fontSize: 13.5, lineHeight: 19, marginTop: 10 },

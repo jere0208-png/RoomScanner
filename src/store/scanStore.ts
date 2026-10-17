@@ -236,6 +236,13 @@ export interface RoomEntry {
    */
   sol?: string;
   /**
+   * LA TEINTE LIBRE DU SOL — `#RRGGBB`, choisie au sélecteur RGB de Décorer.
+   * Elle repeint le sol SANS changer sa matière (`sol`, ou celle que le nom
+   * de la pièce suggère) : un parquet reste un parquet. Choisir un sol du
+   * nuancier la retire — il porte sa propre teinte.
+   */
+  solTeinte?: string;
+  /**
    * LES MURS D'ACCENT — identifiant de mur → clé de peinture. Seule la face
    * qui regarde CETTE pièce prend la teinte : le mur d'accent du séjour ne
    * déborde pas dans la chambre voisine.
@@ -2240,6 +2247,14 @@ interface ScanState {
   setRoomSol: (roomId: string, cle: string | null) => void;
   /** Une ambiance : murs et sol de plusieurs pièces, en UN geste annulable. */
   appliquerAmbiance: (roomIds: string[], peinture: string | null, sol: string | null) => void;
+  /** Peint les murs de plusieurs pièces (« Tout le logement »), en UN geste annulable. */
+  setPeintureDesPieces: (roomIds: string[], cle: string | null) => void;
+  /** Pose le même sol sur plusieurs pièces, en UN geste annulable. */
+  setSolDesPieces: (roomIds: string[], cle: string | null) => void;
+  /** La teinte libre du sol d'une pièce (#RRGGBB). `null` rend celle du nuancier. */
+  setRoomSolTeinte: (roomId: string, hex: string | null) => void;
+  /** La même teinte libre de sol sur plusieurs pièces, en UN geste annulable. */
+  setSolTeinteDesPieces: (roomIds: string[], hex: string | null) => void;
   /** Peint un mur d'une pièce, côté pièce. `null` lui rend la teinte de la pièce. */
   setMurAccent: (roomId: string, wallId: string, cle: string | null) => void;
   /** Teinte un meuble (#RRGGBB). `null` lui rend sa couleur d'origine. */
@@ -3739,6 +3754,7 @@ export const useScanStore = create<ScanState>((set, get) => {
         ...(kept?.peinture ? { peinture: kept.peinture } : {}),
         ...(kept?.hauteur ? { hauteur: kept.hauteur } : {}),
         ...(kept?.sol ? { sol: kept.sol } : {}),
+        ...(kept?.solTeinte ? { solTeinte: kept.solTeinte } : {}),
         ...(accents ? { accents } : {}),
         ...(seule && kept?.releve ? { releve: kept.releve } : {}),
       };
@@ -4674,15 +4690,75 @@ export const useScanStore = create<ScanState>((set, get) => {
       règles que la peinture : annulable, et le champ s'EFFACE plutôt que de
       valoir « null ».
     */
-    setRoomSol: (roomId, cle) => {
+    /*
+      UN SOL DU NUANCIER PORTE SA TEINTE — il retire la teinte libre : sans
+      quoi « Noyer » choisi après une teinte libre ne changerait rien à
+      l'écran.
+    */
+    setRoomSol: (roomId, cle) => get().setSolDesPieces([roomId], cle),
+
+    setSolDesPieces: (roomIds, cle) => {
       const st = get();
-      const piece = st.rooms.find((r) => r.id === roomId);
-      if (!piece || (piece.sol ?? null) === cle) return;
-      pushHistory(`sol-${roomId}`);
+      const vise = new Set(roomIds);
+      const change = st.rooms.some((r) => vise.has(r.id) && ((r.sol ?? null) !== cle || !!r.solTeinte));
+      if (!change) return;
+      pushHistory(roomIds.length === 1 ? `sol-${roomIds[0]}` : 'sol-pieces');
       set({
-        rooms: st.rooms.map((r) =>
-          r.id === roomId ? (cle ? { ...r, sol: cle } : (({ sol: _retire, ...reste }) => reste)(r)) : r,
-        ),
+        rooms: st.rooms.map((r) => {
+          if (!vise.has(r.id)) return r;
+          const reste = { ...r };
+          delete reste.sol;
+          delete reste.solTeinte;
+          return cle ? { ...reste, sol: cle } : reste;
+        }),
+        dirty: true,
+      });
+    },
+
+    setRoomSolTeinte: (roomId, hex) => get().setSolTeinteDesPieces([roomId], hex),
+
+    /*
+      LA TEINTE LIBRE DU SOL — un geste, annulable, sur une pièce ou sur tout
+      le logement. La matière (`sol`) ne bouge pas ; le champ s'EFFACE plutôt
+      que de valoir « null », comme les autres.
+    */
+    setSolTeinteDesPieces: (roomIds, hex) => {
+      const st = get();
+      const vise = new Set(roomIds);
+      const propre = hex && /^#[0-9A-Fa-f]{6}$/.test(hex) ? hex.toUpperCase() : null;
+      if (hex && !propre) return;
+      const change = st.rooms.some((r) => vise.has(r.id) && (r.solTeinte ?? null) !== propre);
+      if (!change) return;
+      pushHistory(roomIds.length === 1 ? `sol-teinte-${roomIds[0]}` : 'sol-teinte-pieces');
+      set({
+        rooms: st.rooms.map((r) => {
+          if (!vise.has(r.id)) return r;
+          const reste = { ...r };
+          delete reste.solTeinte;
+          return propre ? { ...reste, solTeinte: propre } : reste;
+        }),
+        dirty: true,
+      });
+    },
+
+    /* « Tout le logement » : la même peinture partout, UN « Annuler ». */
+    setPeintureDesPieces: (roomIds, cle) => {
+      if (roomIds.length === 1) {
+        get().setRoomPeinture(roomIds[0], cle);
+        return;
+      }
+      const st = get();
+      const vise = new Set(roomIds);
+      const change = st.rooms.some((r) => vise.has(r.id) && (r.peinture ?? null) !== cle);
+      if (!change) return;
+      pushHistory('peinture-pieces');
+      set({
+        rooms: st.rooms.map((r) => {
+          if (!vise.has(r.id)) return r;
+          const reste = { ...r };
+          delete reste.peinture;
+          return cle ? { ...reste, peinture: cle } : reste;
+        }),
         dirty: true,
       });
     },
@@ -4696,7 +4772,7 @@ export const useScanStore = create<ScanState>((set, get) => {
       const st = get();
       const vise = new Set(roomIds);
       const change = st.rooms.some(
-        (r) => vise.has(r.id) && ((r.peinture ?? null) !== peinture || (r.sol ?? null) !== sol),
+        (r) => vise.has(r.id) && ((r.peinture ?? null) !== peinture || (r.sol ?? null) !== sol || !!r.solTeinte),
       );
       if (!change) return;
       pushHistory('ambiance');
@@ -4706,6 +4782,8 @@ export const useScanStore = create<ScanState>((set, get) => {
           const reste = { ...r };
           delete reste.peinture;
           delete reste.sol;
+          // L'ambiance pose son sol, avec sa teinte : la teinte libre s'en va.
+          delete reste.solTeinte;
           return { ...reste, ...(peinture ? { peinture } : {}), ...(sol ? { sol } : {}) };
         }),
         dirty: true,

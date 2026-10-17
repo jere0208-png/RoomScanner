@@ -1893,7 +1893,8 @@ export function FloorplanEditor({
     () => (roomId: string) => {
       const fond = planElec ? c.surface : c.surfaceSunken;
       if (planElec) return fond;
-      return solSurLePlan((roomById.get(roomId) as { sol?: string } | undefined)?.sol, fond) ?? fond;
+      const piece = roomById.get(roomId) as { sol?: string; solTeinte?: string } | undefined;
+      return solSurLePlan(piece?.sol, fond, 0.5, piece?.solTeinte) ?? fond;
     },
     [c, planElec, roomById],
   );

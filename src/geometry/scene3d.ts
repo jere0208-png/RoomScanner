@@ -1440,7 +1440,7 @@ export interface SceneOptions {
    * LE SOL CHOISI, pièce par pièce (`ui/habillage`) : sa teinte, et le
    * dessin de ses joints. Il passe devant la matière devinée par le nom.
    */
-  sols?: Record<string, { hex: string; motif: 'parquet' | 'carrelage' | null } | undefined>;
+  sols?: Record<string, { hex: string; motif?: 'parquet' | 'carrelage' | null } | undefined>;
   /**
    * LES MURS D'ACCENT : pièce → mur → teinte. La face d'un mur qui regarde
    * cette pièce prend cette teinte plutôt que celle de la pièce.
@@ -1979,9 +1979,10 @@ export function buildScene(
       EST, le choix dit ce qu'on PROJETTE, et c'est lui qu'on veut voir.
     */
     const choisi = opts.sols?.[part.roomId];
-    const matiere: 'parquet' | 'carrelage' | undefined = choisi
-      ? choisi.motif ?? undefined
-      : opts.matieres?.[part.roomId];
+    // Un motif absent (une teinte libre sur un sol « selon la pièce ») garde
+    // la matière devinée ; un motif `null` (béton, moquette) n'en a pas.
+    const matiere: 'parquet' | 'carrelage' | undefined =
+      choisi && choisi.motif !== undefined ? choisi.motif ?? undefined : opts.matieres?.[part.roomId];
     const fondMatiere =
       matiere === 'parquet'
         ? mixHex(pal.floor, '#C89A66', 0.55)

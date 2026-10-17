@@ -101,7 +101,7 @@ export function buildObjMaison(
  * de .mtl à égarer en chemin.
  */
 function facesDuModele(model: ModelForExport): Face3D[] {
-  const pieces = (model.rooms ?? []) as (RoomShape & { peinture?: string; sol?: string; accents?: Record<string, string> })[];
+  const pieces = (model.rooms ?? []) as (RoomShape & { peinture?: string; sol?: string; solTeinte?: string; accents?: Record<string, string> })[];
   const scene = buildScene(model.walls, model.openings, model.objects, {
     palette: MAQUETTE,
     showSurfaces: true,
