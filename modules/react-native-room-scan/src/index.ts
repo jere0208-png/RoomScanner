@@ -397,8 +397,6 @@ export const RoomScanVisite = UIManager.getViewManagerConfig?.(
         fond: string;
         /* La température des lampes de la visite, en kelvins (voir `temperatureLampes`). */
         temperature?: number;
-        /* L'intensité des lampes de la visite, en pour cent (voir `intensiteLampes`). */
-        intensite?: number;
         /* La pièce de chaque triangle du maillage, de chaque sol (voir `maillageDeLaVisite`). */
         piecesDuMaillage?: number[];
         piecesDesSols?: number[];

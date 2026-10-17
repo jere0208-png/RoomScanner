@@ -66,22 +66,18 @@ const dep = (id: string, organe: DepartExistant['organe'], rangee: number, calib
 
 describe('la lumière de la visite', () => {
   const natif = lire('modules', 'react-native-room-scan', 'ios', 'RoomScanVisite.swift');
-  const debut = natif.indexOf('private func lumieres(genre: Int');
+  const debut = natif.indexOf('static func puissance(_ genre: Int)');
   const corps = natif.slice(debut, natif.indexOf('\n  }\n', debut));
 
-  it('des lampes plus douces : aucune ne dépasse 260', () => {
-    const forces = [...corps.matchAll(/intensite: (\d+)|l\.intensity = (\d+)/g)].map((m) => Number(m[1] ?? m[2]));
-    expect(forces.length).toBeGreaterThanOrEqual(6);
-    expect(Math.max(...forces)).toBeLessThanOrEqual(260);
+  it('des lampes plus douces : aucun luminaire ne dépasse 360 (une applique, deux faisceaux d’hier)', () => {
+    const forces = [...corps.matchAll(/return (\d+)/g)].map((m) => Number(m[1]));
+    expect(forces.length).toBeGreaterThanOrEqual(5);
+    expect(Math.max(...forces)).toBeLessThanOrEqual(360);
   });
 
-  it('elles éclairent la pièce, et ne blanchissent plus les meubles', () => {
-    // Les faisceaux ne touchent que le bâti ; les meubles ont leur lueur, douce.
-    expect(corps).toContain('l.categoryBitMask = masque');
+  it('elles éclairent la pièce, et ne touchent pas les meubles', () => {
+    expect(natif).toMatch(/l\.categoryBitMask = piece >= 0 \? Self\.masqueDeLaPiece\(piece\) : Self\.MASQUE_PIECE/);
     expect(natif).toMatch(/categoryBitMask = Self\.MASQUE_MEUBLE/);
-    const lueur = natif.slice(natif.indexOf('private func lueurDesMeubles'));
-    const force = Number(/l\.intensity = (\d+)/.exec(lueur)![1]);
-    expect(force).toBeLessThanOrEqual(90);
   });
 
   it('la lumière se voit à sa source : un halo autour du luminaire allumé', () => {

@@ -34,13 +34,9 @@ describe('la lumière des meubles, en visite', () => {
 });
 
 describe('la lampe allumée, sur les meubles', () => {
-  it('sa lueur ne fait qu’effleurer les meubles (relevé du patron : « faible impact »)', () => {
-    const bloc = swift.slice(swift.indexOf('private func lueurDesMeubles'));
-    const intensite = Number((bloc.match(/l\.intensity = (\d+)/) ?? [])[1]);
-    expect(intensite).toBeLessThanOrEqual(20);
-    // Et les faisceaux des lampes ne touchent que le bâti.
-    // Le bâti seul, et de sa pièce seule (voir `masqueDeLaPiece`).
-    expect(swift).toMatch(/l\.categoryBitMask = masque/);
-    expect(swift).toMatch(/let masque = piece >= 0 \? Self\.masqueDeLaPiece\(piece\) : Self\.MASQUE_PIECE/);
+  it('elle ne les touche plus du tout (relevé du patron : « ça agit trop sur les meubles »)', () => {
+    expect(swift).not.toMatch(/lueurDesMeubles/);
+    // La lumière d'une pièce n'éclaire que son bâti — et de sa pièce seule.
+    expect(swift).toMatch(/l\.categoryBitMask = piece >= 0 \? Self\.masqueDeLaPiece\(piece\) : Self\.MASQUE_PIECE/);
   });
 });

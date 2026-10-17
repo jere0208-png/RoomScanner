@@ -140,18 +140,6 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     set { if Self.recevoir(newValue, dans: &fPiecesSols) { rebatir(.sols) } }
   }
 
-  /*
-    L'INTENSITÉ DES LAMPES, EN POUR CENT — relevé du patron : « fais-moi un
-    réglage de lumière pour te guider vers le % voulu ». Elle règle les
-    faisceaux, la lueur des meubles et la clarté que prennent les murs de la
-    pièce allumée.
-  */
-  @objc var intensite: NSNumber = 100 {
-    didSet { if intensite != oldValue { appliquerLampes() } }
-  }
-
-  private var facteurDesLampes: CGFloat { CGFloat(max(0, min(200, intensite.doubleValue))) / 100 }
-
   /// Le bit d'une pièce (au-delà de soixante pièces, aucune : seule la lumière du jour).
   private static func masqueDeLaPiece(_ piece: Int) -> Int {
     piece >= 0 && piece < 60 ? 1 << (piece + 3) : 0
@@ -504,11 +492,12 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     var i = 0
     let v = lampesPosees
     var eclairees: Set<Int> = []
+    // Par pièce allumée : la somme des forces, et le milieu de ses luminaires.
+    var parPiece: [Int: (force: CGFloat, x: Float, y: Float, z: Float, n: Float)] = [:]
     while i + Self.PAR_LAMPE <= v.count {
       let rang = Int(v[i])
       let genre = Int(v[i + 1])
       let allume = v[i + 2] > 0.5
-      let source = v[i + 3] > 0.5
       let matiere = materiauDeDiffuseur(allume: allume)
       for n in diffuseurs[rang] ?? [] where n.geometry?.firstMaterial !== matiere {
         n.geometry?.materials = [matiere]
@@ -516,19 +505,22 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
       if allume {
         let piece = Int(v[i + 9])
         eclairees.insert(piece)
-        // Sa pièce seule ; une lampe hors de toute pièce éclaire le bâti entier.
-        let masque = piece >= 0 ? Self.masqueDeLaPiece(piece) : Self.MASQUE_PIECE
         let p = SCNVector3(x: v[i + 4], y: v[i + 5], z: v[i + 6])
-        // Toute lampe allumée a son halo — même loin, même sans source.
+        // Toute lampe allumée a son halo — même loin.
         eclairage.addChildNode(halo(genre: genre, a: p, nx: v[i + 7], nz: v[i + 8]))
-        if source {
-          for l in lumieres(genre: genre, a: p, nx: v[i + 7], nz: v[i + 8], masque: masque) {
-            eclairage.addChildNode(l)
-          }
-          eclairage.addChildNode(lueurDesMeubles(genre: genre, a: p, nx: v[i + 7], nz: v[i + 8]))
-        }
+        var e = parPiece[piece] ?? (0, 0, 0, 0, 0)
+        e.force += Self.puissance(genre)
+        e.x += p.x + v[i + 7] * 0.1
+        e.y += p.y - Self.descente(genre)
+        e.z += p.z + v[i + 8] * 0.1
+        e.n += 1
+        parPiece[piece] = e
       }
       i += Self.PAR_LAMPE
+    }
+    for (piece, e) in parPiece where e.n > 0 {
+      let c = SCNVector3(x: e.x / e.n, y: e.y / e.n, z: e.z / e.n)
+      eclairage.addChildNode(lumiereDeLaPiece(piece, en: c, puissance: e.force))
     }
     /*
       ALLUMER N'ÉCLAIRE QUE SA PIÈCE — relevé du patron : « elle ne doit pas
@@ -588,16 +580,17 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
   }
 
   /*
-    LA CLARTÉ D'UNE PIÈCE ALLUMÉE : ses murs et son plafond prennent un peu
-    plus de leur teinte, au pourcentage du réglage. Les meubles n'en reçoivent
-    rien, les autres pièces non plus.
+    LA CLARTÉ D'UNE PIÈCE ALLUMÉE : ses murs et son plafond prennent un soupçon
+    de plus de leur teinte — au vingtième, comme les lampes (relevé du patron :
+    « on va sur 5 % »). Les meubles n'en reçoivent rien, les autres pièces non
+    plus.
   */
-  static let CLARTE_PIECE_ALLUMEE: CGFloat = 0.08
+  static let CLARTE_PIECE_ALLUMEE: CGFloat = 0.08 * 0.05
 
   private func rebondDe(_ piece: Int) -> CGFloat {
     let base = rebondDuMoment()
     guard modePose == false, piecesEclairees.contains(piece) else { return base }
-    return base + Self.CLARTE_PIECE_ALLUMEE * facteurDesLampes
+    return base + Self.CLARTE_PIECE_ALLUMEE
   }
 
   private func reglerLesRebonds() {
@@ -627,162 +620,77 @@ final class RoomScanVisite: UIView, SCNSceneRendererDelegate {
     reveiller(0.6)
   }
 
-  /**
-   LA LUMIÈRE D'UN LUMINAIRE, selon sa forme, son usage — et sa teinte.
-
-   1 — l'applique murale : deux faisceaux larges, l'un vers le plafond,
-       l'autre vers le sol — le mur se lave de lumière au-dessus et
-       au-dessous d'elle ; blanc chaud (2 700 K) ;
-   2 — le spot encastré : un cône net vers le sol ; blanc (3 000 K) ;
-   3 — l'ampoule de la DCL : elle rayonne tout autour, à l'ampoule ;
-       blanc chaud ;
-   4 — le plafonnier : une nappe large et douce ; blanc neutre (3 500 K) ;
-   5 — le ventilateur : sous son moteur ; blanc chaud.
-
-   DES TEINTES ADOUCIES ET DES INTENSITÉS MESURÉES — relevé du patron :
-   « l'éclairage en visite agit trop sur les meubles, cassant leurs
-   couleurs ». Le 2 700 K saturé d'avant (un orange franc) teintait tout ce
-   qu'il touchait, à des intensités qui délavaient un meuble clair : le
-   bois virait au roux, le blanc au crème. La lumière garde sa chaleur, sans
-   repeindre la pièce. Une portée de pièce : au-delà, elle s'éteint d'elle-
-   même, sans éclairer la chambre d'à côté au travers.
-
-   PLUS DOUCES ENCORE, ET POUR LA PIÈCE SEULE — relevé du patron : « diminue
-   la lumière, son interrupteur allumé ; elle doit être plus perceptible sans
-   augmenter, au contraire elle doit moins impacter les meubles, qui
-   deviennent blancs sous lumière ». Les forces baissent d'un tiers, et les
-   faisceaux ne touchent plus que le bâti (`MASQUE_PIECE`) : les murs, les
-   sols, le plafond. Les meubles reçoivent leur part par une lueur à elle,
-   cinq fois plus faible (`lueurDesMeubles`). Ce qui rend la lumière
-   perceptible, c'est sa SOURCE : le halo autour du luminaire (`halo`), et la
-   nappe sur le mur et le sol — pas un meuble poussé au blanc.
-   */
   /*
-    PLUS DOUCES ENCORE — relevé du patron : « réduis encore l'intensité de la
-    lumière ». Les faisceaux passent aux six dixièmes de leur force, puis au
-    pourcentage du réglage (`intensite`).
-  */
-  static let FORCE_DES_FAISCEAUX: CGFloat = 0.6
+    UNE LUMIÈRE PAR PIÈCE ALLUMÉE — relevés du patron, sur vidéo : « lorsque
+    tout est allumé, dans une même pièce, la lumière d'un côté disparaît selon
+    la distance », puis « sortir d'une pièce ne doit pas éteindre l'autre
+    pièce ; on doit voir quand même les autres allumées ».
 
-  private func lumieres(genre: Int, a p: SCNVector3, nx: Float, nz: Float, masque: Int) -> [SCNNode] {
-    let force = choix.lampes * Self.FORCE_DES_FAISCEAUX * facteurDesLampes
-    // La température choisie par l'utilisateur, pour tous les luminaires.
-    let chaud = teinteDesLampes
-    let blanc = teinteDesLampes
-    let neutre = teinteDesLampes
-    func faisceau(
-      versLeHaut: Bool, interieur: CGFloat, exterieur: CGFloat, intensite: CGFloat,
-      portee: CGFloat, teinte: UIColor, en q: SCNVector3
-    ) -> SCNNode {
-      let l = SCNLight()
-      l.type = .spot
-      l.color = teinte
-      l.intensity = intensite * force
-      l.spotInnerAngle = interieur
-      l.spotOuterAngle = exterieur
-      l.attenuationStartDistance = 0.3
-      l.attenuationEndDistance = portee
-      l.attenuationFalloffExponent = 2
-      l.castsShadow = false
-      l.categoryBitMask = masque
-      let n = SCNNode()
-      n.light = l
-      n.position = q
-      // Un projecteur éclaire le long de son −z : un quart de tour autour
-      // de x le tourne vers le haut, ou vers le bas.
-      n.eulerAngles = SCNVector3(x: versLeHaut ? Float.pi / 2 : -Float.pi / 2, y: 0, z: 0)
-      return n
-    }
+    Chaque luminaire avait ses faisceaux, mais la carte graphique n'en tient
+    que quelques-uns : seules les lampes allumées les plus proches du visiteur
+    recevaient une vraie lumière, et ce choix changeait à chaque pas — une
+    moitié de séjour s'éteignait quand on reculait, une pièce quand on en
+    sortait. Désormais, chaque pièce allumée a UNE lumière douce, posée au
+    milieu de ses luminaires allumés, qui n'éclaire que son bâti (le bit de sa
+    pièce) : elle ne dépend plus d'où l'on se tient, et toutes les pièces
+    allumées le restent. Sa force est la somme de celles de ses luminaires.
+
+    À CINQ POUR CENT — relevé du patron : « on va sur 5 %, même le 10 % est
+    trop éclairé ». La force d'un luminaire est celle de ses anciens
+    faisceaux, au vingtième des six dixièmes. Les meubles n'en reçoivent
+    rien : ils gardent leur couleur ; la lampe se voit à sa source (le halo,
+    le diffuseur allumé) et sur les murs.
+  */
+  static let FORCE_DES_LAMPES: CGFloat = 0.6 * 0.05
+
+  /// La force d'un luminaire, selon son genre (celle de ses anciens faisceaux).
+  static func puissance(_ genre: Int) -> CGFloat {
     switch genre {
-    case 1:
-      let q = SCNVector3(x: p.x + nx * 0.06, y: p.y, z: p.z + nz * 0.06)
-      return [
-        faisceau(versLeHaut: true, interieur: 40, exterieur: 130, intensite: 200, portee: 3.2, teinte: chaud, en: q),
-        faisceau(versLeHaut: false, interieur: 40, exterieur: 130, intensite: 160, portee: 3.0, teinte: chaud, en: q),
-      ]
-    case 2:
-      return [faisceau(
-        versLeHaut: false, interieur: 24, exterieur: 72, intensite: 240, portee: 4.5, teinte: blanc,
-        en: SCNVector3(x: p.x, y: p.y - 0.02, z: p.z))]
-    case 3:
-      let l = SCNLight()
-      l.type = .omni
-      l.color = chaud
-      l.intensity = 210 * force
-      l.attenuationStartDistance = 0.3
-      l.attenuationEndDistance = 4.5
-      l.attenuationFalloffExponent = 2
-      l.castsShadow = false
-      l.categoryBitMask = masque
-      let n = SCNNode()
-      n.light = l
-      // Au centre de l'ampoule (`DESCENTE_DE_LA_LUMIERE.dcl`), pas à la rosace.
-      n.position = SCNVector3(x: p.x, y: p.y - 0.59, z: p.z)
-      return [n]
-    case 4:
-      return [faisceau(
-        versLeHaut: false, interieur: 80, exterieur: 165, intensite: 250, portee: 5.5, teinte: neutre,
-        en: SCNVector3(x: p.x, y: p.y - 0.07, z: p.z))]
-    case 5:
-      return [faisceau(
-        versLeHaut: false, interieur: 60, exterieur: 155, intensite: 220, portee: 5, teinte: chaud,
-        en: SCNVector3(x: p.x, y: p.y - 0.37, z: p.z))]
-    default:
-      return []
+    case 1: return 360  // l'applique : vers le plafond et vers le sol
+    case 2: return 240  // le spot
+    case 3: return 210  // l'ampoule de la DCL
+    case 4: return 250  // le plafonnier
+    case 5: return 220  // le ventilateur
+    default: return 0
     }
+  }
+
+  /// Où le luminaire donne sa lumière : sous la rosace, au centre de l'ampoule.
+  static func descente(_ genre: Int) -> Float {
+    switch genre {
+    case 3: return 0.59
+    case 5: return 0.37
+    case 1: return 0
+    default: return 0.07
+    }
+  }
+
+  private func lumiereDeLaPiece(_ piece: Int, en c: SCNVector3, puissance: CGFloat) -> SCNNode {
+    let l = SCNLight()
+    l.type = .omni
+    l.color = teinteDesLampes
+    l.intensity = puissance * Self.FORCE_DES_LAMPES
+    // Douce et large : elle porte d'un bout à l'autre de la pièce.
+    l.attenuationStartDistance = 0.5
+    l.attenuationEndDistance = 9
+    l.attenuationFalloffExponent = 1
+    l.castsShadow = false
+    // Sa pièce seule ; une lampe hors de toute pièce éclaire le bâti entier.
+    l.categoryBitMask = piece >= 0 ? Self.masqueDeLaPiece(piece) : Self.MASQUE_PIECE
+    let n = SCNNode()
+    n.light = l
+    n.position = c
+    return n
   }
 
   /*
     QUI REÇOIT QUELLE LUMIÈRE. Le jour, l'ambiance et le contre-jour éclairent
-    tout (leur masque a tous les bits). Les faisceaux des lampes n'éclairent
-    que ce qui porte le bit de la PIÈCE — tout nœud le porte par défaut ; les
-    meubles et les appareils portent celui du MEUBLE à la place, et ne
-    reçoivent des lampes que leur lueur douce. Chaque nœud voit ainsi au plus
-    huit lumières : les trois du jour et cinq sources.
+    tout (leur masque a tous les bits). La lumière d'une pièce n'éclaire que
+    son bâti ; les meubles et les appareils portent le bit du MEUBLE et n'en
+    reçoivent rien.
   */
   private static let MASQUE_PIECE = 1
   private static let MASQUE_MEUBLE = 2
-
-  /**
-   * La part des meubles : une lueur sans faisceau, qui les réchauffe sans les blanchir.
-   *
-   * UN QUART DE CE QU'ELLE ÉTAIT — relevé du patron, après le correctif de
-   * l'ambiance des meubles : « en visite, les meubles sont encore blancs
-   * lorsque la lumière de la pièce est active ; la lumière doit avoir un
-   * faible impact sur ceux-ci ». Éteints, ils gardaient leur couleur ;
-   * allumés, cette lueur suffisait encore à pousser un tissu clair au
-   * blanc (la matière physique d'un meuble reçoit déjà l'ambiance, le jour
-   * et le contre-jour). Elle se devine à peine : c'est le halo et la nappe
-   * sur les murs qui disent qu'une lampe est allumée.
-   */
-  private func lueurDesMeubles(genre: Int, a p: SCNVector3, nx: Float, nz: Float) -> SCNNode {
-    let l = SCNLight()
-    l.type = .omni
-    l.color = teinteDesLampes
-    /*
-      AU PLUS DIX POUR CENT — relevé du patron : « la lumière doit être
-      perceptible sur les murs mais très peu sur les meubles et éléments,
-      ils doivent gagner max en luminosité 10 % de leur couleur de base ».
-      Le moins éclairé des meubles reçoit l'ambiance (620) : une lueur de
-      12, pleine au pied de la lampe et qui s'éteint en trois mètres, n'y
-      ajoute jamais plus de 2 %. Les faisceaux, eux, ne touchent que le bâti.
-    */
-    // RÉDUITE ENCORE, d'un tiers de ce qu'elle était — relevé du patron :
-    // « la lumière sur les meubles est toujours trop élevée, tout devient
-    // blanc ; réduis considérablement ». Et le plafond de couleur des meubles
-    // (voir `nuanceurPlafondDesMeubles`) tient la règle quoi qu'il arrive.
-    l.intensity = 3 * facteurDesLampes
-    l.attenuationStartDistance = 0.2
-    l.attenuationEndDistance = 3.2
-    l.attenuationFalloffExponent = 2
-    l.castsShadow = false
-    l.categoryBitMask = Self.MASQUE_MEUBLE
-    let n = SCNNode()
-    n.light = l
-    let descente: Float = genre == 1 ? 0 : genre == 3 ? 0.59 : 0.3
-    n.position = SCNVector3(x: p.x + nx * 0.1, y: p.y - descente, z: p.z + nz * 0.1)
-    return n
-  }
 
   /// Le halo : un disque doux, d'un blanc chaud, plein au cœur, nul au bord.
   private static let imageDuHalo: UIImage = {

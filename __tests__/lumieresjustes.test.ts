@@ -29,7 +29,9 @@ describe('le halo se pose à l’ampoule', () => {
 
   it('le natif place la lumière de la DCL au même endroit', () => {
     const natif = lire('modules/react-native-room-scan/ios/RoomScanVisite.swift');
-    expect(natif).toContain('n.position = SCNVector3(x: p.x, y: p.y - 0.59, z: p.z)');
+    // La lumière de la pièce se pose au centre de l'ampoule (voir `descente`).
+    expect(natif).toContain('case 3: return 0.59');
+    expect(natif).toContain('e.y += p.y - Self.descente(genre)');
   });
 });
 

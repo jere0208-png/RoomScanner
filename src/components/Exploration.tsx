@@ -79,7 +79,6 @@ import { useImageSansLogo } from '../store/accountStore';
 import { usePriseDeVue } from '../ui/partageRendu';
 import { AlerteHote } from './AlerteHote';
 import { nomDeTemperature, useTemperatureLampes } from '../store/temperatureLampes';
-import { useIntensiteLampes } from '../store/intensiteLampes';
 import { astuce } from '../ui/astuce';
 
 /**
@@ -472,11 +471,6 @@ export function Exploration({
   const kelvin = useTemperatureLampes((s) => s.kelvin);
   useEffect(() => {
     if (visible) void useTemperatureLampes.getState().charger();
-  }, [visible]);
-  /* L'intensité des lampes, en pour cent (voir `intensiteLampes`). */
-  const intensite = useIntensiteLampes((s) => s.pourcent);
-  useEffect(() => {
-    if (visible) void useIntensiteLampes.getState().charger();
   }, [visible]);
 
   // Derrière les baies : un ciel clair, dans la teinte du thème.
@@ -957,7 +951,6 @@ export function Exploration({
               cle={cle}
               fond={fond}
               temperature={kelvin}
-              intensite={intensite}
               piecesDuMaillage={maille.piecesDuMaillage}
               piecesDesSols={maille.piecesDesSols}
             />
@@ -1112,41 +1105,6 @@ export function Exploration({
               </Text>
             </Pressable>
           )}
-          {/*
-            LE RÉGLAGE DE LA LUMIÈRE — relevé du patron : « fais-moi un réglage
-            de lumière pour te guider vers le % voulu ». Moins, la valeur, plus.
-          */}
-          {lampes.length > 0 && (
-            <View style={[styles.temperature, styles.intensite]} testID="intensite-lampes">
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Baisser la lumière des lampes"
-                testID="intensite-moins"
-                hitSlop={8}
-                style={({ pressed }) => [styles.intensiteBouton, pressed && styles.enfonce]}
-                onPress={() => {
-                  useIntensiteLampes.getState().ajuster(-1);
-                  haptic('leger');
-                }}>
-                <Text style={styles.intensiteSigne}>−</Text>
-              </Pressable>
-              <Text style={styles.temperatureTexte} numberOfLines={1} accessibilityLabel={`Lumière ${intensite} pour cent`}>
-                Lumière {intensite} %
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Monter la lumière des lampes"
-                testID="intensite-plus"
-                hitSlop={8}
-                style={({ pressed }) => [styles.intensiteBouton, pressed && styles.enfonce]}
-                onPress={() => {
-                  useIntensiteLampes.getState().ajuster(1);
-                  haptic('leger');
-                }}>
-                <Text style={styles.intensiteSigne}>+</Text>
-              </Pressable>
-            </View>
-          )}
         </View>
 
         {/*
@@ -1271,9 +1229,6 @@ const getStyles = themedStyles((c: Palette) =>
     terminerTexte: { color: c.blue, fontSize: 16, fontWeight: '600' },
     hautDroite: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     reglages: { position: 'absolute', left: 14, gap: 8, alignItems: 'flex-start' },
-    intensite: { paddingHorizontal: 4, gap: 4 },
-    intensiteBouton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-    intensiteSigne: { color: c.ink, fontSize: 20, fontWeight: '700', lineHeight: 22 },
     temperature: {
       height: 40,
       paddingHorizontal: 12,

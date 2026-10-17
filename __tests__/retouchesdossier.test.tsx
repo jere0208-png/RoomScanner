@@ -43,12 +43,12 @@ describe('la visite garde les couleurs des meubles', () => {
     const natif = lire('modules/react-native-room-scan/ios/RoomScanVisite.swift');
     // Le blanc chaud suit désormais la température choisie (voir
     // `eclairagevisite.test.ts`) : 3000 K d'office, adouci vers le blanc.
-    expect(natif).toContain('let chaud = teinteDesLampes');
+    expect(natif).toContain('l.color = teinteDesLampes');
     expect(natif).toContain('RoomScanVisite.teinteDeKelvin(3000)');
-    // Chaque luminaire a sa teinte : le plafonnier est neutre, le spot blanc.
-    // Adoucies une seconde fois : voir `retouchesvisite.test.tsx`.
-    expect(natif).toContain('intensite: 250, portee: 5.5, teinte: neutre');
-    expect(natif).toContain('intensite: 240, portee: 4.5, teinte: blanc');
+    // La force de chaque luminaire : celle de ses faisceaux d'hier (voir
+    // `retouchesvisite.test.tsx`), au vingtième (« on va sur 5 % »).
+    expect(natif).toContain('case 4: return 250  // le plafonnier');
+    expect(natif).toContain('case 2: return 240  // le spot');
     expect(natif).not.toContain('intensite: 700');
     expect(natif).not.toContain('intensite: 720');
   });

@@ -73,11 +73,8 @@ describe('l’appareillage se voit sans lampe', () => {
 });
 
 describe('la lampe du plafond, sur les meubles et l’appareillage : au plus 10 %', () => {
-
-  it('les faisceaux ne touchent que le bâti, meubles et appareils portent l’autre masque', () => {
-    // Le bâti seul, et de sa pièce seule (voir `masqueDeLaPiece`).
-    expect(swift).toMatch(/l\.categoryBitMask = masque/);
-    expect(swift).toMatch(/let masque = piece >= 0 \? Self\.masqueDeLaPiece\(piece\) : Self\.MASQUE_PIECE/);
+  it('la lumière d’une pièce ne touche que le bâti ; meubles et appareils portent l’autre masque', () => {
+    expect(swift).toMatch(/l\.categoryBitMask = piece >= 0 \? Self\.masqueDeLaPiece\(piece\) : Self\.MASQUE_PIECE/);
     expect(swift).toMatch(/m\.categoryBitMask = Self\.MASQUE_MEUBLE/);
   });
 });
@@ -88,9 +85,9 @@ describe('la température des lampes (relevé du patron : 2700, 3000, 4000 K, et
     expect(m).toMatch(/RCT_EXPORT_VIEW_PROPERTY\(temperature, NSNumber\)/);
     expect(swift).toMatch(/@objc var temperature: NSNumber/);
     expect(swift).toMatch(/static func teinteDeKelvin/);
-    // Les faisceaux prennent la teinte choisie.
-    const bloc = swift.slice(swift.indexOf('private func lumieres'), swift.indexOf('private func lumieres') + 600);
-    expect(bloc).toMatch(/teinteDesLampes/);
+    // La lumière des pièces prend la teinte choisie.
+    const bloc = swift.slice(swift.indexOf('private func lumiereDeLaPiece'), swift.indexOf('private func lumiereDeLaPiece') + 400);
+    expect(bloc).toMatch(/l\.color = teinteDesLampes/);
   });
 
   it('le réglage passe de 2700 à 3000, 4000, 6500 K, puis recommence', () => {
@@ -145,16 +142,22 @@ describe('le rendu retenu : C, « Chaleureux du soir » (relevé du patron)', ()
     expect(swift).toMatch(/guard modePose == false, piecesEclairees\.contains\(piece\) else \{ return base \}/);
   });
 
-  it('« réduis encore l’intensité » : faisceaux aux six dixièmes, puis au réglage ; lueur des meubles à 3', () => {
-    expect(swift).toMatch(/static let FORCE_DES_FAISCEAUX: CGFloat = 0\.6/);
-    expect(swift).toMatch(/let force = choix\.lampes \* Self\.FORCE_DES_FAISCEAUX \* facteurDesLampes/);
-    expect(swift).toMatch(/l\.intensity = 3 \* facteurDesLampes/);
+  it('« on va sur 5 % » : la force des lampes au vingtième de celle de la 746', () => {
+    expect(swift).toMatch(/static let FORCE_DES_LAMPES: CGFloat = 0\.6 \* 0\.05/);
+    expect(swift).toMatch(/l\.intensity = puissance \* Self\.FORCE_DES_LAMPES/);
+    expect(swift).toMatch(/static let CLARTE_PIECE_ALLUMEE: CGFloat = 0\.08 \* 0\.05/);
   });
 
-  it('la lueur des meubles reste sous le dixième de l’ambiance éteinte', () => {
-    const lueur = Number((swift.slice(swift.indexOf('private func lueurDesMeubles')).match(/l\.intensity = (\d+)/) ?? [])[1]);
-    // Au réglage le plus fort (200 %), toujours sous le dixième.
-    expect(lueur * 2).toBeLessThanOrEqual(r.eteint[0] * 0.1);
+  it('« la lumière d’un côté disparaît selon la distance », « sortir d’une pièce ne doit pas éteindre l’autre » : une lumière par pièce allumée, où que soit le visiteur', () => {
+    const bloc = swift.slice(swift.indexOf('private func appliquerLampes'), swift.indexOf('private func rebondDuMoment'));
+    // Plus de tri par distance ni de « source » réservée aux plus proches.
+    expect(bloc).not.toMatch(/let source = /);
+    expect(bloc).toMatch(/for \(piece, e\) in parPiece where e\.n > 0/);
+    expect(bloc).toMatch(/lumiereDeLaPiece\(piece, en: c, puissance: e\.force\)/);
+  });
+
+  it('plus aucune lueur sur les meubles', () => {
+    expect(swift).not.toMatch(/lueurDesMeubles/);
   });
 
   it('plus de choix de rendu ni de pastille : un seul rendu, les murs blancs chauds', () => {
@@ -230,26 +233,11 @@ describe('une lampe, une pièce (relevé du patron : « elle ne doit pas agir su
   });
 });
 
-describe('le réglage de la lumière (relevé du patron : « pour te guider vers le % voulu »)', () => {
-  it('de dix en dix, de 0 à 200 %, cent par défaut', () => {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { useIntensiteLampes } = require('../src/store/intensiteLampes');
-    expect(useIntensiteLampes.getState().pourcent).toBe(100);
-    useIntensiteLampes.setState({ pourcent: 190 });
-    expect(useIntensiteLampes.getState().ajuster(1)).toBe(200);
-    expect(useIntensiteLampes.getState().ajuster(1)).toBe(200);
-    useIntensiteLampes.setState({ pourcent: 10 });
-    expect(useIntensiteLampes.getState().ajuster(-1)).toBe(0);
-    expect(useIntensiteLampes.getState().ajuster(-1)).toBe(0);
-  });
-
-  it('la visite affiche le réglage et le passe au natif', () => {
+describe('le réglage de la lumière a servi : il est retiré, 5 % retenu', () => {
+  it('plus de réglage dans la visite ni de propriété native', () => {
     const expl = readFileSync(join(__dirname, '../src/components/Exploration.tsx'), 'utf8');
-    expect(expl).toMatch(/testID="intensite-moins"/);
-    expect(expl).toMatch(/testID="intensite-plus"/);
-    expect(expl).toMatch(/Lumière \{intensite\} %/);
-    expect(expl).toMatch(/intensite=\{intensite\}/);
+    expect(expl).not.toMatch(/intensite-moins|intensite-plus|intensite=\{/);
     const m = readFileSync(join(__dirname, '../modules/react-native-room-scan/ios/RoomScan.m'), 'utf8');
-    expect(m).toMatch(/RCT_EXPORT_VIEW_PROPERTY\(intensite, NSNumber\)/);
+    expect(m).not.toMatch(/RCT_EXPORT_VIEW_PROPERTY\(intensite/);
   });
 });
