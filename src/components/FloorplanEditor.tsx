@@ -2727,6 +2727,37 @@ export function FloorplanEditor({
     a plus d'une, une carte les nomme près du doigt. Une seule : rien ne
     change, elle est prise.
   */
+  /*
+    LE VIDE D'UNE BAIE APPARTIENT À LA BAIE — relevé du patron : « lors du clic
+    sur un ouvrant de porte sur le plan 2D (partie sans mur entre deux murs),
+    ça sélectionne le mur et pas la porte ». La tolérance du mur déborde sur
+    le vide de la baie, et le mur se peint par-dessus elle : avant de choisir
+    le mur, on regarde si le doigt est tombé dans une baie.
+  */
+  const baieSousLeDoigt = (): string | null => {
+    const p = dernierToucher.current;
+    if (!p || !mapping || !editable || !onSelectOpening) return null;
+    for (const o of openings) {
+      const a = mapping.toPx(o.a);
+      const b = mapping.toPx(o.b);
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const l2 = dx * dx + dy * dy;
+      if (l2 < 1) continue;
+      const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2;
+      if (t < 0.02 || t > 0.98) continue;
+      if (Math.hypot(a.x + dx * t - p.x, a.y + dy * t - p.y) <= 13) return o.id;
+    }
+    return null;
+  };
+  const appuiSurLeMur = (id: string) => {
+    const baie = baieSousLeDoigt();
+    if (baie) {
+      onSelectOpening?.(baie === selectedOpeningId ? null : baie);
+      return;
+    }
+    onSelectWall(id === selectedWallId ? null : id);
+  };
   const ciblesAuPoint = (p: { x: number; y: number }): CibleDuPlan[] => {
     if (!mapping) return [];
     const out: CibleDuPlan[] = [];
@@ -3291,11 +3322,7 @@ export function FloorplanEditor({
                 neuve={!!roomById.get(roomOf(w) ?? '')?.neuve}
                 showMeasure={false}
                 selected={false}
-                onPress={
-                  editable
-                    ? () => onSelectWall(w.id === selectedWallId ? null : w.id)
-                    : undefined
-                }
+                onPress={editable ? () => appuiSurLeMur(w.id) : undefined}
               />
             ))}
 
@@ -3594,11 +3621,7 @@ export function FloorplanEditor({
                 measureOpacity={1 - detail}
                 longueur={longueurCotee(walls, w, parts)}
                 selected={editable && w.id === selectedWallId}
-                onPress={
-                  editable
-                    ? () => onSelectWall(w.id === selectedWallId ? null : w.id)
-                    : undefined
-                }
+                onPress={editable ? () => appuiSurLeMur(w.id) : undefined}
               />
             ))}
 

@@ -233,6 +233,7 @@ import { alerte } from '../ui/alerte';
 import { panne as expliquer } from '../ui/panne';
 import { ficheElec } from './result/ficheElec';
 import { astuce, useAstuce } from '../ui/astuce';
+import { teinteDePorteSuivante } from '../ui/teintesPortes';
 import { celebrerSiAuxNormes, resetCelebration } from '../ui/auxNormes';
 import { useModeElec, useUsage } from '../store/usage';
 import { usePremieresFois } from '../store/premieresFois';
@@ -6546,6 +6547,29 @@ export function ResultScreen() {
                           .getState()
                           .flipBattant(selectedOpening.id, 'sens');
                         haptic('succes');
+                      },
+                    },
+                    {
+                      /*
+                        LA TEINTE DE LA PORTE — relevé du patron : « les
+                        portes doivent pouvoir avoir une couleur
+                        modifiable ». Chaque appui passe à la teinte
+                        suivante (blanc, chêne clair, noyer, gris clair,
+                        anthracite, noir) ; la maquette et la visite la
+                        prennent aussitôt.
+                      */
+                      label: 'Couleur de la porte',
+                      mot: 'Couleur',
+                      icone: SOLAIRES.rouleau,
+                      sansMot: true,
+                      ghost: true,
+                      onPress: () => {
+                        const t = teinteDePorteSuivante(selectedOpening.teintePorte);
+                        useScanStore
+                          .getState()
+                          .setTeintePorte(selectedOpening.id, t.cle === 'blanc' ? null : t.hex);
+                        haptic('leger');
+                        astuce(`Porte : ${t.nom}`, { icone: 'colors' });
                       },
                     },
                   ]

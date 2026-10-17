@@ -72,44 +72,154 @@ export interface MaillageDeVisite {
  * normales de ses faces : vers l'œil qui le regarde, il passe devant elles.
  */
 export function aretesDuBati(polys: { pts: P3[]; n: P3 }[]): number[] {
-  const cle = (p: P3) => `${Math.round(p.x * 100)},${Math.round(p.y * 100)},${Math.round(p.z * 100)}`;
-  const parArete = new Map<string, { a: P3; b: P3; normales: P3[] }>();
-  for (const { pts, n } of polys) {
+  const TOL = 0.005;
+  const CASE = 0.5;
+  // Tous les côtés de toutes les faces, avec la normale de leur face.
+  const cotes: { a: P3; b: P3; n: P3; f: number }[] = [];
+  const centres: P3[] = polys.map(({ pts }) => {
+    let x = 0;
+    let y = 0;
+    let z = 0;
+    for (const p of pts) {
+      x += p.x;
+      y += p.y;
+      z += p.z;
+    }
+    return { x: x / pts.length, y: y / pts.length, z: z / pts.length };
+  });
+  polys.forEach(({ pts, n }, f) => {
     for (let i = 0; i < pts.length; i++) {
       const a = pts[i];
       const b = pts[(i + 1) % pts.length];
+      if (Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) >= 0.02) cotes.push({ a, b, n, f });
+    }
+  });
+  // Une grille de cases d'un demi-mètre : on ne compare que des voisins.
+  const caseDe = (v: number) => Math.floor(v / CASE);
+  const cleCase = (i: number, j: number, k: number) => `${i},${j},${k}`;
+  const grille = new Map<string, number[]>();
+  const casesDe = (a: P3, b: P3, cb: (k: string) => void) => {
+    for (let i = caseDe(Math.min(a.x, b.x) - TOL); i <= caseDe(Math.max(a.x, b.x) + TOL); i++) {
+      for (let j = caseDe(Math.min(a.y, b.y) - TOL); j <= caseDe(Math.max(a.y, b.y) + TOL); j++) {
+        for (let k = caseDe(Math.min(a.z, b.z) - TOL); k <= caseDe(Math.max(a.z, b.z) + TOL); k++) cb(cleCase(i, j, k));
+      }
+    }
+  };
+  cotes.forEach((c, idx) => {
+    casesDe(c.a, c.b, (k) => {
+      const l = grille.get(k);
+      if (l) l.push(idx);
+      else grille.set(k, [idx]);
+    });
+  });
+  const distAuSegment = (p: P3, a: P3, b: P3): { d: number; t: number } => {
+    const ux = b.x - a.x;
+    const uy = b.y - a.y;
+    const uz = b.z - a.z;
+    const l2 = ux * ux + uy * uy + uz * uz;
+    const t = l2 > 0 ? ((p.x - a.x) * ux + (p.y - a.y) * uy + (p.z - a.z) * uz) / l2 : 0;
+    const tc = Math.max(0, Math.min(1, t));
+    return { d: Math.hypot(a.x + ux * tc - p.x, a.y + uy * tc - p.y, a.z + uz * tc - p.z), t };
+  };
+  const voisins = (a: P3, b: P3): Set<number> => {
+    const out = new Set<number>();
+    casesDe(a, b, (k) => {
+      for (const idx of grille.get(k) ?? []) out.add(idx);
+    });
+    return out;
+  };
+  /*
+    LES JOINTS EN T. Le linteau au-dessus d'une porte touche le pan de mur
+    voisin sur une partie seulement de sa hauteur : leurs côtés ne partagent
+    pas leurs extrémités. Chaque côté se coupe donc aux sommets des faces
+    voisines qui tombent dessus, et chaque tronçon se juge à son milieu.
+
+    UN JOINT AU MILIEU D'UNE SURFACE PLATE NE LAISSE PAS DE TRAIT — relevé du
+    patron : « des arêtes sont au-dessus des ouvrants, il ne devrait pas y en
+    avoir ». Le linteau est un bloc : ses bouts, cachés dans l'épaisseur du
+    mur contre le pan voisin, faisaient croire à un angle. Dès que deux faces
+    d'un même plan se trouvent de part et d'autre d'un tronçon, la surface
+    continue : ce qui est derrière ne compte pas.
+  */
+  const vus = new Set<string>();
+  const cle = (p: P3) => `${Math.round(p.x * 100)},${Math.round(p.y * 100)},${Math.round(p.z * 100)}`;
+  const out: number[] = [];
+  for (const c of cotes) {
+    const proches = voisins(c.a, c.b);
+    const coupes = [0, 1];
+    for (const idx of proches) {
+      for (const p of [cotes[idx].a, cotes[idx].b]) {
+        const { d, t } = distAuSegment(p, c.a, c.b);
+        if (d < TOL && t > 0.001 && t < 0.999) coupes.push(t);
+      }
+    }
+    coupes.sort((x, y) => x - y);
+    const dx = c.b.x - c.a.x;
+    const dy = c.b.y - c.a.y;
+    const dz = c.b.z - c.a.z;
+    for (let k = 0; k + 1 < coupes.length; k++) {
+      const t0 = coupes[k];
+      const t1 = coupes[k + 1];
+      if (t1 - t0 < 1e-3) continue;
+      const at = (t: number) => ({ x: c.a.x + dx * t, y: c.a.y + dy * t, z: c.a.z + dz * t });
+      const a = at(t0);
+      const b = at(t1);
       if (Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z) < 0.02) continue;
       const ka = cle(a);
       const kb = cle(b);
-      const k = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
-      const e = parArete.get(k);
-      if (e) e.normales.push(n);
-      else parArete.set(k, { a, b, normales: [n] });
-    }
-  }
-  const out: number[] = [];
-  for (const { a, b, normales } of parArete.values()) {
-    if (normales.length >= 2) {
-      // Toutes dans le même plan (à 20° près) : un joint de pans, pas une arête.
-      let pli = false;
-      for (let i = 1; i < normales.length && !pli; i++) {
-        const p = normales[0];
-        const q = normales[i];
-        if (p.x * q.x + p.y * q.y + p.z * q.z < 0.94) pli = true;
+      const k2 = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+      if (vus.has(k2)) continue;
+      vus.add(k2);
+      const m = at((t0 + t1) / 2);
+      // Les faces qui touchent ce tronçon en son milieu.
+      const touchees: number[] = [];
+      for (const idx of voisins(m, m)) {
+        const o = cotes[idx];
+        if (touchees.includes(o.f)) continue;
+        if (distAuSegment(m, o.a, o.b).d < TOL) touchees.push(o.f);
       }
-      if (!pli) continue;
+      // Une surface plate qui continue de part et d'autre : un joint.
+      let joint = false;
+      for (let i = 0; i < touchees.length && !joint; i++) {
+        const p = polys[touchees[i]].n;
+        // Le côté de la face, dans son plan : de quel côté du tronçon est son centre.
+        const cote = (f: number) => {
+          const n = polys[f].n;
+          const sx = n.y * dz - n.z * dy;
+          const sy = n.z * dx - n.x * dz;
+          const sz = n.x * dy - n.y * dx;
+          const q = centres[f];
+          return (q.x - m.x) * sx + (q.y - m.y) * sy + (q.z - m.z) * sz;
+        };
+        for (let j = i + 1; j < touchees.length && !joint; j++) {
+          const q = polys[touchees[j]].n;
+          if (p.x * q.x + p.y * q.y + p.z * q.z < 0.94) continue;
+          if (cote(touchees[i]) * cote(touchees[j]) < 0) joint = true;
+        }
+      }
+      if (joint) continue;
+      const normales = touchees.map((f) => polys[f].n);
+      if (normales.length >= 2) {
+        let pli = false;
+        for (let i = 1; i < normales.length && !pli; i++) {
+          const p = normales[0];
+          const q = normales[i];
+          if (p.x * q.x + p.y * q.y + p.z * q.z < 0.94) pli = true;
+        }
+        if (!pli) continue;
+      }
+      let mx = 0;
+      let my = 0;
+      let mz = 0;
+      for (const q of normales) {
+        mx += q.x;
+        my += q.y;
+        mz += q.z;
+      }
+      const l = Math.hypot(mx, my, mz) || 1;
+      const d = 0.004 / l;
+      out.push(a.x + mx * d, a.y + my * d, a.z + mz * d, b.x + mx * d, b.y + my * d, b.z + mz * d);
     }
-    let mx = 0;
-    let my = 0;
-    let mz = 0;
-    for (const q of normales) {
-      mx += q.x;
-      my += q.y;
-      mz += q.z;
-    }
-    const l = Math.hypot(mx, my, mz) || 1;
-    const d = 0.004 / l;
-    out.push(a.x + mx * d, a.y + my * d, a.z + mz * d, b.x + mx * d, b.y + my * d, b.z + mz * d);
   }
   return out;
 }

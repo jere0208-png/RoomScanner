@@ -140,6 +140,12 @@ export interface WallSeg {
    */
   detecteur?: boolean;
   /**
+   * LA TEINTE D'UNE PORTE (« #RRGGBB ») — relevé du patron : « les portes
+   * doivent pouvoir avoir une couleur modifiable ». Absente : le blanc
+   * d'office. Voir `teintesPortes`.
+   */
+  teintePorte?: string;
+  /**
    * CE QUE LE COFFRE AVANCE DANS LA PIÈCE (m) — mesuré dans le maillage
    * LiDAR (voir `coffreLidar`). Absent pour un coffre déclaré à la main :
    * un tunnel noyé dans la maçonnerie ne dépasse pas du mur. Présent, la 3D

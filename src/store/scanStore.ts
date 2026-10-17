@@ -3032,6 +3032,8 @@ interface ScanState {
   toggleCoffre: (id: string, hauteur?: number) => void;
   /** Pose ou retire le détecteur d'ouverture d'une menuiserie (alarme). */
   toggleDetecteurOuverture: (id: string) => void;
+  /** La teinte d'une porte (« #RRGGBB »), ou `null` pour le blanc d'office. */
+  setTeintePorte: (id: string, hex: string | null) => void;
   removeOpening: (id: string) => void;
   /**
    * Pose un meuble du catalogue au point donné. Renvoie son identifiant,
@@ -9295,6 +9297,22 @@ export const useScanStore = create<ScanState>((set, get) => {
       if (!memePose) pushHistory('coterOuverture');
       set({
         openings: st.openings.map((x) => (x.id === id ? { ...x, ...cote } : x)),
+        dirty: true,
+      });
+    },
+
+    setTeintePorte: (id, hex) => {
+      const st = get();
+      if (!st.openings.some((o) => o.id === id)) return;
+      pushHistory('teintePorte');
+      set({
+        openings: st.openings.map((o) => {
+          if (o.id !== id) return o;
+          const neuf = { ...o };
+          if (hex) neuf.teintePorte = hex;
+          else delete neuf.teintePorte;
+          return neuf;
+        }),
         dirty: true,
       });
     },

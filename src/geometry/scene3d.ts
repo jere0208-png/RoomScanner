@@ -3969,6 +3969,8 @@ export function buildScene(
       yaw: Math.atan2(u.z, u.x),
       yb: Math.max(0, p.y0),
       attributes: [`PorteAngle:${angle}`, `PorteGond:${gond === 1 ? 'droite' : 'gauche'}`, `PorteSens:${sens}`],
+      // La teinte choisie pour cette porte (voir `teintesPortes`).
+      ...(p.seg.teintePorte ? { color: p.seg.teintePorte } : {}),
       murId: p.w.id,
     });
   }
