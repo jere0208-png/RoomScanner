@@ -90,6 +90,12 @@ export function plafondDeLaPiece(
    * rampant. Dans le repère du volume.
    */
   murs: readonly { a: Pt; b: Pt; height: number }[] = [],
+  /**
+   * LES CAISSONS SOUS PLAFOND, dans le même repère : leurs carreaux ne sont
+   * pas le plafond de la pièce — sans quoi une retombée de 40 cm la faisait
+   * passer « sous rampant » (voir `geometry/caisson`).
+   */
+  caissons: readonly Pt[][] = [],
 ): PlafondDeLaPiece | null {
   if (!volume || contour.length < 3 || !(surface > 0) || !(volume.pas > 0)) return null;
   const { pas, minX, minZ, cols, rows, plafond } = volume;
@@ -106,6 +112,7 @@ export function plafondDeLaPiece(
     for (let c = c0; c <= c1; c++) {
       const centre = { x: minX + (c + 0.5) * pas, z: minZ + (r + 0.5) * pas };
       if (!pointInPolygon(centre, contour)) continue;
+      if (caissons.some((e) => pointInPolygon(centre, e))) continue;
       const h = plafond[r * cols + c] ?? 0;
       if (h <= 0) {
         nonVus.push(centre);

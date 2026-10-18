@@ -2494,6 +2494,11 @@ function ecranPc(a: Atelier, { W, D, H }: Gabarit) {
   a.boite(-W / 2 + 0.008, W / 2 - 0.008, H * 0.22 + 0.02, H - 0.008, zd - 0.002, zd, 'ecran', TEINTES.ecran);
 }
 
+/** Le caisson sous plafond : du bâti, à arêtes vives, à la teinte des murs. */
+function caissonDePlafond(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
+  a.boite(-W / 2, W / 2, 0, H, -D / 2, D / 2, 'laque', c.teinte ?? '#F1EFEA', { r: 0.002, seg: 1 });
+}
+
 /** Ce qu'on ne sait pas nommer : un volume net, sans prétendre à rien. */
 function objet(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   a.boite(-W / 2, W / 2, 0, H, -D / 2, D / 2, 'laque', c.teinte ?? '#D8D4CC', { r: Math.min(0.02, W / 4, D / 4, H / 4), seg: 1 });
@@ -3022,6 +3027,7 @@ export function fabriquer(categorie: string, g: Gabarit, c: Omit<Commande, 'cate
   else if (cat.includes('stair')) escalier(a, gab);
   else if (cat.includes('fireplace')) cheminee(a, gab);
   else if (cat.includes('storage') || cat.includes('cabinet') || cat.includes('wardrobe') || cat.includes('shelf')) rangement(a, gab, cmd);
+  else if (cat === 'caisson') caissonDePlafond(a, gab, cmd);
   else objet(a, gab, cmd);
   return a.finir();
 }

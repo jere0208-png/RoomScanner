@@ -81,6 +81,10 @@ import {
   wallFace,
 } from '../geometry/electrical';
 import { frCategory, furnKind, furnitureStrokes, meridienneDe } from '../geometry/furniture';
+import { estUnCaisson } from '../geometry/caisson';
+
+/** L'ordre du dessin des meubles : le tapis au sol, le caisson au plafond. */
+const rangDuDessin = (o: { category?: string }) => (o.category === 'tapis' ? 0 : estUnCaisson(o) ? 2 : 1);
 import { markColor } from '../geometry/schema';
 import { bleuFenetre, encreElectrique } from '../ui/encreElec';
 import { cheminDuPoche, pocheDesMurs, SUREPAISSEUR_FACADE } from '../geometry/poche';
@@ -3230,7 +3234,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                 : o.teinte ?? c.blueSoft
           }
           fillOpacity={
-            poseRefusee && o.id === selectedObjectId ? 0.35 : !planElec && o.teinte ? 0.55 : 1
+            poseRefusee && o.id === selectedObjectId ? 0.35 : estUnCaisson(o) ? 0.25 : !planElec && o.teinte ? 0.55 : 1
           }
           // Et ce qui en chevauche un autre GARDE son trait rouge
           // une fois lâché (revue « Théo ») : le contrôle le dit
@@ -3247,8 +3251,26 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                   : c.lineStrong
           }
           strokeWidth={o.id === selectedObjectId ? 2.5 : meublesEnConflit?.has(o.id) ? 1.6 : 1}
-          rx={3}
+          rx={estUnCaisson(o) ? 0 : 3}
+          /*
+            LE CAISSON SOUS PLAFOND EST AU-DESSUS : en pointillés, comme
+            tout ce qu'un plan dessine au-dessus de la coupe, et presque
+            transparent — on voit le meuble qui est dessous.
+          */
+          {...(estUnCaisson(o) && !(poseRefusee && o.id === selectedObjectId)
+            ? { strokeDasharray: '6 4' }
+            : {})}
         />
+        {estUnCaisson(o) && (
+          // Et ses deux diagonales : le signe du volume en hauteur.
+          <Path
+            d={`M${(-w / 2).toFixed(1)} ${(-d / 2).toFixed(1)} L${(w / 2).toFixed(1)} ${(d / 2).toFixed(1)} M${(w / 2).toFixed(1)} ${(-d / 2).toFixed(1)} L${(-w / 2).toFixed(1)} ${(d / 2).toFixed(1)}`}
+            stroke={planElec ? c.inkFaint : c.inkSoft}
+            strokeWidth={0.8}
+            strokeDasharray="4 3"
+            fill="none"
+          />
+        )}
         {/*
           UN TRAIT PAR POLYLIGNE, pas un nœud par segment.
 
@@ -3547,7 +3569,8 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
     return (
       <>
         {[...objects]
-          .sort((a, b) => (a.category === 'tapis' ? 0 : 1) - (b.category === 'tapis' ? 0 : 1))
+          // Les tapis d'abord, les caissons sous plafond en dernier : ils sont au-dessus de tout.
+          .sort((a, b) => rangDuDessin(a) - rangDuDessin(b))
           /*
             LE MEUBLE TENU SE DESSINE EN VOL — voir `SuitLeDoigt`. À sa
             place dans l'ordre du dessin : il ne passe ni devant ni

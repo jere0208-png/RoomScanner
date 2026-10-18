@@ -178,7 +178,7 @@ describe('à l’écran', () => {
     expect(plan).toContain('const bloquee = enVol && bloqueesEnVol ? bloqueesEnVol(enVol).has(o.id) : !!portesBloquees?.has(o.id);');
     const ecran = lire('src/screens/ResultScreen.tsx');
     expect(ecran).toContain('portesBloquees={showFurniture && !capturing ? portesBloquees : undefined}');
-    expect(ecran).toContain('meublesQuiBloquent(battants, objects)');
+    expect(ecran).toContain('meublesQuiBloquent(battants, objects, solDesMurs(walls))');
     expect(ecran).toContain("code: 'porte',");
   });
 });

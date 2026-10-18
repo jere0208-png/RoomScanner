@@ -163,7 +163,9 @@ describe('le dossier PDF', () => {
 describe('le plan 2D', () => {
   it('dessine les tapis dessous, et chaque meuble à sa teinte', () => {
     const plan = readFileSync(join(__dirname, '..', 'src', 'components', 'FloorplanEditor.tsx'), 'utf8');
-    expect(plan).toMatch(/\.sort\(\(a, b\) => \(a\.category === 'tapis' \? 0 : 1\) - \(b\.category === 'tapis' \? 0 : 1\)\)/);
+    // Les tapis d'abord — et les caissons sous plafond en dernier.
+    expect(plan).toMatch(/const rangDuDessin = \(o: \{ category\?: string \}\) => \(o\.category === 'tapis' \? 0 : estUnCaisson\(o\) \? 2 : 1\);/);
+    expect(plan).toContain('.sort((a, b) => rangDuDessin(a) - rangDuDessin(b))');
     expect(plan).toContain('o.teinte ?? c.blueSoft');
   });
 });

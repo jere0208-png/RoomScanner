@@ -19,6 +19,7 @@
  *     debout ou sur le côté. On ne compte ni la manœuvre en biais, ni les
  *     couloirs étroits : le verdict le dit.
  */
+import { estUnCaisson } from './caisson';
 import type { ObjectData } from 'react-native-room-scan';
 import { pointInPolygon } from './appearance';
 import {
@@ -137,10 +138,19 @@ const AU_DESSUS_DE_LA_PORTE = 2.05;
  * Les meubles qui heurtent le battant de chaque porte : identifiant de la
  * porte → identifiants des meubles, dans l'ordre du plan.
  */
-export function meublesQuiBloquent(battants: Battant[], objects: ObjectData[]): Map<string, string[]> {
+export function meublesQuiBloquent(
+  battants: Battant[],
+  objects: ObjectData[],
+  /**
+   * LE SOL DU PLAN (`solDesMurs`) — RoomPlan ne le met pas à zéro : sur un
+   * vrai relevé il est vers −1,30 m, et un caisson sous plafond (dessous à
+   * 2,40 au-dessus du sol) passait pour un meuble à 1,10 qui bloque la porte.
+   */
+  sol = 0,
+): Map<string, string[]> {
   const out = new Map<string, string[]>();
   const pleins = objects.filter((o) => {
-    const dessous = o.transform[13] - o.height / 2;
+    const dessous = o.transform[13] - o.height / 2 - sol;
     return o.height >= AU_RAS_DU_SOL && dessous < AU_DESSUS_DE_LA_PORTE;
   });
   if (pleins.length === 0) return out;
@@ -238,6 +248,8 @@ export function passageDuMeuble(
   objet: ObjectData,
   plan: { walls: WallSeg[]; openings: WallSeg[]; rooms: (RoomShape & { name?: string })[] },
 ): VerdictDePassage | null {
+  // Le caisson sous plafond est bâti sur place : il ne passe aucune porte.
+  if (estUnCaisson(objet)) return null;
   const parts = roomParts(plan.walls, plan.rooms).filter((p) => p.surface && p.surface.pts.length >= 3);
   const ici = { x: objet.transform[12], z: objet.transform[14] };
   const cible =

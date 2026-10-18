@@ -2439,7 +2439,7 @@ export function ResultScreen() {
     le plan ; le meuble choisi dit s'il passe les portes jusqu'à sa pièce.
   */
   const battants = useMemo(() => battantsDesPortes(openings, walls, rooms), [openings, walls, rooms]);
-  const bloquages = useMemo(() => meublesQuiBloquent(battants, objects), [battants, objects]);
+  const bloquages = useMemo(() => meublesQuiBloquent(battants, objects, solDesMurs(walls)), [battants, objects, walls]);
   const portesBloquees = useMemo(() => new Set(bloquages.keys()), [bloquages]);
   // Le meuble choisi est-il logé entre des murs, un peu plus petit que sa place ?
   const calage = useMemo(() => (selectedObject ? calerDansLaNiche(selectedObject, walls) : null), [selectedObject, walls]);
@@ -2495,6 +2495,7 @@ export function ResultScreen() {
     const b = meublesQuiBloquent(
       battants,
       objects.map((x) => (x.id === o.id ? o : x)),
+      solDesMurs(walls),
     );
     const v = {
       calage: calerDansLaNiche(o, walls),
@@ -2961,7 +2962,7 @@ export function ResultScreen() {
         réflexion « grand public ». Une information : un meuble relevé au
         scan peut être à dix centimètres de sa place réelle.
       */
-      ...[...meublesQuiBloquent(battantsDesPortes(fige.openings, fige.walls, fige.rooms), fige.objects)].map(
+      ...[...meublesQuiBloquent(battantsDesPortes(fige.openings, fige.walls, fige.rooms), fige.objects, solDesMurs(fige.walls))].map(
         ([porteId, ids], n) => {
           const porte = fige.openings.find((o) => o.id === porteId)!;
           const nom = nomDeLaPorte(porte, fige.rooms, fige.parts);
@@ -7204,6 +7205,49 @@ export function ResultScreen() {
                         label: `Côté ${nomDe(p2.roomId)}`,
                         icon: 'rouleau' as const,
                         onPress: () => setMurAPeindre({ roomId: p2.roomId, wallId }),
+                      })),
+                    });
+                  }
+                },
+              },
+              /*
+                LE CAISSON SOUS PLAFOND — diagnostic du patron : « le coffre
+                en haut du mur ne se détecte pas au scan ». Le scan le
+                cherche désormais ; ce qu'il n'a pas vu se pose ici, contre
+                le mur, de nu à nu, collé au plafond. On le retaille ensuite
+                dans sa barre : longueur, profondeur, retombée (« H »).
+              */
+              {
+                label: 'Caisson',
+                icone: SOLAIRES.coffre,
+                sansMot: true,
+                onPress: () => {
+                  const wallId = selectedWall.id;
+                  const cotes = parts.filter((p2) => p2.walls.some((w2) => w2.id === wallId));
+                  const nomDe = (id: string) => rooms.find((r) => r.id === id)?.name || 'la pièce';
+                  const poser = (roomId: string) => {
+                    const id = useScanStore.getState().ajouterCaisson(wallId, roomId);
+                    if (!id) return;
+                    haptic('succes');
+                    seuleSelection('meuble');
+                    setSelectedObjectId(id);
+                    astuce('Caisson posé : 40 cm de profondeur, 30 cm de retombée. Ses cotes se règlent dans sa barre.', {
+                      icone: 'undo',
+                      action: { label: 'Annuler', faire: () => useScanStore.getState().undo() },
+                    });
+                  };
+                  if (cotes.length === 0) {
+                    alerte('Aucune pièce', 'Ce mur ne borde aucune pièce fermée : le caisson n’a pas de plafond où s’accrocher.');
+                  } else if (cotes.length === 1) {
+                    poser(cotes[0].roomId);
+                  } else {
+                    setMenu({
+                      title: 'Caisson de quel côté ?',
+                      subtitle: 'Il se pose contre ce mur, sous le plafond de la pièce choisie.',
+                      actions: cotes.map((p2) => ({
+                        label: `Côté ${nomDe(p2.roomId)}`,
+                        icon: 'coffre' as const,
+                        onPress: () => poser(p2.roomId),
                       })),
                     });
                   }

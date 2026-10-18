@@ -22,6 +22,7 @@
  * ni ce qui est suspendu. Et un meuble qui viendrait chevaucher son voisin
  * garde ses cotes.
  */
+import { estUnCaisson } from './caisson';
 import type { ObjectData } from 'react-native-room-scan';
 import { demiFacesDe, segLength, solDesMurs, type Pt, type WallSeg } from './floorplan';
 
@@ -198,7 +199,10 @@ export function calerLesMeubles<O extends ObjectData>(objets: O[], walls: WallSe
     if (!cale) return o;
     const avant = emprise(o);
     const apres = emprise(cale);
-    const gene = objets.some((v) => v !== o && chevauchent(apres, emprise(v)) && !chevauchent(avant, emprise(v)));
+    // Le caisson sous plafond est au-dessus : il ne gêne aucun meuble posé au sol.
+    const gene = objets.some(
+      (v) => v !== o && !estUnCaisson(v) && chevauchent(apres, emprise(v)) && !chevauchent(avant, emprise(v)),
+    );
     if (gene) return o;
     change = true;
     return cale;

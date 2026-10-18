@@ -10,6 +10,15 @@ import { pasDeGeste } from './geste';
 import { catalogueDesPlans, deposerPlan, reprendrePlan, type Identite, retirerPlan } from '../net/coffrePlans';
 import { implanter, rattacher, sansLaRangee, type DepartExistant, type TableauExistant } from '../geometry/existant';
 import { plafondDeLaPiece, solReleveDe, type PlafondDeLaPiece } from '../geometry/fichePiece';
+import {
+  CAISSON_PROFONDEUR,
+  CAISSON_RETOMBEE,
+  caissonsDuVolume,
+  coteDeLaPiece,
+  empriseDuCaisson,
+  estUnCaisson,
+  objetCaisson,
+} from '../geometry/caisson';
 
 export type { TableauExistant };
 import {
@@ -86,6 +95,7 @@ import {
   fusionnerMursDoubles,
   estDessine,
   longueurCotee,
+  bornesAuNu,
   repereDePiece,
   demiFacesDe,
   epaisseurDe,
@@ -291,10 +301,48 @@ function releveDeLaPiece(
   aire: number,
   /** Les murs de la pièce, dans le repère du scan : ses jambettes (voir `plafondDeLaPiece`). */
   murs: readonly { a: Pt; b: Pt; height: number }[] = [],
+  /** Les caissons trouvés dans la pièce, dans le repère du scan : pas son plafond. */
+  caissons: readonly Pt[][] = [],
 ): RoomEntry['releve'] | undefined {
-  const plafond = plafondDeLaPiece(r.maillage?.volume, contour, aire, murs);
+  const plafond = plafondDeLaPiece(r.maillage?.volume, contour, aire, murs, caissons);
   const surfaceSol = solReleveDe(r.sols, contour, murs);
   return plafond || surfaceSol ? { plafond, surfaceSol } : undefined;
+}
+
+/**
+ * LES CAISSONS SOUS PLAFOND DU RELEVÉ — lus pièce par pièce dans la carte du
+ * plafond (voir `geometry/caisson`), posés comme meubles du plan, collés au
+ * plafond. Leurs emprises, dans le repère du scan, écartent leurs carreaux du
+ * plafond de la pièce (`releveDeLaPiece`).
+ *
+ * `existants` : les caissons déjà au plan (un relevé qu'on complète) — un
+ * caisson retrouvé là où il y en a déjà un ne se pose pas deux fois.
+ */
+function caissonsDuScan(
+  r: ScanResult,
+  pieces: { roomId: string; outline: Pt[]; murs: WallSeg[] }[],
+  versLeBrut: (p: Pt) => Pt,
+  sol: number,
+  marque: string,
+  existants: ObjectData[] = [],
+): { objets: ObjectData[]; emprises: Map<string, Pt[][]> } {
+  const objets: ObjectData[] = [];
+  const emprises = new Map<string, Pt[][]>();
+  const volume = r.maillage?.volume;
+  if (!volume) return { objets, emprises };
+  const deja = existants.filter(estUnCaisson).map(empriseDuCaisson);
+  for (const piece of pieces) {
+    const trouves = caissonsDuVolume(volume, piece.outline, piece.murs, versLeBrut);
+    trouves.forEach((c, k) => {
+      const w = piece.murs.find((m) => m.id === c.wallId);
+      if (!w) return;
+      const o = objetCaisson(w, c, sol, `caisson-${marque}-${piece.roomId}-${k}`, piece.roomId);
+      if (deja.some((e) => pointInPolygon({ x: o.transform[12], z: o.transform[14] }, e))) return;
+      objets.push(o);
+      emprises.set(piece.roomId, [...(emprises.get(piece.roomId) ?? []), empriseDuCaisson(o).map(versLeBrut)]);
+    });
+  }
+  return { objets, emprises };
 }
 
 /** Un dossier de la bibliothèque. Il ne porte qu'un nom : ce sont les scans
@@ -991,6 +1039,37 @@ function roomIndexAt(p: { x: number; z: number }, outlines: Pt[][]): number {
  * On reçoit les murs dans leur hauteur NEUVE : c'est leur plafond qui sert
  * de règle, et leur sol qui reste où il est.
  */
+/**
+ * LE CAISSON SOUS PLAFOND RESTE COLLÉ AU PLAFOND — quand la hauteur d'une
+ * pièce change, ses caissons (voir `geometry/caisson`) remontent ou
+ * descendent avec lui : leur dessus se pose au sol de ses murs plus la
+ * hauteur tapée. `hauteur(roomId)` : la nouvelle hauteur, `null` pour une
+ * pièce qui ne change pas.
+ */
+function recollerLesCaissons(
+  objects: ObjectData[],
+  walls: WallSeg[],
+  rooms: { id: string; wallIds?: string[] }[],
+  hauteur: (roomId: string) => number | null,
+): ObjectData[] {
+  let change = false;
+  const out = objects.map((o) => {
+    if (!estUnCaisson(o) || !o.roomId) return o;
+    const h = hauteur(o.roomId);
+    if (h === null) return o;
+    const ids = new Set(rooms.find((r) => r.id === o.roomId)?.wallIds ?? []);
+    const siens = walls.filter((w) => ids.has(w.id));
+    if (siens.length === 0) return o;
+    const sol = Math.min(...siens.map((w) => w.yCenter - w.height / 2));
+    const t = [...o.transform];
+    t[13] = sol + h - o.height / 2;
+    if (Math.abs(t[13] - o.transform[13]) < 1e-9) return o;
+    change = true;
+    return { ...o, transform: t };
+  });
+  return change ? out : objects;
+}
+
 function rabattreSousLePlafond(
   murs: WallSeg[],
   fixtures: Fixture[],
@@ -2784,6 +2863,11 @@ export interface ScanState {
    * qu'on a pour poser un appareil.
    */
   setWallHeight: (wallId: string, height: number) => void;
+  /**
+   * UN CAISSON SOUS PLAFOND CONTRE CE MUR, du côté de cette pièce — de nu à
+   * nu, collé à son plafond (voir `geometry/caisson`). Rend son identifiant.
+   */
+  ajouterCaisson: (wallId: string, roomId: string) => string | null;
   /** Retire un mur du plan (et les ouvertures qu'il portait). */
   removeWall: (wallId: string) => void;
   /**
@@ -4517,14 +4601,22 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       acc.push(nom ? nomDePieceLibre(nom, [...prisAilleurs, ...acc]) || nom : nom);
       return acc;
     }, []);
+    /*
+      LE PLAFOND RELEVÉ À L'ÉTAGE AUSSI — revue « Malik » : le relevé du
+      rez-de-chaussée gardait sa hauteur et son rampant, celui de l'étage
+      les perdait. Le contour, décalé dans le plan, se relit dans le
+      repère brut du scan.
+    */
+    const versLeBrutEtage = (p: Pt) => ({ x: p.x - dx, z: p.z - dz });
+    // Les caissons sous plafond de l'étage (voir `caissonsDuScan`).
+    const caissons = caissonsDuScan(
+      r,
+      shapes.map((s, i) => ({ roomId: idPiece(i), outline: s.outline, murs: walls.filter((w) => s.wallIds.includes(w.id)) })),
+      versLeBrutEtage,
+      solDe(walls),
+      marque,
+    );
     const pieces: RoomEntry[] = shapes.map((s, i) => {
-      /*
-        LE PLAFOND RELEVÉ À L'ÉTAGE AUSSI — revue « Malik » : le relevé du
-        rez-de-chaussée gardait sa hauteur et son rampant, celui de l'étage
-        les perdait. Le contour, décalé dans le plan, se relit dans le
-        repère brut du scan.
-      */
-      const versLeBrutEtage = (p: Pt) => ({ x: p.x - dx, z: p.z - dz });
       const releve = releveDeLaPiece(
         r,
         s.outline.map(versLeBrutEtage),
@@ -4532,6 +4624,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         walls
           .filter((w) => s.wallIds.includes(w.id))
           .map((w) => ({ a: versLeBrutEtage(w.a), b: versLeBrutEtage(w.b), height: w.height })),
+        caissons.emprises.get(idPiece(i)),
       );
       return {
         id: idPiece(i),
@@ -4569,7 +4662,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       walls: [...st.walls, ...walls],
       openings: [...st.openings, ...openings],
       rooms: [...st.rooms, ...pieces],
-      objects: [...st.objects, ...objects],
+      objects: [...st.objects, ...objects, ...caissons.objets],
       fixtures: [...st.fixtures, ...vise.fixtures],
       ceiling: [...st.ceiling, ...vise.ceiling],
       photos: [
@@ -8251,7 +8344,8 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         st.openings,
       );
       // (`rabattreSousLePlafond` ne touche que les baies du niveau de chaque mur.)
-      set({ walls, rooms, ...suite, dirty: true });
+      const objects = recollerLesCaissons(st.objects, walls, rooms, (id) => (id === roomId ? height : null));
+      set({ walls, rooms, ...suite, objects, dirty: true });
     },
 
     /*
@@ -8296,7 +8390,43 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         delete sans.hauteur;
         return sans;
       });
-      set({ walls, rooms, ...suite, dirty: true });
+      const duNiveau = new Set(st.rooms.filter((r) => niveauDe(r) === n).map((r) => r.id));
+      const objects = recollerLesCaissons(st.objects, walls, rooms, (id) => (duNiveau.has(id) ? height : null));
+      set({ walls, rooms, ...suite, objects, dirty: true });
+    },
+
+    ajouterCaisson: (wallId, roomId) => {
+      const st = get();
+      const w = st.walls.find((x) => x.id === wallId);
+      if (!w) return null;
+      const jeu = jeuDuNiveau(st, niveauDe(w));
+      const parts = roomParts(jeu.walls, jeu.rooms);
+      const part = parts.find((p) => p.roomId === roomId);
+      const contour = part?.surface?.pts;
+      if (!part || !contour) return null;
+      const sens = coteDeLaPiece(w, contour);
+      if (sens === null) return null;
+      const { s0, s1 } = bornesAuNu(jeu.walls, w, [part]);
+      if (s1 - s0 < 0.1) return null;
+      pushHistory('ajouterCaisson');
+      const id = `caisson-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      const o = objetCaisson(
+        w,
+        {
+          t0: s0,
+          t1: s1,
+          profondeur: CAISSON_PROFONDEUR,
+          retombee: CAISSON_RETOMBEE,
+          plafond: hauteurDeLaPiece(part) || hauteurDuNiveau(st.walls, niveauDe(w)),
+          sens,
+        },
+        solDesMurs(part.walls),
+        id,
+        roomId,
+        faceDuCote(demiFacesDe(jeu.walls, w), sens),
+      );
+      set({ objects: [...st.objects, o], dirty: true });
+      return id;
     },
 
     setWallHeight: (wallId, height) => {
@@ -8621,6 +8751,16 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       // Les noms donnés à la main survivent au second passage : on rattache
       // chaque pièce neuve à l'ancienne dont le cartouche tombe dedans.
       const anciennes = roomParts(jeu.walls, jeu.rooms);
+      // Les caissons sous plafond de ce passage ; un caisson déjà au plan ne
+      // se pose pas deux fois (voir `caissonsDuScan`).
+      const caissons = caissonsDuScan(
+        r,
+        shapes.map((sh, i) => ({ roomId: idPiece(i), outline: sh.outline, murs: walls.filter((w) => sh.wallIds.includes(w.id)) })),
+        versLeBrut,
+        solDe(walls),
+        Date.now().toString(36),
+        objects,
+      );
       const kept: RoomEntry[] = shapes.map((sh, i) => {
         const avant = anciennes.find((pa) =>
           pointInPolygon(pa.labelAt, sh.outline),
@@ -8634,7 +8774,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         const sesMurs = walls
           .filter((w) => sh.wallIds.includes(w.id))
           .map((w) => ({ a: versLeBrut(w.a), b: versLeBrut(w.b), height: w.height }));
-        const releve = releveDeLaPiece(r, brut, sh.area, sesMurs) ?? garde?.releve;
+        const releve = releveDeLaPiece(r, brut, sh.area, sesMurs, caissons.emprises.get(idPiece(i))) ?? garde?.releve;
         return {
           id: idPiece(i),
           name: garde?.name || auto[i],
@@ -8667,7 +8807,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       // Le blanc remis d'aplomb, une fois pour toutes : voir
       // `blancsDAplomb`. Tout ce qui lit ces champs — 3D, plan, dossier,
       // export — voit désormais la même chose.
-      const aplomb = blancsDAplomb(walls, objects);
+      const aplomb = blancsDAplomb(walls, [...objects, ...caissons.objets]);
       set({
         modelPath: r.modelPath ?? st.modelPath,
         rooms: remplacer(st.rooms, jeu.rooms, kept),
@@ -9114,8 +9254,23 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       /* Chaque mur, photographié et redressé pendant le scan. */
       const photosAuto = photosDesMurs(r.photosMurs ?? [], surfaces, walls);
       const names = nommerLesPlacards(nameRooms(kinds, shapes.map((s) => s.outline)), kinds, shapes, walls, openings);
+      // Les caissons sous plafond, que RoomPlan ne relève pas (voir `caissonsDuScan`).
+      const caissons = caissonsDuScan(
+        r,
+        shapes.map((s, i) => ({ roomId: `room-${i + 1}`, outline: s.outline, murs: walls.filter((w) => s.wallIds.includes(w.id)) })),
+        (p) => p,
+        solDe(walls),
+        Date.now().toString(36),
+      );
+      const objetsDuPlan = [...objects, ...caissons.objets];
       const kept: RoomEntry[] = shapes.map((s, i) => {
-        const releve = releveDeLaPiece(r, s.outline, s.area, walls.filter((w) => s.wallIds.includes(w.id)));
+        const releve = releveDeLaPiece(
+          r,
+          s.outline,
+          s.area,
+          walls.filter((w) => s.wallIds.includes(w.id)),
+          caissons.emprises.get(`room-${i + 1}`),
+        );
         return {
           id: `room-${i + 1}`,
           name: names[i],
@@ -9187,7 +9342,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         // Le blanc remis d'aplomb, une fois pour toutes : voir
         // `blancsDAplomb`. Tout ce qui lit ces champs — 3D, plan, dossier,
         // export — voit désormais la même chose.
-        ...blancsDAplomb(walls, objects),
+        ...blancsDAplomb(walls, objetsDuPlan),
         openings,
         fixtures: vise.fixtures,
         photos: photosAuto,
@@ -9207,7 +9362,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         // Le blanc remis d'aplomb, une fois pour toutes : voir
         // `blancsDAplomb`. Tout ce qui lit ces champs — 3D, plan, dossier,
         // export — voit désormais la même chose.
-        ...blancsDAplomb(walls, objects),
+        ...blancsDAplomb(walls, objetsDuPlan),
         openings,
         fixtures: vise.fixtures,
         photos: photosAuto,
@@ -11182,13 +11337,24 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       if (height !== undefined && !(height > 0.05 && height <= 4)) return;
       if (base !== undefined && !(base >= 0 && base <= 6)) return;
       if (height === undefined && base === undefined) return;
-      const h = height ?? o.height;
+      let h = height ?? o.height;
       /*
         LA POSE SE COMPTE DEPUIS LE SOL DU PLAN — RoomPlan ne le met pas à
         zéro (voir `solDesMurs`). « 0 » pose le meuble par terre, pas à
         quatre-vingts centimètres au-dessus.
       */
-      const b = base !== undefined ? base + solDesMurs(get().walls) : o.transform[13] - o.height / 2;
+      let b = base !== undefined ? base + solDesMurs(get().walls) : o.transform[13] - o.height / 2;
+      /*
+        LE CAISSON SOUS PLAFOND GARDE SON DESSUS AU PLAFOND : sa hauteur est
+        sa retombée, et sa pose le dessous de la retombée — l'une ou l'autre
+        se règle, le plafond ne bouge pas.
+      */
+      if (estUnCaisson(o)) {
+        const dessus = o.transform[13] + o.height / 2;
+        if (base !== undefined) h = dessus - b;
+        if (!(h > 0.05 && h <= 4)) return;
+        b = dessus - h;
+      }
       pushHistory(`objectHeight:${id}`);
       set({
         objects: get().objects.map((x) => {

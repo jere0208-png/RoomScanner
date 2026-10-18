@@ -389,6 +389,8 @@ const AUTRES: Record<string, string> = {
   transat: 'Transat',
   parasol: 'Parasol',
   barbecue: 'Barbecue',
+  // La retombée qui longe le haut d'un mur (voir `geometry/caisson`).
+  caisson: 'Caisson de plafond',
 };
 
 /**

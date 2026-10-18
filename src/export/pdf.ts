@@ -6,6 +6,7 @@
  * de vues 3D avec les mesures portées sur les murs.
  * PDF 1.4 non compressé, A4, polices Helvetica (WinAnsi).
  */
+import { estUnCaisson } from '../geometry/caisson';
 import { zlibSync } from 'fflate';
 import {
   aDesTravaux,
@@ -3470,8 +3471,18 @@ function planPage(
     // silhouette dit ce qu'est un lit ou une table ; le mot ajoutait de
     // l'écriture là où le plan coté doit d'abord laisser lire ses cotes.
     for (const m of meublesDuPlan) {
+      if (estUnCaisson(m.o)) continue;
       d.poly(m.contour, '#FFFFFF', '#9FACBF', 0.8);
       for (const t of m.traits) d.path(t, 0.7, '#9FACBF');
+    }
+    // Le caisson sous plafond, par-dessus : en pointillés, sans fond, ses
+    // diagonales — comme à l'écran (voir `geometry/caisson`).
+    for (const m of meublesDuPlan) {
+      if (!estUnCaisson(m.o)) continue;
+      d.poly(m.contour, null, '#9FACBF', 0.8, true);
+      const [a, b, c, e] = m.contour;
+      d.dashedPath([a, c], 0.5, '#9FACBF', [3, 2]);
+      d.dashedPath([b, e], 0.5, '#9FACBF', [3, 2]);
     }
 
     /*

@@ -5,6 +5,7 @@
  * de murs, mêmes bandes, mêmes couleurs relevées. Tout est donc calculé ici,
  * chaque rendu ne s'occupant plus que de projeter et de peindre.
  */
+import { estUnCaisson } from './caisson';
 import type { PieceHabillee } from './habillage';
 import type { PoseDeMeuble } from './modeles3d';
 import { posesDUnLot, postesDuLot, type PoseDAppareil } from './appareils3d';
@@ -3810,8 +3811,9 @@ export function buildScene(
       catégorie la devine. La couleur RELEVÉE au scan reste devant : c'est
       une mesure, pas un parti pris.
     */
+    // Le caisson sous plafond est du bâti : il prend la teinte des murs.
     const base =
-      skin ?? matiereDuMeuble(obj) ?? teinteMoelleuse ?? pal.object;
+      skin ?? (estUnCaisson(obj) ? pal.wall : undefined) ?? matiereDuMeuble(obj) ?? teinteMoelleuse ?? pal.object;
     const teintes = {
       body: base,
       soft: mixHex(base, '#FFFFFF', 0.45),
@@ -4119,6 +4121,9 @@ export function buildScene(
   const heurte = (p: Pt) =>
     poses.some((m) => {
       if (m.category === 'porte3d') return false;
+      // Au-dessus du vantail — un caisson sous plafond, une étagère haute :
+      // la porte passe dessous (même seuil que `meublesQuiBloquent`).
+      if (m.yb >= 2.05) return false;
       const dx = p.x - m.cx;
       const dz = p.z - m.cz;
       const c = Math.cos(m.yaw);
