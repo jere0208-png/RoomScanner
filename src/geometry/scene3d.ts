@@ -28,6 +28,7 @@ import {
   type Pt,
   type RoomSurface,
   type WallSeg,
+  normaleVersLaPiece,
 } from './floorplan';
 import { couleurMajoritaire, mixHex, pointInPolygon, sampleTexture } from './appearance';
 import { AMBRE_MEUBLE, MEUBLE_MOELLEUX } from '../ui/maquette';
@@ -1585,10 +1586,17 @@ export function assignOpenings(
       const { dist } = pointOnSeg(mid, w.a, w.b);
       if (dist > 0.6) continue;
       const sienne = roomOf(w) === roomOf(o);
+      /*
+        « À ÉGALITÉ » VEUT DIRE À ÉGALITÉ — enquête 3D : le mur de sa pièce
+        l'emportait jusqu'à 60 cm sur un mur nettement plus proche. Une porte
+        posée sur une cloison, relevée depuis un placard de 50 cm, perçait le
+        fond du placard et laissait la cloison murée. Le mur de sa pièce
+        départage deux murs confondus (à 3 cm près), pas davantage.
+      */
       const mieux =
         !best ||
-        (sienne && !best.sienne) ||
-        (sienne === best.sienne && dist < best.dist);
+        dist < best.dist - 0.03 ||
+        (Math.abs(dist - best.dist) <= 0.03 && sienne && !best.sienne);
       if (mieux) best = { wall: w, dist, sienne };
     }
     if (!best) continue;
@@ -1664,16 +1672,25 @@ export interface WallPanel {
  */
 export function wallPanels(holes: WallHole[], height: number): WallPanel[] {
   if (holes.length === 0) return [{ t0: 0, t1: 1, y0: 0, y1: height }];
-  const sorted = [...holes].sort((a, b) => a.t0 - b.t0);
-  const out: WallPanel[] = [];
+  // Les trous effectivement percés : triés, rognés là où ils se chevauchent.
+  const trous: { t0: number; t1: number; vide: [number, number] }[] = [];
   let cursor = 0;
-  /** Le vide de la baie précédente, que borde le début du prochain trumeau. */
-  let videAvant: [number, number] | null = null;
-  for (const hole of sorted) {
+  for (const hole of [...holes].sort((a, b) => a.t0 - b.t0)) {
     const t0 = Math.max(cursor, hole.t0);
     const t1 = Math.max(t0, Math.min(1, hole.t1));
     if (t1 - t0 < 1e-4) continue;
-    const vide: [number, number] = [Math.max(0, hole.y0), Math.min(height, hole.y1)];
+    trous.push({ t0, t1, vide: [Math.max(0, hole.y0), Math.min(height, hole.y1)] });
+    cursor = t1;
+  }
+  const out: WallPanel[] = [];
+  cursor = 0;
+  trous.forEach((trou, k) => {
+    const { t0, t1, vide } = trou;
+    const avant = trous[k - 1];
+    const apres = trous[k + 1];
+    /** La baie d'avant touche celle-ci, sans trumeau entre elles. */
+    const jointeAvant = !!avant && t0 - avant.t1 <= 1e-4;
+    const jointeApres = !!apres && apres.t0 - t1 <= 1e-4;
     if (t0 - cursor > 1e-4) {
       out.push({
         t0: cursor,
@@ -1681,26 +1698,27 @@ export function wallPanels(holes: WallHole[], height: number): WallPanel[] {
         y0: 0,
         y1: height,
         // Le trumeau ne montre son bout que face au vide des baies qui le bordent.
-        chants: { ...(videAvant ? { debut: [videAvant] } : {}), fin: [vide] },
+        chants: { ...(avant ? { debut: [avant.vide] } : {}), fin: [vide] },
       });
     }
     /*
       L'allège et le linteau touchent le trumeau de chaque côté : leurs bouts
-      sont enfouis — sauf au bout du mur, ou contre la baie d'à côté quand
-      deux baies se touchent sans trumeau entre elles.
+      sont enfouis — sauf au bout du mur (tout le bout), ou contre la baie
+      d'à côté quand deux baies se touchent sans trumeau entre elles : leur
+      bout borde alors le vide de la voisine (enquête 3D : une porte suivie
+      d'une fenêtre laissait l'allège ouverte, on voyait au travers du mur).
     */
-    const debut: [number, number][] | undefined =
-      t0 < 1e-4 ? undefined : t0 - cursor > 1e-4 ? [] : videAvant ? [] : undefined;
-    const fin: [number, number][] | undefined = t1 > 1 - 1e-4 ? undefined : [];
-    if (hole.y0 > 1e-3) out.push({ t0, t1, y0: 0, y1: hole.y0, chants: { debut, fin } });
-    if (hole.y1 < height - 1e-3) {
-      out.push({ t0, t1, y0: hole.y1, y1: height, chants: { debut, fin } });
+    const debut: [number, number][] | undefined = t0 < 1e-4 ? undefined : jointeAvant ? [avant!.vide] : [];
+    const fin: [number, number][] | undefined = t1 > 1 - 1e-4 ? undefined : jointeApres ? [apres!.vide] : [];
+    if (vide[0] > 1e-3) out.push({ t0, t1, y0: 0, y1: vide[0], chants: { debut, fin } });
+    if (vide[1] < height - 1e-3) {
+      out.push({ t0, t1, y0: vide[1], y1: height, chants: { debut, fin } });
     }
     cursor = t1;
-    videAvant = vide;
-  }
+  });
   if (cursor < 1 - 1e-4) {
-    out.push({ t0: cursor, t1: 1, y0: 0, y1: height, ...(videAvant ? { chants: { debut: [videAvant] } } : {}) });
+    const dernier = trous[trous.length - 1];
+    out.push({ t0: cursor, t1: 1, y0: 0, y1: height, ...(dernier ? { chants: { debut: [dernier.vide] } } : {}) });
   }
   return out;
 }
@@ -2205,8 +2223,17 @@ export function buildScene(
        * redevient une seule surface : rien ne peut plus s'y intercaler.
        */
       depthY?: number;
+      /**
+       * LES MONTANTS À TRACER, au bout p et au bout q : les tranches de
+       * hauteur [bas, haut]. Absent : toute la hauteur. Le pan d'un morceau
+       * de mur percé ne cerne que les bouts qui bordent un vide (voir
+       * `WallPanel.chants`) — sinon le PDF et les vignettes montraient un
+       * trait de haut en bas au droit de chaque jambage.
+       */
+      montants?: { p?: [number, number][]; q?: [number, number][] };
     } = {},
   ) => {
+    const restreint = !!o.montants;
     const cols = o.whole
       ? 1
       : Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z) / step));
@@ -2259,7 +2286,7 @@ export function buildScene(
           panId: panCourant,
           pts: vquad(s0, s1, bot, top),
           fill: paint,
-          stroke: o.whole ? o.outline ?? null : null,
+          stroke: o.whole && !restreint ? o.outline ?? null : null,
           shade: o.shade,
           captured: o.captured || !!o.tex,
           normal: o.normal,
@@ -2275,7 +2302,7 @@ export function buildScene(
         });
 
         // D'un seul tenant : le contour est déjà posé sur l'aplat.
-        if (o.whole) continue;
+        if (o.whole && !restreint) continue;
 
         // Contour du POURTOUR, tuile par tuile.
         //
@@ -2298,12 +2325,15 @@ export function buildScene(
         if (r === rows - 1) {
           E({ x: s0.x, y: yb, z: s0.z }, { x: s1.x, y: yb, z: s1.z });
         }
-        if (i === 0) {
-          E({ x: s0.x, y: bot, z: s0.z }, { x: s0.x, y: top, z: s0.z });
-        }
-        if (i === cols - 1) {
-          E({ x: s1.x, y: bot, z: s1.z }, { x: s1.x, y: top, z: s1.z });
-        }
+        const montant = (pt: Pt, tranches: [number, number][] | undefined) => {
+          for (const [b, h] of tranches ?? [[bot, top]]) {
+            const bas = Math.max(bot, b);
+            const haut = Math.min(top, h);
+            if (haut - bas > 1e-3) E({ x: pt.x, y: bas, z: pt.z }, { x: pt.x, y: haut, z: pt.z });
+          }
+        };
+        if (i === 0) montant(s0, o.montants?.p);
+        if (i === cols - 1) montant(s1, o.montants?.q);
       }
     }
   };
@@ -2445,6 +2475,12 @@ export function buildScene(
       /** Les chants qui se voient (voir `WallPanel.chants`). */
       chants?: WallPanel['chants'];
       /**
+       * Les montants que cernent les deux grandes faces — les chants du
+       * découpage, AVANT qu'un bout enfoui dans un autre mur ne perde son
+       * chant : l'angle d'une pièce garde son trait.
+       */
+      montants?: WallPanel['chants'];
+      /**
        * Le TRAIT du mur : `t0`/`t1` sont alors des fractions de SA longueur,
        * reportées d'équerre sur chaque nu (voir `surLeNu`).
        */
@@ -2504,9 +2540,10 @@ export function buildScene(
       tex?: SurfaceTexture,
       uFrom = 0,
       uTo = 1,
-      extra: { cutaway?: boolean; fill?: string } = {},
+      extra: { cutaway?: boolean; fill?: string; montants?: { p?: [number, number][]; q?: [number, number][] } } = {},
     ) =>
       pushStrips(p, r, yb, yt, extra.fill ?? o.fill, {
+        montants: extra.montants,
         shade: o.shade ?? true,
         captured: o.captured,
         tex,
@@ -2522,12 +2559,16 @@ export function buildScene(
     // `texOnPlus` dit déjà quelle face regarde la pièce : l'AUTRE est
     // l'extérieure, celle que l'écorché estompe.
     const dehors = o.cutaway;
+    // Le mur passe ses montants (absents : rien à restreindre) ; les autres blocs, leurs chants.
+    const montants = 'montants' in o ? o.montants : o.chants;
     face(p1, r1, o.texOnPlus ? o.tex : undefined, t0, t1, {
       cutaway: dehors === undefined ? undefined : !o.texOnPlus,
+      montants: montants && { p: montants.debut, q: montants.fin },
     });
     face(r2, p2, o.texOnPlus ? undefined : o.tex, t1, t0, {
       cutaway: dehors === undefined ? undefined : !!o.texOnPlus,
       fill: o.fillMoins,
+      montants: montants && { p: montants.fin, q: montants.debut },
     });
     if (o.facesSeules) return;
     // Tableaux (chants) : trop étroits pour mériter un découpage. Seulement
@@ -2549,9 +2590,13 @@ export function buildScene(
     };
     chant(p2, p1, o.chants?.debut);
     chant(r1, r2, o.chants?.fin);
+    // Un bout du dessus se cerne s'il borde le vide jusqu'en haut : contre
+    // le morceau voisin, la coupe est dans la maçonnerie.
+    const jusquEnHaut = (tr: [number, number][] | undefined) =>
+      tr === undefined || tr.some(([b, h]) => h >= yt - 1e-3 && b < yt - 1e-3);
     pushTopStrips(p1, r1, p2, r2, yt, o.top, o.topStroke, 1, o.whole, {
-      debut: !(o.joints?.a && t0 < 1e-6),
-      fin: !(o.joints?.b && t1 > 1 - 1e-6),
+      debut: !(o.joints?.a && t0 < 1e-6) && jusquEnHaut(montants?.debut),
+      fin: !(o.joints?.b && t1 > 1 - 1e-6) && jusquEnHaut(montants?.fin),
     });
     if (o.closeBottom) {
       pushTopStrips(r1, p1, r2, p2, yb, o.top, o.topStroke, -1, o.whole);
@@ -2745,11 +2790,72 @@ export function buildScene(
     /** Ce mur a-t-il quelque chose devant lui, à trier contre ses bandes ? */
     const litige = devantLeMur(w);
 
+    /*
+      LES BOUTS ENFOUIS DANS UN AUTRE MUR — enquête 3D : à chaque angle, le
+      bout d'un mur s'arrête dans la maçonnerie de son voisin (l'onglet), et
+      son chant y était dessiné quand même : deux faces pleine hauteur dos à
+      dos dans l'épaisseur, qui restaient opaques quand la façade se voile —
+      une bande verticale à chaque angle de la maquette. Un bout dont le
+      chant, poussé de quatre millimètres vers le dehors, tombe tout entier
+      dans la maçonnerie d'un autre mur ne se dessine plus.
+    */
+    const bas = w.yCenter - w.height / 2;
+    const voisins = walls.filter((v) => {
+      if (v.id === w.id || v.type !== 'wall') return false;
+      const vb = v.yCenter - v.height / 2;
+      return vb < bas + w.height - 0.05 && vb + v.height > bas + 0.05;
+    });
+    const dansUnVoisin = (p: Pt) =>
+      voisins.some((v) => {
+        const qv = quads.get(v.id);
+        return !!qv && pointInPolygon(p, [qv.a1, qv.b1, qv.b2, qv.a2]);
+      });
+    const enfoui = (A: Pt, B: Pt, sens: 1 | -1) =>
+      [0.2, 0.5, 0.8].every((t) =>
+        dansUnVoisin({
+          x: A.x + (B.x - A.x) * t + (w.b.x - w.a.x) / len * 0.004 * sens,
+          z: A.z + (B.z - A.z) * t + (w.b.z - w.a.z) / len * 0.004 * sens,
+        }),
+      );
+    const enfouiDebut = enfoui(q.a1, q.a2, -1);
+    const enfouiFin = enfoui(q.b1, q.b2, 1);
+    /*
+      UNE FAÇADE CONTINUE N'A PAS DE COUTURE — deux murs dans le
+      prolongement l'un de l'autre, de même épaisseur (une façade coupée au
+      pied d'une cloison), ne cernent pas leur jonction : c'est un même mur.
+    */
+    const ux = (w.b.x - w.a.x) / len;
+    const uz = (w.b.z - w.a.z) / len;
+    const prolonge = (p: Pt, sens: 1 | -1) =>
+      voisins.some((v) => {
+        const lv = Math.hypot(v.b.x - v.a.x, v.b.z - v.a.z);
+        if (lv < 1e-6 || Math.abs(epaisseurDe(v) - epaisseurDe(w)) > 0.01) return false;
+        if (Math.abs(ux * (v.b.z - v.a.z) / lv - uz * (v.b.x - v.a.x) / lv) > 0.02) return false;
+        const pres = (r: Pt) => Math.hypot(r.x - p.x, r.z - p.z) < 1e-3;
+        const autre = pres(v.a) ? v.b : pres(v.b) ? v.a : null;
+        return !!autre && ((autre.x - p.x) * ux + (autre.z - p.z) * uz) * sens > 0;
+      });
+    const coutureDebut = prolonge(w.a, -1);
+    const coutureFin = prolonge(w.b, 1);
     const mine = holes.get(w.id) ?? [];
     for (const panel of wallPanels(mine, w.height)) {
+      const chants = {
+        ...panel.chants,
+        ...(enfouiDebut && panel.t0 < 1e-6 ? { debut: [] as [number, number][] } : {}),
+        ...(enfouiFin && panel.t1 > 1 - 1e-6 ? { fin: [] as [number, number][] } : {}),
+      };
+      const montants =
+        (coutureDebut && panel.t0 < 1e-6) || (coutureFin && panel.t1 > 1 - 1e-6)
+          ? {
+              ...panel.chants,
+              ...(coutureDebut && panel.t0 < 1e-6 ? { debut: [] as [number, number][] } : {}),
+              ...(coutureFin && panel.t1 > 1 - 1e-6 ? { fin: [] as [number, number][] } : {}),
+            }
+          : panel.chants;
       pushWallBlock(q, panel.t0, panel.t1, panel.y0, panel.y1, {
         ...skin,
-        chants: panel.chants,
+        chants,
+        montants,
         axe: w,
         // Rien devant : le pan reste d'un seul tenant (voir `devantLeMur`).
         whole: !litige,
@@ -2761,6 +2867,21 @@ export function buildScene(
     }
 
     // ---------------------------------------- portes / fenêtres du mur
+    /*
+      LA MENUISERIE SE POSE DANS LE TROU PERCÉ — enquête 3D : deux baies qui
+      se chevauchent voient leur trou rogné (`wallPanels`), mais la fenêtre
+      en volume gardait sa largeur lue et entrait de 20 cm dans la porte.
+    */
+    const perce = new Map<WallHole, { t0: number; t1: number }>();
+    {
+      let curseur = 0;
+      for (const h of [...mine].sort((x, y) => x.t0 - y.t0)) {
+        const t0 = Math.max(curseur, h.t0);
+        const t1 = Math.max(t0, Math.min(1, h.t1));
+        perce.set(h, { t0, t1 });
+        curseur = Math.max(curseur, t1);
+      }
+    }
     for (const hole of mine) {
       // Le trou d'un mur confondu : percé, mais rien ne s'y pose deux fois.
       if (hole.secondaire) continue;
@@ -2812,7 +2933,7 @@ export function buildScene(
         */
         if (porte) {
           // Le vantail en volume se pose après les meubles : voir `portesAPoser`.
-          portesAPoser.push({ seg: hole.seg, w, t0: hole.t0, t1: hole.t1, y0: hole.y0, y1: hole.y1 });
+          portesAPoser.push({ seg: hole.seg, w, ...(perce.get(hole) ?? hole), y0: hole.y0, y1: hole.y1 });
           const teinte = opts.colorOpenings ? pal.door : pal.opening;
           pushWallBlock(q, hole.t0, hole.t1, hole.y0, hole.y0 + 0.02, {
             axe: w,
@@ -2891,7 +3012,7 @@ export function buildScene(
         saute (`enVolume`) et reçoit la vraie menuiserie (`fenetresAPoser`).
       */
       const enVolume = hole.seg.type === 'window';
-      if (enVolume) fenetresAPoser.push({ seg: hole.seg, w, t0: hole.t0, t1: hole.t1, y0: hole.y0, y1: hole.y1 });
+      if (enVolume) fenetresAPoser.push({ seg: hole.seg, w, ...(perce.get(hole) ?? hole), y0: hole.y0, y1: hole.y1 });
       for (let k = avantMenuiserie; k < faces.length; k++) {
         faces[k].menuiserie = true;
         if (enVolume) faces[k].enVolume = true;
@@ -4021,9 +4142,12 @@ export function buildScene(
     const centre = { x: (A.x + B.x) / 2 + n.x * coeurP, z: (A.z + B.z) / 2 + n.z * coeurP };
     // Le battant du plan : sa normale vers la pièce de la porte, retournée si
     // elle ouvre vers l'extérieur ; son gond, celui du dessin.
-    const dedans = interiorOf.get(roomOf(p.seg)) ?? interiorOf.get(roomOf(p.w));
+    // Le même côté que le plan (`normaleVersLaPiece`), sur le trait de la porte.
+    const versPiece = normaleVersLaPiece(p.seg, parts);
+    const dedans = versPiece ? null : interiorOf.get(roomOf(p.seg)) ?? interiorOf.get(roomOf(p.w));
     let sens: 1 | -1 = 1;
-    if (dedans && (dedans.x - centre.x) * n.x + (dedans.z - centre.z) * n.z < 0) sens = -1;
+    if (versPiece) sens = versPiece.x * n.x + versPiece.z * n.z < 0 ? -1 : 1;
+    else if (dedans && (dedans.x - centre.x) * n.x + (dedans.z - centre.z) * n.z < 0) sens = -1;
     if (p.seg.versExterieur) sens = sens === 1 ? -1 : 1;
     const pointGond = pivots.get(p.seg.id) === 'b' ? p.seg.b : p.seg.a;
     const gond: 1 | -1 = (pointGond.x - centre.x) * u.x + (pointGond.z - centre.z) * u.z > 0 ? 1 : -1;
@@ -4035,6 +4159,33 @@ export function buildScene(
     let angle = 0;
     if (deuxPieces) {
       const gondMonde = { x: centre.x + u.x * gond * (largeur / 2), z: centre.z + u.z * gond * (largeur / 2) };
+      /*
+        LE VANTAIL NE TRAVERSE PAS UN MUR NON PLUS — enquête 3D : seuls les
+        meubles l'arrêtaient ; une porte de 83 cm ouvrant sur un dégagement
+        de 65 cm passait son bout au travers de la cloison d'en face. Les
+        murs qui portent le gond (le sien, l'angle contre lequel il bat) ne
+        comptent pas.
+      */
+      const quad = (v: WallSeg) => {
+        const qv = quads.get(v.id);
+        return qv ? [qv.a1, qv.b1, qv.b2, qv.a2] : null;
+      };
+      /** Un mur confondu avec celui de la porte (l'autre pièce l'a relevé aussi) : le même mur. */
+      const confondu = (v: WallSeg) => {
+        const lv = Math.hypot(v.b.x - v.a.x, v.b.z - v.a.z);
+        if (lv < 1e-6 || Math.abs(u.x * (v.b.z - v.a.z) / lv - u.z * (v.b.x - v.a.x) / lv) > 0.05) return false;
+        return pointOnSeg(centre, v.a, v.b).dist < 0.35;
+      };
+      const mursEnTravers = walls.filter((v) => {
+        if (v.type !== 'wall' || v.id === p.w.id || confondu(v)) return false;
+        const poly = quad(v);
+        return !!poly && !pointInPolygon(gondMonde, poly);
+      });
+      const dansUnMur = (pt: Pt) =>
+        mursEnTravers.some((v) => {
+          const poly = quad(v);
+          return !!poly && pointInPolygon(pt, poly);
+        });
       for (const essai of [85, 70, 55, 40, 25]) {
         const r = (essai * Math.PI) / 180;
         // Le vantail part du gond vers l'autre bord, puis tourne vers `sens`.
@@ -4045,7 +4196,8 @@ export function buildScene(
         let libre = true;
         for (let k = 1; k <= 8 && libre; k++) {
           const d = (largeur * k) / 8;
-          if (heurte({ x: gondMonde.x + dir.x * d, z: gondMonde.z + dir.z * d })) libre = false;
+          const pt = { x: gondMonde.x + dir.x * d, z: gondMonde.z + dir.z * d };
+          if (heurte(pt) || dansUnMur(pt)) libre = false;
         }
         if (libre) {
           angle = essai;

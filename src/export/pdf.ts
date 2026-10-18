@@ -18,7 +18,7 @@ import {
   renduNature,
   type NatureMur,
 } from '../geometry/natureMurs';
-import { jonctionsDetaillees, wallQuadsOf as quadsDesMursNature } from '../geometry/floorplan';
+import { jonctionsDetaillees, normaleVersLaPiece, wallQuadsOf as quadsDesMursNature } from '../geometry/floorplan';
 import { carnetDesMenuiseries } from '../geometry/menuiseries';
 import { BLEU_FENETRE, ENCRE_ELEC } from '../ui/encreElec';
 import { dansLeBati, pocheDesMurs, porteurDe, SUREPAISSEUR_FACADE } from '../geometry/poche';
@@ -2679,22 +2679,17 @@ function planPage(
     /** Les traits des menuiseries — battant, arc, dormants — calculés une fois. */
     const traitsMenuiserie: { pts: Pt[]; w: number; c: string }[] = [];
     for (const o of openings) {
-      const room = roomOf(o);
-      const centroid = centerOf(room);
       const dx = o.b.x - o.a.x;
       const dz = o.b.z - o.a.z;
       const len = Math.hypot(dx, dz) || 1;
       // La baie est un VIDE dans le poché : plus d'aplat pour effacer le noir.
       const baie = baieDuPoche.get(o.id);
 
-      // Côté intérieur de la pièce
+      // Côté intérieur de la pièce : le même qu'à l'écran (`normaleVersLaPiece`).
       const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
-      let inx = -dz / len;
-      let inz = dx / len;
-      if (inx * (centroid.x - mid.x) + inz * (centroid.z - mid.z) < 0) {
-        inx = -inx;
-        inz = -inz;
-      }
+      const versPiece = normaleVersLaPiece(o, parts) ?? { x: -dz / len, z: dx / len };
+      let inx = versPiece.x;
+      let inz = versPiece.z;
       // Une porte qui ouvre vers l'AUTRE pièce — placard, cellier, porte
       // palière : le vantail bascule de l'autre côté du dormant.
       if (o.versExterieur) {

@@ -487,10 +487,6 @@ export function Exploration({
       niveauCourant,
     ],
   ));
-  const obstacles = useMemo(
-    () => obstaclesDeLaVisite(walls, openings, objects, rooms),
-    [walls, openings, objects, rooms],
-  );
   const partiesDesPieces = useMemo(() => roomParts(walls, rooms).filter((p) => p.surface), [walls, rooms]);
   const piecesNommees = useMemo(
     () =>
@@ -568,6 +564,8 @@ export function Exploration({
     const lampes = lampesDeLaScene(appareils ?? []);
     return {
       ...maillageDeLaVisite(faces, { sansMeubles: true }),
+      // Les portes telles que la 3D les pose : la marche les suit (voir `obstaclesDeLaVisite`).
+      portes: (meubles ?? []).filter((m) => m.category === 'porte3d'),
       meubles: maillageDesMeubles(
         meubles ?? [],
         groupesDesAppareils(habillerLesTableaux(appareils ?? [], rail), rangsDesLampes(lampes)),
@@ -589,6 +587,11 @@ export function Exploration({
     accents,
     rail,
   ]);
+  const portesDeLaScene = maille?.portes;
+  const obstacles = useMemo(
+    () => obstaclesDeLaVisite(walls, openings, objects, rooms, portesDeLaScene),
+    [walls, openings, objects, rooms, portesDeLaScene],
+  );
   // Derrière les baies : un ciel clair, dans la teinte du thème.
   const fond = useMemo(() => mixHex(teinte.sky, '#FFFFFF', 0.55), [teinte.sky]);
 
@@ -888,6 +891,13 @@ export function Exploration({
       poserCarte({ ...pose.current });
       setEntree({ ...pose.current });
       setSecours(null);
+      /*
+        LA VUE NATIVE SUIT AUSSI — enquête de la visite : revenir dans la
+        pièce d'entrée redonnait les mêmes nombres de caméra, que React ne
+        renvoie pas ; la vue restait là où l'on avait marché, pendant que le
+        voile et la mini-carte annonçaient l'arrivée. On la pose ici.
+      */
+      publier(true);
       setNomDeLaPiece(nom);
       minuteurs.current.nom = setTimeout(() => setNomDeLaPiece(null), DUREE_NOM_DE_PIECE);
     };

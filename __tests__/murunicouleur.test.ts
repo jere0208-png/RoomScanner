@@ -97,10 +97,11 @@ const aplats = (id: string) => {
 };
 
 describe('un mur relevé en couleur', () => {
-  it('se dessine bien en plusieurs bandes — le tri en a besoin', () => {
-    // On ne supprime pas la découpe : c'est elle qui empêche un mur long de
-    // passer devant un meuble posé devant sa moitié proche.
-    expect(aplats('n').length).toBeGreaterThan(2);
+  it('se dessine bien en plusieurs aplats — ses deux faces au moins', () => {
+    // Sans meuble devant, un mur reste d'un seul tenant : ses deux faces.
+    // (Ses chants d'angle, enfouis dans les murs voisins, ne se dessinent
+    // plus — enquête 3D : ils faisaient une bande verticale à chaque angle.)
+    expect(aplats('n').length).toBeGreaterThanOrEqual(2);
   });
 
   it('mais toutes ses bandes portent la MÊME teinte', () => {

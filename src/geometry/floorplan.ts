@@ -5792,6 +5792,54 @@ function longueurDedans(a: Pt, b: Pt, pts: Pt[]): number {
   return dedans;
 }
 
+/**
+ * VERS QUELLE PIÈCE S'OUVRE UNE PORTE — la normale unitaire de la baie,
+ * tournée vers la pièce qui la porte (avant `versExterieur`, que chaque
+ * dessin applique ensuite). Null : rien ne permet d'en décider.
+ *
+ * Enquête 2D : le sens se tirait du point au large de la pièce de la porte
+ * (`roomOf`). Deux pertes : une pièce en L dont le point au large tombe
+ * au-delà de la ligne du mur — le battant partait dans le recoin, hors de
+ * la pièce ; et une porte rattachée à une pièce qu'elle ne borde pas, ou
+ * qui n'existe plus (relevé, « Redétecter ») — le battant disparaissait,
+ * ou la porte d'entrée battait dehors. On SONDE donc les deux côtés de la
+ * baie, juste au-delà du mur, dans les contours des pièces : la pièce de
+ * la porte d'un côté, c'est ce côté ; une seule pièce d'un côté, c'est
+ * elle ; sinon, l'ancienne règle du point au large.
+ *
+ * UNE SEULE SOURCE pour le plan, le PDF, le DXF, la 3D et les passages :
+ * ils doivent montrer la même porte ouverte du même côté.
+ */
+export function normaleVersLaPiece(
+  o: { a: Pt; b: Pt; roomId?: string },
+  parts: readonly RoomPart[],
+): Pt | null {
+  const dx = o.b.x - o.a.x;
+  const dz = o.b.z - o.a.z;
+  const l = Math.hypot(dx, dz);
+  if (l < 1e-6) return null;
+  const n = { x: -dz / l, z: dx / l };
+  const m = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+  // Au-delà du demi-mur le plus épais qu'on relève (un mur ancien de 50 cm).
+  const SONDE = 0.3;
+  const pieceDuCote = (s: 1 | -1) =>
+    parts.find((p) => {
+      const pts = p.surface?.pts;
+      return !!pts && pts.length >= 3 && dansLeContour({ x: m.x + n.x * s * SONDE, z: m.z + n.z * s * SONDE }, pts);
+    });
+  const plus = pieceDuCote(1);
+  const moins = pieceDuCote(-1);
+  const sienne = roomOf(o);
+  const inverse = { x: -n.x, z: -n.z };
+  if (plus?.roomId === sienne) return n;
+  if (moins?.roomId === sienne) return inverse;
+  if (plus && !moins) return n;
+  if (moins && !plus) return inverse;
+  const ancre = parts.find((p) => p.roomId === sienne)?.labelAt;
+  if (ancre) return (ancre.x - m.x) * n.x + (ancre.z - m.z) * n.z < 0 ? inverse : n;
+  return plus ? n : null;
+}
+
 /** Le point est-il dans le contour ? Parité des croisements d'un rayon. */
 function dansLeContour(p: Pt, pts: Pt[]): boolean {
   let dedans = false;

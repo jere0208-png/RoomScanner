@@ -67,6 +67,7 @@ import {
   nomAbrege,
   wallQuadsOf,
   jonctionsDetaillees,
+  normaleVersLaPiece,
 } from '../geometry/floorplan';
 import type { TraceGaine } from '../geometry/routing';
 import { dessinDesNatures, renduNature } from '../geometry/natureMurs';
@@ -158,20 +159,13 @@ export function battantsDuPlan(openings: WallSeg[], partOf: Map<string, RoomPart
   const out: Pt[][] = [];
   for (const o of openings) {
     if (o.type !== 'door' || o.garage || o.placard) continue;
-    const ancre = partOf.get(roomOf(o))?.labelAt;
-    if (!ancre) continue;
-    const lx = o.b.x - o.a.x;
-    const lz = o.b.z - o.a.z;
-    const l = Math.hypot(lx, lz);
+    const l = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z);
     if (l < 0.05) continue;
-    let nx = -lz / l;
-    let nz = lx / l;
-    const mx = (o.a.x + o.b.x) / 2;
-    const mz = (o.a.z + o.b.z) / 2;
-    if ((ancre.x - mx) * nx + (ancre.z - mz) * nz < 0) {
-      nx = -nx;
-      nz = -nz;
-    }
+    // Vers la pièce de la porte : voir `normaleVersLaPiece`.
+    const versPiece = normaleVersLaPiece(o, [...partOf.values()]);
+    if (!versPiece) continue;
+    let nx = versPiece.x;
+    let nz = versPiece.z;
     if (o.versExterieur) {
       nx = -nx;
       nz = -nz;
@@ -3900,20 +3894,22 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
             // La porte de garage ne bat pas (voir `porteDeGarage`), la
             // façade de placard coulisse (voir `facadesDePlacard`).
             if (o.type !== 'door' || o.garage || o.placard) return null;
-            const ancre = partOf.get(roomOf(o))?.labelAt;
-            if (!ancre) return null;
-            const dedans = mapping.toPx(ancre);
+            // Vers la pièce de la porte, sondée des deux côtés de la baie
+            // (voir `normaleVersLaPiece`).
+            const versPiece = normaleVersLaPiece(o, [...partOf.values()]);
+            if (!versPiece) return null;
             const mx = (a.x + b.x) / 2;
             const my = (a.y + b.y) / 2;
             const ex = b.x - a.x;
             const ey = b.y - a.y;
             const r = Math.hypot(ex, ey);
             if (r < 6) return null;
-            // La normale écran tournée vers l'intérieur de la pièce.
-            let n = { x: -ey / r, y: ex / r };
-            if ((dedans.x - mx) * n.x + (dedans.y - my) * n.y < 0) {
-              n = { x: -n.x, y: -n.y };
-            }
+            // La normale écran tournée vers l'intérieur de la pièce : la
+            // normale du plan, portée à l'écran.
+            const o0 = mapping.toPx(o.a);
+            const o1 = mapping.toPx({ x: o.a.x + versPiece.x, z: o.a.z + versPiece.z });
+            const ln = Math.hypot(o1.x - o0.x, o1.y - o0.y) || 1;
+            let n = { x: (o1.x - o0.x) / ln, y: (o1.y - o0.y) / ln };
             // Une porte qui ouvre vers l'AUTRE pièce : le vantail
             // bascule de l'autre côté du dormant. Fréquent sur un
             // placard, un cellier, une porte palière.

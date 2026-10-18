@@ -140,13 +140,64 @@ export function trousDuMur(
  * serait buter dans le vide — la chose même qui a fait retirer la première
  * visite.
  */
+/** Une porte telle que la 3D la pose (voir `buildScene`, catégorie « porte3d »). */
+export interface PorteDeLaScene {
+  id: string;
+  cx: number;
+  cz: number;
+  yaw: number;
+  width: number;
+  attributes?: string[];
+}
+
+const attribut = (p: PorteDeLaScene, cle: string) =>
+  p.attributes?.find((a) => a.startsWith(`${cle}:`))?.slice(cle.length + 1);
+
 export function obstaclesDeLaVisite(
   walls: WallSeg[],
   openings: WallSeg[],
   objects: ObjectData[],
   rooms?: RoomShape[],
+  /**
+   * LES PORTES DE LA 3D — enquête de la visite : on traversait la porte
+   * palière de l'exemple, dessinée fermée, et l'on finissait dans le vide.
+   * Une porte que la 3D pose fermée (rien derrière, ou tout angle heurte un
+   * meuble) ne perce plus son mur pour la marche ; celle qu'elle pose
+   * ouverte arrête le visiteur sur son vantail. Sans elles (pas de carte
+   * graphique), la même règle que la 3D : une pièce de chaque côté.
+   */
+  portes?: PorteDeLaScene[],
 ): Obstacle[] {
   const out: Obstacle[] = [];
+  const sol =
+    walls.length > 0
+      ? Math.min(...walls.map((w) => w.yCenter - w.height / 2))
+      : 0;
+  const parts = roomParts(walls, rooms);
+  const contours = parts.map((p) => p.surface?.pts).filter((x): x is Pt[] => !!x && x.length >= 3);
+  const dansUnePiece = (p: Pt) => contours.some((c) => dansLeContour(p, c));
+  const poseDe = new Map((portes ?? []).map((p) => [p.id, p]));
+  const traversable = (o: WallSeg): boolean => {
+    if (o.type === 'opening') {
+      // Un passe-plat : la 3D bâtit l'allège pleine — on ne passe pas dessous.
+      return o.yCenter - o.height / 2 - sol <= 0.15;
+    }
+    if (o.type !== 'door') return false;
+    if (portes) {
+      const pose = poseDe.get(`porte-${o.id}`);
+      return !!pose && Number(attribut(pose, 'PorteAngle') ?? 0) > 0;
+    }
+    if (o.garage || o.placard) return false;
+    const l = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z) || 1;
+    const n = { x: -(o.b.z - o.a.z) / l, z: (o.b.x - o.a.x) / l };
+    const m = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
+    const recul = 0.45;
+    return (
+      dansUnePiece({ x: m.x + n.x * recul, z: m.z + n.z * recul }) &&
+      dansUnePiece({ x: m.x - n.x * recul, z: m.z - n.z * recul })
+    );
+  };
+  const passages = openings.filter(traversable);
 
   // ------------------------------------------------------------ les murs
   for (const w of walls) {
@@ -162,7 +213,7 @@ export function obstaclesDeLaVisite(
     const demi = (f.plus + f.moins) / 2;
     const point = (t: number): Pt => ({ x: w.a.x + ux * t - uz * coeur, z: w.a.z + uz * t + ux * coeur });
     let curseur = 0;
-    for (const trou of trousDuMur(w, openings)) {
+    for (const trou of trousDuMur(w, passages)) {
       if (trou.de > curseur + 1e-3) {
         out.push({ kind: 'mur', a: point(curseur), b: point(trou.de), demi });
       }
@@ -180,11 +231,6 @@ export function obstaclesDeLaVisite(
     collision et le dessin diffèreraient de quelques centimètres — et l'on
     buterait dans l'air à côté d'un meuble, ou l'on y entrerait d'une main.
   */
-  const sol =
-    walls.length > 0
-      ? Math.min(...walls.map((w) => w.yCenter - w.height / 2))
-      : 0;
-  const parts = roomParts(walls, rooms);
   const interieurDe = new Map(parts.map((p) => [p.roomId, p.labelAt]));
   const repli =
     walls.length > 0
@@ -218,7 +264,51 @@ export function obstaclesDeLaVisite(
       coins: [coin(-w2, -d2), coin(w2, -d2), coin(w2, d2), coin(-w2, d2)],
     });
   }
+  // ------------------------------------------------- les vantaux ouverts
+  /*
+    Le vantail que la 3D ouvre arrête la marche comme un meuble (enquête :
+    on pouvait se tenir dans la porte de la chambre, la caméra dans le
+    battant). Même géométrie que la pose : du gond, vers l'autre bord, puis
+    tourné de son angle du côté du battant.
+  */
+  for (const p of portes ?? []) {
+    const angle = Number(attribut(p, 'PorteAngle') ?? 0);
+    if (!(angle > 0) || !fini(p.cx) || !fini(p.cz)) continue;
+    const gond = attribut(p, 'PorteGond') === 'droite' ? 1 : -1;
+    const sens = Number(attribut(p, 'PorteSens') ?? 1) < 0 ? -1 : 1;
+    const u = { x: Math.cos(p.yaw), z: Math.sin(p.yaw) };
+    const n = { x: -u.z, z: u.x };
+    const r = (angle * Math.PI) / 180;
+    const pivot = { x: p.cx + u.x * gond * (p.width / 2), z: p.cz + u.z * gond * (p.width / 2) };
+    const dir = {
+      x: -gond * u.x * Math.cos(r) + sens * n.x * Math.sin(r),
+      z: -gond * u.z * Math.cos(r) + sens * n.z * Math.sin(r),
+    };
+    const bout = { x: pivot.x + dir.x * p.width, z: pivot.z + dir.z * p.width };
+    const e = { x: -dir.z * 0.02, z: dir.x * 0.02 };
+    out.push({
+      kind: 'meuble',
+      id: p.id,
+      coins: [
+        { x: pivot.x - e.x, z: pivot.z - e.z },
+        { x: bout.x - e.x, z: bout.z - e.z },
+        { x: bout.x + e.x, z: bout.z + e.z },
+        { x: pivot.x + e.x, z: pivot.z + e.z },
+      ],
+    });
+  }
   return out;
+}
+
+/** Le point est-il dans le contour ? Parité des croisements d'un rayon. */
+function dansLeContour(p: Pt, pts: Pt[]): boolean {
+  let dedans = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i];
+    const b = pts[j];
+    if (a.z > p.z !== b.z > p.z && p.x < ((b.x - a.x) * (p.z - a.z)) / (b.z - a.z) + a.x) dedans = !dedans;
+  }
+  return dedans;
 }
 
 // --------------------------------------------------------------- géométrie

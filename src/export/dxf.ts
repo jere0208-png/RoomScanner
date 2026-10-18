@@ -36,6 +36,7 @@ import {
   wallQuadsOf,
   type Pt,
   type WallSeg,
+  normaleVersLaPiece,
 } from '../geometry/floorplan';
 import { FIXTURES, type Fixture } from '../geometry/electrical';
 import { CEILINGS, type CeilingFixture } from '../geometry/ceiling';
@@ -382,8 +383,6 @@ export function buildDxf(plan: PlanPourDxf): string {
   // Le découpage se calcule UNE fois : appelé par porte, il refaisait tout
   // le parcours des faces du logement à chaque menuiserie.
   const decoupage = roomParts(plan.walls, plan.rooms);
-  const centreDe = (o: WallSeg) =>
-    decoupage.find((x) => x.roomId === o.roomId)?.labelAt ?? null;
   for (const o of plan.openings) {
     if (o.type !== 'door') {
       out += ligne(
@@ -403,14 +402,10 @@ export function buildDxf(plan: PlanPourDxf): string {
     const uz = (o.b.z - o.a.z) / len;
     // La normale tournée vers l'intérieur de la pièce, puis retournée si
     // la porte ouvre de l'autre côté : le même choix qu'à l'écran.
-    let nx = -uz;
-    let nz = ux;
-    const dedans = centreDe(o);
+    const versPiece = normaleVersLaPiece(o, decoupage);
+    let nx = versPiece?.x ?? -uz;
+    let nz = versPiece?.z ?? ux;
     const mid = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
-    if (dedans && (dedans.x - mid.x) * nx + (dedans.z - mid.z) * nz < 0) {
-      nx = -nx;
-      nz = -nz;
-    }
     if (o.versExterieur) {
       nx = -nx;
       nz = -nz;

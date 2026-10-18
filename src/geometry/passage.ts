@@ -29,6 +29,7 @@ import {
   type Pt,
   type RoomShape,
   type WallSeg,
+  normaleVersLaPiece,
 } from './floorplan';
 import { frCategory } from './furniture';
 
@@ -55,14 +56,13 @@ export function battantsDesPortes(
   const pivots = pivotsDesBattants(portes.map((o) => ({ id: o.id, a: o.a, b: o.b, pivot: o.pivot })));
   const out: Battant[] = [];
   for (const o of portes) {
-    const ancre = partOf.get(roomOf(o))?.labelAt;
-    if (!ancre) continue;
     const r = Math.hypot(o.b.x - o.a.x, o.b.z - o.a.z);
     if (r < 0.2) continue;
     const m = { x: (o.a.x + o.b.x) / 2, z: (o.a.z + o.b.z) / 2 };
-    // La normale tournée vers la pièce qui porte la porte…
-    let n = { x: -(o.b.z - o.a.z) / r, z: (o.b.x - o.a.x) / r };
-    if ((ancre.x - m.x) * n.x + (ancre.z - m.z) * n.z < 0) n = { x: -n.x, z: -n.z };
+    // La normale tournée vers la pièce qui porte la porte (`normaleVersLaPiece`)…
+    const versPiece = normaleVersLaPiece(o, [...partOf.values()]);
+    if (!versPiece) continue;
+    let n = versPiece;
     // … ou vers l'autre, quand le vantail s'ouvre de ce côté-là.
     if (o.versExterieur) n = { x: -n.x, z: -n.z };
     // La porte à deux vantaux : chacun bat de son tableau jusqu'au milieu.
