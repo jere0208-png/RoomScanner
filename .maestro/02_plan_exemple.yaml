@@ -28,15 +28,18 @@ name: Plan d'exemple
 - waitForAnimationToEnd:
     timeout: 5000
 - takeScreenshot: ${THEME}-13-menu-du-plan
-# La croix de la feuille (Maestro ne lit pas l'intérieur des fenêtres
-# modales de React Native : on la touche à sa place).
-- tapOn:
-    point: "93%,11%"
+# La feuille se ferme en la tirant vers le bas (Maestro ne lit pas
+# l'intérieur des fenêtres modales de React Native, et sa croix a bougé).
+- swipe:
+    start: "50%,12%"
+    end: "50%,95%"
+    duration: 400
 - waitForAnimationToEnd:
     timeout: 5000
 
 # La maquette 3D.
-- tapOn: "Passer en 3D"
+# La pastille de vue s'appelle par ce qu'elle montre : « 2D, passer en 3D ».
+- tapOn: "2D, passer en 3D"
 - waitForAnimationToEnd:
     timeout: 10000
 - takeScreenshot: ${THEME}-14-vue-3d
@@ -48,7 +51,7 @@ name: Plan d'exemple
     timeout: 5000
 - takeScreenshot: ${THEME}-15-vue-3d-tournee
 - tapOn:
-    text: "Passer en 2D"
+    text: "3D, passer en 2D"
     optional: true
 - waitForAnimationToEnd:
     timeout: 5000

@@ -8,15 +8,10 @@ name: Export
 - waitForAnimationToEnd:
     timeout: 5000
 - takeScreenshot: ${THEME}-20-export-formats
-# Dans la feuille « Exporter » (modale : touchée à sa place).
+# Dans la feuille « Exporter » (modale : touchée à sa place) : la carte
+# « Plan PDF », la deuxième, sous « Image du plan ».
 - tapOn:
-    point: "50%,64%"
-- waitForAnimationToEnd:
-    timeout: 5000
-- takeScreenshot: ${THEME}-21-export-autres-formats
-# La feuille déployée garde « Plan PDF » en deuxième carte.
-- tapOn:
-    point: "35%,41%"
+    point: "35%,82%"
 - extendedWaitUntil:
     visible: "Page de garde"
     timeout: 45000
