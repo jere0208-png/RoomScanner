@@ -142,6 +142,11 @@ jobs:
       - name: Parcourir l'app avec Maestro
         id: maestro
         continue-on-error: true
+        env:
+          # Le pilote XCTest d'un simulateur à froid met parfois plus que les
+          # quinze secondes par défaut à répondre (« Failed to connect ») :
+          # le premier parcours tombait deux fois de suite.
+          MAESTRO_DRIVER_STARTUP_TIMEOUT: "180000"
         run: |
           mkdir -p captures/brut captures/debug
           echo "| Thème | Parcours | Résultat |" > captures/bilan.md
@@ -152,7 +157,7 @@ jobs:
             for flow in "$@"; do
               local nom; nom="$(basename "$flow" .yaml)"
               echo "::group::$theme — $nom"
-              # Une seconde chance : le pilote XCTest du simulateur rate
+              # Deux chances de plus : le pilote XCTest du simulateur rate
               # parfois son démarrage, sans que l'app y soit pour rien.
               lancer() {
                 maestro --device "$SIM_UDID" test "$flow" \
@@ -161,7 +166,7 @@ jobs:
                   --debug-output "captures/debug/$theme-$nom" \
                   --format junit --output "captures/brut/$theme-$nom.xml"
               }
-              if lancer || { sleep 5; lancer; }; then
+              if lancer || { sleep 5; lancer; } || { sleep 20; lancer; }; then
                 echo "| $theme | $nom | ok |" >> captures/bilan.md
               else
                 echo "| $theme | $nom | **échec** |" >> captures/bilan.md
