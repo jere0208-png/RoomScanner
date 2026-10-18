@@ -22,7 +22,8 @@ name: Visite
 - runFlow: commun/ouvrir-exemple.yaml
 - tapOn: "Explorer"
 - extendedWaitUntil:
-    visible: "Terminer"
+    # Le bouton s'annonce « Terminer l’exploration » à VoiceOver.
+    visible: "Terminer.*"
     timeout: 20000
 - waitForAnimationToEnd:
     timeout: 8000
@@ -38,7 +39,7 @@ name: Visite
 - takeScreenshot: ${THEME}-60-visite
 
 # Retour au grand public pour les parcours suivants.
-- tapOn: "Terminer"
+- tapOn: "Terminer.*"
 - launchApp
 - runFlow: commun/vers-accueil.yaml
 - tapOn: "Mon compte"

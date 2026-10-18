@@ -32,12 +32,13 @@ name: Mode Électricité
     optional: true
 - waitForAnimationToEnd:
     timeout: 5000
-- tapOn: "Passer en 3D"
+# La pastille de vue s'appelle par ce qu'elle montre (voir 02).
+- tapOn: "2D, passer en 3D"
 - waitForAnimationToEnd:
     timeout: 10000
 - takeScreenshot: ${THEME}-43-vue-3d-electricite
 - tapOn:
-    text: "Passer en 2D"
+    text: "3D, passer en 2D"
     optional: true
 - waitForAnimationToEnd:
     timeout: 5000
