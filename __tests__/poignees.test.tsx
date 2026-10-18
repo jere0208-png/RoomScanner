@@ -451,7 +451,7 @@ describe('le mur choisi', () => {
       const croix = tree.root
         .findAll((n) => n.props.accessibilityLabel === 'Retirer le mur' && typeof n.props.onPress === 'function')[0];
       expect(croix).toBeDefined();
-      const centre = (n: { props: { style: unknown } }) => {
+      const centre = (n: TestRenderer.ReactTestInstance) => {
         const st = ([] as unknown[]).concat(n.props.style as unknown[]).flat(3).reduce<Record<string, number>>(
           (acc, x) => ({ ...acc, ...(x as Record<string, number>) }),
           {},
