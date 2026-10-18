@@ -49,6 +49,7 @@ import {
   planFrameAngle,
   wallQuads,
   wallRuns,
+  wallRunsAuNu,
   WALL_T,
   type ObjectFootprint,
   type PoseDeMur,
@@ -2627,6 +2628,15 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
    * l'écran : pendant la bascule du zoom, l'une s'efface tandis que l'autre
    * paraît, et une cote invisible ne doit pas voler la place d'une autre.
    */
+  /*
+    LES TRONÇONS SE COMPTENT DE NU À NU — enquête des chiffres : le premier
+    et le dernier plein partaient de l'axe du mur d'angle (« 1,50 » à
+    l'écran, « 1,43 » au PDF et au mètre). Mêmes bornes que la cote du mur.
+  */
+  const runsAuNu = useMemo(
+    () => new Map(walls.map((w) => [w.id, wallRunsAuNu(walls, w, openings, parts)])),
+    [walls, openings, parts],
+  );
   const placementCotes = useMemo(() => {
     const vide = {
       murs: new Map<string, { x: number; y: number }>(),
@@ -2741,7 +2751,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
         }
       }
       if (detail > 0.02) {
-        wallRuns(w, openings).forEach((run, ri) => {
+        (runsAuNu.get(w.id) ?? []).forEach((run, ri) => {
           if ((run.t1 - run.t0) * norm < 26) return;
           const t = (run.t0 + run.t1) / 2;
           const brut = { x: a.x + dx * t, y: a.y + dy * t };
@@ -2796,7 +2806,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
       Il rend maintenant ses CANDIDATS. Voir `cotesArbitrees`.
     */
     return { murs, runs, items };
-  }, [walls, openings, mapping, layout, showMeasures, detail, dehorsDesMurs, facesPlan, parts]);
+  }, [walls, mapping, layout, showMeasures, detail, dehorsDesMurs, facesPlan, parts, runsAuNu]);
 
   /**
    * TOUTES LES ÉTIQUETTES DU PLAN, ARBITRÉES ENSEMBLE.
@@ -3370,6 +3380,35 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
     () => new Map(walls.map((w) => [w.id, longueurCotee(walls, w, parts)])),
     [walls, parts],
   );
+  /*
+    UN REFEND SE COTE DANS LA PIÈCE OÙ S'ÉCRIT SA COTE — enquête des
+    chiffres : entre une chambre (face de 2,93) et un bureau aux murs plus
+    épais (face de 2,70), l'écran écrivait toujours la plus longue, même
+    posée dans le bureau ; le PDF, lui, écrit la face de la pièce où il
+    écrit. La pièce du côté de la cote donne sa face.
+  */
+  const longueurDuCote = useCallback(
+    (w: WallSeg, pose: { x: number; y: number } | undefined) => {
+      const tout = longueurs.get(w.id);
+      if (!pose || !mapping) return tout;
+      const siennes = parts.filter((pp) => pp.surface?.nu && pp.walls.some((x) => x.id === w.id));
+      if (siennes.length < 2) return tout;
+      const L = segLength(w);
+      if (L < 1e-6) return tout;
+      const a = mapping.toPx(w.a);
+      const b = mapping.toPx(w.b);
+      const cote = (q: { x: number; y: number }) => Math.sign((b.x - a.x) * (q.y - a.y) - (b.y - a.y) * (q.x - a.x));
+      const sens = cote(pose);
+      const m = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+      const n = { x: -(w.b.z - w.a.z) / L, z: (w.b.x - w.a.x) / L };
+      const sonde = (s: number) => mapping.toPx({ x: m.x + n.x * s * 0.3, z: m.z + n.z * s * 0.3 });
+      const sondeDuSens = cote(sonde(1)) === sens ? 1 : -1;
+      const pt = { x: m.x + n.x * sondeDuSens * 0.3, z: m.z + n.z * sondeDuSens * 0.3 };
+      const laSienne = siennes.find((pp) => insidePoly(pt, pp.surface!.nu!));
+      return laSienne ? longueurCotee(walls, w, [laSienne]) : tout;
+    },
+    [longueurs, mapping, parts, walls],
+  );
 
   /*
     LES COUCHES QUI NE BOUGENT PAS SE GARDENT D'UN RENDU À L'AUTRE.
@@ -3648,7 +3687,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
             }
             measureAt={cotesArbitrees.poses.get(`w:${w.id}`)}
             measureOpacity={1 - detail}
-            longueur={longueurs.get(w.id)}
+            longueur={longueurDuCote(w, cotesArbitrees.poses.get(`w:${w.id}`))}
             selected={editable && w.id === selectedWallId}
             onPress={editable ? appuiDuMur(w.id) : undefined}
           />
@@ -3657,7 +3696,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
     );
   }, [
     walls, quads, mapping, dehorsDesMurs, roomById, placementCotes, cotesArbitrees, detail,
-    longueurs, editable, selectedWallId, appuiDuMur,
+    longueurDuCote, editable, selectedWallId, appuiDuMur,
   ]);
 
   const coucheDesReperes = useMemo(() => {
@@ -3788,7 +3827,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
           walls.map((w) => (
             // Les cotes d'un mur tiré reviennent au lâcher, à leur place.
             <CacheEnVol key={`runs-${w.id}`} mur={w.id}>
-              {wallRuns(w, openings).map((run, ri) => {
+              {(runsAuNu.get(w.id) ?? []).map((run, ri) => {
                 const A = mapping.toPx(w.a);
                 const B = mapping.toPx(w.b);
                 const dx = B.x - A.x;
@@ -3845,7 +3884,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
           ))}
       </>
     );
-  }, [showMeasures, detail, walls, openings, mapping, cotesArbitrees, c]);
+  }, [showMeasures, detail, walls, runsAuNu, mapping, cotesArbitrees, c]);
 
   const coucheDesBaies = useMemo(() => {
     if (!mapping) return null;

@@ -148,10 +148,13 @@ export function RoomBar({
     étiquette, et l'on ne sait plus lequel des quatre fait quelque chose.
     Elle rejoint la surface et les dimensions, en haut, avec ce qu'on lit ;
     son bouton ne dit plus que le geste.
+
+    Et la surface s'écrit au centième, comme le cartouche du plan et le PDF
+    (enquête des chiffres : « 12,35 m² » sur le plan, « 12,3 m² » ici).
   */
   const mesures = `${
     surface
-      ? `${surface.exact ? '' : '≈ '}${fr(surface.area)} m²  ·  ${fr(
+      ? `${surface.exact ? '' : '≈ '}${fr(surface.area, 2)} m²  ·  ${fr(
           extent.width,
           2,
         )} × ${fr(extent.depth, 2)} m`

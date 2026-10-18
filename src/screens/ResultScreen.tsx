@@ -2365,7 +2365,13 @@ export function ResultScreen() {
           aire: `${p.surface!.exact ? '' : '≈ '}${virgule(p.surface!.area)}`,
         })),
     );
-    const total = parts.reduce((t, p) => t + (p.surface?.area ?? 0), 0);
+    /*
+      LE TOTAL EST LA SOMME DE CE QUI EST ÉCRIT — enquête des chiffres, comme
+      au PDF (`sommeEcrite`, revue « Nadia ») : trois pièces à « 10,00 » et
+      un total à « 30,01 » ; chaque surface s'arrondit avant de s'ajouter.
+    */
+    const auCentieme = (v: number) => Math.round(v * 100) / 100;
+    const total = auCentieme(parts.reduce((t, p) => t + auCentieme(p.surface?.area ?? 0), 0));
     /*
       L'HABITABLE PART AUSSI — revue « Bérénice » : l'image disait le sol
       (garage et véranda compris), pas le chiffre d'une annonce.
@@ -3378,8 +3384,9 @@ export function ResultScreen() {
   const promptRoomCotes = () => {
     if (!targetRoom || !targetExtent) return;
     const roomId = targetRoom.id;
-    // Une pièce dessinée se cote à l'intérieur, de mur à mur.
-    const auNu = !!targetPart && estDessine(targetPart.walls);
+    // Une pièce dessinée se cote à l'intérieur, de mur à mur — et toute
+    // pièce dont le plan connaît le nu : c'est lui que la feuille propose.
+    const auNu = !!targetPart && (estDessine(targetPart.walls) || !!targetPart.surface?.nu);
     /*
       LA COTE SE LIT ET SE VÉRIFIE — revues « Inès » et « Hugo » : « 410 »
       tapé ici faisait un mur de 410 m (une pièce de 311 m²), « 320 × 310 »

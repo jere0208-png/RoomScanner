@@ -2099,17 +2099,35 @@ export function longueurCotee(
     5,80. Quand la pièce a un contour au nu, la cote d'un mur scanné est le
     côté de ce contour qui court sur lui : sa face, de nu à nu.
   */
+  const b = bornesAuNu(walls, w, parts);
+  return b.s1 - b.s0;
+}
+
+/**
+ * OÙ COMMENCE ET OÙ FINIT LA FACE D'UN MUR, en mètres depuis son bout `a` —
+ * la même face que `longueurCotee`. Les chaînes de cotes (tronçons de
+ * l'écran, chaîne des baies du PDF) partent de ces bornes : elles retombent
+ * sur la cote totale, même contre un pan coupé, où le nu ne recule pas
+ * d'une demi-épaisseur (enquête des chiffres : 0,93 + 1,00 + 0,93 sous un
+ * total de 2,90).
+ */
+export function bornesAuNu(
+  walls: WallSeg[],
+  w: WallSeg,
+  parts?: ({ surface: RoomSurface | null; walls?: WallSeg[] })[],
+): { s0: number; s1: number } {
   const auNuDuScan =
     !w.auNu &&
     !!parts?.some((p) => !!p.surface?.nu && (!p.walls || p.walls.some((x) => x.id === w.id)));
-  if (!w.auNu && !auNuDuScan) return segLength(w);
   const L = segLength(w);
+  if (!w.auNu && !auNuDuScan) return { s0: 0, s1: L };
   if (parts && L > 1e-6) {
     const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
     // La face d'un mur scanné est son trait ; celle d'un refend vu des deux
     // faces, ou d'un mur dessiné, est à une demi-épaisseur.
     const h = w.auNu || w.deuxFaces ? epaisseurDe(w) / 2 : 0;
     let face = 0;
+    let bornes = { s0: 0, s1: L };
     for (const part of parts) {
       const nu = part.surface?.nu;
       if (!nu || nu.length < 3) continue;
@@ -2126,12 +2144,40 @@ export function longueurCotee(
         if (Math.abs(d - h) > 0.02) continue;
         const t = ((m.x - w.a.x) * u.x + (m.z - w.a.z) * u.z) / L;
         if (t < -0.01 || t > 1.01) continue;
-        face = Math.max(face, le);
+        if (le > face) {
+          face = le;
+          const ta = (a.x - w.a.x) * u.x + (a.z - w.a.z) * u.z;
+          const tb = (b.x - w.a.x) * u.x + (b.z - w.a.z) * u.z;
+          bornes = { s0: Math.min(ta, tb), s1: Math.max(ta, tb) };
+        }
       }
     }
-    if (face > 0) return face;
+    if (face > 0) return bornes;
   }
-  return w.auNu ? longueurAuNu(walls, w) : L;
+  if (!w.auNu) return { s0: 0, s1: L };
+  const s0 = retraitDuCoin(walls, w, w.a);
+  return { s0, s1: Math.max(s0, L - retraitDuCoin(walls, w, w.b)) };
+}
+
+/**
+ * Les tronçons d'un mur percé, mesurés entre ses nus (`bornesAuNu`) : le
+ * premier et le dernier plein partent de la face du mur d'angle, pas de
+ * son axe — comme la cote du mur et la chaîne du PDF.
+ */
+export function wallRunsAuNu(
+  walls: WallSeg[],
+  w: WallSeg,
+  openings: WallSeg[],
+  parts?: ({ surface: RoomSurface | null; walls?: WallSeg[] })[],
+): WallRun[] {
+  const runs = wallRuns(w, openings);
+  if (runs.length === 0) return runs;
+  const L = segLength(w);
+  const { s0, s1 } = bornesAuNu(walls, w, parts);
+  return runs.map((r) => ({
+    ...r,
+    length: Math.max(0, Math.min(r.t1 * L, s1) - Math.max(r.t0 * L, s0)),
+  }));
 }
 
 /**
@@ -4120,15 +4166,16 @@ export function soudureAuBout(
   p: Pt,
   walls: WallSeg[],
   tol = 0.25,
-  exclude?: Pt,
+  exclude?: Pt | Pt[],
 ): Pt | null {
   let meilleur: Pt | null = null;
   let court = tol;
+  const exclus = exclude ? (Array.isArray(exclude) ? exclude : [exclude]) : [];
   for (const w of walls) {
     if (segLength(w) < 0.05) continue;
     for (const end of ['a', 'b'] as const) {
       const q = w[end];
-      if (exclude && Math.hypot(q.x - exclude.x, q.z - exclude.z) < 1e-6) {
+      if (exclus.some((e) => Math.hypot(q.x - e.x, q.z - e.z) < 1e-6)) {
         continue;
       }
       const d = Math.hypot(q.x - p.x, q.z - p.z);
@@ -6346,10 +6393,14 @@ export function ouvertureCotee(
   const allege =
     o.type === 'door' ? 0 : Math.max(0, Math.min(s.allege ?? 0, plafond - 0.2));
   const h = Math.min(Math.max(0.2, s.hauteur), Math.max(0.2, plafond - allege));
-  const bord = Math.min(
-    Math.max(0, bordDepuisCoin(pos, l, Math.max(0, s.depuis), s.depuisB)),
-    Math.max(0, L - l),
-  );
+  /*
+    ENTRE LES DEUX NUS, PAS ENTRE LES DEUX AXES — enquête 2D : cotée depuis
+    l'autre coin, la porte venait se loger de 7 cm dans le mur d'angle d'en
+    face. Quand elle tient entre les nus, elle y reste.
+  */
+  const [min, max] =
+    L - pos.retraitA - pos.retraitB >= l ? [pos.retraitA, L - pos.retraitB - l] : [0, Math.max(0, L - l)];
+  const bord = Math.min(Math.max(min, bordDepuisCoin(pos, l, Math.max(0, s.depuis), s.depuisB)), max);
   const ux = (mur.b.x - mur.a.x) / L;
   const uz = (mur.b.z - mur.a.z) / L;
   // Le sens du trait est gardé : le pivot et le battant d'une porte sont

@@ -139,7 +139,7 @@ import {
   longueurCotee,
   placeDuDetecteur,
   pointOnSeg,
-  retraitDuCoin,
+  bornesAuNu,
   wallRuns,
 } from '../geometry/floorplan';
 import {
@@ -3747,9 +3747,12 @@ function planPage(
         // sur un plan scanné, le dernier plein se mesurait jusqu'à l'axe du
         // refend (« 1,00 / 1,40 / 2,65 » sous un total de 5,00). Le retrait
         // d'un coin vaut zéro contre la face d'un mur relevé (`retraitDuCoin`).
+        // Et contre un pan coupé, le nu ne recule pas d'une demi-épaisseur :
+        // les bornes sont celles de la cote elle-même (`bornesAuNu`).
         const Lax = segLength(w) || 1;
-        const t0nu = Math.min(0.5, retraitDuCoin(walls, w, w.a) / Lax);
-        const t1nu = Math.max(0.5, 1 - retraitDuCoin(walls, w, w.b) / Lax);
+        const nus = bornesAuNu(walls, w, parts);
+        const t0nu = Math.min(0.5, nus.s0 / Lax);
+        const t1nu = Math.max(0.5, nus.s1 / Lax);
         const surMur = (tt: number) => ({ x: a.x + (b.x - a.x) * tt, y: a.y + (b.y - a.y) * tt });
         const aNu = surMur(t0nu);
         const bNu = surMur(t1nu);
