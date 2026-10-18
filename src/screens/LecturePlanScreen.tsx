@@ -10,9 +10,14 @@
  *
  * QUATRE MOMENTS, UNE PAGE.
  *
- *   1. L'INVITATION — ce qu'il faut pour une bonne lecture, en quatre
- *      images, et deux portes : le scanner (la feuille se détecte, se prend
- *      et se redresse seule) ou une photo déjà prise.
+ *   1. L'INVITATION — trois portes : le scanner (la feuille se détecte, se
+ *      prend et se redresse seule), une photo, un fichier ; et, à plat
+ *      dessous, ce qu'il faut pour une bonne lecture.
+ *
+ * UNE RÈGLE POUR TOUTE LA PAGE (diagnostic du patron : « on ne distingue
+ * pas les boutons des informations ») : ce qui se touche est bleu — plein,
+ * ou cerné de bleu avec son chevron ; ce qui se lit est à plat, sur le
+ * gris du fond, sans ombre ni chevron.
  *   2. LA LECTURE — la page prise, une ligne qui la balaie, et les étapes
  *      qui s'allument : on voit que ça travaille, et sur quoi.
  *   3. CE QU'ON A LU — le plan reconstruit, dessiné, et son bilan : les
@@ -392,20 +397,17 @@ function Invitation({
           Murs, cotes, pièces et symboles : tout est lu, mis à l’échelle et redessiné.
         </Text>
       </View>
-      <View style={s.atouts}>
-        {CONSEILS.map((k) => (
-          <View key={k.titre} style={s.atoutCase}>
-            <View style={[s.atout, { height: entre(48, 56) }]} accessibilityLabel={`${k.titre} : ${k.texte}`}>
-              <View style={s.atoutIcone}>
-                <Icone nom={k.icone} taille={18} teinte={c.blue} />
-              </View>
-              <Text style={s.atoutTitre} numberOfLines={2}>
-                {k.titre}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </View>
+      {/*
+        CE QUI SE TOUCHE, ET CE QUI SE LIT — diagnostic du patron : « on ne
+        distingue pas les boutons des informations non cliquables ; refonte
+        moderne, visuelle ». Les quatre conseils avaient la carte blanche,
+        l'ombre et la pastille bleue des deux boutons du dessous : huit
+        tuiles pareilles, dont quatre ne faisaient rien. La règle de la page
+        est maintenant une seule : CE QUI SE TOUCHE est bleu — plein, ou
+        cerné de bleu avec son chevron ; CE QUI SE LIT est à plat, sur le
+        gris du fond, sans ombre ni chevron.
+      */}
+      <Text style={s.rubrique}>Choisir le plan</Text>
       <View style={s.portes}>
         <Pressable
           accessibilityRole="button"
@@ -422,13 +424,24 @@ function Invitation({
               La feuille se détecte et se redresse seule
             </Text>
           </View>
-          <Svg width={20} height={20} viewBox="0 0 24 24">
-            <Path d="M9 5l7 7-7 7" stroke="rgba(255,255,255,0.85)" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-          </Svg>
+          <Chevron teinte="rgba(255,255,255,0.9)" />
         </Pressable>
         <View style={s.deux}>
-          <Tuile s={s} c={c} icone="image" titre="Une photo" sous="Photothèque" libelle="Importer une photo" hauteur={entre(58, 70)} onPress={onPhoto} />
-          <Tuile s={s} c={c} icone="planPapier" titre="Un fichier" sous="PDF ou image" libelle="Ouvrir un fichier" hauteur={entre(58, 70)} onPress={onFichier} />
+          <Tuile s={s} c={c} icone="image" titre="Une photo" sous="Photothèque" libelle="Importer une photo" hauteur={entre(56, 66)} onPress={onPhoto} />
+          <Tuile s={s} c={c} icone="planPapier" titre="Un fichier" sous="PDF ou image" libelle="Ouvrir un fichier" hauteur={entre(56, 66)} onPress={onFichier} />
+        </View>
+      </View>
+      <View style={s.conseils} accessibilityRole="summary">
+        <Text style={s.conseilsTitre}>Pour une lecture juste</Text>
+        <View style={s.conseilsGrille}>
+          {CONSEILS.map((k) => (
+            <View key={k.titre} style={s.conseil} accessible accessibilityLabel={`${k.titre} : ${k.texte}`}>
+              <Icone nom={k.icone} taille={16} teinte={c.inkSoft} />
+              <Text style={s.conseilTexte} numberOfLines={2}>
+                {k.titre}
+              </Text>
+            </View>
+          ))}
         </View>
       </View>
       {/*
@@ -445,7 +458,7 @@ function Invitation({
   );
 }
 
-/** Une porte secondaire : l'icône dans sa pastille, deux mots. */
+/** Une porte secondaire : l'icône dans sa pastille, deux mots, le chevron — cernée de bleu. */
 function Tuile({
   s,
   c,
@@ -482,7 +495,17 @@ function Tuile({
           {sous}
         </Text>
       </View>
+      <Chevron teinte={c.blue} />
     </Pressable>
+  );
+}
+
+/** Le chevron des boutons : ce qui en porte un se touche. */
+function Chevron({ teinte }: { teinte: string }) {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24">
+      <Path d="M9 5l7 7-7 7" stroke={teinte} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </Svg>
   );
 }
 
@@ -829,10 +852,15 @@ function Lu({
           <Text style={[s.confianceMot, { color: teinte }]}>{mot}</Text>
         </Pressable>
       </View>
+      {/* LE BILAN SE LIT : à plat, sur le gris du fond — rien ici ne se touche. */}
       <View style={s.chiffres}>
-        {chiffres.map(([icone, v, l]) => (
-          <View key={l} style={[s.chiffre, { height: entre(62, 74) }]} accessibilityLabel={`${v} ${l}`}>
-            <Icone nom={icone} taille={16} teinte={c.blue} />
+        {chiffres.map(([icone, v, l], i) => (
+          <View
+            key={l}
+            style={[s.chiffre, { height: entre(56, 66) }, i > 0 && s.chiffreSepare]}
+            accessible
+            accessibilityLabel={`${v} ${l}`}>
+            <Icone nom={icone} taille={15} teinte={c.inkSoft} />
             <Text style={s.chiffreValeur}>{v}</Text>
             <Text style={s.chiffreLibelle} numberOfLines={1}>
               {l}
@@ -840,43 +868,46 @@ function Lu({
           </View>
         ))}
       </View>
-      {/* CE QUI TIENT LE PLAN, ce qu'il faut vérifier : des pastilles, et le détail d'un appui. */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Le détail de la lecture"
-        style={({ pressed }) => [s.badges, pressed && s.enfonce]}
-        onPress={() => setDetails(true)}>
-        <View style={[s.badge, { backgroundColor: `${c.green}1A` }]}>
+      <View style={s.badges}>
+        <View style={s.badge}>
           <Icone nom="cotes2d" taille={16} teinte={c.green} />
           <Text style={s.badgeTexte} numberOfLines={1}>
             {echelle}
           </Text>
         </View>
         {alertes > 0 && (
-          <View style={[s.badge, { backgroundColor: `${c.amber}1F` }]}>
+          <View style={s.badge}>
             <Icone nom="murs" taille={16} teinte={c.amber} />
             <Text style={s.badgeTexte} numberOfLines={1}>
               {r.murs.aVerifier.length > 0
                 ? `${r.murs.aVerifier.length} mur${r.murs.aVerifier.length > 1 ? 's' : ''} à vérifier, en orange`
                 : `${alertes} point${alertes > 1 ? 's' : ''} à vérifier`}
             </Text>
-            <Text style={s.badgePlus}>Détail</Text>
           </View>
         )}
         {conversions.length > 0 && (
-          <View style={[s.badge, { backgroundColor: c.surface }]}>
+          <View style={s.badge}>
             <Icone nom="prise" taille={16} teinte={c.blue} />
             <Text style={s.badgeTexte} numberOfLines={1}>
               {conversions[0][1] > 1 ? `${conversions[0][1]} × ` : ''}
               {conversions[0][0]}
+              {conversions.length > 1 ? `  (+${conversions.length - 1})` : ''}
             </Text>
-            {conversions.length > 1 && <Text style={s.badgePlus}>{`+${conversions.length - 1}`}</Text>}
           </View>
         )}
+      </View>
+      {/* LE DÉTAIL SE TOUCHE : un bouton, cerné de bleu, avec son chevron. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Le détail de la lecture"
+        style={({ pressed }) => [s.detail, pressed && s.enfonce]}
+        onPress={() => setDetails(true)}>
+        <Text style={s.detailTexte}>Voir le détail de la lecture</Text>
+        <Chevron teinte={c.blue} />
       </Pressable>
       <View style={s.boutons}>
         <Bouton s={s} principal icone="valider" libelle="Créer le plan" onPress={onCreer} />
-        <Bouton s={s} lien libelle="Reprendre la photo" onPress={onReprendre} />
+        <Bouton s={s} libelle="Reprendre la photo" onPress={onReprendre} />
       </View>
       {essai && (
         <Text style={s.pied}>C’était votre lecture d’essai : les suivantes sont comprises dans le Pro.</Text>
@@ -1065,15 +1096,12 @@ function Bouton({
   s,
   libelle,
   principal,
-  lien,
   icone,
   onPress,
 }: {
   s: ReturnType<typeof themed>;
   libelle: string;
   principal?: boolean;
-  /** Un simple lien, sous le bouton principal. */
-  lien?: boolean;
   icone?: keyof typeof SOLAIRES;
   onPress: () => void;
 }) {
@@ -1082,7 +1110,7 @@ function Bouton({
       accessibilityRole="button"
       accessibilityLabel={libelle}
       style={({ pressed }) => [
-        principal ? s.boutonPrincipal : lien ? s.boutonLien : s.boutonSecond,
+        principal ? s.boutonPrincipal : s.boutonSecond,
         pressed && s.enfonce,
       ]}
       onPress={onPress}>
@@ -1141,27 +1169,21 @@ const themed = (c: Palette) =>
     herosDessin: { alignSelf: 'stretch', flex: 1, alignItems: 'center', justifyContent: 'center' },
     herosTitre: { color: c.ink, fontWeight: '900', letterSpacing: -0.4, textAlign: 'center', marginTop: 6 },
     herosTexte: { color: c.inkSoft, fontSize: 13.5, lineHeight: 18, textAlign: 'center', marginTop: 4, maxWidth: 320 },
-    atouts: { flexDirection: 'row', flexWrap: 'wrap', marginHorizontal: -4, rowGap: 8 },
-    atoutCase: { width: '50%', paddingHorizontal: 4 },
-    atout: {
-      backgroundColor: c.surface,
-      borderRadius: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 9,
-      paddingHorizontal: 12,
-      ...shadowCard,
-      shadowOpacity: 0.05,
+    rubrique: {
+      color: c.inkSoft,
+      fontSize: 12,
+      fontWeight: '800',
+      letterSpacing: 0.7,
+      textTransform: 'uppercase',
+      marginBottom: -4,
+      marginLeft: 4,
     },
-    atoutIcone: {
-      width: 30,
-      height: 30,
-      borderRadius: 10,
-      backgroundColor: c.blueSoft,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    atoutTitre: { flex: 1, color: c.ink, fontSize: 13.5, fontWeight: '700' },
+    // Les conseils SE LISENT : à plat, sur le gris du fond, sans ombre.
+    conseils: { backgroundColor: c.surfaceSunken, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10, gap: 6 },
+    conseilsTitre: { color: c.inkSoft, fontSize: 11.5, fontWeight: '800', letterSpacing: 0.6, textTransform: 'uppercase' },
+    conseilsGrille: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 6 },
+    conseil: { width: '50%', flexDirection: 'row', alignItems: 'center', gap: 7, paddingRight: 6 },
+    conseilTexte: { flex: 1, color: c.inkSoft, fontSize: 13, fontWeight: '600' },
     portes: { gap: 10 },
     scanner: {
       borderRadius: 22,
@@ -1186,16 +1208,20 @@ const themed = (c: Palette) =>
     scannerTitre: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
     scannerSous: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '600' },
     deux: { flexDirection: 'row', gap: 10 },
+    // Les portes secondaires SE TOUCHENT : cernées de bleu, avec leur chevron.
     tuile: {
       flex: 1,
       backgroundColor: c.surface,
       borderRadius: 20,
+      borderWidth: 1.5,
+      borderColor: `${c.blue}55`,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
-      paddingHorizontal: 12,
+      gap: 9,
+      paddingLeft: 10,
+      paddingRight: 8,
       ...shadowCard,
-      shadowOpacity: 0.06,
+      shadowOpacity: 0.07,
     },
     tuileIcone: {
       width: 38,
@@ -1205,7 +1231,7 @@ const themed = (c: Palette) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    tuileTitre: { color: c.ink, fontSize: 14, fontWeight: '800' },
+    tuileTitre: { color: c.blue, fontSize: 14.5, fontWeight: '800' },
     tuileSous: { color: c.inkSoft, fontSize: 11.5, fontWeight: '600' },
     pied: { color: c.inkSoft, fontSize: 11.5, lineHeight: 15.5, textAlign: 'center' },
 
@@ -1228,7 +1254,8 @@ const themed = (c: Palette) =>
     },
     flecheVide: { width: 46, height: 46 },
     balai: { position: 'absolute', left: 0, right: 0, top: 0, height: 3, backgroundColor: c.blue, opacity: 0.85 },
-    etapes: { backgroundColor: c.surface, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 12, gap: 2, ...shadowCard, shadowOpacity: 0.05 },
+    // Les étapes SE LISENT : à plat, sans ombre.
+    etapes: { backgroundColor: c.surfaceSunken, borderRadius: 20, paddingVertical: 8, paddingHorizontal: 12, gap: 2 },
     etape: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 34 },
     etapeRond: {
       width: 26,
@@ -1263,32 +1290,27 @@ const themed = (c: Palette) =>
     },
     pastille: { width: 8, height: 8, borderRadius: 4 },
     confianceMot: { fontSize: 13.5, fontWeight: '800' },
-    chiffres: { flexDirection: 'row', gap: 8 },
-    chiffre: {
-      flex: 1,
-      backgroundColor: c.surface,
-      borderRadius: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 1,
-      ...shadowCard,
-      shadowOpacity: 0.05,
-    },
+    // Le bilan SE LIT : un bandeau plat, quatre chiffres séparés d'un filet.
+    chiffres: { flexDirection: 'row', backgroundColor: c.surfaceSunken, borderRadius: 18, paddingVertical: 4 },
+    chiffre: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 1 },
+    chiffreSepare: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: c.lineStrong },
     chiffreValeur: { color: c.ink, fontSize: 19, fontWeight: '800', fontVariant: ['tabular-nums'] },
     chiffreLibelle: { color: c.inkSoft, fontSize: 11, fontWeight: '600' },
-    badges: { gap: 6 },
-    badge: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 14, paddingHorizontal: 12, paddingVertical: 9 },
-    badgeTexte: { flex: 1, color: c.ink, fontSize: 13, fontWeight: '600' },
-    badgePlus: {
-      color: c.blue,
-      backgroundColor: c.blueSoft,
-      borderRadius: 999,
-      overflow: 'hidden',
-      paddingHorizontal: 8,
-      paddingVertical: 1,
-      fontSize: 12,
-      fontWeight: '800',
+    badges: { gap: 2, paddingHorizontal: 4 },
+    badge: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+    badgeTexte: { flex: 1, color: c.inkSoft, fontSize: 13, fontWeight: '600' },
+    detail: {
+      height: 46,
+      borderRadius: 16,
+      borderWidth: 1.5,
+      borderColor: `${c.blue}55`,
+      backgroundColor: c.surface,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
     },
+    detailTexte: { color: c.blue, fontSize: 15, fontWeight: '700' },
     boutons: { gap: 4 },
     boutonPrincipal: {
       height: 54,
@@ -1310,11 +1332,10 @@ const themed = (c: Palette) =>
       backgroundColor: c.surface,
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: c.line,
+      borderWidth: 1.5,
+      borderColor: `${c.blue}55`,
       marginTop: 6,
     },
-    boutonLien: { height: 40, alignItems: 'center', justifyContent: 'center' },
     boutonSecondTexte: { color: c.blue, fontSize: 15, fontWeight: '700' },
 
     echec: { flex: 1, justifyContent: 'space-between', gap: 12 },

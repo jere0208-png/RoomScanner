@@ -405,7 +405,13 @@ export function StripBar({
   icone,
   onFermer,
   styles,
+  illustration,
 }: {
+  /**
+   * UN DESSIN QUI MONTRE LE GESTE, entre l'en-tête et les boutons — la
+   * règle s'y explique en s'animant (voir `AnimationDeMesure`).
+   */
+  illustration?: React.ReactNode;
   /** La cote, en gras : c'est elle qu'on vient lire. */
   strong: string;
   /** Ce que c'est, en gris — « porte », « m sous plafond ». */
@@ -454,6 +460,7 @@ export function StripBar({
         </View>
         {onFermer && <FermerBandeau onPress={onFermer} styles={styles} />}
       </View>
+      {illustration}
 
       {/* PARTIE BASSE : CE QU'ON PEUT EN FAIRE — une ligne, qui défile. */}
       <RangeeDActions styles={styles}>

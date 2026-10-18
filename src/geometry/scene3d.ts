@@ -1639,6 +1639,21 @@ export interface WallPanel {
   t1: number;
   y0: number;
   y1: number;
+  /**
+   * LES CHANTS QUI SE VOIENT, à chaque bout du panneau : les tranches de
+   * hauteur [bas, haut] où son bout borde le vide (un tableau de baie, le
+   * bout du mur). Absent : tout le bout. Un tableau vide : aucun chant.
+   *
+   * Relevé du patron, sur la maquette : « on voit encore des traits
+   * verticaux autour des ouvrants ; on doit avoir un mur continu et une
+   * fenêtre posée dessus ». Chaque morceau d'un mur percé — trumeau,
+   * allège, linteau — dessinait ses deux bouts sur toute sa hauteur, y
+   * compris là où il touche son voisin, DANS l'épaisseur du mur : au-dessus
+   * et au-dessous de chaque fenêtre, sur toute la hauteur du trumeau. À
+   * travers les murs voilés de la maquette, ces faces enfouies se lisaient
+   * comme des traits de haut en bas. Ne restent que les vrais tableaux.
+   */
+  chants?: { debut?: [number, number][]; fin?: [number, number][] };
 }
 
 /**
@@ -1652,18 +1667,41 @@ export function wallPanels(holes: WallHole[], height: number): WallPanel[] {
   const sorted = [...holes].sort((a, b) => a.t0 - b.t0);
   const out: WallPanel[] = [];
   let cursor = 0;
+  /** Le vide de la baie précédente, que borde le début du prochain trumeau. */
+  let videAvant: [number, number] | null = null;
   for (const hole of sorted) {
     const t0 = Math.max(cursor, hole.t0);
     const t1 = Math.max(t0, Math.min(1, hole.t1));
     if (t1 - t0 < 1e-4) continue;
-    if (t0 - cursor > 1e-4) out.push({ t0: cursor, t1: t0, y0: 0, y1: height });
-    if (hole.y0 > 1e-3) out.push({ t0, t1, y0: 0, y1: hole.y0 });
+    const vide: [number, number] = [Math.max(0, hole.y0), Math.min(height, hole.y1)];
+    if (t0 - cursor > 1e-4) {
+      out.push({
+        t0: cursor,
+        t1: t0,
+        y0: 0,
+        y1: height,
+        // Le trumeau ne montre son bout que face au vide des baies qui le bordent.
+        chants: { ...(videAvant ? { debut: [videAvant] } : {}), fin: [vide] },
+      });
+    }
+    /*
+      L'allège et le linteau touchent le trumeau de chaque côté : leurs bouts
+      sont enfouis — sauf au bout du mur, ou contre la baie d'à côté quand
+      deux baies se touchent sans trumeau entre elles.
+    */
+    const debut: [number, number][] | undefined =
+      t0 < 1e-4 ? undefined : t0 - cursor > 1e-4 ? [] : videAvant ? [] : undefined;
+    const fin: [number, number][] | undefined = t1 > 1 - 1e-4 ? undefined : [];
+    if (hole.y0 > 1e-3) out.push({ t0, t1, y0: 0, y1: hole.y0, chants: { debut, fin } });
     if (hole.y1 < height - 1e-3) {
-      out.push({ t0, t1, y0: hole.y1, y1: height });
+      out.push({ t0, t1, y0: hole.y1, y1: height, chants: { debut, fin } });
     }
     cursor = t1;
+    videAvant = vide;
   }
-  if (cursor < 1 - 1e-4) out.push({ t0: cursor, t1: 1, y0: 0, y1: height });
+  if (cursor < 1 - 1e-4) {
+    out.push({ t0: cursor, t1: 1, y0: 0, y1: height, ...(videAvant ? { chants: { debut: [videAvant] } } : {}) });
+  }
   return out;
 }
 
@@ -2404,6 +2442,8 @@ export function buildScene(
       facesSeules?: boolean;
       /** Les extrémités du mur qui rejoignent d'autres murs (voir `pushTopStrips`). */
       joints?: { a: boolean; b: boolean };
+      /** Les chants qui se voient (voir `WallPanel.chants`). */
+      chants?: WallPanel['chants'];
       /**
        * Le TRAIT du mur : `t0`/`t1` sont alors des fractions de SA longueur,
        * reportées d'équerre sur chaque nu (voir `surLeNu`).
@@ -2490,9 +2530,25 @@ export function buildScene(
       fill: o.fillMoins,
     });
     if (o.facesSeules) return;
-    // Tableaux (chants) : trop étroits pour mériter un découpage.
-    face(p2, p1);
-    face(r1, r2);
+    // Tableaux (chants) : trop étroits pour mériter un découpage. Seulement
+    // là où ils bordent le vide (voir `WallPanel.chants`).
+    const chant = (p: Pt, r: Pt, tranches: [number, number][] | undefined) => {
+      for (const [b, h] of tranches ?? [[yb, yt]]) {
+        const bas = Math.max(yb, b);
+        const haut = Math.min(yt, h);
+        if (haut - bas < 1e-3) continue;
+        pushStrips(p, r, bas, haut, o.fill, {
+          shade: o.shade ?? true,
+          captured: o.captured,
+          outline: o.stroke,
+          normal: outwardOf(p, r),
+          depthY: o.depthY,
+          whole: o.whole,
+        });
+      }
+    };
+    chant(p2, p1, o.chants?.debut);
+    chant(r1, r2, o.chants?.fin);
     pushTopStrips(p1, r1, p2, r2, yt, o.top, o.topStroke, 1, o.whole, {
       debut: !(o.joints?.a && t0 < 1e-6),
       fin: !(o.joints?.b && t1 > 1 - 1e-6),
@@ -2693,6 +2749,7 @@ export function buildScene(
     for (const panel of wallPanels(mine, w.height)) {
       pushWallBlock(q, panel.t0, panel.t1, panel.y0, panel.y1, {
         ...skin,
+        chants: panel.chants,
         axe: w,
         // Rien devant : le pan reste d'un seul tenant (voir `devantLeMur`).
         whole: !litige,

@@ -2694,6 +2694,13 @@ export interface ScanState {
   /** Retire un mur du plan (et les ouvertures qu'il portait). */
   removeWall: (wallId: string) => void;
   /**
+   * RETIRE UN RETOUR — le pan de mur entre `t0` et `t1` (fractions de sa
+   * longueur), et lui seul : le reste du mur, ses portes, ses appareils et
+   * les pièces qu'il borde restent (diagnostic du patron : « impossible de
+   * supprimer un retour de mur »).
+   */
+  retirerUnRetour: (wallId: string, t0: number, t1: number) => void;
+  /**
    * COPIE UNE PIÈCE ET TOUT CE QU'ELLE PORTE, à côté d'elle.
    *
    * Trois chambres qui se ressemblent, deux WC : on les équipait une par
@@ -6033,6 +6040,57 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         ]);
         deletePhotoFiles(partis.filter((p) => !gardees.has(p)));
       }
+    },
+
+    retirerUnRetour: (wallId, t0, t1) => {
+      const st = get();
+      const mur = st.walls.find((w) => w.id === wallId);
+      if (!mur) return;
+      const lo = Math.max(0, Math.min(t0, t1));
+      const hi = Math.min(1, Math.max(t0, t1));
+      if (hi - lo < 1e-3) return;
+      const avant = lo > 1e-3;
+      const apres = hi < 1 - 1e-3;
+      // Le retour, c'est tout le mur : le retirer, c'est retirer le mur.
+      if (!avant && !apres) {
+        get().removeWall(wallId);
+        return;
+      }
+      pushHistory(`retour:${wallId}`);
+      const L = segLength(mur);
+      const en = (t: number): Pt => ({
+        x: mur.a.x + (mur.b.x - mur.a.x) * t,
+        z: mur.a.z + (mur.b.z - mur.a.z) * t,
+      });
+      /*
+        Le morceau d'avant garde l'identité du mur — ses pièces, ses
+        appareils, sa photo, sa teinte le suivent sans rien renommer ; le
+        morceau d'après en prend une nouvelle, et les pièces qui comptaient
+        sur le mur comptent sur les deux.
+      */
+      const nouvelId = `mur-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const morceaux: WallSeg[] = [];
+      if (avant) morceaux.push({ ...mur, b: en(lo) });
+      if (apres) morceaux.push({ ...mur, id: avant ? nouvelId : mur.id, a: en(hi) });
+      const idApres = avant ? nouvelId : mur.id;
+      const walls = st.walls.flatMap((w) => (w.id === wallId ? morceaux : [w]));
+      const rooms = st.rooms.map((r) =>
+        avant && apres && r.wallIds?.includes(wallId) ? { ...r, wallIds: [...r.wallIds, nouvelId] } : r,
+      );
+      // Les appareils : sur le retour, ils partent ; après lui, ils suivent
+      // le morceau d'après, mesurés depuis son nouveau départ.
+      const fixtures = st.fixtures.flatMap((f) => {
+        if (f.wallId !== wallId) return [f];
+        if (f.along >= lo * L && f.along <= hi * L) return [];
+        if (f.along > hi * L) return [{ ...f, wallId: idApres, along: f.along - hi * L }];
+        return [f];
+      });
+      set({
+        walls,
+        rooms,
+        ...sansLiensMorts(fixtures, st.ceiling),
+        dirty: true,
+      });
     },
 
     addWallBetween: (a, b, opts) => {

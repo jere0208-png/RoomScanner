@@ -1,0 +1,11 @@
+# La page « Lire un plan papier » : ce qui se touche, ce qui se lit.
+appId: ${APP_ID}
+name: Lire un plan papier
+---
+- launchApp
+- runFlow: commun/vers-accueil.yaml
+- tapOn:
+    text: "Lire un plan papier"
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ${THEME}-70-lecture-invitation

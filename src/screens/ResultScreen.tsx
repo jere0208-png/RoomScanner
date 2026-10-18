@@ -82,6 +82,7 @@ import { usePrixPro } from '../store/prixPro';
 import { useReglagesPose } from '../store/reglagesPose';
 import { ChoixScan } from '../components/ChoixScan';
 import { RoomBar } from '../components/RoomBar';
+import { AnimationDeMesure } from '../components/AnimationDeMesure';
 import { StripBar } from '../components/StripBar';
 import {
   PILL_CELL_H,
@@ -7307,6 +7308,27 @@ export function ResultScreen() {
                     sansMot: true,
                     onPress: () => openWallElevation(mur.id),
                   },
+                  /*
+                    LE RETOUR SE RETIRE — diagnostic du patron : « impossible
+                    de supprimer un retour de mur ». Seul « Mur entier » puis
+                    « Retirer » existait, et il emportait le mur, sa porte et
+                    ses prises. Ici, seul ce pan s'en va.
+                  */
+                  {
+                    label: 'Retirer',
+                    icone: SOLAIRES.supprimer,
+                    sansMot: true,
+                    danger: true,
+                    onPress: () => {
+                      useScanStore.getState().retirerUnRetour(mur.id, pier.t0, pier.t1);
+                      setPier(null);
+                      haptic('succes');
+                      astuce('Retour retiré.', {
+                        icone: 'undo',
+                        action: { label: 'Annuler', faire: () => useScanStore.getState().undo() },
+                      });
+                    },
+                  },
                 ]}
               />
             );
@@ -7325,6 +7347,8 @@ export function ResultScreen() {
                   : 'Touchez un premier point'
             }
             note="Les bouts s’accrochent aux coins, aux murs et aux meubles"
+            // Avant le premier point, le geste se montre (diagnostic du patron).
+            illustration={!regle.a ? <AnimationDeMesure /> : undefined}
             onFermer={() => sortirLaRegle(false)}
             actions={[
               ...(regle.a && regle.b
