@@ -350,7 +350,7 @@ describe('le mur choisi', () => {
     roomId: 'r1',
   }));
 
-  const monterMur = (selection: string | null) => {
+  const monterMur = (selection: string | null, onDeleteWall?: (id: string) => void) => {
     let tree!: TestRenderer.ReactTestRenderer;
     act(() => {
       useScanStore.setState({
@@ -375,6 +375,7 @@ describe('le mur choisi', () => {
           editable
           selectedWallId={selection}
           onSelectWall={() => {}}
+          onDeleteWall={onDeleteWall}
         />,
       );
     });
@@ -439,6 +440,38 @@ describe('le mur choisi', () => {
     const pris = monterMur('n');
     expect(rotation(pris)).toBeDefined();
     act(() => pris.unmount());
+  });
+
+  it('porte sa croix de suppression à côté de la rotation, sans la chevaucher', () => {
+    // Relevé du patron : « une croix de suppression à côté du bouton de
+    // rotation, directement à côté du mur, pour gagner du temps ».
+    const retires: string[] = [];
+    for (const id of CARRE.map((w) => w.id)) {
+      const tree = monterMur(id, (x) => retires.push(x));
+      const croix = tree.root
+        .findAll((n) => n.props.accessibilityLabel === 'Retirer le mur' && typeof n.props.onPress === 'function')[0];
+      expect(croix).toBeDefined();
+      const centre = (n: { props: { style: unknown } }) => {
+        const st = ([] as unknown[]).concat(n.props.style as unknown[]).flat(3).reduce<Record<string, number>>(
+          (acc, x) => ({ ...acc, ...(x as Record<string, number>) }),
+          {},
+        );
+        return { x: st.left + st.width / 2, y: st.top + st.height / 2 };
+      };
+      const c1 = centre(croix);
+      const c2 = centre(rotation(tree)!);
+      const ecart = Math.hypot(c1.x - c2.x, c1.y - c2.y);
+      // Côte à côte : ni l'une sur l'autre (30 points chacune), ni loin.
+      expect(ecart).toBeGreaterThanOrEqual(34);
+      expect(ecart).toBeLessThanOrEqual(50);
+      act(() => croix.props.onPress());
+      act(() => tree.unmount());
+    }
+    expect(retires).toEqual(CARRE.map((w) => w.id));
+    // Sans rappel, pas de croix.
+    const sans = monterMur('n');
+    expect(sans.root.findAll((n) => n.props.accessibilityLabel === 'Retirer le mur').length).toBe(0);
+    act(() => sans.unmount());
   });
 
   it('ne se pousse plus au doigt : aucune bande ne le recouvre', () => {

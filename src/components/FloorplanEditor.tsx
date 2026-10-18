@@ -558,6 +558,8 @@ interface Props {
   /** Meuble sélectionné : surligné, déplaçable, supprimable. */
   selectedObjectId?: string | null;
   onDeleteObject?: (id: string) => void;
+  /** La croix du mur choisi, à côté de sa poignée de rotation. */
+  onDeleteWall?: (id: string) => void;
   /** Pièce sélectionnée : son cartouche est mis en avant. */
   selectedRoomId?: string | null;
   /** Appui sur le sol d'une pièce (mode édition) : la sélectionne. */
@@ -1003,6 +1005,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
   onSelectPhoto,
   selectedObjectId,
   onDeleteObject,
+  onDeleteWall,
   selectedRoomId,
   onSelectRoom,
   onMoveRoom,
@@ -5724,6 +5727,28 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                     sens={sens}
                     borne={{ w: layout.w, h: layout.h }}
                   />
+                  {onDeleteWall
+                    ? (() => {
+                        /*
+                          LA CROIX À CÔTÉ DE LA ROTATION — relevé du patron :
+                          « une croix de suppression à côté du bouton de
+                          rotation, directement à côté du mur, pour gagner du
+                          temps ». Même flanc que la poignée, un cran plus loin
+                          le long du mur : jamais sur la barre du mur, qui est
+                          de l'autre côté.
+                        */
+                        const at = croixDuMurAt(w, mapping, sens, { w: layout.w, h: layout.h });
+                        return (
+                          <TouchableOpacity
+                            style={[styles.wallDelete, { left: at.x - 15, top: at.y - 15 }]}
+                            accessibilityLabel="Retirer le mur"
+                            hitSlop={{ top: 7, bottom: 7, left: 7, right: 7 }}
+                            onPress={() => onDeleteWall(w.id)}>
+                            <CloseCross size={14} color="#FFFFFF" weight={3.2} />
+                          </TouchableOpacity>
+                        );
+                      })()
+                    : null}
                 </React.Fragment>
               );
             })()}
@@ -7484,6 +7509,29 @@ function poigneeAt(
   return p;
 }
 
+/**
+ * Où se pose la croix du mur choisi : à côté de sa poignée de rotation, à
+ * quarante points le long du mur, vers son bout le plus éloigné du bord
+ * de l'écran.
+ */
+export function croixDuMurAt(
+  w: WallSeg,
+  m: EffMapping,
+  sens: 1 | -1 = 1,
+  borne?: { w: number; h: number },
+): { x: number; y: number } {
+  const p = poigneeAt(w, m, sens, borne);
+  const a = m.toPx(w.a);
+  const b = m.toPx(w.b);
+  const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const u = { x: (b.x - a.x) / l, y: (b.y - a.y) / l };
+  const pose = (s: number) => ({ x: p.x + u.x * 40 * s, y: p.y + u.y * 40 * s });
+  const dedans = (q: { x: number; y: number }) =>
+    !borne || (q.x >= 21 && q.x <= borne.w - 21 && q.y >= 21 && q.y <= borne.h - 21);
+  const q = pose(1);
+  return dedans(q) ? q : pose(-1);
+}
+
 function CornerHandle({
   corner,
   mapping,
@@ -7667,6 +7715,20 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
     justifyContent: 'center',
     ...shadowCard,
     shadowOpacity: 0.1,
+  },
+  /** La croix du mur choisi : la pastille rouge du meuble, à la taille de la rotation. */
+  wallDelete: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: c.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0B0D12',
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
   },
   wallAngle: {
     position: 'absolute',

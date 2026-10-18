@@ -3639,6 +3639,34 @@ export function ResultScreen() {
    * sous-pente, un muret de cuisine : UN mur qui n'a pas la hauteur des
    * autres. La fenêtre le dit, sinon on croit régler la pièce.
    */
+  /**
+   * RETIRER UN MUR — de la barre du mur, ou de la croix posée à côté de lui
+   * sur le plan (relevé du patron : « une croix de suppression à côté du
+   * bouton de rotation, pour gagner du temps »).
+   */
+  const retirerLeMur = (wallId: string) => {
+    const retirer = () => {
+      removeWall(wallId);
+      setSelectedWallId(null);
+      // Revue « Paul » : retiré d'un appui, dans la rangée où
+      // l'on cherche autre chose. On propose de revenir.
+      astuce('Mur retiré.', {
+        icone: 'undo',
+        action: { label: 'Annuler', faire: () => useScanStore.getState().undo() },
+      });
+    };
+    // Le particulier confirme : un mur entier part d'un appui
+    // sur une poubelle de 34 points (revue « Paul »).
+    if (modeElec) {
+      retirer();
+      return;
+    }
+    alerte('Retirer ce mur ?', 'Ses portes et fenêtres partent avec lui. « Annuler » le fera revenir.', [
+      { label: 'Garder' },
+      { label: 'Retirer', onPress: retirer },
+    ]);
+  };
+
   const promptWallHeight = (wallId: string) => {
     const w = walls.find((x) => x.id === wallId);
     if (!w) return;
@@ -4924,6 +4952,7 @@ export function ResultScreen() {
             showObjectDims={objDims}
             onToggleObjectDims={() => setObjDims((v) => !v)}
             selectedWallId={selectedWallId}
+            onDeleteWall={retirerLeMur}
             onSelectWall={(id) => {
               seuleSelection('mur');
               if (id) effacerRetour();
@@ -7221,28 +7250,7 @@ export function ResultScreen() {
                 icone: SOLAIRES.supprimer,
                 sansMot: true,
                 danger: true,
-                onPress: () => {
-                  const retirer = () => {
-                    removeWall(selectedWall.id);
-                    setSelectedWallId(null);
-                    // Revue « Paul » : retiré d'un appui, dans la rangée où
-                    // l'on cherche autre chose. On propose de revenir.
-                    astuce('Mur retiré.', {
-                      icone: 'undo',
-                      action: { label: 'Annuler', faire: () => useScanStore.getState().undo() },
-                    });
-                  };
-                  // Le particulier confirme : un mur entier part d'un appui
-                  // sur une poubelle de 34 points (revue « Paul »).
-                  if (modeElec) {
-                    retirer();
-                    return;
-                  }
-                  alerte('Retirer ce mur ?', 'Ses portes et fenêtres partent avec lui. « Annuler » le fera revenir.', [
-                    { label: 'Garder' },
-                    { label: 'Retirer', onPress: retirer },
-                  ]);
-                },
+                onPress: () => retirerLeMur(selectedWall.id),
               },
             ]}
           />
