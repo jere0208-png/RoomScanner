@@ -1,15 +1,17 @@
 /**
- * LE JOURNAL DU MODE DIAGNOSTIC — tampon circulaire, deux bornes.
+ * LE JOURNAL DU MODE DIAGNOSTIC — toute la session, deux bornes.
  *
- * On verifie ce qui fait sa surete : la fenetre d'envoi (dix secondes), la
- * fenetre gardee (une minute) et le plafond d'evenements. Sans ces bornes, un
- * diagnostic enverrait tout, ou mangerait la memoire du telephone surveille.
+ * Relevé du patron : le diagnostic enregistre du premier appui au second, pas
+ * dix secondes. On vérifie ce qui fait sa sûreté : l'envoi prend la session
+ * entière et elle seule, la fenêtre gardée (trente minutes) et le plafond
+ * d'évènements. Sans ces bornes, un diagnostic mangerait la mémoire du
+ * téléphone surveillé.
  */
 import {
   elaguer,
-  recents,
+  entre,
   noter,
-  evenementsAEnvoyer,
+  evenementsDeLaSession,
   viderJournal,
   tamponBrut,
   FENETRE_JOURNAL_MS,
@@ -44,15 +46,16 @@ describe('elaguer', () => {
   });
 });
 
-describe('recents', () => {
-  it('ne rend que les dix dernieres secondes', () => {
-    const maintenant = 500_000;
+describe('entre', () => {
+  it('ne rend que ce qui tombe dans la session', () => {
     const evs: EvenementJournal[] = [
-      { t: maintenant - 11_000, type: 'avant' },
-      { t: maintenant - 9_000, type: 'pendant' },
-      { t: maintenant - 1, type: 'juste-avant' },
+      { t: 99, type: 'avant' },
+      { t: 100, type: 'debut' },
+      { t: 5_000_000, type: 'pendant' },
+      { t: 6_000_000, type: 'fin' },
+      { t: 6_000_001, type: 'note' },
     ];
-    expect(recents(evs, maintenant).map((e) => e.type)).toEqual(['pendant', 'juste-avant']);
+    expect(entre(evs, 100, 6_000_000).map((e) => e.type)).toEqual(['debut', 'pendant', 'fin']);
   });
 });
 
@@ -63,18 +66,24 @@ describe('le singleton', () => {
   });
   afterEach(() => jest.useRealTimers());
 
-  it('horodate, et n’envoie que les dix dernieres secondes', () => {
+  it('horodate, et envoie toute la session, même longue', () => {
     jest.setSystemTime(100_000);
-    noter('ecran', { ecran: 'home' });
-    jest.setSystemTime(100_000 + 12_000);
+    noter('avant');
+    const debut = 100_500;
+    jest.setSystemTime(debut);
+    noter('session');
+    // Douze minutes plus tard : rien n'est perdu.
+    jest.setSystemTime(debut + 12 * 60_000);
     noter('plan', { walls: 3 });
-    jest.setSystemTime(100_000 + 12_050);
+    const fin = debut + 12 * 60_000 + 50;
+    jest.setSystemTime(fin);
     noter('alerte', { titre: 'Oups' });
+    // La note se tape après le second appui : elle n'en fait pas partie.
+    jest.setSystemTime(fin + 20_000);
+    noter('astuce', { texte: 'clavier' });
 
-    const envoi = evenementsAEnvoyer();
-    // L'ecran, pose il y a douze secondes, est hors de la fenetre d'envoi.
-    expect(envoi.map((e) => e.type)).toEqual(['plan', 'alerte']);
-    expect(envoi[0].t).toBe(112_000);
+    const envoi = evenementsDeLaSession(debut, fin);
+    expect(envoi.map((e) => e.type)).toEqual(['session', 'plan', 'alerte']);
   });
 
   it('reste borne a sa fenetre dans le tampon', () => {
@@ -88,24 +97,13 @@ describe('le singleton', () => {
 });
 
 /*
-  LA FENÊTRE FINIT À L'APPUI — premiers diagnostics du patron : « Évènements
-  app : 0 », parce que la fenêtre était comptée depuis « Envoyer », après le
-  temps de taper le message.
+  VINGT MINUTES TIENNENT DANS LE FIL — une session dure vingt minutes au plus
+  (voir `RoomScanDiagnostic.swift`) : la fenêtre gardée et le plafond la
+  laissent passer entière, note comprise.
 */
-describe('la fenêtre des dix secondes finit à l’appui, pas à l’envoi', () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
-
-  it('un changement fait juste avant l’appui part, même envoyé 40 s plus tard', () => {
-    viderJournal();
-    const t0 = 1_800_000_000_000;
-    jest.setSystemTime(t0);
-    noter('plan', { rooms: 5 });
-    jest.setSystemTime(t0 + 2_000);
-    noter('astuce', { texte: 'après l’appui' });
-    // L'envoi part 40 s après l'appui (t0 + 1 s).
-    jest.setSystemTime(t0 + 41_000);
-    expect(evenementsAEnvoyer()).toEqual([]);
-    expect(evenementsAEnvoyer(t0 + 1_000).map((e) => e.type)).toEqual(['plan']);
+describe('la session tient dans sa fenêtre', () => {
+  it('vingt minutes de session tiennent dans le tampon', () => {
+    expect(FENETRE_JOURNAL_MS).toBeGreaterThanOrEqual(25 * 60_000);
+    expect(PLAFOND_JOURNAL).toBeGreaterThanOrEqual(20_000);
   });
 });

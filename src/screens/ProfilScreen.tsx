@@ -433,8 +433,9 @@ export function ProfilScreen() {
           ADMINISTRATEUR — le mode diagnostic, et rien que pour le patron.
 
           Relevé du patron : « fais-moi un bouton admin […] un mode
-          diagnostique […] au clic sur un bouton visible, les 10 dernières
-          secondes de mes faits et gestes te seront envoyés, écran compris ».
+          diagnostique » — puis : « le bouton doit agir comme un bouton ON (il
+          clignote si actif), il enregistre tout ce qui se passe, et au clic
+          de nouveau on clôt, avec une note, et envoi ».
           La section n'existe QUE si le serveur dit `admin` (sa liste
           `ADMIN_EMAILS`) : le dépôt est public, aucune adresse n'y figure.
 
@@ -448,8 +449,9 @@ export function ProfilScreen() {
               <View style={s.aboTextes}>
                 <Text style={s.aboTitre}>Mode diagnostic</Text>
                 <Text style={s.aboSous}>
-                  Garde en mémoire vos 10 dernières secondes — gestes, écran,
-                  état du plan — pour les envoyer au développeur d’un appui.
+                  Un bouton rouge flotte sur l’app : un appui démarre
+                  l’enregistrement (il clignote) — écran, gestes, journal, plan ;
+                  un second appui l’arrête, et l’on ajoute une note avant d’envoyer.
                 </Text>
               </View>
               <Switch

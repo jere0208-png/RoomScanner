@@ -67,6 +67,22 @@ contient('le résumé du plan', $md, '8 murs, 3 pièces, 5 ouvertures, 12 meuble
 contient('le compte des gestes', $md, '**Gestes (10 s)** : 9');
 contient('la présence vidéo', $md, 'oui (ecran.mp4)');
 
+// ---- Une session du bouton-interrupteur : sa durée et ses tranches.
+$sess = diagResume('Le frigo sort du recoin', $instant, true, 420, 1300, $ts, ['duree' => 192, 'parties' => 4]);
+contient('la durée de la session', $sess, '**Session enregistrée** : 3 min 12 s');
+contient('les gestes de toute la session', $sess, '**Gestes** : 420');
+contient('les évènements de toute la session', $sess, '**Évènements app** : 1300');
+contient('les tranches de vidéo', $sess, '4 tranches d’une minute');
+$courte = diagResume('', [], true, 3, 2, $ts, ['duree' => 45, 'parties' => 1]);
+contient('une session courte', $courte, '**Session enregistrée** : 45 s');
+contient('une seule tranche', $courte, 'oui (ecran.mp4)');
+
+// ---- Le dossier reçu de l'app : la seule forme que le serveur fabrique.
+verifier('dossier valide', true, diagDossierValide('rapports/2026-10-16_14-30-05'));
+verifier('dossier : pas d’évasion', false, diagDossierValide('rapports/../config'));
+verifier('dossier : pas d’ailleurs', false, diagDossierValide('autre/2026-10-16_14-30-05'));
+verifier('dossier : rien après', false, diagDossierValide('rapports/2026-10-16_14-30-05/x'));
+
 // ---- Sans message ni vidéo : lisible quand même.
 $maigre = diagResume('', [], false, 0, 0, $ts);
 contient('message vide annoncé', $maigre, '_(aucun message)_');

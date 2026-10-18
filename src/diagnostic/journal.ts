@@ -1,23 +1,26 @@
 /**
- * LE JOURNAL DU MODE DIAGNOSTIC — un tampon circulaire, et rien de plus.
+ * LE JOURNAL DU MODE DIAGNOSTIC — le fil de ce que l'app vit pendant une
+ * session.
  *
- * Relevé du patron : « n'importe quelle action que je fais sera analysée, et
- * au clic sur un bouton, les 10 dernières secondes de mes faits et gestes te
- * seront envoyés […] pour corriger ». Côté JavaScript, « mes faits et gestes »
- * ce sont les évènements de l'app : l'écran qu'on regarde, une feuille qui
- * s'ouvre, le plan qui change, une alerte posée, une erreur. Le natif tient
- * la vidéo et les touchers (voir `RoomScanDiagnostic.swift`) ; ici, on tient
- * le fil de ce que l'app a VÉCU, horodaté.
+ * Relevé du patron : « le diagnostic ne doit pas agir sur seulement 10 s ;
+ * le bouton doit agir comme un bouton ON […] il enregistre tout ce qui se
+ * passe, et au clic de nouveau on clôt ». Côté JavaScript, « tout ce qui se
+ * passe » ce sont les évènements de l'app : l'écran qu'on regarde, une
+ * feuille qui s'ouvre, le plan qui change, une alerte posée, une erreur. Le
+ * natif tient la vidéo et les touchers (voir `RoomScanDiagnostic.swift`) ;
+ * ici, on tient le fil de ce que l'app a VÉCU, horodaté.
  *
- * CIRCULAIRE, ET BORNÉ DEUX FOIS. On ne garde qu'une MINUTE (l'appui vient
- * après coup, dix secondes suffisent, mais une marge se paie en mémoire, pas
- * en justesse) et JAMAIS plus de trois mille évènements (une boucle d'erreurs
- * pourrait en cracher mille par seconde ; on ne laisse pas un diagnostic
- * manger la mémoire du téléphone qu'il surveille).
+ * LA SESSION REMET LE FIL À ZÉRO (`viderJournal` au premier appui) et l'envoi
+ * prend tout ce qui s'est passé entre le premier et le second appui
+ * (`evenementsDeLaSession`). BORNÉ QUAND MÊME : trente minutes (une session
+ * en dure vingt au plus, plus le temps de taper la note) et JAMAIS plus de
+ * cinquante mille évènements (une boucle d'erreurs pourrait en cracher mille
+ * par seconde ; on ne laisse pas un diagnostic manger la mémoire du
+ * téléphone qu'il surveille).
  *
- * LES FONCTIONS SONT PURES, pour se vérifier au banc : `elaguer` et `recents`
+ * LES FONCTIONS SONT PURES, pour se vérifier au banc : `elaguer` et `entre`
  * ne touchent rien, elles rendent un nouveau tableau. Le singleton (`noter`,
- * `evenements`) n'est qu'un tableau qui les appelle.
+ * `evenementsDeLaSession`) n'est qu'un tableau qui les appelle.
  */
 
 /** Un évènement du fil : quand, de quel genre, et ce qu'il porte. */
@@ -30,13 +33,9 @@ export interface EvenementJournal {
   donnees?: Record<string, unknown>;
 }
 
-/** La fenêtre gardée (une minute) et le plafond d'évènements. */
-// Trois minutes : le temps de taper son message après l'appui sans que les
-// dix secondes d'avant l'appui soient déjà élaguées.
-export const FENETRE_JOURNAL_MS = 180_000;
-export const PLAFOND_JOURNAL = 3000;
-/** Ce que l'appui envoie : les dix dernières secondes. */
-export const FENETRE_ENVOI_MS = 10_000;
+/** La fenêtre gardée (trente minutes) et le plafond d'évènements. */
+export const FENETRE_JOURNAL_MS = 30 * 60_000;
+export const PLAFOND_JOURNAL = 50_000;
 
 /**
  * ÉLAGUE : retire ce qui déborde de la fenêtre, puis ce qui déborde du
@@ -56,14 +55,9 @@ export function elaguer(
     : dansLaFenetre;
 }
 
-/** Les évènements des `fenetreMs` millisecondes qui précèdent `maintenant`, dans l'ordre. */
-export function recents(
-  evs: EvenementJournal[],
-  maintenant: number,
-  fenetreMs: number = FENETRE_ENVOI_MS,
-): EvenementJournal[] {
-  const depuis = maintenant - fenetreMs;
-  return evs.filter((e) => e.t >= depuis && e.t <= maintenant);
+/** Les évènements entre `debut` et `fin` (inclus), dans l'ordre. */
+export function entre(evs: EvenementJournal[], debut: number, fin: number): EvenementJournal[] {
+  return evs.filter((e) => e.t >= debut && e.t <= fin);
 }
 
 /* ---- LE SINGLETON : un tampon, et deux gestes dessus. ---- */
@@ -80,20 +74,16 @@ export function noter(type: string, donnees?: Record<string, unknown>): void {
   tampon = elaguer(tampon, t);
 }
 
-/*
-  LES DIX SECONDES D'AVANT L'APPUI, PAS D'AVANT L'ENVOI — vu sur les premiers
-  diagnostics du patron : « Évènements app : 0 » à chaque fois, alors qu'il
-  venait de changer la teinte d'un mur. La fenêtre était comptée depuis
-  « Envoyer », donc APRÈS le temps de taper le message : tout ce qui
-  précédait l'appui sur le bouton rouge était déjà hors champ. Elle finit
-  maintenant à l'instant de l'appui, comme la vidéo et les gestes.
-*/
-/** Les évènements des dix secondes qui précèdent `instant` (l'appui) — ce que l'appui envoie. */
-export function evenementsAEnvoyer(instant: number = Date.now()): EvenementJournal[] {
-  return recents(tampon, instant);
+/**
+ * LES ÉVÈNEMENTS DE LA SESSION — du premier appui au second, pas jusqu'à
+ * « Envoyer » : la note se tape APRÈS la fin, et ce qu'elle fait vivre à
+ * l'app (le clavier, l'alerte) n'est pas le défaut qu'on montre.
+ */
+export function evenementsDeLaSession(debut: number, fin: number = Date.now()): EvenementJournal[] {
+  return entre(tampon, debut, fin);
 }
 
-/** Vide le fil — à l'arrêt du mode : rien ne traîne entre deux sessions. */
+/** Vide le fil — au début d'une session et à l'arrêt du mode : rien ne traîne entre deux sessions. */
 export function viderJournal(): void {
   tampon = [];
 }

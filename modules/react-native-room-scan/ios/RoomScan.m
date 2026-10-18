@@ -226,9 +226,10 @@ RCT_EXTERN_METHOD(infos:(RCTPromiseResolveBlock)resolve
 @end
 
 /*
-  LE MODE DIAGNOSTIC — reserve a l'administrateur. L'ecran en boucle, les
-  gestes de partout, et le bouton visible qui emet « envoyer ». C'est un
-  emetteur (RCTEventEmitter), comme le telemetre : il emet pour lui-meme.
+  LE MODE DIAGNOSTIC — reserve a l'administrateur. Le bouton-interrupteur :
+  premier appui, la session enregistre l'ecran et les gestes (« debut ») ;
+  second appui, une note puis « envoyer » (ou « jete »). C'est un emetteur
+  (RCTEventEmitter), comme le telemetre : il emet pour lui-meme.
   Voir RoomScanDiagnostic.swift et src/diagnostic/.
 */
 @interface RCT_EXTERN_MODULE(RoomScanDiagnostic, RCTEventEmitter)
@@ -236,7 +237,7 @@ RCT_EXTERN_METHOD(demarrer:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(arreter:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
-RCT_EXTERN_METHOD(figer:(RCTPromiseResolveBlock)resolve
+RCT_EXTERN_METHOD(enCours:(RCTPromiseResolveBlock)resolve
                   reject:(RCTPromiseRejectBlock)reject)
 @end
 

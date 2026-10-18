@@ -100,10 +100,10 @@ if (($_POST['action'] ?? '') === 'diagnostic') {
   }
 
   // Le journal est du texte JSON ; on le garde tel quel (il se rejoue au
-  // banc) mais on borne sa taille : cinq mégaoctets de journal, c'est déjà
-  // bien plus que dix secondes d'évènements.
+  // banc) mais on borne sa taille : vingt mégaoctets — une session de vingt
+  // minutes, ses gestes, ses évènements et le plan avant et après.
   $journal = (string) ($_POST['journal'] ?? '');
-  if (strlen($journal) > 5 * 1024 * 1024) {
+  if (strlen($journal) > 20 * 1024 * 1024) {
     sortir(['ok' => false, 'raison' => 'Journal trop lourd.']);
   }
   $message = (string) ($_POST['message'] ?? '');
@@ -115,6 +115,7 @@ if (($_POST['action'] ?? '') === 'diagnostic') {
   $instant = is_array($decode['instant'] ?? null) ? $decode['instant'] : [];
   $gestes = is_array($decode['gestes'] ?? null) ? count($decode['gestes']) : 0;
   $evenements = is_array($decode['evenements'] ?? null) ? count($decode['evenements']) : 0;
+  $session = is_array($decode['session'] ?? null) ? $decode['session'] : [];
 
   $fichiers = [];
   $avecVideo = false;
@@ -132,11 +133,55 @@ if (($_POST['action'] ?? '') === 'diagnostic') {
 
   $maintenant = time();
   $fichiers['journal.json'] = $journal;
-  $fichiers['message.md'] = diagResume($message, $instant, $avecVideo, $gestes, $evenements, $maintenant);
+  $fichiers['message.md'] = diagResume($message, $instant, $avecVideo, $gestes, $evenements, $maintenant, $session);
 
-  $r = diagDeposer(diagCheminDossier($maintenant), $fichiers);
+  $dossier = diagCheminDossier($maintenant);
+  $r = diagDeposer($dossier, $fichiers);
   if (!$r['ok']) {
     sortir(['ok' => false, 'raison' => 'Le dépôt du diagnostic a échoué.']);
+  }
+  // Le dossier, pour que l'app y dépose les minutes suivantes (`diagnostic-video`).
+  sortir(['ok' => true, 'range' => $r['range'], 'dossier' => $dossier]);
+}
+
+/*
+  LES MINUTES SUIVANTES D'UNE SESSION — une requête par tranche de vidéo,
+  déposée dans le dossier que la première a créé (`ecran-2.mp4`, …). Même
+  contrôle que le diagnostic : administrateur seulement, et un dossier de la
+  seule forme que le serveur fabrique.
+*/
+if (($_POST['action'] ?? '') === 'diagnostic-video') {
+  $identifiant = trim((string) ($_POST['identifiant'] ?? ''));
+  if ($identifiant === '' || strlen($identifiant) > 191) {
+    sortir(['ok' => false, 'raison' => 'Identifiant manquant.']);
+  }
+  $db = base();
+  if (!hash_equals(jeton($identifiant), (string) ($_POST['jeton'] ?? ''))) {
+    sortir(['ok' => false, 'raison' => 'Jeton invalide.']);
+  }
+  $compte = compteDe($db, $identifiant);
+  if (!$compte || !estAdmin($compte)) {
+    sortir(['ok' => false, 'raison' => 'Réservé à l’administrateur.']);
+  }
+  $dossier = (string) ($_POST['dossier'] ?? '');
+  $rang = (int) ($_POST['rang'] ?? 0);
+  if (!diagDossierValide($dossier) || $rang < 2 || $rang > 60) {
+    sortir(['ok' => false, 'raison' => 'Tranche invalide.']);
+  }
+  $video = $_FILES['video'] ?? null;
+  if (!is_array($video) || (int) ($video['error'] ?? 1) !== UPLOAD_ERR_OK) {
+    sortir(['ok' => false, 'raison' => 'Vidéo absente.']);
+  }
+  if ((int) ($video['size'] ?? 0) > 25 * 1024 * 1024) {
+    sortir(['ok' => false, 'raison' => 'Vidéo trop lourde.']);
+  }
+  $brut = @file_get_contents((string) $video['tmp_name']);
+  if ($brut === false || $brut === '') {
+    sortir(['ok' => false, 'raison' => 'Vidéo illisible.']);
+  }
+  $r = diagDeposer($dossier, ['ecran-' . $rang . '.mp4' => $brut]);
+  if (!$r['ok']) {
+    sortir(['ok' => false, 'raison' => 'Le dépôt de la vidéo a échoué.']);
   }
   sortir(['ok' => true, 'range' => $r['range']]);
 }

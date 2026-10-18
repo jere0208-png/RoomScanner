@@ -1,6 +1,6 @@
 <?php
 /**
- * LE DÉPÔT D'UN DIAGNOSTIC — où atterrissent les dix dernières secondes.
+ * LE DÉPÔT D'UN DIAGNOSTIC — où atterrit une session enregistrée.
  *
  * Relevé du patron : « un mode diagnostique […] au clic sur un bouton, les 10
  * dernières secondes de mes faits et gestes te seront envoyés, y compris
@@ -31,6 +31,15 @@ function diagCheminDossier(int $tsSecondes): string {
 }
 
 /**
+ * UN DOSSIER DE RAPPORT REÇU DE L'APP — pour y déposer les tranches de vidéo
+ * suivantes. On n'accepte QUE la forme que `diagCheminDossier` fabrique :
+ * aucune autre écriture n'est possible par ce chemin.
+ */
+function diagDossierValide(string $dossier): bool {
+  return preg_match('#^rapports/\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}$#', $dossier) === 1;
+}
+
+/**
  * UN NOM DE FICHIER SÛR — ni barre, ni point-point, ni rien d'exotique.
  *
  * Le nom des pièces est écrit ici (message.md, journal.json, ecran.mp4) et ne
@@ -57,7 +66,13 @@ function diagResume(
   bool $avecVideo,
   int $gestes,
   int $evenements,
-  int $tsSecondes
+  int $tsSecondes,
+  /**
+   * LA SESSION (bouton-interrupteur) : `duree` en secondes, `parties` le
+   * nombre de tranches de vidéo d'une minute. Absente : un ancien envoi,
+   * les dix dernières secondes.
+   */
+  array $session = []
 ): string {
   $lignes = [];
   $lignes[] = '# Diagnostic EchoPlan';
@@ -96,9 +111,22 @@ function diagResume(
       $lignes[] = '- **Plan** : ' . implode(', ', $resume);
     }
   }
-  $lignes[] = '- **Gestes (10 s)** : ' . $gestes;
-  $lignes[] = '- **Évènements app (10 s)** : ' . $evenements;
-  $lignes[] = '- **Vidéo de l’écran** : ' . ($avecVideo ? 'oui (ecran.mp4)' : 'non');
+  if (isset($session['duree'])) {
+    $d = max(0, (int) $session['duree']);
+    $lignes[] = '- **Session enregistrée** : ' . ($d >= 60 ? intdiv($d, 60) . ' min ' . ($d % 60) . ' s' : $d . ' s');
+    $lignes[] = '- **Gestes** : ' . $gestes;
+    $lignes[] = '- **Évènements app** : ' . $evenements;
+    $parties = max(0, (int) ($session['parties'] ?? 0));
+    if ($parties > 1) {
+      $lignes[] = '- **Vidéo de l’écran** : ' . $parties . ' tranches d’une minute (ecran.mp4, puis ecran-2.mp4 à ecran-' . $parties . '.mp4)';
+    } else {
+      $lignes[] = '- **Vidéo de l’écran** : ' . ($avecVideo ? 'oui (ecran.mp4)' : 'non');
+    }
+  } else {
+    $lignes[] = '- **Gestes (10 s)** : ' . $gestes;
+    $lignes[] = '- **Évènements app (10 s)** : ' . $evenements;
+    $lignes[] = '- **Vidéo de l’écran** : ' . ($avecVideo ? 'oui (ecran.mp4)' : 'non');
+  }
   $lignes[] = '';
   return implode("\n", $lignes) . "\n";
 }
@@ -153,7 +181,8 @@ function diagPutGithub(string $depot, string $jeton, string $chemin, string $con
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_CUSTOMREQUEST => 'PUT',
     CURLOPT_POSTFIELDS => $corps,
-    CURLOPT_TIMEOUT => 20,
+    // Une minute de vidéo pèse ~7 Mo (9 en base64) : on lui laisse le temps.
+    CURLOPT_TIMEOUT => 90,
     CURLOPT_HTTPHEADER => [
       'Authorization: Bearer ' . $jeton,
       'User-Agent: EchoPlan-Diagnostic',

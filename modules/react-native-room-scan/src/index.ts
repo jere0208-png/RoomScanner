@@ -554,34 +554,26 @@ export interface GesteDiagnostic {
   at: number;
 }
 
-/** Ce que `figer()` fige : la vidéo (ou rien) et les gestes des 10 s. */
-export interface FigeDiagnostic {
-  /** L'instant de l'appui (ms depuis 1970) : la fenêtre des dix secondes finit là. */
-  instant?: number;
-  /** Chemin du fichier mp4 assemblé, ou `null` si ReplayKit n'a rien donné. */
-  video: string | null;
-  gestes: GesteDiagnostic[];
-}
-
 /**
- * CE QUE L'ÉVÉNEMENT `envoyer` PORTE — l'appui sur le bouton a déjà figé
- * l'instant : le message tapé, la vidéo et les gestes voyagent ensemble, pour
- * qu'il n'y ait pas de course entre l'appui et un second appel.
+ * CE QUE L'ÉVÉNEMENT `envoyer` PORTE — la session close : le message tapé, les
+ * tranches de vidéo (une par minute), tous les gestes, le début et la fin de
+ * la session (ms depuis 1970). Tout voyage ensemble : pas de course entre le
+ * second appui et un appel de plus.
  */
-export interface EnvoiDiagnostic extends FigeDiagnostic {
+export interface EnvoiDiagnostic {
   message: string;
+  /** Chemins des tranches mp4, de la première à la dernière (vide sans ReplayKit). */
+  videos: string[];
+  gestes: GesteDiagnostic[];
+  debut?: number;
+  fin?: number;
 }
 
 /**
- * LE MODE DIAGNOSTIC — réservé à l'administrateur (voir
+ * LE MODE DIAGNOSTIC (iOS, administrateur) — `demarrer` arme le bouton,
+ * `arreter` le retire (et jette une session en cours). Le reste se passe au
+ * bouton : il émet `debut`, puis `envoyer` ou `jete` (voir
  * `RoomScanDiagnostic.swift` et `src/diagnostic/`).
- *
- * `demarrer` arme la surveillance (écran en boucle, gestes, bouton flottant) ;
- * `arreter` la range ; `figer` rend les dix dernières secondes. L'événement
- * `envoyer` (voir `diagnosticEvents`) part de l'appui sur le bouton visible.
- *
- * Sans module natif (Android, banc d'essai), tout répond « rien » sans lever :
- * le mode n'existe que sur iPhone.
  */
 export const Diagnostic = {
   demarrer: (): Promise<boolean> =>
@@ -594,15 +586,16 @@ export const Diagnostic = {
       ? NativeModules.RoomScanDiagnostic.arreter()
       : Promise.resolve(false),
 
-  figer: (): Promise<FigeDiagnostic> =>
-    Platform.OS === 'ios' && NativeModules.RoomScanDiagnostic?.figer
-      ? NativeModules.RoomScanDiagnostic.figer()
-      : Promise.resolve({ video: null, gestes: [] }),
+  /** Une session enregistre-t-elle ? */
+  enCours: (): Promise<boolean> =>
+    Platform.OS === 'ios' && NativeModules.RoomScanDiagnostic?.enCours
+      ? NativeModules.RoomScanDiagnostic.enCours()
+      : Promise.resolve(false),
 };
 
 /**
- * L'ÉMETTEUR DU MODE DIAGNOSTIC — son seul événement est `envoyer`
- * (voir `EnvoiDiagnostic`). Émetteur à part, comme le télémètre : un module
+ * L'ÉMETTEUR DU MODE DIAGNOSTIC — `debut` (la session démarre), `envoyer`
+ * (voir `EnvoiDiagnostic`) et `jete` (la session est abandonnée). Émetteur à part, comme le télémètre : un module
  * d'événements n'émet que pour lui-même.
  */
 export const diagnosticEvents = new NativeEventEmitter(

@@ -6,30 +6,39 @@ import React
 import UIKit
 
 /**
- LE MODE DIAGNOSTIC — les dix dernières secondes, pour corriger.
+ LE MODE DIAGNOSTIC — une session enregistrée, du premier appui au second.
 
- Relevé du patron : « un mode diagnostique […] au clic sur un bouton visible,
- les 10 dernières secondes de mes faits et gestes te seront envoyés, écran
- compris, pour corriger ». Réservé à l'administrateur (le JavaScript ne l'arme
- que si le serveur l'a confirmé, voir `src/diagnostic/`). Trois pièces :
+ Premier relevé du patron : « au clic sur un bouton visible, les 10 dernières
+ secondes de mes faits et gestes te seront envoyés, écran compris ». Second
+ relevé : « le diagnostic ne doit pas agir sur seulement 10 s ; le bouton doit
+ agir comme un bouton ON (il clignote si actif), il enregistre tout ce qui se
+ passe, et au clic de nouveau on clôt, avec toujours la possibilité de
+ rajouter une note, et envoi ». Réservé à l'administrateur (le JavaScript ne
+ l'arme que si le serveur l'a confirmé, voir `src/diagnostic/`). Trois pièces :
 
- 1. L'ÉCRAN EN BOUCLE. ReplayKit capture l'écran (micro coupé) ; on l'écrit
-    par SEGMENTS de ~3 s (AVAssetWriter, H.264, demi-résolution, ~1,2 Mbit/s)
-    et on ne garde que les cinq derniers sur disque. `figer()` assemble ceux
-    qui couvrent les dix dernières secondes en un mp4, puis la capture reprend.
-    ReplayKit refusé ou indisponible : la vidéo est `null`, le reste marche.
+ 1. L'ÉCRAN, TOUTE LA SESSION. ReplayKit capture l'écran (micro coupé) dès le
+    premier appui ; on l'écrit par TRANCHES d'une minute (AVAssetWriter, H.264,
+    demi-résolution, ~0,9 Mbit/s, soit ~7 Mo la minute) et on les garde TOUTES
+    jusqu'au second appui. Chaque tranche part au serveur dans sa propre
+    requête : aucune ne dépasse ce qu'un envoi mobile supporte. Vingt minutes
+    au plus — au-delà, la session se clôt d'elle-même et propose l'envoi.
+    ReplayKit refusé ou indisponible : pas de vidéo, le reste marche.
 
  2. LES GESTES DE PARTOUT. On échange une seule fois l'implémentation de
     `UIWindow.sendEvent(_:)` : chaque toucher est noté (début/fin/annulé, sa
     position, et l'étiquette d'accessibilité de la vue touchée). Cela couvre
     les modales et le scan RoomPlan, que rien d'autre ne voit. Le drapeau
-    `actif` est vérifié EN PREMIER : coupé, l'échange ne coûte rien.
+    `enregistre` est vérifié EN PREMIER : hors session, l'échange ne coûte rien.
 
- 3. LE BOUTON VISIBLE. Une petite fenêtre transparente posée au-dessus de
+ 3. LE BOUTON-INTERRUPTEUR. Une petite fenêtre transparente posée au-dessus de
     tout (feuilles, page Pro, scan), qui ne capte que les touchers sur son
-    bouton rond. Appui → on fige l'instant (pour que ce soit bien celui de
-    l'appui), puis une alerte « Envoyer au développeur » avec un champ libre ;
-    « Envoyer » émet l'événement `envoyer` vers le JavaScript.
+    bouton rond. Au repos : un rond rouge. Premier appui : la session démarre,
+    le bouton CLIGNOTE et porte un carré d'arrêt. Second appui : la session se
+    clôt, et une alerte propose une note, « Envoyer », « Reprendre
+    l'enregistrement » (un appui de trop ne perd rien) ou « Jeter ».
+    « Envoyer » émet l'événement `envoyer` vers le JavaScript, avec les
+    tranches de vidéo, tous les gestes, le début et la fin de la session ;
+    le démarrage émet `debut`, l'abandon `jete`.
 
  UIKit TOUJOURS SUR LE FIL PRINCIPAL ; l'écriture vidéo sur sa propre file.
  */
@@ -39,10 +48,19 @@ final class RoomScanDiagnostic: RCTEventEmitter {
   static weak var shared: RoomScanDiagnostic?
   private var hasListeners = false
 
-  /// Vérifié EN PREMIER par l'échange de `sendEvent` : coupé, rien ne coûte.
+  /// Le mode est armé (le bouton est là).
   static var actif = false
+  /// Une session enregistre — vérifié EN PREMIER par l'échange de `sendEvent`.
+  static var enregistre = false
 
-  // MARK: - Gestes (tampon circulaire 60 s)
+  /// Une tranche de vidéo par minute.
+  private static let dureeTranche: Double = 60
+  /// Une session dure vingt minutes au plus.
+  private static let dureeMaxSession: Double = 20 * 60
+  /// Les gestes d'une session, au plus (une boucle de touchers ne mange pas la mémoire).
+  private static let plafondGestes = 60_000
+
+  // MARK: - Gestes (toute la session)
 
   private struct Geste {
     let phase: String
@@ -63,22 +81,30 @@ final class RoomScanDiagnostic: RCTEventEmitter {
   private var sessionDemarree = false
   private var debutSegment: CMTime = .zero
   private var segmentCourant: URL?
-  /// Les segments finis, du plus vieux au plus récent — cinq au plus.
+  /// Les tranches finies de la session, de la plus vieille à la plus récente.
   private var segments: [URL] = []
   private var largeur = 0
   private var hauteur = 0
 
   private var boutonFenetre: UIWindow?
-  private weak var boutonVue: UIView?
+  private weak var boutonVue: UIButton?
   private var observateur: NSObjectProtocol?
 
-  /// Ce qu'un figé rend : la vidéo (ou rien) et les gestes des dix secondes.
-  private struct Fige {
-    let video: String?
+  /// Le début de la session, en ms depuis 1970 (0 : pas de session).
+  private var debutSession: Double = 0
+  /// Le temps déjà enregistré avant une reprise (s), pour la borne des vingt minutes.
+  private var dureeAvantReprise: Double = 0
+  private var repriseA: Date?
+  private var minuterie: Timer?
+
+  /// Ce qu'une session close rend : ses tranches de vidéo et ses gestes.
+  private struct Session {
+    let videos: [String]
     let gestes: [[String: Any]]
-    /// L'instant de l'appui, en ms depuis 1970 : le JavaScript y arrête la
-    /// fenêtre de ses évènements (on tape le message APRÈS l'appui).
-    let at: Double
+    /// Début et fin de la session, en ms depuis 1970 : le JavaScript y borne
+    /// le fil de ses évènements (on tape la note APRÈS la fin).
+    let debut: Double
+    let fin: Double
   }
 
   override init() {
@@ -88,45 +114,100 @@ final class RoomScanDiagnostic: RCTEventEmitter {
 
   override static func requiresMainQueueSetup() -> Bool { true }
 
-  override func supportedEvents() -> [String]! { ["envoyer"] }
+  override func supportedEvents() -> [String]! { ["envoyer", "debut", "jete"] }
   override func startObserving() { hasListeners = true }
   override func stopObserving() { hasListeners = false }
 
   // MARK: - API exposée au JavaScript
 
+  /// Arme le mode : le bouton paraît, rien n'enregistre encore.
   @objc func demarrer(_ resolve: @escaping RCTPromiseResolveBlock,
                       reject: @escaping RCTPromiseRejectBlock) {
     RoomScanDiagnostic.actif = true
     RoomScanDiagnostic.installerEchange()
     observerRetourPremierPlan()
-    demarrerCapture()
     montrerBouton()
     resolve(true)
   }
 
+  /// Désarme le mode : une session en cours est jetée, le bouton s'en va.
   @objc func arreter(_ resolve: @escaping RCTPromiseResolveBlock,
                      reject: @escaping RCTPromiseRejectBlock) {
     RoomScanDiagnostic.actif = false
-    arreterCapture()
+    DispatchQueue.main.async { self.jeterSession(emettre: false) }
     cacherBouton()
-    RoomScanDiagnostic.fileGestes.async { RoomScanDiagnostic.gestes.removeAll() }
     resolve(true)
   }
 
-  @objc func figer(_ resolve: @escaping RCTPromiseResolveBlock,
-                   reject: @escaping RCTPromiseRejectBlock) {
-    figerInterne { f in
-      resolve(["video": f.video.map { $0 as Any } ?? NSNull(), "gestes": f.gestes, "instant": f.at])
+  /// Une session enregistre-t-elle ? (pour le JavaScript et le banc)
+  @objc func enCours(_ resolve: @escaping RCTPromiseResolveBlock,
+                     reject: @escaping RCTPromiseRejectBlock) {
+    resolve(RoomScanDiagnostic.enregistre)
+  }
+
+  // MARK: - La session
+
+  /// Premier appui : on repart de rien, et tout s'enregistre.
+  private func commencerSession() {
+    nettoyerFichiers()
+    RoomScanDiagnostic.fileGestes.sync { RoomScanDiagnostic.gestes.removeAll() }
+    debutSession = Date().timeIntervalSince1970 * 1000
+    dureeAvantReprise = 0
+    reprendre()
+    if hasListeners { sendEvent(withName: "debut", body: ["debut": debutSession]) }
+  }
+
+  /// La session (re)part : capture, gestes, clignotement, minuterie des vingt minutes.
+  private func reprendre() {
+    RoomScanDiagnostic.enregistre = true
+    repriseA = Date()
+    demarrerCapture()
+    etatBouton(enregistre: true)
+    minuterie?.invalidate()
+    let reste = max(1, RoomScanDiagnostic.dureeMaxSession - dureeAvantReprise)
+    minuterie = Timer.scheduledTimer(withTimeInterval: reste, repeats: false) { [weak self] _ in
+      self?.clore(limite: true)
     }
+  }
+
+  /// Second appui (ou vingt minutes) : la session s'arrête et propose l'envoi.
+  private func clore(limite: Bool = false) {
+    guard RoomScanDiagnostic.enregistre else { return }
+    RoomScanDiagnostic.enregistre = false
+    minuterie?.invalidate()
+    minuterie = nil
+    if let r = repriseA { dureeAvantReprise += Date().timeIntervalSince(r) }
+    repriseA = nil
+    etatBouton(enregistre: false)
+    let fin = Date().timeIntervalSince1970 * 1000
+    let gestes = gestesDeLaSession()
+    let debut = debutSession
+    suspendreCapture {
+      let videos = self.segments.map { $0.path }
+      let s = Session(videos: videos, gestes: gestes, debut: debut, fin: fin)
+      DispatchQueue.main.async { self.presenterAlerte(s, limite: limite) }
+    }
+  }
+
+  /// « Jeter » : les tranches s'effacent, le JavaScript vide son fil.
+  private func jeterSession(emettre: Bool) {
+    RoomScanDiagnostic.enregistre = false
+    minuterie?.invalidate()
+    minuterie = nil
+    repriseA = nil
+    debutSession = 0
+    etatBouton(enregistre: false)
+    arreterCapture()
+    RoomScanDiagnostic.fileGestes.async { RoomScanDiagnostic.gestes.removeAll() }
+    if emettre && hasListeners { sendEvent(withName: "jete", body: [:]) }
   }
 
   // MARK: - Les gestes
 
-  private func gestesRecents() -> [[String: Any]] {
+  private func gestesDeLaSession() -> [[String: Any]] {
     var out: [[String: Any]] = []
     RoomScanDiagnostic.fileGestes.sync {
-      let depuis = Date().timeIntervalSince1970 * 1000 - 10_000
-      out = RoomScanDiagnostic.gestes.filter { $0.at >= depuis }.map { g in
+      out = RoomScanDiagnostic.gestes.map { g in
         var d: [String: Any] = ["phase": g.phase, "x": g.x, "y": g.y, "at": g.at]
         if let c = g.cible { d["cible"] = c }
         return d
@@ -148,7 +229,7 @@ final class RoomScanDiagnostic: RCTEventEmitter {
   }
 
   /// Note les touchers d'un évènement — appelé depuis l'échange, déjà protégé
-  /// par `actif`. Jamais rien de personnel : une position et une étiquette.
+  /// par `enregistre`. Jamais rien de personnel : une position et une étiquette.
   static func noter(_ event: UIEvent, fenetre: UIWindow) {
     guard event.type == .touches, let touches = event.allTouches else { return }
     let at = Date().timeIntervalSince1970 * 1000
@@ -168,8 +249,7 @@ final class RoomScanDiagnostic: RCTEventEmitter {
     guard !paquet.isEmpty else { return }
     fileGestes.async {
       gestes.append(contentsOf: paquet)
-      let limite = at - 60_000
-      gestes.removeAll { $0.at < limite }
+      if gestes.count > plafondGestes { gestes.removeFirst(gestes.count - plafondGestes) }
     }
   }
 
@@ -201,10 +281,39 @@ final class RoomScanDiagnostic: RCTEventEmitter {
     })
   }
 
+  /// Arrête la capture en GARDANT les tranches : la session se clôt, on va
+  /// les envoyer (ou reprendre). Rend la main une fois la dernière rangée.
+  private func suspendreCapture(_ completion: @escaping () -> Void) {
+    if capture {
+      capture = false
+      RPScreenRecorder.shared().stopCapture { _ in }
+    }
+    fileVideo.async {
+      self.terminerSegmentCourant {
+        completion()
+      }
+    }
+  }
+
+  /// Les tranches de la session envoyée juste avant : son envoi peut être
+  /// encore en cours quand la suivante démarre — on ne les efface qu'une
+  /// session plus tard.
+  private var anciennes: [URL] = []
+
+  /// Range les tranches de la session précédente, et efface celles d'avant.
+  private func nettoyerFichiers() {
+    fileVideo.async {
+      for u in self.anciennes { try? FileManager.default.removeItem(at: u) }
+      self.anciennes = self.segments
+      self.segments = []
+    }
+  }
+
   private func arreterCapture() {
-    guard capture else { return }
-    capture = false
-    RPScreenRecorder.shared().stopCapture { _ in }
+    if capture {
+      capture = false
+      RPScreenRecorder.shared().stopCapture { _ in }
+    }
     fileVideo.async {
       self.input?.markAsFinished()
       self.writer?.finishWriting {}
@@ -233,9 +342,9 @@ final class RoomScanDiagnostic: RCTEventEmitter {
         self.largeur = max(2, (w / 2) & ~1)
         self.hauteur = max(2, (h / 2) & ~1)
       }
-      // Rouler tous les ~3 s.
+      // Une tranche par minute.
       if self.writer != nil, self.sessionDemarree,
-        CMTimeGetSeconds(CMTimeSubtract(pts, self.debutSegment)) >= 3.0 {
+        CMTimeGetSeconds(CMTimeSubtract(pts, self.debutSegment)) >= RoomScanDiagnostic.dureeTranche {
         self.rouler()
       }
       if self.writer == nil { self.ouvrirSegment() }
@@ -261,7 +370,7 @@ final class RoomScanDiagnostic: RCTEventEmitter {
       AVVideoCodecKey: AVVideoCodecType.h264,
       AVVideoWidthKey: largeur,
       AVVideoHeightKey: hauteur,
-      AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: 1_200_000],
+      AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: 900_000],
     ]
     let inp = AVAssetWriterInput(mediaType: .video, outputSettings: reglages)
     inp.expectsMediaDataInRealTime = true
@@ -291,7 +400,6 @@ final class RoomScanDiagnostic: RCTEventEmitter {
       self.fileVideo.async {
         if w.status == .completed {
           self.segments.append(url)
-          self.elaguerSegments()
         } else {
           try? FileManager.default.removeItem(at: url)
         }
@@ -299,39 +407,8 @@ final class RoomScanDiagnostic: RCTEventEmitter {
     }
   }
 
-  /// On ne garde que les cinq derniers segments (~15 s) ; les plus vieux partent.
-  private func elaguerSegments() {
-    while segments.count > 5 {
-      let vieux = segments.removeFirst()
-      try? FileManager.default.removeItem(at: vieux)
-    }
-  }
-
-  // MARK: - Figer
-
-  private func figerInterne(_ completion: @escaping (Fige) -> Void) {
-    let gestes = gestesRecents()
-    let at = Date().timeIntervalSince1970 * 1000
-    guard capture else {
-      completion(Fige(video: nil, gestes: gestes, at: at))
-      return
-    }
-    fileVideo.async {
-      self.terminerSegmentCourant {
-        let liste = self.segments
-        guard !liste.isEmpty else {
-          completion(Fige(video: nil, gestes: gestes, at: at))
-          return
-        }
-        self.assembler(liste) { url in
-          completion(Fige(video: url?.path, gestes: gestes, at: at))
-        }
-      }
-    }
-  }
-
-  /// Comme `rouler`, mais rend la main une fois le segment rangé : `figer` doit
-  /// pouvoir assembler ce qui vient d'être écrit. À appeler sur `fileVideo`.
+  /// Comme `rouler`, mais rend la main une fois la tranche rangée : la session
+  /// close doit pouvoir envoyer ce qui vient d'être écrit. À appeler sur `fileVideo`.
   private func terminerSegmentCourant(_ completion: @escaping () -> Void) {
     guard let w = writer, let inp = input, sessionDemarree, let url = segmentCourant else {
       completion()
@@ -346,60 +423,11 @@ final class RoomScanDiagnostic: RCTEventEmitter {
       self.fileVideo.async {
         if w.status == .completed {
           self.segments.append(url)
-          self.elaguerSegments()
         } else {
           try? FileManager.default.removeItem(at: url)
         }
         completion()
       }
-    }
-  }
-
-  /// Assemble les segments et ne garde que les ~10 dernières secondes (mp4,
-  /// copie directe des pistes). À appeler sur `fileVideo`.
-  private func assembler(_ liste: [URL], _ completion: @escaping (URL?) -> Void) {
-    let compo = AVMutableComposition()
-    guard
-      let piste = compo.addMutableTrack(
-        withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)
-    else {
-      completion(nil)
-      return
-    }
-    var curseur = CMTime.zero
-    for u in liste {
-      let asset = AVURLAsset(url: u)
-      guard let vp = asset.tracks(withMediaType: .video).first else { continue }
-      let plage = CMTimeRange(start: .zero, duration: asset.duration)
-      do {
-        try piste.insertTimeRange(plage, of: vp, at: curseur)
-        piste.preferredTransform = vp.preferredTransform
-        curseur = CMTimeAdd(curseur, asset.duration)
-      } catch {
-        // Un segment illisible ne doit pas emporter tout l'assemblage.
-      }
-    }
-    guard curseur > .zero else {
-      completion(nil)
-      return
-    }
-    let dix = CMTime(seconds: 10, preferredTimescale: 600)
-    if curseur > dix {
-      compo.removeTimeRange(CMTimeRange(start: .zero, duration: CMTimeSubtract(curseur, dix)))
-    }
-    let sortie = FileManager.default.temporaryDirectory
-      .appendingPathComponent("echoplan-diagnostic-\(UUID().uuidString).mp4")
-    try? FileManager.default.removeItem(at: sortie)
-    guard
-      let export = AVAssetExportSession(asset: compo, presetName: AVAssetExportPresetPassthrough)
-    else {
-      completion(nil)
-      return
-    }
-    export.outputURL = sortie
-    export.outputFileType = .mp4
-    export.exportAsynchronously {
-      completion(export.status == .completed ? sortie : nil)
     }
   }
 
@@ -430,7 +458,7 @@ final class RoomScanDiagnostic: RCTEventEmitter {
       let image =
         UIImage(systemName: "ladybug.fill") ?? UIImage(systemName: "exclamationmark.bubble.fill")
       bouton.setImage(image, for: .normal)
-      bouton.accessibilityLabel = "Diagnostic : envoyer au développeur"
+      bouton.accessibilityLabel = "Diagnostic : démarrer l’enregistrement"
       bouton.addTarget(self, action: #selector(self.appuiBouton), for: .touchUpInside)
       let pan = UIPanGestureRecognizer(target: self, action: #selector(self.glisser(_:)))
       bouton.addGestureRecognizer(pan)
@@ -440,6 +468,36 @@ final class RoomScanDiagnostic: RCTEventEmitter {
       self.boutonVue = bouton
       self.boutonFenetre = f
       f.isHidden = false
+      // Revenu au premier plan en pleine session : il reclignote.
+      if RoomScanDiagnostic.enregistre { self.etatBouton(enregistre: true) }
+    }
+  }
+
+  /// AU REPOS, un rond rouge ; EN SESSION, il clignote et porte un carré d'arrêt.
+  private func etatBouton(enregistre: Bool) {
+    DispatchQueue.main.async {
+      guard let b = self.boutonVue else { return }
+      b.layer.removeAnimation(forKey: "clignote")
+      b.alpha = 1
+      if enregistre {
+        b.setImage(UIImage(systemName: "stop.fill"), for: .normal)
+        b.accessibilityLabel = "Diagnostic : arrêter l’enregistrement"
+        b.layer.borderWidth = 3
+        b.layer.borderColor = UIColor.white.cgColor
+        let a = CABasicAnimation(keyPath: "opacity")
+        a.fromValue = 1
+        a.toValue = 0.3
+        a.duration = 0.6
+        a.autoreverses = true
+        a.repeatCount = .infinity
+        b.layer.add(a, forKey: "clignote")
+      } else {
+        b.setImage(
+          UIImage(systemName: "ladybug.fill") ?? UIImage(systemName: "exclamationmark.bubble.fill"),
+          for: .normal)
+        b.accessibilityLabel = "Diagnostic : démarrer l’enregistrement"
+        b.layer.borderWidth = 0
+      }
     }
   }
 
@@ -459,36 +517,60 @@ final class RoomScanDiagnostic: RCTEventEmitter {
   }
 
   @objc private func appuiBouton() {
-    // Figer D'ABORD : l'instant envoyé doit être celui de l'appui.
-    figerInterne { f in
-      DispatchQueue.main.async { self.presenterAlerte(f) }
+    if RoomScanDiagnostic.enregistre {
+      clore()
+    } else {
+      commencerSession()
     }
   }
 
-  private func presenterAlerte(_ f: Fige) {
+  /// La durée lisible d'une session : « 3 min 12 s », « 45 s ».
+  private func dureeLisible(_ s: Session) -> String {
+    let total = Int(max(0, (s.fin - s.debut) / 1000).rounded())
+    let m = total / 60
+    let r = total % 60
+    return m > 0 ? "\(m) min \(r) s" : "\(r) s"
+  }
+
+  private func presenterAlerte(_ s: Session, limite: Bool) {
     let a = UIAlertController(
-      title: "Envoyer au développeur",
-      message: "Les 10 dernières secondes de votre écran et de vos gestes seront envoyées.",
+      title: limite ? "Vingt minutes enregistrées" : "Enregistrement terminé",
+      message:
+        "\(dureeLisible(s)) d’écran, tous vos gestes et le journal de l’app seront envoyés. Décrivez le problème :",
       preferredStyle: .alert)
-    a.addTextField { tf in tf.placeholder = "Ce qui s’est passé (facultatif)" }
-    a.addAction(UIAlertAction(title: "Annuler", style: .cancel))
+    a.addTextField { tf in
+      tf.placeholder = "Ce qui ne va pas (facultatif)"
+      tf.autocapitalizationType = .sentences
+    }
     a.addAction(
       UIAlertAction(title: "Envoyer", style: .default) { [weak self, weak a] _ in
         let message = a?.textFields?.first?.text ?? ""
-        self?.emettreEnvoi(message: message, fige: f)
+        self?.emettreEnvoi(message: message, session: s)
+      })
+    if !limite {
+      // Un second appui par mégarde ne perd rien : la session continue.
+      a.addAction(
+        UIAlertAction(title: "Reprendre l’enregistrement", style: .default) { [weak self] _ in
+          self?.reprendre()
+        })
+    }
+    a.addAction(
+      UIAlertAction(title: "Jeter", style: .destructive) { [weak self] _ in
+        self?.jeterSession(emettre: true)
       })
     sommetPrincipal()?.present(a, animated: true)
   }
 
-  private func emettreEnvoi(message: String, fige: Fige) {
+  private func emettreEnvoi(message: String, session: Session) {
     guard hasListeners else { return }
     sendEvent(
       withName: "envoyer",
       body: [
         "message": message,
-        "video": fige.video.map { $0 as Any } ?? NSNull(),
-        "gestes": fige.gestes,
-        "instant": fige.at,
+        "videos": session.videos,
+        "gestes": session.gestes,
+        "debut": session.debut,
+        "fin": session.fin,
       ])
   }
 
@@ -513,8 +595,14 @@ final class RoomScanDiagnostic: RCTEventEmitter {
       forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
     ) { [weak self] _ in
       guard let self, RoomScanDiagnostic.actif else { return }
-      // ReplayKit coupe la capture en arrière-plan : on la relance au retour.
-      self.demarrerCapture()
+      // ReplayKit coupe la capture en arrière-plan : on la relance au retour,
+      // en pleine session seulement (une nouvelle tranche commence). Le
+      // drapeau `capture` est resté levé : on le baisse si ReplayKit ne
+      // capture plus, sans quoi la relance ne partirait jamais.
+      if RoomScanDiagnostic.enregistre {
+        if !RPScreenRecorder.shared().isRecording { self.capture = false }
+        self.demarrerCapture()
+      }
       if self.boutonFenetre == nil { self.montrerBouton() }
     }
   }
@@ -540,7 +628,7 @@ extension UIWindow {
   /// appel-ci rejoint l'original. On délègue d'abord, on note ensuite.
   @objc fileprivate func rsd_sendEvent(_ event: UIEvent) {
     self.rsd_sendEvent(event)
-    guard RoomScanDiagnostic.actif else { return }
+    guard RoomScanDiagnostic.enregistre else { return }
     RoomScanDiagnostic.noter(event, fenetre: self)
   }
 }

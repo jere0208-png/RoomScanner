@@ -14459,33 +14459,42 @@ VoiceOver), Sven (ancien relecteur App Review), Nadia (métreuse) et Lucas
 
 ## Le mode diagnostic, réservé à l'administrateur
 
-Demande du patron : « au clic sur un bouton visible, les 10 dernières
-secondes de mes faits et gestes te seront envoyés, y compris pendant un scan
-avec l'enregistrement de mon écran », avec un message en plus.
+Première demande du patron : « au clic sur un bouton visible, les 10
+dernières secondes de mes faits et gestes te seront envoyés, y compris pendant
+un scan avec l'enregistrement de mon écran ». Seconde : « le bouton doit agir
+comme un bouton ON (il clignote si actif), il enregistre tout ce qui se passe,
+et au clic de nouveau on clôt, avec une note, et envoi ».
 - **Qui y a droit** : le serveur, et lui seul, compare l'e-mail du compte à
   `ADMIN_EMAILS`, dans sa configuration. Aucune adresse n'est écrite dans
   l'app, dont le dépôt est public.
   - L'app reçoit `admin` dans `connecter` et `etat`.
   - Le serveur revérifie à chaque envoi.
 - **Le réglage** : Profil, section « Administrateur », « Mode diagnostic ».
-- **Ce qui est gardé** (natif, `RoomScanDiagnostic.swift`) :
-  - l'écran, en boucle : ReplayKit, segments de 3 s, demi-résolution, les
-    cinq derniers seulement ;
-  - chaque toucher, avec l'étiquette de la vue touchée, par un échange de
-    `UIWindow.sendEvent`. Il couvre les modales et le scan.
-
-  Côté JS (`src/diagnostic/`) : l'écran courant, les changements du plan,
-  les alertes, les astuces, `console.warn` et `console.error`, les erreurs
-  globales. Jetons et e-mails sont masqués.
-- **Le bouton** : un rond rouge déplaçable, posé dans une fenêtre au-dessus
-  de tout.
-  - L'appui fige l'instant, puis propose un message.
-  - « Envoyer » expédie les 10 dernières secondes : la vidéo, les gestes,
-    le journal, puis un instantané (appareil, version, plan complet).
+  Il pose le bouton ; rien n'enregistre avant le premier appui.
+- **Le bouton-interrupteur** : un rond rouge déplaçable, posé dans une fenêtre
+  au-dessus de tout (feuilles, page Pro, scan).
+  - Premier appui : la session démarre, le bouton clignote et porte un carré
+    d'arrêt.
+  - Second appui : la session se clôt ; une note, puis « Envoyer »,
+    « Reprendre l'enregistrement » ou « Jeter ».
+  - Vingt minutes au plus : la session se clôt d'elle-même et propose l'envoi.
+- **Ce qui est gardé, toute la session** :
+  - natif (`RoomScanDiagnostic.swift`) : l'écran (ReplayKit, tranches d'une
+    minute, demi-résolution, ~0,9 Mbit/s, soit ~7 Mo la minute) et chaque
+    toucher, avec l'étiquette de la vue touchée, par un échange de
+    `UIWindow.sendEvent` (il couvre les modales et le scan) ;
+  - JS (`src/diagnostic/`) : l'écran courant, les changements du plan, les
+    alertes, les astuces, `console.warn` et `console.error`, les erreurs
+    globales, et le plan complet au premier appui et au second. Jetons et
+    e-mails sont masqués.
 - **Le trajet** :
-  - `api.php`, action `diagnostic`, range le rapport dans un dépôt GitHub
-    privé (`DIAG_GITHUB_DEPOT`, `DIAG_GITHUB_JETON`) ;
-  - à défaut, dans `server/diagnostics/`, fermé par `.htaccess` ;
+  - `api.php`, action `diagnostic` : le journal, la note et la première minute ;
+    le serveur rend le dossier du rapport ;
+  - action `diagnostic-video` : chaque minute suivante, déposée dans ce
+    dossier (`ecran-2.mp4`, …) — aucune requête ne dépasse 25 Mo ;
+  - le rapport va dans un dépôt GitHub privé (`DIAG_GITHUB_DEPOT`,
+    `DIAG_GITHUB_JETON`), à défaut dans `server/diagnostics/`, fermé par
+    `.htaccess` ;
   - en cas d'échec réseau, l'app propose de partager le fichier.
 
 ## Huit découvreurs : épurer, rendre cohérent, partager

@@ -2,10 +2,11 @@
  * LE CHEF D'ORCHESTRE DU MODE DIAGNOSTIC — un seul endroit pour tout allumer
  * et tout éteindre, pour qu'App n'ait pas à connaître les trois morceaux.
  *
- * Allumé : le natif arme l'écran en boucle, les gestes et le bouton flottant
- * (`Diagnostic.demarrer`), les capteurs remplissent le journal, et l'écoute de
- * l'événement `envoyer` est posée. Éteint : tout se défait, et le journal se
- * vide — rien ne traîne entre deux sessions.
+ * Allumé : le natif pose le bouton-interrupteur (`Diagnostic.demarrer`), les
+ * capteurs remplissent le journal, et l'écoute du bouton est posée (`debut`,
+ * `envoyer`, `jete`). C'est le bouton qui démarre et clôt chaque session.
+ * Éteint : tout se défait (une session en cours est jetée), et le journal se
+ * vide — rien ne traîne.
  *
  * IDEMPOTENT : App peut appeler `activer` à chaque rendu sans rien doubler.
  */
