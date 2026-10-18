@@ -409,8 +409,10 @@ const styles = getStyles(c);
   );
   const existant = useScanStore((s) => s.existant);
   const north = useScanStore((s) => s.north);
-  const client = useScanStore((s) => s.client);
-  const address = useScanStore((s) => s.address);
+  // Un plan ancien ou un relevé neuf peuvent ne pas porter de client :
+  // l'export plantait sur `client.trim()` (diagnostic du patron).
+  const client = useScanStore((s) => s.client) ?? '';
+  const address = useScanStore((s) => s.address) ?? '';
   const setClientInfo = useScanStore((s) => s.setClientInfo);
   const [prompt, setPrompt] = useState<PromptData | null>(null);
   /**
@@ -660,11 +662,11 @@ const styles = getStyles(c);
     setPrompt({
       title: 'Nom du client',
       subtitle: 'Il paraît dans le cartouche de chaque feuille.',
-      value: useScanStore.getState().client,
+      value: useScanStore.getState().client ?? '',
       okLabel: 'Enregistrer',
       onSubmit: (nom: string) => {
         if (!nom.trim()) return;
-        const adresse = useScanStore.getState().address;
+        const adresse = useScanStore.getState().address ?? '';
         setClientInfo(nom, adresse);
         if (adresse.trim()) {
           setRelancerExport(true);
@@ -678,7 +680,7 @@ const styles = getStyles(c);
           value: '',
           okLabel: 'Exporter',
           onSubmit: (a: string) => {
-            setClientInfo(useScanStore.getState().client, a);
+            setClientInfo(useScanStore.getState().client ?? '', a);
             setRelancerExport(true);
           },
         });

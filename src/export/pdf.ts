@@ -2642,6 +2642,7 @@ function planPage(
         undefined,
         0.02,
         facesDesMurs(walls),
+        partOf.get(roomOf(ob))?.surface?.pts,
       );
       const cosY = Math.cos(o.yaw);
       const sinY = Math.sin(o.yaw);

@@ -403,7 +403,7 @@ function footprintOf(
   if (deja && deja.partOf === partOf && deja.faces === faces) return deja.f;
   const part = partOf.get(roomOf(o));
   const f = part
-    ? clampFootprint(toFootprint(o), part.walls, part.labelAt, undefined, undefined, faces)
+    ? clampFootprint(toFootprint(o), part.walls, part.labelAt, undefined, undefined, faces, part.surface?.pts)
     : toFootprint(o);
   EMPRISES.set(o, { partOf, faces, f });
   return f;

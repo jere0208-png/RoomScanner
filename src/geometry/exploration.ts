@@ -232,6 +232,7 @@ export function obstaclesDeLaVisite(
     buterait dans l'air à côté d'un meuble, ou l'on y entrerait d'une main.
   */
   const interieurDe = new Map(parts.map((p) => [p.roomId, p.labelAt]));
+  const contourDe = new Map(parts.map((p) => [p.roomId, p.surface?.pts]));
   const repli =
     walls.length > 0
       ? {
@@ -245,6 +246,10 @@ export function obstaclesDeLaVisite(
       toFootprint(o),
       walls,
       interieurDe.get(roomOf(o)) ?? repli,
+      undefined,
+      undefined,
+      undefined,
+      contourDe.get(roomOf(o)),
     );
     if (!fini(f.cx) || !fini(f.cz) || !fini(f.width) || !fini(f.depth)) continue;
     if (f.height < HAUTEUR_FRANCHISSABLE) continue;

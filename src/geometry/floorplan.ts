@@ -2859,6 +2859,12 @@ export function clampFootprint(
    * refend qu'elle partage avec sa voisine paraît relevé d'un seul côté.
    */
   faces: Map<string, DemiFaces> = facesDesMurs(walls),
+  /**
+   * LE CONTOUR DE SA PIÈCE : un meuble dont le centre y est garde son côté
+   * de chaque mur (voir plus bas). Sans lui, le côté se lit au point
+   * `interior`, comme avant.
+   */
+  contour?: Pt[],
 ): ObjectFootprint {
   /*
     UN ESCALIER ENJAMBE SES MURS — revue « Nadia » : l'escalier droit qui
@@ -2878,6 +2884,7 @@ export function clampFootprint(
     partait dehors.
   */
   const pousses: Poussee[] = [];
+  const centreDansSaPiece = !!contour && contour.length >= 3 && insidePoly({ x: f.cx, z: f.cz }, contour);
   const cos = Math.cos(f.yaw);
   const sin = Math.sin(f.yaw);
   const localCorners: [number, number][] = [
@@ -2902,13 +2909,33 @@ export function clampFootprint(
       ),
     ];
     if (Math.max(...ts) < -0.1 || Math.min(...ts) > 1.1) continue;
+    /*
+      UN MEUBLE QUI NE FAIT QUE TOUCHER LE BOUT D'UN MUR N'EST PAS CONTRE
+      LUI — diagnostic du patron, sa cuisine : l'élément haut posé contre le
+      mur du fond, sur toute la largeur entre deux retours, touchait le bout
+      de l'un d'eux ; ce retour le repoussait de 35 cm hors de sa place. Le
+      meuble doit longer le mur sur trois centimètres au moins.
+    */
+    const corners = ts.slice(1).map((t) => t * len);
+    if (Math.min(len, Math.max(...corners)) - Math.max(0, Math.min(...corners)) < 0.03) continue;
     const nx = -dz / len;
     const nz = dx / len;
     // Le meuble est ramené du côté de SA pièce, pas du côté où RoomPlan a
     // cru voir son centre : une télé posée à plat contre un mur ressort
     // volontiers à cheval dessus, et se voyait alors depuis l'autre pièce.
+    /*
+      MAIS UN MEUBLE BIEN D'UN CÔTÉ Y RESTE — même diagnostic : le frigo
+      encastré dans son recoin en placo était, vu du centre de la pièce,
+      « derrière » la cloison du recoin, et il en était chassé de 77 cm.
+      Un meuble dont le centre est DANS sa pièce, à plus de 10 cm du trait,
+      reste de son côté ; le centre de la pièce ne départage que celui qui
+      est à cheval sur le mur, ou qui en déborde.
+    */
+    const dCentre = (cx - w.a.x) * nx + (cz - w.a.z) * nz;
     const side =
-      Math.sign((interior.x - w.a.x) * nx + (interior.z - w.a.z) * nz) || 1;
+      centreDansSaPiece && Math.abs(dCentre) >= 0.1
+        ? Math.sign(dCentre)
+        : Math.sign((interior.x - w.a.x) * nx + (interior.z - w.a.z) * nz) || 1;
     let minCorner = Infinity;
     for (const [lx, lz] of localCorners) {
       const px = cx + lx * cos - lz * sin;
@@ -2925,6 +2952,14 @@ export function clampFootprint(
     */
     const fw = faces.get(w.id);
     if (fw && Math.abs(fw.plus - fw.moins) > 1e-9) demi = (side > 0 ? fw.plus : fw.moins) > 1e-9 ? 2 * demi : 0;
+    /*
+      ET L'ÉPAISSEUR DEVINÉE NE CHASSE PAS UN MEUBLE QUE LE SCAN A VU LÀ —
+      la cloison du recoin, relevée de la cuisine seulement, prenait ses
+      14 cm « de référence » DANS le recoin : il ne restait que 56 cm pour
+      un frigo de 66 que RoomPlan avait vu entrer. Du côté qu'on n'a pas
+      vu, un mur sans épaisseur mesurée ne repousse qu'à son trait.
+    */
+    if (fw && estAUneFace(w) && w.epaisseur === undefined && (side > 0 ? fw.plus : fw.moins) > 1e-9) demi = 0;
     const need = demi + margin - minCorner;
     // On accepte de déplacer jusqu'à la profondeur du meuble : de quoi
     // dégager une télé ou une étagère entièrement enfoncée dans la cloison.

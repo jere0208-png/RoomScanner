@@ -162,6 +162,24 @@ describe('l’écran d’export', () => {
     expect(38 + h.left + h.right).toBeGreaterThanOrEqual(44);
   });
 
+  /*
+    DIAGNOSTIC DU PATRON — trois plantages à l'export : « Cannot read
+    property 'trim' of undefined ». Le relevé neuf laissait le client
+    absent, et l'export le lisait comme du texte.
+  */
+  it('exporte sans planter quand le plan ne porte ni client ni adresse', () => {
+    const t = monter();
+    act(() => useScanStore.setState({ client: undefined, address: undefined } as never));
+    const exporter = t.root
+      .findAll(estUneTouche)
+      .find((n) => /PDF/.test(String(n.props.accessibilityLabel ?? '')) && n.props.onPress && n.props.accessibilityState)!;
+    expect(() => act(() => exporter.props.onPress())).not.toThrow();
+    // Et un relevé neuf repart d'un client vide, pas absent.
+    act(() => useScanStore.getState().reset());
+    expect(useScanStore.getState().client).toBe('');
+    expect(useScanStore.getState().address).toBe('');
+  });
+
   it('le bouton d’export et les champs « Renseigner » ont leur rôle', () => {
     const t = monter();
     const touches = t.root.findAll(estUneTouche);

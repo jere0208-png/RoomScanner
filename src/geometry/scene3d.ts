@@ -2016,6 +2016,7 @@ export function buildScene(
   // suffit, deux pièces mitoyennes n'y forment pas d'onglet commun.
   const quads = wallQuads(walls);
   const interiorOf = new Map(parts.map((p) => [p.roomId, p.labelAt]));
+  const contourOf = new Map(parts.map((p) => [p.roomId, p.surface?.pts]));
   const wallsOf = new Map(parts.map((p) => [p.roomId, p.walls]));
   const fallbackInterior = wallsCentroid(walls);
   const floorY =
@@ -3772,6 +3773,10 @@ export function buildScene(
       toFootprint(source),
       walls,
       interiorOf.get(roomOf(source)) ?? fallbackInterior,
+      undefined,
+      undefined,
+      undefined,
+      contourOf.get(roomOf(source)),
     );
     const cosY = Math.cos(obj.yaw);
     const sinY = Math.sin(obj.yaw);

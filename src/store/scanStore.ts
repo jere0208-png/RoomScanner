@@ -7564,7 +7564,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     },
 
     setClientInfo: (client, address) => {
-      set({ client: client.trim(), address: address.trim(), dirty: true });
+      set({ client: (client ?? '').trim(), address: (address ?? '').trim(), dirty: true });
     },
 
     renameSave: (id, name) => {
@@ -12157,8 +12157,10 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
           piège : il le désarme à l'abandon et à l'échec du post-traitement,
           mais pas quand on repart d'un relevé neuf.
         */
-        client: undefined,
-        address: undefined,
+        // Vides, pas absents : l'export les lit comme du texte (diagnostic
+        // du patron : « Cannot read property 'trim' of undefined »).
+        client: '',
+        address: '',
         niveauCourant: 0,
         etageEnCours: null,
         panne: null,
