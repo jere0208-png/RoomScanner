@@ -4,7 +4,7 @@ import type { Mesure } from '../geometry/regle';
 import { photosDesMurs } from '../geometry/photosAuto';
 import { trajetDe } from '../geometry/traversee';
 import { create } from 'zustand';
-import { HEIGHT_RULES, estCuisine, heightRuleAt, worktopsOnWall } from '../geometry/nfc15100';
+import { HEIGHT_RULES, estCuisine, fixturePlacement, heightRuleAt, roomInputsOf, worktopsOnWall } from '../geometry/nfc15100';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pasDeGeste } from './geste';
 import { catalogueDesPlans, deposerPlan, reprendrePlan, type Identite, retirerPlan } from '../net/coffrePlans';
@@ -1562,6 +1562,22 @@ function sansLiensMorts(
   };
 }
 
+/** Le chiffrage d'un plan, sans le numéro donné au devis envoyé. */
+function sansNumero<D extends { numero?: string }>(devis: D | undefined): D | undefined {
+  if (!devis?.numero) return devis;
+  const reste = { ...devis };
+  delete reste.numero;
+  return reste;
+}
+
+/**
+ * LA PIÈCE OÙ DONNE CHAQUE APPAREIL — par sa face, pas par son mur : un refend
+ * porte les prises des DEUX pièces qu'il sépare (voir `fixturePlacement`).
+ */
+function pieceDesAppareils(st: { fixtures: Fixture[]; walls: WallSeg[]; rooms: RoomEntry[] }): Map<string, string> {
+  return fixturePlacement(st.fixtures, st.walls, roomInputsOf(st.rooms, roomParts(st.walls, st.rooms)));
+}
+
 const STORAGE_KEY = 'roomscanner.saves.v1';
 /** L'ordre des scans. Le contenu, lui, vit une clé par scan. */
 const INDEX_KEY = 'roomscanner.index.v2';
@@ -2527,6 +2543,13 @@ interface Snapshot {
   notes: PlanNote[];
   mesures: Mesure[];
   /**
+   * LE TABLEAU RELEVÉ AUSSI — agent testeur ÉLECTRICITÉ : « Vider le
+   * tableau » promettait que « Annuler » du plan le rendait ; l'instantané ne
+   * le portait pas, et un quart d'heure de relevé des départs partait pour
+   * de bon. Absent d'un instantané : on n'y touche pas.
+   */
+  existant?: TableauExistant | null;
+  /**
    * La clé du geste qui a mené à l'état SUIVANT (celle de `pushHistory`) :
    * « Annuler » dit ce qu'il défait, « Refaire » ce qu'il rétablit (voir
    * `store/libelleDuGeste`). Elle ne part jamais dans l'état du magasin.
@@ -3287,6 +3310,11 @@ export interface ScanState {
   lierPlafond: (id: string, voisin: string) => void;
   delierPlafond: (id: string) => void;
   removeFixture: (id: string) => void;
+  /**
+   * Retire d'un geste l'appareillage d'une pièce — ses appareils muraux (ceux
+   * qui donnent dans la pièce) et son plafond. Rend le nombre d'éléments retirés.
+   */
+  viderAppareillage: (roomId: string) => number;
   /**
    * Annule la dernière retouche. Vide = plus rien à annuler. La clé du
    * geste défait se lit ensuite par `cleDuDernierRetour`.
@@ -4069,6 +4097,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       ceiling: st.ceiling,
       notes: st.notes,
       mesures: st.mesures,
+      existant: st.existant,
       cle: key,
     });
     if (history.length > HISTORY_MAX) {
@@ -5834,6 +5863,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
           : st.walls.filter((w) => roomOf(w) === roomId).map((w) => w.id),
       );
       const walls = st.walls.filter((w) => !doomed.has(w.id));
+      const dansLaPiece = pieceDesAppareils(st);
       set({
         rooms,
         walls,
@@ -5844,8 +5874,14 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         }),
         objects: st.objects.filter((o) => roomOf(o) !== roomId),
         // Les appareils des murs partis, ET les liens qui les visaient.
+        /*
+          ET CEUX DE LA PIÈCE SUR LES MURS QUI RESTENT — agent testeur
+          ÉLECTRICITÉ : un refend survit à la pièce retirée (la voisine s'y
+          appuie), et les prises de SA face restaient au plan, tournées vers
+          le vide — « hors pièce », comptées au devis et aux circuits.
+        */
         ...sansLiensMorts(
-          st.fixtures.filter((f) => !doomed.has(f.wallId)),
+          st.fixtures.filter((f) => !doomed.has(f.wallId) && dansLaPiece.get(f.id) !== roomId),
           // Le plafond d'une pièce détruite n'a plus rien à éclairer —
           // il restait pourtant dessiné au-dessus du vide, et compté au
           // métré comme aux circuits.
@@ -6258,24 +6294,54 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
           niveau: st.niveauCourant,
         }));
 
-      const appareils = st.fixtures
-        .filter((f) => parMur.has(f.wallId))
-        .map((f, i) => ({
-          ...f,
-          id: `fx-${cle}-${i}`,
-          wallId: parMur.get(f.wallId)!,
-          // Les liens vers une commande resteraient pendus vers l'original.
-          commandes: undefined,
-          group: undefined,
-        }));
+      /*
+        L'APPAREILLAGE DE LA PIÈCE, ET SON CÂBLAGE — agent testeur ÉLECTRICITÉ :
+          — seulement ce qui DONNE dans la pièce : un refend porte aussi les
+            prises de la voisine, et la copie de l'entrée emportait quatre
+            appareils du séjour et de la chambre ;
+          — les liens se recâblent entre copies : l'applique copiée restait
+            commandée par l'interrupteur de l'ORIGINALE (la clé effacée,
+            `commandes`, n'existait pas), et les plafonniers copiés aussi ;
+          — les plaques et les lignes de spots ont leurs identifiants à elles :
+            les spots copiés rejoignaient la ligne de l'originale, et la
+            déplacer emmenait les deux pièces ;
+          — le tracé d'un ruban LED suit son ancre.
+      */
+      const piece = pieceDesAppareils(st);
+      const sources = st.fixtures.filter((f) => parMur.has(f.wallId) && (piece.get(f.id) ?? roomId) === roomId);
+      const idAppareil = new Map(sources.map((f, i) => [f.id, `fx-${cle}-${i}`]));
+      const recable = (commands?: string[]) => {
+        const neufs = (commands ?? []).map((c) => idAppareil.get(c)).filter((c): c is string => !!c);
+        return neufs.length > 0 ? neufs : undefined;
+      };
+      const groupes = new Map<string, string>();
+      const groupeNeuf = (g?: string) => {
+        if (!g) return undefined;
+        if (!groupes.has(g)) groupes.set(g, `grp-${cle}-${groupes.size}`);
+        return groupes.get(g);
+      };
+      const appareils = sources.map((f) => ({
+        ...f,
+        id: idAppareil.get(f.id)!,
+        wallId: parMur.get(f.wallId)!,
+        commands: recable(f.commands),
+        group: groupeNeuf(f.group),
+      }));
 
+      const lignes = new Map<string, string>();
+      const ligneNeuve = (r?: string) => {
+        if (!r) return undefined;
+        if (!lignes.has(r)) lignes.set(r, `row-${cle}-${lignes.size}`);
+        return lignes.get(r);
+      };
       const plafond = st.ceiling
         .filter((c) => c.roomId === roomId)
         .map((c, i) => ({
-          ...c,
+          ...avecSaTrace(c, (p) => ({ x: p.x + dx, z: p.z + dz })),
           id: `pl-${cle}-${i}`,
           roomId: neufId,
-          at: c.at ? { x: c.at.x + dx, z: c.at.z + dz } : c.at,
+          commands: recable(c.commands),
+          row: ligneNeuve(c.row),
         }));
 
       const meubles = st.objects
@@ -7726,6 +7792,8 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         // reprend ce qui l'a été — pas les modifications en attente.
         supprimeLe: undefined,
         retouche: undefined,
+        // Une variante a son propre devis, donc son propre numéro (voir `saveAsCopy`).
+        devis: sansNumero(source.devis),
       };
       const i = st.saves.findIndex((x) => x.id === id);
       const saves = [...st.saves];
@@ -8097,8 +8165,22 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     },
 
     removeCeiling: (id) => {
+      const parti = get().ceiling.find((c) => c.id === id);
+      if (!parti) return;
       pushHistory('removeCeiling');
-      set({ ceiling: get().ceiling.filter((c) => c.id !== id), dirty: true });
+      /*
+        UN SPOT SEUL N'EST PAS UNE LIGNE — agent testeur ÉLECTRICITÉ : retirer
+        l'un des deux spots d'une ligne laissait l'autre dans une « ligne »
+        d'un seul, ponté vers personne. Même règle que `delierPlafond`.
+      */
+      const restants = parti.row ? get().ceiling.filter((c) => c.row === parti.row && c.id !== id) : [];
+      const aDefaire = !!parti.row && restants.length <= 1;
+      set({
+        ceiling: get()
+          .ceiling.filter((c) => c.id !== id)
+          .map((c) => (aDefaire && c.row === parti.row ? { ...c, row: undefined, axe: undefined } : c)),
+        dirty: true,
+      });
     },
 
     toggleCeilingCommand: (ceilingId, fixtureId) => {
@@ -8161,8 +8243,22 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         : [null, null];
       // Ni l'un ni l'autre n'allume : deux prises, deux points, un fantôme.
       if (!commande || !cible || !sAllume(cible)) return false;
-      if (plafond(cible)) get().toggleCeilingCommand(cible, commande);
-      else get().toggleFixtureCommand(cible, commande);
+      const point = plafond(cible);
+      if (point) {
+        /*
+          TOUTE LA LIGNE, COMME DANS L'AUTRE SENS — agent testeur ÉLECTRICITÉ :
+          partir du spot reliait la ligne entière (« toute la ligne d'un coup,
+          ou le point seul : même geste »), partir de l'interrupteur ne
+          reliait que le spot touché ; les trois autres restaient « sans
+          commande » au contrôle. Les spots d'une ligne prennent tous l'état
+          que prend le spot touché.
+        */
+        const relie = !(point.commands ?? []).includes(commande);
+        const ligne = point.row ? st.ceiling.filter((c) => c.row === point.row) : [point];
+        for (const c of ligne) {
+          if ((c.commands ?? []).includes(commande) !== relie) get().toggleCeilingCommand(c.id, commande);
+        }
+      } else get().toggleFixtureCommand(cible, commande);
       return true;
     },
 
@@ -8236,25 +8332,54 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     },
 
     flipFixture: (id) => {
-      pushHistory(`flip:${id}`);
+      const f0 = get().fixtures.find((f) => f.id === id);
+      if (!f0) return;
+      /*
+        UNE PLAQUE CHANGE DE FACE D'UN BLOC — agent testeur ÉLECTRICITÉ :
+        « Autre face » sur une prise d'un double passait ce seul poste de
+        l'autre côté du mur ; la plaque restait « commune » à deux faces, et
+        le déplacement suivant (qui ne prend que la face) cassait l'entraxe.
+        Comme pour `moveFixture`, l'ensemble bouge entier.
+      */
+      const lot = new Set(
+        f0.group
+          ? get()
+              .fixtures.filter((o) => o.group === f0.group && o.wallId === f0.wallId && o.side === f0.side)
+              .map((o) => o.id)
+          : [id],
+      );
+      pushHistory(`flip:${f0.group ?? id}`);
       set({
         fixtures: get().fixtures.map((f) =>
-          f.id === id ? { ...f, side: (f.side > 0 ? -1 : 1) as 1 | -1 } : f,
+          lot.has(f.id) ? { ...f, side: (f.side > 0 ? -1 : 1) as 1 | -1 } : f,
         ),
         dirty: true,
       });
     },
 
+    /*
+      L'HISTOIRE AVANT LE CHANGEMENT, ET LE PLAN « À ENREGISTRER » — agent
+      testeur ÉLECTRICITÉ : le point de reprise se prenait APRÈS la bascule
+      (« Annuler » rendait l'état déjà basculé : rien ne se défaisait), et
+      `dirty` restait faux — refuser le pontage d'une prise ne s'enregistrait
+      pas, le devis la repontait au prochain chargement. Même défaut pour
+      lier et délier des spots en ligne.
+    */
     basculerPontage: (id) => {
+      if (!get().fixtures.some((f) => f.id === id)) return;
+      pushHistory('basculerPontage');
       set((e) => ({
         fixtures: e.fixtures.map((f) =>
           f.id === id ? { ...f, sansPontage: !f.sansPontage } : f,
         ),
+        dirty: true,
       }));
-      pushHistory('basculerPontage');
     },
 
     lierPlafond: (id, voisin) => {
+      if (id === voisin || !get().ceiling.some((x) => x.id === id) || !get().ceiling.some((x) => x.id === voisin)) return;
+      // Avant le changement, comme toute retouche (voir `basculerPontage`).
+      pushHistory('lierPlafond');
       set((e) => {
         const cible = e.ceiling.find((x) => x.id === voisin);
         if (!cible) return {};
@@ -8265,12 +8390,14 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
           ceiling: e.ceiling.map((x) =>
             x.id === id || x.id === voisin ? { ...x, row } : x,
           ),
+          dirty: true,
         };
       });
-      pushHistory('lierPlafond');
     },
 
     delierPlafond: (id) => {
+      if (!get().ceiling.find((x) => x.id === id)?.row) return;
+      pushHistory('delierPlafond');
       set((e) => {
         const moi = e.ceiling.find((x) => x.id === id);
         if (!moi?.row) return {};
@@ -8291,9 +8418,9 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
               ? { ...x, row: undefined, axe: undefined }
               : x,
           ),
+          dirty: true,
         };
       });
-      pushHistory('delierPlafond');
     },
 
     removeFixture: (id) => {
@@ -8342,6 +8469,35 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       });
     },
 
+    /*
+      REPARTIR DE ZÉRO DANS UNE PIÈCE — agent testeur ÉLECTRICITÉ, manque
+      relevé en rénovation : l'électricien qui refait la cuisine retirait ses
+      quinze appareils un par un. D'un geste, et d'un seul « Annuler » : les
+      appareils muraux qui donnent dans la pièce (pas ceux de la voisine sur
+      le même refend), son plafond, et les liens qui les visaient.
+    */
+    viderAppareillage: (roomId) => {
+      const st = get();
+      const piece = pieceDesAppareils(st);
+      const muraux = new Set(st.fixtures.filter((f) => piece.get(f.id) === roomId).map((f) => f.id));
+      const plafond = st.ceiling.filter((c) => c.roomId === roomId).length;
+      if (muraux.size + plafond === 0) return 0;
+      pushHistory('viderAppareillage');
+      // Une plaque dont il ne reste qu'un poste redevient simple (voir `removeFixture`).
+      const restants = st.fixtures.filter((f) => !muraux.has(f.id));
+      const parGroupe = new Map<string, number>();
+      for (const f of restants) if (f.group) parGroupe.set(f.group, (parGroupe.get(f.group) ?? 0) + 1);
+      set({
+        ...sansLiensMorts(
+          restants.map((f) => (f.group && parGroupe.get(f.group) === 1 ? { ...f, group: undefined } : f)),
+          st.ceiling.filter((c) => c.roomId !== roomId),
+        ),
+        pendingJoin: null,
+        dirty: true,
+      });
+      return muraux.size + plafond;
+    },
+
     undo: () => {
       const instantane = history.pop();
       dernierRetour = instantane ? instantane.cle ?? '' : null;
@@ -8360,6 +8516,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         ceiling: st.ceiling,
         notes: st.notes,
         mesures: st.mesures,
+        existant: st.existant,
         cle,
       });
       set({
@@ -8391,6 +8548,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         ceiling: st.ceiling,
         notes: st.notes,
         mesures: st.mesures,
+        existant: st.existant,
         cle,
       });
       set({
@@ -8953,6 +9111,9 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         .toString(36)
         .slice(2, 5)}`;
       const ex = get().existant;
+      // Chaque retouche du tableau est un point de reprise : l'instantané
+      // porte le tableau (voir `Snapshot.existant`).
+      pushHistory('ajouterDepart');
       set({
         existant: rangerLeTableau({
           ...(ex ?? { departs: [] }),
@@ -8965,7 +9126,9 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
 
     modifierDepart: (id, champs) => {
       const ex = get().existant;
-      if (!ex) return;
+      if (!ex?.departs.some((d) => d.id === id)) return;
+      // Les retouches d'un même organe, de suite, ne font qu'un « Annuler ».
+      pushHistory(`depart:${id}`);
       set({
         existant: rangerLeTableau({
           ...ex,
@@ -8979,7 +9142,8 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
 
     retirerDepart: (id) => {
       const ex = get().existant;
-      if (!ex) return;
+      if (!ex?.departs.some((d) => d.id === id)) return;
+      pushHistory('retirerDepart');
       set({
         existant: rangerLeTableau({ ...ex, departs: ex.departs.filter((d) => d.id !== id) }),
         dirty: true,
@@ -9009,11 +9173,13 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         departs[i] = voisin;
         departs[j] = ici;
       } else return;
+      pushHistory(`deplacerDepart:${id}`);
       set({ existant: rangerLeTableau({ ...ex, departs }), dirty: true });
     },
 
     decrireTableau: (t) => {
       const ex = get().existant;
+      pushHistory('decrireTableau:');
       set({
         existant: rangerLeTableau({ ...(ex ?? { departs: [] }), ...t }),
         dirty: true,
@@ -11565,11 +11731,17 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         north: st.north ?? undefined,
         client: st.client || undefined,
         address: st.address || undefined,
-        devis: devisDuPlan(st),
+        /*
+          UN AUTRE DEVIS, UN AUTRE NUMÉRO — agent testeur ÉLECTRICITÉ : la
+          copie qui sert à chiffrer une variante gardait le numéro du devis
+          déjà envoyé, et deux devis différents partaient au client sous le
+          même numéro. Elle en recevra un à son premier envoi.
+        */
+        devis: sansNumero(devisDuPlan(st)),
       };
       const saves = [save, ...st.saves];
       const avaitUneEntree = !!st.currentSaveId;
-      set({ saves, currentSaveId: save.id, scanName: clean, dirty: false });
+      set({ saves, currentSaveId: save.id, scanName: clean, dirty: false, devisNumero: null });
       persistSoon(saves);
       deposerPlusTard(save.id);
       // L'écran bascule sur la copie : on le dit (revue « Chloé »).
