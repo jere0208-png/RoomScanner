@@ -479,7 +479,9 @@ export function achats(pieces: PieceTravaux[], h: HypothesesTravaux = HYPOTHESES
   const peinture = (surface: number) => {
     const litres = (surface * h.couches) / h.rendement;
     return {
-      surface: arrondi(surface),
+      // Au centième, comme le métré : l'estimatif ne doit pas écrire 119,90
+      // quand le métré, deux pages plus tôt, écrit 119,94.
+      surface: Math.round(surface * 100) / 100,
       litres: arrondi(litres),
       // Un pot entamé s'achète entier ; rien du tout ne s'achète pas.
       pots: litres > 0 ? Math.ceil(litres / h.pot - 1e-9) : 0,
@@ -511,7 +513,7 @@ export function achats(pieces: PieceTravaux[], h: HypothesesTravaux = HYPOTHESES
         const litres = (s * h.couches) / h.rendement;
         return {
           cle,
-          surface: auDixieme(s),
+          surface: Math.round(s * 100) / 100,
           litres: auDixieme(litres),
           pots: litres > 0 ? Math.ceil(litres / h.pot - 1e-9) : 0,
           pieces: ou.get(cle) ?? [],

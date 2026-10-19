@@ -136,7 +136,8 @@ describe('la faïence murale des pièces d’eau', () => {
     expect(sdb.murs).toBeCloseTo(4.5, 6);
     expect(sdb.faienceMurale).toEqual({ hauteur: 'h200', surface: 16 });
     const apres = achats(piecesRetenues(PIECES, [], null, choix), HYPOTHESES);
-    expect(apres.murs.surface).toBeCloseTo(avant.murs.surface - 16, 6);
+    // Chacune arrondie au centième : un centième de m² d'écart au plus.
+    expect(Math.abs(apres.murs.surface - (avant.murs.surface - 16))).toBeLessThanOrEqual(0.011);
     expect(apres.murs.pots).toBeLessThan(avant.murs.pots);
     expect(apres.faience.murale).toBeCloseTo(16, 6);
     expect(apres.faience.avecChute).toBeCloseTo(17.6, 6);
