@@ -27,7 +27,7 @@ import { RoomScan, type ObjectData } from 'react-native-room-scan';
 import { PLAFOND_BARRE, useTheme } from '../theme';
 import { getStyles } from './result/styles';
 import { fr } from './result/format';
-import { arrondiM2, frM2 } from '../ui/mots';
+import { arrondiM2, frM2, pluriel } from '../ui/mots';
 import { AddRoomSheet } from './result/AddRoomSheet';
 import { PlanViergePage } from './result/PlanViergePage';
 import { ElecSheet } from './result/ElecSheet';
@@ -72,6 +72,9 @@ import { SidePill } from '../components/SidePill';
 import { Presse } from '../components/Presse';
 import { CeilingBar } from '../components/CeilingBar';
 import { ObjectBar } from '../components/ObjectBar';
+import { SelectionMeublesBar } from '../components/SelectionMeublesBar';
+import { estVerrouille } from '../geometry/alignement';
+import { estUnCaisson } from '../geometry/caisson';
 import { calerDansLaNiche } from '../geometry/niche';
 import { completerAuxNormes, corrigerConstat, poserAuxNormes } from '../geometry/auto';
 import { ControlePastille } from '../components/ControlePastille';
@@ -576,6 +579,17 @@ export function ResultScreen() {
 
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const selectedObject = objects.find((o) => o.id === selectedObjectId) ?? null;
+  /*
+    PLUSIEURS MEUBLES CHOISIS — manque proposé par l'agent testeur MEUBLES :
+    « aligner ou répartir plusieurs meubles d'un coup ». `null` : on choisit
+    un meuble à la fois, comme avant. Les meubles qui disparaissent (annuler,
+    retirer) sortent de la sélection d'eux-mêmes.
+  */
+  const [meublesChoisisBruts, setMeublesChoisis] = useState<string[] | null>(null);
+  const meublesChoisis = useMemo(
+    () => (meublesChoisisBruts ? meublesChoisisBruts.filter((id) => objects.some((o) => o.id === id)) : null),
+    [meublesChoisisBruts, objects],
+  );
   /**
    * Renonce au meuble qu'on vient de poser.
    *
@@ -587,6 +601,22 @@ export function ResultScreen() {
     if (draftObject) removeObject(draftObject);
     setDraftObject(null);
     setSelectedObjectId(null);
+  };
+
+  /**
+   * RETIRER UN MEUBLE VERROUILLÉ SE CONFIRME — le verrou dit « je tiens à
+   * celui-là » ; il n'empêche pas de le retirer, il le fait demander.
+   */
+  const retirerLeMeuble = (id: string, retirer: () => void) => {
+    const o = objects.find((x) => x.id === id);
+    if (!estVerrouille(o)) {
+      retirer();
+      return;
+    }
+    alerte('Retirer ce meuble verrouillé ?', 'Il était verrouillé pour ne pas bouger par accident.', [
+      { label: 'Garder' },
+      { label: 'Retirer', danger: true, onPress: retirer },
+    ]);
   };
 
   /**
@@ -1447,6 +1477,10 @@ export function ResultScreen() {
   const showPhotos = useScanStore((s) => s.showPhotos);
   const showNotes = useScanStore((s) => s.showNotes);
   const [editMode, setEditMode] = useState(false);
+  // Hors édition, ou en quittant le plan 2D, la sélection multiple se referme.
+  useEffect(() => {
+    if (!editMode || vue !== '2d') setMeublesChoisis(null);
+  }, [editMode, vue]);
   // En sortant de l'édition, le plafond choisi se lâche, et un lien en cours
   // s'abandonne : hors édition, rien ne se modifie (voir `onSelectCeiling`).
   useEffect(() => {
@@ -1511,7 +1545,11 @@ export function ResultScreen() {
     (garde?: 'mur' | 'meuble' | 'piece' | 'ouverture' | 'plafond' | 'note' | 'retour') => {
       if (garde !== 'note') setSelNote(null);
       if (garde !== 'mur') setSelectedWallId(null);
-      if (garde !== 'meuble') setSelectedObjectId(null);
+      if (garde !== 'meuble') {
+        setSelectedObjectId(null);
+        // Choisir autre chose qu'un meuble referme la sélection multiple.
+        setMeublesChoisis(null);
+      }
       if (garde !== 'piece') {
         setSelectedRoomId(null);
         fermerPiecesNeuves();
@@ -4959,12 +4997,36 @@ export function ResultScreen() {
             showMeasures={showMeasures}
             editable={editMode}
             selectedObjectId={selectedObjectId}
-            onDeleteObject={(id) => {
-              removeObject(id);
-              setDraftObject(null);
+            meublesChoisis={meublesChoisis ?? undefined}
+            onSelectionMultiple={(id) => {
+              setMeublesChoisis([id]);
               setSelectedObjectId(null);
+              setDraftObject(null);
+              haptic('leger');
             }}
+            onVerrouObject={(id, v) => {
+              useScanStore.getState().verrouillerMeuble(id, v);
+              setDraftObject(null);
+              haptic(v ? 'succes' : 'leger');
+            }}
+            onDeleteObject={(id) =>
+              retirerLeMeuble(id, () => {
+                removeObject(id);
+                setDraftObject(null);
+                setSelectedObjectId(null);
+              })
+            }
             onSelectObject={(id) => {
+              if (meublesChoisis) {
+                // À plusieurs : toucher un meuble l'ajoute ou le retire.
+                if (!id) return;
+                const suite = meublesChoisis.includes(id)
+                  ? meublesChoisis.filter((x) => x !== id)
+                  : [...meublesChoisis, id];
+                setMeublesChoisis(suite.length > 0 ? suite : null);
+                haptic('leger');
+                return;
+              }
               seuleSelection('meuble');
               if (id) effacerRetour();
               setSelectedObjectId(id);
@@ -6121,7 +6183,51 @@ export function ResultScreen() {
                       },
                     };
                   })()}
-                  onCancel={cancelObject}
+                  onCancel={() => retirerLeMeuble(selectedObject.id, cancelObject)}
+                  onVerrou={(v) => {
+                    useScanStore.getState().verrouillerMeuble(selectedObject.id, v);
+                    setDraftObject(null);
+                    haptic(v ? 'succes' : 'leger');
+                  }}
+                  onRecoller={
+                    estUnCaisson(selectedObject)
+                      ? () => {
+                          // Les murs de SA pièce, nommés par où ils regardent à l'écran.
+                          const part = parts.find((p2) => p2.roomId === selectedObject.roomId);
+                          const murs = (part?.walls ?? []).filter((w) => w.type === 'wall' && segLength(w) >= 0.3);
+                          if (!part || murs.length === 0) {
+                            alerte('Aucun autre mur', 'Ce caisson n’a pas de pièce fermée autour de lui.');
+                            return;
+                          }
+                          const cs = Math.cos(vuePlanRef.current.rot);
+                          const sn = Math.sin(vuePlanRef.current.rot);
+                          const ou = (w: (typeof murs)[number]) => {
+                            const dx = (w.a.x + w.b.x) / 2 - part.labelAt.x;
+                            const dz = (w.a.z + w.b.z) / 2 - part.labelAt.z;
+                            const sx = dx * cs - dz * sn;
+                            const sy = dx * sn + dz * cs;
+                            return Math.abs(sx) >= Math.abs(sy) ? (sx > 0 ? 'à droite' : 'à gauche') : sy > 0 ? 'en bas' : 'en haut';
+                          };
+                          setMenu({
+                            title: 'Contre quel mur ?',
+                            subtitle: 'Le caisson s’y recolle de nu à nu, avec sa profondeur et sa retombée.',
+                            actions: murs.map((w) => ({
+                              label: `Mur ${ou(w)} · ${segLength(w).toFixed(2).replace('.', ',')} m`,
+                              onPress: () => {
+                                if (useScanStore.getState().recollerCaisson(selectedObject.id, w.id)) haptic('succes');
+                                else alerte('Pas contre ce mur', 'Il ne borde pas la pièce du caisson.');
+                              },
+                            })),
+                          });
+                        }
+                      : undefined
+                  }
+                  onSelectionMultiple={() => {
+                    setMeublesChoisis([selectedObject.id]);
+                    setSelectedObjectId(null);
+                    setDraftObject(null);
+                    haptic('leger');
+                  }}
                   passage={verdict}
                   teinte={selectedObject.teinte ?? null}
                   onTeinte={() => setMeubleATeinter(selectedObject.id)}
@@ -6256,6 +6362,52 @@ export function ResultScreen() {
                 />
               );
             }}
+          />
+        )}
+
+        {vue === '2d' && editMode && meublesChoisis && meublesChoisis.length > 0 && !capturing && (
+          <SelectionMeublesBar
+            ids={meublesChoisis}
+            styles={stylesBarres}
+            palette={teinte}
+            verrouilles={objects.filter((o) => meublesChoisis.includes(o.id) && estVerrouille(o)).length}
+            onMenu={setMenu}
+            onAligner={(mode) => {
+              useScanStore.getState().alignerMeubles(meublesChoisis, mode, vuePlanRef.current.rot);
+              haptic('succes');
+            }}
+            onRepartir={(axe) => {
+              useScanStore.getState().repartirMeubles(meublesChoisis, axe, vuePlanRef.current.rot);
+              haptic('succes');
+            }}
+            onNudge={(dx, dy) => {
+              // Un centimètre dans l'axe de l'écran, comme les flèches d'un meuble seul.
+              const c = Math.cos(-vuePlanRef.current.rot);
+              const s = Math.sin(-vuePlanRef.current.rot);
+              const PAS = 0.01;
+              useScanStore
+                .getState()
+                .deplacerMeubles(meublesChoisis, (dx * c - dy * s) * PAS, (dx * s + dy * c) * PAS, { ranger: true });
+            }}
+            onRetirer={() =>
+              alerte(
+                `Retirer ${pluriel(meublesChoisis.length, 'meuble')} ?`,
+                'Un seul « Annuler » les rendra tous.',
+                [
+                  { label: 'Garder' },
+                  {
+                    label: 'Retirer',
+                    danger: true,
+                    onPress: () => {
+                      useScanStore.getState().retirerLesMeubles(meublesChoisis);
+                      setMeublesChoisis(null);
+                      haptic('succes');
+                    },
+                  },
+                ],
+              )
+            }
+            onTerminer={() => setMeublesChoisis(null)}
           />
         )}
 

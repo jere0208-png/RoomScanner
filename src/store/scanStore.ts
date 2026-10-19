@@ -128,6 +128,13 @@ import type { MurDouteux } from '../geometry/murDouteux';
 import { reunirLesCanapesDAngle } from '../geometry/canapeAngle';
 import { alignerLesMeubles, calerDansLaNiche, calerLesMeubles, contreLeMurLePlusProche, seGenent } from '../geometry/niche';
 import {
+  cibleDAlignement,
+  cibleDeRepartition,
+  estVerrouille,
+  type AxeDeRepartition,
+  type ModeDAlignement,
+} from '../geometry/alignement';
+import {
   SUR_MESURE,
   catalogTransform,
   seFixeAuMur,
@@ -2999,6 +3006,14 @@ export interface ScanState {
    * nu, collé à son plafond (voir `geometry/caisson`). Rend son identifiant.
    */
   ajouterCaisson: (wallId: string, roomId: string) => string | null;
+  /**
+   * LE CAISSON CONTRE UN AUTRE MUR DE SA PIÈCE — bonus du manque proposé par
+   * l'agent testeur MEUBLES : pivoté, un caisson traversait la pièce comme
+   * une poutre. Il se recolle de nu à nu contre le mur choisi, avec sa
+   * profondeur et sa retombée, sous le même identifiant. Rend `false` si ce
+   * mur ne borde pas sa pièce.
+   */
+  recollerCaisson: (id: string, wallId: string) => boolean;
   /** Retire un mur du plan (et les ouvertures qu'il portait). */
   removeWall: (wallId: string) => void;
   /**
@@ -3806,6 +3821,34 @@ export interface ScanState {
   /** Il a lu le chiffre : on n'y revient pas. */
   oublierPlaceRendue: () => void;
   removeObject: (id: string) => void;
+  /**
+   * VERROUILLER UN MEUBLE — manque proposé par l'agent testeur MEUBLES. Un
+   * meuble verrouillé ne se déplace, ne tourne et ne se redimensionne plus
+   * (ni au doigt, ni aux flèches) ; il reste sélectionnable et supprimable.
+   */
+  verrouillerMeuble: (id: string, verrou: boolean) => void;
+  /**
+   * PLUSIEURS MEUBLES D'UN COUP — manque proposé par l'agent testeur
+   * MEUBLES. `rot` est la rotation du plan à l'écran : « à gauche » est la
+   * gauche qu'on voit. Chaque geste est UN « Annuler » ; les meubles
+   * verrouillés ne bougent pas (ils servent d'ancre à l'alignement).
+   */
+  alignerMeubles: (ids: string[], mode: ModeDAlignement, rot: number) => void;
+  repartirMeubles: (ids: string[], axe: AxeDeRepartition, rot: number) => void;
+  /**
+   * Déplace l'ensemble de (dx, dz). `depuis` : les positions de départ d'un
+   * glisser (le doigt donne un déplacement depuis l'appui, pas depuis l'image
+   * d'avant) ; `ranger` : au lâcher, chacun se range hors des murs et des
+   * voisins. Un glisser entier ne coûte qu'un « Annuler ».
+   */
+  deplacerMeubles: (
+    ids: string[],
+    dx: number,
+    dz: number,
+    opts?: { depuis?: Record<string, { x: number; z: number }>; ranger?: boolean },
+  ) => void;
+  /** Retire plusieurs meubles, en un seul « Annuler ». */
+  retirerLesMeubles: (ids: string[]) => void;
   /**
    * UN MEUBLE DE PLUS, LE MÊME — quatre chaises autour d'une table, deux
    * chevets. Rend l'identifiant de la copie, posée à côté de l'original.
@@ -8891,6 +8934,40 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       return id;
     },
 
+    recollerCaisson: (id, wallId) => {
+      const st = get();
+      const avant = st.objects.find((o) => o.id === id);
+      const w = st.walls.find((x) => x.id === wallId);
+      if (!avant || !estUnCaisson(avant) || !w || !avant.roomId) return false;
+      const jeu = jeuDuNiveau(st, niveauDe(w));
+      const part = roomParts(jeu.walls, jeu.rooms).find((p) => p.roomId === avant.roomId);
+      const contour = part?.surface?.pts;
+      if (!part || !contour || !part.walls.some((x) => x.id === wallId)) return false;
+      const sens = coteDeLaPiece(w, contour);
+      if (sens === null) return false;
+      const { s0, s1 } = bornesAuNu(jeu.walls, w, [part]);
+      if (s1 - s0 < 0.1) return false;
+      pushHistory('recollerCaisson');
+      const o = objetCaisson(
+        w,
+        {
+          t0: s0,
+          t1: s1,
+          // Ses cotes à lui, pas celles d'un caisson neuf.
+          profondeur: avant.depth,
+          retombee: avant.height,
+          plafond: hauteurDeLaPiece(part) || hauteurDuNiveau(st.walls, niveauDe(w)),
+          sens,
+        },
+        solDesMurs(part.walls),
+        id,
+        avant.roomId,
+        faceDuCote(demiFacesDe(jeu.walls, w), sens),
+      );
+      set({ objects: st.objects.map((x) => (x.id === id ? { ...o, ...(avant.teinte ? { teinte: avant.teinte } : {}) } : x)), dirty: true });
+      return true;
+    },
+
     setWallHeight: (wallId, height) => {
       /*
         LA BORNE BASSE N'EST PAS CELLE D'UNE PIÈCE.
@@ -11357,7 +11434,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
 
     rotateObject: (id, quarts = 1) => {
       const avant = get().objects.find((x) => x.id === id);
-      if (!avant) return;
+      if (!avant || estVerrouille(avant)) return;
       const ici = { x: avant.transform[12], z: avant.transform[14] };
       const ancre = ancresDeRotation.get(id);
       const depart =
@@ -11389,7 +11466,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     },
 
     setObjectYaw: (id, yaw) => {
-      if (!sontFinis(yaw)) return;
+      if (!sontFinis(yaw) || estVerrouille(get().objects.find((o) => o.id === id))) return;
       pushHistory(`yaw:${id}`);
       set({
         objects: get().objects.map((o) => (o.id === id ? meubleTourne(o, yaw) ?? o : o)),
@@ -11529,6 +11606,77 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       set({ objects: get().objects.filter((o) => o.id !== id), dirty: true });
     },
 
+    verrouillerMeuble: (id, verrou) => {
+      const o = get().objects.find((x) => x.id === id);
+      if (!o || estVerrouille(o) === verrou) return;
+      pushHistory(`verrou:${id}`);
+      set({
+        objects: get().objects.map((x) => {
+          if (x.id !== id) return x;
+          if (verrou) return { ...x, verrou: true };
+          const libre: ObjectData & { verrou?: boolean } = { ...x };
+          delete libre.verrou;
+          return libre;
+        }),
+        dirty: true,
+      });
+    },
+
+    alignerMeubles: (ids, mode, rot) => {
+      const meubles = get().objects.filter((o) => ids.includes(o.id));
+      const vers = cibleDAlignement(meubles, mode, rot);
+      if (vers.size === 0) return;
+      // Un seul point de reprise pour tout le geste ; chacun se range ensuite
+      // comme au lâcher du doigt : le mur l'arrête, le voisin ne se traverse pas.
+      pushHistory('alignerMeubles');
+      for (const [id, p] of vers) get().rangerMeuble(id, p.x, p.z, 'alignerMeubles', true);
+    },
+
+    repartirMeubles: (ids, axe, rot) => {
+      const meubles = get().objects.filter((o) => ids.includes(o.id));
+      const vers = cibleDeRepartition(meubles, axe, rot);
+      if (vers.size === 0) return;
+      pushHistory('repartirMeubles');
+      for (const [id, p] of vers) get().rangerMeuble(id, p.x, p.z, 'repartirMeubles', true);
+    },
+
+    deplacerMeubles: (ids, dx, dz, opts) => {
+      if (!sontFinis(dx, dz)) return;
+      const bougent = get().objects.filter((o) => ids.includes(o.id) && !estVerrouille(o));
+      if (bougent.length === 0) return;
+      // Clé continue (avec deux-points) : un glisser entier fusionne en un
+      // seul « Annuler », comme le glisser d'un meuble seul.
+      const cle = `deplacerMeubles:${[...ids].sort().join(',')}`;
+      pushHistory(cle);
+      const depart = (o: ObjectData) => opts?.depuis?.[o.id] ?? { x: o.transform[12], z: o.transform[14] };
+      if (opts?.ranger) {
+        for (const o of bougent) {
+          const d = depart(o);
+          get().rangerMeuble(o.id, d.x + dx, d.z + dz, cle, true);
+        }
+        return;
+      }
+      const ensemble = new Set(bougent.map((o) => o.id));
+      set({
+        objects: get().objects.map((o) => {
+          if (!ensemble.has(o.id)) return o;
+          const d = depart(o);
+          const t = [...o.transform];
+          t[12] = d.x + dx;
+          t[14] = d.z + dz;
+          return { ...o, transform: t };
+        }),
+        dirty: true,
+      });
+    },
+
+    retirerLesMeubles: (ids) => {
+      const restent = get().objects.filter((o) => !ids.includes(o.id));
+      if (restent.length === get().objects.length) return;
+      pushHistory('retirerMeubles');
+      set({ objects: restent, dirty: true });
+    },
+
     /**
      * Déplace un meuble. Les murs l'ARRÊTENT, ils ne l'attirent pas.
      *
@@ -11557,7 +11705,8 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       */
       const st = get();
       const obj = st.objects.find((o) => o.id === id);
-      if (!obj || !sontFinis(x, z)) return;
+      // Verrouillé, il ne bouge plus — ni au doigt, ni à la flèche.
+      if (!obj || estVerrouille(obj) || !sontFinis(x, z)) return;
       /*
         LA GARDE PASSE AVANT LE POINT DE REPRISE.
 
@@ -11680,7 +11829,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       */
       const st = get();
       const obj = st.objects.find((o) => o.id === id);
-      if (!obj || !sontFinis(x, z)) return;
+      if (!obj || estVerrouille(obj) || !sontFinis(x, z)) return;
       /*
         LA GARDE PASSE AVANT LE POINT DE REPRISE.
 
@@ -11951,7 +12100,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     resizeObjectSide: (id, cote, distance, depuis) => {
       const st = get();
       const obj = st.objects.find((o) => o.id === id);
-      if (!obj) return { accroche: false };
+      if (!obj || estVerrouille(obj)) return { accroche: false };
       pushHistory(`resizeSide:${id}`);
       // Le calcul est celui que la poignée montre pendant le geste : voir
       // `meubleEtire`.
@@ -11984,6 +12133,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         tromper.
       */
       if (!estUneCote(width) || !estUneCote(depth)) return;
+      if (estVerrouille(get().objects.find((o) => o.id === id))) return;
       pushHistory(`resize:${id}`);
       /*
         IL GRANDIT DU CÔTÉ DE LA PIÈCE — agent testeur MEUBLES : la cote
@@ -12016,7 +12166,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     calerMeuble: (id) => {
       const st = get();
       const o = st.objects.find((x) => x.id === id);
-      if (!o) return;
+      if (!o || estVerrouille(o)) return;
       const cale = calerDansLaNiche(o, st.walls);
       // La garde AVANT le point de reprise : voir `annulerunefois`.
       if (!cale) return;
@@ -12026,7 +12176,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
 
     setObjectHeight: (id, height, base) => {
       const o = get().objects.find((x) => x.id === id);
-      if (!o) return;
+      if (!o || estVerrouille(o)) return;
       // Un meuble de deux centimètres ou de neuf mètres est une faute de
       // frappe, pas un relevé ; une pose négative enfoncerait le meuble dans
       // la dalle.

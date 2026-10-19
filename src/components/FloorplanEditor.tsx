@@ -82,6 +82,7 @@ import {
 } from '../geometry/electrical';
 import { frCategory, furnKind, furnitureStrokes, meridienneDe } from '../geometry/furniture';
 import { estUnCaisson } from '../geometry/caisson';
+import { estVerrouille } from '../geometry/alignement';
 
 /** L'ordre du dessin des meubles : le tapis au sol, le caisson au plafond. */
 const rangDuDessin = (o: { category?: string }) => (o.category === 'tapis' ? 0 : estUnCaisson(o) ? 2 : 1);
@@ -562,6 +563,21 @@ interface Props {
   onSelectPhoto?: (id: string) => void;
   /** Meuble sélectionné : surligné, déplaçable, supprimable. */
   selectedObjectId?: string | null;
+  /**
+   * PLUSIEURS MEUBLES CHOISIS — manque proposé par l'agent testeur MEUBLES.
+   * Ils se dessinent comme le meuble tenu ; l'ensemble se glisse d'un doigt
+   * (`GroupeDragHandle`), et toucher un meuble l'ajoute ou le retire (c'est
+   * l'écran qui en décide, par `onSelectObject`).
+   */
+  meublesChoisis?: string[];
+  /**
+   * LES DEUX PASTILLES DE PLUS du meuble tenu — « Plusieurs » (entrer dans
+   * la sélection multiple) et le cadenas (verrouiller / libérer). Manques
+   * proposés par l'agent testeur MEUBLES ; sans elles, la rangée reste à
+   * trois pastilles.
+   */
+  onSelectionMultiple?: (id: string) => void;
+  onVerrouObject?: (id: string, verrou: boolean) => void;
   onDeleteObject?: (id: string) => void;
   /** La croix du mur choisi, à côté de sa poignée de rotation. */
   onDeleteWall?: (id: string) => void;
@@ -1009,6 +1025,9 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
   photos,
   onSelectPhoto,
   selectedObjectId,
+  meublesChoisis,
+  onSelectionMultiple,
+  onVerrouObject,
   onDeleteObject,
   onDeleteWall,
   selectedRoomId,
@@ -3299,6 +3318,8 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
     const ctr = mapping.toPx({ x: f.cx, z: f.cz });
     const w = f.width * mapping.scale;
     const d = f.depth * mapping.scale;
+    // Tenu seul, ou l'un des meubles choisis à plusieurs : même trait bleu.
+    const choisi = o.id === selectedObjectId || !!meublesChoisis?.includes(o.id);
     return (
       <G
         key={f.id}
@@ -3337,7 +3358,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
           stroke={
             poseRefusee && o.id === selectedObjectId
               ? c.danger
-              : o.id === selectedObjectId
+              : choisi
               ? c.blue
               : meublesEnConflit?.has(o.id)
                 ? c.danger
@@ -3345,7 +3366,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                   ? c.line
                   : c.lineStrong
           }
-          strokeWidth={o.id === selectedObjectId ? 2.5 : meublesEnConflit?.has(o.id) ? 1.6 : 1}
+          strokeWidth={choisi ? 2.5 : meublesEnConflit?.has(o.id) ? 1.6 : 1}
           rx={estUnCaisson(o) ? 0 : 3}
           /*
             LE CAISSON SOUS PLAFOND EST AU-DESSUS : en pointillés, comme
@@ -3420,6 +3441,15 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
           le meuble dessine : plus rien ne peut lui voler l'appui.
           Invisible, elle ne change pas le plan d'un pixel.
         */}
+        {estVerrouille(o) && (
+          /* LE CADENAS SUR LE PLAN — on voit d'un coup d'œil ce qui ne
+             bougera pas (manque proposé par l'agent testeur MEUBLES). */
+          <G
+            testID={`cadenas-${f.id}`}
+            transform={`rotate(${(-(f.yaw + view.rot) * 180) / Math.PI}) translate(-6, -6) scale(0.5)`}>
+            <Path d={SOLAIRES.cadenas} fill={c.amber} fillRule="evenodd" />
+          </G>
+        )}
         <Rect
           accessibilityLabel={`Autour du meuble ${frCategory(
             f.category,
@@ -3442,7 +3472,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
     );
   }, [
     mapping, partOf, facesPlan, view.rot, selectedObjectId, planElec, c, meublesEnConflit,
-    onSelectObject, editable,
+    onSelectObject, editable, meublesChoisis,
   ]);
 
   /*
@@ -5438,6 +5468,47 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
               );
             })}
 
+          {/* PLUSIEURS MEUBLES CHOISIS : l'ensemble se glisse d'un doigt. */}
+          {meublesChoisis && meublesChoisis.length >= 2 && showFurniture && editable &&
+            (() => {
+              const choisis = meublesDuNiveau.filter((x) => meublesChoisis.includes(x.id));
+              if (choisis.length < 2) return null;
+              // La boîte écran de l'ensemble : c'est elle qu'on empoigne.
+              let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+              for (const o of choisis) {
+                const f = footprintOf(o, partOf, facesPlan);
+                const ang = f.yaw;
+                for (const [sx, sz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+                  const q = mapping.toPx({
+                    x: f.cx + Math.cos(ang) * (f.width / 2) * sx - Math.sin(ang) * (f.depth / 2) * sz,
+                    z: f.cz + Math.sin(ang) * (f.width / 2) * sx + Math.cos(ang) * (f.depth / 2) * sz,
+                  });
+                  x0 = Math.min(x0, q.x); y0 = Math.min(y0, q.y);
+                  x1 = Math.max(x1, q.x); y1 = Math.max(y1, q.y);
+                }
+              }
+              return (
+                <GroupeDragHandle
+                  ids={choisis.map((o) => o.id)}
+                  box={{ x: x0 - 8, y: y0 - 8, w: x1 - x0 + 16, h: y1 - y0 + 16 }}
+                  mapping={mapping}
+                  onTap={(q) => {
+                    // Un appui sans glisser : le meuble dessous s'ajoute ou se retire.
+                    const m = mapping.toMeters(q);
+                    const dessous = meublesDuNiveau.find((o) => {
+                      const f = footprintOf(o, partOf, facesPlan);
+                      const dx = m.x - f.cx;
+                      const dz = m.z - f.cz;
+                      const u = dx * Math.cos(f.yaw) + dz * Math.sin(f.yaw);
+                      const v = -dx * Math.sin(f.yaw) + dz * Math.cos(f.yaw);
+                      return Math.abs(u) <= f.width / 2 && Math.abs(v) <= f.depth / 2;
+                    });
+                    if (dessous) onSelectObject?.(dessous.id);
+                  }}
+                />
+              );
+            })()}
+
           {/* Meuble sélectionné : poignée de déplacement + bouton supprimer */}
           {/* Le meuble sélectionné : toute son emprise se glisse, sa croix
               et sa poignée de rotation flottent HORS de lui.
@@ -5483,7 +5554,9 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                       pouce par hasard.
                     */
                     const ECART = 42;
-                    const rangeeW = ECART * 2;
+                    // Pivoter, coter, [plusieurs], [verrou], retirer : la croix reste la dernière.
+                    const enPlus = (onSelectionMultiple ? 1 : 0) + (onVerrouObject ? 1 : 0);
+                    const rangeeW = ECART * (2 + enPlus);
                     // Au-dessus du contour ; en dessous s'il n'y a pas la place —
                     // le meuble reste visible, ses commandes doivent l'être aussi.
                     /*
@@ -5528,8 +5601,12 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                       { cote: 'profondeur+', n: { x: -Math.sin(f.yaw), z: Math.cos(f.yaw) }, demi: f.depth / 2 },
                       { cote: 'profondeur-', n: { x: Math.sin(f.yaw), z: -Math.cos(f.yaw) }, demi: f.depth / 2 },
                     ];
+                    // Verrouillé : ni glisser, ni tourner, ni étirer — la croix et
+                    // les cotes restent (manque proposé par l'agent testeur MEUBLES).
+                    const fige = estVerrouille(o);
                     return (
                       <>
+                        {!fige && (
                         <ObjectDragHandle
                           objectId={o.id}
                           center={p}
@@ -5539,7 +5616,8 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                           onRefus={signalerRefus}
                           onTap={onSelectObject ? () => onSelectObject(null) : undefined}
                         />
-                        {showObjectDims &&
+                        )}
+                        {showObjectDims && !fige &&
                           cotesTirables.map((b) => {
                             // Milieu du bord, et un point voisin LE LONG du bord :
                             // deux projections suffisent à connaître son angle à
@@ -5589,6 +5667,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                               />
                             );
                           })}
+                        {!fige && (
                         <RotateHandle
                           objectId={o.id}
                           center={p}
@@ -5597,16 +5676,42 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                           viewRot={view.rot}
                           frame={frame}
                         />
+                        )}
                         <TouchableOpacity
                           style={[
                             styles.objDelete,
-                            { left: bx + ECART * 2 - 17, top: by - 17 },
+                            { left: bx + ECART * (2 + enPlus) - 17, top: by - 17 },
                           ]}
                           accessibilityLabel="Retirer le meuble"
                           hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                           onPress={() => onDeleteObject?.(o.id)}>
                           <CloseCross size={17} color="#FFFFFF" weight={3.4} />
                         </TouchableOpacity>
+                        {onSelectionMultiple && (
+                          <TouchableOpacity
+                            style={[styles.objMeasure, { left: bx + ECART * 2 - 17, top: by - 17 }]}
+                            accessibilityLabel="Sélectionner plusieurs meubles"
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                            onPress={() => onSelectionMultiple(o.id)}>
+                            <Svg width={17} height={17} viewBox="0 0 24 24">
+                              <Path d={SOLAIRES.selection} fill={c.ink} fillRule="evenodd" />
+                            </Svg>
+                          </TouchableOpacity>
+                        )}
+                        {onVerrouObject && (
+                          <TouchableOpacity
+                            style={[
+                              styles.objMeasure,
+                              { left: bx + ECART * (2 + (onSelectionMultiple ? 1 : 0)) - 17, top: by - 17 },
+                            ]}
+                            accessibilityLabel={fige ? 'Déverrouiller le meuble' : 'Verrouiller le meuble'}
+                            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                            onPress={() => onVerrouObject(o.id, !fige)}>
+                            <Svg width={17} height={17} viewBox="0 0 24 24">
+                              <Path d={fige ? SOLAIRES.cadenas : SOLAIRES.cadenasOuvert} fill={fige ? c.amber : c.ink} fillRule="evenodd" />
+                            </Svg>
+                          </TouchableOpacity>
+                        )}
                         {/* Les cotes à la demande : le bandeau du bas et les
                             dégagements ne s'affichent que si on les réclame. Ils
                             couvraient le plan en permanence pour un réglage qu'on
@@ -6973,6 +7078,85 @@ export function ObjectDragHandle({
           height: half.y * 2,
         },
       ]}
+    />
+  );
+}
+
+/**
+ * GLISSER PLUSIEURS MEUBLES ENSEMBLE — manque proposé par l'agent testeur
+ * MEUBLES. Une poignée sur la boîte de l'ensemble : le doigt donne un
+ * déplacement depuis l'appui, chaque meuble part de SA position de départ,
+ * et au lâcher chacun se range (hors des murs, hors des voisins). Tout le
+ * geste est un seul « Annuler » (clé continue, voir `deplacerMeubles`). Un
+ * appui sans glisser rend la main à l'écran (`onTap`) : il ajoute ou retire
+ * le meuble touché.
+ */
+export function GroupeDragHandle({
+  ids,
+  box,
+  mapping,
+  onTap,
+}: {
+  ids: string[];
+  box: { x: number; y: number; w: number; h: number };
+  mapping: EffMapping;
+  onTap?: (p: { x: number; y: number }) => void;
+}) {
+  const live = useRef({ ids, mapping, onTap, box });
+  live.current = { ids, mapping, onTap, box };
+  const seuil = useRef(creerSeuil()).current;
+  const depart = useRef<Record<string, { x: number; z: number }>>({});
+  const dernier = useRef<{ dx: number; dz: number } | null>(null);
+  const appui = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const pan = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderTerminationRequest: () => false,
+        onShouldBlockNativeResponder: () => true,
+        onPanResponderGrant: (e) => {
+          seuil.reprendre();
+          dernier.current = null;
+          const b = live.current.box;
+          appui.current = { x: b.x + e.nativeEvent.locationX, y: b.y + e.nativeEvent.locationY };
+          const objets = useScanStore.getState().objects;
+          depart.current = Object.fromEntries(
+            objets
+              .filter((o) => live.current.ids.includes(o.id))
+              .map((o) => [o.id, { x: o.transform[12], z: o.transform[14] }]),
+          );
+        },
+        onPanResponderMove: (_e, g) => {
+          if (!seuil.franchi(g.dx, g.dy)) return;
+          const d = live.current.mapping.deltaToMeters(g.dx, g.dy);
+          dernier.current = { dx: d.x, dz: d.z };
+          useScanStore.getState().deplacerMeubles(live.current.ids, d.x, d.z, { depuis: depart.current });
+        },
+        onPanResponderRelease: () => {
+          const d = dernier.current;
+          if (d) {
+            useScanStore.getState().deplacerMeubles(live.current.ids, d.dx, d.dz, { depuis: depart.current, ranger: true });
+            finirLeGeste();
+          } else {
+            live.current.onTap?.(appui.current);
+          }
+          dernier.current = null;
+        },
+        onPanResponderTerminate: () => {
+          const d = dernier.current;
+          if (d) useScanStore.getState().deplacerMeubles(live.current.ids, d.dx, d.dz, { depuis: depart.current, ranger: true });
+          dernier.current = null;
+        },
+      }),
+    [seuil],
+  );
+  return (
+    <View
+      {...pan.panHandlers}
+      testID="glisser-les-meubles"
+      accessibilityLabel="Glisser les meubles choisis"
+      style={{ position: 'absolute', left: box.x, top: box.y, width: box.w, height: box.h }}
     />
   );
 }

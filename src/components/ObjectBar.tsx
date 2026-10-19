@@ -22,6 +22,7 @@ import type { VerdictDePassage } from '../geometry/passage';
 import type { Palette } from '../theme';
 
 import type { ObjectData } from 'react-native-room-scan';
+import { estVerrouille } from '../geometry/alignement';
 import { lireMetres } from '../ui/saisieCote';
 
 const fr2 = (v: number) => v.toFixed(2).replace('.', ',');
@@ -129,7 +130,7 @@ export function useRepetition(action: () => void) {
 }
 
 /** Une flèche qui répète tant qu'on la tient. */
-function Fleche({
+export function Fleche({
   nom,
   d,
   couleur,
@@ -199,6 +200,9 @@ export function ObjectBar({
   teinte,
   onTeinte,
   onMeridienne,
+  onVerrou,
+  onSelectionMultiple,
+  onRecoller,
 }: {
   object: ObjectData;
   /** Les styles de l'écran : le bandeau partage ceux des autres barres. */
@@ -268,7 +272,25 @@ export function ObjectBar({
    */
   teinte?: string | null;
   onTeinte?: () => void;
+  /**
+   * VERROUILLER — manque proposé par l'agent testeur MEUBLES : « verrouiller
+   * un meuble contre les déplacements accidentels ». Verrouillé, la barre
+   * n'offre plus ni flèches, ni « Pivoter », ni « Placer », et ses cotes se
+   * lisent sans s'ouvrir ; le meuble reste sélectionnable et supprimable.
+   */
+  onVerrou?: (verrou: boolean) => void;
+  /**
+   * PLUSIEURS MEUBLES — le point d'entrée de la sélection multiple (aligner,
+   * répartir, déplacer ou retirer ensemble). Même manque proposé.
+   */
+  onSelectionMultiple?: () => void;
+  /**
+   * UN CAISSON CONTRE UN AUTRE MUR — pivoté, il traversait la pièce comme
+   * une poutre. Pour un caisson seulement (l'écran ne le passe qu'à lui).
+   */
+  onRecoller?: () => void;
 }) {
+  const verrou = estVerrouille(object);
   /** Le dessous du meuble, au-dessus du sol. */
   const pose = object.transform[13] - object.height / 2 - (sol ?? 0);
 
@@ -291,7 +313,16 @@ export function ObjectBar({
     depuisZero?: boolean,
     /** Le mot qui rattache le chiffre, écrit DANS la pastille. */
     mot?: string,
-  ) => (
+  ) => verrou ? (
+    // Verrouillé : la cote se lit, elle ne s'ouvre plus.
+    <View style={[styles.clChamp, local.fige]} accessibilityLabel={`${titre}, verrouillé`}>
+      {mot ? <Text style={styles.clMot}>{mot}</Text> : null}
+      <Text style={styles.clValeur} numberOfLines={1}>
+        {fr2(valeur)}
+      </Text>
+      {unite ? <Text style={styles.unit}>{unite}</Text> : null}
+    </View>
+  ) : (
     <TouchableOpacity
       hitSlop={DEBORD_COTE}
       style={styles.clChamp}
@@ -382,6 +413,14 @@ export function ObjectBar({
       */}
       <View style={styles.bandeauEntete}>
         <IconeBandeau icone={SOLAIRES.meubles} styles={styles} />
+        {verrou ? (
+          /* Le cadenas devant le nom : on sait pourquoi rien ne bouge. */
+          <View accessibilityLabel="Meuble verrouillé" style={local.cadenas}>
+            <Svg width={14} height={14} viewBox="0 0 24 24">
+              <Path d={SOLAIRES.cadenas} fill={palette.amber} fillRule="evenodd" />
+            </Svg>
+          </View>
+        ) : null}
         <View style={styles.bandeauTexte}>
           <Text style={styles.bandeauTitre} numberOfLines={1}>
             {/* Son nom du catalogue — « Meuble TV », pas « Rangement » (revue « Théo »). */}
@@ -405,13 +444,15 @@ export function ObjectBar({
         {/* Les deux gestes, poussés à droite : le nom prend la place qui
             reste, et les pastilles restent où l'œil les cherche. */}
         <View style={styles.bandeauGestes}>
-          {onPlacer &&
+          {onPlacer && !verrou &&
             geste('Placer au centimètre', 'Placer', SOLAIRES.metre, palette.blue, onPlacer)}
           {onDupliquer &&
             geste('Dupliquer le meuble', 'Dupliquer', SOLAIRES.dupliquer, palette.blue, onDupliquer)}
           {onRemplacer &&
             geste('Remplacer le meuble', 'Remplacer', SOLAIRES.meubler, palette.blue, onRemplacer)}
-          {geste('Pivoter', 'Pivoter', SOLAIRES.pivoter, palette.blue, onRotate)}
+          {onRecoller && !verrou &&
+            geste('Contre un autre mur', 'Recoller', SOLAIRES.murs, palette.blue, onRecoller)}
+          {!verrou && geste('Pivoter', 'Pivoter', SOLAIRES.pivoter, palette.blue, onRotate)}
           {onMeridienne &&
             geste(
               onMeridienne.cote === 'droite' ? 'Méridienne à gauche' : 'Méridienne à droite',
@@ -482,17 +523,38 @@ export function ObjectBar({
           ) : null}
         </View>
       )}
-      {onNudge && (
+      {(onNudge || onVerrou || onSelectionMultiple) && (
         /* Le filet passe ICI : au-dessus de ce qui règle, sous ce qui nomme.
            Voir `bandeauFilet`. */
         <View style={[styles.nudgeRow, styles.bandeauFilet]}>
-          {fleche('Déplacer vers le haut', 0, -1, SOLAIRES.flecheHaut)}
-          {fleche('Déplacer vers la gauche', -1, 0, SOLAIRES.flecheGauche)}
-          {fleche('Déplacer vers la droite', 1, 0, SOLAIRES.flecheDroite)}
-          {fleche('Déplacer vers le bas', 0, 1, SOLAIRES.flecheBas)}
-          {/* Ce que fait le geste, en trois mots : sans cette note, le
-              maintien ne se découvre que par hasard. */}
-          <Text style={styles.nudgeNote}>1 cm · maintenir</Text>
+          {onNudge && !verrou && (
+            <>
+              {fleche('Déplacer vers le haut', 0, -1, SOLAIRES.flecheHaut)}
+              {fleche('Déplacer vers la gauche', -1, 0, SOLAIRES.flecheGauche)}
+              {fleche('Déplacer vers la droite', 1, 0, SOLAIRES.flecheDroite)}
+              {fleche('Déplacer vers le bas', 0, 1, SOLAIRES.flecheBas)}
+              {/* Ce que fait le geste, en trois mots : sans cette note, le
+                  maintien ne se découvre que par hasard. */}
+              <Text style={styles.nudgeNote}>1 cm · maintenir</Text>
+            </>
+          )}
+          {verrou && <Text style={[styles.nudgeNote, local.notePleine]}>Verrouillé : il ne bouge plus.</Text>}
+          {/* Le verrou et la sélection multiple, au bout de la rangée des
+              flèches : ce sont des gestes de placement, pas de réglage. */}
+          {(onVerrou || onSelectionMultiple) && (
+            <View style={local.auBout}>
+              {onSelectionMultiple &&
+                geste('Sélectionner plusieurs meubles', 'Plusieurs', SOLAIRES.selection, palette.blue, onSelectionMultiple)}
+              {onVerrou &&
+                geste(
+                  verrou ? 'Déverrouiller le meuble' : 'Verrouiller le meuble',
+                  verrou ? 'Libérer' : 'Verrouiller',
+                  verrou ? SOLAIRES.cadenas : SOLAIRES.cadenasOuvert,
+                  verrou ? palette.amber : palette.blue,
+                  () => onVerrou(!verrou),
+                )}
+            </View>
+          )}
         </View>
       )}
       {/*
@@ -554,6 +616,11 @@ export function ObjectBar({
 
 const local = StyleSheet.create({
   verdicts: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, paddingTop: 6 },
+  /** Une cote verrouillée : lue, pas ouverte. */
+  fige: { opacity: 0.6 },
+  cadenas: { marginRight: 4 },
+  notePleine: { flexShrink: 1 },
+  auBout: { flexDirection: 'row', alignItems: 'center', marginLeft: 'auto', gap: 4 },
   puce: {
     flexDirection: 'row',
     alignItems: 'center',
