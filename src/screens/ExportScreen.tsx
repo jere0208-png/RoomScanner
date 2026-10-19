@@ -65,6 +65,7 @@ import { piecesRetenues, travauxDesPieces } from '../geometry/travaux';
 import type { Fixture } from '../geometry/electrical';
 import { planRoutes } from '../geometry/elecplan';
 import { NOM_PLAN_MAX, floorsOf, useScanStore } from '../store/scanStore';
+import { pointsAvantEnvoi } from '../export/avantEnvoi';
 import { useAccountStore, useDossierNet } from '../store/accountStore';
 import { deviceNames } from '../geometry/naming';
 import { PromptSheet, type PromptData } from '../components/Sheet';
@@ -413,6 +414,21 @@ const styles = getStyles(c);
   // l'export plantait sur `client.trim()` (diagnostic du patron).
   const client = useScanStore((s) => s.client) ?? '';
   const address = useScanStore((s) => s.address) ?? '';
+  /* Ce qu'il vaut mieux regarder avant d'envoyer : voir `pointsAvantEnvoi`. */
+  const pointsEnvoi = useMemo(
+    () =>
+      pointsAvantEnvoi(
+        {
+          walls: tousLesMurs,
+          openings: toutesLesOuvertures,
+          rooms: toutesLesPieces,
+          objects: tousLesMeubles,
+          fixtures: toutLAppareillage,
+        },
+        { client, adresse: address, particulier, modeElec },
+      ),
+    [tousLesMurs, toutesLesOuvertures, toutesLesPieces, tousLesMeubles, toutLAppareillage, client, address, particulier, modeElec],
+  );
   const setClientInfo = useScanStore((s) => s.setClientInfo);
   const [prompt, setPrompt] = useState<PromptData | null>(null);
   /**
@@ -636,7 +652,7 @@ const styles = getStyles(c);
     if (exportEnCours.current) return;
     if (!particulier && !client.trim() && net) {
       alerte('Le client n’est pas renseigné', 'Son nom et l’adresse du chantier s’impriment sur chaque feuille.', [
-        { label: 'Le renseigner', onPress: renseignerPuisExporter },
+        { label: 'Le renseigner', onPress: () => renseignerPuisExporter() },
         { label: 'Exporter quand même', onPress: () => exporterLeDossier() },
       ]);
       return;
@@ -658,7 +674,7 @@ const styles = getStyles(c);
     rendu qui suit l'enregistrement — client compris.
   */
   const [relancerExport, setRelancerExport] = useState(false);
-  const renseignerPuisExporter = () =>
+  const renseignerPuisExporter = (puisExporter = true) =>
     setPrompt({
       title: 'Nom du client',
       subtitle: 'Il paraît dans le cartouche de chaque feuille.',
@@ -669,7 +685,7 @@ const styles = getStyles(c);
         const adresse = useScanStore.getState().address ?? '';
         setClientInfo(nom, adresse);
         if (adresse.trim()) {
-          setRelancerExport(true);
+          if (puisExporter) setRelancerExport(true);
           return;
         }
         // La saisie suivante attend que celle-ci soit partie : `onSubmit`
@@ -678,10 +694,10 @@ const styles = getStyles(c);
           title: 'Adresse du chantier',
           subtitle: 'Elle paraît dans le cartouche de chaque feuille.',
           value: '',
-          okLabel: 'Exporter',
+          okLabel: puisExporter ? 'Exporter' : 'Enregistrer',
           onSubmit: (a: string) => {
             setClientInfo(useScanStore.getState().client ?? '', a);
-            setRelancerExport(true);
+            if (puisExporter) setRelancerExport(true);
           },
         });
       },
@@ -1588,6 +1604,33 @@ const styles = getStyles(c);
             </Carte>
           )}
 
+          {/*
+            AVANT D'ENVOYER — peaufinage EXPORTS : ce que le dossier
+            imprimerait mal (surface « ≈ », « Pièce 3 », cartouche vide,
+            dossier d'électricien sans tableau), dit ici, avec le geste qui
+            le corrige. Rien n'empêche d'envoyer.
+          */}
+          {pointsEnvoi.length > 0 && (
+            <View style={styles.avantEnvoi} testID="avant-envoi">
+              <Text style={styles.avantEnvoiTitre}>À regarder avant d’envoyer</Text>
+              {pointsEnvoi.map((pt) => (
+                <View key={pt.cle} style={styles.avantEnvoiLigne}>
+                  <View style={styles.avantEnvoiTextes}>
+                    <Text style={styles.avantEnvoiPoint}>{pt.titre}</Text>
+                    <Text style={styles.avantEnvoiDetail}>{pt.detail}</Text>
+                  </View>
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={pt.geste === 'client' ? `Compléter avant l’envoi : ${pt.titre}` : `Corriger sur le plan : ${pt.titre}`}
+                    hitSlop={8}
+                    style={styles.avantEnvoiGeste}
+                    onPress={() => (pt.geste === 'client' ? renseignerPuisExporter(false) : setScreen('result'))}>
+                    <Text style={styles.avantEnvoiGesteTexte}>{pt.geste === 'client' ? 'Renseigner' : 'Au plan'}</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
         </ScrollView>
 
         {/*
@@ -1696,6 +1739,26 @@ function Carte({
 }
 
 const getStyles = themedStyles((c: Palette) => StyleSheet.create({
+  avantEnvoi: {
+    marginTop: 14,
+    marginBottom: 6,
+    padding: 14,
+    borderRadius: radius.md,
+    backgroundColor: c.surface,
+    gap: 10,
+  },
+  avantEnvoiTitre: { color: c.ink, fontSize: 15, fontWeight: '700' },
+  avantEnvoiLigne: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avantEnvoiTextes: { flex: 1, gap: 2 },
+  avantEnvoiPoint: { color: c.ink, fontSize: 14, fontWeight: '600' },
+  avantEnvoiDetail: { color: c.inkSoft, fontSize: 12.5, lineHeight: 17 },
+  avantEnvoiGeste: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 14,
+    backgroundColor: c.blueSoft,
+  },
+  avantEnvoiGesteTexte: { color: c.blue, fontSize: 13, fontWeight: '600' },
   container: {
     flex: 1,
     backgroundColor: c.bg,

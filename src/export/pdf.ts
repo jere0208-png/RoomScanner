@@ -1851,19 +1851,11 @@ function draw3DView(
   };
   const margeG = marge(true);
   const margeD = marge(false);
-  const cadre = { x: box.x + margeG, y: box.y, w: box.w - margeG - margeD, h: box.h };
-  // Les cotes courent hors du volume : le cadrage leur garde leur place.
-  const scaleSphere = ((Math.min(cadre.w, cadre.h) * 0.46) / (r3 + (showDims ? ECART_DE_COTE + 0.35 : 0))) * zoom;
   /*
-    LA MAQUETTE REMPLIT SA CASE — revue « dessins » : cadrée sur la sphère
-    englobante, elle n'occupait que 35 % de la largeur de la feuille et 28 %
-    de sa hauteur. Sans zoom réglé à l'écran, on cadre sur la boîte que
-    dessine VRAIMENT la projection (à 90 %, cotes comprises) ; un zoom réglé
-    dans l'aperçu garde le cadrage de l'app, qu'il a choisi.
+    LA BOÎTE QUE DESSINE VRAIMENT LA PROJECTION (sans zoom réglé) : elle sert
+    au cadrage plus bas, et d'abord à choisir où ranger les noms des pièces.
   */
-  let scale = scaleSphere;
-  let milieuX = 0;
-  let milieuY = 0;
+  let boite: { minX: number; maxX: number; minY: number; maxY: number; bw: number; bh: number } | null = null;
   if (Math.abs(zoom - 1) < 1e-3) {
     let minX = Infinity;
     let maxX = -Infinity;
@@ -1885,14 +1877,48 @@ function draw3DView(
     const marge3D = showDims ? 2 * (ECART_DE_COTE + 0.35) : 0;
     const bw = maxX - minX + marge3D;
     const bh = maxY - minY + marge3D;
-    if (isFinite(bw) && isFinite(bh) && bw > 1e-6 && bh > 1e-6) {
-      scale = Math.max(scaleSphere, Math.min(cadre.w / bw, cadre.h / bh) * 0.9);
-      milieuX = (minX + maxX) / 2;
-      milieuY = (minY + maxY) / 2;
-    }
+    if (isFinite(bw) && isFinite(bh) && bw > 1e-6 && bh > 1e-6) boite = { minX, maxX, minY, maxY, bw, bh };
+  }
+  /*
+    LES NOMS AU-DESSUS ET AU-DESSOUS QUAND LA FEUILLE EST HAUTE — peaufinage
+    EXPORTS : sur la feuille en portrait, une maquette large et plate se
+    logeait entre deux colonnes de noms et n'occupait plus que la moitié de
+    la largeur, au milieu d'un grand blanc. Quand une bande de noms en haut
+    et une en bas lui laissent plus de place que deux colonnes, les noms
+    passent en bandes ; sinon, ils restent en marge comme avant.
+  */
+  const BANDE = 38;
+  const pasBande = etiquettes.length ? Math.max(...etiquettes.map(largeurDe)) + 14 : 0;
+  const parBande = pasBande > 0 ? Math.floor((box.w - 12) / pasBande) : 0;
+  const enBandes =
+    !!boite &&
+    etiquettes.length > 0 &&
+    etiquettes.length <= 2 * parBande &&
+    box.h - 2 * BANDE > 60 &&
+    Math.min(box.w / boite.bw, (box.h - 2 * BANDE) / boite.bh) >
+      Math.min((box.w - margeG - margeD) / boite.bw, box.h / boite.bh) * 1.08;
+  const cadre = enBandes
+    ? { x: box.x, y: box.y + BANDE, w: box.w, h: box.h - 2 * BANDE }
+    : { x: box.x + margeG, y: box.y, w: box.w - margeG - margeD, h: box.h };
+  // Les cotes courent hors du volume : le cadrage leur garde leur place.
+  const scaleSphere = ((Math.min(cadre.w, cadre.h) * 0.46) / (r3 + (showDims ? ECART_DE_COTE + 0.35 : 0))) * zoom;
+  /*
+    LA MAQUETTE REMPLIT SA CASE — revue « dessins » : cadrée sur la sphère
+    englobante, elle n'occupait que 35 % de la largeur de la feuille et 28 %
+    de sa hauteur. Sans zoom réglé à l'écran, on cadre sur la boîte que
+    dessine VRAIMENT la projection (à 90 %, cotes comprises) ; un zoom réglé
+    dans l'aperçu garde le cadrage de l'app, qu'il a choisi.
+  */
+  let scale = scaleSphere;
+  let milieuX = 0;
+  let milieuY = 0;
+  if (boite) {
+    scale = Math.max(scaleSphere, Math.min(cadre.w / boite.bw, cadre.h / boite.bh) * 0.9);
+    milieuX = (boite.minX + boite.maxX) / 2;
+    milieuY = (boite.minY + boite.maxY) / 2;
   }
   const cx = cadre.x + cadre.w / 2 - milieuX * scale + view.fx * (box.w / 2);
-  const cy = box.y + box.h / 2 - milieuY * scale - view.fy * (box.h / 2);
+  const cy = cadre.y + cadre.h / 2 - milieuY * scale - view.fy * (box.h / 2);
 
   const project = (p: P3) => {
     const x = p.x - ctr.x;
@@ -2070,7 +2096,61 @@ function draw3DView(
     colonne suit l'ordre des pièces à l'écran : les traits ne se croisent
     pas.
   */
-  for (const gauche of [true, false]) {
+  if (enBandes) {
+    /*
+      EN BANDES : les pièces du haut du dessin en haut, celles du bas en bas,
+      chacune au plus près de sa pièce sur la largeur, dans l'ordre de leurs
+      pièces à l'écran (les traits ne se croisent pas). Une bande trop pleine
+      cède ses noms les plus proches du milieu à l'autre.
+    */
+    const posees = etiquettes.map((e) => ({ ...e, ancre: project(e.monde) }));
+    const milieu = cadre.y + cadre.h / 2;
+    const ordreVertical = [...posees].sort((a, b) => b.ancre.y - a.ancre.y);
+    let enHaut = ordreVertical.filter((e) => e.ancre.y >= milieu);
+    let enBas = ordreVertical.filter((e) => e.ancre.y < milieu);
+    while (enHaut.length > parBande) enBas = [enHaut.pop()!, ...enBas];
+    while (enBas.length > parBande) enHaut = [...enHaut, enBas.shift()!];
+    for (const [bande, haut] of [
+      [enHaut, true],
+      [enBas, false],
+    ] as const) {
+      if (bande.length === 0) continue;
+      const xs = rangerEnColonne(
+        bande.map((e) => e.ancre.x),
+        box.x + 6 + pasBande / 2,
+        box.x + box.w - 6 - pasBande / 2,
+        pasBande,
+      );
+      /*
+        Les noms se posent près du dessin, pas contre le bord de la case :
+        juste au-dessus du haut de la maquette (cotes comprises), ou juste
+        en dessous de son bas.
+      */
+      const debord = showDims ? (ECART_DE_COTE + 0.35) * scale : 0;
+      const hautDessin = boite ? cy + boite.maxY * scale + debord : box.y + box.h;
+      const basDessin = boite ? cy + boite.minY * scale - debord : box.y;
+      const yNom = haut
+        ? Math.min(box.y + box.h - 14, hautDessin + 26)
+        : Math.max(box.y + 20, basDessin - 16);
+      bande.forEach((e, i) => {
+        const x = xs[i];
+        // Le trait part sous la surface (en haut), au-dessus du nom (en bas).
+        const attache = haut ? yNom - 15 : yNom + 11;
+        d.line(x, attache, e.ancre.x, e.ancre.y, 0.5, GREY);
+        d.circle(e.ancre.x, e.ancre.y, 2.4, '#FFFFFF');
+        d.circle(e.ancre.x, e.ancre.y, 1.5, INK);
+      });
+      bande.forEach((e, i) => {
+        const x = xs[i];
+        if (e.nom) d.text(e.nom, x, yNom, 9, INK, { bold: true, align: 'center' });
+        d.text(e.aire, x, e.nom ? yNom - 10 : yNom, e.nom ? 7.5 : 9, e.nom ? GREY : INK, {
+          align: 'center',
+          bold: !e.nom,
+        });
+      });
+    }
+  }
+  for (const gauche of enBandes ? [] : [true, false]) {
     const colonne = etiquettes
       .filter((e) => e.gauche === gauche)
       .map((e) => ({ ...e, ancre: project(e.monde) }));
@@ -5914,7 +5994,19 @@ function existantPage(
     d.text(fitText(nomDe(dep), 9.5, cols[1] - xNom - 6, enTete), xNom, y, 9.5, INK, { align: 'left', bold: enTete });
     d.text(dep.calibre ? `${dep.calibre} A` : '—', cols[1] + 40, y, 9.5, INK, { align: 'right' });
     const protege = [dep.usage, dep.piece].filter(Boolean).join(' · ');
-    d.text(fitText(protege || '—', 9.5, x0 + w - cols[2]), cols[2], y, 9.5, GREY, { align: 'left' });
+    /*
+      CE QU'IL PROTÈGE SE LIT EN ENTIER — peaufinage EXPORTS : la liste des
+      pièces d'un départ d'éclairage finissait en « Bure… ». Elle passe à la
+      ligne (deux au plus, la seconde coupée seulement si elle déborde
+      encore), et la ligne suivante descend d'autant.
+    */
+    const largeurProtege = x0 + w - cols[2];
+    const morceaux = wrapText(protege || '—', 9.5, largeurProtege);
+    d.text(morceaux[0], cols[2], y, 9.5, GREY, { align: 'left' });
+    if (morceaux.length > 1) {
+      y -= 11;
+      d.text(fitText(morceaux.slice(1).join(' '), 9.5, largeurProtege), cols[2], y, 9.5, GREY, { align: 'left' });
+    }
     if (enTete) d.line(x0, y - 4, x0 + w, y - 4, 0.3, '#E3E7ED');
   }
   if (ecrites < lignes.length) {
@@ -6892,6 +6984,8 @@ function dessinerUneFace(
     reste dans le mur, et cherche une place que les baies n'occupent pas.
   */
   const etiquettesMeubles: { m: ReturnType<typeof wallFurniture>[number]; haut: number; bas: number; larg: number }[] = [];
+  /** Les silhouettes des meubles : un nom évite de couper celle d'un autre. */
+  const silhouettes: { m: unknown; x0: number; x1: number; y0: number; y1: number }[] = [];
   const occupees: { x0: number; x1: number; y0: number; y1: number }[] = [];
   /*
     LES APPAREILS RÉSERVENT LEUR PLACE AVANT LES NOMS DES MEUBLES — revues
@@ -6936,6 +7030,7 @@ function dessinerUneFace(
       contre ? 0.8 : 0.6,
     );
     if (larg > 30) etiquettesMeubles.push({ m, haut, bas, larg });
+    silhouettes.push({ m, x0: px(m.from), x1: px(m.from) + larg, y0: py(bas), y1: py(haut) });
   }
 
   /*
@@ -7061,10 +7156,44 @@ function dessinerUneFace(
     // Une ligne si tout tient ; sinon le nom (abrégé au besoin) sur la
     // hauteur ; sinon la hauteur seule. La première qui trouve une place
     // libre — hors des baies, de leurs cotes et des autres noms — l'emporte.
-    const options: string[][] = [[`${nom} · ${cm}`], [nom, cm], [fitText(nom, taille, place), cm], [cm]].filter(
-      (o) => o.every((l) => largeur(l) <= place) && (o.length === 1 || (haut - bas) * scale >= 26) && o[0].length >= 3,
+    /*
+      LE NOM EN ENTIER AVANT LE NOM ABRÉGÉ — peaufinage EXPORTS : « Fauteuil… »
+      sur un meuble étroit, alors que « Fauteuil de / bureau » tenait sur deux
+      lignes. Le nom se coupe aux espaces quand la hauteur du meuble le permet
+      ; il ne s'abrège qu'ensuite.
+    */
+    const coupe = wrapText(nom, taille, place);
+    const options: string[][] = [
+      [`${nom} · ${cm}`],
+      [nom, cm],
+      ...(coupe.length >= 2 && coupe.length <= 3 ? [[...coupe, cm]] : []),
+      [fitText(nom, taille, place), cm],
+      [cm],
+    ].filter(
+      (o) =>
+        o.every((l) => largeur(l) <= place) &&
+        (o.length === 1 || (haut - bas) * scale >= o.length * (taille + 2) + 8) &&
+        o[0].length >= 3,
     );
     let pose: { cx: number; y: number; lignes: string[]; w: number; h: number } | null = null;
+    /*
+      ET SANS COUPER LA SILHOUETTE D'UN AUTRE MEUBLE — peaufinage EXPORTS :
+      « Bureau · h 75 cm » était barré par le contour du fauteuil posé devant.
+      Une place libre de toute autre silhouette est cherchée d'abord ; à
+      défaut, la première place libre de texte, comme avant.
+    */
+    const coupeUneSilhouette = (x0: number, x1: number, y0: number, y1: number) =>
+      silhouettes.some(
+        (q) =>
+          q.m !== m &&
+          x0 < q.x1 &&
+          x1 > q.x0 &&
+          y0 < q.y1 &&
+          y1 > q.y0 &&
+          // Seul un BORD qui traverse le texte gêne : un meuble qui l'englobe entier, non.
+          !(q.x0 <= x0 && q.x1 >= x1 && q.y0 <= y0 && q.y1 >= y1),
+      );
+    for (const strict of [true, false]) {
     for (const lignes of options) {
       const w = Math.max(...lignes.map(largeur));
       const h = lignes.length * (taille + 2);
@@ -7076,7 +7205,9 @@ function dessinerUneFace(
       for (const y of ys) {
         if (y - h + taille + 2 < py(bas) + 1) continue;
         const cx = cxs.find(
-          (x) => !occupees.some((o) => x - w / 2 < o.x1 && x + w / 2 > o.x0 && y - h + taille + 2 < o.y1 && y + taille > o.y0),
+          (x) =>
+            !occupees.some((o) => x - w / 2 < o.x1 && x + w / 2 > o.x0 && y - h + taille + 2 < o.y1 && y + taille > o.y0) &&
+            (!strict || !coupeUneSilhouette(x - w / 2, x + w / 2, y - h + taille + 2, y + taille)),
         );
         if (cx !== undefined) {
           pose = { cx, y, lignes, w, h };
@@ -7084,6 +7215,8 @@ function dessinerUneFace(
         }
       }
       if (pose) break;
+    }
+    if (pose) break;
     }
     if (!pose) continue;
     const { lignes, w, h } = pose;
