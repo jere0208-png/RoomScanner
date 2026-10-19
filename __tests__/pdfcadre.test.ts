@@ -200,8 +200,9 @@ describe('la perspective du PDF montre ce que montre l’app', () => {
   const pages = [
     ...pdf.matchAll(/<< \/Length \d+ >>\nstream\n([\s\S]*?)\nendstream/g),
   ].map((m) => m[1]);
-  // La feuille 3D est la seconde (plan, puis perspective).
-  const flux = pages[1];
+  // La feuille 3D ouvre le dossier : le logement commence par sa vue
+  // d'ensemble (revue « structure »).
+  const flux = pages[0];
 
   it('les murs qui font face à l’objectif s’effacent, comme à l’écran', () => {
     // L'écorché : au moins un pan passe en transparence…

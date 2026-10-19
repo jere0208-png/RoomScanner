@@ -569,7 +569,7 @@ const styles = getStyles(c);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /** Schémas unifilaire et multifilaire, tirés des mêmes circuits. */
+  /** Le schéma unifilaire, tiré des circuits. */
   const [schema, setSchema] = useCaseRetenue(modeExport, 'schema', modeElec);
   const schemas = useMemo(() => {
     if (fixtures.length === 0) return null;
@@ -817,6 +817,8 @@ const styles = getStyles(c);
         // L'électricien remet un dossier de chantier ; les autres, celui du logement.
         modeElec,
         entreprise: entrepriseDuDossier,
+        // Le jour du relevé : la garde le distingue du jour de l'export.
+        releveLe: useScanStore.getState().saves.find((x) => x.id === useScanStore.getState().currentSaveId)?.createdAt,
       },
       include3D,
       {
@@ -1415,7 +1417,7 @@ const styles = getStyles(c);
               icone={EXPORT_ICONS.schema}
               titre="Schémas électriques"
               dit="L’unifilaire : le tableau, ses protections et chacun de ses départs."
-              pages={pagesDe(schema, combien(sommaire, 'unifilaire', 'multifilaire'), combien(avecTout, 'unifilaire', 'multifilaire'))}
+              pages={pagesDe(schema, combien(sommaire, 'unifilaire'), combien(avecTout, 'unifilaire'))}
               actif={schema}
               label="Schémas"
               onChange={(v) => basculer(() => setSchema(v))}

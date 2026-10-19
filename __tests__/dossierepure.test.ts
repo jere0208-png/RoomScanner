@@ -150,7 +150,8 @@ describe('ce qu’on retire', () => {
   });
 
   it('la perspective qui redit la page de garde', () => {
-    expect(texte(SRC)).not.toMatch(/\| Perspective \|/);
+    // Non cotée, elle redit la garde et s'en va ; cotée, elle reste (revue « structure »).
+    expect(texte(dossier({ measures3D: false }))).not.toMatch(/\| Perspective \|/);
     // Sans page de garde, la vue garde sa feuille.
     expect(texte(dossier({ garde: false }))).toMatch(/Perspective/);
   });

@@ -78,7 +78,9 @@ describe('le sommaire est celui du document', () => {
     ] as const) {
       const sommaire = sommaireDuDossier(BASE, include3D, opts);
       expect(sommaire.length).toBe(feuillesDuPdf(buildScanPdf(BASE, include3D, opts)));
-      expect(sommaire[0]).toEqual({ genre: 'plan', titre: 'Plan coté' });
+      // Le logement d'abord, la perspective en tête quand il y en a une (revue « structure »).
+      expect(sommaire.find((f) => f.genre !== 'perspective')).toEqual({ genre: 'plan', titre: 'Plan coté' });
+      expect(sommaire[0].genre).toBe(include3D ? 'perspective' : 'plan');
     }
   });
 

@@ -73,7 +73,7 @@ export function resumeDuDossier(sommaire: FeuilleDuDossier[]): string {
   dire(n('perspective'), 'vue 3D', 'vues 3D');
   dire(n('elevation'), 'mur de face', 'murs de face');
   dire(n('gaines'), 'plan des gaines', 'plans des gaines');
-  dire(n('unifilaire') + n('multifilaire'), 'schéma', 'schémas');
+  dire(n('unifilaire'), 'schéma', 'schémas');
   dire(n('existant'), 'tableau existant', 'tableaux existants');
   return bouts.join(' · ');
 }

@@ -182,7 +182,8 @@ describe('la page de garde et le cartouche', () => {
 
   it('les étiquettes du cartouche, en 7,5 pt et en gris foncé', () => {
     const src = latin1(buildScanPdf(SCAN, false, {}));
-    for (const mot of ['PROJET', 'DATE', 'DOCUMENT', 'FEUILLE']) {
+    // « ÉDITÉ LE » : la date de l'export ne se donne plus pour celle du relevé.
+    for (const mot of ['PROJET', '\xc9DIT\xc9 LE', 'DOCUMENT', 'FEUILLE']) {
       expect(src).toMatch(new RegExp(`/F1 7\\.5 Tf 0\\.35 0\\.39 0\\.45 rg [^()]*\\(${mot}\\) Tj`));
     }
   });

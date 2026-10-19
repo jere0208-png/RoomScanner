@@ -8,6 +8,7 @@
  */
 import { estUnCaisson } from '../geometry/caisson';
 import { zlibSync } from 'fflate';
+import { largeurWinAnsi } from './metriques';
 import {
   aDesTravaux,
   mursDeLaPhase,
@@ -283,6 +284,16 @@ function latin1(s: string): string {
   return efface ? out.replace(/ {2,}/g, ' ').replace(/^ | $/g, '') : out;
 }
 
+/**
+ * LA LARGEUR RÉELLE D'UN TEXTE (pt), mesurée sur les métriques d'Helvetica
+ * (voir `metriques.ts`) — pour centrer, caler à droite, couper ou passer à
+ * la ligne. Toute estimation « au signe » finit par déborder ou couper trop
+ * tôt : un « i » et un « M » n'ont pas la même largeur.
+ */
+export function largeurDuTexte(str: string, taille: number, gras = false): number {
+  return largeurWinAnsi(latin1(str), taille, gras);
+}
+
 function escText(s: string): string {
   return latin1(s).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
 }
@@ -304,10 +315,14 @@ function avecNiveau(titre: string, ctx: { niveau?: string }): string {
   return ctx.niveau ? `${titre} — ${ctx.niveau}` : titre;
 }
 
-function fitText(s: string, size: number, maxW: number): string {
-  const perChar = size * EM_TEXTE;
-  const max = Math.max(1, Math.floor(maxW / perChar));
-  return s.length <= max ? s : `${s.slice(0, max - 1)}…`;
+function fitText(s: string, size: number, maxW: number, gras = false): string {
+  // Un point de marge : la mesure est exacte, l'impression l'est un peu moins.
+  const place = maxW - 1;
+  if (largeurDuTexte(s, size, gras) <= place) return s;
+  const signes = [...s];
+  let n = signes.length - 1;
+  while (n > 1 && largeurDuTexte(`${signes.slice(0, n).join('').trimEnd()}…`, size, gras) > place) n--;
+  return `${signes.slice(0, Math.max(1, n)).join('').trimEnd()}…`;
 }
 
 /** Paramètres de cadrage validés dans l'aperçu (fractions de demi-boîte). */
@@ -397,9 +412,9 @@ export interface PdfOptions {
    */
   toutesElevations?: boolean;
   /**
-   * Schémas unifilaire et multifilaire : deux feuilles de plus, tirées des
-   * circuits déjà calculés. Absent = pas de schéma, et le dossier garde sa
-   * pagination d'avant.
+   * Le schéma unifilaire : une feuille de plus, tirée des circuits déjà
+   * calculés (et les repères des appareils pour le plan). Absent = pas de schéma.
+   * Le dossier garde alors sa pagination d’avant.
    */
   schemas?: {
     rows: SchemaRow[];
@@ -659,6 +674,20 @@ export interface InfosDuDocument {
   titre: string;
   /** L'entreprise de l'artisan, si elle est renseignée. */
   auteur?: string;
+  /** Les signets du document (voir `Signet`). */
+  signets?: Signet[];
+}
+
+/**
+ * UN SIGNET DU PDF — revue « structure » : un dossier de vingt feuilles
+ * sans signets se feuillette page à page. Aperçu, Acrobat et Fichiers
+ * montrent ces entrées dans leur panneau latéral ; un toucher mène à la
+ * feuille. `page` compte depuis 0 ; `enfants`, un niveau au plus.
+ */
+export interface Signet {
+  titre: string;
+  page: number;
+  enfants?: { titre: string; page: number }[];
 }
 
 /**
@@ -685,8 +714,8 @@ function dateDuDocument(): string {
   return `D:${d.getFullYear()}${deux(d.getMonth() + 1)}${deux(d.getDate())}`;
 }
 
-/** Les métadonnées du dossier : son titre, et l'artisan qui le remet. */
-function infosDuDossier(scan: ScanForPdf): InfosDuDocument {
+/** Les métadonnées du dossier : son titre, l'artisan qui le remet, ses signets. */
+function infosDuDossier(scan: ScanForPdf, feuilles: FeuilleAnnoncee[] = []): InfosDuDocument {
   // Le même mot que la page de garde (voir `gardePage`).
   const chantier = !scan.particulier && !!scan.modeElec;
   const nom = scan.name.trim();
@@ -694,7 +723,32 @@ function infosDuDossier(scan: ScanForPdf): InfosDuDocument {
   return {
     titre: nom ? `${nom} \u2014 ${genre}` : genre,
     auteur: scan.entreprise?.nom?.trim() || undefined,
+    ...(feuilles.length > 1 ? { signets: signetsDuDossier(feuilles) } : {}),
   };
+}
+
+/**
+ * LES SIGNETS DU DOSSIER, DU MÊME PLAN QUE SON SOMMAIRE — une entrée par
+ * sorte de feuille (le titre de la feuille quand elle est seule, celui du
+ * groupe sinon), et sous les élévations, une entrée par feuille.
+ */
+function signetsDuDossier(feuilles: FeuilleAnnoncee[]): Signet[] {
+  const out: Signet[] = [];
+  let avant: FeuilleAnnoncee | null = null;
+  feuilles.forEach((f, page) => {
+    const dernier = out[out.length - 1];
+    if (avant && dernier && avant.genre === f.genre && avant.partie === f.partie) {
+      if (f.genre === 'elevation') {
+        dernier.enfants ??= [{ titre: avant.titre, page: dernier.page }];
+        dernier.enfants.push({ titre: f.titre, page });
+      }
+      dernier.titre = GENRE_EN_CLAIR[f.genre];
+    } else {
+      out.push({ titre: f.intitule, page });
+    }
+    avant = f;
+  });
+  return out;
 }
 
 /**
@@ -759,13 +813,38 @@ function assemblerLeDocument(
     `<< /Type /Pages /Kids [${pageIds.map((i) => `${i} 0 R`).join(' ')}] /Count ${pageIds.length} >>`,
   );
   /*
+    LES SIGNETS : un dictionnaire /Outlines, et ses entrées chaînées
+    (/Prev, /Next, /Parent), chacune menant à sa feuille (/Dest … /Fit).
+  */
+  const signets = infos?.signets ?? [];
+  let outlinesId = 0;
+  if (signets.length > 0) {
+    outlinesId = add('');
+    const ecrire = (liste: { titre: string; page: number; enfants?: { titre: string; page: number }[] }[], parent: number): number[] => {
+      const ids = liste.map(() => add(''));
+      liste.forEach((sg, i) => {
+        const enfants = sg.enfants && sg.enfants.length > 0 ? ecrire(sg.enfants, ids[i]) : [];
+        const page = pageIds[Math.min(Math.max(0, sg.page), pageIds.length - 1)];
+        objects[ids[i] - 1] =
+          `<< /Title ${chaineDeTexte(sg.titre)} /Parent ${parent} 0 R` +
+          (i > 0 ? ` /Prev ${ids[i - 1]} 0 R` : '') +
+          (i < ids.length - 1 ? ` /Next ${ids[i + 1]} 0 R` : '') +
+          (enfants.length > 0 ? ` /First ${enfants[0]} 0 R /Last ${enfants[enfants.length - 1]} 0 R /Count -${enfants.length}` : '') +
+          ` /Dest [${page} 0 R /Fit] >>`;
+      });
+      return ids;
+    };
+    const tete = ecrire(signets, outlinesId);
+    objects[outlinesId - 1] = `<< /Type /Outlines /First ${tete[0]} 0 R /Last ${tete[tete.length - 1]} 0 R /Count ${tete.length} >>`;
+  }
+  /*
     LA LANGUE ET LE TITRE À L'OUVERTURE : /Lang dit au lecteur d'écran et à
     la recherche que le texte est français ; /DisplayDocTitle fait afficher
     le titre du document, pas le nom du fichier, dans la barre du lecteur.
   */
   const catalogId = add(
     infos
-      ? `<< /Type /Catalog /Pages ${pagesId} 0 R /Lang (fr-FR) /ViewerPreferences << /DisplayDocTitle true >> >>`
+      ? `<< /Type /Catalog /Pages ${pagesId} 0 R /Lang (fr-FR) /ViewerPreferences << /DisplayDocTitle true >>${outlinesId ? ` /Outlines ${outlinesId} 0 R /PageMode /UseOutlines` : ''} >>`
       : `<< /Type /Catalog /Pages ${pagesId} 0 R >>`,
   );
   const infoId = infos
@@ -974,7 +1053,9 @@ class Draw {
     const a = ((opts.angle ?? 0) * Math.PI) / 180;
     const cos = Math.cos(a);
     const sin = Math.sin(a);
-    const large = latin1(str).length * size * 0.5;
+    // La vraie largeur du texte (voir `largeurDuTexte`) : un titre centré
+    // l'est vraiment, une colonne calée à droite finit au même bord.
+    const large = largeurDuTexte(str, size, opts.bold);
     const w =
       opts.align === 'left' ? 0 : opts.align === 'right' ? large * 2 : large;
     const tx = x - (w / 2) * cos;
@@ -1064,6 +1145,18 @@ export interface EntreprisePdf {
  * là que l'œil va chercher de quoi il s'agit.
  */
 const TETE = FRAME.y + FRAME.h - 30;
+/*
+  LE GABARIT DES TITRES, UNE FOIS POUR TOUTES — revue « typographie » : le
+  titre d'une feuille sautait de six points en feuilletant (x = 54 sur les
+  plans, 60 sur les élévations et la garde), et un titre de section valait
+  13 pt ici, 9 pt là. Une feuille se titre à TITRE_X, sur la ligne TITRE_Y ;
+  H1 pour le titre de la feuille, H2 pour une section, H3 pour un intertitre.
+*/
+export const TITRE_X = FRAME.x + 24;
+export const TITRE_Y = TETE + 2;
+export const TITRE_H1 = 13;
+export const TITRE_H2 = 11;
+export const TITRE_H3 = 9;
 /**
  * LA MARGE D'UN CADRE DE LÉGENDE — la même sur les quatre côtés.
  *
@@ -1403,6 +1496,8 @@ function drawSheetChrome(
     particulier?: boolean;
     /** L'entreprise de l'artisan : elle prend la place de la marque. */
     entreprise?: EntreprisePdf | null;
+    /** Le jour du relevé (ms), quand on le connaît : la date « Relevé » du cartouche. */
+    releveLe?: number;
   },
 ) {
   // Cadre de feuille
@@ -1524,20 +1619,28 @@ function drawSheetChrome(
     });
   }
 
-  // Bloc date / échelle
-  const now = new Date();
+  /*
+    BLOC DATE / ÉCHELLE — revue « structure » : « DATE » donnait le jour de
+    l'export, pris pour celui du relevé, et « ÉCHELLE — » sur une feuille
+    sans dessin à l'échelle (un tableau, un schéma) se lisait comme un
+    oubli. La date dit ce qu'elle est : « ÉDITÉ LE », et le jour du relevé
+    au-dessus quand on le connaît et qu'il diffère. Sans dessin à l'échelle :
+    « Sans échelle ».
+  */
+  const leJour = (t: Date) => `${two(t.getDate())}/${two(t.getMonth() + 1)}/${t.getFullYear()}`;
   const two = (v: number) => String(v).padStart(2, '0');
-  etiquette('DATE', cols[1] + 12, ty + 50);
-  d.text(
-    `${two(now.getDate())}/${two(now.getMonth() + 1)}/${now.getFullYear()}`,
-    cols[1] + 12,
-    ty + 38,
-    9.5,
-    INK,
-    { align: 'left' },
-  );
+  const edite = leJour(new Date());
+  const releve = info.releveLe ? leJour(new Date(info.releveLe)) : null;
+  if (releve && releve !== edite) {
+    etiquette('DATES', cols[1] + 12, ty + 50);
+    d.text(fitText(`Relevé ${releve}`, 7.5, width(1) + 16), cols[1] + 12, ty + 40, 7.5, INK, { align: 'left' });
+    d.text(fitText(`Édité ${edite}`, 7.5, width(1) + 16), cols[1] + 12, ty + 31.5, 7.5, GREY, { align: 'left' });
+  } else {
+    etiquette('ÉDITÉ LE', cols[1] + 12, ty + 50);
+    d.text(edite, cols[1] + 12, ty + 38, 9.5, INK, { align: 'left' });
+  }
   etiquette('ÉCHELLE', cols[1] + 12, ty + 24);
-  d.text(fitText(info.scaleLabel ?? '—', 9.5, width(1)), cols[1] + 12, ty + 12, 9.5, INK, {
+  d.text(fitText(info.scaleLabel ?? 'Sans échelle', 9.5, width(1) + 16), cols[1] + 12, ty + 12, 9.5, info.scaleLabel ? INK : GREY, {
     align: 'left',
   });
   /*
@@ -1573,18 +1676,27 @@ function drawSheetChrome(
 
   // Bloc feuille
   etiquette('DOCUMENT', cols[2] + 12, ty + 50);
-  // Deux lignes quand le titre ne tient pas : « Élévation — côté Séjou… »
-  // ne disait plus de quel mur il s'agissait.
-  const titreDoc = wrapText(info.sheetTitle, 7.5, width(2));
-  if (fitText(info.sheetTitle, 8.5, width(2)) === info.sheetTitle || titreDoc.length < 2) {
-    d.text(fitText(info.sheetTitle, 8.5, width(2)), cols[2] + 12, ty + 38, 8.5, INK, {
-      align: 'left',
-    });
+  /*
+    LE TITRE TIENT, ET RESTE AÉRÉ — revues « typographie » et « structure » :
+    « Estimatif des fournitu… » alors qu'il tenait (la largeur était
+    estimée), et quatre lignes tassées à 8 pt d'interligne quand il passait
+    sur deux. Mesuré, il cède d'abord des points (8,5 → 7,5), puis passe
+    sur deux lignes ; et s'il déborde encore, il perd sa précision de queue
+    (« , mur nord ») plutôt que des lettres au milieu d'un mot.
+  */
+  const titreLarge = width(2) + 10;
+  const corpsSeul = [8.5, 8, 7.5].find((t) => largeurDuTexte(info.sheetTitle, t) <= titreLarge);
+  if (corpsSeul) {
+    d.text(info.sheetTitle, cols[2] + 12, ty + 38, corpsSeul, INK, { align: 'left' });
   } else {
-    d.text(titreDoc[0], cols[2] + 12, ty + 42, 7.5, INK, { align: 'left' });
-    d.text(fitText(titreDoc.slice(1).join(' '), 7.5, width(2)), cols[2] + 12, ty + 33.5, 7.5, INK, {
-      align: 'left',
-    });
+    const sansQueue = info.sheetTitle.replace(/,[^,—·]*$/, '');
+    const candidats = [info.sheetTitle, sansQueue];
+    const lignes =
+      candidats.map((t) => wrapText(t, 7.5, titreLarge)).find((l) => l.length <= 2) ?? wrapText(sansQueue, 7.5, titreLarge);
+    d.text(fitText(lignes[0], 7.5, titreLarge), cols[2] + 12, ty + 41, 7.5, INK, { align: 'left' });
+    if (lignes.length > 1) {
+      d.text(fitText(lignes.slice(1).join(' '), 7.5, titreLarge), cols[2] + 12, ty + 32, 7.5, INK, { align: 'left' });
+    }
   }
   etiquette('FEUILLE', cols[2] + 12, ty + 24);
   d.text(info.sheet, cols[2] + 12, ty + 12, 10, INK, { bold: true, align: 'left' });
@@ -2056,6 +2168,8 @@ interface SheetContext {
   modeElec?: boolean;
   /** L'entreprise de l'artisan, pour le cartouche. */
   entreprise?: EntreprisePdf | null;
+  /** Le jour du relevé (ms), quand on le connaît (voir `ScanForPdf.releveLe`). */
+  releveLe?: number;
   /** Les perspectives portent-elles les repères d'appareillage ? */
   reperes3D?: boolean;
   /**
@@ -7579,6 +7693,7 @@ function elevationWalls(
   photographies: Set<string> = new Set(),
 ): FaceAElever[] {
   const out: FaceAElever[] = [];
+  const quads = wallQuads(ctx.walls);
   for (const w of wallsInOrder(ctx)) {
     const interieur = interiorSide(w, ctx.walls, ctx.rooms ?? []);
     const appareils = (ctx.fixtures ?? []).filter((f) => f.wallId === w.id);
@@ -7591,7 +7706,9 @@ function elevationWalls(
       pièce, n'a pas sa feuille ; équipé ou photographié, si.
     */
     const borde = (ctx.rooms ?? []).some((r) => (r.wallIds ?? []).includes(w.id)) || !(ctx.rooms ?? []).some((r) => r.wallIds);
-    const digne = segLength(w) >= 0.6 && borde;
+    // La longueur de la FACE, pas de l'axe : une joue de 0,53 m entre deux
+    // refends de 14 cm passait le seuil par son axe (revue « structure »).
+    const digne = wallFace(w, quads.get(w.id), interieur).len >= 0.6 && borde;
     if ((toutes && digne) || devant || photographies.has(w.id)) out.push({ wall: w, cote: interieur });
     if (derriere) out.push({ wall: w, cote: interieur === 1 ? -1 : 1 });
   }
@@ -7728,6 +7845,12 @@ export interface ScanForPdf {
   /** Un particulier : le cartouche dit « Propriétaire », pas « Client ». */
   particulier?: boolean;
   /**
+   * LE JOUR DU RELEVÉ (ms) — revue « structure » : la garde disait « Établi
+   * le » avec le jour de l'export, qu'on prenait pour celui du relevé. Elle
+   * dit maintenant les deux quand ils diffèrent.
+   */
+  releveLe?: number;
+  /**
    * LE DOSSIER DE L'ÉLECTRICIEN (mode Électricité) : sa page de garde dit
    * « Dossier de chantier ». Hors de ce mode, c'est un logement.
    */
@@ -7796,13 +7919,14 @@ function drawSymbol(
 // ------------------------------------------ feuille « liste du matériel »
 
 /** Découpe un texte en lignes qui tiennent dans `maxW` points. */
-function wrapText(str: string, size: number, maxW: number): string[] {
-  const perChar = size * 0.52;
-  const max = Math.max(8, Math.floor(maxW / perChar));
+function wrapText(str: string, size: number, maxW: number, gras = false): string[] {
+  // Mesuré, pas estimé (voir `largeurDuTexte`) : plus de mot seul renvoyé à
+  // la ligne alors qu'il tenait, ni de ligne qui déborde.
+  const place = Math.max(size * 4, maxW - 1);
   const out: string[] = [];
   let line = '';
   for (const word of str.split(' ')) {
-    if (line.length + word.length + 1 > max) {
+    if (line && largeurDuTexte(`${line} ${word}`, size, gras) > place) {
       if (line) out.push(line);
       line = word;
     } else {
@@ -8976,25 +9100,90 @@ function ctxTemporaire(scan: ScanForPdf): SheetContext {
  * s'agit : le logement et à qui il est, ses chiffres, une vue d'ensemble, et
  * ce que contient chaque feuille.
  */
+/*
+  LE NOM D'UN GROUPE DE FEUILLES, TEL QUE LES FEUILLES LE PORTENT — revue
+  « structure » : le sommaire annonçait « Plan coté », « Métré », « Murs de
+  face » ; les feuilles s'intitulaient « Plan d'ensemble coté », « Métré par
+  pièce », « Élévation — … ». On cherche une feuille par son titre.
+*/
 const GENRE_EN_CLAIR: Record<FeuilleDuDossier['genre'], string> = {
   garde: 'Page de garde',
-  plan: 'Plan coté',
-  phases: 'Existant et projet',
-  metre: 'Métré',
+  plan: 'Plan d’ensemble coté',
+  phases: 'État existant et projet',
+  metre: 'Métré par pièce',
   menuiseries: 'Menuiseries',
   achats: 'Liste d’achats',
-  existant: 'Tableau existant',
+  existant: 'Installation existante',
   gaines: 'Plan des gaines',
   perspective: 'Perspectives',
-  elevation: 'Murs de face',
+  elevation: 'Élévations',
   unifilaire: 'Schéma unifilaire',
-  multifilaire: 'Schéma multifilaire',
 };
+
+/** « 9 à 11, 15 » : des numéros de feuille, les suites resserrées. */
+function suiteDeNumeros(ns: number[]): string {
+  const tri = [...new Set(ns)].sort((a, b) => a - b);
+  const bouts: string[] = [];
+  for (let i = 0; i < tri.length; i++) {
+    let j = i;
+    while (j + 1 < tri.length && tri[j + 1] === tri[j] + 1) j++;
+    bouts.push(j > i + 1 ? `${tri[i]} à ${tri[j]}` : j === i + 1 ? `${tri[i]}, ${tri[j]}` : String(tri[i]));
+    i = j;
+  }
+  return bouts.join(', ');
+}
+
+/** Une ligne du contenu du dossier, sur la page de garde. */
+type LigneDuContenu =
+  | { sorte: 'partie'; texte: string }
+  | { sorte: 'groupe'; texte: string; pages: string }
+  | { sorte: 'piece'; texte: string; pages: string };
+
+/**
+ * LE CONTENU DU DOSSIER, LIGNE PAR LIGNE — une ligne par sorte de feuille,
+ * avec ses numéros ; les deux parties quand le dossier en a deux ; et sous
+ * les murs de face, une ligne par pièce (« Chambre : 12, 15 ») : « Murs de
+ * face 9 à 21 » ne disait pas où trouver la chambre (revue « structure »).
+ */
+export function contenuDuDossier(suite: FeuilleAnnoncee[], premiere = 2): LigneDuContenu[] {
+  const groupes: { f: FeuilleAnnoncee; de: number; a: number; pieces: Map<string, number[]> }[] = [];
+  suite.forEach((f, i) => {
+    const numero = i + premiere;
+    const dernier = groupes[groupes.length - 1];
+    const g =
+      dernier && dernier.f.genre === f.genre && dernier.f.partie === f.partie
+        ? dernier
+        : (groupes.push({ f, de: numero, a: numero, pieces: new Map() }), groupes[groupes.length - 1]);
+    g.a = numero;
+    for (const p of f.pieces ?? []) g.pieces.set(p, [...(g.pieces.get(p) ?? []), numero]);
+  });
+  const deuxParties = new Set(suite.map((f) => f.partie)).size > 1;
+  const out: LigneDuContenu[] = [];
+  let partie: FeuilleAnnoncee['partie'] | null = null;
+  for (const g of groupes) {
+    if (deuxParties && g.f.partie !== partie) {
+      partie = g.f.partie;
+      out.push({ sorte: 'partie', texte: partie === 'electricite' ? 'L’électricité' : 'Le logement' });
+    }
+    out.push({
+      sorte: 'groupe',
+      texte: g.a > g.de ? GENRE_EN_CLAIR[g.f.genre] : g.f.intitule,
+      pages: g.a > g.de ? `${g.de} à ${g.a}` : String(g.de),
+    });
+    if (g.f.genre === 'elevation' && g.a > g.de) {
+      for (const [piece, ns] of g.pieces) out.push({ sorte: 'piece', texte: piece, pages: suiteDeNumeros(ns) });
+    }
+  }
+  return out;
+}
+
+/** La hauteur (pt) d'une ligne du contenu, sur la page de garde. */
+const PAS_DU_CONTENU: Record<LigneDuContenu['sorte'], number> = { partie: 18, groupe: 14, piece: 12 };
 
 function gardePage(
   ctx: SheetContext,
   sheet: string,
-  suite: FeuilleDuDossier[],
+  suite: FeuilleAnnoncee[],
   /** Les niveaux du logement, quand il en a plusieurs : ses chiffres en font la somme. */
   niveaux?: { nom: string; ctx: SheetContext }[],
 ): string {
@@ -9006,10 +9195,11 @@ function gardePage(
   // Qui remet le dossier : l'entreprise de l'artisan, ou la marque.
   const ent = ctx.entreprise?.nom ? ctx.entreprise : null;
   if (ent) {
-    d.text(fitText(ent.nom, 13, w), x0, y, 13, INK, { bold: true, align: 'left' });
+    d.text(fitText(ent.nom, TITRE_H1, w, true), x0, y, TITRE_H1, INK, { bold: true, align: 'left' });
     const coord = [ent.telephone, ent.email, ent.adresse].filter((x): x is string => !!x && !!x.trim()).join(' · ');
     if (coord) d.text(fitText(coord, 8.5, w), x0, y - 14, 8.5, GREY, { align: 'left' });
-    if (ent.siret) d.text(fitText(`SIRET ${ent.siret}`, 8, w), x0, y - 26, 8, GREY_LIGHT, { align: 'left' });
+    // Le SIRET se lit (revue « typographie » : gris clair, 2,6:1 de contraste).
+    if (ent.siret) d.text(fitText(`SIRET ${ent.siret}`, 8, w), x0, y - 26, 8, GREY, { align: 'left' });
   } else {
     drawLogo(d, x0, y - 30, 36);
     d.text('EchoPlan', x0 + 44, y - 12, 13, INK, { bold: true, align: 'left' });
@@ -9035,16 +9225,21 @@ function gardePage(
     });
   }
   y -= 26;
-  const now = new Date();
   const two = (v: number) => String(v).padStart(2, '0');
+  const leJour = (t: Date) => `${two(t.getDate())}/${two(t.getMonth() + 1)}/${t.getFullYear()}`;
+  const edite = leJour(new Date());
+  // Le jour du relevé, quand il n'est pas celui de l'export (revue « structure »).
+  const releve = ctx.releveLe ? leJour(new Date(ctx.releveLe)) : null;
   const lignes: [string, string | undefined][] = [
     [ctx.particulier ? 'Propriétaire' : 'Client', ctx.client],
     [chantier ? 'Chantier' : 'Adresse', ctx.address],
-    ['Établi le', `${two(now.getDate())}/${two(now.getMonth() + 1)}/${now.getFullYear()}`],
+    ['Relevé le', releve && releve !== edite ? releve : undefined],
+    ['Édité le', edite],
   ];
   for (const [mot, valeur] of lignes) {
     if (!valeur) continue;
-    d.text(mot.toUpperCase(), x0, y, 7, GREY_LIGHT, { align: 'left' });
+    // Les étiquettes se lisent imprimées : le gris des textes, pas celui des filets.
+    d.text(mot.toUpperCase(), x0, y, 7.5, GREY, { align: 'left' });
     d.text(fitText(valeur, 10.5, w - 90), x0 + 90, y, 10.5, INK, { align: 'left' });
     y -= 16;
   }
@@ -9100,8 +9295,15 @@ function gardePage(
   });
   y -= 46;
 
-  // Une vue d'ensemble, quand il y a de quoi la dessiner.
-  const basVue = FRAME.y + TITLE_H + 190;
+  /*
+    LE CONTENU DÉCIDE DE SA PLACE — avec les deux parties et une ligne par
+    pièce sous les murs de face, la liste ne tient plus toujours dans les
+    190 points d'avant : la vue d'ensemble lui cède ce qu'il faut, et
+    disparaît plutôt que de se réduire à une vignette illisible.
+  */
+  const contenu = contenuDuDossier(suite);
+  const hauteurContenu = 28 + contenu.reduce((h, l) => h + PAS_DU_CONTENU[l.sorte], 0);
+  const basVue = Math.max(FRAME.y + TITLE_H + 190, FRAME.y + TITLE_H + 24 + hauteurContenu);
   if (ctx.walls.length > 0 && y - 20 - basVue > 120) {
     draw3DView(
       d,
@@ -9126,25 +9328,27 @@ function gardePage(
   /*
     LE CONTENU DU DOSSIER — une ligne par sorte de feuille, avec ses
     numéros : un dossier de trente murs de face ne déroule pas trente
-    lignes, il dit « Murs de face, 6 à 35 ».
+    lignes, il dit « Élévations, 6 à 35 », puis où est chaque pièce.
   */
   let yl = basVue - 22;
-  d.text('Contenu du dossier', x0, yl, 11, INK, { bold: true, align: 'left' });
+  d.text('Contenu du dossier', x0, yl, TITRE_H2, INK, { bold: true, align: 'left' });
   yl -= 6;
   d.line(x0, yl, x0 + w, yl, 0.6, INK);
-  const groupes: { genre: FeuilleDuDossier['genre']; titre: string; de: number; a: number }[] = [];
-  suite.forEach((f, i) => {
-    const numero = i + 2;
-    const dernier = groupes[groupes.length - 1];
-    if (dernier && dernier.genre === f.genre) dernier.a = numero;
-    else groupes.push({ genre: f.genre, titre: f.titre, de: numero, a: numero });
-  });
-  for (const g of groupes) {
-    if (yl < FRAME.y + TITLE_H + 24) break;
-    yl -= 15;
-    const titre = g.a > g.de ? GENRE_EN_CLAIR[g.genre] : g.titre;
-    d.text(fitText(titre, 10, w - 80), x0, yl, 10, INK, { align: 'left' });
-    d.text(g.a > g.de ? `${g.de} à ${g.a}` : String(g.de), x0 + w, yl, 10, GREY, { align: 'right' });
+  for (const l of contenu) {
+    if (yl - PAS_DU_CONTENU[l.sorte] < FRAME.y + TITLE_H + 10) break;
+    yl -= PAS_DU_CONTENU[l.sorte];
+    if (l.sorte === 'partie') {
+      d.text(l.texte.toUpperCase(), x0, yl, 8, GREY, { bold: true, align: 'left' });
+      continue;
+    }
+    const retrait = l.sorte === 'piece' ? 16 : 0;
+    const corps = l.sorte === 'piece' ? 9 : 10;
+    const pages = l.pages;
+    const largeurPages = largeurDuTexte(pages, corps);
+    d.text(fitText(l.texte, corps, w - retrait - largeurPages - 16), x0 + retrait, yl, corps, l.sorte === 'piece' ? GREY : INK, {
+      align: 'left',
+    });
+    d.text(pages, x0 + w, yl, corps, GREY, { align: 'right' });
   }
 
   drawSheetChrome(d, {
@@ -9191,8 +9395,7 @@ export interface FeuilleDuDossier {
     | 'gaines'
     | 'perspective'
     | 'elevation'
-    | 'unifilaire'
-    | 'multifilaire';
+    | 'unifilaire';
   titre: string;
 }
 
@@ -9261,8 +9464,20 @@ interface DependancesDeLaFeuille {
   args: unknown[];
 }
 
+/**
+ * Une feuille telle que la page de garde et les signets l'annoncent : le
+ * titre qu'elle porte (`intitule`), sa partie du dossier, et les pièces
+ * qu'elle montre (pour les murs de face).
+ */
+interface FeuilleAnnoncee extends FeuilleDuDossier {
+  /** Le titre imprimé SUR la feuille : le sommaire dit le même. */
+  intitule: string;
+  partie: 'logement' | 'electricite' | 'garde';
+  pieces?: string[];
+}
+
 /** Une feuille prévue, et la façon de la fabriquer une fois numérotée. */
-interface FeuillePlanifiee extends FeuilleDuDossier {
+interface FeuillePlanifiee extends FeuilleAnnoncee {
   fabriquer: (numero: string) => ReturnType<typeof planPage>;
   depend: DependancesDeLaFeuille;
 }
@@ -9350,6 +9565,7 @@ function planifierUnNiveau(
     particulier: scan.particulier,
     modeElec: scan.modeElec,
     entreprise: scan.entreprise ?? null,
+    releveLe: scan.releveLe,
     reperes3D: opts.reperes3D ?? true,
     reperesMenuiseries: opts.metre ?? true,
     walls: scan.walls,
@@ -9377,14 +9593,64 @@ function planifierUnNiveau(
     d'ensemble redevient ce qu'il est : la maçonnerie, l'appareillage et
     leurs cotes.
   */
-  const feuilles: FeuillePlanifiee[] = [
-    {
-      genre: 'plan',
-      titre: 'Plan coté',
-      fabriquer: (n) => planPage({ ...ctx, routes: undefined }, n, opts.plan, opts.measures2D ?? true),
-      depend: { ctx, lit: LU_PAR_LE_PLAN_SANS_GAINES, args: [opts.plan, opts.measures2D ?? true] },
-    },
-  ];
+  /*
+    DEUX PARTIES, DANS L'ORDRE OÙ ON LES LIT — revue « structure » : la
+    partie de l'électricien était éclatée (tableau feuille 6, gaines 7,
+    unifilaire 22), et le plan des gaines renvoyait au schéma quinze feuilles
+    plus loin. D'abord LE LOGEMENT (la perspective, le plan, le métré, les
+    menuiseries, les finitions), puis L'ÉLECTRICITÉ (le tableau, son schéma,
+    le plan des gaines, et chaque mur équipé). Sans électricité, les murs de
+    face suivent le logement.
+  */
+  const logement: FeuillePlanifiee[] = [];
+  const electricite: FeuillePlanifiee[] = [];
+  const faces: FeuillePlanifiee[] = [];
+  const LOGEMENT = 'logement' as const;
+  const ELEC = 'electricite' as const;
+  if (include3D) {
+    /*
+      LA PERSPECTIVE QUI REDIT LA GARDE S'EN VA — relevé des revues du
+      dossier : la même vue, sous le même angle, ouvrait le dossier et
+      occupait une feuille avec 70 % de blanc. Un autre angle, réglé à
+      l'export, garde sa feuille. SAUF COTÉE — revue « structure » : la vue
+      de la garde n'est ni cotée ni entière (elle est rognée pour remplir sa
+      case) ; avec les cotes 3D, la perspective du même angle apprend
+      quelque chose et reste.
+
+      ET LES AUTRES SE RENUMÉROTENT — revue « Thomas » : trois vues
+      imprimaient « Perspective 2 » et « Perspective 3 », sans 1.
+    */
+    const cotee = opts.measures3D ?? true;
+    const gardees = vues.filter((v) => !(opts.garde && !cotee && memeAngle(v, DEFAULT_PDF_VIEWS[0])));
+    gardees.forEach((v, i) => {
+      const titre = gardees.length > 1 ? `Perspective ${i + 1}` : 'Perspective';
+      logement.push({
+        genre: 'perspective',
+        titre,
+        // Le titre que porte la feuille (voir `threeDPage`).
+        intitule: cotee ? `${titre} cotée` : titre,
+        partie: LOGEMENT,
+        fabriquer: (n) => threeDPage(ctx, n, v, cotee, i + 1, gardees.length),
+        depend: { ctx, lit: LU_PAR_LA_PERSPECTIVE, args: [v, cotee, i + 1, gardees.length] },
+      });
+    });
+  }
+  /*
+    LE PLAN D'ENSEMBLE NE PORTE PLUS LES GAINES.
+
+    Relevé du patron : « on y voit plein de traits incompréhensibles ». Le
+    cheminement part sur sa feuille — voir `gainesPage` — et le plan
+    d'ensemble redevient ce qu'il est : la maçonnerie, l'appareillage et
+    leurs cotes.
+  */
+  logement.push({
+    genre: 'plan',
+    titre: 'Plan coté',
+    intitule: 'Plan d’ensemble coté',
+    partie: LOGEMENT,
+    fabriquer: (n) => planPage({ ...ctx, routes: undefined }, n, opts.plan, opts.measures2D ?? true),
+    depend: { ctx, lit: LU_PAR_LE_PLAN_SANS_GAINES, args: [opts.plan, opts.measures2D ?? true] },
+  });
   /*
     AVANT ET APRÈS LES TRAVAUX — relevé du patron, dossier d'architecte à
     l'appui : dès qu'un mur est marqué « à démolir » ou « à créer », le
@@ -9405,9 +9671,12 @@ function planifierUnNiveau(
     );
     for (const phase of ['existant', 'projet'] as const) {
       const m = mursDeLaPhase(ctx.walls, ctx.openings, phase, porteurDe);
-      feuilles.push({
+      const titre = phase === 'existant' ? 'État existant' : 'Projet';
+      logement.push({
         genre: 'phases',
-        titre: phase === 'existant' ? 'État existant' : 'Projet',
+        titre,
+        intitule: titre,
+        partie: LOGEMENT,
         fabriquer: (n) =>
           planPage(
             {
@@ -9435,9 +9704,12 @@ function planifierUnNiveau(
   if (withMetre) {
     const pages = feuillesDuMetre(scan.walls, scan.rooms);
     for (let page = 1; page <= pages; page++) {
-      feuilles.push({
+      logement.push({
         genre: 'metre',
         titre: page > 1 ? 'Métré (suite)' : 'Métré',
+        // Le titre que porte la feuille (voir `metrePage`).
+        intitule: page > 1 ? 'Métré par pièce, suite' : 'Métré par pièce',
+        partie: LOGEMENT,
         fabriquer: (n) => metrePage(ctx, n, { page, pages }),
         depend: { ctx, lit: RIEN_DE_SELECTIF, args: [page, pages] },
       });
@@ -9445,9 +9717,11 @@ function planifierUnNiveau(
     // Les menuiseries suivent le métré : les baies de chaque pièce, cotées.
     const pagesMenuiseries = feuillesDesMenuiseries(ctx);
     for (let page = 1; page <= pagesMenuiseries; page++) {
-      feuilles.push({
+      logement.push({
         genre: 'menuiseries',
         titre: page > 1 ? 'Menuiseries (suite)' : 'Menuiseries',
+        intitule: page > 1 ? 'Menuiseries, suite' : 'Menuiseries',
+        partie: LOGEMENT,
         fabriquer: (n) => menuiseriesPage(ctx, n, { page, pages: pagesMenuiseries }),
         depend: { ctx, lit: RIEN_DE_SELECTIF, args: [page, pagesMenuiseries] },
       });
@@ -9456,75 +9730,83 @@ function planifierUnNiveau(
   // Les achats suivent le métré : ce qu'on a mesuré, puis ce qu'on achète.
   const achats = opts.achats && opts.achats.pieces.length > 0 ? opts.achats : null;
   if (achats) {
-    feuilles.push({
+    logement.push({
       genre: 'achats',
       titre: titreDesAchats(ctx),
+      intitule: titreDesAchats(ctx),
+      partie: LOGEMENT,
       fabriquer: (n) => achatsPage(ctx, n, achats),
       depend: { ctx, lit: RIEN_DE_SELECTIF, args: [achats] },
     });
   }
   /*
-    L'EXISTANT VIENT JUSTE APRÈS LE MÉTRÉ.
-
-    C'est l'ordre de la visite : voici le logement, voici ce qu'il y a
-    dedans aujourd'hui, voici ce qu'on propose. Le client lit le dossier
-    dans cet ordre-là, et c'est dans cet ordre qu'on lui en parle.
+    L'ÉLECTRICITÉ, DANS L'ORDRE DU CHANTIER : ce qu'il y a au tableau, son
+    schéma, puis par où passent les gaines — le plan des gaines dit « le
+    compte de fils est celui du schéma », le schéma est juste avant.
   */
   if (existant) {
-    feuilles.push({
+    // Déduit du plan, il ne se présente pas comme un relevé (revue « Marc »).
+    const titre = existant.projete ? 'Tableau projeté (non relevé)' : 'Tableau existant';
+    electricite.push({
       genre: 'existant',
-      // Déduit du plan, il ne se présente pas comme un relevé (revue « Marc »).
-      titre: existant.projete ? 'Tableau projeté (non relevé)' : 'Tableau existant',
+      titre,
+      intitule: existant.projete ? 'Tableau projeté (non relevé)' : 'Installation existante',
+      partie: ELEC,
       fabriquer: (n) => existantPage(ctx, n, existant),
       depend: { ctx, lit: RIEN_DE_SELECTIF, args: [existant] },
     });
   }
+  if (withSchema && schemas) {
+    /**
+     * LE SCHÉMA HORS SOL : l'unifilaire.
+     *
+     * Le dossier portait aussi les deux mêmes schémas POSÉS SUR LE PLAN,
+     * un par mode de tracé. Ils promettaient de montrer où passe chaque
+     * départ et ne montraient qu'un écheveau : sur un logement réel, une
+     * dizaine de circuits se croisent, et aucun d'eux ne se suit à l'œil.
+     * Le cheminement se lit sur le plan des gaines, l'architecture sur
+     * l'unifilaire.
+     *
+     * PLUS DE FEUILLE MULTIFILAIRE — relevé unanime des revues du dossier :
+     * des traits de couleur parallèles, sans appareil ni borne, qui
+     * annonçaient des navettes là où chaque pièce est en simple allumage.
+     */
+    const sch = schemas;
+    electricite.push({
+      genre: 'unifilaire',
+      titre: 'Schéma unifilaire',
+      intitule: 'Schéma unifilaire',
+      partie: ELEC,
+      fabriquer: (n) => unifilairePage(ctx, n, sch.rows, sch.differentials, detailDesDeparts(scan, sch.marks, sch.rows, opts.ceiling ?? [])),
+      depend: { ctx, lit: RIEN_DE_SELECTIF, args: [sch.rows, sch.differentials, sch.marks, scan, opts.ceiling ?? []] },
+    });
+  }
   /*
-    LE CHEMINEMENT, JUSTE APRES LE METRE.
-
-    C'est l'ordre du chantier : voici le logement, voici ce qu'il faut, voici
-    par ou ca passe. Et le tableau de tirage se lit sous le trace, sur la
-    meme feuille — celui qui commande la couronne a tout sous les yeux.
+    LE CHEMINEMENT : le tableau de tirage se lit sous le tracé, sur la même
+    feuille — celui qui commande la couronne a tout sous les yeux.
   */
   if (withGaines) {
-    feuilles.push({
+    electricite.push({
       genre: 'gaines',
       titre: 'Plan des gaines',
+      intitule: 'Plan des gaines',
+      partie: ELEC,
       fabriquer: (n) => gainesPage(ctx, n, schemas?.rows ?? []),
       // `gainesPage` dessine sur `planPage`, cheminement compris.
       depend: { ctx, lit: LU_PAR_LE_PLAN, args: [schemas?.rows ?? []] },
     });
   }
-  if (include3D) {
-    /*
-      LA PERSPECTIVE QUI REDIT LA GARDE S'EN VA — relevé des revues du
-      dossier : la même vue, sous le même angle, ouvrait le dossier et
-      occupait la feuille 4, avec 70 % de blanc. Un autre angle, réglé à
-      l'export, garde sa feuille.
-
-      ET LES AUTRES SE RENUMÉROTENT — revue « Thomas » : trois vues
-      imprimaient « Perspective 2 » et « Perspective 3 », sans 1.
-    */
-    const gardees = vues.filter((v) => !(opts.garde && memeAngle(v, DEFAULT_PDF_VIEWS[0])));
-    gardees.forEach((v, i) => {
-      feuilles.push({
-        genre: 'perspective',
-        titre: gardees.length > 1 ? `Perspective ${i + 1}` : 'Perspective',
-        fabriquer: (n) => threeDPage(ctx, n, v, opts.measures3D ?? true, i + 1, gardees.length),
-        depend: { ctx, lit: LU_PAR_LA_PERSPECTIVE, args: [v, opts.measures3D ?? true, i + 1, gardees.length] },
-      });
-    });
-  }
-  // Les élévations viennent après les plans et avant les schémas : on lit
-  // le logement, puis chaque mur, puis le tableau.
   // Les photos d'un mur vont à sa PREMIÈRE feuille : celle de la face de
-  // la pièce qui l'a relevé, d'où on l'a photographié.
-  const dejaPhotographie = new Set<string>();
-  const avecCliches = murs.map(({ wall: w }) => {
-    const cliches = dejaPhotographie.has(w.id) ? [] : photos.get(w.id) ?? [];
-    dejaPhotographie.add(w.id);
-    return cliches;
-  });
+  // la pièce qui l'a relevé, d'où on l'a photographié (la première de
+  // `elevationWalls`).
+  const clichesDe = new Map<FaceAElever, { im: PdfImage; along?: number }[]>();
+  {
+    const dejaPhotographie = new Set<string>();
+    for (const f of murs) {
+      clichesDe.set(f, dejaPhotographie.has(f.wall.id) ? [] : photos.get(f.wall.id) ?? []);
+      dejaPhotographie.add(f.wall.id);
+    }
+  }
   /*
     DEUX FACES PAR FEUILLE quand elles vont ensemble (même pièce, ou les
     deux faces d'une cloison), qu'aucune ne porte de photo, et que l'échelle
@@ -9541,13 +9823,14 @@ function planifierUnNiveau(
     return pire.ratio <= 50 ? pire : null;
   };
   /*
-    UNE LÉGENDE QUI DIT QUELLE PIÈCE — revue de l'export : dans l'aperçu,
-    les murs de face s'appelaient « Mur 1 », « Murs 2 et 3 »… jusqu'à
-    « Murs 20 et 21 », sans rien qui dise de quelle pièce il s'agissait ; il
-    fallait ouvrir les feuilles une à une pour trouver la bonne. Le sommaire
-    porte maintenant la pièce et l'orientation, en court : « Mur 1 · Séjour
-    N », « Murs 2-3 · Chambre », « Murs 4-5 · deux faces ». La feuille, elle,
-    garde son titre complet.
+    UNE LÉGENDE QUI DIT QUELLE PIÈCE — revue de l'export : le sommaire porte
+    la pièce et l'orientation, en court : « Mur 1 · Séjour N », « Murs 2 et
+    3 · Chambre », « Mur 12 · Salle d'eau / Entrée ».
+
+    ET LE NUMÉRO DU PLAN — revue « structure » : le sommaire comptait les
+    FACES (« Murs 20-21 »), les feuilles et le plan numérotent les MURS
+    (« Mur 16 ») ; à partir de la première cloison vue des deux côtés, plus
+    rien ne concordait. C'est `wallNumbers`, celui que la feuille imprime.
   */
   // Le découpage des pièces, calculé au premier mur nommé seulement : sans
   // murs de face, le sommaire ne le paie pas.
@@ -9570,38 +9853,59 @@ function planifierUnNiveau(
     const aire = centre ? wallCardinal(f.wall, centre, ctx.north ?? null, f.cote) : null;
     return [nomDeLaPiece(f), aire ? AIRE_COURTE[aire] ?? '' : ''].filter(Boolean).join(' ');
   };
-  let numeroDeFace = 0;
-  for (let i = 0; i < murs.length; i++) {
-    const a = murs[i];
-    const b = murs[i + 1];
-    numeroDeFace += 1;
-    const ensemble =
-      b &&
-      avecCliches[i].length === 0 &&
-      avecCliches[i + 1].length === 0 &&
-      (a.wall.id === b.wall.id || (pieceDe(a) !== null && pieceDe(a) === pieceDe(b)));
-    const commune = ensemble ? echelleCommune(a, b) : null;
+  const numeros = murs.length > 0 ? wallNumbers(ctx) : new Map<string, number>();
+  const numeroDe = (f: FaceAElever) => numeros.get(f.wall.id) ?? 0;
+  /*
+    RANGÉES PAR PIÈCE — revue « structure » : rangées mur par mur, les faces
+    du séjour tombaient sur cinq feuilles éparses. Chaque pièce garde ses
+    murs ensemble, dans l'ordre des pièces du relevé ; les deux faces d'une
+    même cloison vont ensemble d'abord, sur une feuille, sous la pièce de la
+    première.
+  */
+  const rangDesPieces = new Map((ctx.rooms ?? []).map((r, i) => [r.id, i] as const));
+  const rangDe = (f: FaceAElever) => rangDesPieces.get(pieceDeLaFace(f)) ?? Number.MAX_SAFE_INTEGER;
+  const ordre = murs
+    .map((f, i) => ({ f, i }))
+    .sort((p, q) => rangDe(p.f) - rangDe(q.f) || p.i - q.i)
+    .map((x) => x.f);
+  const prises = new Set<FaceAElever>();
+  const sansPhoto = (f: FaceAElever) => (clichesDe.get(f) ?? []).length === 0;
+  for (const a of ordre) {
+    if (prises.has(a)) continue;
+    prises.add(a);
+    // Le partenaire : l'autre face de la même cloison, sinon la face suivante, de la même pièce.
+    const libres = ordre.filter((f) => !prises.has(f));
+    const b =
+      libres.find((f) => f.wall.id === a.wall.id) ??
+      (libres.length > 0 && pieceDe(a) !== null && pieceDe(libres[0]) === pieceDe(a) ? libres[0] : undefined);
+    const commune = b && sansPhoto(a) && sansPhoto(b) ? echelleCommune(a, b) : null;
     if (b && commune) {
-      feuilles.push({
+      prises.add(b);
+      const memeMur = a.wall.id === b.wall.id;
+      const deux = [...new Set([nomDeLaPiece(a), nomDeLaPiece(b)].filter(Boolean))];
+      const titre = memeMur
+        ? `Mur ${numeroDe(a)}${deux.length ? ` · ${deux.join(' / ')}` : ''}`
+        : `Murs ${numeroDe(a)} et ${numeroDe(b)}${nomDeLaPiece(a) ? ` · ${nomDeLaPiece(a)}` : ''}`;
+      faces.push({
         genre: 'elevation',
-        titre: (() => {
-          const quoi = a.wall.id === b.wall.id ? 'deux faces' : nomDeLaPiece(a);
-          return `Murs ${numeroDeFace}-${numeroDeFace + 1}${quoi ? ` · ${quoi}` : ''}`;
-        })(),
+        titre,
+        intitule: `${memeMur ? 'Élévation' : 'Élévations'} — ${titre}`,
+        partie: ELEC,
+        pieces: deux,
         fabriquer: (n) => elevationsDeDeuxFaces(ctx, n, a, b, commune),
         depend: { ctx, lit: LU_PAR_LES_FACES, args: [a, b, commune] },
       });
-      numeroDeFace += 1;
-      i += 1;
       continue;
     }
-    const cliches = avecCliches[i];
-    feuilles.push({
+    const cliches = clichesDe.get(a) ?? [];
+    const quoi = legendeDeLaFace(a);
+    const titre = `Mur ${numeroDe(a)}${quoi ? ` · ${quoi}` : ''}`;
+    faces.push({
       genre: 'elevation',
-      titre: (() => {
-        const quoi = legendeDeLaFace(a);
-        return `Mur ${numeroDeFace}${quoi ? ` · ${quoi}` : ''}`;
-      })(),
+      titre,
+      intitule: `Élévation — ${titre}`,
+      partie: ELEC,
+      pieces: nomDeLaPiece(a) ? [nomDeLaPiece(a)] : [],
       fabriquer: (n) => elevationPage(ctx, n, a.wall, cliches, a.cote),
       // Une photo compte par ce que la page en écrit : son nom, sa taille,
       // sa cote — pas ses octets, qui vont au document, pas à la page.
@@ -9612,32 +9916,13 @@ function planifierUnNiveau(
       },
     });
   }
-  if (withSchema && schemas) {
-    /**
-     * LES SCHÉMAS HORS SOL : unifilaire, puis multifilaire.
-     *
-     * Le dossier portait aussi les deux mêmes schémas POSÉS SUR LE PLAN,
-     * un par mode de tracé. Ils promettaient de montrer où passe chaque
-     * départ et ne montraient qu'un écheveau : sur un logement réel, une
-     * dizaine de circuits se croisent, et aucun d'eux ne se suit à l'œil.
-     * Le cheminement se lit sur le plan des gaines, l'architecture sur
-     * l'unifilaire, le câblage sur le multifilaire.
-     */
-    const sch = schemas;
-    feuilles.push({
-      genre: 'unifilaire',
-      titre: 'Schéma unifilaire',
-      fabriquer: (n) => unifilairePage(ctx, n, sch.rows, sch.differentials, detailDesDeparts(scan, sch.marks, sch.rows, opts.ceiling ?? [])),
-      depend: { ctx, lit: RIEN_DE_SELECTIF, args: [sch.rows, sch.differentials, sch.marks, scan, opts.ceiling ?? []] },
-    });
-    /*
-      PLUS DE FEUILLE MULTIFILAIRE — relevé unanime des revues du dossier :
-      des traits de couleur parallèles, sans appareil ni borne, qui
-      annonçaient des navettes là où chaque pièce est en simple allumage.
-      Ce n'est pas un multifilaire, et la feuille n'apprenait rien que
-      l'unifilaire ne dise.
-    */
-  }
+  // Sans électricité, les murs de face sont du logement.
+  const avecElec = electricite.length > 0;
+  const feuilles: FeuillePlanifiee[] = [
+    ...logement,
+    ...electricite,
+    ...faces.map((f) => (avecElec ? f : { ...f, partie: LOGEMENT })),
+  ];
   return { feuilles, images, ctx };
 }
 
@@ -9669,6 +9954,7 @@ function planifierLeDossier(
         particulier: scan.particulier,
         modeElec: scan.modeElec,
         entreprise: scan.entreprise,
+        releveLe: scan.releveLe,
         north: scan.north,
       };
       const r = planifierUnNiveau(
@@ -9684,7 +9970,7 @@ function planifierLeDossier(
         },
         `N${k}`,
       );
-      for (const f of r.feuilles) feuilles.push({ ...f, titre: `${f.titre} — ${nv.nom}` });
+      for (const f of r.feuilles) feuilles.push({ ...f, titre: `${f.titre} — ${nv.nom}`, intitule: `${f.intitule} — ${nv.nom}` });
       images.push(...r.images);
       ctxNiveaux!.push({ nom: nv.nom, ctx: r.ctx });
     });
@@ -9698,19 +9984,26 @@ function planifierLeDossier(
       feuilles.push({
         genre: 'achats',
         titre: titreDesAchats(pourTout),
+        intitule: titreDesAchats(pourTout),
+        partie: 'logement',
         fabriquer: (n) => achatsPage(pourTout, n, achats),
         depend: { ctx: pourTout, lit: RIEN_DE_SELECTIF, args: [achats] },
       });
     }
+    // Les deux parties, sur tout le logement : chaque niveau garde son ordre.
+    const rangDePartie = (f: FeuillePlanifiee) => (f.partie === 'electricite' ? 1 : 0);
+    feuilles = feuilles.map((f, i) => ({ f, i })).sort((p, q) => rangDePartie(p.f) - rangDePartie(q.f) || p.i - q.i).map((x) => x.f);
   }
   // La page de garde ouvre le dossier, et annonce les feuilles qui suivent.
   if (opts.garde) {
-    const suite = feuilles.map(({ genre, titre }) => ({ genre, titre }));
+    const suite: FeuilleAnnoncee[] = feuilles.map(({ genre, titre, intitule, partie, pieces }) => ({ genre, titre, intitule, partie, pieces }));
     const duLogement = ctx;
     const parNiveau = ctxNiveaux;
     feuilles.unshift({
       genre: 'garde',
       titre: 'Page de garde',
+      intitule: 'Page de garde',
+      partie: 'garde',
       fabriquer: (n) => gardePage(duLogement, n, suite, parNiveau),
       depend: { ctx: duLogement, lit: 'tout', args: [suite, parNiveau] },
     });
@@ -9743,7 +10036,7 @@ export function buildScanPdf(
   const { feuilles, images } = planifierLeDossier(scan, include3D, opts);
   const total = feuilles.length;
   const pages = feuilles.map((f, i) => f.fabriquer(`${i + 1} / ${total}`));
-  return buildDocument(pages, images, infosDuDossier(scan));
+  return buildDocument(pages, images, infosDuDossier(scan, feuilles));
 }
 
 /*
@@ -9937,7 +10230,7 @@ export function chantierDuDossier(
     pages[i] = null;
   };
   const assembler = () => {
-    fini = assemblerLeDocument(flux as string[], images, infosDuDossier(scan));
+    fini = assemblerLeDocument(flux as string[], images, infosDuDossier(scan, feuilles));
     // Le cache ne garde que les deux derniers dossiers achevés.
     for (const m of [cache.dessins, cache.flux, cache.empreintes] as Map<string, unknown>[]) {
       for (const k of [...m.keys()]) if (!vus.has(k) && !cache.precedent.has(k)) m.delete(k);

@@ -108,7 +108,7 @@ describe('sans les feuilles rendues, une miniature fidèle — jamais une icône
 
   it('chaque genre de feuille se dessine, même sans murs (logement d’exemple)', () => {
     const genres: FeuilleDuDossier['genre'][] = [
-      'garde', 'plan', 'metre', 'achats', 'existant', 'gaines', 'perspective', 'elevation', 'unifilaire', 'multifilaire',
+      'garde', 'plan', 'metre', 'achats', 'existant', 'gaines', 'perspective', 'elevation', 'unifilaire',
     ];
     for (const genre of genres) {
       const r = rendre(<MiniatureFeuille feuille={{ genre, titre: genre }} murs={[]} net largeur={196} />);

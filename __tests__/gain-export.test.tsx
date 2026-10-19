@@ -38,6 +38,7 @@ import {
   fromBase64,
   materialFilename,
   pdfFilename,
+  PHOTO_A_BLANC,
   sommaireDuDossier,
   toBase64,
 } from '../src/export/pdf';
@@ -621,13 +622,29 @@ describe('9. des légendes parlantes, des options dans l’ordre du dossier', ()
     const murs = s.filter((f) => f.genre === 'elevation').map((f) => f.titre);
     expect(murs.length).toBeGreaterThan(0);
     for (const t of murs) {
-      expect(t).toMatch(/^(Mur \d+|Murs \d+-\d+) · /);
-      expect(t).not.toMatch(/ et /);
+      // « Murs 2 et 5 » : les numéros du plan ne se suivent pas toujours,
+      // « 2-5 » se lirait comme une plage (revue « structure »).
+      expect(t).toMatch(/^(Mur \d+|Murs \d+ et \d+) · /);
     }
     // Une face seule porte sa pièce et son cardinal en court.
     const seules = murs.filter((t) => t.startsWith('Mur '));
     for (const t of seules) expect(t).toMatch(/^Mur \d+ · Pièce \d+( (N|NE|E|SE|S|SO|O|NO))?$/);
-    expect(murs.some((t) => / (N|NE|E|SE|S|SO|O|NO)$/.test(t)) || seules.length === 0).toBe(true);
+    // Rangés par pièce, les murs de façade vont par deux ; la face seule qui
+    // reste ici est le refend, qui ne regarde aucun point cardinal. Une
+    // façade seule — photographiée, elle garde sa feuille — porte le sien.
+    const facades = sommaireDuDossier(
+      {
+        ...BASE,
+        roomNames,
+        north: 0,
+        walls: BASE.walls.filter((w) => w.id !== 'refend'),
+        photos: BASE.walls.filter((w) => w.id !== 'refend').map((w) => ({ wallId: w.id, base64: PHOTO_A_BLANC })),
+      },
+      false,
+      { elevations: true, toutesElevations: true },
+    ).filter((f) => f.genre === 'elevation');
+    expect(facades.length).toBeGreaterThan(0);
+    for (const f of facades) expect(f.titre).toMatch(/^Mur \d+ · Pièce \d+ (N|NE|E|SE|S|SO|O|NO)$/);
   });
 
   it('sans boussole, la pièce seule ; le PDF a autant de feuilles que son sommaire', () => {
