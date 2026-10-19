@@ -636,7 +636,7 @@ export function HomeScreen() {
               {/* « Mes plans », comme la bibliothèque qu'il ouvre (c'était
                   « Vos plans » ici, « Mes scans » là-bas). */}
               <Text style={styles.sectionTitre}>{cherche ? 'Résultats' : 'Mes plans'}</Text>
-              {saves.length > 0 && (
+              {recents.length > 0 && (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Mes plans"
@@ -645,7 +645,10 @@ export function HomeScreen() {
                   onPress={() => setScreen('library')}>
                   <Text style={styles.toutVoirTexte}>Tout voir</Text>
                   <View accessibilityLabel="Nombre de plans" style={styles.compteur}>
-                    <Text style={styles.compteurTexte}>{saves.length}</Text>
+                    {/* LES PLANS QU'ON VA VOIR, PAS LA CORBEILLE — relevé du patron :
+                        « Tout voir » annonçait un nombre que la bibliothèque ne
+                        montrait pas ; elle range à part les plans jetés. */}
+                    <Text style={styles.compteurTexte}>{recents.length}</Text>
                   </View>
                 </Pressable>
               )}

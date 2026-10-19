@@ -3264,6 +3264,15 @@ export function clampFootprint(
     cloison par nature ; on ne le recadre pas.
   */
   if (/stairs/i.test(f.category)) return f;
+  /*
+    LE COFFRAGE SOUS PLAFOND EST DÉJÀ À SA PLACE — relevé du patron, dans la
+    chambre de l'appartement de test : « il ne se centre pas bien, rentre
+    dans un mur d'un côté et laisse une marge de l'autre ». Posé de nu à nu
+    (`ajouterCaisson`), au plafond, il était recadré comme un meuble posé au
+    sol : décalé de 3,5 cm vers le refend, et un jour du côté de la façade.
+    Il ne gêne aucun meuble et ne se recadre pas (voir `caisson.ts`).
+  */
+  if (f.category === 'caisson') return f;
   let cx = f.cx;
   let cz = f.cz;
   /*

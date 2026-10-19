@@ -7,12 +7,19 @@
  * (`NotificationsScreen`), écrit pour eux seuls ; il vit maintenant ici, une
  * fois, pour tout ce qui se jette d'un glissé.
  *
- * Trois issues, comme dans Mail :
+ * Deux issues :
  *   — un glissé court se referme ;
- *   — un glissé à mi-course laisse la corbeille ouverte, collée au bord
- *     droit : un appui dessus jette ;
- *   — un glissé long (ou vif) jette d'un coup, et la vibration dit au
- *     passage du seuil que lâcher jettera.
+ *   — un glissé franc laisse la corbeille ouverte, collée au bord droit : un
+ *     appui dessus jette.
+ *
+ * LE GLISSÉ NE JETTE JAMAIS À LUI SEUL — relevé du patron : « le glisser pour
+ * voir Supprimer est trop capricieux et rapide ; qu'on ne puisse pas juste
+ * glisser pour supprimer directement, mais qu'on propose le Supprimer ».
+ * Le glissé long (ou vif) qui jetait d'un coup a disparu : au-delà de la
+ * corbeille, la carte résiste comme un élastique, et seule la corbeille
+ * touchée jette. Le geste démarre plus tard (un vrai glissé horizontal, pas
+ * un défilement un peu de travers), la carte suit le doigt un peu moins vite
+ * que lui, et se pose en douceur, sans rebond.
  *
  * Ce qui est DEVANT reste ce qu'il était — une carte, une ligne — et garde son
  * appui : `children` reçoit `refermer`, qui referme une ligne entrouverte et
@@ -35,10 +42,24 @@ import { haptic } from '../ui/haptic';
 import { SOLAIRES } from '../ui/solaires';
 import { themedStyles, useTheme, type Palette } from '../theme';
 
-/** Au-delà, lâcher jette. */
-export const SEUIL_SUPPRIMER = 150;
 /** La corbeille ouverte : sa largeur. */
 export const OUVERT = -92;
+/** Le doigt doit avoir glissé d'autant, à l'horizontale, pour que la carte le suive. */
+export const DEPART_DU_GLISSE = 18;
+/** La carte suit le doigt à ce train : un geste vif ne l'emporte pas. */
+const SUIVI = 0.8;
+/** Au-delà de la corbeille ouverte, l'élastique : la carte ne va plus qu'au quart. */
+const ELASTIQUE = 0.25;
+/** La place que la carte prend au doigt, élastique compris (`dx` : glissé du doigt). */
+export function placeAuDoigt(base: number, dx: number): number {
+  const brut = Math.min(0, base + dx * SUIVI);
+  return brut < OUVERT ? OUVERT + (brut - OUVERT) * ELASTIQUE : brut;
+}
+/** Où se pose la carte au lâcher : ouverte (corbeille offerte) ou refermée. */
+export function poseAuLacher(fin: number, vx: number): number {
+  // Ouverte aux deux tiers de la corbeille, ou d'un glissé franc et vif.
+  return fin < OUVERT * 0.66 || (vx < -0.6 && fin < -28) ? OUVERT : 0;
+}
 
 export function GlisserPourSupprimer({
   libelle,
@@ -61,7 +82,7 @@ export function GlisserPourSupprimer({
   const base = useRef(0);
   const auSeuil = useRef(false);
   const vers = (v: number) =>
-    Animated.spring(x, { toValue: v, useNativeDriver: true, speed: 22, bounciness: 2 }).start();
+    Animated.spring(x, { toValue: v, useNativeDriver: true, speed: 12, bounciness: 0 }).start();
   const partir = () =>
     Animated.timing(x, { toValue: -700, duration: 200, useNativeDriver: true }).start(() => onSupprimer());
   /** Une ligne entrouverte se referme d'abord — et le dit. */
@@ -76,7 +97,8 @@ export function GlisserPourSupprimer({
 
   const pan = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dx) > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onMoveShouldSetPanResponder: (_e, g) =>
+        Math.abs(g.dx) > DEPART_DU_GLISSE && Math.abs(g.dx) > Math.abs(g.dy) * 2.2,
       onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: () => {
         auSeuil.current = false;
@@ -85,19 +107,17 @@ export function GlisserPourSupprimer({
         });
       },
       onPanResponderMove: (_e, g) => {
-        const v = Math.min(0, base.current + g.dx);
+        const v = placeAuDoigt(base.current, g.dx);
         x.setValue(v);
-        const passe = v < -SEUIL_SUPPRIMER;
+        // Une vibration légère quand la corbeille est entièrement offerte.
+        const passe = v <= OUVERT;
         if (passe !== auSeuil.current) {
           auSeuil.current = passe;
           if (passe) haptic('leger');
         }
       },
       onPanResponderRelease: (_e, g) => {
-        const fin = base.current + g.dx;
-        if (fin < -SEUIL_SUPPRIMER || g.vx < -1.2) partir();
-        else if (fin < OUVERT / 2) vers(OUVERT);
-        else vers(0);
+        vers(poseAuLacher(placeAuDoigt(base.current, g.dx), g.vx));
       },
       onPanResponderTerminate: () => vers(0),
     }),

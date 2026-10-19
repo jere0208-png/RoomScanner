@@ -438,6 +438,20 @@ describe('vos plans', () => {
     expect(useScanStore.getState().screen).toBe('library');
   });
 
+  it('le compte de « Tout voir » ne compte pas la corbeille, que la bibliothèque range à part', () => {
+    useScanStore.setState({
+      saves: [
+        plan('a', 'Studio Hugo', 1000),
+        plan('b', 'Appartement Dupont', 4000),
+        { ...plan('c', 'Maison Leroy', 3000), corbeille: 5000 },
+        { ...plan('d', 'Garage', 2000), corbeille: 5000 },
+      ] as never,
+    });
+    const t = monter();
+    const badge = bouton(t, 'Mes plans').findAll((n) => n.props?.accessibilityLabel === 'Nombre de plans')[0];
+    expect(badge.findAllByType(Text).map((n) => String(n.props.children))).toEqual(['2']);
+  });
+
   it('la recherche n’apparaît qu’avec beaucoup de plans, et trouve sans accents', () => {
     quatre();
     let t = monter();
