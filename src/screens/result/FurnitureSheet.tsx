@@ -73,6 +73,25 @@ const SYNONYMES: Record<string, string[]> = {
   sofa: ['canape'],
   divan: ['canape'],
   salon: ['sejour'],
+  // Ce qu'on dit chez soi, que le catalogue nomme autrement (peaufinage MEUBLES).
+  placard: ['armoire', 'dressing', 'colonne'],
+  penderie: ['armoire', 'dressing', 'portant'],
+  machine: ['lave-linge', 'lave-vaisselle', 'seche-linge'],
+  cuisiniere: ['plaque', 'four'],
+  gaziniere: ['plaque', 'four'],
+  ballon: ['chauffe-eau'],
+  cumulus: ['chauffe-eau'],
+  convertible: ['canape'],
+  clic: ['canape'],
+  matelas: ['lit'],
+  berceau: ['lit bebe'],
+  ordinateur: ['ecran', 'bureau'],
+  pc: ['ecran', 'bureau'],
+  luminaire: ['lampe', 'lampadaire'],
+  toilettes: ['wc'],
+  vasque: ['lavabo', 'meuble vasque'],
+  etageres: ['etagere', 'bibliotheque', 'casiers'],
+  rangement: ['armoire', 'commode', 'buffet', 'casiers', 'colonne'],
 };
 
 /*
@@ -83,6 +102,33 @@ const EXPRESSIONS: [RegExp, string][] = [[/\bsalles? de bains?\b/g, 'salle d’e
 
 /** « chaises » trouve « Chaise », « tableaux » trouve « Tableau ». */
 const singulier = (m: string) => (m.length > 3 && /[sx]$/.test(m) ? m.slice(0, -1) : m);
+
+/**
+ * À UNE FAUTE PRÈS — peaufinage MEUBLES : « armore », « bibliotheqe »,
+ * « refrigirateur » ne trouvaient rien. Un mot tapé de cinq lettres ou plus
+ * se reconnaît au début d'un mot du catalogue à une lettre près (deux à
+ * partir de neuf lettres) : une lettre oubliée, en trop, ou remplacée.
+ */
+function aUneFautePres(tape: string, mot: string): boolean {
+  if (tape.length < 5) return false;
+  const tolere = tape.length >= 9 ? 2 : 1;
+  // On compare au début du mot du catalogue : « frigi » doit trouver « frigo… ».
+  const debut = mot.slice(0, tape.length + tolere);
+  const n = tape.length;
+  const m = debut.length;
+  let prec = Array.from({ length: m + 1 }, (_, j) => j);
+  let mini = Infinity;
+  for (let i = 1; i <= n; i++) {
+    const cour = [i];
+    for (let j = 1; j <= m; j++) {
+      cour[j] = Math.min(prec[j] + 1, cour[j - 1] + 1, prec[j - 1] + (tape[i - 1] === debut[j - 1] ? 0 : 1));
+    }
+    prec = cour;
+  }
+  // Le mot tapé peut s'arrêter avant la fin du mot du catalogue (préfixe).
+  for (let j = Math.max(0, n - tolere); j <= m; j++) mini = Math.min(mini, prec[j]);
+  return mini <= tolere;
+}
 
 /**
  * MOT PAR MOT — revue « Théo » : « table manger » et « canape angle » ne
@@ -101,8 +147,10 @@ export function matchItem(item: CatalogItem, quete: string, famille = ''): boole
   const mots = q.split(/[\s'’-]+/).filter(Boolean);
   if (mots.length === 0) return true;
   const texte = sansAccent(`${item.label} ${item.category} ${famille}`);
+  const motsDuTexte = texte.split(/[\s'’-]+/).filter(Boolean);
   const trouve = (m: string) => texte.includes(m) || (SYNONYMES[m] ?? []).some((s) => texte.includes(sansAccent(s)));
-  return mots.every((m) => trouve(m) || trouve(singulier(m)));
+  const approche = (m: string) => motsDuTexte.some((t) => aUneFautePres(m, t));
+  return mots.every((m) => trouve(m) || trouve(singulier(m)) || approche(m));
 }
 
 /**
@@ -407,7 +455,13 @@ export function FurnitureSheet({
   onLacher,
   poseValide = true,
   titre = 'Ajouter un meuble',
+  familleConseillee = null,
 }: {
+  /**
+   * LA FAMILLE DE LA PIÈCE CHOISIE — peaufinage MEUBLES : depuis la chambre,
+   * le catalogue s'ouvre sur les meubles de chambre (« Tout » rend le reste).
+   */
+  familleConseillee?: string | null;
   /** Le titre de la feuille : « Remplacer … par » quand on remplace un meuble. */
   titre?: string;
   visible: boolean;
@@ -513,7 +567,11 @@ export function FurnitureSheet({
       setDoigt(null);
       setFamilleChoisie(null);
       setMesure((m) => ({ ...m, ouvert: false }));
+    } else if (familleConseillee && !quete.trim()) {
+      setFamilleChoisie(familleConseillee);
     }
+    // Seulement à l'ouverture : la puce choisie ensuite reste celle de l'utilisateur.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const lever = (item: CatalogItem, page: { x: number; y: number }) => {

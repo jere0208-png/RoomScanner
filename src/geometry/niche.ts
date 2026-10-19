@@ -440,10 +440,13 @@ export function contreLeMurLePlusProche(
   box: { width: number; depth: number },
   walls: WallSeg[],
   dedans: Pt,
+  /** Les seuls murs éligibles (les autres servent encore à lire les faces). */
+  parmi?: (w: WallSeg) => boolean,
 ): { centre: Pt; yaw: number } | null {
   let mieux: { w: WallSeg; d: number; s: number; L: number; u: Pt } | null = null;
   for (const w of walls) {
     if (w.type !== 'wall') continue;
+    if (parmi && !parmi(w)) continue;
     const L = segLength(w);
     if (L < Math.min(box.width, 0.3)) continue;
     const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
@@ -467,4 +470,146 @@ export function contreLeMurLePlusProche(
     // Le dos (+z local) regarde le mur : ez = −n.
     yaw: Math.atan2(n.x, -n.z),
   };
+}
+
+/** La distance d'un point au segment d'un mur (m). */
+function distanceAuMur(p: Pt, w: WallSeg): number {
+  const L = segLength(w);
+  if (L < 1e-6) return Math.hypot(p.x - w.a.x, p.z - w.a.z);
+  const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
+  const s = Math.max(0, Math.min(L, (p.x - w.a.x) * u.x + (p.z - w.a.z) * u.z));
+  return Math.hypot(p.x - (w.a.x + u.x * s), p.z - (w.a.z + u.z * s));
+}
+
+/**
+ * La place du meuble le long de son mur, une fois adossé : [s0, s1] en mètres
+ * depuis `a`, comme `contreLeMurLePlusProche` la choisit.
+ */
+function placeLeLong(p: Pt, w: WallSeg, largeur: number): [number, number] {
+  const L = segLength(w);
+  const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
+  const s = (p.x - w.a.x) * u.x + (p.z - w.a.z) * u.z;
+  const c = L >= largeur ? Math.max(largeur / 2, Math.min(L - largeur / 2, s)) : L / 2;
+  return [c - largeur / 2, c + largeur / 2];
+}
+
+/** La menuiserie `o` mord-elle la place [s0, s1] du mur `w` ? */
+function mordLaPlace(o: WallSeg, w: WallSeg, place: [number, number]): boolean {
+  const L = segLength(w);
+  if (L < 1e-6) return false;
+  const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
+  const n = { x: -u.z, z: u.x };
+  // Sur ce mur : dans sa ligne, à son épaisseur près.
+  const loin = (q: Pt) => Math.abs((q.x - w.a.x) * n.x + (q.z - w.a.z) * n.z);
+  if (loin(o.a) > 0.25 || loin(o.b) > 0.25) return false;
+  const t0 = (o.a.x - w.a.x) * u.x + (o.a.z - w.a.z) * u.z;
+  const t1 = (o.b.x - w.a.x) * u.x + (o.b.z - w.a.z) * u.z;
+  return Math.min(Math.max(t0, t1), place[1]) - Math.max(Math.min(t0, t1), place[0]) > 0.05;
+}
+
+/*
+  CE QUI S'ADOSSE, POSÉ PRÈS D'UN MUR, S'Y ADOSSE — peaufinage MEUBLES. Un lit,
+  une armoire, un canapé, un meuble bas, un lave-linge lâchés à un pas d'un
+  mur arrivaient de travers ou à quelques centimètres de lui, et il fallait
+  les tourner, puis les traîner. Ils viennent contre ce mur, dos au nu (la
+  tête du lit, le dossier du canapé), sans se mettre devant une porte ; et
+  un lit évite le mur de la fenêtre, s'il en a un autre à portée. Lâché au
+  milieu de la pièce, rien ne change : la table reste au milieu.
+*/
+const ADOSSABLES = new Set([
+  'lit90', 'lit140', 'lit160', 'lit180', 'litBebe', 'litSuperpose', 'chevet', 'commode', 'armoire2p',
+  'armoire', 'dressing', 'coiffeuse', 'meubleBas', 'meubleBas120', 'evier', 'frigo', 'lv', 'frigoUs',
+  'caveVin', 'colonneFour', 'canape2', 'canape3', 'console', 'meubleTv', 'buffet', 'biblio', 'casiers2',
+  'casiers4', 'piano', 'baignoire', 'lavabo', 'meubleVasque', 'doubleVasque', 'colonneSdb', 'wc', 'll', 'sl',
+  'bureau', 'bureau160', 'meubleChaussures', 'bancEntree', 'portemanteau',
+]);
+/** Ceux qui ne se posent pas sous une fenêtre quand un autre mur est à portée. */
+const PAS_SOUS_LA_FENETRE = new Set([
+  'lit90', 'lit140', 'lit160', 'lit180', 'litBebe', 'litSuperpose', 'armoire2p', 'armoire', 'dressing',
+  'biblio', 'frigo', 'frigoUs', 'colonneFour', 'colonneSdb',
+]);
+
+/** Le meuble du catalogue s'adosse-t-il au mur quand on le lâche près de lui ? */
+export function sAdosse(key: string | undefined): boolean {
+  return !!key && ADOSSABLES.has(key);
+}
+
+/**
+ * Adossé au mur proche, s'il y en a un à portée (le dos du meuble à
+ * soixante centimètres du mur, au plus) ; null sinon. Les murs dont la place serait
+ * devant une porte sont écartés ; pour un lit ou une armoire, ceux dont la
+ * place est sous une fenêtre aussi, tant qu'il en reste un autre à portée.
+ */
+export function adosserAuMurProche(
+  key: string,
+  p: Pt,
+  box: { width: number; depth: number },
+  walls: WallSeg[],
+  dedans: Pt,
+  baies: WallSeg[] = [],
+): { centre: Pt; yaw: number } | null {
+  if (!sAdosse(key)) return null;
+  // À portée : le dos du meuble à soixante centimètres du mur, au plus.
+  const portee = box.depth / 2 + 0.6;
+  // Et lâché plus près du mur que du milieu de la pièce : au centre d'une
+  // chambre étroite, le lit reste où on l'a mis.
+  const auMilieu = Math.hypot(p.x - dedans.x, p.z - dedans.z);
+  const proches = walls.filter(
+    (w) =>
+      w.type === 'wall' &&
+      segLength(w) >= Math.min(box.width, 0.3) &&
+      distanceAuMur(p, w) <= portee &&
+      distanceAuMur(p, w) < auMilieu,
+  );
+  if (proches.length === 0) return null;
+  const devantUnePorte = (w: WallSeg) =>
+    baies.some((o) => o.type !== 'window' && mordLaPlace(o, w, placeLeLong(p, w, box.width)));
+  const sousUneFenetre = (w: WallSeg) =>
+    baies.some((o) => o.type === 'window' && mordLaPlace(o, w, placeLeLong(p, w, box.width)));
+  const libres = proches.filter((w) => !devantUnePorte(w));
+  if (libres.length === 0) return null;
+  const sansFenetre = PAS_SOUS_LA_FENETRE.has(key) ? libres.filter((w) => !sousUneFenetre(w)) : libres;
+  const eligibles = new Set(sansFenetre.length > 0 ? sansFenetre : libres);
+  return contreLeMurLePlusProche(p, box, walls, dedans, (w) => eligibles.has(w));
+}
+
+/**
+ * L'AXE DE LA PIÈCE — l'orientation de ses murs, ramenée au quart de tour
+ * (radians, dans ]−π/4, π/4]) : celle qui réunit le plus de longueur de mur
+ * à 3° près. Une pièce droite rend 0 ; une pièce relevée de biais, son biais.
+ */
+export function axeDeLaPiece(walls: WallSeg[]): number {
+  const quart = Math.PI / 2;
+  const ramene = (a: number) => {
+    let r = ((a % quart) + quart) % quart;
+    if (r > quart / 2) r -= quart;
+    return r;
+  };
+  const angles = walls
+    .filter((w) => w.type === 'wall' && segLength(w) > 0.3)
+    .map((w) => ({ a: ramene(Math.atan2(w.b.z - w.a.z, w.b.x - w.a.x)), L: segLength(w) }));
+  if (angles.length === 0) return 0;
+  const proche = (x: number, y: number) => Math.abs(ramene(x - y)) < (3 * Math.PI) / 180;
+  let mieux = { a: 0, poids: -1 };
+  for (const { a } of angles) {
+    const groupe = angles.filter((g) => proche(g.a, a));
+    const poids = groupe.reduce((t, g) => t + g.L, 0);
+    if (poids > mieux.poids) {
+      // La moyenne du groupe, chaque mur pesant sa longueur.
+      const moyenne = a + groupe.reduce((t, g) => t + ramene(g.a - a) * g.L, 0) / poids;
+      mieux = { a: ramene(moyenne), poids };
+    }
+  }
+  return Math.abs(mieux.a) < 1e-4 ? 0 : mieux.a;
+}
+
+/**
+ * LE QUART DE TOUR SUR LES MURS — le cap d'un meuble tourné de `quarts`
+ * quarts, recalé sur l'axe de sa pièce : un meuble relevé de travers (3°)
+ * ou posé avant qu'on redresse la pièce retombe d'aplomb avec ses murs au
+ * premier quart de tour, au lieu de garder son travers indéfiniment.
+ */
+export function capSurLesMurs(yaw: number, quarts: number, axe: number): number {
+  const quart = Math.PI / 2;
+  return axe + Math.round((yaw + quart * quarts - axe) / quart) * quart;
 }
