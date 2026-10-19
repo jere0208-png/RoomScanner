@@ -43,6 +43,7 @@ export function ElecSheet({
   onChoose,
   onClose,
   onDemander,
+  onChangerDeMur,
 }: {
   visible: boolean;
   /** Le catalogue, ou le mur vu de face : jamais les deux. */
@@ -58,6 +59,8 @@ export function ElecSheet({
   onClose: () => void;
   /** La façon d'ouvrir NOS questions : l'établi n'a pas de feuille à lui. */
   onDemander?: (data: ActionData) => void;
+  /** L'appareil tenu est parti sur un autre mur : l'établi le suit. */
+  onChangerDeMur?: (wallId: string) => void;
 }) {
   const styles = getStyles(useTheme());
   const plein = vue === 'mur';
@@ -108,6 +111,7 @@ export function ElecSheet({
                 onLinkRequest={onLinkRequest}
                 onClose={onClose}
                 onDemander={onDemander ?? setDemande}
+                onChangerDeMur={onChangerDeMur}
               />
             </View>
           ) : (

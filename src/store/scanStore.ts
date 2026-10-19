@@ -143,6 +143,7 @@ import {
   masonryRuns,
   snapToMasonry,
   interiorSide,
+  pieceDuCote,
   newFixture,
   reprojectAnchors,
   reprojectFixtures,
@@ -3173,6 +3174,14 @@ export interface ScanState {
   /** Bascule l'appareil sur l'autre face du mur, sans le déplacer. */
   flipFixture: (id: string) => void;
   /**
+   * PORTE L'APPAREIL (ou sa plaque entière) SUR UN AUTRE MUR, sans le
+   * supprimer ni le reposer : hauteur, nature, liens, plaque gardés. `at` :
+   * l'abscisse visée sur la face du nouveau mur (m) ; sans elle, le milieu
+   * de la plus grande place libre. `cote` : la face ; sans elle, celle qui
+   * donne dans la pièce de l'appareil. Rend `false` si rien n'a bougé.
+   */
+  deplacerVersLeMur: (id: string, wallId: string, at?: number, cote?: 1 | -1) => boolean;
+  /**
    * L'APPAREIL QU'ELLE DESSERT (« LV », « PL »…, voir `USAGES`) — il
    * s'écrit dans son symbole. `undefined` le retire.
    */
@@ -3383,6 +3392,12 @@ export interface ScanState {
    * qui donnent dans la pièce) et son plafond. Rend le nombre d'éléments retirés.
    */
   viderAppareillage: (roomId: string) => number;
+  /**
+   * Reporte l'appareillage d'une pièce dans une autre : appareils muraux mur
+   * à mur (même orientation), plafond à la même place relative. Rend le
+   * nombre d'éléments copiés et celui qui n'a pas trouvé de place.
+   */
+  copierEquipement: (sourceId: string, cibleId: string) => { copies: number; sansPlace: number };
   /**
    * Annule la dernière retouche. Vide = plus rien à annuler. La clé du
    * geste défait se lit ensuite par `cleDuDernierRetour`.
@@ -8563,6 +8578,102 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     },
 
     /*
+      UN APPAREIL CHANGE DE MUR SANS ÊTRE REPOSÉ — manque proposé par
+      l'agent testeur ÉLECTRICITÉ : pour passer une prise du mur nord au
+      mur est, il fallait la supprimer puis la reposer, et l'on perdait sa
+      hauteur réglée, son lien de commande, son sigle, sa plaque. Elle
+      change maintenant de mur porteur d'un bloc — la plaque entière si
+      elle en a une, postes dans le même ordre —, du côté de SA pièce, sur
+      de la maçonnerie et sans s'empiler sur ce qui s'y trouve déjà.
+    */
+    deplacerVersLeMur: (id, wallId, at, cote) => {
+      const st = get();
+      const f = st.fixtures.find((x) => x.id === id);
+      const ancien = f ? st.walls.find((w) => w.id === f.wallId) : undefined;
+      const mur = st.walls.find((w) => w.id === wallId && w.type === 'wall');
+      if (!f || !ancien || !mur || wallId === f.wallId) return false;
+      const quads = wallQuadsOf(st.walls);
+      const face0 = wallFace(ancien, quads.get(ancien.id), f.side);
+      const lot = f.group
+        ? st.fixtures.filter((o) => o.group === f.group && o.wallId === f.wallId && o.side === f.side)
+        : [f];
+      // La face qui donne dans la pièce de l'appareil ; à défaut, l'intérieur.
+      const piece = pieceDuCote(ancien, f.side, st.walls, st.rooms) ?? roomOf(ancien);
+      const side: 1 | -1 =
+        cote ??
+        (pieceDuCote(mur, 1, st.walls, st.rooms) === piece
+          ? 1
+          : pieceDuCote(mur, -1, st.walls, st.rooms) === piece
+            ? -1
+            : interiorSide(mur, st.walls, st.rooms));
+      const face = wallFace(mur, quads.get(mur.id), side);
+      // Le bloc, en abscisses relatives à l'appareil tenu, sur l'ancienne face.
+      const x0f = faceX(face0, f.along);
+      const rel = lot.map((o) => ({ o, dx: faceX(face0, o.along) - x0f }));
+      let g = Infinity;
+      let d = -Infinity;
+      for (const { o, dx } of rel) {
+        g = Math.min(g, dx - FIXTURES[o.kind].w / 2);
+        d = Math.max(d, dx + FIXTURES[o.kind].w / 2);
+      }
+      const largeur = d - g;
+      const pleins = masonryRuns(wallRuns(mur, st.openings), segLength(mur), face);
+      // Ce qui occupe déjà cette face, à la hauteur des appareils déplacés.
+      const deja = st.fixtures.filter((o) => o.wallId === wallId && o.side === side);
+      const libre = (centre: number) =>
+        !rel.some(({ o, dx }) =>
+          deja.some((v) =>
+            overlaps(
+              { x: centre + dx, y: o.height, kind: o.kind },
+              { x: faceX(face, v.along), y: v.height, kind: v.kind },
+            ),
+          ),
+        );
+      // La place visée : le doigt, sinon le milieu du plus grand plein.
+      let vise = at;
+      if (vise === undefined) {
+        const grand = [...pleins].sort((a, b) => b.x1 - b.x0 - (a.x1 - a.x0))[0];
+        vise = grand ? (grand.x0 + grand.x1) / 2 : face.len / 2;
+      }
+      // Le CENTRE du bloc se cale ; l'appareil tenu suit à son décalage.
+      const caler = (centreBloc: number) => snapToMasonry(pleins, centreBloc, largeur / 2, face.len);
+      let centre = caler(vise);
+      if (!libre(centre - (g + d) / 2)) {
+        let trouve: number | null = null;
+        for (let k = 1; k <= 60 && trouve === null; k++) {
+          for (const sens of [1, -1]) {
+            const essai = caler(vise + sens * k * 0.05);
+            if (libre(essai - (g + d) / 2)) {
+              trouve = essai;
+              break;
+            }
+          }
+        }
+        if (trouve !== null) centre = trouve;
+      }
+      const xTenu = centre - (g + d) / 2;
+      pushHistory(`deplacerVersLeMur:${f.group ?? id}`);
+      const nouvelles = new Map(
+        rel.map(({ o, dx }) => [
+          o.id,
+          {
+            ...o,
+            wallId,
+            side,
+            along: fromFaceX(face, xTenu + dx),
+            // Un mur plus bas ne garde pas l'appareil au-dessus de lui.
+            height: Math.min(o.height, Math.max(0, mur.height - FIXTURES[o.kind].h / 2)),
+          },
+        ]),
+      );
+      set({
+        fixtures: st.fixtures.map((o) => nouvelles.get(o.id) ?? o),
+        dirty: true,
+      });
+      return true;
+    },
+
+    /*
       L'HISTOIRE AVANT LE CHANGEMENT, ET LE PLAN « À ENREGISTRER » — agent
       testeur ÉLECTRICITÉ : le point de reprise se prenait APRÈS la bascule
       (« Annuler » rendait l'état déjà basculé : rien ne se défaisait), et
@@ -8701,6 +8812,175 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         dirty: true,
       });
       return muraux.size + plafond;
+    },
+
+    /*
+      L'ÉQUIPEMENT D'UNE PIÈCE, COPIÉ DANS UNE AUTRE — manque proposé par
+      l'agent testeur ÉLECTRICITÉ : trois chambres équipées pareil, c'était
+      trois fois la même pose, appareil par appareil. Chaque appareil mural
+      part sur le mur de la pièce cible qui REGARDE DANS LE MÊME SENS (la
+      face dont la normale est la plus proche, à 45° près), à la même
+      fraction de sa longueur, sur de la maçonnerie et sans s'empiler ; une
+      plaque part entière. Le plafond garde sa place relative dans la pièce.
+      Les liens se recâblent entre les copies — jamais vers l'originale —,
+      plaques et lignes ont leurs identifiants à elles (comme
+      `duplicateRoom`). Un appareil sans mur pour le recevoir n'est pas
+      inventé : il est compté.
+    */
+    copierEquipement: (sourceId, cibleId) => {
+      const st = get();
+      if (sourceId === cibleId) return { copies: 0, sansPlace: 0 };
+      const piece = pieceDesAppareils(st);
+      const sources = st.fixtures.filter((f) => piece.get(f.id) === sourceId);
+      const plafondSource = st.ceiling.filter((c) => c.roomId === sourceId);
+      if (sources.length + plafondSource.length === 0) return { copies: 0, sansPlace: 0 };
+      const quads = wallQuadsOf(st.walls);
+      // Les faces de la pièce cible qui donnent dans la pièce.
+      const facesCible = mursDeLaPiece(cibleId)
+        .filter((w) => w.type === 'wall' && segLength(w) > 0.3)
+        .flatMap((w) =>
+          ([1, -1] as const)
+            .filter((sd) => pieceDuCote(w, sd, st.walls, st.rooms) === cibleId)
+            .map((sd) => ({ w, side: sd, face: wallFace(w, quads.get(w.id), sd) })),
+        );
+      const cle = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const idAppareil = new Map(sources.map((f, i) => [f.id, `fx-${cle}-${i}`]));
+      const recable = (commands?: string[]) => {
+        const neufs = (commands ?? []).map((c) => idAppareil.get(c)).filter((c): c is string => !!c);
+        return neufs.length > 0 ? neufs : undefined;
+      };
+      // Une plaque part d'un bloc : on regroupe par plaque (ou appareil seul).
+      const blocs = new Map<string, Fixture[]>();
+      for (const f of sources) {
+        const k = f.group ? `g:${f.group}:${f.wallId}:${f.side}` : `f:${f.id}`;
+        blocs.set(k, [...(blocs.get(k) ?? []), f]);
+      }
+      const poses: Fixture[] = [];
+      let sansPlace = 0;
+      let rang = 0;
+      for (const bloc of blocs.values()) {
+        const tenu = bloc[0];
+        const mur0 = st.walls.find((w) => w.id === tenu.wallId);
+        if (!mur0) {
+          sansPlace += bloc.length;
+          continue;
+        }
+        const face0 = wallFace(mur0, quads.get(mur0.id), tenu.side);
+        let cible: (typeof facesCible)[number] | undefined;
+        let mieux = Math.cos(Math.PI / 4);
+        for (const c of facesCible) {
+          const dot = c.face.nx * face0.nx + c.face.nz * face0.nz;
+          if (dot > mieux + 1e-9 || (cible && Math.abs(dot - mieux) < 1e-9 && c.face.len > cible.face.len)) {
+            mieux = dot;
+            cible = c;
+          }
+        }
+        if (!cible) {
+          sansPlace += bloc.length;
+          continue;
+        }
+        const { w, side, face } = cible;
+        const x0f = faceX(face0, tenu.along);
+        const rel = bloc.map((o) => ({ o, dx: faceX(face0, o.along) - x0f }));
+        let g = Infinity;
+        let d = -Infinity;
+        for (const { o, dx } of rel) {
+          g = Math.min(g, dx - FIXTURES[o.kind].w / 2);
+          d = Math.max(d, dx + FIXTURES[o.kind].w / 2);
+        }
+        const largeur = d - g;
+        if (largeur > face.len) {
+          sansPlace += bloc.length;
+          continue;
+        }
+        const pleins = masonryRuns(wallRuns(w, st.openings), segLength(w), face);
+        const occupe = [...st.fixtures, ...poses].filter((o) => o.wallId === w.id && o.side === side);
+        const libre = (xTenu: number) =>
+          !rel.some(({ o, dx }) =>
+            occupe.some((v) =>
+              overlaps(
+                { x: xTenu + dx, y: o.height, kind: o.kind },
+                { x: faceX(face, v.along), y: v.height, kind: v.kind },
+              ),
+            ),
+          );
+        // Même fraction de la longueur, le bloc entier sur la maçonnerie.
+        const centreVoulu = ((x0f + (g + d) / 2) / face0.len) * face.len;
+        const caler = (c: number) => snapToMasonry(pleins, c, largeur / 2, face.len);
+        let xTenu: number | null = null;
+        for (let k = 0; k <= 60 && xTenu === null; k++) {
+          for (const sens of k === 0 ? [0] : [1, -1]) {
+            const essai = caler(centreVoulu + sens * k * 0.05) - (g + d) / 2;
+            if (libre(essai)) {
+              xTenu = essai;
+              break;
+            }
+          }
+        }
+        if (xTenu === null) {
+          sansPlace += bloc.length;
+          continue;
+        }
+        const groupe = tenu.group ? `grp-${cle}-${rang}` : undefined;
+        rang += 1;
+        for (const { o, dx } of rel) {
+          poses.push({
+            ...o,
+            id: idAppareil.get(o.id)!,
+            wallId: w.id,
+            side,
+            along: fromFaceX(face, xTenu + dx),
+            height: Math.min(o.height, Math.max(0, w.height - FIXTURES[o.kind].h / 2)),
+            group: groupe,
+            commands: undefined,
+          });
+        }
+      }
+      // Les commandes, une fois tous les identifiants connus — et seulement
+      // vers ce qui a été copié.
+      const posees = new Set(poses.map((p) => p.id));
+      const recablePose = (commands?: string[]) => {
+        const neufs = recable(commands)?.filter((c) => posees.has(c));
+        return neufs && neufs.length > 0 ? neufs : undefined;
+      };
+      const parSource = new Map(sources.map((f) => [idAppareil.get(f.id)!, f]));
+      const appareils = poses.map((p) => ({ ...p, commands: recablePose(parSource.get(p.id)?.commands) }));
+      // Le plafond : même place relative dans la boîte de la pièce.
+      const parts = roomParts(st.walls, st.rooms);
+      const boite = (id: string) => {
+        const pts = parts.find((p) => p.roomId === id)?.surface?.pts ?? mursDeLaPiece(id).flatMap((x) => [x.a, x.b]);
+        if (pts.length === 0) return null;
+        const xs = pts.map((q) => q.x);
+        const zs = pts.map((q) => q.z);
+        return { x0: Math.min(...xs), z0: Math.min(...zs), w: Math.max(...xs) - Math.min(...xs) || 1, h: Math.max(...zs) - Math.min(...zs) || 1 };
+      };
+      const bs = boite(sourceId);
+      const bc = boite(cibleId);
+      const lignes = new Map<string, string>();
+      const ligneNeuve = (r?: string) => {
+        if (!r) return undefined;
+        if (!lignes.has(r)) lignes.set(r, `row-${cle}-${lignes.size}`);
+        return lignes.get(r);
+      };
+      const plafond =
+        bs && bc
+          ? plafondSource.map((c, i) => ({
+              ...avecSaTrace(c, (q) => ({ x: bc.x0 + ((q.x - bs.x0) / bs.w) * bc.w, z: bc.z0 + ((q.z - bs.z0) / bs.h) * bc.h })),
+              id: `pl-${cle}-${i}`,
+              roomId: cibleId,
+              commands: recablePose(c.commands),
+              row: ligneNeuve(c.row),
+            }))
+          : [];
+      if (!bs || !bc) sansPlace += plafondSource.length;
+      if (appareils.length + plafond.length === 0) return { copies: 0, sansPlace };
+      pushHistory('copierEquipement');
+      set({
+        fixtures: [...st.fixtures, ...appareils],
+        ceiling: [...st.ceiling, ...plafond],
+        dirty: true,
+      });
+      return { copies: appareils.length + plafond.length, sansPlace };
     },
 
     undo: () => {

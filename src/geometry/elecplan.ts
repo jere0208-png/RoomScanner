@@ -151,12 +151,18 @@ export function planRoutes(
   /**
    * Hauteur sous plafond d'une pièce : la montée et la retombée en partent.
    * Pièce inconnue : le plus haut mur du relevé, à défaut 2,50 m.
+   *
+   * SOUS LE FAUX PLAFOND — défaut relevé par l'agent testeur PLAN 3D : la
+   * hauteur se lisait sur le plus haut mur, faux plafond ignoré. Les gaines
+   * passaient au-dessus du faux plafond en 3D, et le métré comptait la
+   * montée jusqu'au vrai plafond. Une pièce qui a sa hauteur à elle
+   * (`hauteur`, voir `hauteurDeLaPiece`) la donne aux gaines.
    */
-  const hauteurDe = (roomId: string | undefined) =>
-    (parts.find((p) => p.roomId === roomId)?.walls ?? walls).reduce(
-      (h, w) => Math.max(h, w.height),
-      0,
-    ) || HAUTEUR_SOUS_PLAFOND;
+  const hauteurDe = (roomId: string | undefined) => {
+    const part = parts.find((p) => p.roomId === roomId);
+    if (part?.hauteur !== undefined && part.hauteur > 0) return part.hauteur;
+    return (part?.walls ?? walls).reduce((h, w) => Math.max(h, w.height), 0) || HAUTEUR_SOUS_PLAFOND;
+  };
   /**
    * LE DÉPART : le tableau, et le plafond de SA pièce — c'est jusque-là que
    * chaque gaine monte avant de traverser.

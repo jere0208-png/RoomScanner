@@ -3252,6 +3252,56 @@ export function ResultScreen() {
           en rénovation, on repart de zéro pièce par pièce. Seulement en mode
           électricité, et seulement s'il y a quelque chose à retirer.
         */
+        /*
+          L'ÉQUIPEMENT COPIÉ DANS UNE AUTRE PIÈCE — manque proposé par l'agent
+          testeur ÉLECTRICITÉ : trois chambres équipées pareil se posent une
+          fois. Seulement s'il y a quelque chose à copier, et une autre pièce
+          au même niveau.
+        */
+        ...(modeElec && aDeLAppareillage(roomId) && rooms.some((r) => r.id !== roomId && (r.niveau ?? 0) === (rooms.find((x) => x.id === roomId)?.niveau ?? 0))
+          ? [
+              {
+                label: 'Copier l’équipement vers…',
+                hint: 'Les mêmes appareils, sur les murs qui regardent dans le même sens.',
+                icon: 'dupliquer' as const,
+                onPress: () => {
+                  const niveau = rooms.find((x) => x.id === roomId)?.niveau ?? 0;
+                  setMenu({
+                    title: 'Copier l’équipement vers…',
+                    subtitle: 'Appareils muraux et plafond. Ce que la pièce a déjà reste en place.',
+                    actions: rooms
+                      .filter((r) => r.id !== roomId && (r.niveau ?? 0) === niveau)
+                      .map((r) => ({
+                        label: r.name || 'Pièce sans nom',
+                        icon: 'dupliquer' as const,
+                        onPress: () => {
+                          const { copies, sansPlace } = useScanStore.getState().copierEquipement(roomId, r.id);
+                          if (copies === 0) {
+                            alerte(
+                              'Rien n’a été copié',
+                              sansPlace > 0
+                                ? `Aucun mur de « ${r.name || 'la pièce'} » ne peut recevoir ces appareils.`
+                                : 'La pièce n’a pas d’appareillage à copier.',
+                            );
+                            return;
+                          }
+                          setSelectedRoomId(r.id);
+                          astuce(
+                            `${copies} élément${copies > 1 ? 's' : ''} copié${copies > 1 ? 's' : ''}` +
+                              (sansPlace > 0 ? ` · ${sansPlace} sans place` : '') +
+                              '.',
+                            {
+                              icone: 'undo',
+                              action: { label: 'Annuler', faire: () => useScanStore.getState().undo() },
+                            },
+                          );
+                        },
+                      })),
+                  });
+                },
+              },
+            ]
+          : []),
         ...(modeElec && aDeLAppareillage(roomId)
           ? [
               {
@@ -8207,6 +8257,8 @@ export function ResultScreen() {
         }}
         onChoose={chooseKind}
         onClose={() => setElecOpen(false)}
+        // L'appareil a changé de mur : l'établi suit sur le nouveau mur.
+        onChangerDeMur={(id) => setElecWallId(id)}
       />
 
       {/* ---------- Renommage ---------- */}

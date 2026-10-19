@@ -214,6 +214,8 @@ interface Props {
    * une question, plutôt que de tomber sur l'alerte du système.
    */
   onDemander?: (data: ActionData) => void;
+  /** L'appareil tenu est parti sur un autre mur : le parent ouvre ce mur. */
+  onChangerDeMur?: (wallId: string) => void;
 }
 
 export function WallElevation({
@@ -224,6 +226,7 @@ export function WallElevation({
   onLinkRequest,
   onClose,
   onDemander,
+  onChangerDeMur,
 }: Props) {
   const walls = useScanStore(s => s.walls);
   /* Le tableau relevé : celui qui se dessine au mur, organe pour organe. */
@@ -239,6 +242,7 @@ export function WallElevation({
   const moveFixture = useScanStore(s => s.moveFixture);
   const addFixture = useScanStore(s => s.addFixture);
   const flipFixture = useScanStore(s => s.flipFixture);
+  const deplacerVersLeMur = useScanStore(s => s.deplacerVersLeMur);
   const setFixtureUsage = useScanStore(s => s.setFixtureUsage);
   const basculerPontage = useScanStore(s => s.basculerPontage);
   const removeFixture = useScanStore(s => s.removeFixture);
@@ -933,6 +937,26 @@ export function WallElevation({
       p => p.roomId === roomOf(wall),
     )?.labelAt;
     return centre ? wallLabel(wall, centre, north) : null;
+  })();
+
+  /*
+    LES AUTRES MURS DE LA PIÈCE DE L'APPAREIL TENU — où « Autre mur » peut
+    le porter. Nommés par leur orientation quand le nord est connu, sinon
+    par leur longueur.
+  */
+  const autresMurs = (() => {
+    if (!selected) return [] as { id: string; label: string }[];
+    const piece = pieceDuCote(wall, selected.side, walls, rooms) ?? roomOf(wall);
+    const contour = rooms.find(r => r.id === piece)?.wallIds;
+    const centre = roomParts(walls, rooms).find(p => p.roomId === piece)?.labelAt;
+    return walls
+      .filter(w => w.id !== wall.id && w.type === 'wall' && segLength(w) > 0.3)
+      .filter(w => (contour ? contour.includes(w.id) : roomOf(w) === piece))
+      .map(w => {
+        const nom = centre ? wallLabel(w, centre, north) : null;
+        const lg = `${segLength(w).toFixed(2).replace('.', ',')} m`;
+        return { id: w.id, label: nom ? `${nom.charAt(0).toUpperCase()}${nom.slice(1)} · ${lg}` : `Mur de ${lg}` };
+      });
   })();
 
   // La règle de hauteur de l'appareil qu'on tient : c'est ici, et nulle
@@ -2692,6 +2716,36 @@ export function WallElevation({
                         'M7.5 11.5 L4 15 l3.5 3.5',
                       ],
                       press: () => flipFixture(selected.id),
+                    },
+                    /*
+                      SUR UN AUTRE MUR, SANS LE REPOSER — manque proposé par
+                      l'agent testeur ÉLECTRICITÉ : la prise garde sa hauteur,
+                      son lien, son sigle et sa plaque ; l'établi la suit.
+                    */
+                    {
+                      key: 'mur',
+                      label: 'Autre mur',
+                      on: autresMurs.length > 0,
+                      tint: c.ink,
+                      plein: null,
+                      paths: ['M4 20 V8 l8 -4 l8 4 v12', 'M9 13 h6', 'M12.5 10.5 L15 13 l-2.5 2.5'],
+                      press: () => {
+                        const data: ActionData = {
+                          title: 'Déplacer vers…',
+                          subtitle: 'Hauteur, lien et plaque sont gardés. Il se pose au milieu de la place libre.',
+                          actions: autresMurs.map(m => ({
+                            label: m.label,
+                            onPress: () => {
+                              if (deplacerVersLeMur(selected.id, m.id)) {
+                                haptic('leger');
+                                onChangerDeMur?.(m.id);
+                              }
+                            },
+                          })),
+                        };
+                        if (onDemander) onDemander(data);
+                        else alerte(data.title, data.subtitle ?? '', [...data.actions.map(a => ({ label: a.label, onPress: a.onPress })), { label: 'Annuler' }]);
+                      },
                     },
                     {
                       key: 'lien',
