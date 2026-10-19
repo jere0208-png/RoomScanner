@@ -17,7 +17,7 @@
  *   — les gaines, toutes du même bleu, quand le tableau de tirage juste
  *     au-dessus distingue chaque circuit par sa couleur.
  */
-import { buildScanPdf } from '../src/export/pdf';
+import { buildScanPdf, motifDuRepere } from '../src/export/pdf';
 import { wallCardinal } from '../src/geometry/naming';
 import { roomParts, type WallSeg } from '../src/geometry/floorplan';
 import { fixturePlacement, materialList, roomInputsOf, wallToRooms } from '../src/geometry/nfc15100';
@@ -209,7 +209,8 @@ describe('les gaines à la couleur de leur circuit', () => {
     // Le tireté de chaque gaine porte la teinte du circuit de son appareil.
     for (const f of ['p1', 'i1']) {
       const teinte = rgb(markColor(marks.get(f)!));
-      expect(gaines).toContain(`[4 3] 0 d ${teinte} RG`);
+      // Et son tireté propre, distinct en noir et blanc (revue « dessins »).
+      expect(gaines).toContain(`[${motifDuRepere(marks.get(f)!).join(' ')}] 0 d ${teinte} RG`);
     }
 
     /*

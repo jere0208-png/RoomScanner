@@ -112,7 +112,6 @@ import {
 } from '../geometry/nfc15100';
 import { auPluriel, type OrganeDuTableau } from '../geometry/coffret';
 import {
-  circuitColor,
   markColor,
   type MultiWireSchema,
   type SchemaRow,
@@ -832,12 +831,12 @@ class Draw {
 
   /** Ligne brisée en tireté : le cheminement d'une gaine. `alpha` l'estompe
    *  (dixièmes, comme `poly`) : un lien de commande se lit sans dominer. */
-  dashedPath(pts: Pt[], w: number, hex: string, dash: [number, number], alpha = 1) {
+  dashedPath(pts: Pt[], w: number, hex: string, dash: readonly number[], alpha = 1) {
     if (pts.length < 2) return;
     const [r, g, b] = hexRgb(hex);
     const ga = Math.round(Math.min(1, Math.max(0.1, alpha)) * 10);
     this.ops.push(
-      `q ${ga < 10 ? `/GA${ga} gs ` : ''}[${dash[0]} ${dash[1]}] 0 d ${n2(r)} ${n2(g)} ${n2(b)} RG ${n2(w)} w 1 J 1 j ` +
+      `q ${ga < 10 ? `/GA${ga} gs ` : ''}[${dash.join(' ')}] 0 d ${n2(r)} ${n2(g)} ${n2(b)} RG ${n2(w)} w 1 J 1 j ` +
         pts.map((p, i) => `${n2(p.x)} ${n2(p.y)} ${i === 0 ? 'm' : 'l'}`).join(' ') +
         ' S Q',
     );
@@ -1078,7 +1077,7 @@ const CADRE_MARGE = 10;
 /** Hauteur d'une ligne de légende, texte compris. */
 const CADRE_LIGNE = 12;
 /** Largeur de la vignette qui précède un libellé, et son écart. */
-const CADRE_PUCE = 21;
+const CADRE_PUCE = 23;
 
 /**
  * Dessine un cadre de légende : titre(s), lignes colorées, marges égales.
@@ -1107,6 +1106,12 @@ interface LegendLine {
   mot?: { texte: string; x: number; y: number; taille: number };
   /** Ou un tronçon de mur, rendu selon sa nature (voir `natureMurs`). */
   nature?: NatureMur;
+  /** Le tireté propre d'une gaine (voir `motifDuRepere`), à pleine opacité. */
+  motif?: readonly number[];
+  /** Ou le triangle d'une retombée, à cette teinte. */
+  retombee?: string;
+  /** Ou un mot tel que le plan l'écrit : un repère cerné (« F1 »), un chiffre de cote (« 110 »). */
+  echantillon?: { texte: string; couleur: string; cerne?: boolean };
 }
 
 interface LegendSection {
@@ -1231,8 +1236,12 @@ function drawLegendBox(
     let base = y + haut - CADRE_MARGE - CADRE_LIGNE + 3.5;
     for (const sec of sections) {
       if (sec.titre) {
-        d.circle(tx + 2.4, base + 2.2, 2.2, sec.teinte ?? ENCRE_ELEC);
-        d.text(sec.titre, tx + 8, base, 6.3, GREY, { align: 'left', bold: true });
+        // Un titre blanc garde son rang, sans pastille : la suite d'une
+        // section sur une seconde colonne s'aligne sur la première.
+        if (sec.titre.trim()) {
+          d.circle(tx + 2.4, base + 2.2, 2.2, sec.teinte ?? ENCRE_ELEC);
+          d.text(sec.titre, tx + 8, base, 6.3, GREY, { align: 'left', bold: true });
+        }
         base -= CADRE_LIGNE;
       }
       for (const ligne of sec.lignes) {
@@ -1264,8 +1273,9 @@ function drawLegendBox(
             const c = pointDuSymbole({ x: ligne.mot.x, y: ligne.mot.y }, tx + 6.5, base + 2.5, 0.4);
             d.text(ligne.mot.texte, c.x, c.y - t * 0.36, t, ligne.symbole.color, { bold: true, align: 'center' });
           }
+          // Lisible imprimé : 6 pt, comme sur le plan (revue « typographie »).
           if (ligne.fois) {
-            d.text(`×${ligne.fois}`, tx + 14, base + 0.5, 4.6, ligne.symbole.color, {
+            d.text(`×${ligne.fois}`, tx + 13.5, base + 0.5, 6, ligne.symbole.color, {
               align: 'left',
               bold: true,
             });
@@ -1288,12 +1298,21 @@ function drawLegendBox(
             const b = bouclesDuDoublage({ a1: cadre[3], b1: cadre[2], b2: cadre[1], a2: cadre[0] } as never);
             d.path(b.map((p) => ({ x: p.x, y: (p as unknown as { z: number }).z })), 0.35, r.contour);
           }
+        } else if (ligne.retombee) {
+          symboleDeRetombee(d, { x: tx + 6, y: base + 2.6 }, ligne.retombee);
+        } else if (ligne.echantillon) {
+          const e = ligne.echantillon;
+          const lw = latin1(e.texte).length * 5.4 * 0.62 + 4;
+          if (e.cerne) d.poly(rectArrondi(tx, base - 1.6, lw, 8.4, 2), '#FFFFFF', e.couleur, 0.6);
+          d.text(e.texte, tx + lw / 2, base + 0.4, 5.4, e.couleur, { bold: true });
         } else if (ligne.couleur) {
           const trait = [
             { x: tx + 1, y: base + 2.5 },
             { x: tx + CADRE_PUCE - 5, y: base + 2.5 },
           ];
-          if (ligne.tirete) {
+          if (ligne.motif) {
+            d.dashedPath(trait, 1, ligne.couleur, ligne.motif);
+          } else if (ligne.tirete) {
             d.dashedPath(trait, LIEN_LARGEUR * 1.4, ligne.couleur, [3, 2.2], LIEN_ALPHA);
           } else {
             d.path(trait, 2, ligne.couleur);
@@ -1717,9 +1736,46 @@ function draw3DView(
   const margeD = marge(false);
   const cadre = { x: box.x + margeG, y: box.y, w: box.w - margeG - margeD, h: box.h };
   // Les cotes courent hors du volume : le cadrage leur garde leur place.
-  const scale = ((Math.min(cadre.w, cadre.h) * 0.46) / (r3 + (showDims ? ECART_DE_COTE + 0.35 : 0))) * zoom;
-  const cx = cadre.x + cadre.w / 2 + view.fx * (box.w / 2);
-  const cy = box.y + box.h / 2 - view.fy * (box.h / 2);
+  const scaleSphere = ((Math.min(cadre.w, cadre.h) * 0.46) / (r3 + (showDims ? ECART_DE_COTE + 0.35 : 0))) * zoom;
+  /*
+    LA MAQUETTE REMPLIT SA CASE — revue « dessins » : cadrée sur la sphère
+    englobante, elle n'occupait que 35 % de la largeur de la feuille et 28 %
+    de sa hauteur. Sans zoom réglé à l'écran, on cadre sur la boîte que
+    dessine VRAIMENT la projection (à 90 %, cotes comprises) ; un zoom réglé
+    dans l'aperçu garde le cadrage de l'app, qu'il a choisi.
+  */
+  let scale = scaleSphere;
+  let milieuX = 0;
+  let milieuY = 0;
+  if (Math.abs(zoom - 1) < 1e-3) {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const f of faces) {
+      for (const p of f.pts) {
+        const x = p.x - ctr.x;
+        const y = p.y - ctr.y;
+        const z = p.z - ctr.z;
+        const rx = x * ct - z * st;
+        const ry = -((x * st + z * ct) * cp - y * sp);
+        minX = Math.min(minX, rx);
+        maxX = Math.max(maxX, rx);
+        minY = Math.min(minY, ry);
+        maxY = Math.max(maxY, ry);
+      }
+    }
+    const marge3D = showDims ? 2 * (ECART_DE_COTE + 0.35) : 0;
+    const bw = maxX - minX + marge3D;
+    const bh = maxY - minY + marge3D;
+    if (isFinite(bw) && isFinite(bh) && bw > 1e-6 && bh > 1e-6) {
+      scale = Math.max(scaleSphere, Math.min(cadre.w / bw, cadre.h / bh) * 0.9);
+      milieuX = (minX + maxX) / 2;
+      milieuY = (minY + maxY) / 2;
+    }
+  }
+  const cx = cadre.x + cadre.w / 2 - milieuX * scale + view.fx * (box.w / 2);
+  const cy = box.y + box.h / 2 - milieuY * scale - view.fy * (box.h / 2);
 
   const project = (p: P3) => {
     const x = p.x - ctr.x;
@@ -1908,15 +1964,40 @@ function draw3DView(
       box.y + box.h - 14,
       26,
     );
-    const bord = gauche ? cadre.x - 10 : cadre.x + cadre.w + 10;
+    /*
+      LE BORD SUIT LE DESSIN RÉEL — revue « typographie » : calé sur le
+      cadrage, il laissait les étiquettes de la page de garde (zoomée) sur
+      les arêtes et les sols. Il recule jusqu'à l'emprise vraie du modèle,
+      sans sortir de la case.
+    */
+    const dessines = polys.flatMap((p) => p.pts).filter((q) => q.y >= box.y && q.y <= box.y + box.h);
+    const bordDessin = gauche
+      ? Math.min(cadre.x, ...dessines.map((q) => q.x)) - 10
+      : Math.max(cadre.x + cadre.w, ...dessines.map((q) => q.x)) + 10;
+    const largeurMax = Math.max(...colonne.map(largeurDe));
+    const bord = gauche
+      ? Math.max(box.x + 6 + largeurMax, bordDessin)
+      : Math.min(box.x + box.w - 6 - largeurMax, bordDessin);
+    const align = gauche ? 'right' : 'left';
+    // Les traits d'abord, les fonds blancs et les mots ensuite : un trait
+    // qui passe derrière une étiquette s'y interrompt.
     colonne.forEach((e, i) => {
       const y = ys[i];
-      const attache = gauche ? bord + 4 : bord - 4;
+      const attache = gauche ? bord + 6 : bord - 6;
       d.line(attache, y + 3, gauche ? attache + 6 : attache - 6, y + 3, 0.5, GREY);
       d.line(gauche ? attache + 6 : attache - 6, y + 3, e.ancre.x, e.ancre.y, 0.5, GREY);
       d.circle(e.ancre.x, e.ancre.y, 2.4, '#FFFFFF');
       d.circle(e.ancre.x, e.ancre.y, 1.5, INK);
-      const align = gauche ? 'right' : 'left';
+    });
+    // Un fond blanc seulement quand la colonne a dû rentrer SUR le dessin
+    // (la case de la page de garde, zoomée) : en marge, aucun pavé blanc —
+    // « sans gros bloc blanc », relevé du patron sur la perspective.
+    const surLeDessin = gauche ? bord > bordDessin + 0.5 : bord < bordDessin - 0.5;
+    colonne.forEach((e, i) => {
+      const y = ys[i];
+      const lw = largeurDe(e) + 4;
+      const haut = e.nom ? 21 : 12;
+      if (surLeDessin) d.rect(gauche ? bord - lw + 2 : bord - 2, (e.nom ? y - 13 : y - 3), lw, haut, '#FFFFFF', null);
       if (e.nom) d.text(e.nom, bord, y, 9, INK, { bold: true, align });
       d.text(e.aire, bord, e.nom ? y - 10 : y, e.nom ? 7.5 : 9, e.nom ? GREY : INK, { align, bold: !e.nom });
     });
@@ -1930,7 +2011,8 @@ function draw3DView(
 
 // -------------------------------------------------------------- pages
 
-const fr1 = (v: number) => v.toFixed(1).replace('.', ',');
+/** Une section de conducteur comme on l'écrit : « 1,5 », « 2,5 », « 6 » — partout pareil. */
+const frSection = (v: number) => String(v).replace('.', ',');
 
 /*
   LE NOM ABRÉGÉ VIT AVEC LA GÉOMÉTRIE DU PLAN — l'écran s'en sert aussi
@@ -2100,6 +2182,18 @@ function planPage(
      * existe pour ca.
      */
     hideCotesPose?: boolean;
+    /**
+     * LA LÉGENDE DES GAINES — revue « dessins » : la feuille des gaines ne
+     * légendait que les murs. Chaque circuit y montre sa teinte et son
+     * tireté, et le triangle de retombée dit ce qu'il veut dire.
+     */
+    gaines?: string[];
+    /**
+     * LA HAUTEUR QUE LA SURCOUCHE PREND EN HAUT DU CADRE — revue « dessins » :
+     * le tableau de tirage se posait dans le blanc au-dessus du plan, sans
+     * le réserver ; une légende plus haute remontait le plan sous le tableau.
+     */
+    reserveHaut?: number;
   },
 ): string {
   const {
@@ -2360,12 +2454,43 @@ function planPage(
     if (liensTraces && !extra?.hideLegend) {
       seconde.push({ lignes: [{ couleur: ENCRE_ELEC, tirete: true, texte: 'Lien de commande' }] });
     }
+    /*
+      CE QUE LE PLAN ÉCRIT SANS L'EXPLIQUER — revue « dessins » : les cotes
+      d'appareil en bleu (en cm) et les repères des menuiseries n'étaient
+      nulle part en légende.
+    */
+    {
+      const lignesPlan: LegendLine[] = [];
+      const cotesDePose =
+        !extra?.hideLegend && !extra?.hideCotesPose && ((ctx.fixtures?.length ?? 0) > 0 || (ctx.ceiling?.length ?? 0) > 0);
+      if (cotesDePose) lignesPlan.push({ texte: 'Cote d’appareil, en centimètres', echantillon: { texte: '110', couleur: SKY } });
+      if (ctx.reperesMenuiseries && !extra?.overlay) {
+        lignesPlan.push({ texte: 'Repère de menuiserie (carnet)', echantillon: { texte: 'F1', couleur: BLEU_REPERE, cerne: true } });
+      }
+      if (lignesPlan.length > 0) seconde.push({ titre: 'REPÈRES', teinte: SKY, lignes: lignesPlan });
+    }
     if (!extra?.hideLegend && ctx.fixtures && ctx.openings.some((o) => o.detecteur)) {
       seconde.push({
         lignes: [{ symbole: { paths: [{ d: 'M-7 -4 H7 V4 H-7 Z' }], color: C_LED }, texte: 'Détecteur d’ouverture (DO)' }],
       });
     }
     if (seconde.length > 0) colonnesLegende.push(seconde);
+  }
+  if (extra?.gaines && extra.gaines.length > 0) {
+    const lignes: LegendLine[] = [
+      ...extra.gaines.map((mark) => ({
+        texte: `Gaine du circuit ${mark}`,
+        couleur: markColor(mark),
+        motif: motifDuRepere(mark),
+      })),
+      { texte: 'Retombée le long du mur', retombee: INK },
+    ];
+    // Sur deux colonnes au-delà de cinq lignes : la légende ne doit pas
+    // prendre au plan la hauteur qu'elle lui explique.
+    const moitie = lignes.length > 6 ? Math.ceil(lignes.length / 2) : lignes.length;
+    const cols: LegendSection[][] = [[{ titre: 'GAINES', teinte: INK, lignes: lignes.slice(0, moitie) }]];
+    if (moitie < lignes.length) cols.push([{ titre: ' ', lignes: lignes.slice(moitie) }]);
+    colonnesLegende.unshift(...cols);
   }
   /*
     LA LARGEUR SUIT LE PLUS LONG LIBELLÉ de chaque colonne — sa vignette, son
@@ -2431,12 +2556,16 @@ function planPage(
     d'échelle se gagne.
   */
   const MARGE = 50;
-  const box = {
+  const boxPleine = {
     x: FRAME.x + MARGE,
     y: FRAME.y + TITLE_H + MARGE + reserve,
     w: FRAME.w - MARGE * 2,
     h: FRAME.h - TITLE_H - MARGE * 2 - BANDEAU - reserve,
   };
+  // Le plan cède le haut à la surcouche ; elle garde le cadre entier.
+  const box = extra?.reserveHaut
+    ? { ...boxPleine, h: Math.max(120, boxPleine.h - extra.reserveHaut) }
+    : boxPleine;
   /**
    * Le plan se dessine SUR LA TRAME DU LOGEMENT, pas dans le repère du scan.
    *
@@ -2885,7 +3014,7 @@ function planPage(
         ECHELLE_SYMBOLE) /
         2;
     /** La taille des mots qui accompagnent un symbole. */
-    const TAILLE_SIGLE = 5.5;
+    const TAILLE_SIGLE = 6;
     /** Le mot de chaque symbole (« 2 », « RJ45 »…), à la place retenue. */
     const motsDesSymboles = new Map<string, { texte: string; base: { x: number; y: number }; taille: number }>();
     /** Un mot retenu ici, dessiné plus bas, à la place qu'il a trouvée. */
@@ -2917,18 +3046,34 @@ function planPage(
         const a0 = px(facePoint(face, x, 0.02));
         const Lw = Math.hypot(a0.x - q.x, a0.y - q.y) || 1;
         const versLeMur = { x: (a0.x - q.x) / Lw, y: (a0.y - q.y) / Lw };
-        const t = lib.taille * ECHELLE_SYMBOLE * 1.15;
+        /*
+          LISIBLE IMPRIMÉ — revues « dessins » et « typographie » : le mot
+          rétrécissait avec le symbole, « RJ45 » à 2,9 pt, « LV » à 3. Il ne
+          descend plus sous 6 pt, en gras ; s'il ne tient plus dans le rond,
+          il se pose à côté, à la première place libre. Et un nombre de
+          postes s'écrit « ×3 », comme dans la légende.
+        */
+        const t = Math.max(6, lib.taille * ECHELLE_SYMBOLE * 1.15);
+        const texte = lib.compte && /^\d+$/.test(lib.texte) ? `×${lib.texte}` : lib.texte;
         const dedans = lib.ou.x === 0 && lib.ou.y > 0;
-        const essais = [lib.ou, ...(dedans ? [{ x: 0, y: -9 }] : []), { x: 13, y: 0 }, { x: -13, y: 0 }, { x: 0, y: -16 }];
+        // Le rond fait treize unités de symbole : ce qui est plus large en sort.
+        const tientDansLeRond = texte.length * t * 0.56 <= 13 * ECHELLE_SYMBOLE;
+        const essais = [
+          ...(dedans && !tientDansLeRond ? [] : [lib.ou]),
+          ...(dedans ? [{ x: 0, y: -9 }] : []),
+          { x: 13, y: 0 },
+          { x: -13, y: 0 },
+          { x: 0, y: -16 },
+        ];
         let choisi: ReturnType<typeof boiteDuMot> | null = null;
         for (const ou of essais) {
           const anc = pointDuSymbole(ou, 0, 0, ECHELLE_SYMBOLE, versLeMur);
           const L = Math.hypot(anc.x, anc.y) || 1;
           const auCentre = ou === lib.ou && dedans;
-          const larg = lib.texte.length * t * 0.5;
+          const larg = texte.length * t * 0.5;
           const haut = t * 0.72;
           const demi = auCentre ? 0 : (Math.abs(anc.x / L) * larg + Math.abs(anc.y / L) * haut) / 2;
-          const mot = boiteDuMot(lib.texte, q.x + (anc.x / L) * (L + demi), q.y + (anc.y / L) * (L + demi), t);
+          const mot = boiteDuMot(texte, q.x + (anc.x / L) * (L + demi), q.y + (anc.y / L) * (L + demi), t);
           if (!choisi) choisi = mot;
           if (dansLeCadre(mot.base) && encre.sous(mot.boite) === 0 && libre(mot.boite)) {
             choisi = mot;
@@ -2938,7 +3083,7 @@ function planPage(
         if (choisi) {
           encre.boite(choisi.boite);
           posees.push(choisi.boite);
-          motsDesSymboles.set(f.id, { texte: lib.texte, base: choisi.base, taille: t });
+          motsDesSymboles.set(f.id, { texte, base: choisi.base, taille: t });
         }
       }
       encre.disque(q, rayonDuSymbole(postes.length));
@@ -3303,6 +3448,29 @@ function planPage(
         }
         return dedans;
       };
+      /*
+        JAMAIS SUR UN SYMBOLE — revue « dessins » : le plafonnier du Bureau
+        et celui de l'Entrée disparaissaient, délavés, sous le fond blanc de
+        l'étiquette de pièce. Les disques des appareils (muraux et de
+        plafond) sont interdits au cartouche ; il préfère un meuble, ou une
+        place plus loin dans la pièce.
+      */
+      const disquesSymboles: { x: number; y: number; r: number }[] = [
+        ...(ctx.ceiling ?? []).map((cl) => {
+          const q = px(cl.at);
+          return { x: q.x, y: q.y, r: rayonPlafond(cl) + 1.5 };
+        }),
+        ...unites.map(({ f, face, along, postes }) => {
+          const q = px(facePoint(face, Math.max(0, Math.min(face.len, along)), sortieDuMur(f.id)));
+          return { x: q.x, y: q.y, r: rayonDuSymbole(postes.length) + 1 };
+        }),
+      ];
+      const surUnSymbole = (b: Boite) =>
+        disquesSymboles.some((c) => {
+          const nx = Math.max(b.x, Math.min(c.x, b.x + b.w));
+          const ny = Math.max(b.y, Math.min(c.y, b.y + b.h));
+          return Math.hypot(nx - c.x, ny - c.y) < c.r;
+        });
       for (const part of parts) {
         if (!part.surface) continue;
         const cp = px(part.labelAt);
@@ -3397,7 +3565,7 @@ function planPage(
             { x: b.x + b.w + marge, y: b.y + b.h + marge },
             { x: b.x - marge, y: b.y + b.h + marge },
           ].every((q) => dansLaPiece(contour, q));
-        const candidat = (avecAire: boolean, propre: boolean, marge = 0) => {
+        const candidat = (avecAire: boolean, propre: boolean, marge = 0, eviterSymboles = true) => {
           let mieux: ReturnType<typeof emprise> | null = null;
           let cout = Infinity;
           for (const [dx, dy] of ecarts) {
@@ -3405,6 +3573,7 @@ function planPage(
             if (contour.length >= 3 && !dansLaPiece(contour, q)) continue;
             const b = emprise(avecAire, q.x, q.y);
             if (!libre(b) || !entier(b, marge)) continue;
+            if (eviterSymboles && surUnSymbole(b)) continue;
             // Trois points d'air autour : un nom collé à une prise la cache
             // autant qu'un nom posé dessus.
             const tache = encre.sous({ x: b.x - 3, y: b.y - 3, w: b.w + 6, h: b.h + 6 });
@@ -3420,6 +3589,36 @@ function planPage(
           }
           return mieux;
         };
+        /*
+          SI LA PIÈCE N'A PAS UNE PLACE SANS SYMBOLE, celle qui en couvre le
+          moins, et le moins possible : dans une entrée de deux mètres, le
+          nom glisse à côté du point lumineux plutôt que dessus.
+        */
+        const moinsCouvrant = (avecAire: boolean) => {
+          let mieux: ReturnType<typeof emprise> | null = null;
+          let cout = Infinity;
+          for (const [dx, dy] of ecarts) {
+            const q = { x: cp.x + dx, y: cp.y + dy };
+            if (contour.length >= 3 && !dansLaPiece(contour, q)) continue;
+            const b = emprise(avecAire, q.x, q.y);
+            // Tout se paie ici, rien n'est exclu : un mot voisin, le bord de la
+            // pièce, et surtout un symbole couvert.
+            const gene0 = (libre(b) ? 0 : 25) + (entier(b) ? 0 : 60);
+            let couvert = 0;
+            for (const c of disquesSymboles) {
+              const nx = Math.max(b.x, Math.min(c.x, b.x + b.w));
+              const ny = Math.max(b.y, Math.min(c.y, b.y + b.h));
+              const p0 = c.r - Math.hypot(nx - c.x, ny - c.y);
+              if (p0 > 0) couvert += p0;
+            }
+            const c0 = couvert * 10 + gene0 + Math.hypot(dx, dy) * 0.05;
+            if (c0 < cout) {
+              cout = c0;
+              mieux = b;
+            }
+          }
+          return mieux;
+        };
         // La surface est une information : elle passe avant la bande des
         // cotes, qui sait se replier ailleurs.
         const BANDE = 14;
@@ -3430,7 +3629,9 @@ function planPage(
           candidat(variantes[1], true, BANDE) ??
           candidat(variantes[1], true) ??
           candidat(variantes[0], false) ??
-          candidat(variantes[1], false);
+          candidat(variantes[1], false) ??
+          moinsCouvrant(variantes[1]) ??
+          candidat(variantes[1], false, 0, false);
         if (trouve) {
           choisi = trouve;
           gene = false;
@@ -3476,10 +3677,16 @@ function planPage(
     // SANS LEUR NOM — relevé du patron : « enlève le nom des meubles ». La
     // silhouette dit ce qu'est un lit ou une table ; le mot ajoutait de
     // l'écriture là où le plan coté doit d'abord laisser lire ses cotes.
+    /*
+      LE MOBILIER EN RETRAIT — revue « dessins » : à 0,8 pt, il pesait plus
+      que les cotes (0,6) et leurs attaches (0,4) ; l'œil lisait le canapé
+      avant la cote. Un trait fin et clair : la silhouette se reconnaît, la
+      cote se lit d'abord.
+    */
     for (const m of meublesDuPlan) {
       if (estUnCaisson(m.o)) continue;
-      d.poly(m.contour, '#FFFFFF', '#9FACBF', 0.8);
-      for (const t of m.traits) d.path(t, 0.7, '#9FACBF');
+      d.poly(m.contour, '#FFFFFF', '#AEB8C6', 0.4);
+      for (const t of m.traits) d.path(t, 0.3, '#AEB8C6');
     }
     // Le caisson sous plafond, par-dessus : en pointillés, sans fond, ses
     // diagonales — comme à l'écran (voir `geometry/caisson`).
@@ -3737,6 +3944,8 @@ function planPage(
       // ------------------------------------------------ les façades, dehors
       const RANG_BAIES = 11;
       const RANG_MURS = 27;
+      /** Les cotes de façade posées : une cloison parallèle de même valeur ne se recote pas. */
+      const cotesDeFacade: { a: Pt; b: Pt; valeur: number }[] = [];
       for (const w of parLongueur) {
         const sgn = coteDehors(w);
         if (sgn === 0) continue;
@@ -3773,6 +3982,7 @@ function planPage(
         const surMur = (tt: number) => ({ x: a.x + (b.x - a.x) * tt, y: a.y + (b.y - a.y) * tt });
         const aNu = surMur(t0nu);
         const bNu = surMur(t1nu);
+        cotesDeFacade.push({ a: aNu, b: bNu, valeur: L });
 
         // La chaîne des murs : la longueur de chacun.
         const A2 = plus(aNu, n, E + RANG_MURS);
@@ -3955,11 +4165,33 @@ function planPage(
         }),
       );
       const pieceDuPoint = (P: Pt) => piecesPage.findIndex((poly) => dansLePoche({ x: P.x, z: P.y }, [poly]));
+      /*
+        UNE COTE NE SE DIT QU'UNE FOIS — revue « dessins » : « 2,93 m » en
+        travers de la salle d'eau répétait la chaîne de façade parallèle. Une
+        cloison qui a la même valeur, à un centimètre près, sur la même
+        portée qu'une cote de façade déjà posée, ne se recote pas.
+      */
+      const dejaCoteeEnFacade = (w: WallSeg, a: Pt, b: Pt) => {
+        const valeur = longueurCotee(walls, w, parts);
+        const lc = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const uc = { x: (b.x - a.x) / lc, y: (b.y - a.y) / lc };
+        return cotesDeFacade.some((f) => {
+          if (Math.abs(f.valeur - valeur) > 0.0101) return false;
+          const lf = Math.hypot(f.b.x - f.a.x, f.b.y - f.a.y) || 1;
+          const uf = { x: (f.b.x - f.a.x) / lf, y: (f.b.y - f.a.y) / lf };
+          if (Math.abs(uf.x * uc.y - uf.y * uc.x) > 0.03) return false;
+          const ta = (a.x - f.a.x) * uf.x + (a.y - f.a.y) * uf.y;
+          const tb = (b.x - f.a.x) * uf.x + (b.y - f.a.y) * uf.y;
+          const commun = Math.min(Math.max(ta, tb), lf) - Math.max(Math.min(ta, tb), 0);
+          return commun >= 0.8 * Math.min(lf, lc);
+        });
+      };
       for (const w of parPlace) {
         const a = px(w.a);
         const b = px(w.b);
         const longPage = Math.hypot(b.x - a.x, b.y - a.y);
         if (longPage < 4) continue;
+        if (dejaCoteeEnFacade(w, a, b)) continue;
         const u = unitaire({ x: b.x - a.x, y: b.y - a.y });
         const angle = angleDe(a, b);
         const facesC = demiFacesDe(walls, w);
@@ -4000,8 +4232,9 @@ function planPage(
         const longueurMot = txt.length * 7.5 * 0.5;
         const courte = longueurMot > longPage - 4;
         const audela = courte ? [-(longueurMot / 2 + 3) / longPage, 1 + (longueurMot / 2 + 3) / longPage] : [];
-        // Et elle reste près de son mur : loin, rien ne dit plus ce qu'elle mesure.
-        const ecarts = [6, 11, 16, 22, 28, 34].filter((o) => !courte || o <= Math.max(11, longPage));
+        // Et elle reste près de son mur : loin, rien ne dit plus ce qu'elle
+        // mesure — elle traversait la pièce et ses meubles (revue « dessins »).
+        const ecarts = [6, 8.5, 11];
         let mieux: {
           A: Pt;
           B: Pt;
@@ -4064,7 +4297,9 @@ function planPage(
               const cout =
                 chocs * 10000 +
                 encre.sous(q.boite) * 20 +
-                encreTrait * 2.5 +
+                // Traverser un meuble, un symbole, un battant coûte cher : la
+                // cote se pose sur le blanc qui longe son mur.
+                encreTrait * 20 +
                 barre * 400 +
                 coutAttaches +
                 (pieceDuBord >= 0 && pieceDuPoint(c) !== pieceDuBord ? 3000 : 0) +
@@ -4110,7 +4345,8 @@ function planPage(
         // avaient le même bleu, quand le tableau de tirage juste au-dessus
         // les distingue chacun par sa teinte.
         const repere = ctx.circuitsDesAppareils?.get(r.id);
-        d.dashedPath(r.path.map(px), 0.7, repere ? markColor(repere) : '#2F6BFF', [4, 3]);
+        // Et à son tireté propre : distinct sur une photocopie.
+        d.dashedPath(r.path.map(px), 0.8, repere ? markColor(repere) : '#2F6BFF', motifDuRepere(repere));
       }
       /*
         LES RETOMBÉES, AU PIED DU TRACÉ — relevé du patron : « pour les
@@ -4132,6 +4368,42 @@ function planPage(
         if (!dansLeCadre(pied)) continue;
         const repere = ctx.circuitsDesAppareils?.get(r.id);
         symboleDeRetombee(d, pied, repere ? markColor(repere) : '#2F6BFF');
+      }
+      /*
+        LE REPÈRE AU BOUT DE CHAQUE GAINE — revue « dessins » : aucun « Cn »
+        n'était écrit sur le tracé ; il fallait remonter le tireté jusqu'au
+        tableau pour savoir quel circuit descendait là. Chaque gaine porte son
+        repère à son arrivée, une fois par grappe : trois prises voisines du
+        même circuit n'écrivent pas trois fois « C4 ».
+      */
+      const reperesPoses: { x: number; y: number; mark: string }[] = [];
+      for (const r of gainesDuPlan) {
+        if (r.path.length < 2) continue;
+        const repere = ctx.circuitsDesAppareils?.get(r.id);
+        if (!repere) continue;
+        const bout = px(r.path[r.path.length - 1]);
+        if (!dansLeCadre(bout)) continue;
+        if (reperesPoses.some((q) => q.mark === repere && Math.hypot(q.x - bout.x, q.y - bout.y) < 28)) continue;
+        // À l'épaule du triangle, du côté où la gaine arrive : le texte ne
+        // se pose pas sur le tracé qu'il nomme.
+        const avant = px(r.path[r.path.length - 2]);
+        const cote = bout.x - avant.x >= 0 ? 1 : -1;
+        const T = 5.8;
+        const larg = latin1(repere).length * T * 0.6 + 2;
+        // Quatre places autour du bout, la première libre l'emporte : jamais
+        // sur une étiquette de pièce, une cote ou un symbole déjà posés.
+        const places = [
+          { x: cote > 0 ? bout.x + 6 : bout.x - 6 - larg, y: bout.y + 2 },
+          { x: cote > 0 ? bout.x - 6 - larg : bout.x + 6, y: bout.y + 2 },
+          { x: bout.x - larg / 2, y: bout.y + 6 },
+          { x: bout.x - larg / 2, y: bout.y - 6 - T },
+        ].map((q) => ({ x: q.x - 1, y: q.y - 1.5, w: larg, h: T + 1.2 }));
+        const boite = places.find((b) => libre(b) && dansLaFenetre(b));
+        if (!boite) continue;
+        posees.push(boite);
+        d.rect(boite.x, boite.y, boite.w, boite.h, '#FFFFFF', null);
+        d.text(repere, boite.x + 1, boite.y + 1.5, T, markColor(repere), { bold: true, align: 'left' });
+        reperesPoses.push({ x: bout.x, y: bout.y, mark: repere });
       }
     }
 
@@ -4244,7 +4516,7 @@ function planPage(
         const mot = motsDesSymboles.get(f.id);
         if (mot) d.text(mot.texte, mot.base.x, mot.base.y, mot.taille, ENCRE_ELEC, { bold: true });
         if (fois && !libelle?.compte) {
-          d.text(`×${fois}`, q.x + SYMBOL_SPAN * ECHELLE_SYMBOLE * 0.45, q.y + SYMBOL_SPAN * ECHELLE_SYMBOLE * 0.3, 5.5, ENCRE_ELEC, {
+          d.text(`×${fois}`, q.x + SYMBOL_SPAN * ECHELLE_SYMBOLE * 0.45, q.y + SYMBOL_SPAN * ECHELLE_SYMBOLE * 0.3, 6, ENCRE_ELEC, {
             align: 'left',
             bold: true,
           });
@@ -4588,6 +4860,23 @@ function planPage(
         }
       }
       /*
+        UN SYMBOLE NE DISPARAÎT PAS SOUS UN NOM — revue « dessins » : dans une
+        pièce trop petite pour loger son nom ailleurs, le fond voilé de
+        l'étiquette délavait le point lumineux (Bureau, Entrée). Le symbole
+        se redessine par-dessus : on lit les deux.
+      */
+      for (const cl of ctx.ceiling ?? []) {
+        if (cl.trace && cl.trace.length >= 2) continue;
+        const q = px(cl.at);
+        const r = rayonPlafond(cl);
+        const dessous = emprises.some((b) => {
+          const nx = Math.max(b.x, Math.min(q.x, b.x + b.w));
+          const ny = Math.max(b.y, Math.min(q.y, b.y + b.h));
+          return Math.hypot(nx - q.x, ny - q.y) < r;
+        });
+        if (dessous && dansLeCadre(q)) drawSymbol(d, CEILING_SYMBOL[cl.kind], q.x, q.y, r / 9, ENCRE_ELEC, 1.1);
+      }
+      /*
         LES MOTS ÉCRITS SUR LE PLAN.
 
         « Colonne montante ici », « attente TV à confirmer avec le client »,
@@ -4692,7 +4981,7 @@ function planPage(
 
     // La surcouche vient EN DERNIER, dans la même fenêtre de découpe : un
     // schéma se lit par-dessus le plan, jamais dessous.
-    if (extra?.overlay) extra.overlay(d, px, scale, box);
+    if (extra?.overlay) extra.overlay(d, px, scale, boxPleine);
 
     d.restore();
   }
@@ -4810,6 +5099,10 @@ function planPage(
     */
     const pn = dir(0);
     d.text('N', cx + pn.x * 22, cy + pn.y * 22 - 2.5, 7.5, INK, { bold: true });
+  } else {
+    // Sans boussole au relevé, on le dit : une feuille sans nord se lit
+    // comme un oubli (revue « dessins »).
+    d.text('Nord non relevé', FRAME.x + FRAME.w - 24, TETE - 14, 7, GREY, { align: 'right' });
   }
 
   drawSheetChrome(d, {
@@ -5599,20 +5892,21 @@ function existantPage(
  * vingt sans se serrer, et ce qui ne tiendrait pas est ANNONCÉ.
  */
 /** Repère rond posé sur un tracé : « C1 » dans une pastille blanche. */
-function markerAt(d: Draw, at: Pt, texte: string, couleur: string) {
-  d.circle(at.x, at.y, 7.5, '#FFFFFF');
+function markerAt(d: Draw, at: Pt, texte: string, couleur: string, r = 7.5) {
+  d.circle(at.x, at.y, r, '#FFFFFF');
   d.poly(
     [
-      { x: at.x - 7.5, y: at.y },
-      { x: at.x, y: at.y + 7.5 },
-      { x: at.x + 7.5, y: at.y },
-      { x: at.x, y: at.y - 7.5 },
+      { x: at.x - r, y: at.y },
+      { x: at.x, y: at.y + r },
+      { x: at.x + r, y: at.y },
+      { x: at.x, y: at.y - r },
     ],
     null,
     couleur,
     0.8,
   );
-  d.text(texte, at.x, at.y - 2.6, 6.5, couleur, { bold: true });
+  const t = r < 7 ? 6 : 6.5;
+  d.text(texte, at.x, at.y - t * 0.38, t, couleur, { bold: true });
 }
 
 /**
@@ -5634,6 +5928,24 @@ function markerAt(d: Draw, at: Pt, texte: string, couleur: string) {
  * avec : un tirage par ligne, son diamètre de conduit, et le nombre de fils
  * qui l'a décidé. C'est ce qu'on emporte chez le grossiste.
  */
+/*
+  LE GABARIT DU TABLEAU DE TIRAGE — revue « dessins » : le losange de repère
+  (15 pt de haut) débordait sur la ligne voisine, au pas de 13. Il est plus
+  petit dans le tableau (`markerAt`, rayon 5,5), et le pas laisse de l'air.
+*/
+const GABARIT_TIRAGE = { HAUT: 120, PAS: 15 };
+/** La hauteur que le tableau de tirage prend en haut de la feuille, cotes du plan comprises. */
+function hauteurDuTirage(n: number): number {
+  if (n === 0) return 0;
+  const { HAUT, PAS } = GABARIT_TIRAGE;
+  const parColonne = Math.max(1, Math.floor((HAUT - 30) / PAS));
+  const nCol = n > parColonne ? 2 : 1;
+  const lignes = Math.min(parColonne, Math.ceil(Math.min(n, parColonne * nCol) / nCol));
+  // Titre, en-tête, lignes ; puis la place des chaînes de cotes qui pendent
+  // au-dessus du plan, dans la marge du cadre.
+  return 30 + lignes * PAS + 24;
+}
+
 function gainesPage(
   ctx: SheetContext,
   sheet: string,
@@ -5648,6 +5960,7 @@ function gainesPage(
   */
   const tirage: PlanOverlay = (d, _px, _scale, box) => {
     if (rows.length === 0) return;
+    const { HAUT, PAS } = GABARIT_TIRAGE;
     /*
       LE TABLEAU SE POSE SOUS LE TITRE, pas sous le plan.
 
@@ -5663,8 +5976,6 @@ function gainesPage(
       se pose sur deux colonnes quand une ne suffit pas, et ce qui ne tient
       toujours pas renvoie au schéma, en toutes lettres.
     */
-    const HAUT = 110;
-    const PAS = 13;
     const parColonne = Math.max(1, Math.floor((HAUT - 30) / PAS));
     const nCol = rows.length > parColonne ? 2 : 1;
     const capacite = parColonne * nCol;
@@ -5677,27 +5988,34 @@ function gainesPage(
       const x0 = box.x + c * largeur;
       const w = largeur - (nCol > 1 ? 10 : 0);
       let y = yTitre - 14;
-      const cols = [x0, x0 + 26, x0 + w * 0.46, x0 + w * 0.64, x0 + w * 0.82];
-      d.text('Rep.', cols[0], y, 7, GREY_LIGHT, { align: 'left' });
-      d.text('Circuit', cols[1], y, 7, GREY_LIGHT, { align: 'left' });
-      d.text('Section', cols[2], y, 7, GREY_LIGHT, { align: 'left' });
-      d.text('Fils', cols[3], y, 7, GREY_LIGHT, { align: 'left' });
-      d.text('Conduit', cols[4], y, 7, GREY_LIGHT, { align: 'left' });
+      /*
+        LE NOM DU CIRCUIT D'ABORD — revues « dessins » et « typographie » :
+        « Four — Séjour… », « Lave-vaissell… » coupés, quand Section, Fils
+        et Conduit avaient de la place à revendre. Ces trois-là tiennent en
+        quelques caractères ; le libellé prend le reste.
+      */
+      const cols = [x0, x0 + 24, x0 + w * 0.6, x0 + w * 0.76, x0 + w * 0.85];
+      d.text('Rep.', cols[0], y, 7, GREY, { align: 'left' });
+      d.text('Circuit', cols[1], y, 7, GREY, { align: 'left' });
+      d.text('Section', cols[2], y, 7, GREY, { align: 'left' });
+      d.text('Fils', cols[3], y, 7, GREY, { align: 'left' });
+      d.text('Conduit', cols[4], y, 7, GREY, { align: 'left' });
       y -= 4;
       d.line(x0, y, x0 + w, y, 0.6, '#D8DEE7');
       y -= 12;
       const tranche = affiches.slice(c * parColonne, (c + 1) * parColonne);
-      tranche.forEach((r, k) => {
-        const i = c * parColonne + k;
-        const teinte = circuitColor(i);
-        markerAt(d, { x: x0 + 7, y: y + 2 }, r.mark, teinte);
+      tranche.forEach((r) => {
+        // La teinte du REPÈRE, celle du tracé sur le plan et de l'unifilaire :
+        // C4 est orange partout, pas selon son rang dans un tableau.
+        const teinte = markColor(r.mark);
+        markerAt(d, { x: x0 + 7, y: y + 2.5 }, r.mark, teinte, 5.5);
         d.text(fitText(r.label, 8, cols[2] - cols[1] - 8), cols[1], y, 8, INK, {
           align: 'left',
         });
         // « Courants faibles » débordait sur la colonne des fils (revue
         // « Nadia ») : le sigle du métier tient dans la case.
         d.text(
-          fitText(r.section === null ? 'VDI' : `${fr1(r.section)} mm²`, 8, cols[3] - cols[2] - 4),
+          fitText(r.section === null ? 'VDI' : `${frSection(r.section)} mm²`, 8, cols[3] - cols[2] - 4),
           cols[2],
           y,
           8,
@@ -5708,7 +6026,7 @@ function gainesPage(
         // Le diamètre se CALCULE ici, sur le compte de fils de cette ligne :
         // c'est la règle du tiers, et elle se vérifie du regard.
         d.text(
-          `ICTA ${conduitPour(r.section, r.wires)}`,
+          `ICTA Ø${conduitPour(r.section, r.wires)}`,
           cols[4],
           y,
           8,
@@ -5740,8 +6058,8 @@ function gainesPage(
         triangle au pied de chaque gaine.
       */
       'Passage en plafond, retombées le long des murs (triangle au pied du ' +
-      'tracé). Diamètres calculés au tiers de remplissage — le compte de ' +
-      'fils est celui du schéma.',
+      'tracé). Diamètres calculés au tiers de remplissage, sur les fils que ' +
+      'porte la gaine (navettes et retours compris).',
     // La légende d'appareillage se tait : la feuille parle de tirage, et
     // deux boîtes cherchant le coin le plus libre finissent l'une sur
     // l'autre.
@@ -5749,6 +6067,11 @@ function gainesPage(
     // Et les cotes de pose aussi : elles croisent les tracés qu'on est venu
     // suivre. Elles se lisent sur le plan d'ensemble.
     hideCotesPose: true,
+    // Mais les gaines, elles, ont leur légende : teinte et tireté par circuit.
+    gaines: rows.filter((r) => r.section !== null || r.breaker !== null).map((r) => r.mark),
+    // Le tableau de tirage a sa place en haut ; le plan se pose dessous, ses
+    // chaînes de cotes comprises.
+    reserveHaut: hauteurDuTirage(rows.length),
   });
   return page;
 }
@@ -5763,6 +6086,29 @@ function gainesPage(
  * posé plus loin dans la pièce.
  */
 const DEMI_RETOMBEE = 2.2;
+
+/**
+ * UN TIRETÉ PAR CIRCUIT — revue « dessins » : toutes les gaines avaient le
+ * même tiret [4, 3] ; en noir et blanc, on ne distinguait plus C3 de C4. Le
+ * motif suit le numéro du repère, comme la teinte (`markColor`) : la feuille
+ * se lit en couleur ET photocopiée.
+ */
+const MOTIFS_DE_GAINE: readonly (readonly number[])[] = [
+  [4, 3],
+  [1, 2],
+  [7, 2, 1, 2],
+  [2.5, 2.5],
+  [9, 2.5],
+  [1, 2, 4, 2],
+  [6, 2, 1, 2, 1, 2],
+  [3, 1.2],
+  [12, 3],
+  [1, 3.5],
+];
+export function motifDuRepere(mark: string | undefined): readonly number[] {
+  const n = parseInt((mark ?? '').replace(/^\D+/, ''), 10);
+  return MOTIFS_DE_GAINE[(Number.isFinite(n) && n > 0 ? n - 1 : 0) % MOTIFS_DE_GAINE.length];
+}
 function symboleDeRetombee(d: Draw, c: Pt, teinte: string) {
   const r = DEMI_RETOMBEE;
   // L'axe vertical de la page monte : la pointe est en y − r.
@@ -5893,14 +6239,28 @@ function unifilairePage(
     pouvait pas vérifier ce que dessert chaque départ, et la feuille avait
     la place.
   */
+  /*
+    LISIBLE, ET JAMAIS UN MOT COUPÉ — revues « dessins » et « typographie » :
+    6,5 pt gris clair, trois lignes, puis « Point lumine… ». Le détail passe
+    à 7,5 pt en gris de texte, jusqu'à quatre lignes ; au-delà, on compte ce
+    qui reste plutôt que de trancher un mot.
+  */
+  const T_DESSERT = 7.5;
+  const PAS_DESSERT = 9.5;
   const dessertDe = (r: SchemaRow): string[] => {
     const dessert = detail?.get(r.mark) || r.points;
     if (!dessert) return [];
-    const lignes = wrapText(dessert, 6.5, CABLE - NOM);
-    if (lignes.length <= 3) return lignes;
-    return [lignes[0], lignes[1], fitText(lignes.slice(2).join(' '), 6.5, CABLE - NOM)];
+    const lignes = wrapText(dessert, T_DESSERT, CABLE - NOM);
+    if (lignes.length <= 4) return lignes;
+    // Les points desservis sont séparés par des virgules : on compte ceux
+    // qui ne tiennent pas dans les trois premières lignes.
+    const gardes = lignes.slice(0, 3);
+    const vus = gardes.join(' ').split(',').length;
+    const total = dessert.split(',').length;
+    const reste = Math.max(1, total - vus + 1);
+    return [...gardes, `+ ${reste} point${reste > 1 ? 's' : ''} : voir la liste du matériel`];
   };
-  const pasDe = (r: SchemaRow) => PAS + (Math.max(1, dessertDe(r).length) - 1) * 8;
+  const pasDe = (r: SchemaRow) => PAS + (Math.max(1, dessertDe(r).length) - 1) * PAS_DESSERT;
 
   /** Une ligne de départ, avec tout ce qui se lit dessus. */
   const ligneDepart = (r: SchemaRow, cy: number, teinte: string) => {
@@ -5948,18 +6308,17 @@ function unifilairePage(
     });
     // Toute la largeur : la colonne de droite est vide à cette hauteur.
     dessertDe(r).forEach((l, k) => {
-      d.text(l, NOM, cy - 12 - k * 8, 6.5, GREY_LIGHT, { align: 'left' });
+      d.text(l, NOM, cy - 13 - k * PAS_DESSERT, T_DESSERT, GREY, { align: 'left' });
     });
     const droite =
       r.section === null
         ? `ICTA Ø${r.conduit}`
-        : `${String(r.section).replace('.', ',')} mm² · ICTA Ø${r.conduit}`;
+        : `${frSection(r.section)} mm² · ICTA Ø${r.conduit}`;
     d.text(droite, CABLE, cy - 3, 7.5, INK, { align: 'right' });
   };
 
   const BAS = FRAME.y + TITLE_H + 30;
   let restants = 0;
-  let indexGlobal = 0;
   /*
     LES DIFFÉRENTIELS EN PARALLÈLE, SUR UNE NOURRICE — relevé des revues du
     dossier : la barre s'interrompait sous ID1 et repartait vers ID2, et on
@@ -5985,7 +6344,8 @@ function unifilairePage(
       basNourrice = y - 10;
     }
     d.rect(BUS - 30, y - 20, 60, 20, '#F3F6FB', INK, 1);
-    d.text(bloc.titre, BUS, y - 8, 8, INK, { bold: true });
+    // Centré dans sa boîte : la ligne de base à mi-hauteur moins un tiers du corps.
+    d.text(bloc.titre, BUS, y - 10 - 8 * 0.35, 8, INK, { bold: true });
     d.text(bloc.sous, BUS + 42, y - 12, 7.5, GREY, { align: 'left' });
     y -= 20;
 
@@ -5994,14 +6354,13 @@ function unifilairePage(
       const pas = pasDe(r);
       if (y - pas < BAS) {
         restants += 1;
-        indexGlobal += 1;
         continue;
       }
       y -= pas;
       // Ancré en HAUT de sa place : la seconde ligne des points desservis
       // descend dans le surplus, le départ reste où on l'attend.
-      ligneDepart(r, y + pas - PAS / 2 - 2, circuitColor(indexGlobal));
-      indexGlobal += 1;
+      // La teinte du repère : la même que sur le plan des gaines.
+      ligneDepart(r, y + pas - PAS / 2 - 2, markColor(r.mark));
     }
     // La barre qui porte les dérivations de ce différentiel.
     d.line(BUS, debut, BUS, y + 4, 1.2, INK);
@@ -6027,12 +6386,12 @@ function unifilairePage(
   if (y > BAS + 24) {
     d.line(x0, BAS + 16, x0 + w, BAS + 16, 0.6, GREY_LIGHT);
     d.text(
-      'La barre oblique et son chiffre donnent le nombre de conducteurs du ' +
-        'départ.',
+      'La barre oblique et son chiffre donnent le nombre de conducteurs qui ' +
+        'sortent du disjoncteur (phase, neutre, terre).',
       x0,
       BAS + 4,
       7,
-      GREY_LIGHT,
+      GREY,
       { align: 'left' },
     );
   }
@@ -6167,6 +6526,54 @@ function elevationsDeDeuxFaces(
 /** Les vignettes que porte la bande d'un mur : au-delà, des timbres. */
 const PHOTOS_PAR_MUR = 3;
 
+/** Un appareil posé sur une face d'élévation : sa position le long de la face. */
+interface PoseEnElevation {
+  f: Fixture;
+  x: number;
+}
+
+/**
+ * LES GRAPPES D'APPAREILS D'UNE FACE — revues « dessins » et « typographie ».
+ *
+ * Des appareils dont les symboles se toucheraient à l'échelle de la feuille
+ * (même hauteur à 12 points près, côte à côte) se dessinent comme une seule
+ * plaque : un cadre, un symbole de poste, et ce qu'elle porte (« ×6 »,
+ * « ×3 RJ »). Un appareil seul garde son symbole et son sigle.
+ */
+function grappesDAppareils(
+  poses: PoseEnElevation[],
+  scale: number,
+): { membres: PoseEnElevation[]; cx: number; cy: number; demiLarg: number; etiquette: string | null }[] {
+  const demi = (k: FixtureKind) => Math.max(5, postsOf(k).length * 4.5);
+  const tas: PoseEnElevation[][] = [];
+  for (const p of [...poses].sort((a, b) => a.x - b.x)) {
+    const g = tas.find((t) =>
+      t.some(
+        (o) =>
+          Math.abs(o.f.height - p.f.height) * scale < 12 &&
+          Math.abs(o.x - p.x) * scale < demi(o.f.kind) + demi(p.f.kind) + 2,
+      ),
+    );
+    if (g) g.push(p);
+    else tas.push([p]);
+  }
+  return tas.map((membres) => {
+    const xs = membres.map((m) => m.x);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cy = membres.reduce((t, m) => t + m.f.height, 0) / membres.length;
+    if (membres.length === 1) {
+      const k = membres[0].f.kind;
+      return { membres, cx, cy, demiLarg: demi(k), etiquette: FIXTURE_TAG[k] ?? null };
+    }
+    const postes = membres.flatMap((m) => postsOf(m.f.kind));
+    const prises = postes.filter((k) => k === 'prise').length;
+    const autres = [...new Set(membres.map((m) => FIXTURE_TAG[m.f.kind]).filter((t): t is string => !!t))];
+    const etiquette = [prises > 0 ? `×${prises}` : '', ...autres].filter(Boolean).join(' ') || `×${membres.length}`;
+    const demiLarg = ((Math.max(...xs) - Math.min(...xs)) * scale) / 2 + Math.max(...membres.map((m) => demi(m.f.kind)));
+    return { membres, cx, cy, demiLarg, etiquette };
+  });
+}
+
 /** La face dessinée dans son cadre : le titre qu'elle donne, l'échelle tenue. */
 function dessinerUneFace(
   d: Draw,
@@ -6238,7 +6645,8 @@ function dessinerUneFace(
       `${H.toFixed(2).replace('.', ',')} m · ` +
       // Un dossier sans électricité ne parle pas d'appareils — revue
       // « Thomas » : « 0 appareil » sur chaque feuille d'un architecte.
-      (sansElec ? '' : `${poses0} appareil${poses0 > 1 ? 's' : ''} · `) +
+      // Ni « 0 appareil » au-dessus d'« Aucun appareil sur ce mur » (revue « typographie »).
+      (sansElec || poses0 === 0 ? '' : `${poses0} appareil${poses0 > 1 ? 's' : ''} · `) +
       'cotes en cm depuis le nu du mur et depuis le sol.' +
       // La légende n'existe que s'il y a quelque chose à expliquer : on
       // ne commente pas ce qui n'est pas dessiné.
@@ -6330,6 +6738,24 @@ function dessinerUneFace(
   */
   const etiquettesMeubles: { m: ReturnType<typeof wallFurniture>[number]; haut: number; bas: number; larg: number }[] = [];
   const occupees: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  /*
+    LES APPAREILS RÉSERVENT LEUR PLACE AVANT LES NOMS DES MEUBLES — revues
+    « dessins » et « typographie » : « Meub◯ 120 », le disque blanc d'une
+    alimentation mangeait le nom du meuble, et les tiretés de hauteur
+    barraient « Plante verte ». Les grappes d'appareils, leurs sigles et les
+    fils de rappel des hauteurs se posent d'abord ; les noms s'en écartent.
+  */
+  const poses = mine
+    .filter((f) => f.side === side)
+    .map((f) => ({ f, x: faceX(face, f.along) }))
+    .sort((a, b) => a.x - b.x);
+  const grappes = grappesDAppareils(poses, scale);
+  for (const g of grappes) {
+    const cx = px(g.cx);
+    const cy = py(g.cy);
+    occupees.push({ x0: cx - g.demiLarg - 3, x1: cx + g.demiLarg + 3 + (g.etiquette ? 22 : 0), y0: cy - 11, y1: cy + 11 });
+    occupees.push({ x0: px(0) - 40, x1: cx - g.demiLarg, y0: cy - 3, y1: cy + 3 });
+  }
   const occuper = (cx: number, y: number, texte: string, taille: number) => {
     const w = texte.length * taille * EM_TEXTE;
     occupees.push({ x0: cx - w / 2 - 2, x1: cx + w / 2 + 2, y0: y - 2, y1: y + taille + 1 });
@@ -6538,15 +6964,17 @@ function dessinerUneFace(
   for (const x of [0, face.len]) {
     d.line(px(x), yCote - 4, px(x), yCote + 4, 1.2, INK);
   }
-  d.circle(px(face.len / 2), yCote, 15, '#FFFFFF');
-  d.text(
-    `${face.len.toFixed(2).replace('.', ',')} m`,
-    px(face.len / 2),
-    yCote - 3.5,
-    10,
-    INK,
-    { bold: true },
-  );
+  {
+    /*
+      UN FOND À LA LARGEUR DU TEXTE — revues « dessins » et « typographie » :
+      le disque de quinze points était plus étroit que « 4,93 m » en gras de
+      10, et le trait de cote touchait le 4 et le m.
+    */
+    const texteLong = `${face.len.toFixed(2).replace('.', ',')} m`;
+    const lt = latin1(texteLong).length * 10 * 0.56 + 10;
+    d.rect(px(face.len / 2) - lt / 2, yCote - 6, lt, 12, '#FFFFFF', null);
+    d.text(texteLong, px(face.len / 2), yCote - 3.5, 10, INK, { bold: true });
+  }
   /*
     LA HAUTEUR SOUS PLAFOND, DEBOUT À DROITE.
 
@@ -6566,10 +6994,6 @@ function dessinerUneFace(
   );
 
   // ------------------------------------------------------- l'appareillage
-  const poses = mine
-    .filter((f) => f.side === side)
-    .map((f) => ({ f, x: faceX(face, f.along) }))
-    .sort((a, b) => a.x - b.x);
 
   /*
     ET CE QUI EST POSÉ DE L'AUTRE CÔTÉ, en clair.
@@ -6580,10 +7004,14 @@ function dessinerUneFace(
     appareils de l'autre face en fantôme ; la feuille imprimée les jetait
     purement et simplement.
   */
+  /*
+    À l'encre des appareils, éclaircie de moitié seulement : à 62 % vers le
+    blanc, elle disparaissait à l'impression (revue « dessins »).
+  */
+  const ENCRE_DOS = mixHex(ENCRE_ELEC, '#FFFFFF', 0.5);
   for (const f of dos) {
     const x = faceX(face, f.along);
-    const pale = mixHex(FIXTURES[f.kind].color, '#FFFFFF', 0.62);
-    drawSymbol(d, assemblySymbol(f.kind), px(x), py(f.height), 0.62, pale, 0.8);
+    drawSymbol(d, assemblySymbol(f.kind), px(x), py(f.height), 0.62, ENCRE_DOS, 0.7);
   }
 
   /**
@@ -6595,29 +7023,31 @@ function dessinerUneFace(
    * qu'une moitié de dessin. En deux passes, un disque ne peut plus rien
    * recouvrir d'autre que le mur.
    */
-  const serre = (x: number, y: number) =>
-    poses.some(
-      (o) =>
-        (o.x !== x || o.f.height !== y) &&
-        Math.hypot((o.x - x) * scale, (o.f.height - y) * scale) < 18,
-    );
-  for (const { f, x } of poses) {
-    d.circle(px(x), py(f.height), serre(x, f.height) ? 6 : 9, '#FFFFFF');
+  /*
+    UNE GRAPPE, UNE PLAQUE — revues « dessins » et « typographie » : deux
+    prises triples à 110 cm donnaient six arcs entremêlés, impossibles à
+    compter. Des appareils dont les symboles se toucheraient se dessinent
+    comme ce qu'on pose : un cadre, UN symbole, et leur nombre de postes
+    (« ×6 »). Et une seule encre, celle du plan : orange, bleu et violet ne
+    se distinguaient plus une fois photocopiés.
+  */
+  for (const g of grappes) {
+    d.circle(px(g.cx), py(g.cy), g.membres.length > 1 ? 6 : 9, '#FFFFFF');
   }
-  for (const { f, x } of poses) {
-    const spec = FIXTURES[f.kind];
-    drawSymbol(d, assemblySymbol(f.kind), px(x), py(f.height), 0.62, spec.color, 1);
-    const tag = FIXTURE_TAG[f.kind];
-    if (!tag) continue;
-    // Le sigle va à droite s'il y a la place, au-dessus sinon : à droite
-    // d'une prise serrée contre sa voisine, il tombait sur elle.
-    const place = !poses.some(
-      (o) => o.x > x && (o.x - x) * scale < 34 && Math.abs(o.f.height - f.height) * scale < 16,
-    );
-    if (place) {
-      d.text(tag, px(x) + 12, py(f.height) + 4, 6, spec.color, { align: 'left' });
-    } else {
-      d.text(tag, px(x), py(f.height) + 14, 6, spec.color);
+  for (const g of grappes) {
+    const f = g.membres[0].f;
+    const encreApp = FIXTURES[f.kind].teintePropre ?? ENCRE_ELEC;
+    const cx = px(g.cx);
+    const cy = py(g.cy);
+    if (g.membres.length > 1) {
+      // Le trait de plaque commune, comme le cadre d'un ensemble (0,95 pt).
+      d.poly(rectArrondi(cx - g.demiLarg, cy - 8, g.demiLarg * 2, 16, 2), '#FFFFFF', encreApp, 0.95);
+    }
+    // Une grappe montre UN poste : le nombre est dans l'étiquette.
+    const kindDessine = g.membres.length > 1 ? (postsOf(f.kind)[0] ?? f.kind) : f.kind;
+    drawSymbol(d, assemblySymbol(kindDessine), cx, cy, 0.62, encreApp, 1);
+    if (g.etiquette) {
+      d.text(g.etiquette, cx + g.demiLarg + 3, cy - 2.2, 6.5, encreApp, { align: 'left', bold: true });
     }
   }
 
@@ -6632,6 +7062,8 @@ function dessinerUneFace(
   for (const g of new Set(poses.map((p) => p.f.group).filter(Boolean))) {
     const lot = poses.filter((p) => p.f.group === g);
     if (lot.length < 2) continue;
+    // Déjà dessinée en grappe, sous un seul cadre.
+    if (grappes.some((gr) => lot.every((p) => gr.membres.includes(p)))) continue;
     const xs = lot.map((p) => p.x);
     const ys = lot.map((p) => p.f.height);
     const larg = Math.max(...lot.map((p) => FIXTURES[p.f.kind].w));
@@ -6726,7 +7158,9 @@ function dessinerUneFace(
     const tient = larg * scale > 26;
     etage = tient ? 0 : etage === 0 ? 1 : 0;
     const yv = yb - etage * 13;
-    if (!tient) d.line(px(m), yb - 3, px(m), yv + 4, 0.5, '#B9C2CE');
+    // Un vrai trait de rappel : à 0,5 pt gris clair, on ne voyait plus à
+    // quel segment appartenait le chiffre décalé (revue « dessins »).
+    if (!tient) d.line(px(m), yb - 3, px(m), yv + 6, 0.6, GREY);
     d.circle(px(m), yv, 9, '#FFFFFF');
     // Arrondi au cumul : la chaîne fait la longueur du mur, au centimètre.
     d.text(`${Math.round(bornes[i + 1] * 100) - Math.round(bornes[i] * 100)}`, px(m), yv - 2.5, 7, GREY, { bold: true });
@@ -6743,7 +7177,7 @@ function dessinerUneFace(
   */
   const aucun = 'Aucun appareil sur ce mur.';
   if (poses.length === 0 && !sansElec && fitText(aucun, 8, face.len * scale) === aucun) {
-    d.text(aucun, px(face.len / 2), yb - 20, 8, GREY_LIGHT);
+    d.text(aucun, px(face.len / 2), yb - 20, 8, GREY);
   }
 
   // ------------------------------------------------------------ la photo
@@ -6809,6 +7243,43 @@ function dessinerUneFace(
       );
       cx += pw + marge;
     });
+  }
+
+  /*
+    UNE MINI-LÉGENDE DES SYMBOLES DE CETTE FACE — revue « dessins » : aucune
+    élévation n'avait de légende, et la feuille se photocopie seule. Elle se
+    pose sous le dessin, à gauche, quand la place y est (pas de photos, et
+    pas de chaîne de cotes à couvrir).
+  */
+  if (cliches.length === 0 && (poses.length > 0 || dos.length > 0)) {
+    const kindsMontres = [
+      ...new Set(grappes.map((g) => (g.membres.length > 1 ? postsOf(g.membres[0].f.kind)[0] ?? g.membres[0].f.kind : g.membres[0].f.kind))),
+    ];
+    const lignes: LegendLine[] = kindsMontres.map((k) => ({
+      texte: FIXTURES[k].label,
+      symbole: { paths: assemblySymbol(k), color: FIXTURES[k].teintePropre ?? ENCRE_ELEC },
+    }));
+    if (grappes.some((g) => g.membres.length > 1)) {
+      lignes.push({ texte: 'Appareils sous une même plaque, et leurs postes', echantillon: { texte: '×3', couleur: ENCRE_ELEC } });
+    }
+    if (dos.length > 0) {
+      lignes.push({
+        texte: 'Appareil de l’autre face (ne pas percer dos à dos)',
+        symbole: { paths: assemblySymbol(dos[0].kind), color: ENCRE_DOS },
+      });
+    }
+    const parColonne = 5;
+    const colonnes: LegendSection[][] = [];
+    for (let i = 0; i < lignes.length; i += parColonne) {
+      colonnes.push([{ titre: i === 0 ? 'SUR CETTE FACE' : ' ', teinte: ENCRE_ELEC, lignes: lignes.slice(i, i + parColonne) }]);
+    }
+    const rangs = Math.min(parColonne, lignes.length) + 1;
+    const hautLegende = rangs * CADRE_LIGNE + CADRE_MARGE * 2;
+    const basDuDessin = y0 - 50;
+    const yLegende = cadre.bas + 4;
+    if (yLegende + hautLegende < basDuDessin) {
+      drawLegendBox(d, FRAME.x + 40, yLegende, Math.min(FRAME.w - 80, 230 * colonnes.length), colonnes);
+    }
   }
 
   return { titre: numero ? `Mur ${numero} — ${quoi}` : `Élévation — ${quoi}`, echelle };
@@ -6884,10 +7355,16 @@ function wallNumbers(ctx: SheetContext): Map<string, number> {
  * (un grand logement sur un A4), le chiffre ne déborde pas en blanc sur du
  * blanc : il se pose juste à côté du mur, côté logement, en gris.
  */
-const NUMERO_MAX = 6;
-const NUMERO_MIN = 4.4;
-const NUMERO_A_COTE = 5.5;
-const GRIS_NUMERO = '#6B7380';
+const NUMERO_MAX = 6.5;
+/*
+  LISIBLE IMPRIMÉ — revues « dessins » et « typographie » : 4,4 pt en blanc
+  sur une cloison gris clair, les numéros 13, 14, 16 disparaissaient à
+  l'impression. Le chiffre ne descend plus sous 5,5 pt dans le mur ; à côté
+  du mur, il s'écrit à 6,5 pt, à l'encre du texte.
+*/
+const NUMERO_MIN = 5.5;
+const NUMERO_A_COTE = 6.5;
+const GRIS_NUMERO = INK;
 
 /** Le milieu du logement : c'est de ce côté qu'un numéro sorti du mur se pose. */
 function centreDesMurs(walls: WallSeg[]): { x: number; z: number } {
@@ -7016,7 +7493,12 @@ export function placeDuNumero(
   if (tient >= NUMERO_MIN) {
     const taille = Math.min(NUMERO_MAX, tient);
     const p = px(milieu.centre);
-    return { x: p.x, y: p.y, taille, couleur: '#FFFFFF', boite: boite(p.x, p.y, taille) };
+    // En réserve, blanc, sur le poché sombre ; à l'encre sur un fond clair
+    // (cloison grise, doublage, mur à créer) : blanc sur gris clair ne se
+    // lit pas une fois imprimé.
+    const [r0, g0, b0] = hexRgb(renduNature(w.nature ?? 'porteur', INK, '#FFFFFF').fond);
+    const clair = 0.299 * r0 + 0.587 * g0 + 0.114 * b0 > 0.5;
+    return { x: p.x, y: p.y, taille, couleur: clair ? INK : '#FFFFFF', boite: boite(p.x, p.y, taille) };
   }
   /*
     TROP MINCE : À CÔTÉ DU MUR, LÀ OÙ LE PAPIER EST BLANC. Côté logement

@@ -1571,8 +1571,8 @@ export function filetJusquAuSymbole(
  * l'intensité change, et un plan l'écrit.
  */
 export const FIXTURE_TAG: Partial<Record<FixtureKind, string>> = {
-  prise20: '20A',
-  prise32: '32A',
+  prise20: '20 A',
+  prise32: '32 A',
   rj45: 'RJ',
   rj2: 'RJ',
   rjPrise: 'RJ',
