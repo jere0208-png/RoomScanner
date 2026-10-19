@@ -451,6 +451,29 @@ export function ScanScreen() {
     };
   }, []);
   /*
+    LA TORCHE SUIT LA PAUSE — défaut signalé par l'agent testeur SCAN : en
+    pause, la session s'arrête (iOS coupe alors la lampe, ou la laisse brûler
+    pour rien sous iOS 17, qui garde ARKit chaud), et le bouton restait
+    « allumé » ; à la reprise, il mentait. On l'éteint en pause, pour de bon
+    et à l'écran, et on la rallume à la reprise si elle l'était avant.
+  */
+  const torcheAvantPause = useRef(false);
+  const torcheRef = useRef(torch);
+  torcheRef.current = torch;
+  useEffect(() => {
+    if (paused) {
+      if (!torcheRef.current) return;
+      torcheAvantPause.current = true;
+      setTorch(false);
+      RoomScan.setTorch(false).catch(() => {});
+      return;
+    }
+    if (!torcheAvantPause.current) return;
+    torcheAvantPause.current = false;
+    setTorch(true);
+    RoomScan.setTorch(true).catch(() => {});
+  }, [paused]);
+  /*
     LA TORCHE QUI S'ALLUME TOUTE SEULE, QUAND IL FAIT SOMBRE — le natif la
     décide (RoomPlan réclame de la lumière, ou l'image reste trop sombre) ;
     l'écran le montre : le bouton passe allumé, un mot le dit trois

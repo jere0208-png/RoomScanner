@@ -56,6 +56,27 @@ let partiDUnPlan = false;
 let tourDuScan = 0;
 
 /**
+ * DÉMARRER L'IPHONE, ET DIRE AU MAGASIN DANS QUELLE SESSION ON EST.
+ *
+ * Un départ à neuf ouvre une session (un autre repère) ; un passage ajouté
+ * la poursuit. Et des poses du viseur qui attendent un mur dans CETTE
+ * session, à ce niveau, la font poursuivre même pour un relevé neuf ou un
+ * étage repris : leur point du monde n'a de sens que dans son repère (voir
+ * `PoseEnAttente`, manque proposé par l'agent testeur SCAN).
+ */
+async function demarrerLeNatif(additif: boolean, niveau: number): Promise<void> {
+  const ajout = additif || useScanStore.getState().posesAReprendre(niveau);
+  if (ajout) await RoomScan.startAdditional();
+  else await RoomScan.start();
+  useScanStore.getState().ouvrirSessionNative(ajout);
+}
+
+/** « 3 poses gardées », « Une pose gardée » : le compte en toutes lettres. */
+function posesEnToutesLettres(n: number, participe: string): string {
+  return n === 1 ? `Une pose ${participe}` : `${n} poses ${participe}s`;
+}
+
+/**
  * LA CAMÉRA AVANT LE SCAN D'UN PLAN OUVERT — relevé App Store : « Scanner un
  * étage » partait sans demander l'autorisation caméra. RoomPlan échouait
  * alors en silence, ou laissait l'étage « en cours » sur un refus.
@@ -94,8 +115,7 @@ export async function demarrerComplement(): Promise<void> {
     d'un autre client. Sans les passages du plan à l'écran, on scanne à
     neuf, et la pièce s'ajoute à côté (voir `finalizeMerge`).
   */
-  if (st.passagesDuPlanOuvert()) await RoomScan.startAdditional();
-  else await RoomScan.start();
+  await demarrerLeNatif(st.passagesDuPlanOuvert(), st.niveauCourant);
   st.setComplement(true);
   st.setScreen('scan');
   st.setScanning(true);
@@ -148,7 +168,7 @@ export async function demarrerEtage(n: number): Promise<void> {
   // L'échec d'un scan précédent ne rouvre pas l'étage sur son panneau.
   st.setError(null);
   try {
-    await RoomScan.start();
+    await demarrerLeNatif(false, n);
   } catch (e) {
     useScanStore.setState({ etageEnCours: null });
     throw e;
@@ -178,7 +198,7 @@ export async function lancerUnScan(): Promise<void> {
   partiDUnPlan = false;
   st.setError(null);
   st.beginScan();
-  await RoomScan.start();
+  await demarrerLeNatif(false, useScanStore.getState().niveauCourant);
   st.setScanning(true);
   st.setPaused(false);
   st.setScreen('scan');
@@ -438,7 +458,7 @@ function resumerLeReleve() {
       « Scanner », et rien ne se passait.
     */
     try {
-      await RoomScan.start();
+      await demarrerLeNatif(false, useScanStore.getState().niveauCourant);
     } catch (e) {
       const p = signaler('releve', e ?? 'Le scan n’a pas pu démarrer.', 'scan');
       alerte(p.titre, p.message);
@@ -532,6 +552,8 @@ function resumerLeReleve() {
         */
         // Les murs d'avant : s'ils n'ont pas bougé, l'étage ou le passage n'a rien apporté.
         const mursAvant = useScanStore.getState().walls;
+        // Les poses du viseur en attente, avant ce passage : son apport se lira par différence.
+        const enAttenteAvant = useScanStore.getState().posesEnAttente.length;
         if (etage !== null) {
           useScanStore.getState().finalizeEtage(result, etage);
         } else if (complement) {
@@ -547,6 +569,18 @@ function resumerLeReleve() {
           pièce » vide ouvrait le bilan sur « Relevé complété ». Le plan
           revient tel qu'il était, et l'on dit pourquoi rien n'a changé.
         */
+        /*
+          LES POSES DU VISEUR : gardées faute de mur, ou reposées par ce
+          passage (voir `PoseEnAttente`). On le dit, une phrase.
+        */
+        const enAttenteApres = useScanStore.getState().posesEnAttente.length;
+        const gardees = enAttenteApres - enAttenteAvant;
+        const phraseDesPoses =
+          gardees > 0
+            ? `${posesEnToutesLettres(gardees, 'gardée')} : ${gardees > 1 ? 'elles se placeront' : 'elle se placera'} au prochain passage, sur les murs qu'il relèvera.`
+            : gardees < 0
+              ? `${posesEnToutesLettres(-gardees, 'en attente posée')} sur les murs de ce passage.`
+              : null;
         if ((etage !== null || complement) && useScanStore.getState().walls === mursAvant) {
           partiDUnPlan = false;
           useScanStore.setState({
@@ -557,15 +591,25 @@ function resumerLeReleve() {
             complementEnCours: false,
             screen: 'result',
           });
+          const etLesPoses = gardees > 0 ? `\n\n${phraseDesPoses}` : '';
+          // Les poses gardées se jettent d'ici, si l'on n'en veut plus.
+          const boutons =
+            gardees > 0
+              ? [{ label: 'Garder les poses' }, { label: 'Jeter les poses', danger: true, onPress: () => useScanStore.getState().jeterPosesEnAttente() }]
+              : undefined;
           if (etage !== null) {
             alerte(
               `${nomDuNiveau(etage)} : rien de relevé`,
-              'Aucun mur n’a été vu : le niveau n’est pas créé. Relancez « Scanner un étage » et balayez ses murs avant de terminer.',
+              'Aucun mur n’a été vu : le niveau n’est pas créé. Relancez « Scanner un étage » et balayez ses murs avant de terminer.' +
+                etLesPoses,
+              boutons,
             );
           } else {
             alerte(
               'Aucune pièce ajoutée',
-              'Ce passage n’a relevé aucun mur : le plan reste tel qu’il était. Entrez dans la pièce et balayez ses murs avant de terminer.',
+              'Ce passage n’a relevé aucun mur : le plan reste tel qu’il était. Entrez dans la pièce et balayez ses murs avant de terminer.' +
+                etLesPoses,
+              boutons,
             );
           }
           return;
@@ -590,6 +634,13 @@ function resumerLeReleve() {
         const depense = phraseDeLaDepense(result);
         const porte = ecartes ? direCeQuiEstEcarte(ecartes) : null;
         const enCarte = montrerLeBilan({ etage, complement, avant, premier, depense, porte });
+        // Les poses gardées ou reposées se disent à part : la carte du bilan ne les compte pas.
+        if (phraseDesPoses) {
+          astuce(phraseDesPoses, {
+            icone: 'elec',
+            ...(gardees > 0 ? { action: { label: 'Jeter', faire: () => useScanStore.getState().jeterPosesEnAttente() } } : {}),
+          });
+        }
         if (!enCarte) {
           // Pas de carte : les bandeaux d'avant, que rien ne recouvre.
           if (premier) astuce(FETE_DU_PREMIER_PLAN, { fete: true });
