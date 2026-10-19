@@ -15,7 +15,8 @@
  * de les remettre en matière d'un clic dans le logiciel de destination.
  */
 import type { ObjectData } from 'react-native-room-scan';
-import { abregerNiveau, type RoomShape, type WallSeg } from '../geometry/floorplan';
+import { abregerNiveau, roomParts, type RoomShape, type WallSeg } from '../geometry/floorplan';
+import { pointInPolygon } from '../geometry/appearance';
 import type { Fixture } from '../geometry/electrical';
 import type { CeilingFixture } from '../geometry/ceiling';
 import { buildScene, type Face3D } from './../geometry/scene3d';
@@ -59,8 +60,10 @@ export interface ModelForExport {
  * « Sols » et « Volumes », pour tout le logement ; on ne pouvait pas masquer
  * les meubles pour ne garder que l'architecture. Un groupe par nature.
  */
-function groupOf(face: Face3D): string {
-  if (face.isFloor) return 'Sols';
+function groupOf(face: Face3D & { piece?: string }): string {
+  // Le sol d'une pièce dans son groupe à elle — manque proposé par l'agent
+  // testeur PLAN 3D : dans Blender, « Sols — Séjour » se masque seul.
+  if (face.isFloor) return face.piece ? `Sols — ${face.piece}` : 'Sols';
   if (face.menuiserie) return 'Menuiseries';
   if (face.meuble || face.ownerId) return 'Meubles';
   if (face.appareil) return 'Appareillage';
@@ -109,7 +112,7 @@ export function buildObjMaison(
  * Blender, MeshLab et la plupart des visionneuses. Un seul fichier : pas
  * de .mtl à égarer en chemin.
  */
-function facesDuModele(model: ModelForExport): Face3D[] {
+function facesDuModele(model: ModelForExport): (Face3D & { piece?: string })[] {
   const pieces = (model.rooms ?? []) as (RoomShape & { peinture?: string; sol?: string; solTeinte?: string; accents?: Record<string, string> })[];
   const scene = buildScene(model.walls, model.openings, model.objects, {
     palette: MAQUETTE,
@@ -122,11 +125,30 @@ function facesDuModele(model: ModelForExport): Face3D[] {
     sols: solsDesPieces(pieces),
     accents: accentsDesPieces(pieces),
   });
-  return scene.faces;
+  // Le sol de chaque pièce porte son nom : la pièce dont le contour contient son centre.
+  const noms = new Map((model.rooms ?? []).map((r) => [r.id, (r as { name?: string }).name ?? '']));
+  const contours = roomParts(model.walls, model.rooms ?? [])
+    .filter((p) => (p.surface?.pts.length ?? 0) >= 3 && noms.get(p.roomId))
+    .map((p) => ({ nom: noms.get(p.roomId)!, pts: p.surface!.pts }));
+  if (contours.length === 0) return scene.faces;
+  return scene.faces.map((f) => {
+    if (!f.isFloor || f.pts.length < 3) return f;
+    const c = {
+      x: f.pts.reduce((t, p) => t + p.x, 0) / f.pts.length,
+      z: f.pts.reduce((t, p) => t + p.z, 0) / f.pts.length,
+    };
+    // Le sol EST le contour de sa pièce (même sommets) ; à défaut, son centre
+    // — qui peut tomber hors d'une pièce en L, d'où la première règle.
+    const meme = contours.find(
+      (k) => k.pts.length === f.pts.length && Math.hypot(k.pts[0].x - f.pts[0].x, k.pts[0].z - f.pts[0].z) < 1e-6,
+    );
+    const piece = (meme ?? contours.find((k) => pointInPolygon(c, k.pts)))?.nom;
+    return piece ? { ...f, piece } : f;
+  });
 }
 
 function ecrireObj(
-  parties: { prefixe: string; faces: Face3D[]; dy: number }[],
+  parties: { prefixe: string; faces: (Face3D & { piece?: string })[]; dy: number }[],
   name: string,
 ): string {
   const lines: string[] = [

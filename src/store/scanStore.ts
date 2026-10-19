@@ -1094,6 +1094,14 @@ function rabattreSousLePlafond(
   murs: WallSeg[],
   fixtures: Fixture[],
   openings: WallSeg[],
+  /**
+   * LE PLAFOND QU'UNE BAIE DOIT PASSER, quand il est plus bas que le mur —
+   * défaut relevé par l'agent testeur PLAN 2D : un mur MITOYEN garde la
+   * hauteur de la pièce voisine (voir `setRoomHeight`), et la porte qu'il
+   * porte, de 2,04 m, traversait le plafond du couloir baissé à 1,90 m. Une
+   * porte relie deux pièces : elle passe sous le plus bas des deux plafonds.
+   */
+  plafondDeLaBaie?: (w: WallSeg) => number,
 ): { fixtures: Fixture[]; openings: WallSeg[] } {
   const parId = new Map(murs.map((w) => [w.id, w]));
   const murDe = new Map<string, WallSeg>();
@@ -1119,7 +1127,7 @@ function rabattreSousLePlafond(
       if (!w) return o;
       const sol = w.yCenter - w.height / 2;
       const base = o.yCenter - o.height / 2;
-      const plafond = sol + w.height;
+      const plafond = sol + Math.min(w.height, plafondDeLaBaie?.(w) ?? w.height);
       if (base + o.height <= plafond) return o;
       // On rabat d'abord le linteau ; si l'allège elle-même est au-dessus
       // du nouveau plafond, la baie redescend jusqu'au sol.
@@ -8799,11 +8807,13 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         }
         return { ...r, hauteur: height };
       });
-      // Les prises et les menuiseries de CES murs-là suivent leur plafond.
+      // Les prises et les menuiseries de CES murs-là suivent leur plafond —
+      // et une baie d'un mur mitoyen, celui de la pièce baissée.
       const suite = rabattreSousLePlafond(
         walls.filter((w) => ids.has(w.id)),
         st.fixtures,
         st.openings,
+        () => height,
       );
       // (`rabattreSousLePlafond` ne touche que les baies du niveau de chaque mur.)
       const objects = recollerLesCaissons(st.objects, walls, rooms, (id) => (id === roomId ? height : null));

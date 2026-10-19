@@ -102,6 +102,8 @@ import {
   Iso3DView,
   type View3DParams,
 } from '../components/Iso3DView';
+import { gesteDeVue, libelleDuGeste, vueApres, vueEntre } from '../ui/vueMaquette';
+import { reduireLesAnimations } from '../ui/useReduceMotion';
 import {
   fitsInRoom,
   meubleDansLaPiece,
@@ -1024,6 +1026,34 @@ export function ResultScreen() {
         setView3d((x) => ({ ...x, tilt: TILT_VOLUME }));
       });
     }
+  };
+  /*
+    RECENTRER · VUE DE DESSUS · PERSPECTIVE — manque proposé par l'agent
+    testeur PLAN 3D : une maquette zoomée, poussée, tournée ne revenait plus
+    entière qu'en repassant par le plan. Un appui fait le geste que dit la
+    pastille (voir `ui/vueMaquette`), en trois cent cinquante millisecondes —
+    sur-le-champ avec « Réduire les animations ».
+  */
+  const changerVueMaquette = () => {
+    if (releve.current) clearInterval(releve.current);
+    releve.current = null;
+    const de = view3dRef.current;
+    const vers = vueApres(de);
+    haptic('leger');
+    if (reduireLesAnimations()) {
+      setView3d(vers);
+      return;
+    }
+    const t0 = Date.now();
+    const duree = 350;
+    releve.current = setInterval(() => {
+      const t = Math.min(1, (Date.now() - t0) / duree);
+      setView3d(t >= 1 ? vers : vueEntre(de, vers, 1 - Math.pow(1 - t, 3)));
+      if (t >= 1) {
+        if (releve.current) clearInterval(releve.current);
+        releve.current = null;
+      }
+    }, 16);
   };
   // Coupe : index de la pièce isolée en 3D (-1 = tout le logement).
   const [focusIdx, setFocusIdx] = useState(-1);
@@ -5861,6 +5891,40 @@ export function ResultScreen() {
             {walls.length > 0 && tab === '2d' && (
               <PastilleRecadrer style={[styles.vuePastille, styles.pastilleIcone]} teinte={teinte.blue} />
             )}
+            {/*
+              LA MÊME, POUR LA MAQUETTE — elle reste là : recentrer, puis
+              basculer entre vue de dessus et perspective (voir
+              `changerVueMaquette`). Son mot dit le geste qu'elle va faire.
+            */}
+            {walls.length > 0 && tab === '3d' && !capturing && (() => {
+              const geste = gesteDeVue(view3d);
+              const mot = libelleDuGeste(geste);
+              return (
+                <TouchableOpacity
+                  testID="pastille-vue-maquette"
+                  style={[styles.vuePastille, rangeeEnIcones && styles.pastilleIcone]}
+                  hitSlop={HIT_PASTILLE}
+                  accessibilityRole="button"
+                  accessibilityLabel={mot.court}
+                  accessibilityHint={mot.aide}
+                  accessibilityShowsLargeContentViewer
+                  accessibilityLargeContentTitle={mot.court}
+                  onPress={changerVueMaquette}>
+                  <Svg width={16} height={16} viewBox="0 0 24 24">
+                    <Trace
+                      d={geste === 'recentrer' ? SOLAIRES.centrer : geste === 'dessus' ? SOLAIRES.square : SOLAIRES.model}
+                      fill={teinte.blue}
+                      fillRule="evenodd"
+                    />
+                  </Svg>
+                  {!rangeeEnIcones && (
+                    <Text style={styles.vuePastilleTexte} maxFontSizeMultiplier={PLAFOND_BARRE}>
+                      {mot.court}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })()}
             {/*
               LE MOT AFFICHÉ EST DANS LE LIBELLÉ — revue d'accessibilité :
               la pastille montre « 2D » et s'appelait « Passer en 3D » ;
