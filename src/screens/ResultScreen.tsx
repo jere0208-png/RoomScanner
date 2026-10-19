@@ -73,6 +73,8 @@ import { Presse } from '../components/Presse';
 import { CeilingBar } from '../components/CeilingBar';
 import { ObjectBar } from '../components/ObjectBar';
 import { SelectionMeublesBar } from '../components/SelectionMeublesBar';
+import { TraceMursBar, motDEpaisseur } from '../components/TraceMursBar';
+import { pointALaLongueur, type Accroche, type Visee } from '../geometry/traceMurs';
 import { estVerrouille } from '../geometry/alignement';
 import { estUnCaisson } from '../geometry/caisson';
 import { calerDansLaNiche } from '../geometry/niche';
@@ -125,6 +127,7 @@ import {
   type PoseDeMur,
   type SaisieMurNeuf,
   planFrameAngle,
+  WALL_T,
   filtrerAuNiveau,
   altitudesDesNiveaux,
   nomDuNiveau,
@@ -1174,6 +1177,19 @@ export function ResultScreen() {
    */
   const [posesMur, setPosesMur] = useState<PoseDeMur[] | null>(null);
   /*
+    LE TRACÉ DES MURS EN COURS — relevé du patron : « ajouter un mur
+    exactement là où on le souhaite ». Les coins posés attendent ici (le plan
+    ne change pas tant que le mur n'est pas fini) ; voir `poserLeTrace`.
+  */
+  const [trace, setTrace] = useState<{
+    coins: Pt[];
+    accroches: Accroche[];
+    aimant: boolean;
+    epaisseur: number;
+  } | null>(null);
+  const traceRef = useRef(trace);
+  traceRef.current = trace;
+  /*
     LA POSE TOUCHÉE, en attente de ses cotes — voir `MurNeufSheet`. Et le
     mur que donneraient les cotes tapées, dessiné derrière la feuille.
   */
@@ -1615,6 +1631,127 @@ export function ResultScreen() {
   // Nos fenêtres : une pour les choix, une pour les valeurs à saisir.
   const [menu, setMenu] = useState<ActionData | null>(null);
   const [prompt, setPrompt] = useState<PromptData | null>(null);
+
+  /** Pose ce qui est tracé : une pièce (`ferme`), ou les murs tels quels. */
+  const poserLeTraceCourant = useCallback((ferme: boolean): boolean => {
+    const t = traceRef.current;
+    if (!t || t.coins.length < 2) return false;
+    const r = useScanStore.getState().poserLeTrace(t.coins, {
+      ferme,
+      epaisseur: t.epaisseur,
+      // Un coin posé sur le plan existant : on travaille à l'axe, et l'on partage ses murs.
+      accroche: t.accroches.some((a) => a === 'coin' || a === 'mur'),
+    });
+    if (!r) {
+      if (ferme) {
+        alerte('La pièce ne se ferme pas', 'Ses murs se croisent, ou elle est trop petite. Annulez un coin et reprenez.');
+      }
+      return false;
+    }
+    haptic('succes');
+    return true;
+  }, []);
+  const commencerLeTrace = useCallback(() => {
+    setEditMode(true);
+    setSelectedWallId(null);
+    setSelectedObjectId(null);
+    setSelectedRoomId(null);
+    setPosesMur(null);
+    setTrace({ coins: [], accroches: [], aimant: true, epaisseur: WALL_T });
+    haptic('leger');
+  }, []);
+  /** Sortir du mode : rien n'est perdu, ce qui est tracé se pose. */
+  const terminerLeTrace = useCallback(() => {
+    poserLeTraceCourant(false);
+    setTrace(null);
+  }, [poserLeTraceCourant]);
+  /*
+    RIEN N'EST PERDU EN SORTANT — on quitte l'édition, on change de vue, on
+    quitte l'écran : ce qui est tracé se pose tel quel (un mur par pan).
+  */
+  useEffect(() => {
+    if (!editMode && traceRef.current) terminerLeTrace();
+  }, [editMode, terminerLeTrace]);
+  useEffect(
+    () => () => {
+      const t = traceRef.current;
+      if (t && t.coins.length >= 2) {
+        useScanStore.getState().poserLeTrace(t.coins, { ferme: false, epaisseur: t.epaisseur });
+      }
+    },
+    [],
+  );
+  const ajouterUnCoin = useCallback(
+    (p: Pt, accroche: Accroche) => {
+      const t = traceRef.current;
+      if (!t) return;
+      if (accroche === 'premier') {
+        if (poserLeTraceCourant(true)) setTrace({ ...t, coins: [], accroches: [] });
+        return;
+      }
+      const dernier = t.coins[t.coins.length - 1];
+      if (dernier && Math.hypot(p.x - dernier.x, p.z - dernier.z) < 0.03) return;
+      const suite = { ...t, coins: [...t.coins, p], accroches: [...t.accroches, accroche] };
+      /*
+        UN MUR QUI ARRIVE SUR LE PLAN EST FINI — une cloison de mur à mur, un
+        retour de mur, une pièce accolée qu'on referme sur un coin existant :
+        le tracé se pose dès qu'il touche le plan, et l'on peut en tracer un
+        autre aussitôt.
+      */
+      if (t.coins.length >= 1 && (accroche === 'coin' || accroche === 'mur')) {
+        traceRef.current = suite;
+        poserLeTraceCourant(false);
+        setTrace({ ...t, coins: [], accroches: [] });
+        return;
+      }
+      setTrace(suite);
+      haptic('leger');
+    },
+    [poserLeTraceCourant],
+  );
+  const taperUneCote = useCallback(() => {
+    const t = traceRef.current;
+    if (!t || t.coins.length === 0) return;
+    const cadre = planFrameAngle(useScanStore.getState().walls);
+    const demander = (corriger: boolean) =>
+      setPrompt({
+        title: corriger ? 'Longueur du dernier mur' : 'Longueur du mur suivant',
+        subtitle: corriger
+          ? 'Le dernier coin glisse dans l’axe du mur.'
+          : t.coins.length === 1
+            ? 'Il part vers la droite du plan ; tournez-le ensuite au doigt si besoin.'
+            : 'À l’équerre du précédent, dans le sens du tour.',
+        value: '',
+        unit: 'm',
+        numeric: true,
+        verifier: verifierMetres('Longueur', BORNES_MUR),
+        onSubmit: (v) => {
+          const L = lireMetres(v);
+          const cour = traceRef.current;
+          if (!cour || L === null || !(L > 0)) return;
+          if (corriger && cour.coins.length >= 2) {
+            const a = cour.coins[cour.coins.length - 2];
+            const b = cour.coins[cour.coins.length - 1];
+            const p = pointALaLongueur([a], L, b, cadre);
+            if (p) setTrace({ ...cour, coins: [...cour.coins.slice(0, -1), p] });
+            return;
+          }
+          const p = pointALaLongueur(cour.coins, L, null, cadre);
+          if (p) ajouterUnCoin(p, null);
+        },
+      });
+    if (t.coins.length === 1) {
+      demander(false);
+      return;
+    }
+    setMenu({
+      title: 'Taper une cote',
+      actions: [
+        { label: 'Mur suivant à la cote…', onPress: () => demander(false) },
+        { label: 'Corriger le dernier mur…', onPress: () => demander(true) },
+      ],
+    });
+  }, [ajouterUnCoin]);
   // Catalogue de mobilier : ouvert par le « + » posé à côté du calque meubles.
   const [catalogue, setCatalogue] = useState(false);
   /*
@@ -3908,7 +4045,7 @@ export function ResultScreen() {
     y a eu un balayage.
   */
   const niveauVideAilleurs = walls.length === 0 && tousLesMurs.some((w) => w.type === 'wall');
-  if (walls.length === 0) {
+  if (walls.length === 0 && !trace) {
     return (
       <View style={styles.container}>
         {/* Une bande de bord suffit ici : cet écran n'a rien à toucher, et
@@ -3960,6 +4097,7 @@ export function ResultScreen() {
         */}
         {planVierge && !niveauVideAilleurs ? (
           <PlanViergePage
+            onTracer={commencerLeTrace}
             onChoose={(m) => {
               setSelectedRoomId(addRoomLibre(m.largeur, m.profondeur, m.nom, { auNu: true }));
               setEditMode(true);
@@ -4694,6 +4832,19 @@ export function ResultScreen() {
                       }),
                   },
                   {
+                    /*
+                      TRACER DES MURS — relevé du patron : « ajouter un mur
+                      exactement là où on le souhaite ». Coin après coin,
+                      avec l'équerre et la longueur en direct ; une cloison
+                      de mur à mur se pose en deux appuis.
+                    */
+                    section: 'Ajouter',
+                    label: 'Tracer des murs',
+                    icon: 'murer' as const,
+                    hint: 'Coin après coin. Une cloison : touchez un mur, puis l’autre.',
+                    onPress: commencerLeTrace,
+                  },
+                  {
                     section: 'Ajouter',
                     label: 'Ajouter un mur',
                     icon: 'regle' as const,
@@ -5052,6 +5203,8 @@ export function ResultScreen() {
             pleinCadre={capturing}
             /* Les fantômes bleus d'un mur neuf, et le doigt qui tranche. */
             poses={posesDuPlan}
+            traceMurs={trace && vue === '2d' && !capturing ? { coins: trace.coins, aimant: trace.aimant } : null}
+            onTraceCoin={(v: Visee) => ajouterUnCoin(v.p, v.accroche)}
             onPose={(id) => {
               const pose = posesMur?.find((x) => x.id === id);
               if (!pose) return;
@@ -6476,6 +6629,35 @@ export function ResultScreen() {
                 />
               );
             }}
+          />
+        )}
+
+        {vue === '2d' && trace && !capturing && (
+          <TraceMursBar
+            coins={trace.coins.length}
+            aimant={trace.aimant}
+            epaisseur={trace.epaisseur}
+            styles={stylesBarres}
+            palette={teinte}
+            onCote={taperUneCote}
+            onAnnulerCoin={() =>
+              setTrace((t) => (t ? { ...t, coins: t.coins.slice(0, -1), accroches: t.accroches.slice(0, -1) } : t))
+            }
+            onFermer={() => {
+              if (poserLeTraceCourant(true)) setTrace((t) => (t ? { ...t, coins: [], accroches: [] } : t));
+            }}
+            onTerminer={terminerLeTrace}
+            onAimant={() => setTrace((t) => (t ? { ...t, aimant: !t.aimant } : t))}
+            onEpaisseur={() =>
+              setMenu({
+                title: 'Épaisseur des murs à venir',
+                subtitle: 'Les coins posés sont les coins intérieurs de la pièce : les murs s’épaississent vers l’extérieur.',
+                actions: EPAISSEURS.map((e) => ({
+                  label: motDEpaisseur(e.m),
+                  onPress: () => setTrace((t) => (t ? { ...t, epaisseur: e.m } : t)),
+                })),
+              })
+            }
           />
         )}
 

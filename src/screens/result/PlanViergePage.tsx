@@ -14,7 +14,7 @@
  * retire-la »). Les gabarits, trois par rangée, tiennent sur un écran.
  */
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { RoomChoice, type RoomModel } from '../../components/RoomChoice';
 import { themedStyles, useTheme, type Palette } from '../../theme';
 import { MODELES_DE_PIECE } from './AddRoomSheet';
@@ -22,9 +22,17 @@ import { MODELES_DE_PIECE } from './AddRoomSheet';
 export function PlanViergePage({
   onChoose,
   onSurMesure,
+  onTracer,
 }: {
   onChoose: (m: RoomModel) => void;
   onSurMesure: () => void;
+  /**
+   * TRACER SES MURS, COIN APRÈS COIN — relevé du patron : « il est difficile
+   * de structurer une pièce à partir de rien, en ajoutant des murs ». Une
+   * pièce qui n'est pas un rectangle (un L, un pan coupé, une mansarde) se
+   * trace ; c'est donc le premier geste offert.
+   */
+  onTracer?: () => void;
 }) {
   const c = useTheme();
   const s = getStyles(c);
@@ -34,8 +42,19 @@ export function PlanViergePage({
         Plan vierge
       </Text>
       <Text style={s.phrase}>
-        Choisissez une première pièce : vous ajusterez ses cotes au doigt, ou tapez-les avec « Sur mesure ».
+        Tracez les murs coin après coin, ou choisissez une première pièce : vous ajusterez ses cotes au doigt, ou
+        tapez-les avec « Sur mesure ».
       </Text>
+      {onTracer && (
+        <TouchableOpacity
+          style={s.tracer}
+          accessibilityRole="button"
+          accessibilityLabel="Tracer les murs au doigt"
+          onPress={onTracer}>
+          <Text style={s.tracerTitre}>Tracer les murs au doigt</Text>
+          <Text style={s.tracerAide}>Coin après coin, avec l’équerre et les cotes. Touchez le premier coin pour fermer.</Text>
+        </TouchableOpacity>
+      )}
       <View style={s.grille}>
         <RoomChoice
           modeles={MODELES_DE_PIECE}
@@ -70,5 +89,17 @@ const getStyles = themedStyles((c: Palette) =>
       paddingHorizontal: 6,
     },
     grille: { alignSelf: 'stretch' },
+    tracer: {
+      alignSelf: 'stretch',
+      minHeight: 56,
+      borderRadius: 16,
+      backgroundColor: c.blue,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      marginBottom: 14,
+      justifyContent: 'center',
+    },
+    tracerTitre: { color: '#FFFFFF', fontSize: 17, fontWeight: '700', textAlign: 'center' },
+    tracerAide: { color: '#FFFFFF', opacity: 0.88, fontSize: 13, textAlign: 'center', marginTop: 2 },
   }),
 );
