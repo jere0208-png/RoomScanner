@@ -3177,6 +3177,9 @@ export function ResultScreen() {
    * séparée, ou la retirer. Un appui qui n'ouvre QU'UNE des cinq portes en
    * ferme quatre — et l'utilisateur ne sait pas qu'elles existent.
    */
+  /** La pièce porte-t-elle de l'appareillage (au mur, côté pièce, ou au plafond) ? */
+  const aDeLAppareillage = (roomId: string) =>
+    ceiling.some((c) => c.roomId === roomId) || fixtures.some((f) => placement.get(f.id) === roomId);
   const promptRoomFor = (roomId: string) => {
     setSelectedRoomId(roomId);
     const piece = rooms.find((r) => r.id === roomId);
@@ -3235,6 +3238,30 @@ export function ResultScreen() {
                 label: 'Fusionner avec une pièce voisine',
                 icon: 'fusionner' as const,
                 onPress: promptMerge,
+              },
+            ]
+          : []),
+        /*
+          L'APPAREILLAGE DE LA PIÈCE, D'UN GESTE — agent testeur ÉLECTRICITÉ :
+          en rénovation, on repart de zéro pièce par pièce. Seulement en mode
+          électricité, et seulement s'il y a quelque chose à retirer.
+        */
+        ...(modeElec && aDeLAppareillage(roomId)
+          ? [
+              {
+                label: 'Retirer l’appareillage de la pièce',
+                hint: 'Appareils muraux et plafond. Les murs et les meubles restent.',
+                icon: 'supprimer' as const,
+                danger: true,
+                onPress: () => {
+                  const n = useScanStore.getState().viderAppareillage(roomId);
+                  if (n > 0) {
+                    astuce(`${n} élément${n > 1 ? 's' : ''} retiré${n > 1 ? 's' : ''}.`, {
+                      icone: 'undo',
+                      action: { label: 'Annuler', faire: () => useScanStore.getState().undo() },
+                    });
+                  }
+                },
               },
             ]
           : []),
