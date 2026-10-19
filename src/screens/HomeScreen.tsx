@@ -48,6 +48,7 @@ import { BandeauAnnuler, useSuppressionDifferee } from '../components/BandeauAnn
 import { Avatar } from '../components/Avatar';
 import { LogoEcho } from '../components/LogoMark';
 import { horsCorbeille, useScanStore, type SavedScan } from '../store/scanStore';
+import { correspondAuPlan } from '../ui/recherchePlans';
 import { useAccountStore } from '../store/accountStore';
 import { nombreDeLaPastille, useNotifications } from '../store/notifications';
 import { CLOCHE } from './NotificationsScreen';
@@ -59,7 +60,6 @@ import { alerte } from '../ui/alerte';
 import { astuce } from '../ui/astuce';
 import { panne as expliquer } from '../ui/panne';
 import { sansPerdreLeReleve } from '../ui/releveInterrompu';
-import { pourChercher } from '../ui/mots';
 import { PlanThumb, detailsDuScan } from './LibraryScreen';
 import { etatDAttente, useMaintenant } from '../ui/miseDeCote';
 import { NOM_EXEMPLE, appartementExemple } from '../data/exemple';
@@ -363,10 +363,12 @@ export function HomeScreen() {
   const mettreALaCorbeille = useScanStore((s) => s.mettreALaCorbeille);
   const suppression = useSuppressionDifferee(mettreALaCorbeille);
   const montres = useMemo(() => {
-    const q = pourChercher(cherche.trim());
+    const q = cherche.trim();
     const vivants = recents.filter((s) => s.id !== suppression.masque);
     if (!q) return vivants.slice(0, PLANS_A_LACCUEIL);
-    return vivants.filter((s) => pourChercher(s.name ?? '').includes(q)).slice(0, 8);
+    // Le nom, le client, l'adresse, le numéro du devis, à une faute près —
+    // la même recherche que la bibliothèque (peaufinage APPLI, `recherchePlans`).
+    return vivants.filter((s) => correspondAuPlan(s, q)).slice(0, 8);
   }, [recents, cherche, suppression.masque]);
 
   /* L'exemple, en vignette, tant que « Mes plans » est vide — et alors seulement. */

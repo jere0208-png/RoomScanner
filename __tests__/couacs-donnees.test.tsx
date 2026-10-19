@@ -178,7 +178,8 @@ describe('ouvrir un plan depuis la bibliothèque', () => {
       act(() => trier().props.onPress());
       act(() => tree.unmount());
       tree = monter();
-      expect(trier().props.accessibilityLabel).toBe('Trier par date');
+      // Trois tris à la suite : date → nom → client (peaufinage APPLI).
+      expect(trier().props.accessibilityLabel).toBe('Trier par client');
       expect(vueRetenue.tri).toBe('nom');
     } finally {
       act(() => tree.unmount());

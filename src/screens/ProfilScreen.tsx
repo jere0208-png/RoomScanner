@@ -38,7 +38,9 @@ import { useUsage } from '../store/usage';
 import { ThemeGlyph } from '../components/ThemeGlyph';
 import { ContourVif, TexteVif } from '../components/ContourVif';
 import { SOLAIRES } from '../ui/solaires';
-import { useAccountStore } from '../store/accountStore';
+import { identiteDuCompte, useAccountStore } from '../store/accountStore';
+import { quand } from './HomeScreen';
+import { pluriel } from '../ui/mots';
 import { useModeDiagnostic } from '../diagnostic/mode';
 import { useScanStore, type ThemePref } from '../store/scanStore';
 import { ouvrirConfidentialite } from './ConfidentialiteScreen';
@@ -107,6 +109,8 @@ export function ProfilScreen() {
   const s = themed(c);
   const insets = useSafeAreaInsets();
   const setScreen = useScanStore((st) => st.setScreen);
+  const envoiEnLigne = useScanStore((st) => st.envoiEnLigne);
+  const [renvoi, setRenvoi] = useState(false);
   const themePref = useScanStore((st) => st.themePref);
   const accentPref = useScanStore((st) => st.accentPref);
   const iconePref = useScanStore((st) => st.iconePref);
@@ -319,6 +323,34 @@ export function ProfilScreen() {
               donné une fois), et l'App Store peut être muet — une échéance
               inventée serait pire que pas d'échéance.
             */}
+            {/*
+              OÙ EN EST LA SAUVEGARDE EN LIGNE — peaufinage APPLI : un envoi
+              manqué ne se disait nulle part. On dit la dernière réussite, ou
+              combien de plans attendent, avec de quoi les renvoyer.
+            */}
+            {pro && envoiEnLigne.enAttente.length > 0 && (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${pluriel(envoiEnLigne.enAttente.length, 'plan')} pas encore en ligne. Réessayer`}
+                hitSlop={8}
+                disabled={renvoi}
+                onPress={() => {
+                  setRenvoi(true);
+                  useScanStore
+                    .getState()
+                    .renvoyerLesPlansEnAttente(identiteDuCompte())
+                    .finally(() => setRenvoi(false));
+                }}>
+                <Text style={s.aboAttente}>
+                  {renvoi
+                    ? 'Envoi en cours…'
+                    : `${pluriel(envoiEnLigne.enAttente.length, 'plan')} pas encore en ligne · Réessayer`}
+                </Text>
+              </Pressable>
+            )}
+            {pro && envoiEnLigne.enAttente.length === 0 && envoiEnLigne.dernierEnvoi !== null && (
+              <Text style={s.aboSous}>{`Sauvegardé en ligne ${quand(envoiEnLigne.dernierEnvoi)}`}</Text>
+            )}
             {pro && proVia !== 'code' && !!proEcheance && (
               <Text style={s.aboDate}>
                 {proReconduit
@@ -850,6 +882,7 @@ const themed = (c: Palette) =>
     // La date se lit d'un ton en dessous : c'est une précision, pas le
     // titre — mais elle porte la graisse, parce qu'on vient la chercher.
     aboDate: { color: c.blue, fontSize: 12, fontWeight: '700', marginTop: 3 },
+    aboAttente: { color: c.danger, fontSize: 12, fontWeight: '700', marginTop: 3 },
     // Le bouton de la carte est PLEIN et sombre, comme dans le design : sur
     // une carte blanche, c'est le seul contraste qui dit « touche ici ».
     boutonAbo: {

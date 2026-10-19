@@ -38,7 +38,7 @@ import { rangerLeTravail } from './src/ui/miseDeCote';
 import { prendreLaDemande, suiteDuRaccourci } from './src/ui/raccourci';
 import { indexerLesPlans } from './src/ui/spotlight';
 import { astuce } from './src/ui/astuce';
-import { useAccountStore } from './src/store/accountStore';
+import { identiteDuCompte, useAccountStore } from './src/store/accountStore';
 import { useModeDiagnostic } from './src/diagnostic/mode';
 import { activerDiagnostic, desactiverDiagnostic } from './src/diagnostic/controleur';
 
@@ -252,6 +252,12 @@ function Application() {
     const abonne = AppState.addEventListener('change', (etat) => {
       if (etat === 'active') {
         traiter();
+        // Les plans dont l'envoi en ligne a échoué repartent au retour dans
+        // l'app : le réseau est souvent revenu entre-temps (peaufinage APPLI).
+        const st = useScanStore.getState();
+        if (useAccountStore.getState().pro && st.envoiEnLigne.enAttente.length > 0) {
+          st.renvoyerLesPlansEnAttente(identiteDuCompte()).catch(() => {});
+        }
         // Un plan touché dans Spotlight arrive parfois juste APRÈS le retour
         // au premier plan : on regarde une seconde fois, un instant plus tard.
         setTimeout(traiter, 700);

@@ -2763,6 +2763,26 @@ export function defaultName(d: Date, pieces?: { name?: string; kind?: RoomKind |
   return `Scan ${jour} · ${two(d.getHours())}h${two(d.getMinutes())}`;
 }
 
+/*
+  LE PLAN PREND LE NOM DE SON CHANTIER — peaufinage APPLI : la bibliothèque
+  se remplissait de « Scan 19/10 · 21h31 » et de « T3 · 19/10 » qu'il fallait
+  renommer un par un, alors que le client et l'adresse étaient déjà tapés
+  pour le dossier. Tant que le plan porte encore un nom donné par l'app
+  (`defaultName`), le client — ou à défaut le début de l'adresse — le
+  remplace, en gardant ce que le nom disait du logement : « Dupont · T3 ».
+  Un nom choisi à la main n'est jamais touché.
+*/
+const NOM_AUTOMATIQUE = /^(?:Scan (\d{2}\/\d{2}) · \d{2}h\d{2}|(.{1,10}) · (\d{2}\/\d{2}))$/;
+export function nomDuChantier(nomActuel: string, client: string, adresse: string): string | null {
+  const m = NOM_AUTOMATIQUE.exec(nomActuel.trim());
+  if (!m) return null;
+  const qui = client.trim() || adresse.split(/[,\n]/)[0].trim();
+  if (!qui) return null;
+  // « T3 », « 4 pièces », « Chambre » : ce que le nom disait du logement ; sinon la date.
+  const logement = m[2] ?? m[1];
+  return couperLeNom(`${qui} · ${logement}`, NOM_PLAN_MAX);
+}
+
 export interface ScanState {
   screen: Screen;
   /** Le plan que la page du diagnostic examine (voir `ouvrirDiagnostic`). */
@@ -3368,6 +3388,15 @@ export interface ScanState {
    * rien — c'est un filet, jamais une condition pour travailler.
    */
   deposerAuCompte: (id: string, qui: Identite | null) => Promise<void>;
+  /**
+   * L'ÉTAT DE LA SAUVEGARDE EN LIGNE — peaufinage APPLI : un dépôt manqué
+   * (pas de réseau, serveur muet) ne se disait nulle part ; on croyait ses
+   * plans à l'abri. `enAttente` : les plans dont le dernier envoi a échoué ;
+   * `dernierEnvoi` : l'heure du dernier envoi réussi.
+   */
+  envoiEnLigne: { enAttente: string[]; dernierEnvoi: number | null };
+  /** Renvoie les plans dont l'envoi a échoué ; rend combien sont passés. */
+  renvoyerLesPlansEnAttente: (qui: Identite | null) => Promise<number>;
   /**
    * Redescend les relevés que le compte garde et que ce téléphone n'a pas,
    * et rend leur nombre. C'est le geste d'après une réinstallation.
@@ -8164,7 +8193,17 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     },
 
     setClientInfo: (client, address) => {
-      set({ client: (client ?? '').trim(), address: (address ?? '').trim(), dirty: true });
+      const st = get();
+      const nouveauNom = nomDuChantier(st.scanName, client ?? '', address ?? '');
+      set({
+        client: (client ?? '').trim(),
+        address: (address ?? '').trim(),
+        // Un nom déjà pris par un autre plan devient « — version 2 » (`nomDeVersion`).
+        ...(nouveauNom
+          ? { scanName: nomDeVersion(nouveauNom, st.saves.filter((x) => x.id !== st.currentSaveId).map((x) => x.name)) }
+          : {}),
+        dirty: true,
+      });
     },
 
     renameSave: (id, name) => {
@@ -8298,15 +8337,49 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       // Ce que le compte garde, c'est ce qu'on a ENREGISTRÉ : ni le plan
       // rangé pour douze heures, ni les modifications qui attendent.
       if (!save || save.supprimeLe) return;
-      const depose = await deposerPlan(qui, {
-        scan: save.id,
-        nom: save.name,
-        maj: save.updatedAt,
-        contenu: JSON.stringify({ ...save, retouche: undefined }),
-      });
+      const noter = (ok: boolean) => {
+        const e = get().envoiEnLigne;
+        const autres = e.enAttente.filter((x) => x !== id);
+        set({
+          envoiEnLigne: ok
+            ? { enAttente: autres, dernierEnvoi: Date.now() }
+            : { enAttente: [...autres, id], dernierEnvoi: e.dernierEnvoi },
+        });
+      };
+      let depose = false;
+      try {
+        depose = await deposerPlan(qui, {
+          scan: save.id,
+          nom: save.name,
+          maj: save.updatedAt,
+          contenu: JSON.stringify({ ...save, retouche: undefined }),
+        });
+      } catch (e) {
+        noter(false);
+        throw e;
+      }
+      noter(depose === true);
       // Le serveur répond : c'est le moment de lui renvoyer les suppressions
       // faites sans réseau (voir `SuppressionEnAttente`).
       if (depose === true) rejouerPour(qui).catch(() => {});
+    },
+
+    envoiEnLigne: { enAttente: [], dernierEnvoi: null },
+
+    renvoyerLesPlansEnAttente: async (qui) => {
+      if (!qui) return 0;
+      let passes = 0;
+      for (const id of [...get().envoiEnLigne.enAttente]) {
+        // Un plan supprimé ou jeté entre-temps n'a plus à monter.
+        const plan = get().saves.find((x) => x.id === id);
+        if (!plan || plan.corbeille || plan.supprimeLe) {
+          set({ envoiEnLigne: { ...get().envoiEnLigne, enAttente: get().envoiEnLigne.enAttente.filter((x) => x !== id) } });
+          continue;
+        }
+        await get().deposerAuCompte(id, qui).catch(() => {});
+        if (!get().envoiEnLigne.enAttente.includes(id)) passes += 1;
+      }
+      return passes;
     },
 
     /*

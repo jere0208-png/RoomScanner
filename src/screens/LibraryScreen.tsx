@@ -29,6 +29,7 @@ import {
 import { useAccountStore } from '../store/accountStore';
 import { astuce } from '../ui/astuce';
 import { sansPerdreLeReleve } from '../ui/releveInterrompu';
+import { correspondAuPlan } from '../ui/recherchePlans';
 import {
   brutDuPlanIllisible,
   horsCorbeille,
@@ -174,22 +175,6 @@ function alertesDe(scan: SavedScan, parts: ReturnType<typeof roomParts>): Set<st
   }
   alertesDesScans.set(scan, out);
   return out;
-}
-
-/**
- * CE QUE LA RECHERCHE BALAIE D'UN PLAN — nom, client, adresse, en
- * minuscules — préparé une fois par plan (il est immuable, voir
- * `decoupages`), et non à chaque lettre pour chacun des deux cents.
- */
-const textesCherches = new WeakMap<SavedScan, string>();
-
-function texteCherche(item: SavedScan): string {
-  let t = textesCherches.get(item);
-  if (t === undefined) {
-    t = [item.name, item.client ?? '', item.address ?? ''].join(' ').toLowerCase();
-    textesCherches.set(item, t);
-  }
-  return t;
 }
 
 /** La ligne de détails d'un scan, mémoïsée — partagée avec l'accueil. */
@@ -928,11 +913,40 @@ const LigneDePlan = React.memo(function LigneDePlan({
  * chemin à chaque plan d'un chantier. Le dossier ouvert, la recherche et le
  * tri vivent donc hors de l'écran, le temps que l'app vit.
  */
-export const vueRetenue: { quete: string; tri: 'date' | 'nom'; inside: string | null } = {
+export type TriDesPlans = 'date' | 'nom' | 'client';
+export const vueRetenue: { quete: string; tri: TriDesPlans; inside: string | null } = {
   quete: '',
   tri: 'date',
   inside: null,
 };
+
+/*
+  TROIS TRIS, ET DES NOMS QUI SE RANGENT COMME ON LES LIT — peaufinage APPLI :
+  « A → Z » rangeait « Plan 10 » avant « Plan 2 » et « T10 » avant « T3 »
+  (ordre des caractères) ; les chiffres se comparent maintenant comme des
+  nombres. Et l'électricien qui suit plusieurs chantiers d'un même client
+  les retrouve côte à côte : « Client » range par client (les plans sans
+  client à la fin), puis du plus récent au plus ancien.
+*/
+export const TRI_SUIVANT: Record<TriDesPlans, TriDesPlans> = { date: 'nom', nom: 'client', client: 'date' };
+const LIBELLE_DU_TRI: Record<TriDesPlans, { court: string; dit: string }> = {
+  date: { court: 'Récents', dit: 'date' },
+  nom: { court: 'A → Z', dit: 'nom' },
+  client: { court: 'Client', dit: 'client' },
+};
+const comparerNoms = (a: string, b: string) => a.localeCompare(b, 'fr', { sensitivity: 'base', numeric: true });
+export function trierLesPlans<T extends { name: string; client?: string; updatedAt: number }>(plans: T[], tri: TriDesPlans): T[] {
+  return [...plans].sort((a, b) => {
+    if (tri === 'nom') return comparerNoms(a.name, b.name) || b.updatedAt - a.updatedAt;
+    if (tri === 'client') {
+      const ca = (a.client ?? '').trim();
+      const cb = (b.client ?? '').trim();
+      if (!ca !== !cb) return ca ? -1 : 1;
+      return comparerNoms(ca, cb) || b.updatedAt - a.updatedAt;
+    }
+    return b.updatedAt - a.updatedAt;
+  });
+}
 
 export function LibraryScreen() {
   const tousLesPlans = useScanStore((s) => s.saves);
@@ -1039,7 +1053,7 @@ export function LibraryScreen() {
    * le retrouve plus où on l'avait laissé.
    */
   const [quete, setQuete] = useState(vueRetenue.quete);
-  const [tri, setTri] = useState<'date' | 'nom'>(vueRetenue.tri);
+  const [tri, setTri] = useState<TriDesPlans>(vueRetenue.tri);
 
   // Dossier ouvert : on n'affiche plus que son contenu.
   const [inside, setInside] = useState<string | null>(vueRetenue.inside);
@@ -1082,12 +1096,9 @@ export function LibraryScreen() {
     // racine, elle porte sur toute la bibliothèque — sinon il faudrait
     // savoir d'avance où chercher, ce qui est précisément le problème.
     const base = q ? saves : brute;
-    const filtre = q ? base.filter((x) => texteCherche(x).includes(q)) : base;
-    return [...filtre].sort((a, b) =>
-      tri === 'nom'
-        ? a.name.localeCompare(b.name, 'fr', { sensitivity: 'base' })
-        : b.updatedAt - a.updatedAt,
-    );
+    // Accents, fautes de frappe, client, adresse, numéro de devis : voir `recherchePlans`.
+    const filtre = q ? base.filter((x) => correspondAuPlan(x, q)) : base;
+    return trierLesPlans(filtre, tri);
   }, [byFolder, dossierOuvert, saves, queteDifferee, tri]);
 
   // ------------------------------------------------------- glisser-déposer
@@ -1668,9 +1679,9 @@ export function LibraryScreen() {
           <TouchableOpacity
             style={styles.triBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel={tri === 'date' ? 'Trier par nom' : 'Trier par date'}
-            onPress={() => setTri(tri === 'date' ? 'nom' : 'date')}>
-            <Text style={styles.triText}>{tri === 'date' ? 'Récents' : 'A → Z'}</Text>
+            accessibilityLabel={`Trier par ${LIBELLE_DU_TRI[TRI_SUIVANT[tri]].dit}`}
+            onPress={() => setTri(TRI_SUIVANT[tri])}>
+            <Text style={styles.triText}>{LIBELLE_DU_TRI[tri].court}</Text>
           </TouchableOpacity>
         </View>
       )}
