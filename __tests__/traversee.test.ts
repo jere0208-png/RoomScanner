@@ -194,10 +194,10 @@ describe('le natif note le chemin, et ses compteurs font de même', () => {
     const m = lire('modules/react-native-room-scan/ios/RoomScanManager.swift');
     expect(m).toContain('"trajet": trajet,');
     expect(m).toContain('trajet.removeAll()');
-    expect(m).toContain('noterLeTrajet(session)');
+    expect(m).toContain('noterLeTrajet(camera)');
     // Les compteurs, les murs douteux et le trou du contour ne voient que ce qui compte.
     expect(m).toContain('let vus = VuDuTrajet.filtrer(room, chemin: trajet)');
-    expect(m).toContain('let trou = Self.trouDuContour(vus.murs)');
+    expect(m).toContain('let trou = RoomScanManager.trouDuContour(vus.murs)');
     const t = lire(
       'modules/react-native-room-scan/ios/RoomScanTraversee.swift',
     );

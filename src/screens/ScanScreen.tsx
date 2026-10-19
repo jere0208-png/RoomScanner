@@ -349,9 +349,23 @@ export function ScanScreen() {
     permanence en balayant une pièce.
   */
   const accroche = useRef(false);
+  /*
+    L'ÉCRAN NE SE REDESSINE QUE SI CE QU'IL MONTRE CHANGE — relevé
+    « performance du scan ». Le natif redit la visée dix fois par seconde
+    dès que la hauteur bouge d'un centimètre ; l'écran n'en montre que
+    l'accroche et la phrase (« Prise standard · 30 cm »), qui ne change pas
+    tant qu'on reste à portée du même palier. Chaque visée redessinait
+    pourtant tout l'écran de scan, pendant que le téléphone se bat pour
+    suivre le LiDAR.
+  */
+  const vueDeLaVisee = useRef('');
   useEffect(() => {
     const abo = scanEvents.addListener('onVisee', (e: EtatDeVisee) => {
-      setVisee(e);
+      const vue = `${e.kind}|${e.ok ? 1 : 0}|${e.plafond ? 1 : 0}|${phraseDeVisee(e.kind, e)}`;
+      if (vue !== vueDeLaVisee.current) {
+        vueDeLaVisee.current = vue;
+        setVisee(e);
+      }
       if (e.ok && !accroche.current) haptic('accroche');
       accroche.current = !!e.ok;
     });

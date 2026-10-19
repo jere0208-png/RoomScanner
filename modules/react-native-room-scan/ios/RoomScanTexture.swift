@@ -233,15 +233,15 @@ final class RoomColorSampler {
       break
     }
     guard let session = session, let room = room,
-          let frame = session.currentFrame else { return }
-    guard case .normal = frame.camera.trackingState else { return }
+          let prise = Self.lire(session) else { return }
+    guard case .normal = prise.camera.trackingState else { return }
     /*
       SANS PROFONDEUR, RIEN À RELEVER — et rien à verrouiller. Chaque
       échantillon serait refusé faute de profondeur : on s'arrête avant de
       toucher au tampon de la caméra, et sans compter cette pose comme vue.
     */
-    guard frame.sceneDepth != nil || frame.smoothedSceneDepth != nil else { return }
-    let m = frame.camera.transform
+    guard let profondeur = prise.profondeur else { return }
+    let m = prise.camera.transform
     let position = SIMD3<Float>(m.columns.3.x, m.columns.3.y, m.columns.3.z)
     let visee = SIMD3<Float>(m.columns.2.x, m.columns.2.y, m.columns.2.z)
     if let p = dernierePose,
@@ -250,7 +250,7 @@ final class RoomColorSampler {
       return
     }
     dernierePose = (position, visee)
-    guard let img = FrameImage(frame: frame) else { return }
+    guard let img = FrameImage(camera: prise.camera, image: prise.image, donnees: profondeur) else { return }
     defer { img.release() }
 
     for wall in room.walls {
@@ -259,6 +259,24 @@ final class RoomColorSampler {
     sampleFloor(room, img: img)
     for object in room.objects {
       sampleObject(object, img: img)
+    }
+  }
+
+  /*
+    LA CAMÉRA, L'IMAGE ET LA PROFONDEUR — PAS LA PRISE ENTIÈRE. Comme pour
+    les photos des murs (`PhotographeDesMurs.lire`) : une `ARFrame` retient
+    aussi ses ancres, ses points et son estimation de lumière, et la garder
+    pendant tout le relevé d'une pièce (des milliers d'échantillons) privait
+    ARKit d'une prise qu'il recycle. On n'en garde que les trois tampons
+    utiles ; la prise elle-même est rendue en sortant d'ici, même si ARKit
+    l'avait mise en libération différée.
+  */
+  private static func lire(
+    _ session: ARSession
+  ) -> (camera: ARCamera, image: CVPixelBuffer, profondeur: ARDepthData?)? {
+    autoreleasepool { () -> (camera: ARCamera, image: CVPixelBuffer, profondeur: ARDepthData?)? in
+      guard let frame = session.currentFrame else { return nil }
+      return (frame.camera, frame.capturedImage, frame.sceneDepth ?? frame.smoothedSceneDepth)
     }
   }
 
@@ -600,10 +618,7 @@ private struct FrameImage {
   let confBase: UnsafeMutableRawPointer?
   let confLigne: Int
 
-  init?(frame: ARFrame) {
-    // Sans profondeur, tout échantillon serait refusé : on ne verrouille rien.
-    guard let donnees = frame.sceneDepth ?? frame.smoothedSceneDepth else { return nil }
-    let b = frame.capturedImage
+  init?(camera: ARCamera, image b: CVPixelBuffer, donnees: ARDepthData) {
     let d = donnees.depthMap
     guard CVPixelBufferGetPlaneCount(b) >= 2 else { return nil }
     guard CVPixelBufferLockBaseAddress(b, .readOnly) == kCVReturnSuccess else {
@@ -664,10 +679,10 @@ private struct FrameImage {
     confBase = qBase
     confLigne = qLigne
 
-    let t = frame.camera.transform
+    let t = camera.transform
     camPos = SIMD3(t.columns.3.x, t.columns.3.y, t.columns.3.z)
     camInv = t.inverse
-    let k = frame.camera.intrinsics
+    let k = camera.intrinsics
     fx = k.columns.0.x
     fy = k.columns.1.y
     cx = k.columns.2.x

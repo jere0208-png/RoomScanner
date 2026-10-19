@@ -111,7 +111,7 @@ describe('2 — l’échantillonneur ne lit l’image que si l’œil a bougé',
     const tick = s.slice(s.indexOf('private func tick()'), s.indexOf('private func sampleSurface'));
     expect(tick).toContain('dernierePose');
     // La comparaison vient AVANT la lecture de l'image : c'est elle qui coûte.
-    expect(tick.indexOf('dernierePose')).toBeLessThan(tick.indexOf('FrameImage(frame: frame)'));
+    expect(tick.indexOf('dernierePose')).toBeLessThan(tick.indexOf('FrameImage(camera:'));
     expect(s).toMatch(/SEUIL_DEPLACEMENT|seuilDeplacement/);
   });
 });

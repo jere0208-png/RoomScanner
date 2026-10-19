@@ -17,7 +17,8 @@ describe('la torche automatique', () => {
   });
 
   it('ou la lumière mesurée par ARKit reste trop faible une seconde et demie', () => {
-    expect(m).toContain('session.arSession.currentFrame?.lightEstimate?.ambientIntensity');
+    expect(m).toContain('frame.lightEstimate?.ambientIntensity');
+    expect(m).toContain('surveillerLaLumiere(lu?.lumiere)');
     expect(m).toContain('guard lumiere < 150 else {');
     expect(m).toContain('if Date().timeIntervalSince(debut) > 1.5 { allumerLaTorche() }');
   });

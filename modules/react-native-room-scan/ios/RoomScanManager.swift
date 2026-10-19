@@ -23,6 +23,19 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   /// Le mur douteux qu'on désigne : il TIENT tant qu'il reste douteux.
   private var cibleDouteuse: UUID?
   /**
+   L'ANALYSE DU DIRECT, HORS DU FIL PRINCIPAL — relevé « performance du
+   scan ». Deux fois par seconde, on cherchait ce que le chemin voit de la
+   pièce (`VuDuTrajet` : chaque mur, trois points, cent cinquante regards,
+   chaque autre mur — des centaines de milliers de croisements dans un grand
+   logement), le mur douteux le plus proche et le trou du contour, SUR LE FIL
+   PRINCIPAL : celui-là même qui anime la vue de RoomPlan à soixante images
+   par seconde, et qui sautait une image à chaque fois. Le calcul part sur
+   une file de fond ; seul le résultat revient au fil principal.
+   */
+  private let fileDuDirect = DispatchQueue(label: "fr.echoplan.scan.direct", qos: .utility)
+  /// Une analyse tourne déjà : la suivante attend la prochaine demi-seconde.
+  private var analyseEnCours = false
+  /**
    CE QUE LE SCAN COÛTE — relevé au départ, rendu à la fin.
 
    Relevé du patron : « la recherche scan consomme beaucoup de batterie ».
@@ -298,6 +311,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     }
     if additif { self.additif = true }
     dernierApercu = []
+    analyseEnCours = false
     DispatchQueue.main.async {
       UIDevice.current.isBatteryMonitoringEnabled = true
       // Une reprise après pause ne remet pas le compteur à zéro : la mesure
@@ -530,8 +544,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    centimètres du dernier. On ne garde de l'image que sa position : l'image
    elle-même n'est pas retenue (ARKit cale quand on garde ses images).
    */
-  private func noterLeTrajet(_ session: RoomCaptureSession) {
-    guard let c = session.arSession.currentFrame?.camera.transform.columns.3 else { return }
+  private func noterLeTrajet(_ camera: simd_float4x4) {
+    let c = camera.columns.3
     let n = trajet.count
     if n >= 2 {
       let dx: Float = c.x - trajet[n - 2]
@@ -544,9 +558,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
 
   /// Sous cent cinquante lumens (mille : une pièce bien éclairée), une
   /// seconde et demie durant, l'image se brouille : la torche s'allume.
-  private func surveillerLaLumiere(_ session: RoomCaptureSession) {
-    guard !torcheAuto, !torcheRefusee,
-          let lumiere = session.arSession.currentFrame?.lightEstimate?.ambientIntensity else { return }
+  private func surveillerLaLumiere(_ lumiere: CGFloat?) {
+    guard !torcheAuto, !torcheRefusee, let lumiere = lumiere else { return }
     guard lumiere < 150 else {
       sombreDepuis = nil
       return
@@ -1246,8 +1259,20 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     PhotographeDesMurs.shared.update(room: room)
     // C'est elle qui nommera le mur visé à la prochaine pose.
     vueCourante = room
-    noterLeTrajet(session)
-    surveillerLaLumiere(session)
+    /*
+      UNE SEULE LECTURE DE LA CAMÉRA PAR MISE À JOUR, et rendue aussitôt.
+      Le trajet, la lumière, puis le mur douteux relisaient chacun
+      `currentFrame` : trois prises retenues par mise à jour, rendues
+      seulement à la fin du tour de la boucle principale (libération
+      différée). On garde ce qui sert — la pose et la lumière —, la prise
+      repart en sortant du bloc.
+    */
+    let lu = autoreleasepool { () -> (camera: simd_float4x4, lumiere: CGFloat?)? in
+      guard let frame = session.arSession.currentFrame else { return nil }
+      return (frame.camera.transform, frame.lightEstimate?.ambientIntensity)
+    }
+    if let camera = lu?.camera { noterLeTrajet(camera) }
+    surveillerLaLumiere(lu?.lumiere)
     /*
       CINQ NOMBRES, DEUX FOIS PAR SECONDE AU PLUS, ET SEULEMENT S'ILS CHANGENT.
 
@@ -1258,10 +1283,40 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       pas : réveiller le JavaScript pour lui redire la même chose, c'est de
       la batterie pour rien.
     */
-    guard Date().timeIntervalSince(lastLiveEmit) > 0.5 else { return }
+    guard !analyseEnCours, Date().timeIntervalSince(lastLiveEmit) > 0.5 else { return }
     // Le calcul qui suit ne se refait qu'une fois par demi-seconde, même
     // quand l'aperçu ne change pas (il se refaisait à chaque rappel).
     lastLiveEmit = Date()
+    analyseEnCours = true
+    // Copies : la file de fond travaille sur l'instant présent, pas sur
+    // l'état que le fil principal continue de faire vivre.
+    let chemin = trajet
+    let cible = cibleDouteuse
+    let camera = lu?.camera
+    let generation = generationReleve
+    fileDuDirect.async { [weak self] in
+      let analyse = RoomScanManager.analyserLeDirect(room, chemin: chemin, cible: cible, camera: camera)
+      DispatchQueue.main.async {
+        guard let self = self else { return }
+        self.analyseEnCours = false
+        // Un relevé quitté ou recommencé entre-temps : l'analyse ne le concerne plus.
+        guard self.generationReleve == generation, !self.abandonne else { return }
+        self.cibleDouteuse = analyse.cible
+        guard analyse.apercu != self.dernierApercu || analyse.murValide else { return }
+        self.dernierApercu = analyse.apercu
+        RoomScanEvents.shared?.emit(name: "onScanUpdate", body: analyse.corps)
+      }
+    }
+  }
+
+  /**
+   CE QUE LE DIRECT DIT DE LA PIÈCE — calcul pur, sans état : il tourne sur
+   la file de fond (`fileDuDirect`). `cible` est le mur douteux qu'on
+   désignait ; le résultat dit lequel on désigne maintenant.
+   */
+  static func analyserLeDirect(
+    _ room: CapturedRoom, chemin trajet: [Float], cible cibleAvant: UUID?, camera: simd_float4x4?
+  ) -> (apercu: [Int], corps: [String: Any], cible: UUID?, murValide: Bool) {
     /*
       CE QU'ON VOIT PAR LA PORTE NE COMPTE PAS : le mur du fond de la chambre
       aperçue ne fait pas « +1 », et ses bouts libres ne font pas croire
@@ -1289,6 +1344,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       qu'il reste douteux : en tournant sur soi, la cible sautait d'un mur à
       l'autre deux fois par seconde.
     */
+    var cibleDouteuse = cibleAvant
     var murValide = false
     if let id = cibleDouteuse, !doutes.contains(where: { $0.identifier == id }) {
       murValide = vus.murs.contains { m in
@@ -1299,12 +1355,12 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       cibleDouteuse = nil
     }
     let gardee = doutes.first { $0.identifier == cibleDouteuse }
-    let lequel: [String: Any]? = session.arSession.currentFrame.flatMap {
-      Self.murDouteuxLePlusProche(gardee.map { [$0] } ?? doutes, camera: $0.camera.transform)
+    let lequel: [String: Any]? = camera.flatMap {
+      RoomScanManager.murDouteuxLePlusProche(gardee.map { [$0] } ?? doutes, camera: $0)
     }
     cibleDouteuse = gardee?.identifier ?? (lequel?["ident"] as? UUID)
     // Le plus grand trou du contour, au centimètre (voir `trouDuContour`).
-    let trou = Self.trouDuContour(vus.murs)
+    let trou = RoomScanManager.trouDuContour(vus.murs)
     let apercu = [
       vus.murs.count, vus.objets, vus.portes, vus.fenetres, douteux,
       Int((trou * 100).rounded()),
@@ -1312,8 +1368,6 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
       (lequel?["code"] as? Int) ?? -1,
       Int((((lequel?["distance"] as? Float) ?? 0) * 2).rounded()),
     ]
-    guard apercu != dernierApercu || murValide else { return }
-    dernierApercu = apercu
     var corps: [String: Any] = [
       "wallCount": vus.murs.count,
       "objectCount": vus.objets,
@@ -1325,7 +1379,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     if let l = lequel { corps["murDouteux"] = l.filter { $0.key != "code" && $0.key != "ident" } }
     // Le mur qu'on désignait vient d'être bien vu : on le fête.
     if murValide { corps["murValide"] = true }
-    RoomScanEvents.shared?.emit(name: "onScanUpdate", body: corps)
+    return (apercu, corps, cibleDouteuse, murValide)
   }
 
   /**
