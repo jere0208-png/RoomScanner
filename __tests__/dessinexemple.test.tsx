@@ -192,7 +192,8 @@ describe('aucune surface retirée sur l’exemple', () => {
       it(`${w}×${h}, ${ed ? 'édition' : 'lecture'}`, () => {
         const t = plan(w, h, ed);
         const ecrits = t.root.findAllByType(SvgText).map(texteDe);
-        for (const aire of AIRES) expect(ecrits).toContain(aire);
+        // Seule, ou sur la ligne du nom d'une pièce étroite (« Couloir · 15,40 m² »).
+        for (const aire of AIRES) expect(ecrits.some((e) => e === aire || e.endsWith(` · ${aire}`))).toBe(true);
         // Un nom s'abrège proprement : plus de points de suspension.
         expect(ecrits.filter((x) => x.includes('…'))).toEqual([]);
       });

@@ -2253,17 +2253,45 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
    * dessine. Deux calculs de la même boîte finissent par diverger, et
    * l'arbitre protège alors une place que le dessin n'occupe pas.
    */
+  /*
+    LES NOTES ET LES COTES À LA RÈGLE PRENNENT LEUR PLACE — demande « plan
+    intelligent ». Le nom d'une pièce et les cotes des murs les ignoraient :
+    une note posée au milieu d'une chambre disparaissait sous le cartouche,
+    une cote à la règle sous « 3,53 m ». Leurs pastilles (mêmes mesures que
+    leur dessin, `NotesLayer` et la règle plus bas) se réservent, à l'écran.
+  */
+  const pastillesPosees = useMemo(() => {
+    const out: Boite[] = [];
+    if (!mapping) return out;
+    for (const n of notes ?? []) {
+      if ((n.niveau ?? 0) !== niveauCourant) continue;
+      const p = mapping.toPx(n.at);
+      const court = n.text.length > 22 ? n.text.slice(0, 21) + '…' : n.text;
+      const larg = Math.max(34, court.length * 11 * 0.56 + 22);
+      out.push({ x: p.x, y: p.y - 11, w: larg + 6, h: 19 });
+    }
+    for (const m of mesures ?? []) {
+      const p1 = mapping.toPx(m.a);
+      const p2 = mapping.toPx(m.b);
+      const w = texteDeMesure(m).length * 6.8 + 12;
+      out.push({ x: (p1.x + p2.x) / 2 - w / 2, y: (p1.y + p2.y) / 2 - 10, w, h: 20 });
+    }
+    return out;
+  }, [notes, mesures, niveauCourant, mapping]);
+
   const cartouches = useMemo(() => {
     const out = new Map<
       string,
       {
         pos: Pt;
-        textes: { t: string; role: 'nom' | 'aire' | 'hors' | 'invite' }[];
+        textes: { t: string; role: 'nom' | 'aire' | 'hors' | 'invite' | 'ligne' }[];
         wpx: number;
         hpx: number;
         gene: boolean;
         /** Posé HORS de sa pièce : le point de la pièce où mène son trait de rappel. */
         rappel?: Pt;
+        /** Resserré pour tenir dans sa pièce (1 = taille normale) : voir `RESSERRES`. */
+        echelle: number;
       }
     >();
     if (!mapping || !showSurfaces || layout.w === 0) return out;
@@ -2303,6 +2331,12 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
             return { x: q.x, z: q.z, rx: r, rz: r };
           })
         : []),
+      // Les notes et les cotes à la règle : un disque qui couvre leur pastille.
+      ...pastillesPosees.map((b) => {
+        const q = mapping.toMeters({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
+        const r = (Math.hypot(b.w, b.h) / 2 + 3) / mapping.scale;
+        return { x: q.x, z: q.z, rx: r, rz: r };
+      }),
     ];
     /*
       LES BATTANTS PASSENT AVANT TOUT — avis de l'architecte : « battant et
@@ -2332,14 +2366,25 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
       aire: 9.5 * k,
       hors: 8.5 * k,
       invite: 10.5 * k,
+      ligne: 10 * k,
     };
-    const emprise = (ls: { t: string; role: string }[]) => ({
+    const emprise = (ls: { t: string; role: string }[], f = 1) => ({
       w: Math.max(
-        44 * k,
-        Math.max(...ls.map((l) => l.t.length * (TAILLES[l.role] * 0.62))) + 14 * k,
+        44 * k * f,
+        Math.max(...ls.map((l) => l.t.length * (TAILLES[l.role] * f * 0.62))) + 14 * k * f,
       ),
-      h: PAD * 2 + ls.length * LH,
+      h: (PAD * 2 + ls.length * LH) * f,
     });
+    /*
+      UN NOM SE RESSERRE AVANT DE PERDRE SES MOTS — demande du patron : « un
+      plan intelligent, qui s'adapte à toute situation ». Sur un téléphone,
+      trente pièces de 4 × 3,20 m se dessinent à seize pixels le mètre : le
+      cartouche « Pièce 12 / 12,80 m² » faisait 66 pixels dans une pièce de
+      64, il sortait par le mur, posé de force au milieu. Il essaie d'abord
+      un corps un peu plus petit (85 %, puis 72 %), jamais sous six points
+      pour le nom — avant d'abréger, de sortir ou de déborder.
+    */
+    const RESSERRES = [1, 0.85, 0.72].filter((f) => f === 1 || k * f >= 0.6);
     /*
       DES ANNEAUX DE PLUS EN PLUS LARGES, SEIZE DIRECTIONS CHACUN.
 
@@ -2424,7 +2469,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                 .replace('.', ',')} m`;
             })()
           : null;
-      const textes: { t: string; role: 'nom' | 'aire' | 'hors' | 'invite' }[] =
+      const textes: { t: string; role: 'nom' | 'aire' | 'hors' | 'invite' | 'ligne' }[] =
         [];
       if (roomName !== '') textes.push({ t: roomName, role: 'nom' });
       if (areaText) textes.push({ t: areaText, role: 'aire' });
@@ -2480,17 +2525,46 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
       if (!avecAire && roomName !== '' && nomCourt !== roomName) {
         variantes.push([{ t: nomCourt, role: 'nom' }]);
       }
+      /*
+        UNE PIÈCE ÉTROITE PREND SON NOM SUR UNE LIGNE — « Couloir · 15,40 m² ».
+        Un couloir de quatorze mètres sur un mètre dix n'a jamais la hauteur
+        de deux lignes : il sortait avec un trait de rappel alors que toute
+        sa longueur était libre. Essayé après le cartouche à deux lignes,
+        avant l'abréviation ; le repli hors de la pièce reste le cartouche
+        abrégé.
+      */
+      // Le repli hors de la pièce garde le cartouche compact à deux lignes.
       const dernier = variantes[variantes.length - 1];
+      if (roomName !== '' && avecAire && areaText) {
+        const enLigne: (typeof textes)[] = [[{ t: `${roomName} · ${areaText}`, role: 'ligne' }]];
+        if (nomCourt !== roomName) enLigne.push([{ t: `${nomCourt} · ${areaText}`, role: 'ligne' }]);
+        // Juste après le cartouche à deux lignes en toutes lettres.
+        variantes.splice(textes.length > 2 ? 2 : 1, 0, ...enLigne);
+      }
       let retenues = dernier;
       let boite = emprise(dernier);
+      let echelle = 1;
       let pos = part.labelAt;
       let gene = true;
       let rappel: Pt | undefined;
       const contour = part.surface?.pts;
-      const chercher = (essai: typeof textes, garde: (cand: Pt, lw: number, lh: number) => boolean) => {
-        const box = emprise(essai);
+      /*
+        L'EMPRISE DE LA PIÈCE, une fois : un cartouche plus large ou plus haut
+        qu'elle n'y tiendra nulle part, inutile d'essayer ses cent vingt-neuf
+        places (c'était la moitié du temps d'un lâcher sur trente pièces).
+      */
+      const bornes =
+        contour && contour.length >= 3
+          ? {
+              w: Math.max(...contour.map((q) => q.x)) - Math.min(...contour.map((q) => q.x)),
+              h: Math.max(...contour.map((q) => q.z)) - Math.min(...contour.map((q) => q.z)),
+            }
+          : null;
+      const chercher = (essai: typeof textes, garde: (cand: Pt, lw: number, lh: number) => boolean, f = 1) => {
+        const box = emprise(essai, f);
         const lw = box.w / mapping.scale;
         const lh = box.h / mapping.scale;
+        if (bornes && (lw >= bornes.w || lh >= bornes.h)) return null;
         for (const [ox, oz] of anneaux) {
           const cand = { x: part.labelAt.x + ox, z: part.labelAt.z + oz };
           if (contour && contour.length >= 3 && !insidePoly(cand, contour)) {
@@ -2521,12 +2595,29 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
         }
         return null;
       };
-      for (const essai of variantes) {
-        const trouve = chercher(essai, (cand, lw, lh) => !cartoucheHeurte(cand, lw / 2, lh / 2, obstacles));
+      /*
+        Dans l'ordre : chaque variante en taille normale puis à 85 % (garder
+        ses mots vaut mieux que garder son corps), puis toutes à 72 %.
+      */
+      /*
+        Le nom en toutes lettres passe avant le nom abrégé, à toutes les
+        tailles : « Salle d'eau / 6,83 m² » resserré vaut mieux que « SdE ».
+      */
+      const abrege = (essai: typeof textes) =>
+        nomCourt !== roomName && essai.some((l) => l.t === nomCourt || l.t.startsWith(`${nomCourt} · `));
+      const essais: [typeof textes, number][] = [];
+      for (const court of [false, true]) {
+        const lot = variantes.filter((v) => abrege(v) === court);
+        for (const essai of lot) for (const f of RESSERRES.filter((x) => x > 0.8)) essais.push([essai, f]);
+        for (const essai of lot) for (const f of RESSERRES.filter((x) => x <= 0.8)) essais.push([essai, f]);
+      }
+      for (const [essai, f] of essais) {
+        const trouve = chercher(essai, (cand, lw, lh) => !cartoucheHeurte(cand, lw / 2, lh / 2, obstacles), f);
         if (!trouve) continue;
         pos = trouve.cand;
         retenues = essai;
         boite = trouve.box;
+        echelle = f;
         gene = false;
         break;
       }
@@ -2539,13 +2630,14 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
       */
       let place = !gene;
       if (!place) {
-        for (const essai of variantes) {
-          if (avecAire && !essai.some((l) => l.role === 'aire')) continue;
-          const trouve = chercher(essai, (cand, lw, lh) => !cartoucheHeurte(cand, lw / 2, lh / 2, portes));
+        for (const [essai, f] of essais) {
+          if (avecAire && !essai.some((l) => l.role === 'aire' || l.role === 'ligne')) continue;
+          const trouve = chercher(essai, (cand, lw, lh) => !cartoucheHeurte(cand, lw / 2, lh / 2, portes), f);
           if (!trouve) continue;
           pos = trouve.cand;
           retenues = essai;
           boite = trouve.box;
+          echelle = f;
           place = true;
           break;
         }
@@ -2557,7 +2649,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
         blanc du dehors, et un trait fin le relie à sa pièce.
       */
       if (!place && avecAire) {
-        const compact = variantes[variantes.length - 1];
+        const compact = dernier;
         const box = emprise(compact);
         const dehors = horsDesPieces(part, box.w, box.h, placesHors);
         if (dehors) {
@@ -2572,7 +2664,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
       if (!place && avecAire) {
         // Le dernier recours : au milieu, débordant s'il le faut — mais avec
         // sa surface.
-        retenues = variantes[variantes.length - 1];
+        retenues = dernier;
         boite = emprise(retenues);
       }
       const q = mapping.toPx(pos);
@@ -2583,6 +2675,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
         wpx: boite.w,
         hpx: boite.h,
         gene,
+        echelle,
         ...(rappel ? { rappel } : {}),
       });
     }
@@ -2608,6 +2701,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
     editable,
     mapping,
     layout,
+      pastillesPosees,
   ]);
 
   /**
@@ -2928,6 +3022,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
     for (const coins of battantsDuPlan(openings, partOf)) {
       encombrants.push(boiteDePoints(coins.map((p) => mapping.toPx(p))));
     }
+    encombrants.push(...pastillesPosees);
     // Trois points de jeu : deux plaques ne se touchent pas (captures du simulateur).
     const poses = placerEtiquettes(items, prises, 3, encombrants);
     const boites = [...poses.entries()].map(([id, p]) => {
@@ -2962,6 +3057,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
     mapping,
     layout,
     showMeasures,
+    pastillesPosees,
   ]);
 
   /**
@@ -4321,7 +4417,8 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
           if (!car) return null;
           const roomName = roomById.get(part.roomId)?.name ?? '';
           const { pos, wpx, hpx, gene } = car;
-          const k = echelleDesNoms(view.zoom);
+          // Le corps du cartouche, resserré s'il a fallu pour tenir dans sa pièce.
+          const k = echelleDesNoms(view.zoom) * car.echelle;
           const PAD = 4 * k;
           const LH = 12.5 * k;
           const TAILLES = {
@@ -4329,12 +4426,13 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
             aire: (roomName !== '' ? 9.5 : 10.5) * k,
             hors: 8.5 * k,
             invite: 10.5 * k,
+            ligne: 10 * k,
           } as const;
           const retenues = car.textes.map((t) => ({
             t: t.t,
             size: TAILLES[t.role],
             fill:
-              t.role === 'nom'
+              t.role === 'nom' || t.role === 'ligne'
                 ? selectedRoomId === part.roomId && editable
                   ? c.blue
                   : c.ink
@@ -4343,7 +4441,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
                     ? c.inkSoft
                     : c.ink
                   : c.inkFaint,
-            bold: t.role === 'nom' || t.role === 'invite' || roomName === '',
+            bold: t.role === 'nom' || t.role === 'ligne' || t.role === 'invite' || roomName === '',
           }));
           const p = mapping.toPx(pos);
           const selected = editable && part.roomId === selectedRoomId;
