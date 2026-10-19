@@ -244,6 +244,49 @@ export function catalogItem(key: string): CatalogItem | undefined {
   return CATALOG_ITEMS.find((i) => i.key === key);
 }
 
+/*
+  CE QUI SE FIXE AU MUR — agent testeur MEUBLES : un meuble haut de cuisine,
+  une télévision, un tableau, un radiateur posés depuis le catalogue
+  arrivaient au MILIEU de la pièce, suspendus dans le vide, et il fallait
+  les traîner jusqu'au mur. Ceux-là se posent contre le mur le plus proche,
+  dos au nu (voir `addObject`). La lampe de chevet, le micro-ondes, l'écran
+  d'ordinateur ont un dessous, mais ils sont posés SUR un meuble : ils n'en
+  font pas partie.
+*/
+const MEUBLES_MURAUX = new Set([
+  'meubleHaut',
+  'meubleHaut40',
+  'meubleHaut120',
+  'meubleHautVitre',
+  'hotte',
+  'etagereCuisine',
+  'tv',
+  'meubleTvSuspendu',
+  'etagereFlottante',
+  'tableauMural',
+  'cadresPhotos',
+  'miroirRond',
+  'horloge',
+  'rideaux',
+  'tableauPortrait',
+  'grandeToile',
+  'affiche',
+  'triptyque',
+  'miroirLed',
+  'secheServiettes',
+  'armoireToilette',
+  'etagereBureau',
+  'miroir',
+  'radiateur',
+  'clim',
+  'cumulus',
+]);
+
+/** Le meuble du catalogue se fixe-t-il au mur ? */
+export function seFixeAuMur(key: string | undefined): boolean {
+  return !!key && MEUBLES_MURAUX.has(key);
+}
+
 /**
  * Matrice de pose d'un meuble du catalogue.
  *

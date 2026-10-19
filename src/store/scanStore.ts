@@ -126,10 +126,11 @@ import { avecCoffresDuLidar } from '../geometry/coffreLidar';
 import { avecLesBordsDuLidar, releveLogique, sansMeublesEnDouble } from '../geometry/logique';
 import type { MurDouteux } from '../geometry/murDouteux';
 import { reunirLesCanapesDAngle } from '../geometry/canapeAngle';
-import { alignerLesMeubles, calerDansLaNiche, calerLesMeubles } from '../geometry/niche';
+import { alignerLesMeubles, calerDansLaNiche, calerLesMeubles, contreLeMurLePlusProche, seGenent } from '../geometry/niche';
 import {
   SUR_MESURE,
   catalogTransform,
+  seFixeAuMur,
   type CatalogItem,
 } from '../geometry/catalogue';
 import {
@@ -887,6 +888,25 @@ function jeuDuNiveau(
     },
     n,
   );
+}
+
+/**
+ * LE CENTRE D'UN MEUBLE SORTI DES MURS DE SA PIÈCE — sans le déplacer
+ * ailleurs : le mur l'arrête par le plus court chemin (`pushOutOfWalls`),
+ * du côté où se trouve son centre. Null s'il n'a pas de pièce.
+ */
+function horsDesMurs(
+  st: Pick<ScanState, 'walls' | 'openings' | 'rooms' | 'fixtures' | 'photos' | 'objects' | 'ceiling' | 'niveauCourant'>,
+  o: ObjectData,
+): Pt | null {
+  const jeu = jeuDuNiveau(st, niveauDe(st.rooms.find((r) => r.id === o.roomId)) ?? st.niveauCourant);
+  const centre = { x: o.transform[12], z: o.transform[14] };
+  const parts = roomParts(jeu.walls, jeu.rooms);
+  const part =
+    parts.find((p) => p.roomId === o.roomId) ?? parts.find((p) => pointInPolygon(centre, p.surface?.pts ?? []));
+  if (!part) return null;
+  const box = { width: o.width, depth: o.depth, yaw: Math.atan2(o.transform[2], o.transform[0]) };
+  return pushOutOfWalls(centre, box, part.walls, part.labelAt, part.surface?.pts, centre, facesDesMurs(jeu.walls));
 }
 
 /**
@@ -3738,6 +3758,12 @@ export interface ScanState {
    * chevets. Rend l'identifiant de la copie, posée à côté de l'original.
    */
   dupliquerMeuble: (id: string) => string | null;
+  /**
+   * CE N'EST PAS CE MEUBLE-LÀ — remplacé par un meuble du catalogue, à la
+   * même place et dans le même sens. Un meuble RELEVÉ garde ses cotes (c'est
+   * la mesure) ; un meuble du catalogue prend celles du nouveau.
+   */
+  remplacerMeuble: (id: string, item: CatalogItem) => void;
   /** Pose en une fois ce que « Normes auto » propose. */
   poserDAuto: (fixtures: Fixture[], ceiling: CeilingFixture[]) => void;
   /**
@@ -4229,6 +4255,15 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     neuf (`reset`, qui est le passage obligé de tout nouveau relevé).
   */
   let dejaCompte = false;
+  /*
+    LA PLACE CHOISIE AVANT DE TOURNER — agent testeur MEUBLES : chaque quart
+    de tour se range (`rotateObject`), et chaque rangement repartait de la
+    place laissée par le précédent. Quatre quarts de tour ramenaient un
+    canapé à 64 cm de là où on l'avait mis, une armoire à 21 cm de son mur.
+    Tant qu'on ne fait que tourner, chaque quart se range depuis la place
+    d'avant le premier : quatre quarts reviennent où l'on était.
+  */
+  const ancresDeRotation = new Map<string, { depart: Pt; apres: Pt }>();
 
   /*
     L'AVENIR : CE QU'UNE ANNULATION A RETIRÉ.
@@ -11011,8 +11046,36 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         chevauchements. S'il y a déjà des meubles dans la pièce, il se range
         aussitôt, comme au lâcher, sous le même « Annuler » que la pose.
       */
+      /*
+        AU MUR, CE QUI SE FIXE AU MUR — agent testeur MEUBLES : le meuble
+        haut, la télévision, le tableau, le radiateur arrivaient au milieu de
+        la pièce, en l'air. Ils viennent au mur le plus proche du point visé,
+        dos au nu (voir `seFixeAuMur`, `contreLeMurLePlusProche`).
+      */
+      const auMur =
+        accueil && seFixeAuMur(item.key)
+          ? contreLeMurLePlusProche({ x, z }, { width: item.w, depth: item.d }, accueil.walls, accueil.labelAt)
+          : null;
+      if (auMur) {
+        const c = Math.cos(auMur.yaw);
+        const sn = Math.sin(auMur.yaw);
+        set({
+          objects: get().objects.map((o) => {
+            if (o.id !== id) return o;
+            const t = [...o.transform];
+            t[0] = c;
+            t[2] = sn;
+            t[8] = -sn;
+            t[10] = c;
+            t[12] = auMur.centre.x;
+            t[14] = auMur.centre.z;
+            return { ...o, transform: t };
+          }),
+        });
+      }
+      const pose = auMur ? auMur.centre : { x, z };
       if (accueil && st.objects.some((o) => o.roomId === accueil.roomId)) {
-        get().rangerMeuble(id, x, z, undefined, true);
+        get().rangerMeuble(id, pose.x, pose.z, undefined, true);
       }
       return id;
     },
@@ -11032,6 +11095,12 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     },
 
     rotateObject: (id, quarts = 1) => {
+      const avant = get().objects.find((x) => x.id === id);
+      if (!avant) return;
+      const ici = { x: avant.transform[12], z: avant.transform[14] };
+      const ancre = ancresDeRotation.get(id);
+      const depart =
+        ancre && Math.hypot(ancre.apres.x - ici.x, ancre.apres.z - ici.z) < 1e-4 ? ancre.depart : ici;
       pushHistory(`rotate:${id}`);
       set({
         objects: get().objects.map((o) => {
@@ -11053,8 +11122,9 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         faisait pivoter entrait de 53 à 66 cm dans la maçonnerie. Le quart de
         tour finit comme un glisser, sous la même annulation.
       */
+      get().rangerMeuble(id, depart.x, depart.z, `rotate:${id}`);
       const o = get().objects.find((x) => x.id === id);
-      if (o) get().rangerMeuble(id, o.transform[12], o.transform[14], `rotate:${id}`);
+      if (o) ancresDeRotation.set(id, { depart, apres: { x: o.transform[12], z: o.transform[14] } });
     },
 
     setObjectYaw: (id, yaw) => {
@@ -11112,8 +11182,23 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         { d: az, l: obj.depth + 0.1 },
         { d: { x: -az.x, z: -az.z }, l: obj.depth + 0.1 },
       ].map(({ d, l }) => ({ x: ici.x + d.x * l, z: ici.z + d.z * l }));
+      /*
+        … ET OÙ LA PLACE EST LIBRE — agent testeur MEUBLES : la copie d'un
+        meuble haut de cuisine tombait sur le frigo voisin, et le rangement
+        la repoussait au milieu de la pièce, en l'air. On préfère le côté où
+        elle ne heurte rien à sa hauteur ; à défaut, le premier qui reste
+        dans la pièce.
+      */
+      const dansLaPiece = (p: Pt) => (contour ? pointInPolygon(p, contour) : true);
+      const libre = (p: Pt) => {
+        const t = [...obj.transform];
+        t[12] = p.x;
+        t[14] = p.z;
+        const essai = { ...obj, transform: t };
+        return !st.objects.some((o) => o.id !== obj.id && seGenent(essai, o));
+      };
       const cible =
-        pas.find((p) => (contour ? pointInPolygon(p, contour) : true)) ?? pas[0];
+        pas.find((p) => dansLaPiece(p) && libre(p)) ?? pas.find(dansLaPiece) ?? pas[0];
       const nouvel = `mb-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       // LA CLÉ DU RANGEMENT QUI SUIT : la copie et son rangement ne font
       // qu'UN geste, et « Annuler » les défait d'un seul appui.
@@ -11127,6 +11212,55 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       });
       get().rangerMeuble(nouvel, cible.x, cible.z);
       return nouvel;
+    },
+
+    /*
+      REMPLACER UN MEUBLE — agent testeur MEUBLES : RoomPlan prend un frigo
+      pour un « rangement », un bureau pour une « table », et rien ne
+      permettait de le corriger sauf retirer le meuble puis en reposer un
+      autre au jugé — perdant sa place exacte, son orientation et ses cotes
+      relevées. On garde la place et le sens ; la nature, le modèle 3D et le
+      nom viennent du catalogue. Les cotes : celles du relevé pour un meuble
+      scanné (c'est la mesure), celles du catalogue sinon (et son dessous :
+      un meuble bas remplacé par un meuble haut monte au mur).
+    */
+    remplacerMeuble: (id, item) => {
+      const st = get();
+      const o = st.objects.find((x) => x.id === id);
+      if (!o || !sontFinis(o.transform[12], o.transform[14])) return;
+      pushHistory(`remplacer:${id}`);
+      const releve = !o.modele;
+      const t = [...o.transform];
+      let { width, depth, height } = o;
+      if (!releve) {
+        const jeu = jeuDuNiveau(st, niveauDe(st.rooms.find((r) => r.id === o.roomId)) ?? st.niveauCourant);
+        width = item.w;
+        depth = item.d;
+        height = item.h;
+        t[13] = solDe(jeu.walls.length > 0 ? jeu.walls : st.walls) + (item.base ?? 0) + item.h / 2;
+      }
+      // Le nom et les cotes de référence de l'ancien meuble ne le suivent pas.
+      const reste: ObjectData = { ...o };
+      delete reste.nom;
+      delete reste.baseWidth;
+      delete reste.baseDepth;
+      const neuf: ObjectData = {
+        ...reste,
+        category: item.category,
+        modele: item.key,
+        ...(item.matiere ? { matiere: item.matiere } : {}),
+        ...(item.key === SUR_MESURE ? { nom: item.label } : {}),
+        // La méridienne n'a de sens que pour un canapé.
+        attributes: item.category === 'sofa' ? o.attributes : (o.attributes ?? []).filter((a) => !/^Sofa/i.test(a)),
+        width,
+        depth,
+        height,
+        transform: t,
+      };
+      set({ objects: st.objects.map((x) => (x.id === id ? neuf : x)), dirty: true });
+      // Aux cotes du catalogue, il se range sous le même « Annuler ». Un meuble
+      // relevé garde ses cotes : sa place est la mesure, il ne bouge pas.
+      if (!releve) get().rangerMeuble(id, t[12], t[14], undefined, true);
     },
 
     removeObject: (id) => {
@@ -11590,15 +11724,30 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       */
       if (!estUneCote(width) || !estUneCote(depth)) return;
       pushHistory(`resize:${id}`);
+      /*
+        IL GRANDIT DU CÔTÉ DE LA PIÈCE — agent testeur MEUBLES : la cote
+        saisie agrandissait le meuble de part et d'autre de son centre. Un
+        meuble bas de 60 passé à 80 de profondeur entrait de 10 cm dans le
+        mur auquel il était adossé, un lit élargi traversait la cloison. Le
+        mur l'arrête désormais (comme au glisser) : il grandit vers la pièce,
+        et ses cotes restent celles qu'on a tapées.
+      */
+      const st0 = get();
+      const o0 = st0.objects.find((o) => o.id === id);
+      const centre = o0 ? horsDesMurs(st0, { ...o0, width, depth }) : null;
       set({
-        objects: get().objects.map((o) =>
-          o.id === id
-            ? // Une cote saisie à la main devient LA référence : c'est
-              // l'électricien qui a mesuré, et son chiffre prime sur celui
-              // du scanner comme sur l'ajustement d'une niche.
-              { ...o, width, depth, baseWidth: width, baseDepth: depth }
-            : o,
-        ),
+        objects: get().objects.map((o) => {
+          if (o.id !== id) return o;
+          const t = [...o.transform];
+          if (centre) {
+            t[12] = centre.x;
+            t[14] = centre.z;
+          }
+          // Une cote saisie à la main devient LA référence : c'est
+          // l'électricien qui a mesuré, et son chiffre prime sur celui
+          // du scanner comme sur l'ajustement d'une niche.
+          return { ...o, width, depth, baseWidth: width, baseDepth: depth, transform: t };
+        }),
         dirty: true,
       });
     },
@@ -11640,6 +11789,27 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         if (base !== undefined) h = dessus - b;
         if (!(h > 0.05 && h <= 4)) return;
         b = dessus - h;
+      } else {
+        /*
+          SOUS LE PLAFOND — agent testeur MEUBLES : une armoire passée à
+          3,20 m dans une pièce de 2,50 m, un meuble haut descendu à 2,20 m du
+          sol traversaient le plafond, en 3D comme au PDF. La valeur qu'on
+          règle l'emporte, l'autre cède : une hauteur se borne à ce qui reste
+          sous le plafond, un dessous se borne pour que le meuble y tienne.
+        */
+        const st0 = get();
+        const jeu = jeuDuNiveau(st0, niveauDe(st0.rooms.find((r) => r.id === o.roomId)) ?? st0.niveauCourant);
+        const part = roomParts(jeu.walls, jeu.rooms).find((p) => p.roomId === o.roomId);
+        const hPiece = part ? hauteurDeLaPiece(part) : 0;
+        if (hPiece > 0) {
+          const sol = solDesMurs(st0.walls);
+          const plafond = sol + hPiece;
+          if (b + h > plafond + 0.005) {
+            if (height === undefined) b = Math.max(sol, plafond - h);
+            h = Math.min(h, plafond - b);
+            if (!(h > 0.05)) return;
+          }
+        }
       }
       pushHistory(`objectHeight:${id}`);
       set({
