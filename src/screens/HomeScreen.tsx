@@ -56,6 +56,7 @@ import { SOLAIRES } from '../ui/solaires';
 import { haptic } from '../ui/haptic';
 import { useReduceMotion } from '../ui/useReduceMotion';
 import { alerte } from '../ui/alerte';
+import { astuce } from '../ui/astuce';
 import { panne as expliquer } from '../ui/panne';
 import { sansPerdreLeReleve } from '../ui/releveInterrompu';
 import { pourChercher } from '../ui/mots';
@@ -289,7 +290,15 @@ export function HomeScreen() {
   useEffect(() => {
     if (!raccourciEnAttente || supported === null) return;
     setRaccourciEnAttente(false);
-    if (supported !== true) return;
+    /*
+      SANS LIDAR, SIRI REÇOIT UNE RÉPONSE — agent testeur SCAN : la demande
+      se perdait sans un mot, l'app s'ouvrait sur l'accueil et l'on ne
+      savait pas pourquoi rien ne scannait.
+    */
+    if (supported !== true) {
+      astuce('Le scan demande un iPhone Pro (capteur LiDAR) : dessinez le plan, ou lisez un plan papier.', { icone: 'rooms' });
+      return;
+    }
     if (!peutCreerPlan()) {
       ouvrirSurprise();
       return;

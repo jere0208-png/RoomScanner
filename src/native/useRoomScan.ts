@@ -3,6 +3,8 @@ import { RoomScan, scanEvents, type ScanResult, type ScanUpdate } from 'react-na
 import { useScanStore } from '../store/scanStore';
 import { roomSurface } from '../geometry/floorplan';
 import { astuce } from '../ui/astuce';
+import { alerte } from '../ui/alerte';
+import { signaler } from '../ui/panne';
 import { useAccountStore } from '../store/accountStore';
 import { useUsage } from '../store/usage';
 import { usePremieresFois } from '../store/premieresFois';
@@ -82,6 +84,8 @@ export async function demarrerComplement(): Promise<void> {
     caméra. Comme `lancerUnScan` et `begin`, on part d'une ardoise propre.
   */
   st.setError(null);
+  // Les compteurs du relevé d'avant ne s'affichent pas sur celui-ci (voir `beginScan`).
+  st.beginScan();
   /*
     ADDITIF SEULEMENT AVEC LES PASSAGES DU PLAN — revue « Agathe ». L'iPhone
     ne garde les passages qu'en mémoire : après un redémarrage il n'en a
@@ -426,7 +430,20 @@ function resumerLeReleve() {
     partiDUnPlan = false;
     store.setError(null);
     store.beginScan();
-    await RoomScan.start();
+    /*
+      UNE SESSION QUI NE DÉMARRE PAS SE DIT — agent testeur SCAN : l'accueil
+      et la page caméra appellent `begin` sans attendre sa réponse. Quand
+      RoomPlan refusait de démarrer (caméra prise par un appel vidéo,
+      session indisponible), la promesse échouait dans le vide : on touchait
+      « Scanner », et rien ne se passait.
+    */
+    try {
+      await RoomScan.start();
+    } catch (e) {
+      const p = signaler('releve', e ?? 'Le scan n’a pas pu démarrer.', 'scan');
+      alerte(p.titre, p.message);
+      return;
+    }
     store.setScanning(true);
     store.setPaused(false);
     store.setScreen('scan');
@@ -513,6 +530,8 @@ function resumerLeReleve() {
           lieu de le remplacer — l'appareillage déjà posé survit, reprojeté
           sur les murs neufs. Un scan ordinaire, lui, ouvre un dossier.
         */
+        // Les murs d'avant : s'ils n'ont pas bougé, l'étage ou le passage n'a rien apporté.
+        const mursAvant = useScanStore.getState().walls;
         if (etage !== null) {
           useScanStore.getState().finalizeEtage(result, etage);
         } else if (complement) {
@@ -520,6 +539,36 @@ function resumerLeReleve() {
           useScanStore.getState().setComplement(false);
         } else {
           useScanStore.getState().finalize(result);
+        }
+        /*
+          UN PASSAGE QUI N'A RIEN VU LE DIT — agent testeur SCAN. Un étage
+          terminé sans un mur laissait l'écran de scan figé (la caméra, des
+          boutons qui ne répondaient plus, aucun message) ; un « Scanner une
+          pièce » vide ouvrait le bilan sur « Relevé complété ». Le plan
+          revient tel qu'il était, et l'on dit pourquoi rien n'a changé.
+        */
+        if ((etage !== null || complement) && useScanStore.getState().walls === mursAvant) {
+          partiDUnPlan = false;
+          useScanStore.setState({
+            processing: false,
+            scanning: false,
+            paused: false,
+            etageEnCours: null,
+            complementEnCours: false,
+            screen: 'result',
+          });
+          if (etage !== null) {
+            alerte(
+              `${nomDuNiveau(etage)} : rien de relevé`,
+              'Aucun mur n’a été vu : le niveau n’est pas créé. Relancez « Scanner un étage » et balayez ses murs avant de terminer.',
+            );
+          } else {
+            alerte(
+              'Aucune pièce ajoutée',
+              'Ce passage n’a relevé aucun mur : le plan reste tel qu’il était. Entrez dans la pièce et balayez ses murs avant de terminer.',
+            );
+          }
+          return;
         }
         /*
           CE QU'ON VIENT DE TROUVER, DIT TOUT DE SUITE.

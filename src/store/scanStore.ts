@@ -4592,7 +4592,8 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       [],
     ).walls;
     if (nettoyes.length === 0) {
-      set({ processing: false, scanning: false, etageEnCours: null });
+      // Rien d'exploitable : on rend le plan tel qu'il était (voir `stop`, qui le dit).
+      set({ processing: false, scanning: false, etageEnCours: null, screen: 'result' });
       return;
     }
     // La logique de construction : d'équerre, sur des niveaux communs.
@@ -8553,12 +8554,24 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       });
     },
 
+    /*
+      UN SCAN NEUF N'HÉRITE RIEN DU PRÉCÉDENT — agent testeur SCAN : après un
+      relevé, « Scanner une pièce » s'ouvrait sur « 12 murs · 3 portes », le
+      bandeau « Repassez le mur… » et sa flèche, et le trou du contour du
+      relevé d'avant : un « Terminer » rapide répondait « Il manque un mur »
+      pour un mur d'une autre pièce. Tout ce que le direct affiche repart de
+      zéro, consigne de RoomPlan comprise.
+    */
     beginScan: () =>
       set({
         wallCount: 0,
         objectCount: 0,
         doorCount: 0,
         windowCount: 0,
+        mursDouteux: 0,
+        murDouteux: null,
+        trouContour: 0,
+        instruction: '',
       }),
 
     setScreen: (screen) => set({ screen }),

@@ -36,6 +36,14 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   /// Une analyse tourne déjà : la suivante attend la prochaine demi-seconde.
   private var analyseEnCours = false
   /**
+   LA CHALEUR ET LA BATTERIE, DITES PENDANT LE SCAN — agent testeur SCAN :
+   elles n'étaient lues qu'à la fin (`energieDuScan`). On les relit au plus
+   toutes les dix secondes, et l'on ne prévient le JavaScript que si l'état
+   change (voir `surveillerLEnergie`).
+   */
+  private var derniereVerifEnergie = Date.distantPast
+  private var dernierEtatEnergie = ""
+  /**
    CE QUE LE SCAN COÛTE — relevé au départ, rendu à la fin.
 
    Relevé du patron : « la recherche scan consomme beaucoup de batterie ».
@@ -312,6 +320,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     if additif { self.additif = true }
     dernierApercu = []
     analyseEnCours = false
+    dernierEtatEnergie = ""
+    derniereVerifEnergie = Date.distantPast
     DispatchQueue.main.async {
       UIDevice.current.isBatteryMonitoringEnabled = true
       // Une reprise après pause ne remet pas le compteur à zéro : la mesure
@@ -865,6 +875,31 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
 
   private func clearPromise() { stopResolver = nil; stopRejecter = nil }
 
+  /// Chaleur (sérieuse ou critique) et batterie sous 15 % hors charge, dites
+  /// au JavaScript quand l'état change : le bandeau dit de terminer à temps.
+  private func surveillerLEnergie() {
+    guard Date().timeIntervalSince(derniereVerifEnergie) > 10 else { return }
+    derniereVerifEnergie = Date()
+    var corps: [String: Any] = [:]
+    switch ProcessInfo.processInfo.thermalState {
+    case .serious: corps["thermique"] = "chaud"
+    case .critical: corps["thermique"] = "brûlant"
+    default: break
+    }
+    let niveau = UIDevice.current.batteryLevel
+    let charge = UIDevice.current.batteryState
+    // Niveau inconnu (−1, simulateur) : on ne l'invente pas ; en charge, rien à craindre.
+    if niveau >= 0, niveau <= 0.15, charge != .charging, charge != .full {
+      corps["batterie"] = Int((niveau * 100).rounded())
+    }
+    let chaleur = corps["thermique"] as? String ?? ""
+    let reste = (corps["batterie"] as? Int).map { String($0) } ?? ""
+    let etat = chaleur + "|" + reste
+    guard etat != dernierEtatEnergie else { return }
+    dernierEtatEnergie = etat
+    RoomScanEvents.shared?.emit(name: "onEnergie", body: corps)
+  }
+
   /// Durée, batterie consommée (en points de pour cent) et chaleur.
   private func energieDuScan() -> [String: Any] {
     var out: [String: Any] = [
@@ -1273,6 +1308,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     }
     if let camera = lu?.camera { noterLeTrajet(camera) }
     surveillerLaLumiere(lu?.lumiere)
+    surveillerLEnergie()
     /*
       CINQ NOMBRES, DEUX FOIS PAR SECONDE AU PLUS, ET SEULEMENT S'ILS CHANGENT.
 

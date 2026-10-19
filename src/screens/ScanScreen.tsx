@@ -27,6 +27,7 @@ import { aimanterHauteur, apercuDeHauteur, natureAuMur } from '../geometry/viseu
 import { PRODUITS_DU_SCAN, configurationDeLaPose, produitDuScan } from '../geometry/poseAR';
 import { VignetteProduit } from '../components/VignetteProduit';
 import { alerte } from '../ui/alerte';
+import { alerteEnergie, type EtatEnergie } from '../ui/energie';
 import { nomDuNiveau } from '../geometry/floorplan';
 
 /** Le guide de pose a été lu : on ne le remontre plus de lui-même. */
@@ -432,6 +433,14 @@ export function ScanScreen() {
         plus. Trois secondes suffisent à le lire ; passé ce délai, l'écran
         appartient au relevé.
       */
+      /*
+        ET L'ANNONCE D'AVANT S'EFFACE AVEC LUI — agent testeur SCAN : refus
+        et annonce partagent leur minuteur. Le refus annulait celui de
+        l'annonce, puis s'effaçait seul : « Prise plinthe placée à 25 cm »
+        revenait alors pour de bon, à la place de la phrase de visée qui dit
+        où le produit suivant se posera.
+      */
+      setAnnonce(null);
       if (minuteurAnnonce.current) clearTimeout(minuteurAnnonce.current);
       minuteurAnnonce.current = setTimeout(() => setRefus(null), 3200);
     }
@@ -464,6 +473,25 @@ export function ScanScreen() {
       abo.remove();
       if (minuteur) clearTimeout(minuteur);
     };
+  }, []);
+  /*
+    LA CHALEUR ET LA BATTERIE, DITES PENDANT LE SCAN — voir `alerteEnergie`.
+    Le natif ne parle que quand l'état change (au plus toutes les dix
+    secondes) ; la phrase reste tant que l'état dure, et VoiceOver l'entend
+    une fois.
+  */
+  const [energie, setEnergie] = useState<EtatEnergie | null>(null);
+  const phraseEnergie = alerteEnergie(energie);
+  useEffect(() => {
+    const abo = scanEvents.addListener('onEnergie', (e: EtatEnergie) => {
+      const phrase = alerteEnergie(e);
+      setEnergie(phrase ? e : null);
+      if (phrase) {
+        haptic('alerte');
+        annoncer(phrase);
+      }
+    });
+    return () => abo.remove();
   }, []);
   /**
    * LA CROIX DEMANDE, quand il y a quelque chose à perdre.
@@ -630,6 +658,14 @@ export function ScanScreen() {
         {!paused && torcheAuto && (
           <View style={[styles.instructionPill, styles.torchePill]} accessibilityLiveRegion="polite">
             <Text style={styles.instructionText}>Peu de lumière — torche allumée</Text>
+          </View>
+        )}
+        {/* La chaleur et la batterie, pendant qu'il est temps de terminer : voir `alerteEnergie`. */}
+        {!!phraseEnergie && (
+          <View testID="alerte-energie" style={[styles.instructionPill, styles.energiePill]} accessibilityLiveRegion="polite">
+            <Text style={styles.instructionText} numberOfLines={2}>
+              {phraseEnergie}
+            </Text>
           </View>
         )}
         {/*
@@ -1246,6 +1282,8 @@ const getStyles = themedStyles((c: Palette) => StyleSheet.create({
   /* Ambre comme la pause : c'est un avertissement, pas une faute. */
   douteuxPill: { backgroundColor: 'rgba(232,161,59,0.9)' },
   torchePill: { backgroundColor: 'rgba(31,91,255,0.9)' },
+  // Orange : ce n'est pas une faute du relevé, c'est le téléphone qui prévient.
+  energiePill: { backgroundColor: 'rgba(230,120,20,0.94)' },
   instructionDot: {
     width: 7,
     height: 7,
