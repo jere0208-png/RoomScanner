@@ -162,8 +162,12 @@ describe('le document', () => {
         ]),
       }),
     );
-    expect(doc).toContain('(non compté) Tj');
-    expect(doc).toContain('(compris) Tj');
+    // Hors du tableau des prix, dits en clair sous le total (relecture « structure ») :
+    // une ligne « — / compris » au milieu des montants se lisait comme un oubli.
+    // Les parenthèses s'échappent dans le flux PDF.
+    expect(doc).toContain('Compris sans supplément : Tableau électrique \\(2 u\\)');
+    expect(doc).toContain('Point lumineux DCL \\(2 u\\)');
+    expect(doc).not.toContain('(compris) Tj');
     expect(doc).not.toContain('(0,00 €) Tj'.replace('€', String.fromCharCode(0x80)));
   });
 

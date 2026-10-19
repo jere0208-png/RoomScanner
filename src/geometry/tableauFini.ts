@@ -27,6 +27,7 @@ import {
   type Circuit,
   type Differential,
   circuitsDuDifferentiel,
+  coffretDuPlan,
 } from './nfc15100';
 import type { RoomKind } from './furniture';
 
@@ -148,9 +149,17 @@ function usageDuCircuit(c: Circuit): string | undefined {
  * déborde). Les courants faibles, sans disjoncteur, n'y sont pas.
  */
 export function tableauDepuisLePlan(circuits: Circuit[], differentiels: Differential[]): TableauExistant {
+  /*
+    L'INTERRUPTEUR GÉNÉRAL OUVRE LA PREMIÈRE RANGÉE, AVEC LE PREMIER
+    DIFFÉRENTIEL — relecture « tableaux chiffrés » : seul sur sa rangée, il
+    portait le tableau projeté à quatre rangées quand le devis en commandait
+    deux et la liste en dessinait trois. Le coffret suit la règle unique
+    (`tailleDuCoffret`).
+  */
   const departs: DepartExistant[] = [{ id: 'plan-ig', organe: 'interrupteur', calibre: 63, rangee: 0 }];
   const poses = new Set<string>();
-  let rangee = 1;
+  let rangee = 0;
+  let enTete = 2;
   const departDe = (c: Circuit, r: number): DepartExistant => {
     const usage = usageDuCircuit(c);
     return {
@@ -166,9 +175,11 @@ export function tableauDepuisLePlan(circuits: Circuit[], differentiels: Differen
     // Par identifiant : deux circuits du même libellé restent deux (revue « Nicolas »).
     const siens = circuitsDuDifferentiel(d, circuits).filter((c) => c.breaker !== null);
     let r = rangee;
-    let rempli = 2;
+    let rempli = 2 + enTete;
+    enTete = 0;
+    const idDiff = `plan-id${i + 1}`;
     departs.push({
-      id: `plan-id${i + 1}`,
+      id: idDiff,
       organe: 'differentiel',
       calibre: d.rating,
       sensibilite: 30,
@@ -180,7 +191,9 @@ export function tableauDepuisLePlan(circuits: Circuit[], differentiels: Differen
         r += 1;
         rempli = 0;
       }
-      departs.push(departDe(c, r));
+      // Chaque départ dit sous quel différentiel il est : la feuille du
+      // tableau l'y range, en retrait.
+      departs.push({ ...departDe(c, r), sousDifferentiel: idDiff });
       poses.add(c.id);
       rempli += 1;
     }
@@ -201,7 +214,8 @@ export function tableauDepuisLePlan(circuits: Circuit[], differentiels: Differen
     }
     rangee = r + 1;
   }
-  return { departs, rangees: Math.max(RANGEES_MIN, rangee), parRangee: PAR_RANGEE_DEFAUT };
+  const coffret = coffretDuPlan(circuits, differentiels).rangees;
+  return { departs, rangees: Math.max(RANGEES_MIN, rangee, coffret), parRangee: PAR_RANGEE_DEFAUT };
 }
 
 /**

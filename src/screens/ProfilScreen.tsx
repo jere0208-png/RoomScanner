@@ -416,7 +416,7 @@ export function ProfilScreen() {
                 c={c}
                 icone={f.icone}
                 label={f.label}
-                valeur={entreprise[f.cle] || 'À renseigner'}
+                valeur={entreprise[f.cle] || (f.facultatif ? 'Facultatif' : 'À renseigner')}
                 onPress={() =>
                   setPrompt({
                     title: f.label,
@@ -734,13 +734,18 @@ function Rangee({
  * LES CHAMPS DE L'ENTREPRISE — dans l'ordre du cartouche : le nom d'abord,
  * puis ce qu'on lit pour joindre l'artisan.
  */
-const CHAMPS_ENTREPRISE: { cle: keyof Entreprise; label: string; icone: keyof typeof SOLAIRES }[] = [
+const CHAMPS_ENTREPRISE: { cle: keyof Entreprise; label: string; icone: keyof typeof SOLAIRES; facultatif?: boolean }[] = [
   { cle: 'nom', label: 'Nom de l’entreprise', icone: 'etiquette' },
   { cle: 'telephone', label: 'Téléphone', icone: 'telephone' },
   { cle: 'email', label: 'E-mail', icone: 'tchat' },
   { cle: 'adresse', label: 'Adresse', icone: 'maison' },
   { cle: 'siret', label: 'SIRET', icone: 'bouclier' },
   { cle: 'decennale', label: 'Assurance décennale', icone: 'bouclier' },
+  // Les mentions du devis : facultatives, imprimées dès qu'elles sont remplies.
+  { cle: 'formeJuridique', label: 'Forme juridique et capital', icone: 'etiquette', facultatif: true },
+  { cle: 'immatriculation', label: 'RCS ou répertoire des métiers', icone: 'bouclier', facultatif: true },
+  { cle: 'tvaIntra', label: 'N° de TVA intracommunautaire', icone: 'bouclier', facultatif: true },
+  { cle: 'mediateur', label: 'Médiateur de la consommation', icone: 'tchat', facultatif: true },
 ];
 
 const themed = (c: Palette) =>

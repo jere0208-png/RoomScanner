@@ -78,7 +78,7 @@ import { ControlePastille } from '../components/ControlePastille';
 import { DevisPastille, prixCourt } from '../components/DevisPastille';
 import { prixDAchat, prixDuDevis } from '../geometry/mainDOeuvre';
 import { cleDuTarif } from '../geometry/prix';
-import { useEntreprise } from '../store/entreprise';
+import { entrepriseAImprimer, useEntreprise } from '../store/entreprise';
 import { usePrixPro } from '../store/prixPro';
 import { useReglagesPose } from '../store/reglagesPose';
 import { ChoixScan } from '../components/ChoixScan';
@@ -1897,7 +1897,15 @@ export function ResultScreen() {
         fixtures,
       );
       const tirage = { pull, buy: buyingList(pull, fixtures, ceiling, openings) };
-      const bytes = buildMaterialPdf(scanName, list, tirage);
+      // L'entreprise et le client au cartouche, comme le dossier et le devis.
+      const ent = entrepriseAImprimer(useEntreprise.getState());
+      const { client: pour, address: chez } = useScanStore.getState();
+      const bytes = buildMaterialPdf(scanName, list, tirage, {
+        entreprise: ent,
+        client: pour,
+        address: chez,
+        particulier: !modeElec && !ent,
+      });
       await RoomScan.sharePDF(toBase64(bytes), materialFilename(scanName));
     } catch (e: any) {
       const p = signaler('export', e, 'result');

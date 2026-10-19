@@ -26,9 +26,35 @@ export interface Entreprise {
    * « Nadia » : elle n'existait nulle part).
    */
   decennale: string;
+  /*
+    LES MENTIONS DU DEVIS — relecture « structure » du PDF : un devis
+    d'artisan porte aussi sa forme juridique et son capital, son
+    immatriculation (RCS ou répertoire des métiers), son numéro de TVA
+    intracommunautaire et le médiateur de la consommation qu'il a désigné.
+    Facultatives : imprimées dès qu'elles sont remplies.
+  */
+  /** « SARL au capital de 10 000 € ». */
+  formeJuridique: string;
+  /** « RCS Lyon 123 456 789 » ou « RM 123 456 789 ». */
+  immatriculation: string;
+  /** « FR 12 123456789 ». */
+  tvaIntra: string;
+  /** Le médiateur de la consommation : nom et site. */
+  mediateur: string;
 }
 
-export const ENTREPRISE_VIDE: Entreprise = { nom: '', adresse: '', telephone: '', email: '', siret: '', decennale: '' };
+export const ENTREPRISE_VIDE: Entreprise = {
+  nom: '',
+  adresse: '',
+  telephone: '',
+  email: '',
+  siret: '',
+  decennale: '',
+  formeJuridique: '',
+  immatriculation: '',
+  tvaIntra: '',
+  mediateur: '',
+};
 
 /**
  * LES CONDITIONS DE SES DEVIS — relevé d'un électricien artisan (2 salariés,
@@ -117,6 +143,10 @@ const champsDe = (e: Entreprise): Entreprise => ({
   email: e.email,
   siret: e.siret,
   decennale: e.decennale ?? '',
+  formeJuridique: e.formeJuridique ?? '',
+  immatriculation: e.immatriculation ?? '',
+  tvaIntra: e.tvaIntra ?? '',
+  mediateur: e.mediateur ?? '',
 });
 
 const conditionsDe = (e: ConditionsDevis): ConditionsDevis => ({
@@ -199,6 +229,16 @@ export const useEntreprise = create<Etat>((set, get) => ({
  * L'entreprise à imprimer, ou rien : sans nom, le dossier garde la marque
  * EchoPlan plutôt qu'un cartouche à moitié vide.
  */
-export function entrepriseAImprimer(e: Entreprise): Entreprise | null {
-  return e.nom.trim() ? champsDe(e) : null;
+export function entrepriseAImprimer(e: Entreprise): EntrepriseImprimee | null {
+  if (!e.nom.trim()) return null;
+  // Les mentions facultatives ne s'impriment que remplies : un champ vide
+  // n'a rien à dire au PDF.
+  const out: EntrepriseImprimee = { ...champsDe(e) };
+  for (const k of MENTIONS_FACULTATIVES) if (!out[k]?.trim()) delete out[k];
+  return out;
 }
+
+const MENTIONS_FACULTATIVES = ['formeJuridique', 'immatriculation', 'tvaIntra', 'mediateur'] as const;
+/** L'entreprise telle que le PDF la reçoit : ses mentions facultatives, seulement remplies. */
+export type EntrepriseImprimee = Omit<Entreprise, (typeof MENTIONS_FACULTATIVES)[number]> &
+  Partial<Pick<Entreprise, (typeof MENTIONS_FACULTATIVES)[number]>>;

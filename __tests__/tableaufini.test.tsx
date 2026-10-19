@@ -104,9 +104,15 @@ describe('le tableau déduit du plan, quand rien n’a été constitué', () => 
     const cuisson = t.departs[2];
     expect(cuisson).toMatchObject({ calibre: 32, usage: 'Plaque de cuisson', piece: 'Cuisine' });
     expect(t.departs[4]).toMatchObject({ usage: 'Éclairage', piece: 'Séjour, Entrée' });
-    // Chaque différentiel ouvre sa rangée.
-    expect(t.departs[1].rangee).toBe(1);
-    expect(t.departs[3].rangee).toBe(2);
+    // Chaque différentiel ouvre sa rangée ; l'interrupteur général partage
+    // la première, au lieu d'en occuper une à lui seul (le coffret unique,
+    // voir `tailleDuCoffret`).
+    expect(t.departs[0].rangee).toBe(0);
+    expect(t.departs[1].rangee).toBe(0);
+    expect(t.departs[3].rangee).toBe(1);
+    // Chaque départ dit sous quel différentiel il est.
+    expect(t.departs[2].sousDifferentiel).toBe(t.departs[1].id);
+    expect(t.rangees).toBe(2);
   });
 });
 

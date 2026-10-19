@@ -25,7 +25,7 @@ import type { BuyRow } from './conduits';
 import { CEILINGS, type CeilingKind } from './ceiling';
 import { articleDuMagasin } from './magasin';
 import { FIXTURES, type FixtureKind } from './electrical';
-import type { Circuit, Differential } from './nfc15100';
+import { coffretDuPlan, type Circuit, type Differential } from './nfc15100';
 import {
   LUMINAIRES,
   TARIFS_COMMUNS,
@@ -530,15 +530,20 @@ export function chiffrer(
     modules occupés ne remplissent jamais plus des quatre cinquièmes du
     coffret.
   */
-  const modules =
-    [...calibres.values()].reduce((t2, q) => t2 + q, 0) +
-    differentiels.length * 2 +
-    // Le télérupteur et les contacteurs se rangent au tableau, un module chacun.
-    achats
-      .filter((a) => a.code === 'telerupteur' || a.code === 'contacteur-ig' || a.code === 'contacteur-jn')
-      .reduce((t2, a) => t2 + a.quantity, 0);
+  /*
+    LA TAILLE VIENT DE LA RÈGLE UNIQUE — relecture « tableaux chiffrés » : le
+    devis commandait deux rangées quand la liste en dessinait trois et la
+    feuille du tableau quatre. Chaque différentiel ouvre sa rangée, les
+    contacteurs et télérupteurs prennent la place libre, la réserve de 20 %
+    tient : voir `tailleDuCoffret`.
+  */
+  const organes = achats
+    .filter((a) => a.code === 'telerupteur' || a.code === 'contacteur-ig' || a.code === 'contacteur-jn')
+    .map((a) => ({ quantity: a.quantity }));
+  const coffret = coffretDuPlan(circuits, differentiels, organes);
+  const modules = coffret.modules;
   if (modules > 0) {
-    const rangees = Math.max(1, Math.min(4, Math.ceil(modules / (MODULES_PAR_RANGEE * 0.8))));
+    const rangees = coffret.rangees;
     poser({
       famille: 'Tableau',
       code: `coffret-${rangees}`,

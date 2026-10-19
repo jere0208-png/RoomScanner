@@ -104,6 +104,12 @@ export interface LigneDePose {
   heures: number;
   /** Les heures viennent de l'artisan, pas du barème (voir `OptionsDuDevis.heures`). */
   corrigee?: boolean;
+  /**
+   * SON PRIX HT, ARRONDI AU CENTIME UNE FOIS — posé par `vendreLeDevis`.
+   * Le total de la pose est la somme de ces prix : le client qui additionne
+   * les lignes du PDF retombe sur le total, au centime.
+   */
+  totalHt?: number;
 }
 
 export interface Pose {
@@ -377,10 +383,16 @@ export function vendreLeDevis<L extends LigneAVendre>(
   const corrections = options.heures ?? {};
   const lignesPose = poseEstimee.lignes.map((l) => {
     const h = corrections[l.famille];
-    return h !== undefined && isFinite(h) && h >= 0 ? { ...l, heures: auQuart(h), corrigee: true } : l;
+    const ligne = h !== undefined && isFinite(h) && h >= 0 ? { ...l, heures: auQuart(h), corrigee: true } : l;
+    return { ...ligne, totalHt: cents(ligne.heures * poseEstimee.taux) };
   });
   const heures = lignesPose.reduce((t, l) => t + l.heures, 0);
-  const poseHtBrut = cents(heures * poseEstimee.taux);
+  /*
+    LA POSE EST LA SOMME DE SES LIGNES — relecture « tableaux chiffrés » : le
+    total se calculait sur la somme des heures, chaque ligne du PDF à part ;
+    à 42,50 €/h, quatre lignes faisaient 85,02 € et le total 85,00 €.
+  */
+  const poseHtBrut = cents(lignesPose.reduce((t, l) => t + l.totalHt, 0));
   const compte = heures > 0;
 
   const fournituresHt = cents(fournitures.reduce((s, f) => s + f.totalHt, 0) + deType('fourniture'));

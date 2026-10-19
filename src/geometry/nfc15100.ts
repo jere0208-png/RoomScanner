@@ -30,6 +30,7 @@ import {
   type CeilingKind,
 } from './ceiling';
 import { pointInPolygon } from './appearance';
+import { auPluriel, MODULES_PAR_RANGEE, organesDuTableau, tailleDuCoffret, type TailleDuCoffret } from './coffret';
 import type { VolumeVerdict } from './volumes';
 import {
   COMMANDES_MURALES,
@@ -2157,6 +2158,34 @@ export interface Differential {
 }
 
 /** Les circuits d'un différentiel, chacun une seule fois (voir `circuitIds`). */
+/**
+ * LES GROUPES DU TABLEAU — chaque différentiel (deux modules) suivi de ses
+ * disjoncteurs, puis les disjoncteurs qu'aucun ne reprend. C'est ce que
+ * `tailleDuCoffret` range, rangée par rangée.
+ */
+export function groupesDuTableau(circuits: Circuit[], differentials: Differential[]): number[] {
+  const repris = new Set<string>();
+  const groupes = differentials.map((d) => {
+    const siens = circuitsDuDifferentiel(d, circuits).filter((c) => c.breaker !== null);
+    for (const c of siens) repris.add(c.id);
+    return 2 + siens.length;
+  });
+  const restes = circuits.filter((c) => c.breaker !== null && !repris.has(c.id)).length;
+  return restes > 0 ? [...groupes, restes] : groupes;
+}
+
+/** Le coffret du plan : la règle unique (`tailleDuCoffret`), lue sur les circuits. */
+export function coffretDuPlan(
+  circuits: Circuit[],
+  differentials: Differential[],
+  organes: readonly { quantity: number }[] = [],
+): TailleDuCoffret {
+  return tailleDuCoffret(
+    groupesDuTableau(circuits, differentials),
+    organes.reduce((s, o) => s + o.quantity, 0),
+  );
+}
+
 export function circuitsDuDifferentiel(d: Differential, circuits: Circuit[]): Circuit[] {
   if (d.circuitIds) {
     const parId = new Map(circuits.map((c) => [c.id, c]));
@@ -2404,6 +2433,16 @@ export function materialList(
   }
   for (const d of parDiff.values()) {
     board.push({ label: `Interrupteur différentiel ${d.rating} A 30 mA type ${d.type}`, quantity: d.quantity });
+  }
+  /*
+    LE COFFRET ET SES PEIGNES, À LA MÊME TAILLE QUE LE DEVIS ET LE DESSIN —
+    relecture « tableaux chiffrés » : la liste renvoyait au « rayon
+    Tableau » sans jamais compter la boîte. Voir `tailleDuCoffret`.
+  */
+  const coffret = coffretDuPlan(circuits, differentials, organesDuTableau(fixtures, ceiling ?? []));
+  if (coffret.rangees > 0) {
+    board.push({ label: `Coffret de répartition ${auPluriel(coffret.rangees, 'rangée')} (${coffret.rangees * MODULES_PAR_RANGEE} modules)`, quantity: 1 });
+    board.push({ label: 'Peigne d’alimentation (un par rangée)', quantity: coffret.rangees });
   }
   if (circuits.some((c) => c.nature === 'vdi')) {
     board.push({ label: 'Coffret de communication', quantity: 1 });

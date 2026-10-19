@@ -108,7 +108,9 @@ import {
   type Differential,
   type MaterialList,
   circuitsDuDifferentiel,
+  coffretDuPlan,
 } from '../geometry/nfc15100';
+import { auPluriel, type OrganeDuTableau } from '../geometry/coffret';
 import {
   circuitColor,
   markColor,
@@ -163,7 +165,6 @@ import { accentsDesPieces, peinturesDesPieces, solsDesPieces } from '../ui/habil
 import { cotesExterieures, ECART_DE_COTE } from '../geometry/cotes3d';
 import type { Devis, LigneDevis } from '../geometry/devis';
 import {
-  enHeures,
   poseComptee,
   pourcent,
   POSE_VIDE,
@@ -1048,6 +1049,11 @@ export interface EntreprisePdf {
   siret?: string;
   /** Assureur, contrat et zone de l'assurance décennale (voir `Entreprise`). */
   decennale?: string;
+  /** Les mentions du devis, imprimées si remplies (voir `Entreprise`). */
+  formeJuridique?: string;
+  immatriculation?: string;
+  tvaIntra?: string;
+  mediateur?: string;
 }
 /**
  * LA LIGNE DE TITRE, EN HAUT DE LA FEUILLE.
@@ -4875,7 +4881,15 @@ function menuiseriesPage(
   let y = TETE - 22;
   const titre = avecNiveau(tranche.page > 1 ? 'Menuiseries, suite' : 'Menuiseries', ctx);
   d.text(titre, x0, y + 24, 13, INK, { bold: true, align: 'left' });
-  for (let i = 0; i < heads.length; i++) d.text(heads[i], cols[i], y, 8.5, GREY, { align: 'left' });
+  /*
+    LES COTES À DROITE — relecture « tableaux chiffrés » : les nombres
+    s'alignent sur leurs unités, l'en-tête avec eux.
+  */
+  const aDroite = (i: number) => i >= 3;
+  const xDe = (i: number) => (aDroite(i) ? (cols[i + 1] ?? x0 + w) - 8 : cols[i]);
+  for (let i = 0; i < heads.length; i++) {
+    d.text(heads[i], xDe(i), y, 8.5, GREY, { align: aDroite(i) ? 'right' : 'left' });
+  }
   y -= 6;
   d.line(x0, y, x0 + w, y, 0.8, INK);
   const debut = (tranche.page - 1) * LIGNES_DES_MENUISERIES;
@@ -4889,7 +4903,10 @@ function menuiseriesPage(
       l.allege === null ? '—' : frLen(l.allege),
     ];
     for (let i = 0; i < cells.length; i++) {
-      d.text(cells[i], cols[i], y, i === 0 ? 10 : 9.5, i === 0 ? INK : '#2A3340', { align: 'left', bold: i === 0 });
+      d.text(cells[i], xDe(i), y, i === 0 ? 10 : 9.5, i === 0 ? INK : '#2A3340', {
+        align: aDroite(i) ? 'right' : 'left',
+        bold: i === 0,
+      });
     }
     d.line(x0, y - 7, x0 + w, y - 7, 0.4, GREY_LIGHT);
   }
@@ -4947,8 +4964,13 @@ function metrePage(
   const avecEclairage = (ctx.ceiling?.length ?? 0) > 0;
   // Colonnes : nom, cotes, sol, périmètre, hauteur, murs nets, éclairage.
   const cols = avecEclairage
-    ? [0, 0.26, 0.42, 0.55, 0.66, 0.76, 0.88].map((f) => x0 + f * w)
+    ? [0, 0.22, 0.37, 0.49, 0.59, 0.71, 0.85].map((f) => x0 + f * w)
     : [0, 0.28, 0.46, 0.6, 0.73, 0.85].map((f) => x0 + f * w);
+  /*
+    LA COLONNE DIT CE QU'ELLE COMPTE — relecture « structure » : « Éclairage »
+    annonçait 6 points quand la liste en comptait 7 ; elle ne compte que les
+    points AU PLAFOND (`lightingLoad`), et le dit.
+  */
   const heads = [
     'Pièce',
     'Cotes (m)',
@@ -4956,14 +4978,17 @@ function metrePage(
     'Périm. (m)',
     'H. (m)',
     'Murs (m²)',
-    ...(avecEclairage ? ['Éclairage'] : []),
+    ...(avecEclairage ? ['Points au plafond'] : []),
   ];
+  /* Les nombres à droite, sur leur colonne : les virgules se suivent. */
+  const xDe = (i: number) => (i === 0 ? cols[0] : (cols[i + 1] ?? x0 + w) - 8);
+  const alignDe = (i: number): 'left' | 'right' => (i === 0 ? 'left' : 'right');
   let y = TETE - 22;
 
   const titre = avecNiveau(tranche.page > 1 ? 'Métré par pièce, suite' : 'Métré par pièce', ctx);
   d.text(titre, x0, y + 24, 13, INK, { bold: true, align: 'left' });
   for (let i = 0; i < heads.length; i++) {
-    d.text(heads[i], cols[i], y, 8.5, GREY, { align: 'left' });
+    d.text(heads[i], xDe(i), y, i === 6 ? 8 : 8.5, GREY, { align: alignDe(i) });
   }
   y -= 6;
   d.line(x0, y, x0 + w, y, 0.8, INK);
@@ -5045,8 +5070,8 @@ function metrePage(
         : []),
     ];
     for (let i = 0; i < cells.length; i++) {
-      d.text(cells[i], cols[i], y, i === 0 ? 10 : 9.5, i === 0 ? INK : '#2A3340', {
-        align: 'left',
+      d.text(cells[i], xDe(i), y, i === 0 ? 10 : 9.5, i === 0 ? INK : '#2A3340', {
+        align: alignDe(i),
         bold: i === 0,
       });
     }
@@ -5074,16 +5099,16 @@ function metrePage(
   y -= 26;
   d.line(x0, y + 12, x0 + w, y + 12, 0.8, INK);
   d.text('Total', cols[0], y, 10, INK, { align: 'left', bold: true });
-  d.text(frM2(totalArea2), cols[2], y, 10, INK, { align: 'left', bold: true });
-  d.text(frM2(totalWalls), cols[5], y, 10, INK, { align: 'left', bold: true });
+  d.text(frM2(totalArea2), xDe(2), y, 10, INK, { align: 'right', bold: true });
+  d.text(frM2(totalWalls), xDe(5), y, 10, INK, { align: 'right', bold: true });
   if (avecEclairage && totalPoints > 0) {
     d.text(
       `${totalPoints} point${totalPoints > 1 ? 's' : ''}`,
-      cols[6],
+      xDe(6),
       y,
       10,
       INK,
-      { align: 'left', bold: true },
+      { align: 'right', bold: true },
     );
   }
 
@@ -5182,8 +5207,14 @@ function metrePage(
  */
 // Revue des « découvreurs » : un seul nom dans l'app et l'export, celui
 // du bouton du plan — « Liste d'achats ».
+/*
+  … ET LE PROFESSIONNEL DIT QUE CE N'EST PAS SON DEVIS — relecture
+  « structure » : « Estimatif des fournitures ≈ 1 388 € TTC » se confondait
+  avec le « Total fournitures HT » du devis du même chantier. Ce sont les
+  finitions (peinture, sols, plinthes), hors devis : le titre le dit.
+*/
 function titreDesAchats(ctx: { particulier?: boolean }): string {
-  return ctx.particulier ? 'Liste d’achats' : 'Estimatif des fournitures';
+  return ctx.particulier ? 'Liste d’achats' : 'Estimatif des finitions';
 }
 
 function achatsPage(
@@ -5198,26 +5229,41 @@ function achatsPage(
   const a = achatsDe(pieces, h);
   const cout = prix ? coutDesAchats(a, prix) : null;
   let y = TETE - 22;
-  d.text(titreDesAchats(ctx), x0, y + 24, 13, INK, { bold: true, align: 'left' });
+  d.text(
+    ctx.particulier ? titreDesAchats(ctx) : `${titreDesAchats(ctx)} (peinture, sols) — hors devis`,
+    x0,
+    y + 24,
+    13,
+    INK,
+    { bold: true, align: 'left' },
+  );
 
-  const cols = (cout ? [0, 0.34, 0.52, 0.82] : [0, 0.4, 0.6]).map((f) => x0 + f * w);
+  /*
+    LA QUANTITÉ ET LE PRIX À DROITE — relecture « tableaux chiffrés » : « ~
+    350 € » et « ~ 1 388 € » commençaient au même x, leurs unités ne se
+    suivaient pas. La mesure, une phrase, reste à gauche.
+  */
+  const cols = (cout ? [0, 0.34, 0.5, 0.82] : [0, 0.4, 0.58]).map((f) => x0 + f * w);
   const heads = ['Achat', 'Quantité', 'Mesure', ...(cout ? ['Prix estimé'] : [])];
-  for (let i = 0; i < heads.length; i++) d.text(heads[i], cols[i], y, 8.5, GREY, { align: 'left' });
+  const xA = (i: number) => (i === 1 ? cols[2] - 14 : i === 3 ? x0 + w : cols[i]);
+  const alA = (i: number): 'left' | 'right' => (i === 1 || i === 3 ? 'right' : 'left');
+  for (let i = 0; i < heads.length; i++) d.text(heads[i], xA(i), y, 8.5, GREY, { align: alA(i) });
   y -= 6;
   d.line(x0, y, x0 + w, y, 0.8, INK);
   const pluriel = (n: number, mot: string) => `${n} ${mot}${n > 1 ? 's' : ''}`;
   const rangs: [string, string, string, number][] = [
-    ['Peinture des murs', pluriel(a.murs.pots, 'pot'), `${nombre(a.murs.litres)} L pour ${nombre(a.murs.surface)} m²`, cout?.murs ?? 0],
-    ['Peinture des plafonds', pluriel(a.plafonds.pots, 'pot'), `${nombre(a.plafonds.litres)} L pour ${nombre(a.plafonds.surface)} m²`, cout?.plafonds ?? 0],
-    ['Revêtement de sol', pluriel(a.sol.paquets, 'paquet'), `${nombre(a.sol.avecChute)} m², chute comprise`, cout?.sol ?? 0],
-    ['Plinthes', pluriel(a.plinthes.barres, 'barre'), `${nombre(a.plinthes.metres)} m, seuils déduits`, cout?.plinthes ?? 0],
+    // Les surfaces au centième, comme au métré : 119,94 m² partout (relecture « tableaux chiffrés »).
+    ['Peinture des murs', pluriel(a.murs.pots, 'pot'), `${nombre(a.murs.litres)} L pour ${frM2(a.murs.surface)} m²`, cout?.murs ?? 0],
+    ['Peinture des plafonds', pluriel(a.plafonds.pots, 'pot'), `${nombre(a.plafonds.litres)} L pour ${frM2(a.plafonds.surface)} m²`, cout?.plafonds ?? 0],
+    ['Revêtement de sol', pluriel(a.sol.paquets, 'paquet'), `${frM2(a.sol.avecChute)} m², chute comprise`, cout?.sol ?? 0],
+    ['Plinthes', pluriel(a.plinthes.barres, 'barre'), `${fr2(a.plinthes.metres)} m, seuils déduits`, cout?.plinthes ?? 0],
   ];
   for (const [nom, qte, mesure, euro] of rangs) {
     y -= 22;
     const cells = [nom, qte, mesure, ...(cout ? [`≈ ${euros(euro)}`] : [])];
     for (let i = 0; i < cells.length; i++) {
-      d.text(fitText(cells[i], 10, (cols[i + 1] ?? x0 + w) - cols[i] - 6), cols[i], y, i === 0 ? 10 : 9.5, i === 0 ? INK : '#2A3340', {
-        align: 'left',
+      d.text(fitText(cells[i], 10, (cols[i + 1] ?? x0 + w) - cols[i] - 6), xA(i), y, i === 0 ? 10 : 9.5, i === 0 ? INK : '#2A3340', {
+        align: alA(i),
         bold: i === 0 || i === 1,
       });
     }
@@ -5229,8 +5275,8 @@ function achatsPage(
       for (const t of a.murs.parTeinte ?? []) {
         y -= 15;
         d.text(fitText(`· ${nomDeTeinte(t.cle)}`, 9, cols[1] - cols[0] - 6), cols[0] + 10, y, 9, '#2A3340', { align: 'left' });
-        d.text(pluriel(t.pots, 'pot'), cols[1], y, 9, '#2A3340', { align: 'left' });
-        d.text(fitText(`${nombre(t.litres)} L pour ${nombre(t.surface)} m²`, 9, (cols[3] ?? x0 + w) - cols[2] - 6), cols[2], y, 9, '#2A3340', {
+        d.text(pluriel(t.pots, 'pot'), xA(1), y, 9, '#2A3340', { align: 'right' });
+        d.text(fitText(`${nombre(t.litres)} L pour ${frM2(t.surface)} m²`, 9, (cols[3] ?? x0 + w) - cols[2] - 6), cols[2], y, 9, '#2A3340', {
           align: 'left',
         });
       }
@@ -5242,7 +5288,7 @@ function achatsPage(
     d.line(x0, y + 12, x0 + w, y + 12, 0.8, INK);
     // Revue « Thomas » : un montant remis au client dit ce qu'il comprend.
     d.text('Total estimé TTC', cols[0], y, 10.5, INK, { align: 'left', bold: true });
-    d.text(`≈ ${euros(cout.total)}`, cols[3], y, 10.5, INK, { align: 'left', bold: true });
+    d.text(`≈ ${euros(cout.total)}`, x0 + w, y, 10.5, INK, { align: 'right', bold: true });
   }
   y -= 22;
   d.text(
@@ -5278,21 +5324,50 @@ function achatsPage(
   const pc = [0, 0.3, 0.45, 0.62, 0.77, 0.9].map((f) => x0 + f * w);
   // « Baies » comptait aussi les portes (revue « Thomas »).
   const ph = ['Pièce', 'Sol (m²)', 'Murs nets (m²)', 'Plafond (m²)', 'Plinthes (m)', 'Ouvertures'];
-  for (let i = 0; i < ph.length; i++) d.text(ph[i], pc[i], y, 8.5, GREY, { align: 'left' });
+  const xP = (i: number) => (i === 0 ? pc[0] : (pc[i + 1] ?? x0 + w) - 8);
+  const alP = (i: number): 'left' | 'right' => (i === 0 ? 'left' : 'right');
+  for (let i = 0; i < ph.length; i++) d.text(ph[i], xP(i), y, 8.5, GREY, { align: alP(i) });
   y -= 6;
   d.line(x0, y, x0 + w, y, 0.8, INK);
+  /*
+    UNE LIGNE DE TOTAL, ET RIEN NE DISPARAÎT SANS LE DIRE — relecture
+    « tableaux chiffrés » : le détail n'avait pas de total, et un logement de
+    vingt pièces perdait ses dernières lignes en bas de feuille, en silence.
+  */
+  let ecrites = 0;
   for (const p of pieces) {
-    if (y < FRAME.y + 90) break;
+    if (y < FRAME.y + 120) break;
+    ecrites += 1;
     y -= 19;
     // Les surfaces à deux décimales, comme au métré (revue « Nadia »).
-    const cells = [p.nom, frM2(p.sol), frM2(p.murs), frM2(p.plafond), nombre(p.plinthes), String(p.portes + p.fenetres)];
+    const cells = [p.nom, frM2(p.sol), frM2(p.murs), frM2(p.plafond), fr2(p.plinthes), String(p.portes + p.fenetres)];
     for (let i = 0; i < cells.length; i++) {
-      d.text(i === 0 ? fitText(cells[i], 10, pc[1] - pc[0] - 6) : cells[i], pc[i], y, i === 0 ? 10 : 9.5, i === 0 ? INK : '#2A3340', {
-        align: 'left',
+      d.text(i === 0 ? fitText(cells[i], 10, pc[1] - pc[0] - 6) : cells[i], xP(i), y, i === 0 ? 10 : 9.5, i === 0 ? INK : '#2A3340', {
+        align: alP(i),
         bold: i === 0,
       });
     }
     d.line(x0, y - 7, x0 + w, y - 7, 0.4, GREY_LIGHT);
+  }
+  if (ecrites < pieces.length) {
+    y -= 16;
+    d.text(`… et ${pluriel(pieces.length - ecrites, 'pièce')} de plus, comptée${pieces.length - ecrites > 1 ? 's' : ''} dans le total.`, x0, y, 8.5, GREY, {
+      align: 'left',
+    });
+  }
+  if (pieces.length > 1) {
+    y -= 24;
+    d.line(x0, y + 12, x0 + w, y + 12, 0.8, INK);
+    const somme = (f: (p: (typeof pieces)[number]) => number) => sommeEcrite(pieces.map(f));
+    const totaux = [
+      'Total',
+      frM2(somme((p) => p.sol)),
+      frM2(somme((p) => p.murs)),
+      frM2(somme((p) => p.plafond)),
+      fr2(pieces.reduce((t, p) => t + p.plinthes, 0)),
+      String(pieces.reduce((t, p) => t + p.portes + p.fenetres, 0)),
+    ];
+    for (let i = 0; i < totaux.length; i++) d.text(totaux[i], xP(i), y, 10, INK, { align: alP(i), bold: true });
   }
 
   drawSheetChrome(d, {
@@ -5338,64 +5413,101 @@ function existantPage(
       : undefined,
   );
 
-  d.text('Installation existante', x0, y + 24, 13, INK, {
+  // Déduit du plan, il ne se fait pas passer pour un relevé (revue « Marc »).
+  const titre = tableau.projete ? 'Tableau projeté (déduit du plan)' : 'Installation existante';
+  d.text(titre, x0, y + 24, 13, INK, {
     bold: true,
     align: 'left',
   });
 
   /* ------------------------------------------------ le tableau tel quel */
-  const cols = [0, 0.34, 0.5, 0.72].map((f) => x0 + f * w);
-  ['Module', 'Calibre', 'Protège', 'Sous'].forEach((t, i) => {
-    d.text(t, cols[i], y, 8.5, GREY, { align: 'left' });
-  });
+  /*
+    CHAQUE ORGANE SOUS SON NOM, CHAQUE DÉPART SOUS SON DIFFÉRENTIEL —
+    relecture « tableaux chiffrés » : l'interrupteur général s'imprimait
+    « Disjoncteur », la colonne « Sous » ne disait que « — », et des lignes
+    disparaissaient sans un mot en bas de feuille. Les départs se rangent
+    maintenant en retrait sous le différentiel qui les protège ; ceux
+    qu'aucun ne reprend viennent ensuite, sous « Sans différentiel ».
+  */
+  const cols = [0, 0.38, 0.5].map((f) => x0 + f * w);
+  d.text('Organe', cols[0], y, 8.5, GREY, { bold: true, align: 'left' });
+  d.text('Calibre', cols[1] + 40, y, 8.5, GREY, { bold: true, align: 'right' });
+  d.text('Protège', cols[2], y, 8.5, GREY, { bold: true, align: 'left' });
   y -= 6;
   d.line(x0, y, x0 + w, y, 0.8, INK);
 
-  /* Les différentiels sont numérotés D1, D2… : c'est ainsi qu'on renvoie
-     chaque départ au sien, sans redessiner un unifilaire. */
-  const rang = new Map(
-    tableau.departs
-      .filter((x) => x.organe === 'differentiel')
-      .map((x, i) => [x.id, `D${i + 1}`]),
+  /* Les différentiels sont numérotés ID1, ID2… comme sur l'unifilaire. */
+  const diffs = tableau.departs.filter((x) => x.organe === 'differentiel');
+  const rang = new Map(diffs.map((x, i) => [x.id, `ID${i + 1}`]));
+  const NOM_ORGANE: Record<string, string> = {
+    disjoncteur: 'Disjoncteur',
+    fusible: 'Porte-fusible',
+    agcp: 'Disjoncteur d’abonné (AGCP)',
+    interrupteur: 'Interrupteur général',
+    repartiteur: 'Répartiteur',
+    contacteur: 'Contacteur jour/nuit',
+    telerupteur: 'Télérupteur',
+    parafoudre: 'Parafoudre',
+    autre: 'Autre organe',
+  };
+  const nomDe = (dep: (typeof tableau.departs)[number]) =>
+    dep.organe === 'differentiel'
+      ? `${rang.get(dep.id) ?? 'ID'} — Différentiel ${dep.sensibilite ?? 30} mA${dep.typeDiff ? ` type ${dep.typeDiff}` : ''}`
+      : (NOM_ORGANE[dep.organe] ?? 'Organe');
+  type Ligne = { dep: (typeof tableau.departs)[number]; retrait: boolean } | { titre: string };
+  const lignes: Ligne[] = [];
+  const sousUn = (dep: (typeof tableau.departs)[number]) => !!dep.sousDifferentiel && rang.has(dep.sousDifferentiel);
+  // La tête : ce qui n'est ni différentiel ni départ raccordé (interrupteur général, AGCP, répartiteur…).
+  const tete = tableau.departs.filter(
+    (x) => x.organe !== 'differentiel' && !sousUn(x) && !['disjoncteur', 'fusible', 'contacteur', 'telerupteur'].includes(x.organe),
   );
-  for (const dep of tableau.departs) {
-    y -= 17;
-    if (y < FRAME.y + 90) break;
-    const nom =
-      dep.organe === 'differentiel'
-        ? `${rang.get(dep.id) ?? 'D'} — Différentiel ${dep.sensibilite ?? 30} mA${
-            dep.typeDiff ? ` type ${dep.typeDiff}` : ''
-          }`
-        : dep.organe === 'fusible'
-          ? 'Porte-fusible'
-          : dep.organe === 'agcp'
-            ? 'Disjoncteur d’abonné'
-            : 'Disjoncteur';
-    d.text(nom, cols[0], y, 9.5, INK, { align: 'left' });
-    d.text(dep.calibre ? `${dep.calibre} A` : '—', cols[1], y, 9.5, INK, {
+  for (const dep of tete) lignes.push({ dep, retrait: false });
+  for (const dif of diffs) {
+    lignes.push({ dep: dif, retrait: false });
+    for (const dep of tableau.departs.filter((x) => x.sousDifferentiel === dif.id)) lignes.push({ dep, retrait: true });
+  }
+  const seuls = tableau.departs.filter((x) => !tete.includes(x) && x.organe !== 'differentiel' && !sousUn(x));
+  if (seuls.length > 0) {
+    lignes.push({ titre: diffs.length > 0 ? 'Sans différentiel 30 mA en amont' : 'Départs' });
+    for (const dep of seuls) lignes.push({ dep, retrait: true });
+  }
+  // Le pas se resserre avant de laisser une ligne dehors ; ce qui ne tient
+  // toujours pas est ANNONCÉ, jamais avalé.
+  const BAS_TABLEAU = FRAME.y + 300;
+  const pas = Math.max(12.5, Math.min(17, (y - BAS_TABLEAU) / Math.max(1, lignes.length)));
+  let ecrites = 0;
+  for (const l of lignes) {
+    if (y - pas < BAS_TABLEAU) break;
+    y -= pas;
+    ecrites += 1;
+    if ('titre' in l) {
+      d.text(l.titre, cols[0], y, 8.5, GREY, { bold: true, align: 'left' });
+      continue;
+    }
+    const { dep, retrait } = l;
+    const enTete = dep.organe === 'differentiel';
+    const xNom = cols[0] + (retrait ? 14 : 0);
+    d.text(fitText(nomDe(dep), 9.5, cols[1] - xNom - 6), xNom, y, 9.5, INK, { align: 'left', bold: enTete });
+    d.text(dep.calibre ? `${dep.calibre} A` : '—', cols[1] + 40, y, 9.5, INK, { align: 'right' });
+    const protege = [dep.usage, dep.piece].filter(Boolean).join(' · ');
+    d.text(fitText(protege || '—', 9.5, x0 + w - cols[2]), cols[2], y, 9.5, GREY, { align: 'left' });
+    if (enTete) d.line(x0, y - 4, x0 + w, y - 4, 0.3, '#E3E7ED');
+  }
+  if (ecrites < lignes.length) {
+    y -= 14;
+    const n = lignes.length - ecrites;
+    d.text(`… et ${auPluriel(n, 'ligne')} de plus, non reproduite${n > 1 ? 's' : ''} sur cette feuille : voir le tableau dans l’app.`, x0, y, 8.5, GREY, {
       align: 'left',
     });
-    d.text(dep.usage || '—', cols[2], y, 9.5, GREY, { align: 'left' });
-    d.text(
-      dep.sousDifferentiel ? (rang.get(dep.sousDifferentiel) ?? '—') : '—',
-      cols[3],
-      y,
-      9.5,
-      GREY,
-      { align: 'left' },
-    );
   }
 
   if (tableau.rangees && tableau.parRangee) {
     y -= 20;
     const places = tableau.rangees * tableau.parRangee;
+    const libres = modulesLibres(tableau.departs, tableau.rangees, tableau.parRangee);
     d.text(
-      `Tableau : ${tableau.rangees} rangée(s) de ${tableau.parRangee} — ` +
-        `${modulesLibres(
-          tableau.departs,
-          tableau.rangees,
-          tableau.parRangee,
-        )} module(s) libre(s) sur ${places}.`,
+      `Coffret : ${auPluriel(tableau.rangees, 'rangée')} de ${tableau.parRangee} modules — ` +
+        `${auPluriel(libres, 'module libre', 'modules libres')} sur ${places}.`,
       x0,
       y,
       9.5,
@@ -5413,8 +5525,10 @@ function existantPage(
   y -= 8;
   d.line(x0, y, x0 + w, y, 0.8, INK);
 
+  let dits = 0;
   for (const k of constats) {
     if (y < FRAME.y + 80) break;
+    dits += 1;
     y -= 20;
     const mot =
       k.gravite === 'danger'
@@ -5435,8 +5549,15 @@ function existantPage(
     /* La fleche ne survit pas au jeu de caracteres du PDF : elle sortait
        en « -> ». Un mot le dit mieux, et c'est celui qu'on emploie devant
        le client. */
-    d.text(`À faire : ${k.remede}`, x0 + 62, y, 9, INK, { align: 'left' });
-    y -= 4;
+    for (const ligne of wrapText(`À faire : ${k.remede.charAt(0).toLowerCase()}${k.remede.slice(1)}`, 9, w - 62)) {
+      d.text(ligne, x0 + 62, y, 9, INK, { align: 'left' });
+      y -= 11;
+    }
+    y += 7;
+  }
+  if (dits < constats.length) {
+    y -= 16;
+    d.text(`… et ${auPluriel(constats.length - dits, 'constat')} de plus : voir le tableau dans l’app.`, x0, y, 8.5, GREY, { align: 'left' });
   }
 
   drawSheetChrome(d, {
@@ -5446,7 +5567,7 @@ function existantPage(
     particulier: ctx.particulier,
     entreprise: ctx.entreprise,
     address: ctx.address,
-    sheetTitle: 'Installation existante',
+    sheetTitle: titre,
     sheet,
     scaleLabel: null,
   });
@@ -7272,7 +7393,11 @@ export interface BoardRow {
  *
  * Exportée : c'est un calcul, pas un dessin, et c'est lui qu'on vérifie.
  */
-export function boardRows(list: MaterialList): BoardRow[] {
+export function boardRows(
+  list: MaterialList,
+  /** Les contacteurs et télérupteurs du tableau (`organesDuTableau`). */
+  organes: readonly OrganeDuTableau[] = [],
+): BoardRow[] {
   const rows: BoardRow[] = [];
   let numero = 0;
   for (const diff of list.differentials) {
@@ -7318,6 +7443,26 @@ export function boardRows(list: MaterialList): BoardRow[] {
       premiere = false;
     } while (reste.length > 0);
   }
+  /*
+    LES ORGANES DE COMMANDE PRENNENT LA PLACE LIBRE, PUIS LES RANGÉES DE
+    RÉSERVE — la même règle que le devis et la feuille du tableau
+    (`tailleDuCoffret`) : le dessin montre le coffret qu'on commande.
+  */
+  const enOrganes = organes.flatMap((o) => Array.from({ length: o.quantity }, () => o));
+  for (const o of enOrganes) {
+    let r = rows.find((x) => x.libres > 0);
+    if (!r) {
+      r = { label: 'Commandes', modules: [], libres: MODULES_PAR_RANGEE };
+      rows.push(r);
+    }
+    numero += 1;
+    r.modules.push({ numero, marque: o.marque, largeur: 1, legende: o.label, differentiel: false });
+    r.libres -= 1;
+  }
+  const voulues = coffretDuPlan(list.circuits, list.differentials, organes).rangees;
+  while (rows.length > 0 && rows.length < voulues) {
+    rows.push({ label: 'Réserve', modules: [], libres: MODULES_PAR_RANGEE });
+  }
   return rows;
 }
 
@@ -7330,30 +7475,63 @@ export function buildMaterialPdf(
    * forme d'avant.
    */
   tirage?: { pull: PullRow[]; buy: BuyRow[] },
+  /**
+   * À QUI EST LE DOCUMENT — relecture « structure » : le cartouche disait
+   * « PROJET / PROJET » et la marque EchoPlan, quand le devis du même
+   * chantier portait l'entreprise et le client.
+   */
+  contexte?: { entreprise?: EntreprisePdf | null; client?: string; address?: string; particulier?: boolean },
 ): Uint8Array {
   const x0 = FRAME.x + 24;
   const w = FRAME.w - 48;
   const TOP = TETE - 22;
-  const BOTTOM = FRAME.y + 54;
+  // Au-dessus du cartouche, avec une ligne d'air : la dernière note de la
+  // feuille passait sous son filet.
+  const BOTTOM = FRAME.y + TITLE_H + 16;
 
   const pages: Draw[] = [];
   let d = new Draw();
   pages.push(d);
   let y = TOP;
+  /*
+    CE QU'UNE PAGE DE SUITE REDESSINE — relecture « tableaux chiffrés » : les
+    lignes du tirage et de « À commander » reprenaient en haut de page sans
+    leur en-tête de colonnes, et le lecteur ne savait plus ce qu'il lisait.
+    Chaque tableau pose ici son rappel : « Section (suite) », puis ses
+    colonnes.
+  */
+  let reprise: (() => void) | null = null;
   const need = (h: number) => {
     if (y - h < BOTTOM) {
       d = new Draw();
       pages.push(d);
       y = TOP;
+      reprise?.();
     }
   };
-  const titre = (t: string) => {
-    need(46);
+  /**
+   * Un titre de section, qui RÉSERVE la place de son premier bloc : un titre
+   * seul en bas de page, son contenu sur la suivante, ne se lit pas.
+   */
+  const titre = (t: string, premierBloc = 16) => {
+    reprise = null;
+    need(30 + premierBloc);
     y -= 6;
     d.text(t, x0, y, 13, INK, { bold: true, align: 'left' });
     y -= 8;
     d.line(x0, y, x0 + w, y, 1, INK);
     y -= 16;
+  };
+  const suiteDe = (t: string) => {
+    d.text(`${t} (suite)`, x0, y, 9, GREY, { bold: true, align: 'left' });
+    y -= 16;
+  };
+  /** Une ligne d'en-tête de colonnes : des libellés gris, puis un filet. */
+  const colonnes = (cols: { t: string; x: number; align: 'left' | 'right' }[]) => {
+    for (const c of cols) d.text(c.t, c.x, y, 8, GREY, { align: c.align, bold: true });
+    y -= 6;
+    d.line(x0, y, x0 + w, y, 0.6, '#D6DBE3');
+    y -= 12;
   };
   /**
    * Une ligne à deux colonnes : la désignation, et sa valeur.
@@ -7387,10 +7565,11 @@ export function buildMaterialPdf(
     }
     y -= 15;
   };
-  const note = (t: string) => {
-    for (const l of wrapText(t, 8.5, w)) {
+  /** Une note en gris, en retrait par l'abscisse (jamais par des espaces). */
+  const note = (t: string, retrait = 0) => {
+    for (const l of wrapText(t, 8.5, w - retrait)) {
       need(12);
-      d.text(l, x0, y, 8.5, GREY, { align: 'left' });
+      d.text(l, x0 + retrait, y, 8.5, GREY, { align: 'left' });
       y -= 11;
     }
   };
@@ -7415,10 +7594,20 @@ export function buildMaterialPdf(
   y -= 22;
 
   // ------------------------------------------------ appareillage par pièce
-  titre('Appareillage par pièce');
+  titre('Appareillage par pièce', 60);
+  const enTetePieces = () => colonnes([
+    { t: 'Désignation', x: x0, align: 'left' },
+    { t: 'Qté', x: x0 + w, align: 'right' },
+  ]);
+  enTetePieces();
+  reprise = () => {
+    suiteDe('Appareillage par pièce');
+    enTetePieces();
+  };
   for (const room of list.rooms) {
     if (room.rows.length === 0) continue;
-    need(30);
+    // La pièce ne reste pas seule en bas de page : son nom et ses premières lignes passent ensemble.
+    need(17 + Math.min(3, room.rows.length) * 15);
     d.text(room.room, x0, y, 11, INK, { bold: true, align: 'left' });
     /*
       L'USAGE DÉDUIT NE SE RAPPELLE QUE S'IL APPREND QUELQUE CHOSE.
@@ -7435,14 +7624,7 @@ export function buildMaterialPdf(
     const surface = `${frM2(room.area)} m²`;
     const usageParlant =
       !!room.use && room.use !== room.room && room.use !== USE_LABEL.autre;
-    d.text(
-      usageParlant ? `${room.use} · ${surface}` : surface,
-      x0 + w,
-      y,
-      9,
-      GREY,
-      { align: 'right' },
-    );
+    d.text(fitText(usageParlant ? `${room.use} · ${surface}` : surface, 9, w - 200), x0 + 200, y, 9, GREY, { align: 'left' });
     y -= 15;
     for (const row of room.rows) {
       ligne(row.label, `${row.quantity}`, { indent: 14 });
@@ -7459,44 +7641,42 @@ export function buildMaterialPdf(
 
     On monte un tableau rangée par rangée, module par module : c'est cette
     image-là qu'on cherche sur le chantier, pas une liste. Elle vient donc
-    AVANT le tableau des protections, qui reste pour le chiffrage.
+    AVANT le tableau des protections, qui reste pour le chiffrage. Les
+    rangées sont celles du coffret qu'on commande (`tailleDuCoffret`) : les
+    contacteurs et télérupteurs y prennent leur place, la réserve aussi.
   */
-  const rangees = boardRows(list);
+  const organes: OrganeDuTableau[] = (tirage?.buy ?? [])
+    .filter((r) => r.code === 'contacteur-ig' || r.code === 'contacteur-jn' || r.code === 'telerupteur')
+    .map((r) => ({
+      code: r.code as OrganeDuTableau['code'],
+      label: r.label,
+      spec: r.spec ?? '',
+      quantity: r.quantity,
+      marque: r.code === 'telerupteur' ? 'TL' : r.code === 'contacteur-jn' ? 'HC' : 'KM',
+    }));
+  const rangees = boardRows(list, organes);
+  // Le coffret prend la LARGEUR DE LA FEUILLE : bridés à vingt points, les
+  // modules se serraient dans le quart gauche de la page, illisibles, et
+  // les trois quarts restaient blancs.
+  const MOD_W = (w - 12) / MODULES_PAR_RANGEE;
+  const MOD_H = 30;
+  const hauteurRangee = (r: BoardRow) => MOD_H + 26 + Math.max(1, r.modules.length) * 15;
   if (rangees.length > 0) {
-    titre('Tableau électrique');
-    // Le coffret prend la LARGEUR DE LA FEUILLE : bridés à vingt points, les
-    // modules se serraient dans le quart gauche de la page, illisibles, et
-    // les trois quarts restaient blancs.
-    const MOD_W = (w - 12) / MODULES_PAR_RANGEE;
-    const MOD_H = 30;
-    // Deux points d'écart entre rangées, plus la légende de chacune.
+    titre('Tableau électrique', hauteurRangee(rangees[0]));
     for (const r of rangees) {
       // La rangée et ses légendes ne se coupent jamais en deux pages.
-      need(MOD_H + 26 + r.modules.length * 11);
+      need(hauteurRangee(r));
       const x1 = x0 + 6;
       // Le rail : un cadre qui tient les treize emplacements.
-      d.rect(
-        x1 - 4,
-        y - MOD_H - 4,
-        MOD_W * MODULES_PAR_RANGEE + 8,
-        MOD_H + 8,
-        null,
-        GREY_LIGHT,
-        0.8,
-      );
+      d.rect(x1 - 4, y - MOD_H - 4, MOD_W * MODULES_PAR_RANGEE + 8, MOD_H + 8, null, GREY_LIGHT, 0.8);
       let mx = x1;
       for (const m of r.modules) {
         const mw = MOD_W * m.largeur;
         d.rect(mx, y - MOD_H, mw - 2, MOD_H, m.differentiel ? '#EEF2FA' : '#FFFFFF', INK, 0.9);
         // Le calibre, gros : c'est ce qu'on lit en levant les yeux.
-        d.text(m.marque, mx + (mw - 2) / 2, y - 13, 10.5, INK, {
-          bold: true,
-          align: 'center',
-        });
+        d.text(m.marque, mx + (mw - 2) / 2, y - 13, 10.5, INK, { bold: true, align: 'center' });
         // Le numéro d'ordre, en pied de module : celui de l'étiquette.
-        d.text(`${m.numero}`, mx + (mw - 2) / 2, y - MOD_H + 5, 7.5, GREY, {
-          align: 'center',
-        });
+        d.text(`${m.numero}`, mx + (mw - 2) / 2, y - MOD_H + 5, 7.5, GREY, { align: 'center' });
         mx += mw;
       }
       // La RÉSERVE, dessinée vide : la norme en demande 20 %, et un tableau
@@ -7507,16 +7687,10 @@ export function buildMaterialPdf(
       }
       y -= MOD_H + 10;
       if (r.libres > 0) {
-        d.text(
-          `${r.libres} module${r.libres > 1 ? 's' : ''} de réserve`,
-          x0 + w,
-          y,
-          7.5,
-          GREY_LIGHT,
-          { align: 'right' },
-        );
+        d.text(auPluriel(r.libres, 'module de réserve', 'modules de réserve'), x0 + w, y, 7.5, GREY, { align: 'right' });
       }
       y -= 10;
+      if (r.modules.length === 0) ligne('Rangée de réserve', '', { indent: 10, grey: true });
       for (const m of r.modules) {
         ligne(`${m.numero} — ${m.legende}`, '', { indent: 10, grey: true });
       }
@@ -7525,66 +7699,102 @@ export function buildMaterialPdf(
     const vdi = list.circuits.filter((c) => c.nature === 'vdi').length;
     if (vdi > 0) {
       note(
-        `   Les courants faibles (${vdi} circuit${vdi > 1 ? 's' : ''}) ne sont ` +
-          'pas protégés par un disjoncteur : ils rejoignent le coffret de ' +
-          'communication.',
+        `Les courants faibles (${auPluriel(vdi, 'circuit')}) ne sont pas protégés par un disjoncteur : ` +
+          'ils rejoignent le coffret de communication.',
       );
     }
     y -= 6;
   }
 
-  titre(rangees.length > 0 ? 'Protections, circuit par circuit' : 'Tableau électrique');
-  ligne('Circuit', 'Protection', { bold: true, grey: true });
+  // ---------------------------------------------------- les protections
+  /*
+    QUATRE COLONNES, PLUS DE « … » — relecture « tableaux chiffrés » : tout
+    tenait sur une ligne, et la longueur de câble, justement ce qu'on vient
+    chercher, était la partie coupée. Le circuit, ses pièces (sur deux lignes
+    s'il le faut), son câble, sa protection ; la note du circuit dessous, en
+    retrait, rattachée à SA ligne.
+  */
+  const P_PIECES = x0 + 190;
+  const P_CABLE = x0 + 392;
+  const enTeteProtections = () => colonnes([
+    { t: 'Circuit', x: x0, align: 'left' },
+    { t: 'Points · pièces', x: P_PIECES, align: 'left' },
+    { t: 'Câble', x: P_CABLE, align: 'right' },
+    { t: 'Protection', x: x0 + w, align: 'right' },
+  ]);
+  titre(rangees.length > 0 ? 'Protections, circuit par circuit' : 'Tableau électrique', 40);
+  enTeteProtections();
+  reprise = () => {
+    suiteDe('Protections, circuit par circuit');
+    enTeteProtections();
+  };
   for (const c of list.circuits) {
     const protection =
-      c.breaker === null
-        ? 'coffret com.'
-        : `${c.breaker} A · ${String(c.section).replace('.', ',')} mm²`;
-    ligne(
-      `${c.label} — ${c.points} point${c.points > 1 ? 's' : ''}` +
-        (c.rooms.length ? ` (${c.rooms.join(', ')})` : '') +
-        // Le métré, à même la ligne du circuit : c'est là qu'on le cherche
-        // au moment de chiffrer.
-        (c.cable ? ` · ${c.cable} m de câble` : ''),
-      protection,
+      c.breaker === null ? 'coffret com.' : `${c.breaker} A · ${String(c.section).replace('.', ',')} mm²`;
+    const pieces = wrapText(
+      `${auPluriel(c.points, 'point')}${c.rooms.length > 0 ? ` · ${c.rooms.join(', ')}` : ''}`,
+      9,
+      P_CABLE - 48 - P_PIECES,
     );
-    if (c.note) note(`   ${c.note}`);
+    const notes = c.note ? wrapText(c.note, 8, w - 14) : [];
+    const h = pieces.length * 12 + 4 + (notes.length > 0 ? notes.length * 10 + 7 : 0);
+    need(h);
+    d.text(fitText(c.label, 9.5, P_PIECES - x0 - 8), x0, y, 9.5, INK, { align: 'left' });
+    pieces.forEach((l, i) => d.text(l, P_PIECES, y - i * 12, 9, GREY, { align: 'left' }));
+    // Le métré, à même la ligne du circuit : c'est là qu'on le cherche au moment de chiffrer.
+    d.text(c.cable ? `${c.cable} m` : '—', P_CABLE, y, 9.5, INK, { align: 'right' });
+    d.text(protection, x0 + w, y, 9.5, INK, { align: 'right' });
+    y -= pieces.length * 12;
+    if (notes.length > 0) {
+      for (const l of notes) {
+        d.text(l, x0 + 14, y, 8, GREY, { align: 'left' });
+        y -= 10;
+      }
+      y -= 3;
+    }
+    d.line(x0, y + 6, x0 + w, y + 6, 0.3, '#E3E7ED');
+    y -= 6;
   }
   if (list.circuits.length === 0) note('Aucun circuit : rien à protéger.');
 
   // ------------------------------------------------------------- tirage
   if (tirage && tirage.pull.length > 0) {
     y -= 8;
-    titre('Tirage — gaines et conducteurs');
-    ligne('Circuit', 'Gaine · longueur', { bold: true, grey: true });
+    const T_DEPARTS = x0 + 262;
+    const T_COND = x0 + 352;
+    const enTeteTirage = () => colonnes([
+      { t: 'Circuit', x: x0, align: 'left' },
+      { t: 'Départs', x: T_DEPARTS, align: 'right' },
+      { t: 'Conducteur', x: T_COND, align: 'right' },
+      { t: 'Gaine · longueur', x: x0 + w, align: 'right' },
+    ]);
+    titre('Tirage — gaines et conducteurs', 40);
+    enTeteTirage();
+    reprise = () => {
+      suiteDe('Tirage — gaines et conducteurs');
+      enTeteTirage();
+    };
     for (const r of tirage.pull) {
+      need(16);
       // « ≈ » comme sur les surfaces : la même réserve, écrite pareil.
       const approche = r.approx && r.conduitLength > 0 ? '≈ ' : '';
-      const droite =
-        r.conduitLength > 0
-          ? `ICTA Ø${r.conduit} · ${approche}${r.conduitLength} m`
-          : `ICTA Ø${r.conduit}`;
-      ligne(
-        `${r.label} — ${r.runs} départ${r.runs > 1 ? 's' : ''}` +
-          (r.cableLength > 0
-            ? ` · ${approche}${r.cableLength} m de conducteur`
-            : ''),
-        droite,
-      );
+      const gaine = r.conduitLength > 0 ? `ICTA Ø${r.conduit} · ${approche}${r.conduitLength} m` : `ICTA Ø${r.conduit}`;
+      d.text(fitText(r.label, 9.5, T_DEPARTS - 60 - x0), x0, y, 9.5, INK, { align: 'left' });
+      d.text(auPluriel(r.runs, 'départ'), T_DEPARTS, y, 9.5, INK, { align: 'right' });
+      d.text(r.cableLength > 0 ? `${approche}${r.cableLength} m` : '—', T_COND, y, 9.5, INK, { align: 'right' });
+      d.text(gaine, x0 + w, y, 9.5, INK, { align: 'right' });
+      y -= 15;
     }
-    note(
-      '   Remplissage NF C 15-100 : la section des conducteurs ne dépasse ' +
-        'pas le tiers de celle du conduit.',
-    );
+    reprise = null;
+    note('Remplissage NF C 15-100 : la section des conducteurs ne dépasse pas le tiers de celle du conduit.');
     if (tirage.pull.some((r) => r.approx && r.conduitLength > 0)) {
       note(
-        '   Les longueurs marquées « ≈ » longent un contour reconstitué : ' +
-          'la pièce n’a pas été relevée en boucle fermée. Prévoyez une ' +
-          'marge, ou refaites le tour de la pièce.',
+        'Les longueurs marquées « ≈ » longent un contour reconstitué : la pièce n’a pas été relevée ' +
+          'en boucle fermée. Prévoyez une marge, ou refaites le tour de la pièce.',
       );
     }
     if (tirage.pull.every((r) => r.conduitLength === 0)) {
-      note('   Posez le tableau sur le plan pour obtenir les longueurs.');
+      note('Posez le tableau sur le plan pour obtenir les longueurs.');
     }
   }
 
@@ -7598,38 +7808,45 @@ export function buildMaterialPdf(
   // C'est exactement ce qu'on lui donne maintenant.
   if (tirage && tirage.buy.length > 0) {
     y -= 8;
-    titre('À commander');
     const COL_U = 62; // l'unité, calée à droite
     const COL_Q = 34; // la quantité, juste avant
     const xU = x0 + w;
     const xQ = xU - COL_U;
     const largeurDesignation = w - COL_U - COL_Q - 12;
-
-    need(20);
-    d.text('Désignation', x0, y, 8, GREY_LIGHT, { align: 'left', bold: true });
-    d.text('Qté', xQ, y, 8, GREY_LIGHT, { align: 'right', bold: true });
-    d.text('Unité', xU, y, 8, GREY_LIGHT, { align: 'right', bold: true });
-    y -= 6;
-    d.line(x0, y, x0 + w, y, 0.6, '#D6DBE3');
-    y -= 12;
-
+    const enTeteCommande = () => colonnes([
+      { t: 'Désignation', x: x0, align: 'left' },
+      { t: 'Qté', x: xQ, align: 'right' },
+      { t: 'Unité', x: xU, align: 'right' },
+    ]);
+    const bandeau = (t: string) => {
+      d.rect(x0, y - 4, w, 15, '#EEF2F8', null);
+      d.text(t.toUpperCase(), x0 + 7, y, 7.5, INK, { align: 'left', bold: true });
+      y -= 19;
+    };
+    titre('À commander', 70);
+    enTeteCommande();
     let famille = '';
+    reprise = () => {
+      suiteDe('À commander');
+      enTeteCommande();
+      if (famille) bandeau(`${famille} (suite)`);
+    };
+
     let bande = 0;
     for (const r of tirage.buy) {
+      // Le texte sous la désignation passe sur deux lignes plutôt que de
+      // perdre ce qui compte (« jusqu'à 3 con… »).
+      const dessous = [r.spec, r.note].filter(Boolean).join(' · ');
+      const lignesDessous = dessous ? wrapText(dessous, 8, largeurDesignation).slice(0, 2) : [];
+      const hauteur = 15 + lignesDessous.length * 10;
       if (r.family !== famille) {
+        need(30 + hauteur);
         famille = r.family;
         bande = 0;
-        need(30);
         y -= 4;
         // Le rayon, en bandeau : on parcourt le magasin dans cet ordre.
-        d.rect(x0, y - 4, w, 15, '#EEF2F8', null);
-        d.text(famille.toUpperCase(), x0 + 7, y, 7.5, INK, {
-          align: 'left',
-          bold: true,
-        });
-        y -= 19;
+        bandeau(famille);
       }
-      const hauteur = r.spec || r.note ? 24 : 15;
       need(hauteur + 2);
       // Une bande sur deux, très pâle : l'œil suit la ligne jusqu'à sa
       // quantité sans avoir à poser le doigt sur la feuille.
@@ -7637,23 +7854,17 @@ export function buildMaterialPdf(
         d.rect(x0, y - hauteur + 11, w, hauteur, '#FAFBFD', null);
       }
       bande += 1;
-      d.text(fitText(r.label, 10, largeurDesignation), x0 + 3, y, 10, INK, {
-        align: 'left',
-      });
+      d.text(fitText(r.label, 10, largeurDesignation), x0 + 3, y, 10, INK, { align: 'left' });
       d.text(`${r.quantity}`, xQ, y, 10, INK, { align: 'right', bold: true });
-      d.text(fitText(r.unit, 9, COL_U - 6), xU - 3, y, 9, GREY, {
-        align: 'right',
-      });
+      d.text(fitText(r.unit, 9, COL_U - 6), xU - 3, y, 9, GREY, { align: 'right' });
       y -= 12;
-      const dessous = [r.spec, r.note].filter(Boolean).join(' · ');
-      if (dessous) {
-        d.text(fitText(dessous, 8, largeurDesignation), x0 + 3, y, 8, GREY_LIGHT, {
-          align: 'left',
-        });
-        y -= 12;
+      for (const l of lignesDessous) {
+        d.text(l, x0 + 3, y, 8, GREY, { align: 'left' });
+        y -= 10;
       }
       y -= 3;
     }
+    reprise = null;
     y -= 4;
     /*
       LE MÉTRÉ DIT COMMENT IL PASSE — relevé du patron : « très souvent on
@@ -7662,16 +7873,15 @@ export function buildMaterialPdf(
       pas au comptoir.
     */
     note(
-      '   Quantités établies sur le relevé, chutes non comprises. Les ' +
-        'longueurs de conduit et de conducteur sont mesurées sur le plan, ' +
-        'pas estimées au mètre carré : montée du tableau au plafond, ' +
-        'passage en plafond, retombée le long du mur jusqu’à chaque appareil.',
+      'Quantités établies sur le relevé, chutes non comprises. Les longueurs de conduit et de conducteur ' +
+        'sont mesurées sur le plan, pas estimées au mètre carré : montée du tableau au plafond, passage en ' +
+        'plafond, retombée le long du mur jusqu’à chaque appareil.',
     );
   }
 
   if (list.differentials.length > 0) {
     y -= 8;
-    ligne('Protection différentielle 30 mA', '', { bold: true });
+    titre('Protection différentielle 30 mA', 40);
     for (const diff of list.differentials) {
       // Le label porte déjà son type (« Différentiel type A 1 ») : le
       // répéter écrivait « type A … type A » sur chaque ligne. Et la liste
@@ -7695,16 +7905,26 @@ export function buildMaterialPdf(
   }
 
   // -------------------------------------------------------- fournitures
+  /*
+    LE TOTAL DE CÂBLE N'EST PAS UN ARTICLE DU TABLEAU — relecture
+    « tableaux chiffrés » : « Câble — 257 m au total » se glissait entre les
+    disjoncteurs et additionnait des sections différentes. Il passe en note
+    sous la liste ; le détail par section est au bordereau.
+  */
+  const articles = list.board.filter((r) => r.quantity > 0);
+  const totaux = list.board.filter((r) => r.quantity <= 0);
   if (list.board.length > 0) {
-    titre('Fournitures de tableau');
-    for (const row of list.board) {
-      // Quantité zéro = un total, pas un article : la colonne reste vide.
-      ligne(row.label, row.quantity > 0 ? `${row.quantity}` : '');
-    }
+    y -= 8;
+    titre('Fournitures de tableau', Math.min(3, Math.max(1, articles.length)) * 15);
+    reprise = () => suiteDe('Fournitures de tableau');
+    for (const row of articles) ligne(row.label, `${row.quantity}`);
+    reprise = null;
+    for (const row of totaux) note(`${row.label} — toutes sections confondues ; le détail par section est au bordereau.`);
   }
 
   // -------------------------------------------------------- conformité
-  titre('Conformité');
+  y -= 8;
+  titre('Conformité', 30);
   const alertes = list.issues.filter((i) => i.severity === 'alerte');
   if (alertes.length === 0) {
     ligne('Aucun écart relevé sur ce qui est vérifiable.', '');
@@ -7741,12 +7961,16 @@ export function buildMaterialPdf(
       sheetTitle: 'Liste du matériel',
       sheet: `${i + 1} / ${pages.length}`,
       scaleLabel: null,
+      ...(contexte?.client ? { client: contexte.client } : {}),
+      ...(contexte?.address ? { address: contexte.address } : {}),
+      ...(contexte?.particulier ? { particulier: true } : {}),
+      ...(contexte?.entreprise ? { entreprise: contexte.entreprise } : {}),
     }),
   );
   return buildDocument(
     pages.map((p) => p.stream()),
     [],
-    { titre: name.trim() ? `${name.trim()} \u2014 Liste du matériel` : 'Liste du matériel' },
+    { titre: name.trim() ? `${name.trim()} — Liste du matériel` : 'Liste du matériel' },
   );
 }
 
@@ -7795,6 +8019,8 @@ export interface DevisPourPdf {
    * absentes. Réglées dans « Mon entreprise ».
    */
   conditions?: { validite?: number; paiement?: string };
+  /** Le début et la durée des travaux, quand l'artisan les a fixés ; sinon « à convenir ». */
+  travaux?: { debut?: string; duree?: string };
 }
 
 /** « 1 234,50 € » — l'espace des milliers, la virgule, les centimes. */
@@ -7811,8 +8037,17 @@ export function devisFilename(numero: string, chantier: string): string {
 export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   const X0 = 40;
   const X1 = PAGE_W - 40;
-  const COL_QTE = 382;
+  /*
+    LES COLONNES DU TABLEAU — relecture « tableaux chiffrés » : « 1 cour.
+    100 m » et « 39 u » dans la même cellule, les chiffres ne s'alignaient
+    pas, et la main-d'œuvre écrivait « 810,00 € HT » sous des montants sans
+    « HT ». Le nombre se cale à droite, son unité à gauche juste après ; les
+    montants à droite, et le « HT » une seule fois, dans l'en-tête.
+  */
+  const COL_QTE = 350;
+  const COL_UNITE = 360;
   const COL_PU = 468;
+  const COL_TOTAL = X1 - 6;
   const BAS = 78;
   const two = (v: number) => String(v).padStart(2, '0');
   const jj = (x: Date) => `${two(x.getDate())}/${two(x.getMonth() + 1)}/${x.getFullYear()}`;
@@ -7828,13 +8063,16 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   const feuilles: Draw[] = [];
   let d = new Draw();
   let y = 0;
+  /** Le rayon en cours : une page de suite le rappelle sous l'en-tête. */
+  let rayonEnCours: string | null = null;
 
   const enTeteDuTableau = () => {
     d.rect(X0, y - 6, X1 - X0, 18, '#EEF1F6', null, 0);
     d.text('Désignation', X0 + 8, y, 8, GREY, { bold: true, align: 'left' });
     d.text('Qté', COL_QTE, y, 8, GREY, { bold: true, align: 'right' });
+    d.text('Unité', COL_UNITE, y, 8, GREY, { bold: true, align: 'left' });
     d.text('PU HT', COL_PU, y, 8, GREY, { bold: true, align: 'right' });
-    d.text('Total HT', X1 - 6, y, 8, GREY, { bold: true, align: 'right' });
+    d.text('Total HT', COL_TOTAL, y, 8, GREY, { bold: true, align: 'right' });
     y -= 22;
   };
   const nouvellePage = () => {
@@ -7842,13 +8080,21 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
     feuilles.push(d);
     y = PAGE_H - 50;
   };
-  /** Une page de plus quand ce qui vient ne tient pas — le tableau reprend son en-tête. */
+  /**
+   * Une page de plus quand ce qui vient ne tient pas — le tableau reprend
+   * son en-tête, et le rayon interrompu son titre, « (suite) ».
+   */
   const place = (h: number, tableau = true) => {
     if (y - h >= BAS) return;
     nouvellePage();
     d.text(`Devis n° ${e.numero} — suite`, X0, y, 10, GREY, { bold: true, align: 'left' });
     y -= 26;
-    if (tableau) enTeteDuTableau();
+    if (!tableau) return;
+    enTeteDuTableau();
+    if (rayonEnCours) {
+      d.text(`${rayonEnCours.toUpperCase()} (SUITE)`, X0 + 8, y, 7.5, GREY, { bold: true, align: 'left' });
+      y -= 16;
+    }
   };
 
   // ------------------------------------------------------------ l'en-tête
@@ -7857,10 +8103,16 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   if (ent) {
     d.text(fitText(ent.nom, 15, 270), X0, y, 15, INK, { bold: true, align: 'left' });
     let yy = y - 16;
+    /*
+      LES MENTIONS DE L'ENTREPRISE — relecture « structure » : forme
+      juridique et capital, immatriculation, TVA intracommunautaire, dès
+      qu'elles sont remplies dans « Mon entreprise ».
+    */
     for (const l of [
       ent.adresse,
       [ent.telephone, ent.email].filter(Boolean).join(' · '),
-      ent.siret ? `SIRET ${ent.siret}` : '',
+      [ent.formeJuridique, ent.siret ? `SIRET ${ent.siret}` : ''].filter(Boolean).join(' · '),
+      [ent.immatriculation, ent.tvaIntra ? `TVA intracom. ${ent.tvaIntra}` : ''].filter(Boolean).join(' · '),
       ent.decennale ? `Assurance décennale : ${ent.decennale}` : '',
     ]) {
       if (!l) continue;
@@ -7892,46 +8144,60 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
 
   // ------------------------------------------------------- les fournitures
   enTeteDuTableau();
-  /** Une ligne du tableau : désignation, quantité, PU HT, total HT. */
-  const ligneDuTableau = (nom: string, qte: string, pu: string, total: string, gris = false) => {
+  /** « 2 », « 0,5 » : la quantité, à la française. */
+  const nombre = (q: number) => String(Math.round(q * 100) / 100).replace('.', ',');
+  /** Une ligne du tableau : désignation, quantité et unité, PU HT, total HT. */
+  const ligneDuTableau = (nom: string, qte: string, unite: string, pu: string, total: string, gris = false) => {
     place(16);
-    d.text(fitText(nom, 9.5, COL_QTE - X0 - 60), X0 + 8, y, 9.5, INK, { align: 'left' });
+    d.text(fitText(nom, 9.5, COL_QTE - 34 - X0 - 8), X0 + 8, y, 9.5, INK, { align: 'left' });
     d.text(qte, COL_QTE, y, 9, INK, { align: 'right' });
+    d.text(fitText(unite, 8.5, COL_PU - 52 - COL_UNITE), COL_UNITE, y, 8.5, GREY, { align: 'left' });
     d.text(pu, COL_PU, y, 9, gris ? GREY : INK, { align: 'right' });
-    d.text(total, X1 - 6, y, 9, gris ? GREY : INK, { align: 'right' });
+    d.text(total, COL_TOTAL, y, 9, gris ? GREY : INK, { align: 'right' });
     d.line(X0, y - 5, X1, y - 5, 0.3, '#E3E7ED');
     y -= 16;
   };
-  const quantite = (q: number, unite: string) => `${String(q).replace('.', ',')} ${unite}`;
   const titreDeRayon = (mot: string) => {
+    rayonEnCours = null;
     place(36);
     d.text(mot.toUpperCase(), X0 + 8, y, 7.5, GREY, { bold: true, align: 'left' });
+    rayonEnCours = mot;
     y -= 16;
   };
-  const sousTotal = (mot: string, v: number, taille = 9.5) => {
+  /** Le sous-total discret d'un rayon : on vérifie sans attendre la fin. */
+  const sousTotalDeRayon = (mot: string, v: number) => {
+    place(16);
+    d.text(`Sous-total ${mot.toLowerCase()}`, COL_PU, y, 8.5, GREY, { align: 'right' });
+    d.text(enEuros(v), COL_TOTAL, y, 8.5, GREY, { bold: true, align: 'right' });
+    y -= 14;
+  };
+  const sousTotal = (mot: string, v: number) => {
+    rayonEnCours = null;
     place(24);
     d.line(X0, y + 8, X1, y + 8, 0.8, INK);
-    d.text(mot, X0 + 8, y - 6, taille, INK, { bold: true, align: 'left' });
-    d.text(enEuros(v), X1 - 6, y - 6, taille, INK, { bold: true, align: 'right' });
+    d.text(mot, X0 + 8, y - 6, 10, INK, { bold: true, align: 'left' });
+    d.text(enEuros(v), COL_TOTAL, y - 6, 10, INK, { bold: true, align: 'right' });
     y -= 29;
   };
   const gardees = prix.fournitures.filter((v) => !v.ligne.ecarte);
+  /*
+    CE QUI NE SE FACTURE PAS SORT DU TABLEAU — relecture « structure » : des
+    lignes « — / compris / non compté » au milieu des prix se lisaient comme
+    des oublis. Le support du tableau est compris dans le coffret, le
+    luminaire dépend des envies : ils sont dits sous le total, en clair.
+    Rien ne s'écrit « 0,00 € » : un zéro sur un devis se lit comme un oubli.
+  */
+  const sansPrix = gardees.filter((v) => v.ligne.pu === 0 && v.ligne.total === 0);
+  const facturees = gardees.filter((v) => !sansPrix.includes(v));
   const familles: string[] = [];
-  for (const v of gardees) if (!familles.includes(v.ligne.famille)) familles.push(v.ligne.famille);
+  for (const v of facturees) if (!familles.includes(v.ligne.famille)) familles.push(v.ligne.famille);
   for (const f of familles) {
     titreDeRayon(f);
-    for (const v of gardees.filter((x) => x.ligne.famille === f)) {
+    const siennes = facturees.filter((x) => x.ligne.famille === f);
+    for (const v of siennes) {
       const l = v.ligne;
-      const qte = quantite(l.quantite, l.unite);
-      /*
-        CE QUI NE SE FACTURE PAS NE S'ÉCRIT PAS « 0,00 € » : un luminaire
-        n'est pas compté (cela dépend des envies), le support du tableau est
-        compris dans le coffret. Un zéro sur un devis se lit comme un oubli.
-      */
-      if (l.pu === 0 && l.total === 0) {
-        ligneDuTableau(l.libelle, qte, '—', /non compt/i.test(l.note ?? '') ? 'non compté' : 'compris', true);
-      } else if (v.puHt === null) {
-        ligneDuTableau(l.libelle, qte, 'à chiffrer', '—', true);
+      if (v.puHt === null) {
+        ligneDuTableau(l.libelle, nombre(l.quantite), l.unite, 'à chiffrer', '—', true);
       } else {
         /*
           HORS TAXES, LIGNE À LIGNE — revue « Nadia » : un devis d'artisan
@@ -7939,8 +8205,11 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
           prix de VENTE seulement : public ramené HT, ou achat × coefficient
           — le client ne lit ni l'un ni l'autre, il lit un prix.
         */
-        ligneDuTableau(l.libelle, qte, enEuros(v.puHt), enEuros(v.totalHt));
+        ligneDuTableau(l.libelle, nombre(l.quantite), l.unite, enEuros(v.puHt), enEuros(v.totalHt));
       }
+    }
+    if (familles.length > 1 && siennes.length > 1) {
+      sousTotalDeRayon(f, Math.round(siennes.reduce((s2, v) => s2 + v.totalHt, 0) * 100) / 100);
     }
     y -= 4;
   }
@@ -7948,7 +8217,7 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   const libresDe = (type: 'fourniture' | 'mainDOeuvre' | 'forfait') => prix.libres.filter((l) => l.type === type);
   const ecrireLibres = (type: 'fourniture' | 'mainDOeuvre' | 'forfait') => {
     for (const l of libresDe(type)) {
-      ligneDuTableau(l.designation || 'Ligne sans désignation', quantite(l.quantite, l.unite), enEuros(l.puHt), enEuros(l.totalHt));
+      ligneDuTableau(l.designation || 'Ligne sans désignation', nombre(l.quantite), l.unite, enEuros(l.puHt), enEuros(l.totalHt));
     }
   };
   if (libresDe('fourniture').length > 0) {
@@ -7956,26 +8225,47 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
     ecrireLibres('fourniture');
     y -= 4;
   }
-  place(24);
-  d.line(X0, y + 8, X1, y + 8, 0.8, INK);
-  d.text('Total fournitures HT', X0 + 8, y - 6, 10, INK, { bold: true, align: 'left' });
-  d.text(enEuros(t.fournituresHt), X1 - 6, y - 6, 10, INK, { bold: true, align: 'right' });
-  y -= 32;
+  sousTotal('Total fournitures HT', t.fournituresHt);
+  const enClair = (vs: typeof sansPrix) =>
+    vs.map((v) => `${v.ligne.libelle} (${nombre(v.ligne.quantite)} ${v.ligne.unite})`).join(', ');
+  const compris = sansPrix.filter((v) => !/non compt/i.test(v.ligne.note ?? ''));
+  const nonComptes = sansPrix.filter((v) => /non compt/i.test(v.ligne.note ?? ''));
+  const notesSansPrix = [
+    ...(compris.length > 0 ? [`Compris sans supplément : ${enClair(compris)}.`] : []),
+    ...(nonComptes.length > 0 ? [`Non chiffrés (luminaires au choix du client) : ${enClair(nonComptes)}.`] : []),
+  ];
+  if (notesSansPrix.length > 0) {
+    y += 10;
+    for (const n of notesSansPrix) {
+      for (const l of wrapText(n, 8, X1 - X0 - 16)) {
+        place(11, false);
+        d.text(l, X0 + 8, y, 8, GREY, { align: 'left' });
+        y -= 10;
+      }
+    }
+    y -= 12;
+  }
 
   // ------------------------------------------------- la main-d'œuvre
   // La même règle que l'écran et la pastille : voir `prixDuDevis`.
   const pose = poseComptee(prix.pose);
   if (pose || libresDe('mainDOeuvre').length > 0) {
+    rayonEnCours = null;
     place(60);
-    d.text(e.parLArtisan || !pose ? 'MAIN-D’ŒUVRE' : 'MAIN-D’ŒUVRE (ESTIMÉE)', X0 + 8, y, 7.5, GREY, { bold: true, align: 'left' });
+    const titreMO = e.parLArtisan || !pose ? 'Main-d’œuvre' : 'Main-d’œuvre (estimée)';
+    d.text(titreMO.toUpperCase(), X0 + 8, y, 7.5, GREY, { bold: true, align: 'left' });
+    rayonEnCours = titreMO;
     y -= 16;
     for (const l of pose?.lignes ?? []) {
       if (l.heures <= 0) continue;
       ligneDuTableau(
         `Pose — ${l.famille} (${l.quantite} point${l.quantite > 1 ? 's' : ''})`,
-        enHeures(l.heures),
-        `${enEuros(pose!.taux)} HT/h`,
-        `${enEuros(Math.round(l.heures * pose!.taux * 100) / 100)} HT`,
+        nombre(l.heures),
+        'h',
+        enEuros(pose!.taux),
+        // Le total de la ligne, arrondi une fois (`vendreLeDevis`) : la
+        // somme des lignes est le total de la main-d'œuvre.
+        enEuros(l.totalHt ?? Math.round(l.heures * pose!.taux * 100) / 100),
       );
     }
     ecrireLibres('mainDOeuvre');
@@ -7999,7 +8289,22 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
     bougé et que l'app n'a pas vérifiée. Elle dit désormais la condition
     connue, sous réserve, et rien de plus.
   */
+  const acompte = t.tauxAcompte > 0 && t.acompte > 0;
+  const solde = Math.round((t.ttc - t.acompte) * 100) / 100;
+  /*
+    L'ACOMPTE ÉCRIT DEPUIS SON TAUX — relecture « tableaux chiffrés » : la
+    phrase de paiement, tapée une fois, pouvait dire « 30 % » quand le
+    réglage en disait un autre. Le taux réglé écrit sa phrase, montants
+    compris ; un texte libre qui parle lui-même d'acompte lui cède la
+    place, les autres conditions restent telles que l'artisan les a écrites.
+  */
   const paiement = e.conditions?.paiement?.trim();
+  const phraseAcompte = acompte
+    ? `Acompte de ${pourcent(t.tauxAcompte / 100)} à la commande, soit ${enEuros(t.acompte)} TTC ; ` +
+      `solde de ${enEuros(solde)} TTC à la réception des travaux.`
+    : null;
+  const paiementParleDAcompte = !!paiement && /acompte|%/i.test(paiement);
+  const travaux = e.travaux;
   const mentions = [
     ...(t.tauxTva < TVA_DES_PRIX_PUBLICS
       ? [
@@ -8013,8 +8318,11 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
             : 'Main-d’œuvre estimée au temps de pose de chaque point, à confirmer après visite.',
         ]
       : []),
-    ...(paiement ? [`Conditions de paiement : ${paiement}`] : []),
+    `Début des travaux : ${travaux?.debut?.trim() || 'à convenir'} · durée : ${travaux?.duree?.trim() || 'à convenir'}.`,
+    ...(paiement && !(phraseAcompte && paiementParleDAcompte) ? [`Conditions de paiement : ${paiement}`] : []),
+    ...(phraseAcompte ? [phraseAcompte] : []),
     ...e.devis.exclusions.filter((x) => !(t.poseHt > 0 && /^Main-d/.test(x))),
+    ...(ent?.mediateur?.trim() ? [`Médiateur de la consommation : ${ent.mediateur.trim()}.`] : []),
   ];
   const lignesMentions = mentions.map((m) => wrapText(m, 7.5, X1 - X0));
   const bx = 300;
@@ -8025,14 +8333,14 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
     ['Total HT', t.ht],
     [`TVA ${pourcent(t.tauxTva)}`, t.tva],
   ];
-  const acompte = t.tauxAcompte > 0 && t.acompte > 0;
-  const hauteurTotal = lignesTotal.length * 14 + 30 + (acompte ? 16 : 0);
+  const hauteurTotal = lignesTotal.length * 14 + 30 + (acompte ? 30 : 0);
   /*
-    LE TOTAL, LES MENTIONS ET LE BON POUR ACCORD TIENNENT ENSEMBLE — revue
+    LE TOTAL, LES MENTIONS ET LES SIGNATURES TIENNENT ENSEMBLE — revue
     « Karim » : le cadre de signature partait seul en page 3. On réserve
     leur place d'un coup ; s'ils ne tiennent pas, ils passent ensemble.
   */
-  const hauteurFin = hauteurTotal + 18 + lignesMentions.reduce((h, ls) => h + ls.length * 10 + 2, 0) + 10 + 84;
+  const hauteurFin = hauteurTotal + 18 + lignesMentions.reduce((h, ls) => h + ls.length * 10 + 2, 0) + 10 + 92;
+  rayonEnCours = null;
   place(Math.min(hauteurFin, 560), false);
   d.rect(bx, y - hauteurTotal + 10, X1 - bx, hauteurTotal, '#F4F6FA', null, 0);
   let yt = y - 4;
@@ -8046,13 +8354,16 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   d.text('TOTAL TTC', bx + 10, yt, 12, INK, { bold: true, align: 'left' });
   d.text(enEuros(t.ttc), X1 - 10, yt, 13, INK, { bold: true, align: 'right' });
   /*
-    L'ACOMPTE, EN POUR CENT ET EN EUROS — relevé d'un électricien artisan :
-    le client signe un montant, pas un pourcentage.
+    L'ACOMPTE, EN POUR CENT ET EN EUROS, ET LE SOLDE — relevé d'un
+    électricien artisan : le client signe un montant, pas un pourcentage.
   */
   if (acompte) {
     yt -= 16;
     d.text(`Acompte ${pourcent(t.tauxAcompte / 100)} à la commande`, bx + 10, yt, 9, INK, { align: 'left' });
     d.text(`${enEuros(t.acompte)} TTC`, X1 - 10, yt, 9, INK, { align: 'right', bold: true });
+    yt -= 14;
+    d.text('Solde à la réception des travaux', bx + 10, yt, 9, GREY, { align: 'left' });
+    d.text(`${enEuros(solde)} TTC`, X1 - 10, yt, 9, INK, { align: 'right' });
   }
   y -= hauteurTotal + 18;
 
@@ -8065,19 +8376,27 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
     }
   }
 
-  // ------------------------------------------------ le bon pour accord
+  // ------------------------------------------------ les deux signatures
+  /*
+    LE CLIENT ET L'ENTREPRISE SIGNENT TOUS LES DEUX — relecture « structure » :
+    seul le client avait sa case. « Lu et approuvé, bon pour accord » est la
+    formule qu'il recopie ; l'artisan signe et tamponne à côté.
+  */
   y -= 10;
-  place(84, false);
+  place(92, false);
+  d.rect(X0, y - 72, cx - X0 - 20, 76, null, GREY_LIGHT, 0.6);
+  d.text('Pour l’entreprise — date, signature et cachet', X0 + 10, y - 10, 8, GREY, { align: 'left' });
   d.rect(cx, y - 72, X1 - cx, 76, null, GREY_LIGHT, 0.6);
-  d.text('Bon pour accord — date et signature du client', cx + 10, y - 10, 8, GREY, { align: 'left' });
+  d.text('Bon pour accord — « lu et approuvé »', cx + 10, y - 10, 8, INK, { align: 'left', bold: true });
+  d.text('Date et signature du client', cx + 10, y - 21, 8, GREY, { align: 'left' });
 
   // ------------------------------------------------------- les pieds de page
   const signe = ent ? `${ent.nom}${ent.siret ? ` · SIRET ${ent.siret}` : ''}` : 'EchoPlan';
   feuilles.forEach((f, i) => {
-    f.text(fitText(`${signe} · Devis n° ${e.numero} — page ${i + 1} / ${feuilles.length}`, 7.5, X1 - X0), PAGE_W / 2, 30, 7.5, GREY_LIGHT);
+    f.text(fitText(`${signe} · Devis n° ${e.numero} — page ${i + 1} / ${feuilles.length}`, 7.5, X1 - X0), PAGE_W / 2, 30, 7.5, GREY);
   });
   return buildDocument(feuilles.map((f) => f.stream()), [], {
-    titre: `Devis ${e.numero}${e.chantier.trim() ? ` \u2014 ${e.chantier.trim()}` : ''}`,
+    titre: `Devis ${e.numero}${e.chantier.trim() ? ` — ${e.chantier.trim()}` : ''}`,
     auteur: ent?.nom?.trim() || undefined,
   });
 }

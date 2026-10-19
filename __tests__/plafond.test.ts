@@ -865,7 +865,8 @@ describe('l’éclairage sur la feuille de métré', () => {
 
   it('compte les points, par pièce et au total — sans watts', () => {
     const vu = doc(PLAFOND);
-    expect(vu).toContain('Éclairage');
+    // La colonne dit ce qu'elle compte : les points AU PLAFOND (relecture « structure »).
+    expect(vu).toContain('Points au plafond');
     /*
       « POINTS », PAS « PTS » — et le nombre s'accorde.
 

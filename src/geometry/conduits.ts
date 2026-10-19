@@ -23,6 +23,7 @@
  */
 import { CEILINGS, type CeilingFixture } from './ceiling';
 import { longueurDuRuban } from './ruban';
+import { organesDuTableau } from './coffret';
 import { FIXTURES, postsOf, type Fixture } from './electrical';
 import type { Circuit } from './nfc15100';
 import type { TronconMetre } from './elecplan';
@@ -445,61 +446,18 @@ export function buyingList(
 ): BuyRow[] {
   const out: BuyRow[] = [];
   /*
-    L'INTERRUPTEUR GÉNÉRAL COMMANDE UN CONTACTEUR — revue « Mehdi » : il était
-    compté comme une commande de plus, sans rien au tableau. Il coupe
-    l'éclairage en sortant : c'est la bobine d'un contacteur de tableau
-    qu'il commande, et ce contacteur s'achète.
+    LES ORGANES DU TABLEAU — contacteurs et télérupteurs : la règle vit avec
+    le coffret qui leur fait place (`organesDuTableau`).
   */
-  if (fixtures.some((f) => postsOf(f.kind).includes('interGeneral'))) {
+  for (const o of organesDuTableau(fixtures, ceiling)) {
     out.push({
       family: 'Appareillage',
-      code: 'contacteur-ig',
-      label: 'Contacteur 2F 25 A',
-      spec: 'Au tableau, commandé par l’interrupteur général : il coupe l’éclairage',
-      quantity: 1,
+      code: o.code,
+      label: o.label,
+      spec: o.spec,
+      quantity: o.quantity,
       unit: 'u',
-    });
-  }
-  /*
-    LE CHAUFFE-EAU EN HEURES CREUSES A SON CONTACTEUR — revue « chantier » :
-    la note de son circuit le dit (« commandé par un contacteur heures
-    creuses ») ; le bordereau ne l'achetait pas. Un par chauffe-eau.
-  */
-  const chauffeEau = fixtures.filter((f) => f.kind === 'sortieCable' && f.usage === 'CU').length;
-  if (chauffeEau > 0) {
-    out.push({
-      family: 'Appareillage',
-      code: 'contacteur-jn',
-      label: 'Contacteur jour/nuit 20 A',
-      spec: 'Au tableau : le chauffe-eau chauffe en heures creuses',
-      quantity: chauffeEau,
-      unit: 'u',
-      note: 'un par chauffe-eau',
-    });
-  }
-  /*
-    LE POUSSOIR COMMANDE UN TÉLÉRUPTEUR — revue « Karim » : trois poussoirs
-    reliés à un point, et rien au tableau, alors que la fiche du poussoir
-    dit elle-même « télérupteur ». Un télérupteur par jeu de poussoirs qui
-    commande les mêmes points ; des poussoirs reliés à rien en demandent un.
-  */
-  const poussoirs = new Set(fixtures.filter((f) => f.kind === 'poussoir').map((f) => f.id));
-  if (poussoirs.size > 0) {
-    const jeux = new Set<string>();
-    for (const p of [...ceiling, ...fixtures]) {
-      const siens = (p.commands ?? []).filter((c) => poussoirs.has(c)).sort();
-      if (siens.length > 0) jeux.add(siens.join('|'));
-    }
-    const lies = new Set([...jeux].flatMap((j) => j.split('|')));
-    const telerupteurs = jeux.size + ([...poussoirs].some((p) => !lies.has(p)) ? 1 : 0);
-    out.push({
-      family: 'Appareillage',
-      code: 'telerupteur',
-      label: 'Télérupteur 16 A',
-      spec: 'Au tableau, commandé par les boutons-poussoirs',
-      quantity: telerupteurs,
-      unit: 'u',
-      note: 'un par groupe de poussoirs',
+      ...(o.note ? { note: o.note } : {}),
     });
   }
   const contacts = openings.filter((o) => o.detecteur).length;
@@ -568,7 +526,14 @@ export function buyingList(
   */
   const parBrin = new Map<
     string,
-    { section: number; wire: Wire; metres: number; bouts: number[] }
+    {
+      section: number;
+      wire: Wire;
+      metres: number;
+      bouts: number[];
+      /** Les mètres de ce conducteur, circuit par circuit (voir la note plus bas). */
+      parCircuit: Map<string, number>;
+    }
   >();
   for (const r of rows) {
     parConduit.set(
@@ -670,12 +635,14 @@ export function buyingList(
         if (e) {
           e.metres += b.cable;
           e.bouts.push(b.cable);
+          e.parCircuit.set(r.circuitId, (e.parCircuit.get(r.circuitId) ?? 0) + b.cable);
         } else {
           parBrin.set(cle, {
             section: r.section,
             wire: w,
             metres: b.cable,
             bouts: [b.cable],
+            parCircuit: new Map([[r.circuitId, b.cable]]),
           });
         }
       }
@@ -727,7 +694,19 @@ export function buyingList(
     (a, b) => a.section - b.section || ordre[a.wire.role] - ordre[b.wire.role],
   )) {
     if (e.metres <= 0) continue;
-    const paquetDuFil = couronnes(e.bouts, longueurDeCouronne(e.section));
+    const taille = longueurDeCouronne(e.section);
+    const paquetDuFil = couronnes(e.bouts, taille);
+    /*
+      LA MÊME RÈGLE QUE LE TIRAGE — relecture « tableaux chiffrés » : le tirage
+      arrondit chaque circuit au mètre supérieur (10 + 11 + 7 + 19 + 98 + 14 =
+      159 m), la note arrondissait la somme (« 156 m »). Elle additionne
+      maintenant les mêmes mètres, circuit par circuit, arrondis pareil ; et
+      un départ trop long dit SA longueur, pas celle de la couronne.
+    */
+    const metres = [...e.parCircuit.values()].reduce((t, v) => t + Math.ceil(v - 1e-9), 0);
+    const tropLongs = e.bouts.filter((l) => l > taille).sort((a, b) => b - a);
+    // Au décimètre SUPÉRIEUR : un départ de 10,04 m n'est pas « de 10 m ».
+    const enMetres = (l: number) => `${String(Math.ceil(l * 10 - 1e-9) / 10).replace('.', ',')} m`;
     out.push({
       family: 'Conduits et conducteurs',
       code: `fil-${e.section}-${e.wire.role}`,
@@ -742,17 +721,17 @@ export function buyingList(
         lesquels, parce que c'est la seule façon de vérifier un métré sans
         refaire le calcul.
       */
-      note: `${Math.round(e.metres)} m ${forfait ?? 'de parcours'}${
+      note: `${metres} m ${forfait ?? 'de parcours'}${
         e.wire.role === 'retour'
           ? ' — départs des commandes et des points lumineux'
           : e.wire.role === 'navette'
           ? ' — départs des commandes'
           : ''
       }${
-        paquetDuFil.horsGabarit > 0
-          ? ` · ${paquetDuFil.horsGabarit} départ${paquetDuFil.horsGabarit > 1 ? 's' : ''} plus long${
-              paquetDuFil.horsGabarit > 1 ? 's' : ''
-            } que la couronne : compté${paquetDuFil.horsGabarit > 1 ? 's' : ''} en couronnes entières, à rabouter en boîte ou à prendre à la coupe`
+        tropLongs.length > 0
+          ? ` · ${tropLongs.length > 1 ? 'départs' : 'départ'} de ${tropLongs.map(enMetres).join(', ')}, ` +
+            `plus long${tropLongs.length > 1 ? 's' : ''} que la couronne de ${taille} m : ` +
+            `compté${tropLongs.length > 1 ? 's' : ''} en couronnes entières, à rabouter en boîte ou à prendre à la coupe`
           : ''
       }`,
     });

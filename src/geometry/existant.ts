@@ -467,6 +467,8 @@ export function calibreMaxSection(section: number | undefined): number | null {
 
 /** « 2,5 » : une section à la française. */
 const enMm2 = (s: number) => String(s).replace('.', ',');
+/** « 3 circuits », « 1 circuit » : plus de « circuit(s) » sur un constat. */
+const auPluriel = (n: number, mot: string, pluriel = `${mot}s`) => `${n} ${n >= 2 ? pluriel : mot}`;
 
 /** Au-delà, le différentiel ne protège plus rien correctement. */
 export const MAX_CIRCUITS_PAR_DIFF = 8;
@@ -578,7 +580,7 @@ export function diagnosticExistant(
     dire({
       id: 'fusibles',
       gravite: 'danger',
-      titre: `${fusibles.length} porte-fusible(s) en service`,
+      titre: `${auPluriel(fusibles.length, 'porte-fusible')} en service`,
       detail:
         'Un porte-fusible ne coupe pas comme un disjoncteur, et son ' +
         'calibre est celui que l’occupant a bien voulu y remettre.',
@@ -602,7 +604,7 @@ export function diagnosticExistant(
       dire({
         id: 'hors-30ma',
         gravite: 'danger',
-        titre: `${nus.length} circuit(s) sans 30 mA en amont`,
+        titre: `${auPluriel(nus.length, 'circuit')} sans 30 mA en amont`,
         detail:
           'Ces départs ne sont derrière aucun différentiel 30 mA : un défaut ' +
           'sur leurs circuits passe par la personne.',
@@ -742,8 +744,8 @@ export function diagnosticExistant(
         gravite: 'ecart',
         titre: 'Pas de réserve dans le tableau',
         detail:
-          `${modulesLibres(departs, tableau.rangees, tableau.parRangee)} ` +
-          `module(s) libre(s) sur ${places} : la norme demande d’en garder ` +
+          `${auPluriel(modulesLibres(departs, tableau.rangees, tableau.parRangee), 'module libre', 'modules libres')} ` +
+          `sur ${places} : la norme demande d’en garder ` +
           'un cinquième pour les ajouts.',
         remede: 'Prévoir une rangée supplémentaire ou un tableau plus grand.',
       });
