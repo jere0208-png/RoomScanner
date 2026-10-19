@@ -19,7 +19,7 @@
  * cartouche en a un peu, la cote en a beaucoup (elle glisse le long de son
  * trait). Chacun s'écarte de ce qui est plus contraint que lui.
  */
-import { buildScanPdf } from '../src/export/pdf';
+import { buildScanPdf, largeurDuTexte } from '../src/export/pdf';
 import type { WallSeg } from '../src/geometry/floorplan';
 import type { CeilingFixture } from '../src/geometry/ceiling';
 
@@ -73,7 +73,8 @@ const motsDu = (source: string): Mot[] => {
 const emprise = (m: Mot) => ({
   x: m.x,
   y: m.y,
-  w: m.texte.length * m.taille * 0.5,
+  // La largeur RÉELLE (métriques d'Helvetica), celle que la mise en page mesure.
+  w: largeurDuTexte(m.texte, m.taille),
   h: m.taille,
 });
 
@@ -120,7 +121,8 @@ describe('la tête de la feuille du plan', () => {
 
   it('et garde la surface relevée, à la ligne s’il le faut', () => {
     const vu = motsDu(dossier(true)).map((m) => m.texte);
-    expect(vu.some((t) => t.includes('Surface relev'))).toBe(true);
+    // Coupée à la ligne au besoin, elle reste lue d'un trait.
+    expect(vu.join(' ').includes('Surface relev')).toBe(true);
   });
 
   it('ne déborde jamais de la feuille, boussole ou pas', () => {

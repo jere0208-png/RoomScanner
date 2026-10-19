@@ -118,8 +118,8 @@ describe('une élévation par face équipée', () => {
     const apresChambre = t.slice(t.indexOf(titres.find((x) => x.includes('côté Chambre'))!));
     const avantLAutre = apresChambre.includes('côté Séjour') ? apresChambre.slice(0, apresChambre.indexOf('côté Séjour')) : apresChambre;
     expect(avantLAutre).toMatch(/\| 110 \|/);
-    // Le cartouche le dit : ses deux faces.
-    expect(t).toContain('ses deux faces');
+    // Le cartouche le dit comme le sommaire : le mur et ses deux pièces.
+    expect(t).toContain('Mur 1 · Séjour / Chambre');
   });
 
   it('une seule face équipée : une seule feuille pour ce mur', () => {
@@ -226,7 +226,8 @@ describe('les gaines à la couleur de leur circuit', () => {
       ),
     );
     const t14 = texte(flux(src14).find((p) => texte(p).includes('Tirage par circuit'))!);
-    for (let k = 1; k <= 11; k++) expect(t14).toContain(`Circuit ${k} `.trim());
-    expect(t14).toContain('+ 3 circuits : voir le sch');
+    // Deux colonnes de sept : les quatorze tiennent, sans renvoi.
+    for (let k = 1; k <= 14; k++) expect(t14).toContain(`Circuit ${k} `.trim());
+    expect(t14).not.toContain('voir le sch');
   });
 });

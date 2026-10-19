@@ -1153,6 +1153,8 @@ const TETE = FRAME.y + FRAME.h - 30;
   H1 pour le titre de la feuille, H2 pour une section, H3 pour un intertitre.
 */
 export const TITRE_X = FRAME.x + 24;
+/** Un tableau déduit du plan ne se présente pas comme un relevé : une seule formule partout. */
+export const TITRE_TABLEAU_PROJETE = 'Tableau projeté (non relevé)';
 export const TITRE_Y = TETE + 2;
 export const TITRE_H1 = 13;
 export const TITRE_H2 = 11;
@@ -1395,7 +1397,7 @@ function drawLegendBox(
           symboleDeRetombee(d, { x: tx + 6, y: base + 2.6 }, ligne.retombee);
         } else if (ligne.echantillon) {
           const e = ligne.echantillon;
-          const lw = latin1(e.texte).length * 5.4 * 0.62 + 4;
+          const lw = largeurDuTexte(e.texte, 5.4, true) + 4;
           if (e.cerne) d.poly(rectArrondi(tx, base - 1.6, lw, 8.4, 2), '#FFFFFF', e.couleur, 0.6);
           d.text(e.texte, tx + lw / 2, base + 0.4, 5.4, e.couleur, { bold: true });
         } else if (ligne.couleur) {
@@ -1535,7 +1537,7 @@ function drawSheetChrome(
     // Revue « Marc » : « Lefèvre Plomberie Ch… » sur chaque feuille. Le nom
     // cède des points avant de céder des lettres, comme le projet.
     const corpsNom = [11, 10, 9, 8].find((t) => fitText(ent.nom, t, large) === ent.nom) ?? 8;
-    d.text(fitText(ent.nom, corpsNom, large), FRAME.x + 12, ty + 46, corpsNom, INK, { bold: true, align: 'left' });
+    d.text(fitText(ent.nom, corpsNom, large, true), FRAME.x + 12, ty + 46, corpsNom, INK, { bold: true, align: 'left' });
     const lignes = [
       ent.telephone,
       ent.email,
@@ -1602,7 +1604,9 @@ function drawSheetChrome(
       : info.particulier
         ? 'LOGEMENT'
         : 'PROJET';
-  etiquette(libelle, cols[0] + 12, ty + 24);
+  // Rien de renseigné : pas de seconde ligne. « PROJET / PROJET » répétait
+  // le nom juste au-dessus (revue « structure »).
+  if (aQui) etiquette(libelle, cols[0] + 12, ty + 24);
   /*
     SANS COUPER — relevé des revues du dossier : « 12 rue des Lila… » sur
     toutes les feuilles. Quand la ligne ne tient pas, le client et
@@ -1613,8 +1617,8 @@ function drawSheetChrome(
   if (surDeux) {
     d.text(fitText(info.client!, 7, width(0)), cols[0] + 12, ty + 14, 7, GREY, { align: 'left' });
     d.text(fitText(info.address!, 7, width(0)), cols[0] + 12, ty + 5.5, 7, GREY, { align: 'left' });
-  } else {
-    d.text(fitText(aQui || info.project, 8, width(0)), cols[0] + 12, ty + 12, 8, GREY, {
+  } else if (aQui) {
+    d.text(fitText(aQui, 8, width(0)), cols[0] + 12, ty + 12, 8, GREY, {
       align: 'left',
     });
   }
@@ -1684,7 +1688,8 @@ function drawSheetChrome(
     sur deux lignes ; et s'il déborde encore, il perd sa précision de queue
     (« , mur nord ») plutôt que des lettres au milieu d'un mot.
   */
-  const titreLarge = width(2) + 10;
+  // Huit points d'air avant le bord du cadre : collé au trait, le titre semblait en sortir.
+  const titreLarge = width(2) + 2;
   const corpsSeul = [8.5, 8, 7.5].find((t) => largeurDuTexte(info.sheetTitle, t) <= titreLarge);
   if (corpsSeul) {
     d.text(info.sheetTitle, cols[2] + 12, ty + 38, corpsSeul, INK, { align: 'left' });
@@ -1838,7 +1843,7 @@ function draw3DView(
       };
     });
   const largeurDe = (e: { nom: string; aire: string }) =>
-    Math.max(e.nom.length * 9 * 0.56, e.aire.length * 7.5 * 0.52);
+    Math.max(largeurDuTexte(e.nom, 9, true), largeurDuTexte(e.aire, 7.5));
   const marge = (cote: boolean) => {
     const siennes = etiquettes.filter((e) => e.gauche === cote);
     if (siennes.length === 0) return 0;
@@ -2357,6 +2362,7 @@ function planPage(
       sheetTitle: avecNiveau(extra?.title ?? 'Plan d’ensemble coté', ctx),
       sheet,
       scaleLabel: null,
+      releveLe: ctx.releveLe,
     });
     return d.stream();
   }
@@ -2617,12 +2623,12 @@ function planPage(
       Math.max(
         96,
         ...sections.flatMap((sec) => [
-          latin1(sec.titre ?? '').length * 6 * EM_TEXTE + CADRE_PUCE,
+          largeurDuTexte(sec.titre ?? '', 6, true) + CADRE_PUCE,
           ...sec.lignes.map(
             // La MÊME largeur de signe que `fitText`, qui décidera de couper
             // ou non : deux estimations divergentes, c'est un libellé qui
             // tient au calcul et se coupe au dessin.
-            (l) => latin1(l.texte).length * 7 * EM_TEXTE + CADRE_PUCE + 2,
+            (l) => largeurDuTexte(l.texte, 7) + CADRE_PUCE + 2,
           ),
         ]),
       ),
@@ -3171,7 +3177,7 @@ function planPage(
         const texte = lib.compte && /^\d+$/.test(lib.texte) ? `×${lib.texte}` : lib.texte;
         const dedans = lib.ou.x === 0 && lib.ou.y > 0;
         // Le rond fait treize unités de symbole : ce qui est plus large en sort.
-        const tientDansLeRond = texte.length * t * 0.56 <= 13 * ECHELLE_SYMBOLE;
+        const tientDansLeRond = largeurDuTexte(texte, t, true) <= 13 * ECHELLE_SYMBOLE;
         const essais = [
           ...(dedans && !tientDansLeRond ? [] : [lib.ou]),
           ...(dedans ? [{ x: 0, y: -9 }] : []),
@@ -3184,7 +3190,7 @@ function planPage(
           const anc = pointDuSymbole(ou, 0, 0, ECHELLE_SYMBOLE, versLeMur);
           const L = Math.hypot(anc.x, anc.y) || 1;
           const auCentre = ou === lib.ou && dedans;
-          const larg = texte.length * t * 0.5;
+          const larg = largeurDuTexte(texte, t, true);
           const haut = t * 0.72;
           const demi = auCentre ? 0 : (Math.abs(anc.x / L) * larg + Math.abs(anc.y / L) * haut) / 2;
           const mot = boiteDuMot(texte, q.x + (anc.x / L) * (L + demi), q.y + (anc.y / L) * (L + demi), t);
@@ -3622,7 +3628,7 @@ function planPage(
                 ]
               : [[area, (parts.length === 1 ? 12 : 9) * 1.05]];
           const larg =
-            Math.max(...lignes.map(([t, z]) => latin1(t).length * z)) * 0.52 + 8;
+            Math.max(...lignes.map(([t, z], k) => largeurDuTexte(t, z, k === 0))) + 8;
           const haut = label ? (avecAire ? 23 : 19) : avecAire ? 25 : 14;
           return {
             x: cx - larg / 2,
@@ -4169,7 +4175,7 @@ function planPage(
           const txt = frLen(valeur);
           const centre = surLigne((m.t0 + m.t1) / 2);
           const place = (m.t1 - m.t0) * longPage;
-          const largeurTxt = txt.length * 7 * 0.5;
+          const largeurTxt = largeurDuTexte(txt, 7);
           const places = [
             plus(centre, n, 5.2),
             plus(centre, n, -4.6),
@@ -4268,7 +4274,7 @@ function planPage(
         de tout son mur : elle cède la place.
       */
       const etroite = (w: WallSeg) =>
-        `${frLen(longueurCotee(walls, w, parts))} m`.length * 7.5 * 0.5 > Math.hypot(px(w.b).x - px(w.a).x, px(w.b).y - px(w.a).y) - 4;
+        largeurDuTexte(`${frLen(longueurCotee(walls, w, parts))} m`, 7.5) > Math.hypot(px(w.b).x - px(w.a).x, px(w.b).y - px(w.a).y) - 4;
       const cloisons = parLongueur.filter((w) => coteDehors(w) === 0);
       const parPlace = [...cloisons.filter(etroite).reverse(), ...cloisons.filter((w) => !etroite(w))];
       // Les pièces sur la feuille : une cote reste dans la pièce de son mur.
@@ -4343,7 +4349,7 @@ function planPage(
           la profondeur d'un placard, plutôt que de l'envoyer flotter dans la
           pièce voisine (revue « Claire »).
         */
-        const longueurMot = txt.length * 7.5 * 0.5;
+        const longueurMot = largeurDuTexte(txt, 7.5);
         const courte = longueurMot > longPage - 4;
         const audela = courte ? [-(longueurMot / 2 + 3) / longPage, 1 + (longueurMot / 2 + 3) / longPage] : [];
         // Et elle reste près de son mur : loin, rien ne dit plus ce qu'elle
@@ -4503,7 +4509,7 @@ function planPage(
         const avant = px(r.path[r.path.length - 2]);
         const cote = bout.x - avant.x >= 0 ? 1 : -1;
         const T = 5.8;
-        const larg = latin1(repere).length * T * 0.6 + 2;
+        const larg = largeurDuTexte(repere, T, true) + 2;
         // Quatre places autour du bout, la première libre l'emporte : jamais
         // sur une étiquette de pièce, une cote ou un symbole déjà posés.
         const places = [
@@ -4541,7 +4547,7 @@ function planPage(
     }
     // Le mot d'un symbole aussi : un lien ne barre pas « RJ45 ».
     for (const mot of motsDesSymboles.values()) {
-      const l = mot.texte.length * mot.taille * 0.5;
+      const l = largeurDuTexte(mot.texte, mot.taille, true);
       const h = mot.taille * 0.72;
       disquesElec.push({ x: mot.base.x, y: mot.base.y + h / 2, r: Math.hypot(l, h) / 2 + MARGE_LIEN });
     }
@@ -4771,7 +4777,7 @@ function planPage(
         // devant eux plutôt que de les barrer.
         const disquesDesMots = [
           ...[...motsDesSymboles.values()].map((mot) => {
-            const l = mot.texte.length * mot.taille * 0.5;
+            const l = largeurDuTexte(mot.texte, mot.taille, true);
             const h = mot.taille * 0.72;
             return { x: mot.base.x, y: mot.base.y + h / 2, r: Math.hypot(l, h) / 2 + 0.8 };
           }),
@@ -5008,7 +5014,7 @@ function planPage(
         const q = px(note.at);
         if (!dansLeCadre(q)) continue;
         const mot = fitText(note.text, 6.5, 150);
-        const larg = latin1(mot).length * 6.5 * 0.5 + 10;
+        const larg = largeurDuTexte(mot, 6.5) + 10;
         /*
           LA PUNAISE NE BOUGE PAS, LE MOT SI — ET IL PEUT ALLER LOIN.
 
@@ -5066,7 +5072,7 @@ function planPage(
       d.line(a.x, a.y, b.x, b.y, 0.7, BLEU_REGLE);
       for (const q of [a, b]) d.line(q.x - t.x, q.y - t.y, q.x + t.x, q.y + t.y, 0.7, BLEU_REGLE);
       const mot = `${(Math.hypot(m.b.x - m.a.x, m.b.z - m.a.z)).toFixed(2).replace('.', ',')} m`;
-      const larg = latin1(mot).length * 7 * 0.55 + 8;
+      const larg = largeurDuTexte(mot, 7, true) + 8;
       const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
       d.rect(c.x - larg / 2, c.y - 5.5, larg, 11, '#FFFFFF', BLEU_REGLE, 0.5);
       d.text(mot, c.x, c.y - 2.4, 7, BLEU_REGLE, { bold: true });
@@ -5120,9 +5126,13 @@ function planPage(
   // La somme des surfaces que le plan écrit, pièce par pièce (revue « Nadia »).
   const totalM2 = sommeEcrite(surfaces.map((p) => p.surface?.area ?? 0));
   const exact = surfaces.every((p) => p.surface?.exact);
+  // Les mots d'une mention restent ensemble (`LIE`) : « Surface » en fin de
+  // ligne et « relevée : 45,82 m² » sur la suivante ne se lisent pas.
+  const LIE = '\u0001';
+  const lier = (t: string) => t.replace(/ /g, LIE);
   const mentionSurface =
     totalM2 > 0
-      ? ` \u00b7 Surface ${estDessine(walls) ? 'au nu' : 'relev\u00e9e'} : ${exact ? '' : '\u2248 '}${frM2(totalM2)} m\u00b2`
+      ? ` \u00b7 ${lier(`Surface ${estDessine(walls) ? 'au nu' : 'relev\u00e9e'} : ${exact ? '' : '\u2248 '}${frM2(totalM2)} m\u00b2`)}`
       : '';
   const sous =
     (extra?.sub ??
@@ -5134,8 +5144,8 @@ function planPage(
           : 'Murs, ouvertures et surfaces relev\u00e9s au scan \u2014 cotes en m\u00e8tres.')) +
     (extra?.sub ? '' : mentionSurface) +
     // Le numéro d'un mur se dit : il renvoie à sa feuille d'élévation.
-    (!extra?.sub && wallNumbers(ctx).size > 0 ? ' \u00b7 N\u00b0 de mur : sa feuille d\u2019\u00e9l\u00e9vation.' : '');
-  d.text(titre, FRAME.x + 24, TETE, 13, INK, {
+    (!extra?.sub && wallNumbers(ctx).size > 0 ? ` \u00b7 ${lier('N\u00b0 de mur : sa feuille d\u2019\u00e9l\u00e9vation.')}` : '');
+  d.text(titre, TITRE_X, TITRE_Y, TITRE_H1, INK, {
     bold: true,
     align: 'left',
   });
@@ -5152,13 +5162,14 @@ function planPage(
     met, et c'est là qu'on va la chercher.
   */
   const largeurTexte = (t: string, taille: number) =>
-    latin1(t).length * taille * 0.5;
+    largeurDuTexte(t, taille);
   /* La place disponible s'arrête avant la rose, quand il y en a une. */
+  // … et avant « Nord non relevé » sinon, qu'il ne faut pas recouvrir non plus.
   const dispoTete =
     (ctx.north !== null && ctx.north !== undefined
       ? FRAME.x + FRAME.w - 72
-      : FRAME.x + FRAME.w - 24) -
-    (FRAME.x + 24);
+      : FRAME.x + FRAME.w - 24 - largeurDuTexte('Nord non relevé', 7) - 12) -
+    TITRE_X;
   /** Coupe au mot, à la largeur donnée : deux lignes au plus. */
   const enLignes = (t: string, large: number, max = 2) => {
     const mots = t.split(' ');
@@ -5166,7 +5177,7 @@ function planPage(
     let ligne = '';
     for (const mot of mots) {
       const essai = ligne ? `${ligne} ${mot}` : mot;
-      if (largeurTexte(essai, 8) <= large || !ligne) {
+      if (largeurTexte(essai.split(LIE).join(' '), 8) <= large || !ligne) {
         ligne = essai;
         continue;
       }
@@ -5175,10 +5186,11 @@ function planPage(
       if (out.length === max) break;
     }
     if (out.length < max && ligne) out.push(ligne);
-    return out;
+    // Un « · » ne commence ni ne finit une ligne : il sépare deux mentions.
+    return out.map((l) => l.split(LIE).join(' ').replace(/^\u00b7 /, '').replace(/ \u00b7$/, ''));
   };
   enLignes(sous, dispoTete).forEach((ligne, i) => {
-    d.text(ligne, FRAME.x + 24, TETE - 14 - i * 10, 8, GREY, { align: 'left' });
+    d.text(ligne, TITRE_X, TITRE_Y - 14 - i * 10, 8, GREY, { align: 'left' });
   });
 
   /**
@@ -5216,7 +5228,7 @@ function planPage(
   } else {
     // Sans boussole au relevé, on le dit : une feuille sans nord se lit
     // comme un oubli (revue « dessins »).
-    d.text('Nord non relevé', FRAME.x + FRAME.w - 24, TETE - 14, 7, GREY, { align: 'right' });
+    d.text('Nord non relevé', FRAME.x + FRAME.w - 24, TITRE_Y - 14, 7, GREY, { align: 'right' });
   }
 
   drawSheetChrome(d, {
@@ -5231,6 +5243,7 @@ function planPage(
     scaleLabel,
     scaleRatio: echelleRatio,
     metersToPoints: echellePtParM,
+    releveLe: ctx.releveLe,
   });
   return d.stream();
 }
@@ -5287,7 +5300,7 @@ function menuiseriesPage(
   const heads = ['Repère', 'Pièce', 'Type', 'L × H (m)', 'Allège (m)'];
   let y = TETE - 22;
   const titre = avecNiveau(tranche.page > 1 ? 'Menuiseries, suite' : 'Menuiseries', ctx);
-  d.text(titre, x0, y + 24, 13, INK, { bold: true, align: 'left' });
+  d.text(titre, TITRE_X, TITRE_Y, TITRE_H1, INK, { bold: true, align: 'left' });
   /*
     LES COTES À DROITE — relecture « tableaux chiffrés » : les nombres
     s'alignent sur leurs unités, l'en-tête avec eux.
@@ -5342,6 +5355,7 @@ function menuiseriesPage(
     sheetTitle: avecNiveau('Menuiseries', ctx),
     sheet,
     scaleLabel: null,
+    releveLe: ctx.releveLe,
   });
   return d.stream();
 }
@@ -5393,7 +5407,7 @@ function metrePage(
   let y = TETE - 22;
 
   const titre = avecNiveau(tranche.page > 1 ? 'Métré par pièce, suite' : 'Métré par pièce', ctx);
-  d.text(titre, x0, y + 24, 13, INK, { bold: true, align: 'left' });
+  d.text(titre, TITRE_X, TITRE_Y, TITRE_H1, INK, { bold: true, align: 'left' });
   for (let i = 0; i < heads.length; i++) {
     d.text(heads[i], xDe(i), y, i === 6 ? 8 : 8.5, GREY, { align: alignDe(i) });
   }
@@ -5499,6 +5513,7 @@ function metrePage(
       sheetTitle: avecNiveau('Métré par pièce', ctx),
       sheet,
       scaleLabel: null,
+      releveLe: ctx.releveLe,
     });
     return d.stream();
   }
@@ -5594,6 +5609,7 @@ function metrePage(
     sheetTitle: avecNiveau('Métré par pièce', ctx),
     sheet,
     scaleLabel: null,
+    releveLe: ctx.releveLe,
   });
   return d.stream();
 }
@@ -5638,9 +5654,9 @@ function achatsPage(
   let y = TETE - 22;
   d.text(
     ctx.particulier ? titreDesAchats(ctx) : `${titreDesAchats(ctx)} (peinture, sols) — hors devis`,
-    x0,
-    y + 24,
-    13,
+    TITRE_X,
+    TITRE_Y,
+    TITRE_H1,
     INK,
     { bold: true, align: 'left' },
   );
@@ -5787,6 +5803,7 @@ function achatsPage(
     sheetTitle: titreDesAchats(ctx),
     sheet,
     scaleLabel: null,
+    releveLe: ctx.releveLe,
   });
   return d.stream();
 }
@@ -5821,8 +5838,8 @@ function existantPage(
   );
 
   // Déduit du plan, il ne se fait pas passer pour un relevé (revue « Marc »).
-  const titre = tableau.projete ? 'Tableau projeté (déduit du plan)' : 'Installation existante';
-  d.text(titre, x0, y + 24, 13, INK, {
+  const titre = tableau.projete ? TITRE_TABLEAU_PROJETE : 'Installation existante';
+  d.text(titre, TITRE_X, TITRE_Y, TITRE_H1, INK, {
     bold: true,
     align: 'left',
   });
@@ -5859,7 +5876,7 @@ function existantPage(
   };
   const nomDe = (dep: (typeof tableau.departs)[number]) =>
     dep.organe === 'differentiel'
-      ? `${rang.get(dep.id) ?? 'ID'} — Différentiel ${dep.sensibilite ?? 30} mA${dep.typeDiff ? ` type ${dep.typeDiff}` : ''}`
+      ? `${rang.get(dep.id) ?? 'ID'} · ${dep.calibre ? `${dep.calibre} A ` : ''}${dep.sensibilite ?? 30} mA${dep.typeDiff ? ` type ${dep.typeDiff}` : ''}`
       : (NOM_ORGANE[dep.organe] ?? 'Organe');
   type Ligne = { dep: (typeof tableau.departs)[number]; retrait: boolean } | { titre: string };
   const lignes: Ligne[] = [];
@@ -5894,7 +5911,7 @@ function existantPage(
     const { dep, retrait } = l;
     const enTete = dep.organe === 'differentiel';
     const xNom = cols[0] + (retrait ? 14 : 0);
-    d.text(fitText(nomDe(dep), 9.5, cols[1] - xNom - 6), xNom, y, 9.5, INK, { align: 'left', bold: enTete });
+    d.text(fitText(nomDe(dep), 9.5, cols[1] - xNom - 6, enTete), xNom, y, 9.5, INK, { align: 'left', bold: enTete });
     d.text(dep.calibre ? `${dep.calibre} A` : '—', cols[1] + 40, y, 9.5, INK, { align: 'right' });
     const protege = [dep.usage, dep.piece].filter(Boolean).join(' · ');
     d.text(fitText(protege || '—', 9.5, x0 + w - cols[2]), cols[2], y, 9.5, GREY, { align: 'left' });
@@ -5977,6 +5994,7 @@ function existantPage(
     sheetTitle: titre,
     sheet,
     scaleLabel: null,
+    releveLe: ctx.releveLe,
   });
   return d.stream();
 }
@@ -6047,13 +6065,25 @@ function markerAt(d: Draw, at: Pt, texte: string, couleur: string, r = 7.5) {
   (15 pt de haut) débordait sur la ligne voisine, au pas de 13. Il est plus
   petit dans le tableau (`markerAt`, rayon 5,5), et le pas laisse de l'air.
 */
-const GABARIT_TIRAGE = { HAUT: 120, PAS: 15 };
+const GABARIT_TIRAGE = { PAS: 15, LIGNES_MAX: 12 };
+/*
+  UNE SEULE COLONNE TANT QU'ELLE TIENT — relecture finale : sur deux
+  colonnes de 210 points, « 2,5 mm² » se coupait en « 2,5 m… » et chaque nom
+  de circuit en « Lave-vaissell… », alors que la feuille gardait un grand
+  blanc entre le tableau et le plan (le plan est à 1:75, pas à 1:50 : il ne
+  remplit pas la largeur). Douze circuits tiennent sur une colonne pleine
+  largeur ; au-delà, deux colonnes.
+*/
+function dispositionDuTirage(n: number): { nCol: number; parColonne: number } {
+  const { LIGNES_MAX } = GABARIT_TIRAGE;
+  if (n <= LIGNES_MAX) return { nCol: 1, parColonne: Math.max(1, n) };
+  return { nCol: 2, parColonne: Math.min(LIGNES_MAX, Math.ceil(n / 2)) };
+}
 /** La hauteur que le tableau de tirage prend en haut de la feuille, cotes du plan comprises. */
 function hauteurDuTirage(n: number): number {
   if (n === 0) return 0;
-  const { HAUT, PAS } = GABARIT_TIRAGE;
-  const parColonne = Math.max(1, Math.floor((HAUT - 30) / PAS));
-  const nCol = n > parColonne ? 2 : 1;
+  const { PAS } = GABARIT_TIRAGE;
+  const { nCol, parColonne } = dispositionDuTirage(n);
   const lignes = Math.min(parColonne, Math.ceil(Math.min(n, parColonne * nCol) / nCol));
   // Titre, en-tête, lignes ; puis la place des chaînes de cotes qui pendent
   // au-dessus du plan, dans la marge du cadre.
@@ -6074,7 +6104,7 @@ function gainesPage(
   */
   const tirage: PlanOverlay = (d, _px, _scale, box) => {
     if (rows.length === 0) return;
-    const { HAUT, PAS } = GABARIT_TIRAGE;
+    const { PAS } = GABARIT_TIRAGE;
     /*
       LE TABLEAU SE POSE SOUS LE TITRE, pas sous le plan.
 
@@ -6090,8 +6120,7 @@ function gainesPage(
       se pose sur deux colonnes quand une ne suffit pas, et ce qui ne tient
       toujours pas renvoie au schéma, en toutes lettres.
     */
-    const parColonne = Math.max(1, Math.floor((HAUT - 30) / PAS));
-    const nCol = rows.length > parColonne ? 2 : 1;
+    const { nCol, parColonne } = dispositionDuTirage(rows.length);
     const capacite = parColonne * nCol;
     const affiches = rows.length > capacite ? rows.slice(0, capacite - 1) : rows;
     const reste = rows.length - affiches.length;
@@ -6108,7 +6137,11 @@ function gainesPage(
         et Conduit avaient de la place à revendre. Ces trois-là tiennent en
         quelques caractères ; le libellé prend le reste.
       */
-      const cols = [x0, x0 + 24, x0 + w * 0.6, x0 + w * 0.76, x0 + w * 0.85];
+      // Les trois colonnes courtes, mesurées sur ce qu'elles écrivent ; le nom prend le reste.
+      const larConduit = largeurDuTexte('ICTA Ø25', 8, true) + 6;
+      const larFils = largeurDuTexte('Fils', 7) + 10;
+      const larSection = largeurDuTexte('2,5 mm²', 8) + 10;
+      const cols = [x0, x0 + 24, x0 + w - larConduit - larFils - larSection, x0 + w - larConduit - larFils, x0 + w - larConduit];
       d.text('Rep.', cols[0], y, 7, GREY, { align: 'left' });
       d.text('Circuit', cols[1], y, 7, GREY, { align: 'left' });
       d.text('Section', cols[2], y, 7, GREY, { align: 'left' });
@@ -6259,11 +6292,11 @@ function unifilairePage(
   const w = FRAME.w - 60;
   let y = TETE - 22;
 
-  d.text('Schéma unifilaire', x0, y + 22, 13, INK, { bold: true, align: 'left' });
+  d.text('Schéma unifilaire', TITRE_X, TITRE_Y, TITRE_H1, INK, { bold: true, align: 'left' });
   d.text(
     'Origine, protections, départs. Sections et calibres selon NF C 15-100.',
-    x0,
-    y + 8,
+    TITRE_X,
+    TITRE_Y - 14,
     8,
     GREY,
     { align: 'left' },
@@ -6520,6 +6553,7 @@ function unifilairePage(
     sheetTitle: 'Schéma unifilaire',
     sheet,
     scaleLabel: null,
+    releveLe: ctx.releveLe,
   });
   return d.stream();
 }
@@ -6557,6 +6591,8 @@ function elevationPage(
   cliches: { im: PdfImage; along?: number }[],
   /** La face regardée ; par défaut, celle de la pièce qui a relevé le mur. */
   cote?: 1 | -1,
+  /** Le titre du sommaire (« Mur 6 · Entrée ») : le cartouche dit le même, en court. */
+  titreCourt?: string,
 ): string {
   const d = new Draw();
   const r = dessinerUneFace(d, ctx, wall, cliches, cote, CADRE_FEUILLE);
@@ -6569,11 +6605,12 @@ function elevationPage(
     address: ctx.address,
     // Le numéro du mur d'abord : c'est par lui qu'on retrouve la feuille
     // depuis le plan (cinq feuilles s'appelaient « côté Séjour »).
-    sheetTitle: r.titre,
+    sheetTitle: titreCourt ?? r.titre,
     sheet,
     // Plus d'arrondi : le cartouche dit l'échelle à laquelle on a tracé.
     scaleLabel: r.echelle.label,
     metersToPoints: r.echelle.ptParMetre,
+    releveLe: ctx.releveLe,
   });
   return d.stream();
 }
@@ -6611,6 +6648,8 @@ function elevationsDeDeuxFaces(
   a: FaceAElever,
   b: FaceAElever,
   echelle: EchelleChoisie,
+  /** Le titre du sommaire (« Mur 12 · Salle d'eau / Entrée ») : le cartouche dit le même. */
+  titreCourt?: string,
 ): string {
   const d = new Draw();
   const { haut, bas } = CADRE_FEUILLE;
@@ -6627,12 +6666,14 @@ function elevationsDeDeuxFaces(
     entreprise: ctx.entreprise,
     address: ctx.address,
     sheetTitle:
-      a.wall.id === b.wall.id
+      titreCourt ??
+      (a.wall.id === b.wall.id
         ? `${ra.titre.split(' — ')[0]} — ses deux faces`
-        : `${ra.titre.split(' — ')[0].replace(/^Mur /, 'Murs ')} et ${rb.titre.split(' — ')[0].replace(/^Mur /, '')}`,
+        : `${ra.titre.split(' — ')[0].replace(/^Mur /, 'Murs ')} et ${rb.titre.split(' — ')[0].replace(/^Mur /, '')}`),
     sheet,
     scaleLabel: echelle.label,
     metersToPoints: echelle.ptParMetre,
+    releveLe: ctx.releveLe,
   });
   return d.stream();
 }
@@ -6740,9 +6781,9 @@ function dessinerUneFace(
   const hautTitre = cadre.haut;
   d.text(
     `Élévation — ${numero ? `Mur ${numero} · ` : ''}${quoi}`,
-    FRAME.x + 30,
-    hautTitre,
-    13,
+    TITRE_X,
+    hautTitre === TETE ? TITRE_Y : hautTitre,
+    TITRE_H1,
     INK,
     { bold: true, align: 'left' },
   );
@@ -6773,8 +6814,8 @@ function dessinerUneFace(
   lignesSous.slice(0, 2).forEach((l, k) => {
     d.text(
       k === 1 && lignesSous.length > 2 ? fitText(lignesSous.slice(1).join(' '), 8, FRAME.w - 60) : l,
-      FRAME.x + 30,
-      hautTitre - 14 - k * 10,
+      TITRE_X,
+      (hautTitre === TETE ? TITRE_Y : hautTitre) - 14 - k * 10,
       8,
       GREY,
       { align: 'left' },
@@ -6871,7 +6912,7 @@ function dessinerUneFace(
     occupees.push({ x0: px(0) - 40, x1: cx - g.demiLarg, y0: cy - 3, y1: cy + 3 });
   }
   const occuper = (cx: number, y: number, texte: string, taille: number) => {
-    const w = texte.length * taille * EM_TEXTE;
+    const w = largeurDuTexte(texte, taille);
     occupees.push({ x0: cx - w / 2 - 2, x1: cx + w / 2 + 2, y0: y - 2, y1: y + taille + 1 });
   };
   for (const m of wallFurniture(face, ctx.objects ?? [], solY)) {
@@ -7011,7 +7052,7 @@ function dessinerUneFace(
 
   for (const { m, haut, bas, larg } of etiquettesMeubles) {
     const taille = 7;
-    const largeur = (t: string) => t.length * taille * EM_TEXTE;
+    const largeur = (t: string) => largeurDuTexte(t, taille);
     // Le nom qu'on lui a donné : « Douche à l'italienne », pas « Baignoire »
     // (revue « Marc ») ; et un évier de salle d'eau est un lavabo.
     const nom = nomDuMeuble(m, ((ctx.rooms ?? []).find((r) => r.id === m.roomId) as { kind?: RoomKind } | undefined)?.kind ?? null);
@@ -7085,7 +7126,7 @@ function dessinerUneFace(
       10, et le trait de cote touchait le 4 et le m.
     */
     const texteLong = `${face.len.toFixed(2).replace('.', ',')} m`;
-    const lt = latin1(texteLong).length * 10 * 0.56 + 10;
+    const lt = largeurDuTexte(texteLong, 10, true) + 10;
     d.rect(px(face.len / 2) - lt / 2, yCote - 6, lt, 12, '#FFFFFF', null);
     d.text(texteLong, px(face.len / 2), yCote - 3.5, 10, INK, { bold: true });
   }
@@ -7765,7 +7806,7 @@ function threeDPage(
     showDims,
   };
   const titre = combien > 1 ? `Perspective ${rang}` : 'Perspective';
-  d.text(titre, FRAME.x + 24, FRAME.y + FRAME.h - 20, 13, INK, {
+  d.text(titre, TITRE_X, TITRE_Y, TITRE_H1, INK, {
     bold: true,
     align: 'left',
   });
@@ -7797,6 +7838,7 @@ function threeDPage(
     sheetTitle: showDims ? `${titre} cotée` : titre,
     sheet,
     scaleLabel: null,
+    releveLe: ctx.releveLe,
   });
   return d.stream();
 }
@@ -8006,7 +8048,7 @@ export function boardRows(
 ): BoardRow[] {
   const rows: BoardRow[] = [];
   let numero = 0;
-  for (const diff of list.differentials) {
+  for (const [rangDiff, diff] of list.differentials.entries()) {
     // Par identifiant : deux circuits du même libellé restent deux (revue « Nicolas »).
     const proteges = circuitsDuDifferentiel(diff, list.circuits);
     // Le différentiel en tête, puis ses disjoncteurs, treize par treize.
@@ -8023,7 +8065,8 @@ export function boardRows(
           numero,
           marque: 'ID',
           largeur: 2,
-          legende: `${diff.label} — ${diff.rating} A · 30 mA · type ${diff.type}`,
+          // Nommé comme sur l'unifilaire : « ID1 · 40 A 30 mA type A ».
+          legende: `ID${rangDiff + 1} · ${diff.rating} A 30 mA type ${diff.type}`,
           differentiel: true,
         });
       }
@@ -8042,7 +8085,7 @@ export function boardRows(
       }
       const pris = modules.reduce((n, m) => n + m.largeur, 0);
       rows.push({
-        label: `${diff.label} · type ${diff.type}`,
+        label: `ID${rangDiff + 1} · ${diff.rating} A 30 mA type ${diff.type}`,
         modules,
         libres: Math.max(0, MODULES_PAR_RANGEE - pris),
       });
@@ -8123,7 +8166,7 @@ export function buildMaterialPdf(
     reprise = null;
     need(30 + premierBloc);
     y -= 6;
-    d.text(t, x0, y, 13, INK, { bold: true, align: 'left' });
+    d.text(t, x0, y, TITRE_H1, INK, { bold: true, align: 'left' });
     y -= 8;
     d.line(x0, y, x0 + w, y, 1, INK);
     y -= 16;
@@ -8214,7 +8257,7 @@ export function buildMaterialPdf(
     if (room.rows.length === 0) continue;
     // La pièce ne reste pas seule en bas de page : son nom et ses premières lignes passent ensemble.
     need(17 + Math.min(3, room.rows.length) * 15);
-    d.text(room.room, x0, y, 11, INK, { bold: true, align: 'left' });
+    d.text(room.room, x0, y, TITRE_H2, INK, { bold: true, align: 'left' });
     /*
       L'USAGE DÉDUIT NE SE RAPPELLE QUE S'IL APPREND QUELQUE CHOSE.
 
@@ -8488,21 +8531,22 @@ export function buildMaterialPdf(
   if (list.differentials.length > 0) {
     y -= 8;
     titre('Protection différentielle 30 mA', 40);
-    for (const diff of list.differentials) {
+    list.differentials.forEach((diff, rangDiff) => {
       // Le label porte déjà son type (« Différentiel type A 1 ») : le
       // répéter écrivait « type A … type A » sur chaque ligne. Et la liste
       // des circuits SE REPLIE : sur un T3, elle dépasse la ligne et
       // sortait tronquée en « Spéci… » — ce que protège un différentiel ne
       // se devine pas.
+      // Nommé comme sur l'unifilaire et la feuille du tableau : « ID1 · 40 A 30 mA type A ».
       const texteDiff =
-        `${diff.label} — ${diff.rating} A · 30 mA` +
+        `ID${rangDiff + 1} · ${diff.rating} A 30 mA type ${diff.type}` +
         (diff.circuits.length ? ` : ${diff.circuits.join(', ')}` : '');
       for (const l of wrapText(texteDiff, 10, w - 14)) {
         need(16);
         d.text(l, x0 + 14, y, 10, INK, { align: 'left' });
         y -= 15;
       }
-    }
+    });
     note(
       'Un différentiel de type A au minimum : les courants de défaut de la ' +
         'cuisson et du lave-linge peuvent comporter une composante continue ' +
@@ -8707,7 +8751,7 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   nouvellePage();
   const ent = e.entreprise?.nom ? e.entreprise : null;
   if (ent) {
-    d.text(fitText(ent.nom, 15, 270), X0, y, 15, INK, { bold: true, align: 'left' });
+    d.text(fitText(ent.nom, 15, 270, true), X0, y, 15, INK, { bold: true, align: 'left' });
     let yy = y - 16;
     /*
       LES MENTIONS DE L'ENTREPRISE — relecture « structure » : forme
@@ -8739,7 +8783,7 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
   const cx = 320;
   d.rect(cx, y - 62, X1 - cx, 70, null, GREY_LIGHT, 0.6);
   d.text('CLIENT', cx + 10, y - 4, 7, GREY, { align: 'left' });
-  d.text(fitText(e.client || '—', 11, X1 - cx - 20), cx + 10, y - 19, 11, INK, { bold: true, align: 'left' });
+  d.text(fitText(e.client || '—', 11, X1 - cx - 20, true), cx + 10, y - 19, 11, INK, { bold: true, align: 'left' });
   if (e.adresse) d.text(fitText(e.adresse, 9, X1 - cx - 20), cx + 10, y - 33, 9, INK, { align: 'left' });
   d.text(fitText(`Chantier : ${e.chantier}`, 8.5, X1 - cx - 20), cx + 10, y - 50, 8.5, GREY, { align: 'left' });
   const objet = `Objet : installation électrique${e.gamme ? `, appareillage ${e.gamme}` : ''}.`;
@@ -8945,7 +8989,10 @@ export function buildDevisPdf(e: DevisPourPdf): Uint8Array {
     « Karim » : le cadre de signature partait seul en page 3. On réserve
     leur place d'un coup ; s'ils ne tiennent pas, ils passent ensemble.
   */
-  const hauteurFin = hauteurTotal + 18 + lignesMentions.reduce((h, ls) => h + ls.length * 10 + 2, 0) + 10 + 92;
+  // Les totaux et leurs mentions restent ensemble ; les signatures, qui
+  // réservent leur propre place plus bas, peuvent passer à la page suivante —
+  // sans quoi une demi-page restait blanche et les totaux partaient seuls.
+  const hauteurFin = hauteurTotal + 18 + lignesMentions.reduce((h, ls) => h + ls.length * 10 + 2, 0);
   rayonEnCours = null;
   place(Math.min(hauteurFin, 560), false);
   d.rect(bx, y - hauteurTotal + 10, X1 - bx, hauteurTotal, '#F4F6FA', null, 0);
@@ -9208,7 +9255,7 @@ function gardePage(
 
   // Le logement.
   y -= 96;
-  d.text(fitText(ctx.name, 26, w), x0, y, 26, INK, { bold: true, align: 'left' });
+  d.text(fitText(ctx.name, 26, w, true), x0, y, 26, INK, { bold: true, align: 'left' });
   y -= 22;
   /*
     UN CHANTIER POUR L'ÉLECTRICIEN, UN LOGEMENT POUR LES AUTRES — revue
@@ -9361,6 +9408,7 @@ function gardePage(
     sheetTitle: 'Page de garde',
     sheet,
     scaleLabel: null,
+    releveLe: ctx.releveLe,
   });
   return d.stream();
 }
@@ -9746,11 +9794,11 @@ function planifierUnNiveau(
   */
   if (existant) {
     // Déduit du plan, il ne se présente pas comme un relevé (revue « Marc »).
-    const titre = existant.projete ? 'Tableau projeté (non relevé)' : 'Tableau existant';
+    const titre = existant.projete ? TITRE_TABLEAU_PROJETE : 'Tableau existant';
     electricite.push({
       genre: 'existant',
       titre,
-      intitule: existant.projete ? 'Tableau projeté (non relevé)' : 'Installation existante',
+      intitule: existant.projete ? TITRE_TABLEAU_PROJETE : 'Installation existante',
       partie: ELEC,
       fabriquer: (n) => existantPage(ctx, n, existant),
       depend: { ctx, lit: RIEN_DE_SELECTIF, args: [existant] },
@@ -9892,7 +9940,7 @@ function planifierUnNiveau(
         intitule: `${memeMur ? 'Élévation' : 'Élévations'} — ${titre}`,
         partie: ELEC,
         pieces: deux,
-        fabriquer: (n) => elevationsDeDeuxFaces(ctx, n, a, b, commune),
+        fabriquer: (n) => elevationsDeDeuxFaces(ctx, n, a, b, commune, titre),
         depend: { ctx, lit: LU_PAR_LES_FACES, args: [a, b, commune] },
       });
       continue;
@@ -9906,7 +9954,7 @@ function planifierUnNiveau(
       intitule: `Élévation — ${titre}`,
       partie: ELEC,
       pieces: nomDeLaPiece(a) ? [nomDeLaPiece(a)] : [],
-      fabriquer: (n) => elevationPage(ctx, n, a.wall, cliches, a.cote),
+      fabriquer: (n) => elevationPage(ctx, n, a.wall, cliches, a.cote, titre),
       // Une photo compte par ce que la page en écrit : son nom, sa taille,
       // sa cote — pas ses octets, qui vont au document, pas à la page.
       depend: {

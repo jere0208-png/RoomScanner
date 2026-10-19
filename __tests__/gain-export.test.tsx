@@ -413,16 +413,18 @@ describe('5. le cartouche dit ce qui est écrit dessous', () => {
     expect(perso).toContain('(12 rue des Lilas) Tj');
   });
 
-  it('rien de rempli : PROJET ou LOGEMENT et le nom du projet — ni FICHIER, ni .pdf, ni case vide', () => {
-    for (const [particulier, mot] of [
-      [false, 'PROJET'],
-      [true, 'LOGEMENT'],
-    ] as const) {
+  /*
+    RIEN DE REMPLI : PAS DE SECONDE LIGNE — relecture « structure » : le
+    cartouche écrivait « PROJET / PROJET Appartement exemple », le nom deux
+    fois l'un sous l'autre. Le projet reste en tête ; dessous, rien.
+  */
+  it('rien de rempli : le nom du projet une fois — ni FICHIER, ni .pdf, ni « PROJET » répété', () => {
+    for (const particulier of [false, true]) {
       const src = cartouche({ particulier });
       expect(src).not.toContain('FICHIER');
       expect(src).not.toMatch(/Appartement-exemple|\.pdf\) Tj/);
-      expect(src).toContain(`(${mot}) Tj`);
-      expect(src).toContain('(Appartement exemple) Tj');
+      expect(src.split('(Appartement exemple) Tj').length - 1).toBe(1);
+      expect(src).not.toContain('(LOGEMENT) Tj');
     }
   });
 });
