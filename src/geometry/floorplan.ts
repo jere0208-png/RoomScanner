@@ -1990,9 +1990,144 @@ export function roomSurface(walls: WallSeg[]): RoomSurface | null {
   */
   const { gardes, branches } = sansBranches(walls);
   const chain = longestChain(gardes);
-  if (chain.length < 3) return null;
-  const pts = coupeParLesBranches(chain, gardes, branches);
+  const pts = chain.length >= 3 ? coupeParLesBranches(chain, gardes, branches) : null;
+  /*
+    DEUX MURS MANQUÉS, PAS UN — revue « plan 2D » : une pièce dont le scan a
+    perdu deux murs qui ne se touchent pas ne laisse que des tronçons de
+    murs. La plus longue chaîne, seule, donnait 6 m² pour une pièce en L de
+    14 (ou rien du tout pour un rectangle dont il reste deux côtés opposés).
+    Les tronçons se raccordent bout à bout, le plus proche d'abord, et la
+    pièce se referme sur ses murs manquants — tant que le contour ainsi
+    refermé ne se recoupe pas. Un tronçon tout entier DANS la pièce que
+    referme la plus longue chaîne est une cloison libre, pas un bord : il
+    n'entre pas dans le contour.
+  */
+  const anneau = anneauDesTroncons(gardes, pts);
+  if (anneau && (!pts || loopAreaM2(anneau) >= loopAreaM2(pts) * 0.5)) {
+    return { pts: anneau, area: loopAreaM2(anneau), exact: false };
+  }
+  if (!pts) return null;
   return { pts, area: loopAreaM2(pts), exact: false };
+}
+
+/** Les tronçons de murs bout à bout : chaque suite qui ne passe que par des nœuds à deux murs. */
+function tronconsBoutABout(walls: WallSeg[]): Pt[][] {
+  const adj = new Map<string, WallSeg[]>();
+  for (const w of walls) for (const p of [w.a, w.b]) adj.set(nodeKey(p), [...(adj.get(nodeKey(p)) ?? []), w]);
+  const vus = new Set<WallSeg>();
+  const out: Pt[][] = [];
+  // On part d'un bout libre d'abord, puis de ce qui reste (une boucle).
+  const departs = [...walls].sort((v, w) => {
+    const libre = (x: WallSeg) => ((adj.get(nodeKey(x.a))?.length ?? 0) === 1 || (adj.get(nodeKey(x.b))?.length ?? 0) === 1 ? 0 : 1);
+    return libre(v) - libre(w);
+  });
+  for (const w0 of departs) {
+    if (vus.has(w0)) continue;
+    vus.add(w0);
+    const debut = (adj.get(nodeKey(w0.a))?.length ?? 0) === 1 ? w0.a : w0.b === w0.a ? w0.a : w0.a;
+    const pts: Pt[] = [debut, debut === w0.a ? w0.b : w0.a];
+    // Prolonger dans les deux sens, tant que le nœud n'a que deux murs.
+    for (const sens of [1, -1]) {
+      for (;;) {
+        const bout = sens === 1 ? pts[pts.length - 1] : pts[0];
+        const ici = adj.get(nodeKey(bout)) ?? [];
+        if (ici.length !== 2) break;
+        const suite = ici.find((x) => !vus.has(x));
+        if (!suite) break;
+        vus.add(suite);
+        const loin = nodeKey(suite.a) === nodeKey(bout) ? suite.b : suite.a;
+        if (sens === 1) pts.push(loin);
+        else pts.unshift(loin);
+      }
+    }
+    out.push(pts);
+  }
+  return out;
+}
+
+/**
+ * Les tronçons, raccordés en un contour : celui dont les raccords (les murs
+ * manquants) sont les plus courts, sans se recouper. Tous les ordres sont
+ * essayés jusqu'à cinq tronçons ; au-delà, on accroche de proche en proche.
+ * Null s'il n'y a qu'un tronçon, ou si aucun contour ne tient.
+ */
+function anneauDesTroncons(walls: WallSeg[], dejaFerme: Pt[] | null): Pt[] | null {
+  const dedans = (t: Pt[]) =>
+    !!dejaFerme && t.every((p) => insidePoly(p, dejaFerme) && signedDistToEdge(p, dejaFerme) > 0.05);
+  const tous = tronconsBoutABout(walls).filter((t) => t.length >= 2);
+  // Rien ne dépasse de la pièce déjà refermée (un refend qui la traverse,
+  // une cloison sur son bord) : il n'y a pas de mur manquant à retrouver.
+  if (dejaFerme && !tous.some((t) => t.some((p) => signedDistToEdge(p, dejaFerme) < -0.05))) return null;
+  const troncons = tous.filter((t) => !dedans(t));
+  if (troncons.length < 2) return null;
+  const dist = (p: Pt, q: Pt) => Math.hypot(p.x - q.x, p.z - q.z);
+  const longueur = (t: Pt[]) => t.reduce((s, p, i) => (i ? s + dist(p, t[i - 1]) : 0), 0);
+  troncons.sort((a, b) => longueur(b) - longueur(a));
+  const premier = troncons[0];
+  const autres = troncons.slice(1);
+  const assembler = (suite: Pt[][]): Pt[] => {
+    const anneau = [...premier];
+    for (const t of suite) {
+      const bout = anneau[anneau.length - 1];
+      const morceau = dist(t[0], bout) < 1e-6 ? t.slice(1) : t;
+      anneau.push(...morceau);
+    }
+    return anneau;
+  };
+  const raccords = (suite: Pt[][]): number => {
+    let total = 0;
+    let bout = premier[premier.length - 1];
+    for (const t of suite) {
+      total += dist(bout, t[0]);
+      bout = t[t.length - 1];
+    }
+    return total + dist(bout, premier[0]);
+  };
+  let mieux: Pt[] | null = null;
+  let cout = Infinity;
+  const essayer = (suite: Pt[][]) => {
+    const c = raccords(suite);
+    if (c >= cout) return;
+    const anneau = assembler(suite);
+    if (anneau.length < 3 || seRecoupe(anneau)) return;
+    mieux = anneau;
+    cout = c;
+  };
+  if (autres.length <= 4) {
+    // Tous les ordres, chaque tronçon dans les deux sens.
+    const permuter = (reste: Pt[][], suite: Pt[][]) => {
+      if (reste.length === 0) {
+        essayer(suite);
+        return;
+      }
+      reste.forEach((t, i) => {
+        const sans = [...reste.slice(0, i), ...reste.slice(i + 1)];
+        permuter(sans, [...suite, t]);
+        permuter(sans, [...suite, [...t].reverse()]);
+      });
+    };
+    permuter(autres, []);
+  } else {
+    // De proche en proche : le bout le plus proche d'abord.
+    const reste = [...autres];
+    const suite: Pt[][] = [];
+    let bout = premier[premier.length - 1];
+    while (reste.length > 0) {
+      let k = 0;
+      let retourne = false;
+      let d = Infinity;
+      reste.forEach((t, i) => {
+        if (dist(t[0], bout) < d) [d, k, retourne] = [dist(t[0], bout), i, false];
+        if (dist(t[t.length - 1], bout) < d) [d, k, retourne] = [dist(t[t.length - 1], bout), i, true];
+      });
+      const t = reste.splice(k, 1)[0];
+      const sens = retourne ? [...t].reverse() : t;
+      suite.push(sens);
+      bout = sens[sens.length - 1];
+    }
+    essayer(suite);
+  }
+  return mieux;
 }
 
 const cleNoeud = (p: Pt) => `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
@@ -2458,8 +2593,27 @@ function makePart(roomId: string, items: WallSeg[]): RoomPart {
     walls: items,
     surface,
     centroid,
-    labelAt: surface ? interiorPole(surface.pts) : centroid,
+    labelAt: surface ? placeDuNom(surface.pts, obstaclesDedans(items, surface.pts)) : centroid,
   };
+}
+
+/*
+  LE NOM DE LA PIÈCE NE SE POSE PAS SUR UN RETOUR DE CLOISON — revue
+  « plan 2D » : le point le plus au large ne regardait que le contour. Une
+  cloison qui part du mur et s'arrête au milieu de la pièce passait par ce
+  point, et « Séjour 12,00 m² » s'écrivait en travers du mur. Les murs de la
+  pièce qui ne sont pas sur son contour sont des obstacles.
+*/
+function obstaclesDedans(items: WallSeg[], contour: Pt[]): { a: Pt; b: Pt; demi: number }[] {
+  const out: { a: Pt; b: Pt; demi: number }[] = [];
+  for (const w of items) {
+    if (w.type !== 'wall' || segLength(w) < 0.05) continue;
+    const m = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
+    // Sur le contour : c'est un bord, déjà compté.
+    if (signedDistToEdge(m, contour) < 0.03) continue;
+    out.push({ a: w.a, b: w.b, demi: epaisseurDe(w) / 2 });
+  }
+  return out;
 }
 
 /** Ce qu'il faut savoir d'une pièce pour la dessiner : ses murs. */
@@ -2546,6 +2700,25 @@ export function roomParts(walls: WallSeg[], rooms?: RoomShape[]): RoomPart[] {
  */
 const massifsGardes = new WeakMap<RoomPart, { dedans: WallSeg[]; part: RoomPart }>();
 
+/** Les murs, par groupes reliés bout à bout (à 2 cm près). */
+function groupesRelies(walls: WallSeg[]): WallSeg[][] {
+  const restants = [...walls];
+  const out: WallSeg[][] = [];
+  const touche = (p: Pt, q: Pt) => Math.hypot(p.x - q.x, p.z - q.z) < 0.02;
+  while (restants.length > 0) {
+    const groupe = [restants.shift()!];
+    for (let k = 0; k < groupe.length; k++) {
+      const w = groupe[k];
+      for (let i = restants.length - 1; i >= 0; i--) {
+        const v = restants[i];
+        if ([v.a, v.b].some((p) => touche(p, w.a) || touche(p, w.b))) groupe.push(...restants.splice(i, 1));
+      }
+    }
+    out.push(groupe);
+  }
+  return out;
+}
+
 function sansLesMassifs(part: RoomPart, libres: WallSeg[]): RoomPart {
   const s = part.surface;
   if (libres.length === 0 || !s || s.pts.length < 3) return part;
@@ -2559,8 +2732,26 @@ function sansLesMassifs(part: RoomPart, libres: WallSeg[]): RoomPart {
   if (garde && garde.dedans.length === dedans.length && garde.dedans.every((w, i) => w === dedans[i])) {
     return garde.part;
   }
-  const couvert = dedans.reduce((t, w) => t + segLength(w) * epaisseurDe(w), 0);
-  const out = { ...part, surface: { ...s, area: Math.max(0, s.area - couvert) } };
+  /*
+    UN POTEAU RENDU EN QUATRE MURS FERMÉS se compte par l'aire qu'ils
+    entourent : leurs traits sont ses faces (un mur relevé d'un côté). Compter
+    longueur × épaisseur de chacun retirait 0,17 m² pour un poteau de 30 × 30.
+  */
+  const enBoucle = new Set<WallSeg>();
+  let couvert = 0;
+  for (const groupe of groupesRelies(dedans)) {
+    const boucle = groupe.length >= 3 ? closedLoop(groupe) : null;
+    if (!boucle) continue;
+    couvert += loopAreaM2(boucle);
+    for (const w of groupe) enBoucle.add(w);
+  }
+  couvert += dedans.filter((w) => !enBoucle.has(w)).reduce((t, w) => t + segLength(w) * epaisseurDe(w), 0);
+  // Et le nom de la pièce ne se pose pas dessus.
+  const labelAt = placeDuNom(s.pts, [
+    ...obstaclesDedans(part.walls, s.pts),
+    ...dedans.map((w) => ({ a: w.a, b: w.b, demi: epaisseurDe(w) / 2 })),
+  ]);
+  const out = { ...part, labelAt, surface: { ...s, area: Math.max(0, s.area - couvert) } };
   massifsGardes.set(part, { dedans, part: out });
   return out;
 }
@@ -2666,6 +2857,74 @@ function signedDistToEdge(p: Pt, poly: Pt[]): number {
   return inside ? best : -best;
 }
 
+/** Le centre de gravité d'un contour (la moyenne de ses sommets s'il est dégénéré). */
+function centreDeSurface(poly: Pt[]): Pt {
+  let a = 0;
+  let cx = 0;
+  let cz = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i];
+    const q = poly[(i + 1) % poly.length];
+    const k = p.x * q.z - q.x * p.z;
+    a += k;
+    cx += (p.x + q.x) * k;
+    cz += (p.z + q.z) * k;
+  }
+  if (Math.abs(a) < 1e-9) {
+    return { x: poly.reduce((t, p) => t + p.x, 0) / poly.length, z: poly.reduce((t, p) => t + p.z, 0) / poly.length };
+  }
+  return { x: cx / (3 * a), z: cz / (3 * a) };
+}
+
+/** La distance au mur ou à l'obstacle le plus proche, négative hors du contour. */
+function distanceAuLarge(q: Pt, poly: Pt[], obstacles: { a: Pt; b: Pt; demi: number }[]): number {
+  let d = signedDistToEdge(q, poly);
+  for (const o of obstacles) d = Math.min(d, pointOnSeg(q, o.a, o.b).dist - o.demi);
+  return d;
+}
+
+/**
+ * OÙ ÉCRIRE LE NOM D'UNE PIÈCE QUI A DES OBSTACLES — le plus près possible
+ * de l'endroit où on l'écrirait sans eux (le milieu de la pièce), mais assez
+ * au large pour son texte. Le point le plus au large de tous, lui, file dans
+ * un coin dès qu'un retour de cloison coupe la pièce : on ne le prend qu'en
+ * dernier recours.
+ */
+function placeDuNom(poly: Pt[], obstacles: { a: Pt; b: Pt; demi: number }[]): Pt {
+  const centre = interiorPole(poly);
+  if (obstacles.length === 0 || poly.length < 3) return centre;
+  const loin = interiorPole(poly, 0.05, obstacles);
+  const dLoin = distanceAuLarge(loin, poly, obstacles);
+  // Assez au large : soixante centimètres, ou presque tout ce que la pièce offre.
+  const seuil = Math.min(0.6, 0.8 * dLoin);
+  if (distanceAuLarge(centre, poly, obstacles) >= seuil) return centre;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const q of poly) {
+    minX = Math.min(minX, q.x);
+    maxX = Math.max(maxX, q.x);
+    minZ = Math.min(minZ, q.z);
+    maxZ = Math.max(maxZ, q.z);
+  }
+  const pas = Math.max(0.05, Math.max(maxX - minX, maxZ - minZ) / 60);
+  let mieux = loin;
+  let ecart = Math.hypot(loin.x - centre.x, loin.z - centre.z);
+  for (let x = minX; x <= maxX + 1e-9; x += pas) {
+    for (let z = minZ; z <= maxZ + 1e-9; z += pas) {
+      const e = Math.hypot(x - centre.x, z - centre.z);
+      if (e >= ecart) continue;
+      const q = { x, z };
+      if (distanceAuLarge(q, poly, obstacles) >= seuil) {
+        mieux = q;
+        ecart = e;
+      }
+    }
+  }
+  return mieux;
+}
+
 /**
  * Point le plus « au large » d'une pièce : celui qui maximise la distance au
  * mur le plus proche.
@@ -2675,10 +2934,20 @@ function signedDistToEdge(p: Pt, poly: Pt[]): number {
  * pièce et sa surface. On balaye donc une grille, puis on affine autour du
  * meilleur point tant que le pas dépasse la précision demandée.
  */
-export function interiorPole(poly: Pt[], precision = 0.05): Pt {
+export function interiorPole(
+  poly: Pt[],
+  precision = 0.05,
+  /**
+   * CE QUI EST DEDANS ET N'EST PAS DU SOL LIBRE — un retour de cloison, un
+   * poteau : le nom de la pièce ne s'y pose pas. Chaque obstacle est un
+   * segment et sa demi-épaisseur.
+   */
+  obstacles: { a: Pt; b: Pt; demi: number }[] = [],
+): Pt {
   if (poly.length < 3) {
     return poly[0] ?? { x: 0, z: 0 };
   }
+  const auLarge = (q: Pt) => distanceAuLarge(q, poly, obstacles);
   let minX = Infinity;
   let maxX = -Infinity;
   let minZ = Infinity;
@@ -2692,12 +2961,13 @@ export function interiorPole(poly: Pt[], precision = 0.05): Pt {
   const w = maxX - minX;
   const h = maxZ - minZ;
   let best = { x: minX + w / 2, z: minZ + h / 2 };
-  let bestD = signedDistToEdge(best, poly);
-  const N = 12;
+  let bestD = auLarge(best);
+  // Une grille assez fine pour ne pas manquer le bon bras d'une pièce en L, quelle que soit son orientation.
+  const N = 40;
   for (let i = 0; i <= N; i++) {
     for (let j = 0; j <= N; j++) {
       const p = { x: minX + (w * i) / N, z: minZ + (h * j) / N };
-      const d = signedDistToEdge(p, poly);
+      const d = auLarge(p);
       if (d > bestD) {
         bestD = d;
         best = p;
@@ -2719,7 +2989,7 @@ export function interiorPole(poly: Pt[], precision = 0.05): Pt {
       [-1, -1],
     ]) {
       const p = { x: best.x + dx * step, z: best.z + dz * step };
-      const d = signedDistToEdge(p, poly);
+      const d = auLarge(p);
       if (d > bestD) {
         bestD = d;
         best = p;
@@ -2728,7 +2998,29 @@ export function interiorPole(poly: Pt[], precision = 0.05): Pt {
     }
     if (!moved) step /= 2;
   }
-  return best;
+  /*
+    UN PLAN TOURNÉ GARDE SON ÉTIQUETTE AU MÊME ENDROIT — revue « plan 2D » :
+    dans une pièce à mur de biais, beaucoup de points sont aussi « au large »
+    les uns que les autres (le cercle inscrit glisse le long des deux murs
+    parallèles), et la grille, alignée sur les axes de l'écran, en prenait un
+    différent selon l'orientation du relevé : jusqu'à 78 cm d'écart. Parmi
+    les points presque aussi au large que le meilleur, le plus proche du
+    centre de la pièce l'emporte — un choix qui ne dépend pas des axes.
+  */
+  const tol = Math.max(0.02, 0.03 * bestD);
+  const centre = centreDeSurface(poly);
+  const loin = (q: Pt) => Math.hypot(q.x - centre.x, q.z - centre.z);
+  let choisi = best;
+  const essayer = (q: Pt) => {
+    if (loin(q) < loin(choisi) && auLarge(q) >= bestD - tol) choisi = q;
+  };
+  for (let i = 0; i <= N; i++) for (let j = 0; j <= N; j++) essayer({ x: minX + (w * i) / N, z: minZ + (h * j) / N });
+  // Puis on resserre autour du point choisi, à la précision demandée.
+  for (let pas = Math.max(w, h) / N; pas > precision / 4; pas /= 4) {
+    const c = choisi;
+    for (let i = -4; i <= 4; i++) for (let j = -4; j <= 4; j++) essayer({ x: c.x + (i * pas) / 2, z: c.z + (j * pas) / 2 });
+  }
+  return choisi;
 }
 
 /**
