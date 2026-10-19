@@ -132,6 +132,12 @@ describe('la rallonge que RoomPlan nomme lui-même', () => {
 });
 
 describe('ce qui n’est pas un L reste à sa place', () => {
+  it('un fauteuil posé au bout du canapé, à côté de lui, même à quelques centimètres', () => {
+    // Tout entier au-delà du bout droit (1,20), à 2 cm : un fauteuil, pas une méridienne.
+    const aCote = objet('fauteuil', 'chair', 1.2 + 0.02 + 0.425, -0.75, 0.8, 0.85, 0.8, Math.PI / 2);
+    expect(reunirLesCanapesDAngle([CANAPE, aCote])).toHaveLength(2);
+  });
+
   it('un fauteuil à un mètre du canapé', () => {
     const loin = objet('fauteuil', 'chair', 2.4, -0.9, 0.85, 0.85, 0.8);
     expect(reunirLesCanapesDAngle([CANAPE, loin])).toHaveLength(2);

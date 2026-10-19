@@ -1451,16 +1451,29 @@ export function separerMeubles<
   const encastre = (a: T, b: T) =>
     (ENCASTRABLE.test(a.category ?? '') && /storage|cabinet/i.test(b.category ?? '') && coins(a).every((p) => dedans(p, b, 0.05))) ||
     (ENCASTRABLE.test(b.category ?? '') && /storage|cabinet/i.test(a.category ?? '') && coins(b).every((p) => dedans(p, a, 0.05)));
+  /*
+    DEUX MEUBLES LOIN L'UN DE L'AUTRE NE COÛTENT RIEN — rejeu d'un gros
+    relevé (30 pièces, 200 meubles) : trois passes sur toutes les paires,
+    chacune copiant les deux meubles et testant l'encastrement, prenaient la
+    moitié de la fin de scan. Deux boîtes dont les cercles circonscrits ne
+    se touchent pas sont séparées (et ne peuvent rien encastrer) : on les
+    écarte d'emblée, avant toute copie. Le résultat ne change pas.
+  */
+  const rayons = objets.map((e) => Math.hypot(e.width, e.depth) / 2);
   // Trois passes : séparer deux meubles peut en rapprocher un troisième.
   for (let passe = 0; passe < 3; passe++) {
     for (let i = 0; i < objets.length; i++) {
       for (let j = i + 1; j < objets.length; j++) {
+        // À des étages différents, ils ne se gênent pas.
+        const haut = Math.min(objets[i].y1, objets[j].y1) - Math.max(objets[i].y0, objets[j].y0);
+        if (haut <= FRANC) continue;
+        const ecartX = objets[i].cx + bouges[i].dx - (objets[j].cx + bouges[j].dx);
+        const ecartZ = objets[i].cz + bouges[i].dz - (objets[j].cz + bouges[j].dz);
+        const portee = rayons[i] + rayons[j];
+        if (ecartX * ecartX + ecartZ * ecartZ > portee * portee) continue;
         const a = { ...objets[i], cx: objets[i].cx + bouges[i].dx, cz: objets[i].cz + bouges[i].dz };
         const b = { ...objets[j], cx: objets[j].cx + bouges[j].dx, cz: objets[j].cz + bouges[j].dz };
         if (encastre(a, b)) continue;
-        // À des étages différents, ils ne se gênent pas.
-        const haut = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
-        if (haut <= FRANC) continue;
         const axes: Pt[] = [];
         for (const n of [
           { x: Math.cos(a.yaw), z: Math.sin(a.yaw) },
@@ -3994,12 +4007,15 @@ export function facadesDePlacard<S extends WallSeg>(
     const nrm = { x: -rf.u.z, z: rf.u.x };
     const d = WALL_T / 2 + 0.25;
     const piece = (p: Pt) => contours().findIndex((c) => insidePoly(p, c));
-    const p1 = piece({ x: m.x + nrm.x * d, z: m.z + nrm.z * d });
-    const p2 = piece({ x: m.x - nrm.x * d, z: m.z - nrm.z * d });
-    const entreDeuxPieces = p1 >= 0 && p2 >= 0 && p1 !== p2;
+    const entreDeuxPieces = () => {
+      const p1 = piece({ x: m.x + nrm.x * d, z: m.z + nrm.z * d });
+      const p2 = piece({ x: m.x - nrm.x * d, z: m.z - nrm.z * d });
+      return p1 >= 0 && p2 >= 0 && p1 !== p2;
+    };
+    // Les pièces ne se cherchent (tout le graphe des murs) que si elles décident.
     const estPlacard =
       !!meuble ||
-      (!entreDeuxPieces && ((niche && (toutHaut || L > LARGEUR_PLACARD)) || (toutHaut && L > LARGEUR_PLACARD)));
+      (((niche && (toutHaut || L > LARGEUR_PLACARD)) || (toutHaut && L > LARGEUR_PLACARD)) && !entreDeuxPieces());
     if (!estPlacard) continue;
     if (meuble) meublesDuPlacard.add(meuble.id);
     const haut = Math.max(...groupe.map((g) => g.yCenter + g.height / 2));
@@ -4057,13 +4073,24 @@ export function facadesDePlacard<S extends WallSeg>(
  */
 export function baiesHorsDesAngles<O extends WallSeg>(openings: O[], tousLesMurs: WallSeg[]): O[] {
   let change = false;
+  // Un tableau par étage, le même pour toutes ses baies : les faces des murs
+  // (`facesDesMurs`, gardées par tableau) ne se recalculent plus à chaque baie.
+  const parNiveau = new Map<number, WallSeg[]>();
+  const mursDuNiveau = (n: number) => {
+    let m = parNiveau.get(n);
+    if (!m) {
+      m = tousLesMurs.filter((w) => niveauDe(w) === n);
+      parNiveau.set(n, m);
+    }
+    return m;
+  };
   const out = openings.map((o) => {
     /*
       LES MURS DE SON ÉTAGE — revue « Nadia » : rouverte, la fenêtre de la
       salle de bains, à l'étage, se cherchait un mur parmi ceux des deux
       niveaux et se recalait sur l'angle du WC du dessous : 30 cm de glissé.
     */
-    const walls = tousLesMurs.filter((w) => niveauDe(w) === niveauDe(o));
+    const walls = mursDuNiveau(niveauDe(o));
     const mur = murDeLOuverture(o, walls);
     if (!mur) return o;
     const L = segLength(mur);

@@ -114,6 +114,15 @@ function enL(canape: ObjectData, piece: ObjectData): Reunion | null {
     const dehors = Math.max(s * x0, s * x1);
     const dedans = Math.min(s * x0, s * x1);
     if (dehors < W - 0.25 || dedans < W - 1.3 || dedans > W + colle) continue;
+    /*
+      UN FAUTEUIL À CÔTÉ DU CANAPÉ N'EST PAS SA MÉRIDIENNE — rejeu bruité des
+      relevés : le fauteuil posé au bout du canapé, tout entier au-delà de
+      lui, disparaissait dans un L dès que le relevé le rapprochait de
+      quelques centimètres. Une méridienne que RoomPlan appelle « chaise »
+      s'assoit DEVANT le bout du canapé : elle en recouvre l'assise. Un
+      second canapé ou une rallonge nommée gardent la règle d'avant.
+    */
+    if (!nommee && !CANAPE.test(piece.category ?? '') && dedans > W - 0.15) continue;
     // Une méridienne, pas un second canapé entier.
     if (dehors - dedans > 1.3) continue;
     return {

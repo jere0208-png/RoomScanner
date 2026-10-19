@@ -24,7 +24,7 @@
  */
 import { estUnCaisson } from './caisson';
 import type { ObjectData } from 'react-native-room-scan';
-import { demiFacesDe, segLength, solDesMurs, type Pt, type WallSeg } from './floorplan';
+import { demiFacesDe, segLength, solDesMurs, type DemiFaces, type Pt, type WallSeg } from './floorplan';
 
 /** Jusqu'où un meuble est réputé « contre » un mur (m). */
 const ECART_MAX = 0.2;
@@ -61,13 +61,36 @@ function repereDe(o: ObjectData): Repere {
  * null. `n` : la normale sortante du côté ; `t` : sa direction ; `m` : son
  * milieu ; `demi` : sa demi-longueur.
  */
-function ecartAuMur(m: Pt, n: Pt, t: Pt, demi: number, walls: WallSeg[]): number | null {
+/*
+  LES MURS LUS UNE FOIS — leur longueur, leur direction, leurs faces, gardées
+  par tableau de murs (comme `facesDesMurs`) : chaque côté de chaque meuble
+  les parcourt tous, à chaque passe.
+*/
+interface MurLu {
+  w: WallSeg;
+  L: number;
+  u: Pt;
+  f: DemiFaces;
+}
+const mursLus = new WeakMap<WallSeg[], MurLu[]>();
+function lireLesMurs(walls: WallSeg[]): MurLu[] {
+  let lus = mursLus.get(walls);
+  if (!lus) {
+    lus = [];
+    for (const w of walls) {
+      if (w.type !== 'wall') continue;
+      const L = segLength(w);
+      if (L < 0.05) continue;
+      lus.push({ w, L, u: { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L }, f: demiFacesDe(walls, w) });
+    }
+    mursLus.set(walls, lus);
+  }
+  return lus;
+}
+
+function ecartAuMur(m: Pt, n: Pt, t: Pt, demi: number, walls: WallSeg[], centre: Pt = m): number | null {
   let mieux: number | null = null;
-  for (const w of walls) {
-    if (w.type !== 'wall') continue;
-    const L = segLength(w);
-    if (L < 0.05) continue;
-    const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
+  for (const { w, L, u, f } of lireLesMurs(walls)) {
     if (Math.abs(u.x * t.x + u.z * t.z) < PARALLELE) continue;
     // La distance de la ligne du mur au côté, le long de la normale.
     const loin = (w.a.x - m.x) * n.x + (w.a.z - m.z) * n.z;
@@ -76,8 +99,14 @@ function ecartAuMur(m: Pt, n: Pt, t: Pt, demi: number, walls: WallSeg[]): number
       demi-épaisseur. Le trait d'un mur scanné EST sa face (voir
       `facesDesMurs`) : le frigo calé à 7 cm du nu se cale contre lui.
     */
-    const f = demiFacesDe(walls, w);
-    const cote = (m.x - w.a.x) * -u.z + (m.z - w.a.z) * u.x >= 0 ? f.plus : f.moins;
+    /*
+      LE CÔTÉ DU MUR SE LIT AU CENTRE DU MEUBLE, pas au milieu de son côté —
+      rejeu des relevés du patron : un lave-linge relevé pile contre le mur
+      (son côté SUR le trait) tombait du mauvais côté au centième près ; on
+      prenait la face de l'autre côté (14 cm), le mur sortait du compte, et
+      l'alignement de cuisine faisait glisser l'appareil… dans ce mur.
+    */
+    const cote = (centre.x - w.a.x) * -u.z + (centre.z - w.a.z) * u.x >= 0 ? f.plus : f.moins;
     const ecart = loin - cote;
     if (ecart < -MORSURE_MAX || ecart > ECART_MAX) continue;
     // Le mur couvre-t-il au moins la moitié du côté ?
@@ -105,6 +134,7 @@ export function calerDansLaNiche<O extends ObjectData>(o: O, walls: WallSeg[]): 
       autre,
       demiAutre,
       walls,
+      r.c,
     );
   // Les deux côtés de la largeur (±x local), puis le dos (+z local).
   const gauche = cote(r.ex, r.ez, r.w / 2, r.d / 2, -1);
@@ -170,6 +200,28 @@ function emprise(o: ObjectData): Pt[] {
   }));
 }
 
+/**
+ * DEUX MEUBLES ASSEZ PROCHES POUR SE TOUCHER ? — leurs cercles circonscrits,
+ * agrandis de `marge`, se recoupent. Faux : ils sont plus loin que `marge`
+ * l'un de l'autre, et tout calcul d'emprise est inutile (rejeu d'un gros
+ * relevé : deux cents meubles, toutes les paires, à chaque passe).
+ */
+const rayons = new WeakMap<ObjectData, number>();
+const rayonDe = (o: ObjectData) => {
+  let r = rayons.get(o);
+  if (r === undefined) {
+    r = Math.hypot(o.width, o.depth) / 2;
+    rayons.set(o, r);
+  }
+  return r;
+};
+function assezProches(a: ObjectData, b: ObjectData, marge: number): boolean {
+  const dx = a.transform[12] - b.transform[12];
+  const dz = a.transform[14] - b.transform[14];
+  const portee = rayonDe(a) + rayonDe(b) + marge;
+  return dx * dx + dz * dz <= portee * portee;
+}
+
 /** Deux emprises convexes se chevauchent-elles de plus d'un centimètre ? */
 function chevauchent(p: Pt[], q: Pt[]): boolean {
   for (const poly of [p, q]) {
@@ -201,7 +253,12 @@ export function calerLesMeubles<O extends ObjectData>(objets: O[], walls: WallSe
     const apres = emprise(cale);
     // Le caisson sous plafond est au-dessus : il ne gêne aucun meuble posé au sol.
     const gene = objets.some(
-      (v) => v !== o && !estUnCaisson(v) && chevauchent(apres, emprise(v)) && !chevauchent(avant, emprise(v)),
+      (v) =>
+        v !== o &&
+        !estUnCaisson(v) &&
+        assezProches(cale, v, 0) &&
+        chevauchent(apres, emprise(v)) &&
+        !chevauchent(avant, emprise(v)),
     );
     if (gene) return o;
     change = true;
@@ -219,8 +276,14 @@ const SUSPENDU = 1.0;
 
 const ENCASTRABLE = /refrigerator|fridge|washer|dryer|dishwasher|oven|stove|storage|cabinet|wardrobe|placard|sink/i;
 
+const alignables = new WeakMap<ObjectData, boolean>();
 function sAligne(o: ObjectData): boolean {
-  return (o.height ?? 0) >= 0.1 && ENCASTRABLE.test(o.category ?? '') && !estUnCaisson(o) && !/tapis|rug/i.test(o.category ?? '');
+  let oui = alignables.get(o);
+  if (oui === undefined) {
+    oui = (o.height ?? 0) >= 0.1 && ENCASTRABLE.test(o.category ?? '') && !estUnCaisson(o) && !/tapis|rug/i.test(o.category ?? '');
+    alignables.set(o, oui);
+  }
+  return oui;
 }
 
 /** La hauteur commune de deux meubles (m). */
@@ -239,7 +302,9 @@ function enHauteur(a: ObjectData, b: ObjectData): number {
 function ecartAuVoisin(o: ObjectData, r: Repere, signe: 1 | -1, objets: ObjectData[]): number | null {
   let mieux: number | null = null;
   for (const v of objets) {
-    if (v === o || v.id === o.id || !sAligne(v) || enHauteur(o, v) < 0.2) continue;
+    // Plus loin que l'écart qu'on referme : ce voisin ne compte pas.
+    if (v === o || !assezProches(o, v, ECART_CUISINE + 0.05)) continue;
+    if (v.id === o.id || !sAligne(v) || enHauteur(o, v) < 0.2) continue;
     const q = repereDe(v);
     const ax = Math.abs(q.ex.x * r.ex.x + q.ex.z * r.ex.z);
     const az = Math.abs(q.ez.x * r.ex.x + q.ez.z * r.ex.z);
@@ -258,7 +323,7 @@ function ecartAuVoisin(o: ObjectData, r: Repere, signe: 1 | -1, objets: ObjectDa
 
 /** Deux meubles se gênent : leurs emprises se chevauchent, à la même hauteur. */
 function seGenent(a: ObjectData, b: ObjectData): boolean {
-  return enHauteur(a, b) > 0.05 && chevauchent(emprise(a), emprise(b));
+  return enHauteur(a, b) > 0.05 && assezProches(a, b, 0) && chevauchent(emprise(a), emprise(b));
 }
 
 /** Le meuble aligné sur ses murs et ses voisins, ou null s'il l'est déjà. */
@@ -277,6 +342,7 @@ function alignerLeMeuble<O extends ObjectData>(o: O, objets: ObjectData[], walls
         r.ex,
         r.w / 2,
         walls,
+        r.c,
       ),
     );
   const devant = dosAuMur(-1);
@@ -292,6 +358,7 @@ function alignerLeMeuble<O extends ObjectData>(o: O, objets: ObjectData[], walls
       r.ez,
       r.d / 2,
       walls,
+      r.c,
     );
     const voisin = ecartAuVoisin(o, r, signe, objets);
     const tous = [mur, voisin].filter((e): e is number => e !== null && e >= -CHEVAUCHE_MAX);
@@ -301,7 +368,9 @@ function alignerLeMeuble<O extends ObjectData>(o: O, objets: ObjectData[], walls
   const droite = bout(1);
   let w = r.w;
   let glisseX = 0;
-  if (suspendu || (gauche !== null && droite !== null && gauche + droite <= ECART_CUISINE)) {
+  // Un appareil a sa largeur normalisée : il glisse, il ne s'élargit pas.
+  const appareil = /refrigerator|fridge|washer|dryer|dishwasher|oven|stove/i.test(o.category ?? '');
+  if (suspendu || (!appareil && gauche !== null && droite !== null && gauche + droite <= ECART_CUISINE)) {
     // L'élément haut prend la largeur du mur ; le meuble bas pris entre deux comble l'intervalle.
     w = r.w + (gauche ?? 0) + (droite ?? 0);
     glisseX = ((droite ?? 0) - (gauche ?? 0)) / 2;
