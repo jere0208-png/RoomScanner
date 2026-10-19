@@ -4,7 +4,7 @@ import type { Mesure } from '../geometry/regle';
 import { photosDesMurs } from '../geometry/photosAuto';
 import { trajetDe } from '../geometry/traversee';
 import { create } from 'zustand';
-import { HEIGHT_RULES, estCuisine, fixturePlacement, heightRuleAt, roomInputsOf, worktopsOnWall } from '../geometry/nfc15100';
+import { HEIGHT_RULES, estCuisine, fixturePlacement, heightRuleAt, roomInputsOf, roomUse, worktopsOnWall } from '../geometry/nfc15100';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pasDeGeste } from './geste';
 import { catalogueDesPlans, deposerPlan, reprendrePlan, type Identite, retirerPlan } from '../net/coffrePlans';
@@ -127,6 +127,7 @@ import { avecLesBordsDuLidar, releveLogique, sansMeublesEnDouble } from '../geom
 import type { MurDouteux } from '../geometry/murDouteux';
 import { reunirLesCanapesDAngle } from '../geometry/canapeAngle';
 import { alignerLesMeubles, calerDansLaNiche, calerLesMeubles, contreLeMurLePlusProche, seGenent } from '../geometry/niche';
+import { meublesQuiSuivent, pointQuiSuit } from '../geometry/redressement';
 import {
   cibleDAlignement,
   cibleDeRepartition,
@@ -904,6 +905,55 @@ function remplacer<T>(tout: T[], tranche: T[], neufs: T[]): T[] {
 }
 
 /** Ce que montre un niveau du plan à l'écran : le filtre du plan lui-même. */
+/**
+ * Les meubles adossés à `wall` (dos contre sa face, à 5 cm près, à 8° près
+ * parallèles, en face de lui), décalés de la part de (dx, dz) qui suit la
+ * normale du mur. Rend `st.objects` tel quel si aucun ne bouge. Voir
+ * `moveWall`.
+ */
+function meublesAdossesQuiSuivent(
+  st: Pick<ScanState, 'walls' | 'objects' | 'rooms'>,
+  wall: WallSeg,
+  dx: number,
+  dz: number,
+): ObjectData[] {
+  // Le niveau d'un meuble est celui de sa pièce.
+  const niveauDePiece = new Map(st.rooms.map((r) => [r.id, niveauDe(r)]));
+  const L = segLength(wall);
+  if (L < 0.05) return st.objects;
+  const u = { x: (wall.b.x - wall.a.x) / L, z: (wall.b.z - wall.a.z) / L };
+  const n = { x: -u.z, z: u.x };
+  const pousse = dx * n.x + dz * n.z;
+  if (Math.abs(pousse) < 1e-6) return st.objects;
+  const f = demiFacesDe(st.walls, wall);
+  let change = false;
+  const out = st.objects.map((o) => {
+    const t = o.transform;
+    if (!t || t.length < 16 || (niveauDePiece.get(roomOf(o)) ?? 0) !== niveauDe(wall)) return o;
+    const c = { x: t[12], z: t[14] };
+    const s = (c.x - wall.a.x) * u.x + (c.z - wall.a.z) * u.z;
+    if (s < 0 || s > L) return o;
+    const lx = Math.hypot(t[0], t[2]) || 1;
+    const ex = { x: t[0] / lx, z: t[2] / lx };
+    const ez = { x: -ex.z, z: ex.x };
+    const cosU = Math.abs(ex.x * u.x + ex.z * u.z);
+    const cosN = Math.abs(ex.x * n.x + ex.z * n.z);
+    if (Math.max(cosU, cosN) < Math.cos((8 * Math.PI) / 180)) return o;
+    const d = (c.x - wall.a.x) * n.x + (c.z - wall.a.z) * n.z;
+    // La demi-épaisseur du meuble selon la normale du mur.
+    const demi =
+      Math.abs((ex.x * n.x + ex.z * n.z) * (o.width / 2)) + Math.abs((ez.x * n.x + ez.z * n.z) * (o.depth / 2));
+    const face = d >= 0 ? f.plus : f.moins;
+    if (Math.abs(Math.abs(d) - demi - face) > 0.05) return o;
+    change = true;
+    const nt = [...t];
+    nt[12] = c.x + n.x * pousse;
+    nt[14] = c.z + n.z * pousse;
+    return { ...o, transform: nt };
+  });
+  return change ? out : st.objects;
+}
+
 function jeuDuNiveau(
   st: Pick<ScanState, 'walls' | 'openings' | 'rooms' | 'fixtures' | 'photos' | 'objects' | 'ceiling'>,
   n: number,
@@ -6246,7 +6296,19 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       );
       const walls = st.walls.filter((w) => !doomed.has(w.id));
       const dansLaPiece = pieceDesAppareils(st);
+      /*
+        SES NOTES ET SES COTES PARTENT AVEC ELLE — peaufinage PLAN 2D : la
+        chambre retirée laissait « Tableau à remplacer » et sa cote de 2,60 m
+        flotter dans le vide, au plan comme au PDF. Ce qui est DANS la pièce
+        (la note, ou les deux bouts de la cote) s'en va ; « Annuler » rend tout.
+      */
+      const contourDeLaPiece =
+        contour ?? roomParts(st.walls, st.rooms).find((p) => p.roomId === roomId)?.surface?.pts ?? null;
+      const dedans = (q: Pt) =>
+        !!contourDeLaPiece && contourDeLaPiece.length >= 3 && pointInPolygon(q, contourDeLaPiece);
       set({
+        notes: st.notes.filter((x) => !(niveauDe(x) === niveauDe(gone) && dedans(x.at))),
+        mesures: st.mesures.filter((x) => !(niveauDe(x) === niveauDe(gone) && dedans(x.a) && dedans(x.b))),
         rooms,
         walls,
         // Les ouvertures des murs supprimés s'en vont avec eux.
@@ -6320,11 +6382,44 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       // La cloison commune reste dessinée, mais ne sépare plus : la fusion
       // survit à « Redétecter » et à « Redresser » (voir `nonSeparateur`).
       const communs = new Set([...inA].filter((id) => inB.has(id)));
+      /*
+        LA PIÈCE RÉUNIE PREND LE BON NOM — peaufinage PLAN 2D : elle gardait
+        toujours celui de la pièce touchée en premier. Le placard réuni à la
+        chambre s'appelait « Placard » (et perdait les règles de la chambre
+        au contrôle électrique), la cuisine réunie au séjour restait
+        « Cuisine ». Cuisine et séjour font un « Séjour-cuisine » ; sinon la
+        pièce de vie l'emporte sur un placard, un couloir, un dressing, et à
+        usage égal, la plus grande.
+      */
+      const nomReuni = (() => {
+        const ua = roomUse(a.name ?? '', a.kind);
+        const ub = roomUse(b.name ?? '', b.kind);
+        if (new Set([ua, ub]).size === 2 && [ua, ub].includes('cuisine') && [ua, ub].includes('sejour')) {
+          const pris = st.rooms.filter((r) => r.id !== aId && r.id !== bId).map((r) => r.name ?? '');
+          return { name: nomDePieceLibre(roomKindLabel('sejourCuisine'), pris, NOM_PIECE_MAX), kind: 'sejourCuisine' as RoomKind };
+        }
+        const secondaire = (u: string) => u === 'autre' || u === 'circulation';
+        let gagnante = a;
+        if (secondaire(ua) !== secondaire(ub)) gagnante = secondaire(ua) ? b : a;
+        else {
+          const aires = new Map(roomParts(st.walls, st.rooms).map((p) => [p.roomId, p.surface?.area ?? 0]));
+          gagnante = (aires.get(bId) ?? 0) > (aires.get(aId) ?? 0) * 1.05 ? b : a;
+        }
+        return gagnante === a ? null : { name: b.name, kind: b.kind };
+      })();
       set({
         walls: st.walls.map((w) => (communs.has(w.id) ? { ...w, nonSeparateur: true } : w)),
         rooms: st.rooms
           .filter((r) => r.id !== bId)
-          .map((r) => (r.id === aId ? { ...r, wallIds } : r)),
+          .map((r) => {
+            if (r.id !== aId) return r;
+            const reunie: RoomEntry = { ...r, wallIds };
+            if (!nomReuni) return reunie;
+            reunie.name = nomReuni.name;
+            if (nomReuni.kind) reunie.kind = nomReuni.kind;
+            else delete reunie.kind;
+            return reunie;
+          }),
         objects: st.objects.map((o) =>
           roomOf(o) === bId ? { ...o, roomId: aId } : o,
         ),
@@ -6388,9 +6483,10 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         ça revient en arrière.
 
         C'est l'un des rares défauts qu'on ne signale jamais, parce qu'on
-        croit avoir mal appuyé. Voir `annulerunefois`.
+        croit avoir mal appuyé. Voir `annulerunefois`. (Peaufinage PLAN 2D :
+        le point de reprise venait AVANT le calcul de la coupe, et une coupe
+        introuvable laissait justement ce point vide ; il vient après.)
       */
-      pushHistory('splitRoom');
       // Cloison posée en travers, perpendiculaire au grand axe et passant par
       // le point le plus au large. Ses deux bouts s'arrêtent EXACTEMENT sur
       // le contour : sans ça rien ne se soude, aucun nœud n'apparaît et la
@@ -6435,6 +6531,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         }
       }
       if (!coupe) return;
+      pushHistory('splitRoom');
       const { a, b } = coupe;
       const h = hauteurDeLaPiece(part) || 2.5;
       const wall: WallSeg = {
@@ -6522,6 +6619,17 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
             const nv = cadreDe(apresParts, cl.roomId);
             return v && nv ? avecSaTrace(cl, (p) => recadrerAuCadre(p, v, nv)) : cl;
           }),
+        ),
+        /*
+          ET CE QUI EST POSÉ CONTRE LE MUR — peaufinage PLAN 2D : le canapé
+          adossé au mur redressé gardait son biais (2,6 cm dans le mur à un
+          bout, un jour à l'autre), les notes et les cotes à la règle prises
+          contre lui restaient où il n'était plus. Voir `redressement.ts`.
+        */
+        objects: remplacer(st.objects, jeu.objects, meublesQuiSuivent(jeu.objects, jeu.walls, droits)),
+        notes: st.notes.map((x) => (niveauDe(x) === n ? { ...x, at: pointQuiSuit(x.at, jeu.walls, droits) } : x)),
+        mesures: st.mesures.map((x) =>
+          niveauDe(x) === n ? { ...x, a: pointQuiSuit(x.a, jeu.walls, droits), b: pointQuiSuit(x.b, jeu.walls, droits) } : x,
         ),
         dirty: true,
       });
@@ -10902,8 +11010,19 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       const murs = st.walls.map(suivi).map((w) =>
         w.id === id ? { ...w, a: rejointes.a ?? w.a, b: rejointes.b ?? w.b } : w,
       );
+      /*
+        CE QUI EST ADOSSÉ AU MUR LE SUIT — peaufinage PLAN 2D : on reculait
+        le mur du séjour de 30 cm, et le canapé, le buffet, la cuisine
+        restaient plantés où le mur n'était plus. Un meuble à peu près
+        parallèle au mur, dont le dos touche sa face (à 5 cm près) et qui est
+        en face de lui, recule ou avance avec lui — de la part du geste qui
+        l'éloigne ou le rapproche du mur, jamais de travers. Pas quand c'est
+        l'épaisseur qui change : la face côté pièce, elle, ne bouge pas.
+      */
+      const objects = (cle ?? '').startsWith('epaisseur:') ? st.objects : meublesAdossesQuiSuivent(st, wall, ddx, ddz);
       set({
         walls: [...murs, ...ajouts],
+        ...(objects !== st.objects ? { objects } : null),
         rooms:
           pourLesPieces.size === 0
             ? st.rooms
