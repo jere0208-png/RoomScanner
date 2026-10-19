@@ -1834,20 +1834,20 @@ export function ResultScreen() {
                 fixtures: st.fixtures,
                 photos: [],
                 objects: st.objects,
-                ceiling: [],
+                ceiling: st.ceiling,
               },
               n,
             );
             return {
               niveau: n,
-              model: { walls: j.walls, openings: j.openings, objects: j.objects, rooms: j.rooms, fixtures: j.fixtures },
+              model: { walls: j.walls, openings: j.openings, objects: j.objects, rooms: j.rooms, fixtures: j.fixtures, ceiling: j.ceiling },
             };
           });
         await RoomScan.shareText(buildObjMaison(parNiveau, altitudes, scanName), objFilename(scanName));
         return;
       }
       const obj = buildObj(
-        { walls, openings, objects, rooms, fixtures },
+        { walls, openings, objects, rooms, fixtures, ceiling },
         scanName,
       );
       await RoomScan.shareText(obj, objFilename(scanName));

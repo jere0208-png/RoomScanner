@@ -47,6 +47,26 @@ import {
 } from './floorplan';
 
 /**
+ * LA PIÈCE D'UN MEUBLE, MÊME SANS ÉTIQUETTE — celle qu'il porte si le plan
+ * la connaît ; sinon celle dont le contour contient son centre ; sinon son
+ * étiquette telle quelle. La 3D et la visite le recalent contre les murs de
+ * cette pièce (agent testeur PLAN 3D : un meuble sans pièce était poussé
+ * vers le milieu du logement, à travers ses propres murs).
+ */
+export function pieceDuMeubleDansLePlan(
+  o: ObjectData,
+  parts: { roomId: string; surface?: { pts: Pt[] } | null }[],
+): string {
+  const id = roomOf(o);
+  if (parts.some((p) => p.roomId === id)) return id;
+  const t = o.transform;
+  if (!t || t.length < 15 || !fini(t[12]) || !fini(t[14])) return id;
+  const c = { x: t[12], z: t[14] };
+  const dedans = parts.find((p) => p.surface && p.surface.pts.length >= 3 && dansLeContour(c, p.surface.pts));
+  return dedans?.roomId ?? id;
+}
+
+/**
  * L'ŒIL D'UN ADULTE DEBOUT — 1,60 m.
  *
  * Plus haut, on survole les meubles ; plus bas, on se sent enfant dans son
@@ -245,11 +265,11 @@ export function obstaclesDeLaVisite(
     const f = clampFootprint(
       toFootprint(o),
       walls,
-      interieurDe.get(roomOf(o)) ?? repli,
+      interieurDe.get(pieceDuMeubleDansLePlan(o, parts)) ?? repli,
       undefined,
       undefined,
       undefined,
-      contourDe.get(roomOf(o)),
+      contourDe.get(pieceDuMeubleDansLePlan(o, parts)),
     );
     if (!fini(f.cx) || !fini(f.cz) || !fini(f.width) || !fini(f.depth)) continue;
     if (f.height < HAUTEUR_FRANCHISSABLE) continue;

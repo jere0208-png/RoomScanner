@@ -32,6 +32,7 @@ import {
   normaleVersLaPiece,
 } from './floorplan';
 import { couleurMajoritaire, mixHex, pointInPolygon, sampleTexture } from './appearance';
+import { pieceDuMeubleDansLePlan } from './exploration';
 import { AMBRE_MEUBLE, MEUBLE_MOELLEUX } from '../ui/maquette';
 import { furnitureParts, type FurnPart } from './furniture3d';
 import { CEILINGS, type CeilingFixture } from './ceiling';
@@ -3541,11 +3542,19 @@ export function buildScene(
   // maquette ouverte, on la regarde par au-dessus.
   for (const cl of opts.ceiling ?? []) {
     const spec = CEILINGS[cl.kind];
+    /*
+      AU PLAFOND DE SA PIÈCE, FAUX PLAFOND COMPRIS — agent testeur PLAN 3D :
+      la hauteur se prenait sur le plus haut mur de la pièce. Un séjour
+      baissé à 2,30 garde ses murs mitoyens à 2,50 (voir `setRoomHeight`) :
+      son plafond se dessinait à 2,30, ses points lumineux à 2,50 — vingt
+      centimètres au-dessus, invisibles de l'intérieur, flottant sur la
+      maquette. C'est la hauteur de la pièce qui commande, comme le plafond.
+    */
+    const partDuPlafond = parts.find((p) => p.roomId === cl.roomId);
     const mursDeLaPiece = walls.filter((w) => roomOf(w) === cl.roomId);
-    const haut = (mursDeLaPiece.length > 0 ? mursDeLaPiece : walls).reduce(
-      (m, w) => Math.max(m, w.height),
-      0,
-    );
+    const haut = partDuPlafond
+      ? hauteurDeLaPiece(partDuPlafond)
+      : (mursDeLaPiece.length > 0 ? mursDeLaPiece : walls).reduce((m, w) => Math.max(m, w.height), 0);
     if (!(haut > 0.5)) continue;
     /*
       LE RUBAN LED : une bande bleue juste sous le plafond, le long de son
@@ -3749,6 +3758,7 @@ export function buildScene(
   // Un meuble n'est recalé que contre les murs de SA pièce : sinon la
   // cloison d'à côté le repousserait au milieu du salon.
   const poses: PoseDeMeuble[] = [];
+  const pieceDe = (o: ObjectData): string => pieceDuMeubleDansLePlan(o, parts);
   for (const source of objects) {
     /*
       RESSORTI DE TOUTE MAÇONNERIE, PAS SEULEMENT DE LA SIENNE.
@@ -3769,15 +3779,29 @@ export function buildScene(
       déplace que ce qui est VRAIMENT dans la maçonnerie, et jamais de plus
       que sa propre profondeur.
     */
+    /*
+      SA PIÈCE, MÊME SANS ÉTIQUETTE — agent testeur PLAN 3D : un meuble sans
+      pièce (relevé ancien, pièce supprimée) était repoussé vers le milieu du
+      LOGEMENT, à travers ses propres murs (72 cm pour l'armoire de la
+      chambre de l'exemple), alors que le plan le laissait à sa place. La
+      pièce qui le contient le recale, comme elle le ferait de son étiquette.
+    */
+    const pieceDuMeuble = pieceDe(source);
     const obj = clampFootprint(
       toFootprint(source),
       walls,
-      interiorOf.get(roomOf(source)) ?? fallbackInterior,
+      interiorOf.get(pieceDuMeuble) ?? fallbackInterior,
       undefined,
       undefined,
       undefined,
-      contourOf.get(roomOf(source)),
+      contourOf.get(pieceDuMeuble),
     );
+    /*
+      UN MEUBLE ILLISIBLE NE PART PAS À LA CARTE GRAPHIQUE — agent testeur
+      PLAN 3D : un relevé abîmé (une position NaN) ne dessinait aucune face,
+      mais sa pose partait quand même au rendu natif, sommets NaN compris.
+    */
+    if (![obj.cx, obj.cz, obj.yaw, obj.width, obj.depth, obj.height, obj.yCenter].every(Number.isFinite)) continue;
     const cosY = Math.cos(obj.yaw);
     const sinY = Math.sin(obj.yaw);
     /**
@@ -3790,7 +3814,14 @@ export function buildScene(
      * suspend, et une télé murale, elle, est bien plus haut.
      */
     let yb = Math.max(0, obj.yCenter - obj.height / 2 - floorY);
-    if (yb > 0 && yb < 0.45 && POSE_AU_SOL.test(obj.category ?? '')) yb = 0;
+    /*
+      … SAUF CE QUE LE CATALOGUE A POSÉ EN HAUTEUR — agent testeur PLAN 3D :
+      le « Meuble TV suspendu » (un rangement à 30 cm du sol) tombait par
+      terre, comme un lit que RoomPlan aurait fait flotter. Un modèle choisi
+      dans le catalogue porte sa hauteur voulue ; seul un relevé brut se
+      rattrape.
+    */
+    if (yb > 0 && yb < 0.45 && !obj.modele && POSE_AU_SOL.test(obj.category ?? '')) yb = 0;
     /*
       L'AMBRE DU MOBILIER MOELLEUX — lits, canapés, fauteuils.
 
@@ -3969,7 +4000,7 @@ export function buildScene(
      * dessinés.
      */
     const hauteurTri =
-      (wallsOf.get(roomOf(source)) ?? walls).reduce(
+      (wallsOf.get(pieceDuMeuble) ?? walls).reduce(
         (h, w) => Math.max(h, w.height),
         0,
       ) || 2.5;
@@ -3998,7 +4029,7 @@ export function buildScene(
     let triRefs: P3[] = [{ x: obj.cx, y: hauteurTri / 2, z: obj.cz }];
     let triCote: P3 | undefined;
     {
-      const murs = wallsOf.get(roomOf(source)) ?? walls;
+      const murs = wallsOf.get(pieceDuMeuble) ?? walls;
       let best = Infinity;
       for (const w of murs) {
         const len = Math.hypot(w.b.x - w.a.x, w.b.z - w.a.z);

@@ -699,6 +699,11 @@ export interface Commande {
   hasard: () => number;
   /** Posé en hauteur (son dessous à 30 cm du sol ou plus) : il tient au mur. */
   suspendu?: boolean;
+  /**
+   * Accroché au mur : son dessous à 90 cm du sol ou plus — aucun meuble ne
+   * porte une télé si haut (voir `television`).
+   */
+  auMur?: boolean;
 }
 
 const attribut = (c: Commande, type: string): string | undefined => {
@@ -1341,9 +1346,15 @@ function table(a: Atelier, g: Gabarit, c: Commande) {
   LA TÉLÉVISION — une dalle fine et son verre noir ; au mur, ou sur un pied
   quand l'emprise a la profondeur d'un pied.
 */
-function television(a: Atelier, { W, D, H }: Gabarit) {
+function television(a: Atelier, { W, D, H }: Gabarit, c?: Commande) {
   const ep = Math.min(D, 0.045);
-  const surPied = D > 0.14;
+  /*
+    ACCROCHÉE AU MUR, ELLE N'A PAS DE PIED — agent testeur PLAN 3D : RoomPlan
+    donne souvent vingt centimètres de profondeur à une télé murale (la dalle
+    et sa platine), et la télé à 1,20 m du sol recevait le pied d'une télé
+    posée, pendu dans le vide. Au-dessus de 90 cm, aucun meuble ne la porte.
+  */
+  const surPied = D > 0.14 && !c?.auMur;
   const y0 = surPied ? Math.min(0.08, H * 0.12) : 0;
   const z0 = surPied ? -ep / 2 : -D / 2;
   const z1 = z0 + ep;
@@ -1785,6 +1796,18 @@ function refrigerateur(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   }
   a.boite(-W / 2, W / 2, 0.02, H, zF + 0.045, D / 2, 'laque', corps, { r: 0.01, seg: 1, sans: ['bas'] });
   a.boite(-W / 2 + 0.01, W / 2 - 0.01, 0, 0.06, zF + 0.05, D / 2 - 0.02, 'noir', TEINTES.anthracite);
+  /*
+    LE FRIGO TOP — agent testeur PLAN 3D : un réfrigérateur de 50 cm sous
+    un plan de travail recevait les deux poignées d'un combiné, à 30 cm
+    au-dessus et 20 cm au-dessous de sa séparation : la poignée basse
+    perçait le sol, la haute dépassait de seize centimètres son dessus. Sous
+    un mètre, c'est une seule porte et une seule poignée, dans sa hauteur.
+  */
+  if (H < 1) {
+    a.boite(-W / 2, W / 2, 0.06, H, zF, zF + 0.045, 'laque', corps, { r: 0.012, seg: 1, sans: ['arriere'] });
+    poignee(a, W / 2 - 0.05, 0.06 + (H - 0.06) * 0.55, zF, Math.min(0.36, (H - 0.06) * 0.5), true);
+    return;
+  }
   const hb = Math.min(0.75, H * 0.36);
   a.boite(-W / 2, W / 2, 0.06, hb - 0.003, zF, zF + 0.045, 'laque', corps, { r: 0.012, seg: 1, sans: ['arriere'] });
   a.boite(-W / 2, W / 2, hb + 0.003, H, zF, zF + 0.045, 'laque', corps, { r: 0.012, seg: 1, sans: ['arriere'] });
@@ -3036,7 +3059,7 @@ export function fabriquer(categorie: string, g: Gabarit, c: Omit<Commande, 'cate
   else if (cat.includes('sofa') || cat.includes('couch')) canape(a, gab, cmd);
   else if (cat.includes('chair') || cat.includes('stool')) chaise(a, gab, cmd);
   else if (cat.includes('table') || cat.includes('desk')) table(a, gab, cmd);
-  else if (cat.includes('television') || cat === 'tv') television(a, gab);
+  else if (cat.includes('television') || cat === 'tv') television(a, gab, cmd);
   else if (cat.includes('refrigerator') || cat.includes('fridge')) refrigerateur(a, gab, cmd);
   else if (cat.includes('stove') || cat.includes('oven') || cat.includes('cooktop')) cuisson(a, gab, cmd);
   else if (cat.includes('dishwasher') || cat.includes('washer') || cat.includes('dryer')) electromenager(a, gab, cmd);
@@ -3088,6 +3111,8 @@ export interface PoseDeMeuble {
 */
 /** Au-dessus, un meuble est posé en hauteur : il tient au mur, sans pieds (m). */
 export const EN_HAUTEUR = 0.3;
+/** Au-dessus, un écran est accroché au mur : aucun meuble ne le porte si haut (m). */
+export const AU_MUR = 0.9;
 
 const ATELIER_CACHE = new Map<string, ModeleLocal>();
 export const CACHE_DES_MODELES = 600;
@@ -3106,6 +3131,7 @@ export function modeleDe(p: PoseDeMeuble): ModeleLocal {
     p.couleurs?.cotes ?? '',
     (p.attributes ?? []).join(','),
     p.yb >= EN_HAUTEUR ? 'suspendu' : '',
+    p.yb >= AU_MUR ? 'au-mur' : '',
   ].join('|');
   const deja = ATELIER_CACHE.get(cle);
   if (deja) {
@@ -3124,6 +3150,7 @@ export function modeleDe(p: PoseDeMeuble): ModeleLocal {
       attributs: p.attributes ?? [],
       hasard: graineDe(p.id || cle),
       suspendu: p.yb >= EN_HAUTEUR,
+      auMur: p.yb >= AU_MUR,
     },
   );
   if (ATELIER_CACHE.size >= CACHE_DES_MODELES) {
