@@ -4745,6 +4745,18 @@ export function reporterOuverture<T extends { a: Pt; b: Pt }>(
   const reporte = (t: number) => (ancre === 'a' ? t : l2 - (l1 - t));
   let ta = reporte(A.t);
   let tb = reporte(B.t);
+  /*
+    PLUS LARGE QUE LE MUR QUI RESTE, ELLE SE RABOTE — agent testeur PLAN 2D :
+    le mur de 1,80 raccourci à 0,90 sous sa fenêtre d'un mètre la laissait
+    dépasser de 10 cm dans le coin. Elle garde son milieu sur le mur, et
+    5 cm de tableau de chaque côté.
+  */
+  if (Math.abs(tb - ta) > l2) {
+    const l = Math.max(Math.min(l2 * 0.9, l2 - 0.1), l2 * 0.5);
+    const sens = tb >= ta ? 1 : -1;
+    ta = l2 / 2 - (sens * l) / 2;
+    tb = l2 / 2 + (sens * l) / 2;
+  }
   const bas = Math.min(ta, tb);
   const haut = Math.max(ta, tb);
   let cale = 0;

@@ -6897,6 +6897,25 @@ export function ResultScreen() {
                 : []),
               {
                 /*
+                  DUPLIQUER — agent testeur PLAN 2D, un manque : la façade
+                  à trois fenêtres identiques. La copie se pose à côté, sur
+                  le même mur, et reste choisie pour qu'on la cote.
+                */
+                label: 'Dupliquer',
+                icone: SOLAIRES.dupliquer,
+                sansMot: true,
+                onPress: () => {
+                  const id = useScanStore.getState().dupliquerOuverture(selectedOpening.id);
+                  if (id) {
+                    setSelectedOpeningId(id);
+                    haptic('succes');
+                  } else {
+                    astuce('Plus de place sur ce mur pour une seconde menuiserie.', { icone: 'ouvertures' });
+                  }
+                },
+              },
+              {
+                /*
                   FERMER : le trou disparaît, le mur redevient continu.
 
                   Relevé du patron : « fermer une ouverture et la remettre
@@ -7289,6 +7308,35 @@ export function ResultScreen() {
                       onPress: () => photographierLeMur(selectedWall.id),
                     },
                   ]),
+              /*
+                COUPER LE MUR — agent testeur PLAN 2D, un manque : un mur
+                scanné d'un seul trait qui, sur place, fait un décroché. On
+                le coupe à la cote voulue, puis on plie ou on déplace l'un
+                des deux pans.
+              */
+              {
+                label: 'Couper',
+                icone: SOLAIRES.scinder,
+                sansMot: true,
+                onPress: () => {
+                  const id = selectedWall.id;
+                  const L = segLength(selectedWall);
+                  setPrompt({
+                    title: 'Couper le mur',
+                    subtitle: `Il fait ${fr(L, 2)} m. Longueur du premier pan, depuis son début : la moitié coupe au milieu.`,
+                    value: fr(L / 2, 2),
+                    unit: 'm',
+                    numeric: true,
+                    verifier: verifierMetres('Premier pan', { ...BORNES_MUR, min: 0.1, max: Math.max(0.1, L - 0.1) }),
+                    onSubmit: (t) => {
+                      const d = lireMetres(t);
+                      if (d === null) return;
+                      if (useScanStore.getState().couperMur(id, d)) haptic('succes');
+                      else alerte('Le mur n’a pas été coupé', 'On ne coupe ni au milieu d’une ouverture, ni à moins de 10 cm d’un bout du mur.');
+                    },
+                  });
+                },
+              },
               ...(selectedWall.libre
                 ? []
                 : [
@@ -7854,6 +7902,10 @@ export function ResultScreen() {
           if (id) {
             setSelectedOpeningId(id);
             setCoteOuverture(id);
+          } else {
+            // Plus une place libre entre ses menuiseries : on le dit plutôt
+            // que d'empiler une ouverture sur une autre (agent testeur PLAN 2D).
+            astuce('Plus de place sur ce mur : déplacez ou réduisez une ouverture.', { icone: 'ouvertures' });
           }
         }}
       />

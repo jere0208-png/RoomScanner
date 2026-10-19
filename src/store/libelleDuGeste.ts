@@ -27,6 +27,8 @@ const LIBELLES: Record<string, string> = {
   detacher: 'mur détaché',
   addWall: 'ajout du mur',
   removeWall: 'suppression du mur',
+  couperMur: 'mur coupé',
+  retour: 'retour de mur retiré',
   // Pièces et niveaux.
   height: 'hauteur sous plafond',
   roomName: 'nom de la pièce',
@@ -49,6 +51,7 @@ const LIBELLES: Record<string, string> = {
   // Menuiseries.
   addOpening: 'pose de la menuiserie',
   removeOpening: 'suppression de la menuiserie',
+  dupliquerOuverture: 'copie de la menuiserie',
   opening: 'taille de la menuiserie',
   coterOuverture: 'cotes de la menuiserie',
   nature: 'type de menuiserie',
