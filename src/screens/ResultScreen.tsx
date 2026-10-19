@@ -4283,8 +4283,13 @@ export function ResultScreen() {
     }
     const lesFixtures = [...pose.fixtures, ...suite.fixtures];
     const leCeiling = [...pose.ceiling, ...suite.ceiling];
-    useScanStore.getState().poserDAuto(lesFixtures, leCeiling);
+    useScanStore.getState().poserDAuto(lesFixtures, leCeiling, [...pose.liens, ...suite.liens]);
     const total = lesFixtures.length + leCeiling.length;
+    if (total === 0) {
+      // Rien de posé, des points reliés à leur interrupteur : on le dit tel quel.
+      alerte('Points lumineux reliés', pose.rapport.join(SAUT) || 'Chaque point lumineux a maintenant sa commande.');
+      return;
+    }
     // « Poser PC 110 » × 4 se dit une fois, avec son compte.
     const comptes = new Map<string, number>();
     for (const l of suite.poses) comptes.set(l, (comptes.get(l) ?? 0) + 1);
@@ -4339,6 +4344,7 @@ export function ResultScreen() {
       openings,
       objects,
       fixtures,
+      ceiling,
       id: (prefixe) =>
         `${prefixe}-${Date.now().toString(36)}-${Math.random()
           .toString(36)
@@ -4353,7 +4359,7 @@ export function ResultScreen() {
       );
       return;
     }
-    useScanStore.getState().poserDAuto(res.fixtures, res.ceiling);
+    useScanStore.getState().poserDAuto(res.fixtures, res.ceiling, res.liens);
   };
 
   /*

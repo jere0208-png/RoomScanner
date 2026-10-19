@@ -68,6 +68,21 @@ const ICONE_DU_CODE: Record<string, string> = {
   meuble: SOLAIRES.meubles,
 };
 
+/**
+ * LE PLUS GRAVE D'ABORD — peaufinage ÉLECTRICITÉ : les pièces venaient dans
+ * l'ordre du plan, et dans une pièce les conseils précédaient parfois un
+ * défaut bloquant. Les pièces qui ont le plus à corriger passent en tête ;
+ * dans chacune, les alertes avant les conseils, et ce qui se règle d'un
+ * appui avant le reste. À égalité, l'ordre du plan est gardé.
+ */
+export function ordonnerLesConstats<G extends { alertes: number; lignes: Constat[] }>(groupes: G[]): G[] {
+  const rang = (l: Constat) => (l.severity === 'alerte' ? 0 : 2) + (l.fix ? 0 : 1);
+  return groupes
+    .map((g, i) => ({ g: { ...g, lignes: g.lignes.map((l, k) => ({ l, k })).sort((a, b) => rang(a.l) - rang(b.l) || a.k - b.k).map((x) => x.l) }, i }))
+    .sort((a, b) => b.g.alertes - a.g.alertes || a.i - b.i)
+    .map((x) => x.g);
+}
+
 export interface DiagnosticSheetProps {
   visible: boolean;
   onClose: () => void;
@@ -159,16 +174,18 @@ export function DiagnosticSheet({
       }
       par.get(cle)!.push(i);
     }
-    return ordre.map((cle) => {
-      const lignes = par.get(cle)!;
-      return {
-        cle,
-        // Les constats qui ne visent aucune pièce parlent du plan lui-même.
-        titre: cle === '—' ? 'Plan' : nomDe.get(cle) ?? 'Pièce',
-        lignes,
-        alertes: lignes.filter((l) => l.severity === 'alerte').length,
-      };
-    });
+    return ordonnerLesConstats(
+      ordre.map((cle) => {
+        const lignes = par.get(cle)!;
+        return {
+          cle,
+          // Les constats qui ne visent aucune pièce parlent du plan lui-même.
+          titre: cle === '—' ? 'Plan' : nomDe.get(cle) ?? 'Pièce',
+          lignes,
+          alertes: lignes.filter((l) => l.severity === 'alerte').length,
+        };
+      }),
+    );
   }, [visibles, nomDe]);
 
   /** Volets refermés à la main : le reste suit la règle par défaut. */
