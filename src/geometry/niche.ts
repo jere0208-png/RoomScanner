@@ -209,3 +209,150 @@ export function calerLesMeubles<O extends ObjectData>(objets: O[], walls: WallSe
   });
   return change ? out : objets;
 }
+
+/** Un écart de moins de quinze centimètres se referme (m). */
+const ECART_CUISINE = 0.15;
+/** Ce qu'un meuble peut chevaucher son voisin et qu'on lui retire (m). */
+const CHEVAUCHE_MAX = 0.05;
+/** Au-dessus, le meuble est suspendu : un élément haut (m). */
+const SUSPENDU = 1.0;
+
+const ENCASTRABLE = /refrigerator|fridge|washer|dryer|dishwasher|oven|stove|storage|cabinet|wardrobe|placard|sink/i;
+
+function sAligne(o: ObjectData): boolean {
+  return (o.height ?? 0) >= 0.1 && ENCASTRABLE.test(o.category ?? '') && !estUnCaisson(o) && !/tapis|rug/i.test(o.category ?? '');
+}
+
+/** La hauteur commune de deux meubles (m). */
+function enHauteur(a: ObjectData, b: ObjectData): number {
+  const bas = Math.max(a.transform[13] - a.height / 2, b.transform[13] - b.height / 2);
+  const haut = Math.min(a.transform[13] + a.height / 2, b.transform[13] + b.height / 2);
+  return haut - bas;
+}
+
+/**
+ * L'écart entre un bout du meuble (signe ±1 le long de sa largeur) et le
+ * voisin qui lui fait face : un meuble encastrable parallèle, à la même
+ * hauteur, en vis-à-vis sur la moitié de la profondeur au moins. Null si
+ * aucun.
+ */
+function ecartAuVoisin(o: ObjectData, r: Repere, signe: 1 | -1, objets: ObjectData[]): number | null {
+  let mieux: number | null = null;
+  for (const v of objets) {
+    if (v === o || v.id === o.id || !sAligne(v) || enHauteur(o, v) < 0.2) continue;
+    const q = repereDe(v);
+    const ax = Math.abs(q.ex.x * r.ex.x + q.ex.z * r.ex.z);
+    const az = Math.abs(q.ez.x * r.ex.x + q.ez.z * r.ex.z);
+    if (Math.max(ax, az) < PARALLELE) continue;
+    const pts = emprise(v);
+    const le = pts.map((p) => (p.x - r.c.x) * r.ex.x + (p.z - r.c.z) * r.ex.z);
+    const travers = pts.map((p) => (p.x - r.c.x) * r.ez.x + (p.z - r.c.z) * r.ez.z);
+    const commun = Math.min(Math.max(...travers), r.d / 2) - Math.max(Math.min(...travers), -r.d / 2);
+    if (commun < Math.min(r.d, q.d) / 2) continue;
+    const ecart = signe > 0 ? Math.min(...le) - r.w / 2 : -r.w / 2 - Math.max(...le);
+    if (ecart < -CHEVAUCHE_MAX) continue;
+    if (mieux === null || ecart < mieux) mieux = ecart;
+  }
+  return mieux;
+}
+
+/** Deux meubles se gênent : leurs emprises se chevauchent, à la même hauteur. */
+function seGenent(a: ObjectData, b: ObjectData): boolean {
+  return enHauteur(a, b) > 0.05 && chevauchent(emprise(a), emprise(b));
+}
+
+/** Le meuble aligné sur ses murs et ses voisins, ou null s'il l'est déjà. */
+function alignerLeMeuble<O extends ObjectData>(o: O, objets: ObjectData[], walls: WallSeg[]): O | null {
+  if (!sAligne(o)) return null;
+  const r = repereDe(o);
+  const suspendu = o.transform[13] - o.height / 2 - solDesMurs(walls) > SUSPENDU;
+  const proche = (e: number | null) => (e !== null && e >= -CHEVAUCHE_MAX && e <= ECART_CUISINE ? e : null);
+
+  // Le dos : contre le seul mur qui le borde, sur la profondeur.
+  const dosAuMur = (signe: 1 | -1) =>
+    proche(
+      ecartAuMur(
+        { x: r.c.x + r.ez.x * (r.d / 2) * signe, z: r.c.z + r.ez.z * (r.d / 2) * signe },
+        { x: r.ez.x * signe, z: r.ez.z * signe },
+        r.ex,
+        r.w / 2,
+        walls,
+      ),
+    );
+  const devant = dosAuMur(-1);
+  const derriere = dosAuMur(1);
+  let glisseZ = 0;
+  if ((devant === null) !== (derriere === null)) glisseZ = derriere ?? -(devant as number);
+
+  // Les bouts : le mur d'angle ou le voisin le plus proche.
+  const bout = (signe: 1 | -1): number | null => {
+    const mur = ecartAuMur(
+      { x: r.c.x + r.ex.x * (r.w / 2) * signe, z: r.c.z + r.ex.z * (r.w / 2) * signe },
+      { x: r.ex.x * signe, z: r.ex.z * signe },
+      r.ez,
+      r.d / 2,
+      walls,
+    );
+    const voisin = ecartAuVoisin(o, r, signe, objets);
+    const tous = [mur, voisin].filter((e): e is number => e !== null && e >= -CHEVAUCHE_MAX);
+    return tous.length ? proche(Math.min(...tous)) : null;
+  };
+  const gauche = bout(-1);
+  const droite = bout(1);
+  let w = r.w;
+  let glisseX = 0;
+  if (suspendu || (gauche !== null && droite !== null && gauche + droite <= ECART_CUISINE)) {
+    // L'élément haut prend la largeur du mur ; le meuble bas pris entre deux comble l'intervalle.
+    w = r.w + (gauche ?? 0) + (droite ?? 0);
+    glisseX = ((droite ?? 0) - (gauche ?? 0)) / 2;
+  } else if (gauche !== null || droite !== null) {
+    // Sinon il glisse jusqu'à toucher le plus proche.
+    glisseX = droite !== null && (gauche === null || Math.abs(droite) <= Math.abs(gauche)) ? droite : -(gauche as number);
+  }
+  if (Math.abs(w - r.w) > Math.min(0.25 * r.w, 0.3) || w < 0.1) {
+    w = r.w;
+    glisseX = 0;
+  }
+  if (Math.abs(w - r.w) + Math.abs(glisseX) + Math.abs(glisseZ) < 0.005) return null;
+  const t = [...o.transform];
+  t[12] = r.c.x + r.ex.x * glisseX + r.ez.x * glisseZ;
+  t[14] = r.c.z + r.ex.z * glisseX + r.ez.z * glisseZ;
+  return { ...o, width: w, transform: t };
+}
+
+/*
+  LA CUISINE SE RANGE COMME ON L'A POSÉE — diagnostic du patron, sa petite
+  cuisine : « les meubles hauts ne prennent pas la largeur du mur alors que
+  dans la réalité si ; le meuble à côté du lave-linge est en retrait, laissant
+  une marge inutile au mur. Il manque une logique de placement, même si le
+  scan pense voir autre chose. »
+
+  Pour ce qui s'encastre (meubles bas et hauts, électroménager), une fois les
+  niches calées :
+    — LE DOS : à moins de quinze centimètres d'un seul mur, il s'y adosse ;
+    — LES BOUTS : l'écart de moins de quinze centimètres avec le mur d'angle
+      ou le meuble voisin, à la même hauteur, se referme. L'élément haut
+      s'allonge (il prend la largeur du mur) ; le meuble bas glisse jusqu'à
+      toucher, ou comble l'intervalle s'il est pris entre deux.
+  Jamais plus d'un quart de sa largeur ni de trente centimètres, et jamais
+  au point de chevaucher un voisin qu'il ne chevauchait pas.
+*/
+export function alignerLesMeubles<O extends ObjectData>(objets: O[], walls: WallSeg[]): O[] {
+  let out = objets;
+  for (let passe = 0; passe < 2; passe++) {
+    let change = false;
+    const suivant = [...out];
+    for (let i = 0; i < suivant.length; i++) {
+      const o = suivant[i];
+      const aligne = alignerLeMeuble(o, suivant, walls);
+      if (!aligne) continue;
+      const gene = suivant.some((v, k) => k !== i && !estUnCaisson(v) && seGenent(aligne, v) && !seGenent(o, v));
+      if (gene) continue;
+      suivant[i] = aligne;
+      change = true;
+    }
+    if (!change) break;
+    out = suivant;
+  }
+  return out;
+}

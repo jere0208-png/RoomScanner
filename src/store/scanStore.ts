@@ -126,7 +126,7 @@ import { avecCoffresDuLidar } from '../geometry/coffreLidar';
 import { avecLesBordsDuLidar, releveLogique, sansMeublesEnDouble } from '../geometry/logique';
 import type { MurDouteux } from '../geometry/murDouteux';
 import { reunirLesCanapesDAngle } from '../geometry/canapeAngle';
-import { calerDansLaNiche, calerLesMeubles } from '../geometry/niche';
+import { alignerLesMeubles, calerDansLaNiche, calerLesMeubles } from '../geometry/niche';
 import {
   SUR_MESURE,
   catalogTransform,
@@ -4551,7 +4551,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         : [{ outline: [], wallIds: walls.map((w) => w.id), area: 0 }];
     const idPiece = (i: number) => (aCote ? `room-${n}-${marque}-${i + 1}` : `room-${n}-${i + 1}`);
 
-    const objects: ObjectData[] = calerLesMeubles(orienterLesSieges(
+    const objects: ObjectData[] = alignerLesMeubles(calerLesMeubles(orienterLesSieges(
       separerLeMobilier(
         // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
         reunirLesCanapesDAngle(sansMeublesEnDouble(entrants.filter((o) => !placardsEtage.meublesDuPlacard.has(o.id)))).map((o) => {
@@ -4572,7 +4572,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         }),
       ),
       walls,
-    ), walls);
+    ), walls), walls);
     const categoriesDe = (i: number) =>
       objects.filter((o) => o.roomId === idPiece(i) && voteDansLaPiece(o, shapes[i].outline)).map((o) => o.category);
     const kinds = shapes.map((sh, i) =>
@@ -8701,7 +8701,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
 
       const floor = r.floor ?? r.rooms?.[0]?.floor ?? jeu.rooms[0]?.floor ?? st.rooms[0]?.floor ?? null;
       // Les sièges regardent la pièce, pas le mur : voir `orienterLesSieges`.
-      const meublesVenus: ObjectData[] = calerLesMeubles(orienterLesSieges(
+      const meublesVenus: ObjectData[] = alignerLesMeubles(calerLesMeubles(orienterLesSieges(
         separerLeMobilier(
           // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
           reunirLesCanapesDAngle(sansMeublesEnDouble(meublesDuPassage)).map((o) => {
@@ -8727,7 +8727,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
           }),
         ),
         walls,
-      ), walls);
+      ), walls), walls);
       const meublesALaMain = jeu.objects
         .filter((o) => !duReleve(o.id))
         .map((o) => ({
@@ -9218,7 +9218,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       // À la sortie du scan comme à l'ouverture d'un dossier : deux meubles que
       // la caméra a fait se traverser sont écartés du strict nécessaire.
       // Les sièges regardent la pièce, pas le mur : voir `orienterLesSieges`.
-      const objects: ObjectData[] = calerLesMeubles(orienterLesSieges(
+      const objects: ObjectData[] = alignerLesMeubles(calerLesMeubles(orienterLesSieges(
         separerLeMobilier(
           // Le canapé d'angle d'abord : séparé, sa méridienne serait repoussée.
           reunirLesCanapesDAngle(sansMeublesEnDouble(incomingObjects.filter((o) => !placards.meublesDuPlacard.has(o.id)))).map((o) => ({
@@ -9230,7 +9230,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
           })),
         ),
         walls,
-      ), walls);
+      ), walls), walls);
 
       /*
         LE TYPE DE CHAQUE PIÈCE : ce que RoomPlan en dit (iOS 17), puis le

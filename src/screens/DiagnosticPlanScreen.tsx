@@ -32,6 +32,7 @@ import {
 import { COURRIEL_SUPPORT, envoyerUnDiagnostic, infosDeLApp } from '../native/support';
 import { useScanStore } from '../store/scanStore';
 import { radius, shadowCard, useTheme, type Palette } from '../theme';
+import { astuce } from '../ui/astuce';
 import { usePannes } from '../ui/journalPannes';
 
 type Etat = 'pret' | 'envoi' | 'sent' | 'cancelled' | 'partage' | 'unavailable';
@@ -85,6 +86,12 @@ export function DiagnosticPlanScreen() {
   };
 
   const retour = () => setScreen('library');
+  const message: Partial<Record<Etat, string>> = {
+    sent: 'Merci ! Le diagnostic est parti : il nous aidera à améliorer EchoPlan.',
+    partage: `Choisissez votre messagerie, et envoyez le dossier à ${COURRIEL_SUPPORT}.`,
+    cancelled: 'Envoi annulé : rien n’est parti.',
+    unavailable: `Impossible d’ouvrir une messagerie. Écrivez-nous à ${COURRIEL_SUPPORT}.`,
+  };
   const basculer = (cle: string) =>
     setRemarques((r) => (r.includes(cle) ? r.filter((x) => x !== cle) : [...r, cle]));
 
@@ -105,6 +112,17 @@ export function DiagnosticPlanScreen() {
     });
     const corps = rapportDuDiagnostic({ nom: plan.name, diag, remarques, commentaire, contexte, fichier });
     const sortie = await envoyerUnDiagnostic(`Diagnostic EchoPlan — ${plan.name}`, corps, fichier, contenu);
+    /*
+      PARTI, ON REVIENT AU MENU — relevé du patron : « après l'envoi du mail
+      de diagnostic, la fenêtre se ferme et retour au menu ». Le merci suit
+      sur la bibliothèque. Annulé, ou parti par la feuille de partage (rien
+      ne dit qu'il est envoyé), la page reste : la note tapée n'est pas perdue.
+    */
+    if (sortie === 'sent') {
+      astuce(message.sent!, { icone: 'sirene', fete: true });
+      retour();
+      return;
+    }
     setEtat(sortie);
   };
 
@@ -130,12 +148,6 @@ export function DiagnosticPlanScreen() {
     ['Appareils', `${r.appareils}`],
     ['Niveaux', `${r.niveaux}`],
   ];
-  const message: Partial<Record<Etat, string>> = {
-    sent: 'Merci ! Le diagnostic est parti : il nous aidera à améliorer EchoPlan.',
-    partage: `Choisissez votre messagerie, et envoyez le dossier à ${COURRIEL_SUPPORT}.`,
-    cancelled: 'Envoi annulé : rien n’est parti.',
-    unavailable: `Impossible d’ouvrir une messagerie. Écrivez-nous à ${COURRIEL_SUPPORT}.`,
-  };
 
   return (
     <RetourGlisse onRetour={retour} style={[s.fond, { paddingTop: insets.top }]}>

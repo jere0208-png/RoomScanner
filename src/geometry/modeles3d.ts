@@ -697,6 +697,8 @@ export interface Commande {
   /** Les précisions de RoomPlan (iOS 17) : « SofaType:lShaped »… */
   attributs: string[];
   hasard: () => number;
+  /** Posé en hauteur (son dessous à 30 cm du sol ou plus) : il tient au mur. */
+  suspendu?: boolean;
 }
 
 const attribut = (c: Commande, type: string): string | undefined => {
@@ -1371,6 +1373,23 @@ function rangement(a: Atelier, g: Gabarit, c: Commande) {
   const { W, D, H } = g;
   const m = c.modele;
   const sorte = attribut(c, 'StorageType');
+  /*
+    EN HAUTEUR, PAS DE PIEDS — relevé du patron : « les meubles hauts ont des
+    pieds… ce ne sont pas des meubles hauts s'il y a des pieds ». RoomPlan ne
+    dit que « storage » : l'emprise d'un meuble haut de cuisine (1,20 × 0,37)
+    tombait sur le buffet, ou la commode, montés sur pieds, et suspendus à
+    1,50 m. Ce qui est posé en hauteur tient au mur : le meuble haut de la
+    cuisine, sauf modèle qui sait déjà se suspendre.
+  */
+  if (c.suspendu) {
+    if (m.startsWith('casiers') || m.startsWith('kallax')) return casiers(a, g, c);
+    if (m.startsWith('biblio') || m.startsWith('billy')) return bibliotheque(a, g, c);
+    if (m.startsWith('etagere')) return etagereMurale(a, g, c);
+    if (m.startsWith('hotte')) return hotte(a, g);
+    if (m.startsWith('armoiretoilette')) return armoireDeToilette(a, g, c);
+    if (m.startsWith('meubletv')) return meubleTv(a, g, c);
+    return meubleHaut(a, g, c);
+  }
   if (m.startsWith('casiers') || m.startsWith('kallax')) return casiers(a, g, c);
   if (m.startsWith('biblio') || m.startsWith('billy') || sorte === 'shelf' || (!m && H >= 1.3 && D <= 0.42)) return bibliotheque(a, g, c);
   if (m.startsWith('etagere')) return etagereMurale(a, g, c);
@@ -1590,7 +1609,7 @@ function meubleChaussures(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
 
 function meubleTv(a: Atelier, { W, D, H }: Gabarit, c: Commande) {
   // Suspendu, il n'a pas de pieds : il tient au mur.
-  const suspendu = c.modele.startsWith('meubletvsuspendu');
+  const suspendu = c.suspendu || c.modele.startsWith('meubletvsuspendu');
   const hPied = suspendu ? 0 : Math.min(0.12, H * 0.3);
   if (!suspendu) pieds(a, [-W / 2 + 0.05, W / 2 - 0.05], [-D / 2 + 0.05, D / 2 - 0.05], 0, hPied, 0.017, 0.012, 'bois', c.teinte ?? c.cotes ?? TEINTES.chene);
   const zF = -D / 2 + SAILLIE_BOUTON;
@@ -3067,6 +3086,9 @@ export interface PoseDeMeuble {
   resservi repasse en tête : ce qui part, c'est ce qu'aucune scène n'a
   redemandé depuis longtemps (l'ancienne forme d'un meuble retouché).
 */
+/** Au-dessus, un meuble est posé en hauteur : il tient au mur, sans pieds (m). */
+export const EN_HAUTEUR = 0.3;
+
 const ATELIER_CACHE = new Map<string, ModeleLocal>();
 export const CACHE_DES_MODELES = 600;
 
@@ -3083,6 +3105,7 @@ export function modeleDe(p: PoseDeMeuble): ModeleLocal {
     p.couleurs?.dessus ?? '',
     p.couleurs?.cotes ?? '',
     (p.attributes ?? []).join(','),
+    p.yb >= EN_HAUTEUR ? 'suspendu' : '',
   ].join('|');
   const deja = ATELIER_CACHE.get(cle);
   if (deja) {
@@ -3100,6 +3123,7 @@ export function modeleDe(p: PoseDeMeuble): ModeleLocal {
       cotes: p.couleurs?.cotes,
       attributs: p.attributes ?? [],
       hasard: graineDe(p.id || cle),
+      suspendu: p.yb >= EN_HAUTEUR,
     },
   );
   if (ATELIER_CACHE.size >= CACHE_DES_MODELES) {

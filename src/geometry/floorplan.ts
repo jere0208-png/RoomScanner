@@ -604,6 +604,7 @@ export function facesDesMurs(walls: WallSeg[], t?: number): Map<string, DemiFace
   }
   const out = new Map<string, DemiFaces>();
   let pieces: Map<string, Pt[]> | null = null;
+  let ouvertes: Map<string, Pt[]> | null = null;
   let graphe: { niveau: number; pts: Pt[] }[] | null = null;
   for (const w of walls) {
     const e = t ?? epaisseurDe(w);
@@ -627,6 +628,24 @@ export function facesDesMurs(walls: WallSeg[], t?: number): Map<string, DemiFace
         const dedans = (s: number) => graphe!.some((c) => c.niveau === niveau && dansLeContour(sonde(s), c.pts));
         cotePlus = dedans(1);
         coteMoins = dedans(-1);
+        /*
+          UNE PIÈCE QUI NE SE FERME PAS A QUAND MÊME UN DEDANS — diagnostic
+          du patron, sa cuisine : un pan de 1,24 m n'avait pas été vu, aucune
+          face ne se fermait, et ses murs se dessinaient CENTRÉS sur leur
+          trait — les éléments hauts « entraient » de 7 cm dans le mur. Le
+          contour approché de la pièce (refermé sur le pan manquant) dit
+          encore de quel côté elle est.
+        */
+        // Le côté VU par la caméra départage d'abord (plus bas) : le contour
+        // approché ne sert qu'aux murs qui n'en disent rien.
+        if (cotePlus === coteMoins && !w.vu) {
+          ouvertes ??= piecesOuvertes(walls);
+          const approche = ouvertes.get(roomOf(w));
+          if (approche) {
+            cotePlus = dansLeContour(sonde(1), approche);
+            coteMoins = dansLeContour(sonde(-1), approche);
+          }
+        }
       }
       if (cotePlus && !coteMoins) {
         plus = 0;
@@ -656,6 +675,22 @@ function piecesFermees(walls: WallSeg[]): Map<string, Pt[]> {
   for (const { roomId, items } of groupByRoom(walls.filter((v) => v.type === 'wall'))) {
     const s = roomSurface(items);
     if (s?.exact && s.pts.length >= 3) out.set(roomId, s.pts);
+  }
+  return out;
+}
+
+/**
+ * Le contour APPROCHÉ de chaque pièce qui ne se ferme pas, par `roomId` :
+ * sa chaîne refermée sur le pan manquant. Il ne sert qu'à départager le
+ * dedans d'un mur que rien d'autre ne situe (voir `facesDesMurs`).
+ */
+function piecesOuvertes(walls: WallSeg[]): Map<string, Pt[]> {
+  const out = new Map<string, Pt[]>();
+  for (const { roomId, items } of groupByRoom(walls.filter((v) => v.type === 'wall'))) {
+    // Deux ou trois murs ne font pas une pièce : un coin, un T, rien qui dise où est le dedans.
+    if (items.length < 4) continue;
+    const s = roomSurface(items);
+    if (s && !s.exact && s.pts.length >= 3) out.set(roomId, s.pts);
   }
   return out;
 }
@@ -1017,6 +1052,17 @@ export function pushOutOfWalls(
     for (const w of walls) {
       const len = segLength(w);
       if (len < 1e-6) continue;
+      // Un mur tout entier sous le meuble ne le repousse pas (voir `clampFootprint`) :
+      // le meuble bas glissé à sa place, sous le coffrage de l'angle, y entre.
+      const sousLeMeuble = (q: Pt) => {
+        const dx0 = q.x - p.x;
+        const dz0 = q.z - p.z;
+        return (
+          Math.abs(dx0 * cos + dz0 * sin) <= box.width / 2 + 0.02 &&
+          Math.abs(-dx0 * sin + dz0 * cos) <= box.depth / 2 + 0.02
+        );
+      };
+      if (sousLeMeuble(w.a) && sousLeMeuble(w.b)) continue;
       const u = { x: (w.b.x - w.a.x) / len, z: (w.b.z - w.a.z) / len };
       let n = perpOf(u);
       const mid = { x: (w.a.x + w.b.x) / 2, z: (w.a.z + w.b.z) / 2 };
@@ -1110,8 +1156,15 @@ export function fitInNook(
   }
   const cos = Math.cos(box.yaw);
   const sin = Math.sin(box.yaw);
+  // Un mur tout entier sous le meuble ne borne pas sa place (voir `pushOutOfWalls`).
+  const sousLeMeuble = (q: Pt) => {
+    const dx0 = q.x - p.x;
+    const dz0 = q.z - p.z;
+    return Math.abs(dx0 * cos + dz0 * sin) <= box.width / 2 + 0.02 && Math.abs(-dx0 * sin + dz0 * cos) <= box.depth / 2 + 0.02;
+  };
+  const bornes = walls.filter((w) => !(sousLeMeuble(w.a) && sousLeMeuble(w.b)));
   const portee = (dx: number, dz: number) =>
-    castToWall(p, { x: dx, z: dz }, walls) ?? Infinity;
+    castToWall(p, { x: dx, z: dz }, bornes) ?? Infinity;
   /** La cote tenable dans cet axe, et de combien il faut se recentrer. */
   const selon = (dx: number, dz: number, cote: number) => {
     const plus = portee(dx, dz);
@@ -2918,6 +2971,22 @@ export function clampFootprint(
     */
     const corners = ts.slice(1).map((t) => t * len);
     if (Math.min(len, Math.max(...corners)) - Math.max(0, Math.min(...corners)) < 0.03) continue;
+    /*
+      UN MUR TOUT ENTIER DANS LE MEUBLE N'EST PAS À SA HAUTEUR — diagnostic
+      du patron, sa cuisine : le pilier de l'angle (deux murets de 31 et
+      50 cm) tombait en entier dans le meuble bas que RoomPlan voyait aligné
+      sur le lave-linge ; il le repoussait de 32 cm. Un mur dont les deux
+      bouts sont dans l'emprise du meuble est au-dessus de lui (un coffrage)
+      ou une erreur du relevé : il ne le repousse pas.
+    */
+    const dansLeMeuble = (p: Pt) => {
+      const dx0 = p.x - cx;
+      const dz0 = p.z - cz;
+      return (
+        Math.abs(dx0 * cos + dz0 * sin) <= f.width / 2 + 0.02 && Math.abs(-dx0 * sin + dz0 * cos) <= f.depth / 2 + 0.02
+      );
+    };
+    if (dansLeMeuble(w.a) && dansLeMeuble(w.b)) continue;
     const nx = -dz / len;
     const nz = dx / len;
     // Le meuble est ramené du côté de SA pièce, pas du côté où RoomPlan a

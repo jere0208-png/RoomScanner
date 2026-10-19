@@ -32,6 +32,7 @@ import {
 import type { WallSeg } from '../src/geometry/floorplan';
 import { COURRIEL_SUPPORT } from '../src/native/support';
 import { DiagnosticPlanScreen } from '../src/screens/DiagnosticPlanScreen';
+import { useAstuce } from '../src/ui/astuce';
 import { HOLD_MS, LibraryScreen } from '../src/screens/LibraryScreen';
 import { useScanStore, type SavedScan } from '../src/store/scanStore';
 
@@ -218,7 +219,23 @@ describe('la page du diagnostic', () => {
     expect(corps).toContain('Le coin reste ouvert');
     expect(fichier).toMatch(/\.json$/);
     expect(JSON.parse(contenu).remarques).toEqual([REMARQUES[0].cle]);
-    expect(textes(t).join(' ')).toMatch(/Merci/);
+    // Parti : la page se ferme, retour au menu, et le merci s'y affiche.
+    expect(useScanStore.getState().screen).toBe('library');
+    const a = useAstuce.getState();
+    expect([a.courante, ...a.file].map((x) => x?.texte).join(' ')).toMatch(/Merci/);
+    act(() => t.unmount());
+  });
+
+  it('envoi annulé : la page reste, la note tapée avec', async () => {
+    (NativeModules as Record<string, unknown>).RoomScanSupport = { composeMailTexte: jest.fn(async () => 'cancelled') };
+    const t = monter();
+    act(() => t.root.findByType(TextInput).props.onChangeText('Le coin reste ouvert'));
+    await act(async () => {
+      await parLabel(t, 'Envoyer le diagnostic').props.onPress();
+    });
+    expect(useScanStore.getState().screen).toBe('diagnostic');
+    expect(t.root.findByType(TextInput).props.value).toBe('Le coin reste ouvert');
+    expect(textes(t).join(' ')).toMatch(/annulé/);
     act(() => t.unmount());
   });
 
