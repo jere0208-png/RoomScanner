@@ -190,6 +190,7 @@ export function ObjectBar({
   onNudge,
   onPlacer,
   onDupliquer,
+  onRemplacer,
   passage,
   sol,
   onCaler,
@@ -226,6 +227,8 @@ export function ObjectBar({
   onPlacer?: () => void;
   /** Un meuble de plus, le même : les chaises d'une table, deux chevets. */
   onDupliquer?: () => void;
+  /** Ce n'est pas ce meuble-là : le catalogue s'ouvre pour le remplacer, à sa place. */
+  onRemplacer?: () => void;
   onCancel: () => void;
   /**
    * LE DÉPLACEMENT AU CENTIMÈTRE, À LA FLÈCHE.
@@ -406,6 +409,8 @@ export function ObjectBar({
             geste('Placer au centimètre', 'Placer', SOLAIRES.metre, palette.blue, onPlacer)}
           {onDupliquer &&
             geste('Dupliquer le meuble', 'Dupliquer', SOLAIRES.dupliquer, palette.blue, onDupliquer)}
+          {onRemplacer &&
+            geste('Remplacer le meuble', 'Remplacer', SOLAIRES.meubler, palette.blue, onRemplacer)}
           {geste('Pivoter', 'Pivoter', SOLAIRES.pivoter, palette.blue, onRotate)}
           {onMeridienne &&
             geste(

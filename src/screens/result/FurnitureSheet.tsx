@@ -68,22 +68,41 @@ const SYNONYMES: Record<string, string[]> = {
   tv: ['television', 'tele'],
   tele: ['television', 'tv'],
   frigo: ['refrigerateur'],
-  sdb: ['salle de bain', 'baignoire', 'douche'],
+  sdb: ['salle de bain', 'salle d’eau', 'baignoire', 'douche'],
   wc: ['toilette'],
   sofa: ['canape'],
   divan: ['canape'],
+  salon: ['sejour'],
 };
+
+/*
+  « SALLE DE BAIN » SE DIT AUSSI — agent testeur MEUBLES : la famille
+  s'appelle « Salle d'eau », et « salle de bain » ne trouvait rien.
+*/
+const EXPRESSIONS: [RegExp, string][] = [[/\bsalles? de bains?\b/g, 'salle d’eau']];
+
+/** « chaises » trouve « Chaise », « tableaux » trouve « Tableau ». */
+const singulier = (m: string) => (m.length > 3 && /[sx]$/.test(m) ? m.slice(0, -1) : m);
 
 /**
  * MOT PAR MOT — revue « Théo » : « table manger » et « canape angle » ne
  * trouvaient rien, parce que la recherche voulait la suite exacte. Chaque
  * mot tapé doit se retrouver, dans n'importe quel ordre.
  */
-export function matchItem(item: CatalogItem, quete: string): boolean {
-  const mots = sansAccent(quete.trim()).split(/[\s'’-]+/).filter(Boolean);
+/*
+  AU PLURIEL, ET PAR PIÈCE — agent testeur MEUBLES : « chaises »,
+  « canapés », « meubles hauts » ne trouvaient rien (la recherche voulait le
+  mot exact, au singulier), ni « cuisine » ou « chambre » (le nom de la
+  famille n'était pas lu). `famille` : le nom de la famille du catalogue.
+*/
+export function matchItem(item: CatalogItem, quete: string, famille = ''): boolean {
+  let q = sansAccent(quete.trim());
+  for (const [motif, dit] of EXPRESSIONS) q = q.replace(motif, dit);
+  const mots = q.split(/[\s'’-]+/).filter(Boolean);
   if (mots.length === 0) return true;
-  const texte = sansAccent(`${item.label} ${item.category}`);
-  return mots.every((m) => texte.includes(m) || (SYNONYMES[m] ?? []).some((s) => texte.includes(s)));
+  const texte = sansAccent(`${item.label} ${item.category} ${famille}`);
+  const trouve = (m: string) => texte.includes(m) || (SYNONYMES[m] ?? []).some((s) => texte.includes(sansAccent(s)));
+  return mots.every((m) => trouve(m) || trouve(singulier(m)));
 }
 
 /**
@@ -387,7 +406,10 @@ export function FurnitureSheet({
   onGlisser,
   onLacher,
   poseValide = true,
+  titre = 'Ajouter un meuble',
 }: {
+  /** Le titre de la feuille : « Remplacer … par » quand on remplace un meuble. */
+  titre?: string;
   visible: boolean;
   quete: string;
   onQuete: (q: string) => void;
@@ -512,7 +534,9 @@ export function FurnitureSheet({
   ) => {
     setEnMain(null);
     setDoigt(null);
-    onLacher?.(item, page);
+    // Sans plan où lâcher (on remplace un meuble), la tuile levée se choisit.
+    if (onLacher) onLacher(item, page);
+    else if (page) onPick(item);
   };
 
   return (
@@ -531,7 +555,7 @@ export function FurnitureSheet({
           <Pressable
             style={[styles.modalCard, auClavier && { maxHeight: hauteurEcran - clavier - marges.top - 16 }]}
             onPress={() => {}}>
-            <Text style={styles.modalTitle}>Ajouter un meuble</Text>
+            <Text style={styles.modalTitle} numberOfLines={1}>{titre}</Text>
             {!auClavier && (
               <Text style={styles.catAide}>
                 Touchez pour poser au centre, maintenez pour glisser sur le plan.
@@ -638,7 +662,7 @@ export function FurnitureSheet({
               keyboardShouldPersistTaps="handled">
               {CATALOGUE.map((famille) => {
                 if (familleChoisie && famille.name !== familleChoisie) return null;
-                const trouves = famille.items.filter((i) => matchItem(i, quete));
+                const trouves = famille.items.filter((i) => matchItem(i, quete, famille.name));
                 if (trouves.length === 0) return null;
                 return (
                   <View key={famille.name}>

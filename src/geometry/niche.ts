@@ -322,7 +322,7 @@ function ecartAuVoisin(o: ObjectData, r: Repere, signe: 1 | -1, objets: ObjectDa
 }
 
 /** Deux meubles se gênent : leurs emprises se chevauchent, à la même hauteur. */
-function seGenent(a: ObjectData, b: ObjectData): boolean {
+export function seGenent(a: ObjectData, b: ObjectData): boolean {
   return enHauteur(a, b) > 0.05 && assezProches(a, b, 0) && chevauchent(emprise(a), emprise(b));
 }
 
@@ -424,4 +424,47 @@ export function alignerLesMeubles<O extends ObjectData>(objets: O[], walls: Wall
     out = suivant;
   }
   return out;
+}
+
+/**
+ * CONTRE LE MUR LE PLUS PROCHE — agent testeur MEUBLES.
+ *
+ * Le meuble qui se fixe au mur (`seFixeAuMur`) vient au mur le plus proche
+ * du point visé : dos au nu de ce mur, centré sur le point visé le long du
+ * mur sans en dépasser les bouts. Le côté du mur est celui où se trouve le
+ * point visé ; posé pile sur le trait, celui de `dedans` (le cœur de la
+ * pièce). Null s'il n'y a pas de mur assez long.
+ */
+export function contreLeMurLePlusProche(
+  p: Pt,
+  box: { width: number; depth: number },
+  walls: WallSeg[],
+  dedans: Pt,
+): { centre: Pt; yaw: number } | null {
+  let mieux: { w: WallSeg; d: number; s: number; L: number; u: Pt } | null = null;
+  for (const w of walls) {
+    if (w.type !== 'wall') continue;
+    const L = segLength(w);
+    if (L < Math.min(box.width, 0.3)) continue;
+    const u = { x: (w.b.x - w.a.x) / L, z: (w.b.z - w.a.z) / L };
+    const s = Math.max(0, Math.min(L, (p.x - w.a.x) * u.x + (p.z - w.a.z) * u.z));
+    const d = Math.hypot(p.x - (w.a.x + u.x * s), p.z - (w.a.z + u.z * s));
+    if (!mieux || d < mieux.d) mieux = { w, d, s, L, u };
+  }
+  if (!mieux) return null;
+  const { w, L, u } = mieux;
+  const plus = { x: -u.z, z: u.x };
+  const cote = (q: Pt) => (q.x - w.a.x) * plus.x + (q.z - w.a.z) * plus.z;
+  const versLaPiece = Math.abs(cote(p)) > 0.02 ? cote(p) >= 0 : cote(dedans) >= 0;
+  const n = versLaPiece ? plus : { x: -plus.x, z: -plus.z };
+  const f = demiFacesDe(walls, w);
+  const face = versLaPiece ? f.plus : f.moins;
+  // Le long du mur : là où l'on vise, sans dépasser ses bouts.
+  const s = L >= box.width ? Math.max(box.width / 2, Math.min(L - box.width / 2, mieux.s)) : L / 2;
+  const recul = face + box.depth / 2;
+  return {
+    centre: { x: w.a.x + u.x * s + n.x * recul, z: w.a.z + u.z * s + n.z * recul },
+    // Le dos (+z local) regarde le mur : ez = −n.
+    yaw: Math.atan2(n.x, -n.z),
+  };
 }

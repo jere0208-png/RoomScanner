@@ -1549,6 +1549,12 @@ export function ResultScreen() {
   const [prompt, setPrompt] = useState<PromptData | null>(null);
   // Catalogue de mobilier : ouvert par le « + » posé à côté du calque meubles.
   const [catalogue, setCatalogue] = useState(false);
+  /*
+    LE MEUBLE QU'ON REMPLACE — agent testeur MEUBLES : le catalogue s'ouvre
+    sur « Remplacer … par », et le meuble choisi prend sa place (voir
+    `remplacerMeuble`). Null : le catalogue ajoute, comme avant.
+  */
+  const [remplacant, setRemplacant] = useState<string | null>(null);
   // Cotes du meuble : à la demande. Le bandeau couvrait le plan en
   // permanence pour un réglage qu'on ne fait qu'une fois.
   const [objDims, setObjDims] = useState(false);
@@ -6101,6 +6107,11 @@ export function ResultScreen() {
                     verdict &&
                     alerte(verdict.ok ? 'Il passe' : 'Il ne passe pas', verdict.detail)
                   }
+                  onRemplacer={() => {
+                    setRemplacant(selectedObject.id);
+                    setQuete('');
+                    setCatalogue(true);
+                  }}
                   onDupliquer={() => {
                     const copie = useScanStore.getState().dupliquerMeuble(selectedObject.id);
                     if (!copie) return;
@@ -8070,12 +8081,32 @@ export function ResultScreen() {
         visible={catalogue}
         quete={quete}
         onQuete={setQuete}
-        onClose={() => setCatalogue(false)}
-        onPick={placeObject}
+        titre={(() => {
+          const o = remplacant ? objects.find((x) => x.id === remplacant) : undefined;
+          return o ? `Remplacer « ${nomDuMeuble(o)} » par` : undefined;
+        })()}
+        onClose={() => {
+          setCatalogue(false);
+          setRemplacant(null);
+        }}
+        onPick={(item) => {
+          if (remplacant && objects.some((x) => x.id === remplacant)) {
+            useScanStore.getState().remplacerMeuble(remplacant, item);
+            setSelectedObjectId(remplacant);
+            setRemplacant(null);
+            setCatalogue(false);
+            setQuete('');
+            haptic('succes');
+            return;
+          }
+          setRemplacant(null);
+          placeObject(item);
+        }}
         /* Maintenue, la tuile se tire jusque sur le plan : le catalogue
            s'efface, le meuble suit le doigt, et il atterrit où on le lâche. */
-        onGlisser={suivreLeMeuble}
-        onLacher={lacherLeMeuble}
+        // On remplace : la tuile se touche, elle ne se tire pas sur le plan.
+        onGlisser={remplacant ? undefined : suivreLeMeuble}
+        onLacher={remplacant ? undefined : lacherLeMeuble}
         poseValide={poseValide}
       />
 
