@@ -166,7 +166,7 @@ import {
   nomDeLaPorte,
   passageDuMeuble,
 } from '../geometry/passage';
-import { type CatalogItem } from '../geometry/catalogue';
+import { familleDeLaPiece, type CatalogItem } from '../geometry/catalogue';
 import { buildObj, buildObjMaison, objFilename } from '../export/model3d';
 import { checkPlan } from '../geometry/diagnostics';
 import {
@@ -8436,6 +8436,7 @@ export function ResultScreen() {
           const o = remplacant ? objects.find((x) => x.id === remplacant) : undefined;
           return o ? `Remplacer « ${nomDuMeuble(o)} » par` : undefined;
         })()}
+        familleConseillee={remplacant ? null : familleDeLaPiece(targetRoom?.name)}
         onClose={() => {
           setCatalogue(false);
           setRemplacant(null);

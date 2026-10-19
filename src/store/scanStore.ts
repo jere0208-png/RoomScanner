@@ -126,7 +126,16 @@ import { avecCoffresDuLidar } from '../geometry/coffreLidar';
 import { avecLesBordsDuLidar, releveLogique, sansMeublesEnDouble } from '../geometry/logique';
 import type { MurDouteux } from '../geometry/murDouteux';
 import { reunirLesCanapesDAngle } from '../geometry/canapeAngle';
-import { alignerLesMeubles, calerDansLaNiche, calerLesMeubles, contreLeMurLePlusProche, seGenent } from '../geometry/niche';
+import {
+  adosserAuMurProche,
+  alignerLesMeubles,
+  axeDeLaPiece,
+  calerDansLaNiche,
+  calerLesMeubles,
+  capSurLesMurs,
+  contreLeMurLePlusProche,
+  seGenent,
+} from '../geometry/niche';
 import { meublesQuiSuivent, pointQuiSuit } from '../geometry/redressement';
 import {
   cibleDAlignement,
@@ -12073,13 +12082,31 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         la pièce, en l'air. Ils viennent au mur le plus proche du point visé,
         dos au nu (voir `seFixeAuMur`, `contreLeMurLePlusProche`).
       */
-      const auMur =
-        accueil && seFixeAuMur(item.key)
+      /*
+        ET CE QUI S'ADOSSE, LÂCHÉ PRÈS D'UN MUR — peaufinage MEUBLES : le lit,
+        l'armoire, le canapé, le lave-linge viennent dos au mur proche, sans
+        se poser devant une porte (voir `adosserAuMurProche`). Lâchés au
+        milieu de la pièce, ils restent où on les a mis, d'aplomb avec ses
+        murs (une pièce relevée de biais les recevait de travers).
+      */
+      const auMur = !accueil
+        ? null
+        : seFixeAuMur(item.key)
           ? contreLeMurLePlusProche({ x, z }, { width: item.w, depth: item.d }, accueil.walls, accueil.labelAt)
-          : null;
-      if (auMur) {
-        const c = Math.cos(auMur.yaw);
-        const sn = Math.sin(auMur.yaw);
+          : adosserAuMurProche(
+              item.key,
+              { x, z },
+              { width: item.w, depth: item.d },
+              accueil.walls,
+              accueil.labelAt,
+              ici.openings,
+            );
+      const axe = !auMur && accueil ? axeDeLaPiece(accueil.walls) : 0;
+      const cap = auMur ? auMur.yaw : axe;
+      if (auMur || axe) {
+        const c = Math.cos(cap);
+        const sn = Math.sin(cap);
+        const centre = auMur ? auMur.centre : { x, z };
         set({
           objects: get().objects.map((o) => {
             if (o.id !== id) return o;
@@ -12088,8 +12115,8 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
             t[2] = sn;
             t[8] = -sn;
             t[10] = c;
-            t[12] = auMur.centre.x;
-            t[14] = auMur.centre.z;
+            t[12] = centre.x;
+            t[14] = centre.z;
             return { ...o, transform: t };
           }),
         });
@@ -12123,11 +12150,21 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       const depart =
         ancre && Math.hypot(ancre.apres.x - ici.x, ancre.apres.z - ici.z) < 1e-4 ? ancre.depart : ici;
       pushHistory(`rotate:${id}`);
+      /*
+        LE QUART DE TOUR RETOMBE D'APLOMB AVEC LES MURS — peaufinage MEUBLES :
+        un meuble relevé de 3° de travers gardait son travers à chaque quart
+        de tour. Il se recale sur l'axe de sa pièce (`capSurLesMurs`).
+      */
+      const saPiece = avant.roomId
+        ? roomParts(get().walls, get().rooms).find((p) => p.roomId === avant.roomId)
+        : undefined;
+      const axe = saPiece ? axeDeLaPiece(saPiece.walls) : null;
       set({
         objects: get().objects.map((o) => {
           if (o.id !== id) return o;
           const t = [...o.transform];
-          const yaw = Math.atan2(t[2], t[0]) + (Math.PI / 2) * quarts;
+          const brut = Math.atan2(t[2], t[0]);
+          const yaw = axe === null ? brut + (Math.PI / 2) * quarts : capSurLesMurs(brut, quarts, axe);
           const cos = Math.cos(yaw);
           const sin = Math.sin(yaw);
           t[0] = cos;

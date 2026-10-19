@@ -240,6 +240,24 @@ export const CATALOGUE: CatalogFamily[] = [
 
 export const CATALOG_ITEMS = CATALOGUE.flatMap((f) => f.items);
 
+/**
+ * LA FAMILLE DU CATALOGUE QUI VA AVEC UNE PIÈCE — peaufinage MEUBLES : on
+ * meuble la chambre avec des meubles de chambre. Lue au nom de la pièce ;
+ * null quand le nom ne dit rien (le catalogue s'ouvre alors sur « Tout »).
+ */
+export function familleDeLaPiece(nom: string | undefined | null): string | null {
+  const n = (nom ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (!n) return null;
+  if (/cuisine|kitchenette/.test(n) && !/sejour|salon/.test(n)) return 'Cuisine';
+  if (/chambre|suite|dortoir/.test(n)) return 'Chambre';
+  if (/sejour|salon|living|salle a manger/.test(n)) return 'Séjour';
+  if (/salle d.?eau|salle de bains?|sdb|douche|bain/.test(n)) return 'Salle d’eau';
+  if (/bureau/.test(n)) return 'Bureau';
+  if (/entree|hall|couloir|degagement/.test(n)) return 'Entrée';
+  if (/balcon|terrasse|jardin|loggia/.test(n)) return 'Balcon et jardin';
+  return null;
+}
+
 export function catalogItem(key: string): CatalogItem | undefined {
   return CATALOG_ITEMS.find((i) => i.key === key);
 }

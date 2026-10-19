@@ -344,14 +344,74 @@ export function hiddenByBox(
  * catégorie — et un évier relevé en salle d'eau ou au WC est un lavabo.
  */
 export function nomDuMeuble(
-  o: { nom?: string; modele?: string; category?: string },
+  o: {
+    nom?: string;
+    modele?: string;
+    category?: string;
+    width?: number;
+    depth?: number;
+    height?: number;
+    attributes?: string[];
+  },
   piece?: RoomKind | null,
 ): string {
   if (o.nom) return o.nom;
   const duCatalogue = o.modele ? catalogItem(o.modele)?.label : undefined;
   if (duCatalogue) return duCatalogue;
   if (furnKind(o.category ?? '') === 'sink' && (piece === 'bathroom' || piece === 'wc')) return 'Lavabo';
-  return frCategory(o.category ?? '');
+  return nomParLaForme(o, piece) ?? frCategory(o.category ?? '');
+}
+
+/*
+  LE MEUBLE RELEVÉ SE NOMME À SA FORME — peaufinage MEUBLES. RoomPlan ne dit
+  que « storage », « bed », « table » : la liste du Décorer, le dossier et la
+  barre du meuble alignaient cinq « Rangement » sans dire lequel était
+  l'armoire. Ses cotes, et la pièce quand on la connaît, le disent : une
+  armoire est haute et profonde, une bibliothèque haute et mince, un meuble
+  bas de cuisine fait 90 cm, un lit de 1,40 m est un lit double. Null quand
+  la forme ne tranche pas : le nom de la catégorie reste.
+*/
+function nomParLaForme(
+  o: { category?: string; width?: number; depth?: number; height?: number; attributes?: string[] },
+  piece?: RoomKind | null,
+): string | null {
+  const w = o.width ?? 0;
+  const d = o.depth ?? 0;
+  const h = o.height ?? 0;
+  if (!(w > 0 && d > 0 && h > 0)) return null;
+  const kind = furnKind(o.category ?? '');
+  const cuisine = piece === 'kitchen' || piece === 'sejourCuisine';
+  if (kind === 'bed') {
+    const large = Math.min(w, d);
+    if (large >= 1.25) return 'Lit double';
+    if (large <= 1.0) return 'Lit simple';
+    return null;
+  }
+  if (kind === 'sofa') {
+    if ((o.attributes ?? []).some((a) => /SofaType:lShaped/i.test(a))) return 'Canapé d’angle';
+    const long = Math.max(w, d);
+    if (long >= 2.1) return 'Canapé 3 places';
+    if (long <= 1.75) return 'Canapé 2 places';
+    return null;
+  }
+  if (kind === 'table') {
+    if (h <= 0.55) return 'Table basse';
+    return null;
+  }
+  if (kind !== 'storage') return null;
+  if (cuisine) {
+    if (h >= 1.8) return 'Colonne';
+    if (h >= 0.7 && h <= 1.05 && d >= 0.45) return 'Meuble bas';
+    if (h <= 1.0 && d < 0.45) return 'Meuble haut';
+    return null;
+  }
+  if (piece === 'bathroom') return 'Meuble de salle de bain';
+  if (h >= 1.5 && d >= 0.45) return 'Armoire';
+  if (h >= 1.2 && d < 0.45) return 'Bibliothèque';
+  if (piece === 'bedroom' && w <= 0.6 && h <= 0.75) return 'Chevet';
+  if (h <= 0.65 && w >= 1.1 && (piece === 'living' || !piece)) return 'Meuble TV';
+  if (h >= 0.7 && h <= 1.3) return piece === 'bedroom' ? 'Commode' : piece === 'living' || piece === 'dining' ? 'Buffet' : null;
+  return null;
 }
 
 export function frCategory(category: string): string {
