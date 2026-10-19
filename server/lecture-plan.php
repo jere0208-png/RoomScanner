@@ -37,6 +37,7 @@
  *   ANTHROPIC_MODELE       facultatif, l'électricité : 'claude-sonnet-5-5' par défaut ;
  *   ANTHROPIC_MODELE_PLAN  facultatif, le bâti : MODELE_DU_BATI par défaut.
  */
+require_once __DIR__ . '/garde-fous.php';
 
 /**
  * Ce qui vaut pour toutes les lectures : les images, le repère, le plan à lire.
@@ -432,6 +433,8 @@ const QUADRILLAGE = [170, 0, 230];
 
 function vuesDuPlan(string $octets): ?array {
   if (!function_exists('imagecreatefromstring')) return null;
+  // Une image démesurée ne se déplie pas (revue « sécurité » : 1,7 Go pour un PNG de 775 Ko).
+  if (imageTropGrande($octets) !== null) return null;
   @ini_set('memory_limit', '768M');
   $src = @imagecreatefromstring($octets);
   if (!$src) return null;
@@ -626,6 +629,12 @@ function lirePlanPapier(string $image, string $media, array $textes): array {
   }
   if (strlen($octets) > 9 * 1024 * 1024) {
     return ['ok' => false, 'raison' => 'La photo est trop lourde : recommencez la prise.'];
+  }
+  // Mesurée avant d'être décodée : neuf mégaoctets compressés peuvent se
+  // déplier en plusieurs gigaoctets (voir `imageTropGrande`).
+  $tropGrande = imageTropGrande($octets);
+  if ($tropGrande !== null) {
+    return ['ok' => false, 'raison' => $tropGrande];
   }
   $lectures = preparerLesLectures($octets, $media, $textes);
   $corpsDe = function (string $cle, array $l, bool $impose): array {

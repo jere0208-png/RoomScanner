@@ -167,6 +167,11 @@ class RoomScanModule: NSObject {
     if #available(iOS 16.0, *) { RoomScanManager.shared.pause() }
   }
 
+  /// La croix « Abandonner » : la session s'éteint pour de bon (voir `abandonner`).
+  @objc func abandonRoomScan() {
+    if #available(iOS 16.0, *) { RoomScanManager.shared.abandonner() }
+  }
+
   @objc func resumeRoomScan() {
     if #available(iOS 16.0, *) { RoomScanManager.shared.resume() }
   }

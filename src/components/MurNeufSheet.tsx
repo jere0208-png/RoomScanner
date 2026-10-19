@@ -15,7 +15,7 @@
  * Le petit schéma du haut dit, avant de valider, de quoi chaque nombre est
  * la cote : une valeur juste mesurée du mauvais côté est une valeur fausse.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Svg, { Line, Rect, Text as SvgText } from 'react-native-svg';
 import { SheetShell, useKeyboardInset } from './Sheet';
@@ -622,7 +622,8 @@ export function OuvertureSheet({
   const attente = useRef<null | (() => void)>(null);
   const porte = ouverture?.type === 'door';
   const nature: Nature = (ouverture?.type as Nature) ?? 'opening';
-  const pos = ouverture ? positionOuverture(ouverture, walls) : null;
+  // Les nus du mur se lisent sur les pièces découpées : une fois par ouverture, pas à chaque frappe.
+  const pos = useMemo(() => (ouverture ? positionOuverture(ouverture, walls) : null), [ouverture, walls]);
 
   // Les cotes actuelles, depuis le coin LE PLUS PROCHE : c'est de lui
   // qu'on mesure sur place.

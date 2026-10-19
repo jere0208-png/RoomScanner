@@ -435,7 +435,13 @@ export function SheetShell({
         <View
           pointerEvents="box-none"
           style={[styles.avoider, { paddingBottom: clavier }]}>
+          {/*
+            EN DESCENDANT, ELLE N'ÉCOUTE PLUS — agent « novice » : pendant les
+            160 ms de descente, un second appui sur « Enregistrer comme
+            nouvelle copie » créait une seconde copie, et la payait.
+          */}
           <Animated.View
+            pointerEvents={visible ? 'auto' : 'none'}
             style={{
               opacity: monte,
               transform: [

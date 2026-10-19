@@ -40,6 +40,7 @@ beforeEach(() => {
   (laserEvents.addListener as jest.Mock).mockClear();
   (RoomScan.laserChercher as jest.Mock).mockClear();
   (RoomScan.laserArreter as jest.Mock).mockClear();
+  (RoomScan.laserDeconnecter as jest.Mock).mockClear();
 });
 
 const monter = (cible: { nom: string; actuelle: number | null }, sur: (m: number) => void) => {
@@ -66,6 +67,17 @@ describe('la radio ne vit que le temps de la feuille', () => {
     // Sans cela, le Bluetooth resterait allumé pour un écran qui n'existe
     // plus — et l'électricien verrait sa batterie fondre sans comprendre.
     expect(RoomScan.laserArreter).toHaveBeenCalled();
+  });
+
+  it('un télémètre connecté est déconnecté quand la feuille se ferme', () => {
+    const t = monter({ nom: 'ce mur', actuelle: 3.42 }, () => {});
+    const etat = (laserEvents.addListener as jest.Mock).mock.calls.find((a) => a[0] === 'onLaserEtat');
+    act(() => etat?.[1]({ etat: 'connecte', nom: 'DISTO' }));
+    expect(RoomScan.laserDeconnecter).not.toHaveBeenCalled();
+    act(() => t.unmount());
+    // Sinon la liaison reste ouverte, et le télémètre ne s'annonce plus à
+    // la réouverture.
+    expect(RoomScan.laserDeconnecter).toHaveBeenCalled();
   });
 });
 

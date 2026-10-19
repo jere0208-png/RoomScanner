@@ -36,6 +36,7 @@ import {
   construirePartie,
   demarrerEnvoi,
   envoyerDiagnostic,
+  identiteMasquee,
 } from '../src/diagnostic/envoi';
 import { noter } from '../src/diagnostic/journal';
 import { useScanStore } from '../src/store/scanStore';
@@ -280,5 +281,19 @@ describe('une session, du premier appui au second', () => {
     expect(types).toContain('session');
     expect(types).toContain('plan');
     expect(types).not.toContain('avant la session');
+  });
+});
+
+/*
+  LE COMPTE, SANS SON ADRESSE — revue « sécurité » : l'identifiant d'un
+  compte e-mail est son adresse ; seul le nom de la méthode part au journal.
+*/
+describe('identiteMasquee', () => {
+  it('ne garde que la méthode de connexion', () => {
+    expect(identiteMasquee('email:patron@exemple.fr')).toBe('email');
+    expect(identiteMasquee('apple:001234.abcd')).toBe('apple');
+    expect(identiteMasquee('google:42')).toBe('google');
+    expect(identiteMasquee('sans-methode')).toBe('compte');
+    expect(identiteMasquee(undefined)).toBeUndefined();
   });
 });

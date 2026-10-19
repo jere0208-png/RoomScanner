@@ -43,12 +43,11 @@ export function resumeDuScan(x: {
   objets: number;
   surface: SurfaceResumee | null;
 }): string {
-  const fr1 = (v: number) => v.toFixed(1).replace('.', ',');
   return [
     ...(x.pieces > 1 ? [pluriel(x.pieces, 'pièce')] : []),
     pluriel(x.murs, 'mur'),
     ...(x.surface
-      ? [`${x.surface.exact ? '' : '≈ '}${fr1(x.surface.area)} m²`]
+      ? [`${x.surface.exact ? '' : '≈ '}${frM2(x.surface.area)} m²`]
       : []),
     ...(x.objets > 0 ? [pluriel(x.objets, 'objet')] : []),
   ].join(' · ');
@@ -103,3 +102,14 @@ export function enumerer(morceaux: string[]): string {
   if (morceaux.length === 1) return morceaux[0];
   return `${morceaux.slice(0, -1).join(', ')} et ${morceaux[morceaux.length - 1]}`;
 }
+
+/*
+  UNE SURFACE S'ÉCRIT PARTOUT DE LA MÊME FAÇON — revue du géomètre : l'écran
+  arrondissait par `toFixed(2)`, le PDF au centième d'abord ; une pièce de
+  2,05 × 2,10 lisait 4,30 m² ici et 4,31 au dossier (7 % des pièces). Une
+  seule règle, deux décimales, la virgule française.
+*/
+/** Une surface arrondie au centième (m²). */
+export const arrondiM2 = (v: number): number => Math.round(v * 100) / 100;
+/** Une surface écrite : « 12,35 » (sans l'unité). */
+export const frM2 = (v: number): string => arrondiM2(v).toFixed(2).replace('.', ',');

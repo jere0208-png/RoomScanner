@@ -71,9 +71,9 @@ class RoomScanPhoto: NSObject {
   static func resolvePhoto(_ path: String) -> URL? {
     let url = URL(fileURLWithPath: path)
     let nom = url.lastPathComponent
-    guard !nom.isEmpty, nom != ".", nom != "..",
-          url.deletingLastPathComponent().lastPathComponent == "photos" else {
-      return nil
+    guard !nom.isEmpty, nom != ".", nom != ".." else { return nil }
+    guard url.deletingLastPathComponent().lastPathComponent == "photos" else {
+      return ancienneVueDeMur(url)
     }
     let fm = FileManager.default
     if fm.fileExists(atPath: url.path) { return url }
@@ -84,6 +84,24 @@ class RoomScanPhoto: NSObject {
       .appendingPathComponent("photos", isDirectory: true)
       .appendingPathComponent(nom)
     return fm.fileExists(atPath: candidat.path) ? candidat : nil
+  }
+
+  /**
+   LES PHOTOS DE MUR D'AVANT — écrites à la racine des Documents
+   (`mur-<UUID>.jpg`, voir `PhotographeDesMurs.livrer`). On les relit et on
+   les efface encore, mais la garde reste stricte : ce nom exact, à la racine
+   des Documents de CE conteneur, et rien d'autre.
+   */
+  private static func ancienneVueDeMur(_ url: URL) -> URL? {
+    let nom = url.lastPathComponent
+    guard url.deletingLastPathComponent().lastPathComponent == "Documents",
+          nom.range(
+            of: "^mur-[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\\.jpg$",
+            options: .regularExpression) != nil,
+          let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+    else { return nil }
+    let candidat = docs.appendingPathComponent(nom)
+    return FileManager.default.fileExists(atPath: candidat.path) ? candidat : nil
   }
 
   /// Le dossier Documents de CE conteneur : le JS y rebranche, pour les
@@ -457,6 +475,8 @@ class RoomScanPhoto: NSObject {
       resolve(nil)
       return
     }
+    // Une prise de vue précédente encore en attente se règle (annulée).
+    self.resolve?(nil)
     self.resolve = resolve
     self.reject = reject
     DispatchQueue.main.async { self.present(attempt: 0) }

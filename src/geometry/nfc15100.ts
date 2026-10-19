@@ -1729,6 +1729,12 @@ export interface Circuit {
    */
   ceilingIds?: string[];
   /**
+   * SON PROPRE DIFFÉRENTIEL — la borne de recharge : chaque point de charge a
+   * sa protection 30 mA à lui (NF C 15-100, partie 7-722), jamais partagée
+   * avec la plaque ou le chauffe-eau. Voir `planDifferentials`.
+   */
+  differentielPropre?: boolean;
+  /**
    * UN VA-ET-VIENT, D'APRÈS LES LIENS TRACÉS — un point lumineux commandé par
    * deux interrupteurs au moins (l'interrupteur général ne compte pas : il
    * coupe, il ne commande pas). Absent quand aucun lien n'est tracé : on s'en
@@ -2092,6 +2098,7 @@ export function planCircuits(
       section: 10,
       breaker: 40,
       note: 'Circuit dédié (7,4 kW), différentiel 30 mA type A ou F ; section à vérifier selon la longueur.',
+      differentielPropre: true,
     },
   };
   for (const f of fixtures.filter((x) => x.kind === 'sortieCable' && !!x.usage && !!DEDIEES[x.usage])) {
@@ -2200,10 +2207,11 @@ export function minimumAC(surface: number | undefined): { nombre: number; calibr
 export function planDifferentials(circuits: Circuit[], surface?: number): Differential[] {
   const proteges = circuits.filter((c) => c.nature !== 'vdi');
   if (proteges.length === 0) return [];
+  const propres = proteges.filter((c) => c.differentielPropre);
   const typeA = proteges.filter(
-    (c) => c.nature === 'cuisson' || c.nature === 'specialise',
+    (c) => !c.differentielPropre && (c.nature === 'cuisson' || c.nature === 'specialise'),
   );
-  const reste = proteges.filter((c) => !typeA.includes(c));
+  const reste = proteges.filter((c) => !typeA.includes(c) && !propres.includes(c));
   const out: Differential[] = [];
   chunk(typeA, MAX_PAR_DIFF).forEach((lot, i) =>
     out.push({
@@ -2233,7 +2241,7 @@ export function planDifferentials(circuits: Circuit[], surface?: number): Differ
       );
   }
   // Un logement sans circuit spécialisé n'aurait aucun type A : la norme en
-  // impose un de toute façon.
+  // impose un de toute façon. (Celui de la borne ne compte pas : il est à elle.)
   if (!out.some((d) => d.type === 'A')) {
     out.unshift({
       label: 'Différentiel type A 1',
@@ -2241,6 +2249,16 @@ export function planDifferentials(circuits: Circuit[], surface?: number): Differ
       rating: 40,
       circuits: [],
       circuitIds: [],
+    });
+  }
+  // La borne de recharge, chacune derrière le sien — au moins de son calibre.
+  for (const c of propres) {
+    out.push({
+      label: `Différentiel type A — ${c.label}`,
+      type: 'A',
+      rating: Math.max(40, c.breaker ?? 40),
+      circuits: [c.label],
+      circuitIds: [c.id],
     });
   }
   return out;
@@ -2292,6 +2310,15 @@ export function materialList(
    * fait acheter aucun est pire qu'un dossier qui n'en parle pas.
    */
   ceiling?: CeilingFixture[],
+  /**
+   * CE QUE LE CONTRÔLE DE L'ÉCRAN SAIT EN PLUS — les plans de travail (la
+   * hauteur au-dessus d'une crédence) et le logement entier (le tableau, le
+   * DAAF posés à un autre niveau). Voir `checkElectrical`.
+   */
+  contexte?: {
+    worktops?: Map<string, { x: (f: Fixture) => number; plans: Worktop[]; devant?: Pt }>;
+    logement?: LogementEntier;
+  },
 ): MaterialList {
   const roomById = new Map(rooms.map((r) => [r.id, r]));
   const firstRoom = (f: Fixture) => {
@@ -2300,8 +2327,18 @@ export function materialList(
     const ids = roomOfWall.get(f.wallId) ?? [];
     return ids.map((id) => roomById.get(id)).find((r) => !!r);
   };
-  const nameOf = (f: Fixture) => firstRoom(f)?.name || 'Hors pièce';
-  const isKitchen = (f: Fixture) => priseDeCuisine(f, firstRoom(f));
+  /*
+    LES CIRCUITS SE FORMENT COMME LE TRACÉ LES FORME — revue « chantier » :
+    `planRoutes` (et l'écran, et le tableau) ne lisent que le placement ; la
+    liste rangeait en plus un appareil hors de toute pièce (une prise de
+    terrasse, sur la face extérieure d'un mur de la cuisine) dans la pièce de
+    son mur. Les numéros des circuits se décalaient, et le métré d'un
+    circuit atterrissait sur un autre. Le décompte par pièce, lui, garde la
+    pièce du mur : la prise est bien à acheter avec la cuisine.
+  */
+  const pieceDuCircuit = (f: Fixture) => (placement ? roomById.get(placement.get(f.id) ?? '') : firstRoom(f));
+  const nameOf = (f: Fixture) => pieceDuCircuit(f)?.name || 'Hors pièce';
+  const isKitchen = (f: Fixture) => priseDeCuisine(f, pieceDuCircuit(f));
 
   const byRoom: RoomMaterial[] = rooms.map((r) => {
     const mine = fixtures.filter((f) => firstRoom(f)?.id === r.id);
@@ -2335,13 +2372,14 @@ export function materialList(
     fixtures,
     nameOf,
     isKitchen,
-    (f) => firstRoom(f)?.id,
+    (f) => pieceDuCircuit(f)?.id,
     ceiling,
   );
-  // La surface du logement fixe le nombre de différentiels.
+  // La surface du logement fixe le nombre de différentiels — sans le balcon
+  // ni la terrasse : ce n'est pas du logement.
   const differentials = planDifferentials(
     circuits,
-    rooms.reduce((s, r) => s + (r.area > 0 ? r.area : 0), 0) || undefined,
+    rooms.reduce((s, r) => s + (r.area > 0 && roomUse(r.name, r.kind) !== 'exterieur' ? r.area : 0), 0) || undefined,
   );
 
   const breakers = new Map<number, number>();
@@ -2355,16 +2393,17 @@ export function materialList(
       label: `Disjoncteur ${amp} A`,
       quantity,
     }));
-  const diffA = differentials.filter((d) => d.type === 'A').length;
-  const diffAC = differentials.filter((d) => d.type === 'AC').length;
-  if (diffA > 0) {
-    board.push({ label: 'Interrupteur différentiel 40 A 30 mA type A', quantity: diffA });
+  // Par type ET par calibre : un logement de 30 m² a un différentiel de 25 A,
+  // et la liste du tableau ne doit pas en commander un de 40.
+  const parDiff = new Map<string, { type: string; rating: number; quantity: number }>();
+  for (const d of differentials) {
+    const cle = `${d.type}|${d.rating}`;
+    const deja = parDiff.get(cle);
+    if (deja) deja.quantity += 1;
+    else parDiff.set(cle, { type: d.type, rating: d.rating, quantity: 1 });
   }
-  if (diffAC > 0) {
-    board.push({
-      label: 'Interrupteur différentiel 40 A 30 mA type AC',
-      quantity: diffAC,
-    });
+  for (const d of parDiff.values()) {
+    board.push({ label: `Interrupteur différentiel ${d.rating} A 30 mA type ${d.type}`, quantity: d.quantity });
   }
   if (circuits.some((c) => c.nature === 'vdi')) {
     board.push({ label: 'Coffret de communication', quantity: 1 });
@@ -2398,6 +2437,21 @@ export function materialList(
     circuits: avecCable,
     differentials,
     board,
-    issues: checkElectrical(rooms, fixtures, roomOfWall, placement),
+    /*
+      LES CONTRÔLES DU PLAFOND AUSSI — sans lui, la liste du matériel
+      imprimait « conforme » quand l'écran disait « aucun point lumineux »
+      ou « aucun détecteur de fumée ».
+    */
+    issues: checkElectrical(
+      rooms,
+      fixtures,
+      roomOfWall,
+      placement,
+      undefined,
+      contexte?.worktops,
+      ceiling ?? [],
+      undefined,
+      contexte?.logement,
+    ),
   };
 }

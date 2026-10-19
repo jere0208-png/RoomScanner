@@ -204,6 +204,8 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
     reject: @escaping RCTPromiseRejectBlock
   ) {
     DispatchQueue.main.async {
+      // Une demande encore en attente ne reste pas suspendue pour toujours.
+      self.signInReject?("apple", "Connexion Apple remplacée par une nouvelle demande", nil)
       self.signInResolve = resolve
       self.signInReject = reject
       let provider = ASAuthorizationAppleIDProvider()
@@ -348,7 +350,16 @@ class RoomScanAccount: NSObject, ASAuthorizationControllerDelegate,
       session.presentationContextProvider = self
       session.prefersEphemeralWebBrowserSession = false
       self.sessionWeb = session
-      session.start()
+      /*
+        UNE FEUILLE QUI NE S'OUVRE PAS LE DIT — relevé « fiabilité » : une
+        autre session d'authentification affichée, l'app pas au premier
+        plan, et `start()` rendait faux sans jamais rappeler : la connexion
+        attendait pour toujours.
+      */
+      if !session.start() {
+        self.sessionWeb = nil
+        reject("web", "La fenêtre de connexion n’a pas pu s’ouvrir", nil)
+      }
     }
   }
 

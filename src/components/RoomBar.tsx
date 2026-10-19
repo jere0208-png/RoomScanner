@@ -27,6 +27,7 @@ import Svg, { Path } from 'react-native-svg';
 import { SOLAIRES } from '../ui/solaires';
 import { CarteDuMenu, FermerBandeau, IconeBandeau, RangeeDActions } from './StripBar';
 import { DEBORD_DOIGT } from '../ui/bandeau';
+import { frM2 } from '../ui/mots';
 
 const fr = (v: number, d = 1) => v.toFixed(d).replace('.', ',');
 
@@ -154,7 +155,7 @@ export function RoomBar({
   */
   const mesures = `${
     surface
-      ? `${surface.exact ? '' : '≈ '}${fr(surface.area, 2)} m²  ·  ${fr(
+      ? `${surface.exact ? '' : '≈ '}${frM2(surface.area)} m²  ·  ${fr(
           extent.width,
           2,
         )} × ${fr(extent.depth, 2)} m`

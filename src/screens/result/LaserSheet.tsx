@@ -122,6 +122,13 @@ export function LaserSheet({
     return () => {
       abos.forEach((a) => a.remove());
       RoomScan.laserArreter().catch(() => {});
+      /*
+        LA LIAISON AUSSI — relevé « fiabilité » : arrêter la recherche
+        laissait le télémètre connecté. Sa batterie et celle du téléphone
+        filaient, et à la réouverture il ne s'annonçait plus (« Recherche… »
+        sans fin) puisqu'il était déjà relié.
+      */
+      RoomScan.laserDeconnecter().catch(() => {});
     };
   }, [visible]);
 

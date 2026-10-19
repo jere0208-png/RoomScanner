@@ -41,6 +41,7 @@ import { SOLAIRES } from '../ui/solaires';
 import { useAccountStore } from '../store/accountStore';
 import { useModeDiagnostic } from '../diagnostic/mode';
 import { useScanStore, type ThemePref } from '../store/scanStore';
+import { ouvrirConfidentialite } from './ConfidentialiteScreen';
 import { ombreBouton, dark, radius, shadowCard, useTheme, type Palette } from '../theme';
 import { ACCENTS } from '../ui/accents';
 import { ICONES } from '../ui/icone';
@@ -670,7 +671,7 @@ export function ProfilScreen() {
           c={c}
           icone="bouclier"
           label="Confidentialité des données"
-          onPress={() => setScreen('confidentialite')}
+          onPress={ouvrirConfidentialite}
         />
         {/*
           PLUS DE « REVOIR LA PRÉSENTATION » — relevé du patron : « dans le

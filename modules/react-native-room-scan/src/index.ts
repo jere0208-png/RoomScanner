@@ -692,6 +692,12 @@ export const RoomScan = {
       : Promise.resolve(false),
 
   pause: (): void => RoomScanModule.pauseRoomScan(),
+  /**
+   * La croix « Abandonner » : la session s'éteint pour de bon, rien ne
+   * s'assemble. Un binaire d'avant cette méthode retombe sur la pause.
+   */
+  abandon: (): void =>
+    RoomScanModule?.abandonRoomScan ? RoomScanModule.abandonRoomScan() : RoomScanModule.pauseRoomScan(),
   resume: (): void => RoomScanModule.resumeRoomScan(),
 
   /**

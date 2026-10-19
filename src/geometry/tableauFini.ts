@@ -22,6 +22,7 @@ import {
   planCircuits,
   planDifferentials,
   roomInputsOf,
+  roomUse,
   priseDeCuisine,
   type Circuit,
   type Differential,
@@ -257,12 +258,15 @@ export function tableauDeReference(
 /** La surface au sol du logement, tous niveaux : chaque niveau découpé chez lui. */
 export function surfaceDuLogement(
   walls: WallSeg[],
-  rooms: (RoomShape & { id: string; niveau?: number })[],
+  rooms: (RoomShape & { id: string; niveau?: number; name?: string; kind?: RoomKind | null })[],
 ): number {
+  // Le balcon, la loggia, la terrasse ne sont pas du logement : ils ne
+  // comptent pas dans la surface qui fixe le nombre de différentiels.
+  const dehors = new Set(rooms.filter((r) => roomUse(r.name ?? '', r.kind) === 'exterieur').map((r) => r.id));
   let total = 0;
   for (const n of niveauxPresents(walls, rooms)) {
     const x = filtrerAuNiveau({ walls, openings: [], rooms, fixtures: [], photos: [], objects: [], ceiling: [] }, n);
-    for (const p of roomParts(x.walls, x.rooms)) total += p.surface?.area ?? 0;
+    for (const p of roomParts(x.walls, x.rooms)) if (!dehors.has(p.roomId)) total += p.surface?.area ?? 0;
   }
   return total;
 }

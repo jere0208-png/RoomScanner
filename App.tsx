@@ -33,6 +33,8 @@ import { Scene } from './src/components/Scene';
 import { usePremieresFois } from './src/store/premieresFois';
 import { useUsage } from './src/store/usage';
 import { brouillonAuDepart, ecrirePlansMaintenant, useScanStore } from './src/store/scanStore';
+import { sansPerdreLeReleve } from './src/ui/releveInterrompu';
+import { rangerLeTravail } from './src/ui/miseDeCote';
 import { prendreLaDemande, suiteDuRaccourci } from './src/ui/raccourci';
 import { indexerLesPlans } from './src/ui/spotlight';
 import { astuce } from './src/ui/astuce';
@@ -223,7 +225,23 @@ function Application() {
         const plan = st.saves.find((p) => p.id === suite.id);
         // À la corbeille, il ne s'ouvre pas d'un toucher Spotlight (relevé
         // « bug-fluidité ») : la bibliothèque le cache, on dit où il est.
-        if (plan && !plan.corbeille) st.openSave(suite.id);
+        /*
+          LA MÊME GARDE QUE LA BIBLIOTHÈQUE — agent « novice » : ouvert depuis
+          Spotlight, le plan laissait le filet réécrire le relevé interrompu
+          par-dessus, et ce qu'on tenait n'était pas rangé.
+        */
+        if (plan && !plan.corbeille) {
+          const id = suite.id;
+          sansPerdreLeReleve(
+            () => {
+              useScanStore.getState().oublierBrouillon();
+              rangerLeTravail();
+              useScanStore.getState().openSave(id);
+            },
+            `Le plan « ${plan.name} »`,
+            'Ouvrir',
+          );
+        }
         else if (plan) astuce('Ce plan est à la corbeille.', { icone: 'save' });
         else astuce('Ce plan n’est plus sur ce téléphone.', { icone: 'save' });
       } else if (suite.faire === 'dire') {

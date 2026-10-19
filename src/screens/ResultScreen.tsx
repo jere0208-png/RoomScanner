@@ -27,6 +27,7 @@ import { RoomScan, type ObjectData } from 'react-native-room-scan';
 import { PLAFOND_BARRE, useTheme } from '../theme';
 import { getStyles } from './result/styles';
 import { fr } from './result/format';
+import { arrondiM2, frM2 } from '../ui/mots';
 import { AddRoomSheet } from './result/AddRoomSheet';
 import { PlanViergePage } from './result/PlanViergePage';
 import { ElecSheet } from './result/ElecSheet';
@@ -1873,6 +1874,7 @@ export function ResultScreen() {
         placement,
         cheminements?.parCircuit,
         ceiling,
+        { worktops: wallWorktops, logement },
       );
       // Les constats de pose rejoignent la conformité du document.
       list.issues.push(...constatsDePose(walls, openings, roomInputs, fixtures));
@@ -1922,6 +1924,7 @@ export function ResultScreen() {
         placement,
         cheminements?.parCircuit,
         ceiling,
+        { worktops: wallWorktops, logement },
       );
       // Le CSV chiffre AUSSI les constats : mêmes yeux que le PDF.
       list.issues.push(...constatsDePose(walls, openings, roomInputs, fixtures));
@@ -2188,7 +2191,7 @@ export function ResultScreen() {
         actions: possibles.map((p, i) => ({
           // Une pièce tapée « Sur mesure » n'a pas encore de nom : jamais un bouton vide (revue « Théo »).
           label: rooms.find((r) => r.id === p.roomId)?.name || `Pièce ${i + 1}`,
-          hint: `${fr(p.surface?.area ?? 0, 1)} m² au sol`,
+          hint: `${frM2(p.surface?.area ?? 0)} m² au sol`,
           icon: 'piece' as const,
           onPress: () => poserDans(item, p),
         })),
@@ -2355,7 +2358,7 @@ export function ResultScreen() {
   const habitable = useMemo(() => surfacesHabitables(rooms, parts, objects), [rooms, parts, objects]);
   /** La liste des surfaces que l'image partagée emporte (voir plus bas, `legendeImage`). */
   const legendeSurfaces = useMemo(() => {
-    const virgule = (v: number) => v.toFixed(2).replace('.', ',');
+    const virgule = frM2;
     const { lignes, autres } = lignesDeLaLegende(
       parts
         .filter((p) => (p.surface?.area ?? 0) > 0)
@@ -2370,7 +2373,7 @@ export function ResultScreen() {
       au PDF (`sommeEcrite`, revue « Nadia ») : trois pièces à « 10,00 » et
       un total à « 30,01 » ; chaque surface s'arrondit avant de s'ajouter.
     */
-    const auCentieme = (v: number) => Math.round(v * 100) / 100;
+    const auCentieme = arrondiM2;
     const total = auCentieme(parts.reduce((t, p) => t + auCentieme(p.surface?.area ?? 0), 0));
     /*
       L'HABITABLE PART AUSSI — revue « Bérénice » : l'image disait le sol
@@ -2528,7 +2531,8 @@ export function ResultScreen() {
     const habitableDeLaCible = lue ? lue.habitable : null;
     return {
       ...ficheDeLaPiece({
-      contour: part.surface?.pts ?? [],
+      // Au nu, comme le plan, le PDF, le tableur et les travaux.
+      contour: part.surface?.nu ?? part.surface?.pts ?? [],
       surface: part.surface?.area ?? 0,
       surfaceExacte: !!part.surface?.exact,
       centre: part.labelAt,
@@ -2539,6 +2543,7 @@ export function ResultScreen() {
       fixtures,
       north: nordReleve,
       releve: targetRoom.releve,
+      hauteurPiece: hauteurDeLaPiece(part),
       }),
       surfaceHabitable: habitableDeLaCible,
       raisonHabitable: lue?.raison ?? null,
@@ -3982,7 +3987,7 @@ export function ResultScreen() {
           {
             // « À vérifier » sur la fiche et au PDF : l'en-tête, que l'on lit
             // d'abord, le dit aussi (revue « Léon »).
-            value: `${(surface && !surface.exact) || habitable.aVerifier > 0 ? '≈ ' : ''}${fr(habitable.total)}`,
+            value: `${(surface && !surface.exact) || habitable.aVerifier > 0 ? '≈ ' : ''}${frM2(habitable.total)}`,
             label: 'm² habitables',
           },
         ]
@@ -3991,7 +3996,7 @@ export function ResultScreen() {
             /* Pas de pièce refermée : pas d'habitable à compter. Le sol
                relevé dit au moins la taille du logement. */
             {
-              value: `${surface.exact ? '' : '≈ '}${fr(surface.area)}`,
+              value: `${surface.exact ? '' : '≈ '}${frM2(surface.area)}`,
               label: 'm² au sol',
             },
           ]
@@ -4004,7 +4009,7 @@ export function ResultScreen() {
     ...(surfaceMaison
       ? [
           {
-            value: `${!surfaceMaison.exact || surfaceMaison.aVerifier > 0 ? '≈ ' : ''}${fr(surfaceMaison.habitable)}`,
+            value: `${!surfaceMaison.exact || surfaceMaison.aVerifier > 0 ? '≈ ' : ''}${frM2(surfaceMaison.habitable)}`,
             label: 'm² hab. maison',
           },
         ]

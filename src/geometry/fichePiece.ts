@@ -28,6 +28,7 @@ import { frCategory } from './furniture';
 import { bearingName } from './naming';
 import { baiesDeLaPiece, mursNetsDe } from './travaux';
 import {
+  hauteurDeLaPiece,
   hauteurLue,
   murDeLOuverture,
   pointOnSeg,
@@ -477,9 +478,15 @@ export function ficheDeLaPiece(p: {
   fixtures: Fixture[];
   north: number | null;
   releve?: { plafond?: PlafondDeLaPiece | null; surfaceSol?: number | null } | null;
+  /**
+   * La hauteur de la pièce comme le reste de l'app la lit (`hauteurDeLaPiece`) :
+   * son faux plafond, sinon la hauteur courante de ses murs — pas celle du
+   * plus haut, qui gonflait le volume dès qu'un seul mur était mal relevé.
+   */
+  hauteurPiece?: number;
 }): FicheDeLaPiece {
   const plafond = p.releve?.plafond ?? null;
-  const hMurs = p.murs.length > 0 ? Math.max(...p.murs.map((w) => w.height)) : 2.5;
+  const hMurs = p.hauteurPiece ?? (p.murs.length > 0 ? hauteurDeLaPiece({ walls: p.murs }) : 2.5);
   const hauteur = plafond?.hMoy ?? hMurs;
   const idsMurs = new Set(p.murs.map((w) => w.id));
   const siennes = p.ouvertures.filter((o) => {

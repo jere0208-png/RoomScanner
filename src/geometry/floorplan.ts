@@ -1947,6 +1947,11 @@ export interface RoomSurface {
   area: number;
   /** false = la boucle de murs n'était pas fermée, le contour est reconstitué. */
   exact: boolean;
+  /**
+   * Le contour se recoupe lui-même (un coin glissé par-dessus le mur d'en
+   * face) : son aire ne veut rien dire, et elle n'est plus donnée pour exacte.
+   */
+  croise?: true;
 }
 
 /**
@@ -1956,7 +1961,11 @@ export interface RoomSurface {
  */
 export function roomSurface(walls: WallSeg[]): RoomSurface | null {
   const loop = closedLoop(walls);
-  if (loop) return { pts: loop, area: loopAreaM2(loop), exact: true };
+  /*
+    UNE BOUCLE QUI SE RECOUPE N'EST PAS UNE PIÈCE EXACTE — revue du
+    géomètre : (0,0)→(4,0)→(0,3)→(4,3) s'affichait « 0,00 m² » sans « ≈ ».
+  */
+  if (loop) return seRecoupe(loop) ? { pts: loop, area: loopAreaM2(loop), exact: false, croise: true } : { pts: loop, area: loopAreaM2(loop), exact: true };
 
   /*
     UNE PIÈCE OUVERTE SE FERME PAR SA CORDE, SANS SES BRANCHES. La chaîne la
@@ -1974,6 +1983,30 @@ export function roomSurface(walls: WallSeg[]): RoomSurface | null {
 }
 
 const cleNoeud = (p: Pt) => `${p.x.toFixed(3)}:${p.z.toFixed(3)}`;
+
+/** Deux côtés non voisins du contour se croisent-ils (franchement, à 1 mm près) ? */
+function seRecoupe(pts: Pt[]): boolean {
+  const n = pts.length;
+  if (n < 4) return false;
+  const orient = (a: Pt, b: Pt, c: Pt) => (b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x);
+  for (let i = 0; i < n; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % n];
+    for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue;
+      const c = pts[j];
+      const d = pts[(j + 1) % n];
+      const l1 = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+      const l2 = Math.hypot(d.x - c.x, d.z - c.z) || 1;
+      const o1 = orient(a, b, c) / l1;
+      const o2 = orient(a, b, d) / l1;
+      const o3 = orient(c, d, a) / l2;
+      const o4 = orient(c, d, b) / l2;
+      if (((o1 > 1e-3 && o2 < -1e-3) || (o1 < -1e-3 && o2 > 1e-3)) && ((o3 > 1e-3 && o4 < -1e-3) || (o3 < -1e-3 && o4 > 1e-3))) return true;
+    }
+  }
+  return false;
+}
 
 /** Retire, de proche en proche, les murs qui pendent d'un nœud à trois murs ou plus. */
 function sansBranches(walls: WallSeg[]): { gardes: WallSeg[]; branches: WallSeg[] } {
@@ -6429,6 +6462,8 @@ export function murDeLOuverture(o: WallSeg, walls: WallSeg[]): WallSeg | null {
 export function positionOuverture(
   o: WallSeg,
   walls: WallSeg[],
+  /** Les pièces du plan, si l'appelant les a ; sinon on les découpe. */
+  parts?: ({ surface: RoomSurface | null; walls?: WallSeg[] })[],
 ): { mur: WallSeg; depuisA: number; depuisB: number; retraitA: number; retraitB: number } | null {
   const mur = murDeLOuverture(o, walls);
   if (!mur) return null;
@@ -6438,8 +6473,18 @@ export function positionOuverture(
   const t = (p: Pt) => (p.x - mur.a.x) * u.x + (p.z - mur.a.z) * u.z;
   const t0 = Math.min(t(o.a), t(o.b));
   const t1 = Math.max(t(o.a), t(o.b));
-  const retraitA = retraitDuCoin(walls, mur, mur.a);
-  const retraitB = retraitDuCoin(walls, mur, mur.b);
+  /*
+    LES MÊMES NUS QUE LA CHAÎNE DE COTES — revue du géomètre : contre un pan
+    coupé, la chaîne affichait 0,171 et la position 0,13 (une demi-épaisseur
+    forfaitaire) ; retaper la cote affichée déplaçait la fenêtre de 4 cm.
+    Les bornes de la face viennent de `bornesAuNu`, comme `wallRunsAuNu`.
+  */
+  // Sans contour au nu qui la borne (un plan scanné ouvert), la face du mur
+  // d'angle reste celle de `retraitDuCoin`.
+  const bornes = bornesAuNu(walls, mur, parts ?? roomParts(walls.filter((w) => w.type === 'wall')));
+  const sansNu = bornes.s0 === 0 && bornes.s1 === L;
+  const retraitA = sansNu ? retraitDuCoin(walls, mur, mur.a) : Math.max(0, bornes.s0);
+  const retraitB = sansNu ? retraitDuCoin(walls, mur, mur.b) : Math.max(0, L - bornes.s1);
   return {
     mur,
     retraitA,
@@ -6486,8 +6531,9 @@ export function ouvertureCotee(
   o: WallSeg,
   walls: WallSeg[],
   s: SaisieOuverture,
+  parts?: ({ surface: RoomSurface | null; walls?: WallSeg[] })[],
 ): { a: Pt; b: Pt; height: number; yCenter: number } | null {
-  const pos = positionOuverture(o, walls);
+  const pos = positionOuverture(o, walls, parts);
   if (!pos) return null;
   const { mur } = pos;
   const L = segLength(mur);

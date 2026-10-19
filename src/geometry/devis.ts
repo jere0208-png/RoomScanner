@@ -533,8 +533,10 @@ export function chiffrer(
   const modules =
     [...calibres.values()].reduce((t2, q) => t2 + q, 0) +
     differentiels.length * 2 +
-    // Le télérupteur et le contacteur se rangent au tableau, un module chacun.
-    achats.filter((a) => a.code === 'telerupteur' || a.code === 'contacteur-ig').reduce((t2, a) => t2 + a.quantity, 0);
+    // Le télérupteur et les contacteurs se rangent au tableau, un module chacun.
+    achats
+      .filter((a) => a.code === 'telerupteur' || a.code === 'contacteur-ig' || a.code === 'contacteur-jn')
+      .reduce((t2, a) => t2 + a.quantity, 0);
   if (modules > 0) {
     const rangees = Math.max(1, Math.min(4, Math.ceil(modules / (MODULES_PAR_RANGEE * 0.8))));
     poser({

@@ -351,10 +351,24 @@ final class RoomScanDiagnostic: RCTEventEmitter {
       guard let w = self.writer, let inp = self.input else { return }
       if !self.sessionDemarree {
         guard w.status == .unknown else { return }
-        w.startWriting()
+        /*
+          UN ÉCRIVAIN QUI NE DÉMARRE PAS NE TUE PAS L'APP — relevé
+          « fiabilité » : disque plein, encodeur pris pendant le passage en
+          arrière-plan. `startWriting` rend faux, le statut passe à
+          `.failed`, et `startSession` levait une exception. On jette ce
+          segment ; l'image suivante en ouvrira un autre.
+        */
+        guard w.startWriting() else {
+          self.jeterSegmentCourant()
+          return
+        }
         w.startSession(atSourceTime: pts)
         self.sessionDemarree = true
         self.debutSegment = pts
+      }
+      guard w.status == .writing else {
+        if w.status == .failed { self.jeterSegmentCourant() }
+        return
       }
       if inp.isReadyForMoreMediaData {
         inp.append(sample)
@@ -382,6 +396,16 @@ final class RoomScanDiagnostic: RCTEventEmitter {
     sessionDemarree = false
   }
 
+  /// Le segment courant ne servira pas : l'écrivain lâché, son fichier effacé.
+  private func jeterSegmentCourant() {
+    if let w = writer, w.status == .writing { w.cancelWriting() }
+    if let url = segmentCourant { try? FileManager.default.removeItem(at: url) }
+    writer = nil
+    input = nil
+    sessionDemarree = false
+    segmentCourant = nil
+  }
+
   /// Ferme le segment courant (sans bloquer) et le range dans la liste.
   private func rouler() {
     guard let w = writer, let inp = input, sessionDemarree, let url = segmentCourant else {
@@ -389,6 +413,11 @@ final class RoomScanDiagnostic: RCTEventEmitter {
       input = nil
       sessionDemarree = false
       segmentCourant = nil
+      return
+    }
+    // Un écrivain tombé en panne ne se ferme pas : on le jette.
+    guard w.status == .writing else {
+      jeterSegmentCourant()
       return
     }
     inp.markAsFinished()
@@ -411,6 +440,11 @@ final class RoomScanDiagnostic: RCTEventEmitter {
   /// close doit pouvoir envoyer ce qui vient d'être écrit. À appeler sur `fileVideo`.
   private func terminerSegmentCourant(_ completion: @escaping () -> Void) {
     guard let w = writer, let inp = input, sessionDemarree, let url = segmentCourant else {
+      completion()
+      return
+    }
+    guard w.status == .writing else {
+      jeterSegmentCourant()
       completion()
       return
     }

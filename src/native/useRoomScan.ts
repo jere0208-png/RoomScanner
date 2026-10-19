@@ -575,8 +575,8 @@ function resumerLeReleve() {
      * frotte la croix, et le chantier de la matinée disparaît.
      *
      * On revient donc au plan, intact, quand le scan partait D'UN PLAN. Le
-     * natif, lui, reste en pause comme avant : la session suivante repart
-     * de zéro.
+     * natif, lui, s'éteint pour de bon (`abandon`) : la session suivante
+     * repart de zéro.
      *
      * « PARTAIT D'UN PLAN » SE SAIT, IL NE SE DEVINE PAS. La garde regardait
      * aussi s'il restait des murs dans le magasin — et il en reste presque
@@ -589,7 +589,10 @@ function resumerLeReleve() {
      * neuf, lancé de l'accueil, et l'abandonner y ramène.
      */
     cancel: () => {
-      RoomScan.pause();
+      // La session s'éteint pour de bon (caméra, LiDAR) : voir `abandonRoomScan`.
+      const abandon = (RoomScan as { abandon?: () => void }).abandon;
+      if (abandon) abandon();
+      else RoomScan.pause();
       tourDuScan += 1;
       const s = useScanStore.getState();
       if (partiDUnPlan || s.complementEnCours || s.etageEnCours !== null) {

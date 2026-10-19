@@ -1747,10 +1747,16 @@ async function lireLesCles(cles: string[]): Promise<(string | null)[]> {
  */
 async function loadLibrary(): Promise<{ plans: SavedScan[]; migres: number } | null> {
   const index = await AsyncStorage.getItem(INDEX_KEY);
-  if (index) {
+  /*
+    UN INDEX ABSENT N'EST PAS UNE BIBLIOTHÈQUE VIDE — agent « données » :
+    des plans écrits chacun à sa clé, sans index (une migration coupée), ne
+    revenaient jamais. S'il y a des clés de plan, l'index se rebâtit.
+  */
+  const sansIndex = !index && (await clesDePlans()).length > 0;
+  if (index || sansIndex) {
     let ids: string[] | null = null;
     try {
-      const lu = JSON.parse(index) as string[];
+      const lu = index ? (JSON.parse(index) as string[]) : null;
       if (Array.isArray(lu)) ids = lu;
     } catch {
       // Un index illisible n'est pas une bibliothèque perdue : voir plus bas.
@@ -1764,16 +1770,7 @@ async function loadLibrary(): Promise<{ plans: SavedScan[]; migres: number } | n
       serait la pire réponse possible.
     */
     const rebati = ids === null;
-    if (ids === null) {
-      const prefixe = scanKey('');
-      const enumerer = (
-        AsyncStorage as { getAllKeys?: () => Promise<string[]> }
-      ).getAllKeys;
-      const toutes = enumerer ? await enumerer().catch(() => []) : [];
-      ids = toutes
-        .filter((k) => k.startsWith(prefixe))
-        .map((k) => k.slice(prefixe.length));
-    }
+    if (ids === null) ids = await clesDePlans();
     /*
       UN IDENTIFIANT, UN PLAN — relevé « bug-données » : un index qui citait
       deux fois le même plan le chargeait deux fois, et la bibliothèque
@@ -1821,6 +1818,24 @@ async function loadLibrary(): Promise<{ plans: SavedScan[]; migres: number } | n
         // tout l'intérêt de ne plus tout mettre dans la même chaîne.
       }
     }
+    /*
+      L'ANCIENNE CLÉ, TANT QU'ELLE EST LÀ, EST ENCORE RELUE — agent
+      « données » : une migration coupée (disque plein) laissait des plans
+      dans l'ancien format ; dès qu'un index existait, on ne la lisait plus,
+      et ces plans disparaissaient de la liste pour toujours.
+    */
+    // Seuls les plans trouvés à leur clé sont connus : un plan que l'index
+    // cite sans que sa clé ait été écrite revient de l'ancienne.
+    const trouves = new Set(ids.filter((_, k) => !!bruts[k]));
+    const reste = await reprendreLAncienFormat(trouves);
+    if (reste && reste.plans.length > 0) {
+      out.push(...reste.plans);
+      migres += reste.migres;
+      ids = [...new Set([...ids, ...reste.plans.map((x) => x.id)])];
+      await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(ids)).catch(() => {});
+    }
+    // L'ancienne clé ne part qu'une fois l'index écrit, et tout réécrit.
+    if (reste?.tousEcrits) await AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
     if (rebati) {
       // L'ordre exact de l'index est perdu ; les scans, non. Les plus
       // récents remontent en tête, comme partout dans la bibliothèque — et
@@ -1836,7 +1851,34 @@ async function loadLibrary(): Promise<{ plans: SavedScan[]; migres: number } | n
   }
 
   // --------------------------------------------- reprise de l'ancien format
-  const legacy = await AsyncStorage.getItem(STORAGE_KEY);
+  const lu = await reprendreLAncienFormat(new Set());
+  if (!lu) return null;
+  const indexEcrit = await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(lu.ids)).then(
+    () => true,
+    () => false,
+  );
+  if (indexEcrit && lu.tousEcrits) await AsyncStorage.removeItem(STORAGE_KEY).catch(() => {});
+  return { plans: lu.plans, migres: lu.migres };
+}
+
+/** Les identifiants des plans écrits chacun à sa clé, trouvés sur le disque. */
+async function clesDePlans(): Promise<string[]> {
+  const prefixe = scanKey('');
+  const enumerer = (AsyncStorage as { getAllKeys?: () => Promise<string[]> }).getAllKeys;
+  const toutes = enumerer ? await enumerer().catch(() => [] as string[]) : [];
+  return (toutes ?? []).filter((k) => k.startsWith(prefixe)).map((k) => k.slice(prefixe.length));
+}
+
+/**
+ * L'ancienne clé unique, éclatée en une clé par plan — sauf les plans déjà
+ * connus (`deja`). Chaque plan dans sa garde : un plan qu'on n'arrive pas à
+ * écrire (disque plein) se charge quand même, et l'ancienne clé ne part que
+ * si TOUS ont été écrits.
+ */
+async function reprendreLAncienFormat(
+  deja: Set<string>,
+): Promise<{ plans: SavedScan[]; ids: string[]; migres: number; tousEcrits: boolean } | null> {
+  const legacy = await AsyncStorage.getItem(STORAGE_KEY).catch(() => null);
   if (!legacy) return null;
   let saves: SavedScan[];
   try {
@@ -1852,23 +1894,27 @@ async function loadLibrary(): Promise<{ plans: SavedScan[]; migres: number } | n
   );
   const charges: SavedScan[] = [];
   let migres = 0;
+  let tousEcrits = eclates.length === saves.length;
   for (const s of eclates) {
+    if (deja.has(s.id)) continue;
     const json = JSON.stringify(s);
-    await AsyncStorage.setItem(scanKey(s.id), json);
+    const ecrit = await AsyncStorage.setItem(scanKey(s.id), json).then(
+      () => true,
+      () => false,
+    );
+    if (!ecrit) tousEcrits = false;
     try {
       if (!planValide(s, s.id)) throw new Error('plan invalide');
       const plan = migrateSave(s);
       charges.push(plan);
-      ecrits.set(s.id, { ref: s, quand: s.updatedAt, empreinte: empreinteDe(json) });
-      if (!estampille(s)) migres += 1;
+      if (ecrit) ecrits.set(s.id, { ref: s, quand: s.updatedAt, empreinte: empreinteDe(json) });
+      if (!estampille(s) || !ecrit) migres += 1;
     } catch {
       // Écrit à sa clé, gardé, mais pas chargé : voir `gardes`.
       gardes.add(s.id);
     }
   }
-  await AsyncStorage.setItem(INDEX_KEY, JSON.stringify(eclates.map((s) => s.id)));
-  if (eclates.length === saves.length) await AsyncStorage.removeItem(STORAGE_KEY);
-  return { plans: charges, migres };
+  return { plans: charges, ids: eclates.map((s) => s.id), migres, tousEcrits };
 }
 
 /**
@@ -4007,6 +4053,12 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       if (get().canRedo) set({ canRedo: false });
     }
     const st = get();
+    // Un plan « propre » juste avant le geste EST l'état enregistré : sa
+    // profondeur et ce que l'historique ne porte pas s'y recalent.
+    if (!st.dirty) {
+      savedDepth = history.length;
+      signatureEnregistree = signatureHorsHistoire();
+    }
     history.push({
       walls: st.walls,
       openings: st.openings,
@@ -4099,6 +4151,19 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
    * sans priver d'annulation ce qui a été fait avant la sauvegarde.
    */
   let savedDepth = 0;
+  /*
+    CE QUE L'HISTORIQUE NE PORTE PAS — agent « novice » : le client,
+    l'adresse, le devis, le nord changent sans passer par « Annuler ».
+    Revenir à la profondeur enregistrée déclarait le plan « propre » alors
+    que le client tapé n'était écrit nulle part, et il se perdait en
+    quittant. Leur empreinte au dernier enregistrement dit s'ils ont bougé.
+  */
+  let signatureEnregistree = '';
+  const signatureHorsHistoire = (): string => {
+    const st = get();
+    return JSON.stringify([st.scanName, st.client, st.address, st.north, st.existant ?? null, devisDuPlan(st) ?? null]);
+  };
+  const salePourDeBon = () => history.length !== savedDepth || signatureHorsHistoire() !== signatureEnregistree;
 
   /**
    * UNE ENTRÉE DE BIBLIOTHÈQUE DE PLUS — le palier gratuit décide, et paie.
@@ -4166,8 +4231,38 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     avenir.length = 0;
     lastKey = '';
     savedDepth = 0;
+    signatureEnregistree = signatureHorsHistoire();
     set({ canUndo: false, canRedo: false });
+    // Plus d'« Annuler » possible : les photos retirées en chemin peuvent partir.
+    purgerLesPhotosEnSursis();
   };
+
+  /*
+    UNE PHOTO RETIRÉE ATTEND QU'ON NE PUISSE PLUS L'ANNULER — agent
+    « données » : supprimer un mur effaçait tout de suite le fichier de sa
+    photo, et « Annuler » rendait une punaise sans image. Le fichier attend
+    que l'historique soit vidé (un autre plan ouvert, un nouveau scan), puis
+    part s'il ne sert plus à personne : ni au plan à l'écran, ni à un plan
+    enregistré, ni à une retouche, ni au brouillon.
+  */
+  let photosEnSursis: string[] = [];
+  const mettreEnSursis = (chemins: string[]) => {
+    photosEnSursis = [...new Set([...photosEnSursis, ...chemins])];
+  };
+  function purgerLesPhotosEnSursis() {
+    if (photosEnSursis.length === 0) return;
+    const st = get();
+    const de = (ps: unknown) =>
+      (Array.isArray(ps) ? ps : []).map((p) => (p as ScanPhoto | undefined)?.path).filter((x): x is string => typeof x === 'string');
+    const gardees = new Set([
+      ...de(st.photos),
+      ...st.saves.flatMap((x) => [...de(x.photos), ...de(x.retouche?.plan?.photos)]),
+      ...de(st.brouillon?.photos),
+    ]);
+    const partis = photosEnSursis.filter((p) => !gardees.has(p));
+    photosEnSursis = [];
+    deletePhotoFiles(partis);
+  }
 
   /*
     LE DÉCLENCHEUR DE LA MONTÉE.
@@ -5762,11 +5857,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         const partis = st.photos
           .filter((p) => doomed.has(p.wallId))
           .map((p) => p.path);
-        const gardees = new Set([
-          ...get().photos.map((p) => p.path),
-          ...st.saves.flatMap((s) => (s.photos ?? []).map((p) => p.path)),
-        ]);
-        deletePhotoFiles(partis.filter((p) => !gardees.has(p)));
+        mettreEnSursis(partis);
       }
     },
 
@@ -6299,11 +6390,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         const partis = st.photos
           .filter((p) => p.wallId === wallId)
           .map((p) => p.path);
-        const gardees = new Set([
-          ...get().photos.map((p) => p.path),
-          ...st.saves.flatMap((s) => (s.photos ?? []).map((p) => p.path)),
-        ]);
-        deletePhotoFiles(partis.filter((p) => !gardees.has(p)));
+        mettreEnSursis(partis);
       }
     },
 
@@ -7582,8 +7669,17 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         name,
         st.saves.filter((x) => x.id !== id).map((x) => x.name),
       );
+      // La retouche en attente prend le nom aussi : l'enregistrer, ou rouvrir
+      // le plan, remettait l'ancien (agent « données »).
       const saves = st.saves.map((x) =>
-        x.id === id ? { ...x, name: clean, updatedAt: Date.now() } : x,
+        x.id === id
+          ? {
+              ...x,
+              name: clean,
+              updatedAt: Date.now(),
+              ...(x.retouche ? { retouche: { ...x.retouche, plan: { ...x.retouche.plan, name: clean } } } : {}),
+            }
+          : x,
       );
       set({
         saves,
@@ -8272,7 +8368,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         canRedo: true,
         // Revenu à l'état enregistré : il n'y a plus rien à enregistrer, et
         // le bouton de sauvegarde n'a plus lieu d'être.
-        dirty: history.length !== savedDepth,
+        dirty: salePourDeBon(),
       });
     },
 
@@ -8301,7 +8397,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         niveauCourant: niveauApresRetour(st.walls, suite.walls, st.niveauCourant, st.rooms, suite.rooms),
         canUndo: true,
         canRedo: avenir.length > 0,
-        dirty: history.length !== savedDepth,
+        dirty: salePourDeBon(),
       });
     },
 
@@ -9404,9 +9500,17 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         */
         brouillon: null,
       });
-      AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
       clearHistory();
       persistSoon(saves);
+      /*
+        … MAIS UNE FOIS LE PLAN SUR LE DISQUE — agent « données » : effacé
+        tout de suite, le brouillon disparaissait six cents millisecondes
+        avant que le relevé soit écrit. Même règle que `ecrireBrouillon`.
+      */
+      draftEcrit = '';
+      apresEcriture().then((ok) => {
+        if (ok && draftEcrit === '') AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
+      });
       // Un scan terminé est un dossier : il monte comme les autres, sans
       // attendre que le patron pense à toucher « Enregistrer ».
       deposerPlusTard(save.id);
@@ -10120,6 +10224,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         set({ saves, currentSaveId: save.id, dirty: false });
         persistSoon(saves);
         savedDepth = history.length;
+      signatureEnregistree = signatureHorsHistoire();
         // Le plan monte au compte comme n'importe quel enregistrement.
         deposerPlusTard(save.id);
         // Enregistré : le brouillon n'a plus rien à protéger — voir plus bas.
@@ -10137,6 +10242,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       }
       syncCurrent();
       savedDepth = history.length;
+      signatureEnregistree = signatureHorsHistoire();
       set({ dirty: false });
       /*
         LE FILET SE REPLIE SUR-LE-CHAMP, pas au prochain tour de minuterie.
@@ -10206,6 +10312,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       set({ saves, dirty: false });
       persistSoon(saves);
       savedDepth = history.length;
+      signatureEnregistree = signatureHorsHistoire();
       // Rangé : le filet des trente secondes n'a plus rien à tenir.
       get().ecrireBrouillon();
       return sorte;
@@ -11388,6 +11495,14 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         // enregistrement d'écrire ce mélange dans la bibliothèque.
         ceiling: migrated.ceiling ?? [],
         photos: migrated.photos ?? [],
+        // Les notes, les cotes, le tableau trouvé sur place aussi (agent
+        // « données ») : abandonner laissait une note effacée par erreur
+        // effacée pour de bon, et l'historique vidé ne la rendait plus.
+        notes: migrated.notes ?? [],
+        mesures: migrated.mesures ?? [],
+        existant: migrated.existant ?? null,
+        cleDuReleve: migrated.cleDuReleve ?? null,
+        modelPath: migrated.modelPath,
         north: migrated.north ?? null,
         client: migrated.client ?? '',
         address: migrated.address ?? '',
@@ -11618,6 +11733,13 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         dirty: true,
         brouillon: null,
       });
+      /*
+        L'HISTOIRE D'UN AUTRE PLAN NE SUIT PAS — agent « novice » : après un
+        plan ouvert puis quitté, « Annuler » sur le relevé repris y remettait
+        les murs de l'autre plan.
+      */
+      clearHistory();
+      dejaCompte = !!(b.saveId && get().saves.some((s) => s.id === b.saveId && !s.corbeille));
       // Le filet qui vient de vous sauver se réarme derrière vous.
       armerBrouillon(() => get().ecrireBrouillon());
     },
@@ -11948,7 +12070,17 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         (Array.isArray(s?.photos) ? s.photos : [])
           .map((p) => p?.path)
           .filter((p): p is string => typeof p === 'string');
-      const gardees = new Set(saves.flatMap(cheminsDe));
+      /*
+        NI CE QU'UNE RETOUCHE, LE PLAN À L'ÉCRAN OU LE BROUILLON RÉCLAMENT
+        ENCORE — agent « données » : une photo prise dans A, gardée par sa
+        retouche, puis dupliquée dans B, partait avec B.
+      */
+      const gardees = new Set([
+        ...saves.flatMap(cheminsDe),
+        ...saves.flatMap((s) => cheminsDe(s.retouche?.plan as SavedScan | undefined)),
+        ...(st.currentSaveId !== id ? cheminsDe({ photos: st.photos } as SavedScan) : []),
+        ...cheminsDe(st.brouillon as unknown as SavedScan | undefined),
+      ]);
       const aEffacer = cheminsDe(parti).filter((p) => !gardees.has(p));
       deletePhotoFiles(aEffacer);
       /*

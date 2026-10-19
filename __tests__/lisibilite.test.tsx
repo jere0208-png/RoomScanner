@@ -113,7 +113,8 @@ describe('les chiffres de l’en-tête disent vrai', () => {
 
   it('« m² hab. » porte « ≈ » quand la surface est approchée, ou l’habitable à vérifier', () => {
     expect(lire('src/screens/ResultScreen.tsx')).toMatch(
-      /value: `\$\{\(surface && !surface\.exact\) \|\| habitable\.aVerifier > 0 \? '≈ ' : ''\}\$\{fr\(habitable\.total\)\}`/,
+      // Au centième, comme partout (revue du géomètre, `frM2`).
+      /value: `\$\{\(surface && !surface\.exact\) \|\| habitable\.aVerifier > 0 \? '≈ ' : ''\}\$\{frM2\(habitable\.total\)\}`/,
     );
   });
 });

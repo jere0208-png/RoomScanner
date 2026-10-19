@@ -83,7 +83,7 @@ class RoomScanLecturePlan: NSObject, VNDocumentCameraViewControllerDelegate,
         resolve(nil)
         return
       }
-      self.rendreA = resolve
+      self.attendre(resolve)
       let camera = VNDocumentCameraViewController()
       camera.delegate = self
       haut.present(camera, animated: true)
@@ -105,7 +105,7 @@ class RoomScanLecturePlan: NSObject, VNDocumentCameraViewControllerDelegate,
       config.selectionLimit = 1
       let picker = PHPickerViewController(configuration: config)
       picker.delegate = self
-      self.rendreA = resolve
+      self.attendre(resolve)
       haut.present(picker, animated: true)
     }
   }
@@ -124,7 +124,7 @@ class RoomScanLecturePlan: NSObject, VNDocumentCameraViewControllerDelegate,
       let selecteur = UIDocumentPickerViewController(forOpeningContentTypes: [.pdf, .image], asCopy: true)
       selecteur.delegate = self
       selecteur.allowsMultipleSelection = false
-      self.rendreA = resolve
+      self.attendre(resolve)
       haut.present(selecteur, animated: true)
     }
   }
@@ -139,7 +139,7 @@ class RoomScanLecturePlan: NSObject, VNDocumentCameraViewControllerDelegate,
       resolve(nil)
       return
     }
-    rendreA = resolve
+    attendre(resolve)
     preparerLaPage(doc, n.intValue - 1)
   }
 
@@ -213,8 +213,20 @@ class RoomScanLecturePlan: NSObject, VNDocumentCameraViewControllerDelegate,
   private func lireLeFichier(_ url: URL) {
     let estUnPdf =
       UTType(filenameExtension: url.pathExtension)?.conforms(to: .pdf) ?? false
+    /*
+      LA COPIE NE TRAÎNE PAS — relevé « fiabilité » : le sélecteur copie le
+      fichier chez nous (`asCopy`), et rien ne l'effaçait. On le lit en
+      mémoire, puis on efface la copie ; le PDF garde ses octets pour les
+      autres pages (`pageDuPdf`).
+    */
+    let lu = try? Data(contentsOf: url)
+    try? FileManager.default.removeItem(at: url)
+    guard let donnees = lu else {
+      rendre(["erreur": "format"])
+      return
+    }
     if estUnPdf {
-      guard let doc = PDFDocument(url: url) else {
+      guard let doc = PDFDocument(data: donnees) else {
         rendre(["erreur": "format"])
         return
       }
@@ -231,9 +243,9 @@ class RoomScanLecturePlan: NSObject, VNDocumentCameraViewControllerDelegate,
       return
     }
     pdf = nil
-    guard let donnees = try? Data(contentsOf: url), let image = UIImage(data: donnees) else {
+    guard let image = UIImage(data: donnees) else {
       // Un PDF arrivé sans son extension : on le reconnaît à son contenu.
-      if let doc = PDFDocument(url: url), !doc.isLocked, doc.pageCount > 0 {
+      if let doc = PDFDocument(data: donnees), !doc.isLocked, doc.pageCount > 0 {
         pdf = doc
         preparerLaPage(doc, Self.meilleurePage(doc))
       } else {
@@ -365,6 +377,13 @@ class RoomScanLecturePlan: NSObject, VNDocumentCameraViewControllerDelegate,
       resultat.merge(enPlus) { garde, _ in garde }
       self.rendre(resultat)
     }
+  }
+
+  /// La promesse de la nouvelle demande ; la précédente, si elle attendait
+  /// encore, se règle sans rien (annulée) au lieu de rester suspendue.
+  private func attendre(_ resolve: @escaping RCTPromiseResolveBlock) {
+    rendreA?(nil)
+    rendreA = resolve
   }
 
   private func rendre(_ valeur: Any?) {

@@ -55,6 +55,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
    session (`start`) le baisse.
    */
   private var sessionEnPanne = false
+  /// Le relevé a été abandonné : RoomPlan n'assemble rien (voir `abandonner`).
+  private var abandonne = false
   /**
    LE NUMÉRO DU RELEVÉ EN COURS — un de plus à chaque relevé commencé
    (`start` sans reprise). Un assemblage lancé pour un relevé qu'on a QUITTÉ
@@ -259,6 +261,7 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     }
     enPause = false
     sessionEnPanne = false
+    abandonne = false
     derniereInstruction = ""
     if fresh {
       /*
@@ -681,6 +684,42 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
     start(fresh: false)
   }
 
+  /*
+    « ABANDONNER » ÉTEINT POUR DE BON — relevé « fiabilité » : sous iOS 17,
+    la croix passait par `pause`, qui garde la session ARKit chaude pour la
+    reprise. L'écran de scan disparu, la caméra et le LiDAR tournaient
+    encore (point vert, batterie, chauffe), et RoomPlan assemblait un relevé
+    que personne n'attendait. Ici : rien ne s'assemble, la promesse en
+    attente est rejetée, et la session ARKit s'arrête.
+  */
+  func abandonner() {
+    guard Thread.isMainThread else {
+      DispatchQueue.main.async { self.abandonner() }
+      return
+    }
+    abandonne = true
+    enPause = true
+    // Ce qui s'assemblait encore pour ce relevé ne sera plus livré.
+    generationReleve &+= 1
+    stopRejecter?("SCAN_CANCELLED", "Le scan a été abandonné.", nil)
+    clearPromise()
+    dernierReleve = nil
+    embelli?.cancel()
+    embelli = nil
+    RoomColorSampler.shared.detach()
+    PhotographeDesMurs.shared.detach()
+    RoomScanCompass.shared.detach()
+    couche?.suspendre(true)
+    if #available(iOS 17.0, *) {
+      captureView?.captureSession.stop(pauseARSession: true)
+    } else {
+      captureView?.captureSession.stop()
+    }
+    // Déjà en pause (session arrêtée, ARKit gardé chaud) : arrêter la
+    // session ne rappelle personne, on coupe ARKit directement.
+    captureView?.captureSession.arSession.pause()
+  }
+
   func stop(resolve: @escaping RCTPromiseResolveBlock,
             reject: @escaping RCTPromiseRejectBlock) {
     guard Thread.isMainThread else {
@@ -838,7 +877,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
   // true = laisser RoomPlan post-traiter les données brutes.
   func captureView(shouldPresent roomDataForProcessing: CapturedRoomData,
                    error: Error?) -> Bool {
-    return true
+    // Un relevé abandonné ne s'assemble pas (voir `abandonner`).
+    return !abandonne
   }
 
   // Le modèle final, nettoyé et paramétrique.
@@ -1346,6 +1386,8 @@ final class RoomScanManager: NSObject, RoomCaptureViewDelegate, RoomCaptureSessi
 
   func captureSession(_ session: RoomCaptureSession, didEndWith data: CapturedRoomData,
                       error: Error?) {
+    // Abandonné : ni panne à signaler, ni passage à garder.
+    if abandonne { return }
     if let error = error {
       sessionEnPanne = true
       RoomScanEvents.shared?.emit(name: "onScanError",

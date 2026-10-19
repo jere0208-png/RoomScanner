@@ -157,3 +157,47 @@ describe('et le bordereau en tient compte, pas seulement le calcul', () => {
     }
   });
 });
+
+/*
+  UN DÉPART PLUS LONG QUE LA COURONNE SE PAIE EN COURONNES — revue
+  « chantier » : un départ cuisson de quatorze mètres sortait « 1 cour.
+  10 m » par conducteur, soit quatre mètres de moins que le parcours sur
+  chacun des trois. On en compte autant qu'il en faut, et la ligne le dit.
+*/
+describe('un départ plus long que la couronne', () => {
+  it('compte autant de couronnes qu’il en faut', () => {
+    expect(couronnes([14], 10).nombre).toBe(2);
+    expect(couronnes([14], 10).chute).toBe(6);
+    // La chute du départ long sert au suivant, s'il y tient.
+    expect(couronnes([14, 5], 10).nombre).toBe(2);
+    expect(couronnes([25], 10).nombre).toBe(3);
+  });
+
+  it('et le bordereau le dit sur la ligne du fil', () => {
+    const brins: Wire[] = [
+      { role: 'phase', color: '#B8352A', label: 'Phase', section: 6 },
+      { role: 'neutre', color: '#2E6FD6', label: 'Neutre', section: 6 },
+      { role: 'terre', color: '#5A9E31', label: 'Terre', section: 6 },
+    ];
+    const long: PullRow[] = [
+      {
+        circuitId: 'cuisson',
+        label: 'Plaque de cuisson',
+        section: 6,
+        nature: 'specialise' as const,
+        brins,
+        fils: 3,
+        conduit: 25,
+        troncons: [{ id: 'p32', conduit: 13, cable: 14, role: 'autre' as const }],
+        runs: 1,
+        conduitLength: 13,
+        cableLength: 42,
+        approx: false,
+        protection: '32 A',
+      },
+    ];
+    const phase = buyingList(long, [], []).find((l) => l.code === 'fil-6-phase')!;
+    expect(phase.quantity).toBe(2);
+    expect(phase.note).toMatch(/plus long que la couronne/);
+  });
+});

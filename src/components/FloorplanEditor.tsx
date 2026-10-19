@@ -353,6 +353,7 @@ import { dansLeCadre, type CadreEcran } from '../geometry/lacher';
 import { DEBORD_DOIGT } from '../ui/bandeau';
 import { SOLAIRES } from '../ui/solaires';
 import { useModeElec } from '../store/usage';
+import { frM2 } from '../ui/mots';
 
 
 /**
@@ -2411,9 +2412,7 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
       const roomName = roomById.get(part.roomId)?.name ?? '';
       // Au centième, comme la fiche, le métré et l'image partagée (revue « immobilier »).
       const areaText = part.surface
-        ? `${part.surface.exact ? '' : '≈ '}${part.surface.area
-            .toFixed(2)
-            .replace('.', ',')} m²`
+        ? `${part.surface.exact ? '' : '≈ '}${frM2(part.surface.area)} m²`
         : null;
       if (roomName === '' && !areaText && !editable) continue;
       const extText =

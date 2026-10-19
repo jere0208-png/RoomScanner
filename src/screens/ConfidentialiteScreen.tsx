@@ -18,7 +18,7 @@ import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackChevron } from '../components/BackChevron';
 import { RetourGlisse } from '../components/RetourGlisse';
-import { useScanStore } from '../store/scanStore';
+import { useScanStore, type Screen } from '../store/scanStore';
 import { radius, shadowCard, useTheme, type Palette } from '../theme';
 import {
   choisirPhotosVisibles,
@@ -185,6 +185,19 @@ function AccesPhotosLigne({ s }: { s: ReturnType<typeof themed> }) {
   );
 }
 
+/*
+  D'OÙ L'ON VIENT, ON Y RETOURNE — agent « novice » : ouverte depuis l'offre
+  Pro, par-dessus un plan, la page renvoyait au Profil. Le plan était quitté
+  sans être rangé, et « Plan vierge » à l'accueil l'effaçait sans un mot.
+*/
+let retourConfidentialite: Screen = 'profil';
+/** Ouvre la page de confidentialité ; « Retour » ramènera à l'écran courant. */
+export function ouvrirConfidentialite(): void {
+  const st = useScanStore.getState();
+  retourConfidentialite = st.screen === 'confidentialite' ? 'profil' : st.screen;
+  st.setScreen('confidentialite');
+}
+
 export function ConfidentialiteScreen() {
   const c = useTheme();
   const s = themed(c);
@@ -195,7 +208,7 @@ export function ConfidentialiteScreen() {
     /* Le bord gauche ramène au profil, comme la flèche : le geste vit
        partout où elle vit. En enveloppe, il ne vole aucun appui. */
     <RetourGlisse
-      onRetour={() => setScreen('profil')}
+      onRetour={() => setScreen(retourConfidentialite)}
       style={[s.fond, { paddingTop: insets.top }]}>
       <View style={s.barre}>
         <Pressable
@@ -203,9 +216,9 @@ export function ConfidentialiteScreen() {
           accessibilityLabel="Retour"
           style={s.rondBarre}
           hitSlop={10}
-          /* On y entre depuis le profil : on y retourne. Renvoyer à
-             l'accueil ferait repartir de zéro pour un réglage voisin. */
-          onPress={() => setScreen('profil')}>
+          /* On y retourne d'où l'on vient (le profil, le plus souvent).
+             Renvoyer à l'accueil ferait repartir de zéro pour un réglage voisin. */
+          onPress={() => setScreen(retourConfidentialite)}>
           <BackChevron color={c.ink} />
         </Pressable>
         <Text style={s.titreBarre}>Confidentialité</Text>

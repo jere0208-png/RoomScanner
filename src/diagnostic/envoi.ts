@@ -13,7 +13,7 @@
  * minute suivante y est déposée par sa propre requête (`diagnostic-video`) :
  * aucune ne dépasse ce qu'un envoi mobile et le serveur supportent.
  *
- * RIEN DU COMPTE, hormis son identifiant interne : pas de nom, pas d'e-mail.
+ * RIEN DU COMPTE, hormis sa méthode de connexion : pas de nom, pas d'e-mail.
  * L'identifiant et le jeton partent comme pour toute action du serveur (voir
  * `coffrePlans`), en multipart puisque la vidéo est un fichier.
  *
@@ -52,6 +52,18 @@ function planCourant() {
   };
 }
 
+/**
+ * LE COMPTE, SANS SON ADRESSE — revue « sécurité » : l'identifiant d'un
+ * compte e-mail EST son adresse (`email:…`), et elle partait dans le
+ * journal.json déposé au dépôt des diagnostics. Seule la méthode y va ; le
+ * serveur sait déjà qui dépose (l'identifiant et le jeton de la requête).
+ */
+export function identiteMasquee(identifiant: string | undefined | null): string | undefined {
+  if (!identifiant) return undefined;
+  const i = identifiant.indexOf(':');
+  return i > 0 ? identifiant.slice(0, i) : 'compte';
+}
+
 /** L'instantané : où en est l'app, et sur quel appareil. */
 async function instantané() {
   const s = useScanStore.getState();
@@ -62,9 +74,8 @@ async function instantané() {
     systeme: infos.systeme,
     ecran: s.screen,
     modeElec: useUsage.getState().modeElec,
-    // L'identifiant interne du compte, et LUI SEUL — de quoi savoir que c'est
-    // bien l'administrateur, rien de plus.
-    identifiant: identiteDuCompte()?.identifiant,
+    // La méthode de connexion du compte, et elle seule : ni nom, ni adresse.
+    identifiant: identiteMasquee(identiteDuCompte()?.identifiant),
     plan: {
       murs: s.walls.length,
       pieces: s.rooms.length,

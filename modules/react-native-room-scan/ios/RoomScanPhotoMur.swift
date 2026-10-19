@@ -317,10 +317,21 @@ final class PhotographeDesMurs {
    */
   func livrer() -> [[String: Any]] {
     queue.sync { () -> [[String: Any]] in
+      /*
+        DANS `Documents/photos`, COMME LES AUTRES — relevé « fiabilité » :
+        écrites à la racine des Documents, elles échappaient à la garde des
+        photos (`RoomScanPhoto.resolvePhoto`) : ni le dossier PDF ne les
+        relisait, ni la suppression du plan ne les effaçait, et le disque se
+        remplissait d'un passage à l'autre.
+      */
       let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("photos", isDirectory: true)
+      try? FileManager.default.createDirectory(at: docs, withIntermediateDirectories: true)
       var out: [[String: Any]] = []
       for (id, m) in meilleures {
-        let url = docs.appendingPathComponent("mur-\(UUID().uuidString).jpg")
+        // Un nom par MUR, pas par livraison : un passage ajouté relivre les
+        // photos déjà prises, il les réécrit au lieu d'en semer des copies.
+        let url = docs.appendingPathComponent("mur-\(id.uuidString).jpg")
         do {
           try m.jpeg.write(to: url, options: .atomic)
           out.append([

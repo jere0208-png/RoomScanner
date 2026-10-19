@@ -200,6 +200,14 @@ export function wiresOfRun(
   circuit: Circuit,
   role: RoleDepart,
   vaEtVient = false,
+  /**
+   * LA COMMANDE ELLE-MÊME, quand on la connaît — revue « chantier » :
+   *   — `rang` : en va-et-vient, la PREMIÈRE commande (rang 0) reçoit la
+   *     phase, les suivantes renvoient le retour de lampe ; chacune ses deux
+   *     navettes ;
+   *   — `retours` : un double allumage renvoie deux retours, un triple trois.
+   */
+  commande: { rang?: number; retours?: number } = {},
 ): Wire[] {
   const section = circuit.section ?? 0;
   if (circuit.section === null) {
@@ -212,9 +220,8 @@ export function wiresOfRun(
     return [fil('phase'), fil('neutre'), fil('terre')];
   }
   if (role === 'commande') {
-    return vaEtVient
-      ? [fil('phase'), fil('navette'), fil('navette')]
-      : [fil('phase'), fil('retour')];
+    if (vaEtVient) return [fil((commande.rang ?? 0) > 0 ? 'retour' : 'phase'), fil('navette'), fil('navette')];
+    return [fil('phase'), ...Array.from({ length: Math.max(1, commande.retours ?? 1) }, () => fil('retour'))];
   }
   return [fil('neutre'), fil('terre'), fil('retour')];
 }
@@ -430,9 +437,13 @@ export function multiWire(
       wires: wiresOfRun(circuit, 'autre'),
     });
   } else {
-    if (aCommande) {
+    if (aCommande && va) {
+      // En étoile : la phase monte à la première, le retour redescend de la seconde.
+      runs.push({ titre: 'Vers la première commande', wires: wiresOfRun(circuit, 'commande', va, { rang: 0 }) });
+      runs.push({ titre: 'Vers la seconde commande', wires: wiresOfRun(circuit, 'commande', va, { rang: 1 }) });
+    } else if (aCommande) {
       runs.push({
-        titre: va ? 'Vers chaque commande' : 'Vers la commande',
+        titre: 'Vers la commande',
         wires: wiresOfRun(circuit, 'commande', va),
       });
     }

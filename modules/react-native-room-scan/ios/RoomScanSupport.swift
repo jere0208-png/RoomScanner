@@ -85,6 +85,8 @@ class RoomScanSupport: NSObject, MFMailComposeViewControllerDelegate,
             fileName: url.lastPathComponent)
         }
       }
+      // Un courrier précédent encore en attente ne reste pas suspendu.
+      self.mailResolve?("cancelled")
       self.mailResolve = resolve
       haut.present(vue, animated: true)
     }
@@ -121,6 +123,8 @@ class RoomScanSupport: NSObject, MFMailComposeViewControllerDelegate,
         let type = fileName.lowercased().hasSuffix(".json") ? "application/json" : "text/plain"
         vue.addAttachmentData(donnees, mimeType: type, fileName: fileName)
       }
+      // Un courrier précédent encore en attente ne reste pas suspendu.
+      self.mailResolve?("cancelled")
       self.mailResolve = resolve
       haut.present(vue, animated: true)
     }
@@ -186,6 +190,7 @@ class RoomScanSupport: NSObject, MFMailComposeViewControllerDelegate,
       config.selectionLimit = 1
       let picker = PHPickerViewController(configuration: config)
       picker.delegate = self
+      self.pickResolve?(nil)
       self.pickResolve = resolve
       haut.present(picker, animated: true)
     }

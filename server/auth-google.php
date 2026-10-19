@@ -89,7 +89,10 @@ if ($sub === '') {
 }
 
 $identifiant = 'google:' . $sub;
-$email = (string) ($charge['email'] ?? '');
+// Seule une adresse que Google dit VÉRIFIÉE est signée : c'est elle qui
+// décide, côté api.php, de l'e-mail du compte (et donc de l'administrateur).
+$verifiee = $charge['email_verified'] ?? false;
+$email = $verifiee === true || $verifiee === 'true' ? (string) ($charge['email'] ?? '') : '';
 $prenom = (string) ($charge['given_name'] ?? '');
 // La signature que api.php vérifie à la connexion : identité non forgeable.
 $signature = hash_hmac('sha256', $identifiant . '|' . $email . '|' . $prenom, SECRET_HMAC);

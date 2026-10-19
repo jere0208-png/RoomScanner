@@ -245,12 +245,26 @@ final class LecteurDeFeuille: NSObject, XMLParserDelegate {
 
   init(partagees: [String]) { self.partagees = partagees }
 
+  /// La dernière colonne d'Excel (XFD).
+  static let colonnesMax = 16_384
+
+  /*
+    UNE RÉFÉRENCE BORNÉE — relevé « fiabilité » : le fichier vient de
+    Fichiers, rien ne le garantit. « ZZZZZZ1 » donnait une colonne de trois
+    cents millions (la ligne se remplissait jusqu'à épuiser la mémoire), et
+    quatorze lettres dépassaient un Int. Au-delà de trois lettres ou de XFD :
+    -1, la cellule est ignorée.
+  */
   private static func indice(_ ref: String) -> Int {
     var n = 0
+    var lettres = 0
     for c in ref.unicodeScalars {
       guard c.value >= 65 && c.value <= 90 else { break }
+      lettres += 1
+      if lettres > 3 { return -1 }
       n = n * 26 + Int(c.value - 64)
     }
+    if n > colonnesMax { return -1 }
     return max(0, n - 1)
   }
 
@@ -276,6 +290,8 @@ final class LecteurDeFeuille: NSObject, XMLParserDelegate {
     case "v", "t":
       dansValeur = false
     case "c":
+      // Une référence hors d'Excel : la cellule ne compte pas.
+      guard colonne >= 0, colonne < LecteurDeFeuille.colonnesMax else { break }
       var texte = valeur
       if type == "s", let i = Int(valeur), i >= 0, i < partagees.count { texte = partagees[i] }
       while ligne.count < colonne { ligne.append("") }

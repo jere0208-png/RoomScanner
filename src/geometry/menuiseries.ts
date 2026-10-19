@@ -13,7 +13,7 @@
  * pièce dans l'ordre du métré. Une porte entre deux pièces n'a qu'une ligne,
  * qui nomme les deux.
  */
-import { roomParts, segLength, type WallSeg } from './floorplan';
+import { murPorteurDe, roomParts, segLength, solDesMurs, type WallSeg } from './floorplan';
 import { baiesDeLaPiece } from './travaux';
 
 export interface LigneMenuiserie {
@@ -31,8 +31,12 @@ export interface LigneMenuiserie {
   allege: number | null;
 }
 
-/** Ce qu'est une baie, dit comme sur un carnet de menuiseries. */
-export function typeDeMenuiserie(o: WallSeg): string {
+/**
+ * Ce qu'est une baie, dit comme sur un carnet de menuiseries. `sol` : le
+ * niveau du sol sous la baie dans le repère du relevé — sur iOS il n'est
+ * pas à zéro, et une fenêtre à 0,95 du sol passait pour une porte-fenêtre.
+ */
+export function typeDeMenuiserie(o: WallSeg, sol = 0): string {
   if (o.type === 'opening') return 'Passage libre';
   if (o.type === 'door') {
     if (o.garage) return 'Porte de garage';
@@ -40,7 +44,7 @@ export function typeDeMenuiserie(o: WallSeg): string {
     if (o.vantaux === 2) return 'Porte double';
     return 'Porte';
   }
-  const allege = o.yCenter - o.height / 2;
+  const allege = o.yCenter - o.height / 2 - sol;
   return allege < 0.15 ? 'Porte-fenêtre' : 'Fenêtre';
 }
 
@@ -72,14 +76,19 @@ export function carnetDesMenuiseries(
   return tries.map((o) => {
     const lettre = o.type === 'door' ? 'P' : o.type === 'window' ? 'F' : 'B';
     compte[lettre] += 1;
-    const allege = o.type === 'window' ? Math.max(0, o.yCenter - o.height / 2) : null;
+    // L'allège se compte depuis le sol de la pièce, pas depuis l'origine du relevé.
+    // Une baie orpheline (aucun mur à 60 cm) prend le sol du relevé.
+    const porteur = murPorteurDe(o, walls).sol;
+    const sol = porteur === o.yCenter - o.height / 2 ? solDesMurs(walls) : porteur;
+    const allege = o.type === 'window' ? Math.max(0, o.yCenter - o.height / 2 - sol) : null;
+    const sorte = typeDeMenuiserie(o, sol);
     return {
       id: o.id,
       repere: `${lettre}${compte[lettre]}`,
       pieces: (piecesDe.get(o.id) ?? ['—']).join(' / '),
       // Une porte qui ne donne que sur une pièce (et pas un placard) ouvre
       // sur le dehors ou le palier : c'est la porte d'entrée.
-      type: typeDeMenuiserie(o) === 'Porte' && (piecesDe.get(o.id)?.length ?? 0) === 1 ? 'Porte d’entrée' : typeDeMenuiserie(o),
+      type: sorte === 'Porte' && (piecesDe.get(o.id)?.length ?? 0) === 1 ? 'Porte d’entrée' : sorte,
       largeur: segLength(o),
       hauteur: o.height,
       // Une porte-fenêtre n'a pas d'allège à dire.

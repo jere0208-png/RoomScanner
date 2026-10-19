@@ -173,6 +173,7 @@ import {
   type PrixDuDevis,
 } from '../geometry/mainDOeuvre';
 import { nomDeTeinte } from '../ui/peintures';
+import { arrondiM2, frM2 } from '../ui/mots';
 import { nomDeFichier } from './nomDeFichier';
 
 const PAGE_W = 595;
@@ -1942,8 +1943,6 @@ export { nomAbrege };
  * des valeurs ÉCRITES (`sommeEcrite`) : on le refait à la calculette.
  */
 const fr2 = (v: number) => v.toFixed(2).replace('.', ',');
-const arrondiM2 = (v: number) => Math.round(v * 100) / 100;
-const frM2 = (v: number) => fr2(arrondiM2(v));
 const sommeEcrite = (valeurs: number[]) => arrondiM2(valeurs.reduce((t, v) => t + arrondiM2(v), 0));
 const frLen = (v: number) => v.toFixed(2).replace('.', ',');
 

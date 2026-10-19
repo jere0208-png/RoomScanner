@@ -218,7 +218,8 @@ describe('côté iPhone, plus rien ne tourne pour rien', () => {
     expect(pose).toContain('vue.antialiasingMode = .multisampling2X');
     expect(pose).toContain('vue.preferredFramesPerSecond = 60');
     const manager = natif('RoomScanManager.swift');
-    expect(manager.match(/couche\?\.suspendre\(true\)/g)?.length).toBe(2);
+    // La pause, « Terminer », et l'abandon (qui éteint la session pour de bon).
+    expect(manager.match(/couche\?\.suspendre\(true\)/g)?.length).toBe(3);
     expect(manager).toContain('self.couche?.suspendre(false)');
     expect(manager).toContain('RoomScanCompass.shared.detach()');
   });

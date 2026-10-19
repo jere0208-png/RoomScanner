@@ -78,12 +78,13 @@ describe('le resume d’un scan dans la bibliotheque', () => {
   });
 
   it('porte la surface quand elle est connue, et son « environ »', () => {
+    // Au centième, comme le plan et le dossier (revue du géomètre, `frM2`).
     expect(
       resumeDuScan({ pieces: 1, murs: 4, objets: 0, surface: { area: 9.75, exact: true } }),
-    ).toContain('9,8 m²');
+    ).toContain('9,75 m²');
     expect(
       resumeDuScan({ pieces: 1, murs: 4, objets: 0, surface: { area: 9.75, exact: false } }),
-    ).toContain('≈ 9,8 m²');
+    ).toContain('≈ 9,75 m²');
   });
 });
 

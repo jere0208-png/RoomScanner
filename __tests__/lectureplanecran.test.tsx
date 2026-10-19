@@ -497,7 +497,9 @@ describe('ce qui la porte', () => {
   it('le natif : le sélecteur de fichiers d’iOS, et le PDF rendu à haute définition', () => {
     const swift = lire('modules', 'react-native-room-scan', 'ios', 'RoomScanLecturePlan.swift');
     expect(swift).toContain('UIDocumentPickerViewController(forOpeningContentTypes: [.pdf, .image], asCopy: true)');
-    expect(swift).toContain('PDFDocument(url: url)');
+    // Lu en mémoire : la copie du sélecteur est effacée aussitôt.
+    expect(swift).toContain('PDFDocument(data: donnees)');
+    expect(swift).toContain('try? FileManager.default.removeItem(at: url)');
     expect(swift).toContain('doc.isLocked');
     // La page retenue : celle qui porte le plus de cotes.
     expect(swift).toContain('static func meilleurePage(');

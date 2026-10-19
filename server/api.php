@@ -36,7 +36,24 @@
  * l'e-mail de quelqu'un pour lister et télécharger ses plans. Chaque méthode
  * apporte maintenant SA preuve, vérifiée ici avant tout (`preuveRefusee`).
  */
+/*
+  UNE ERREUR NE DIT RIEN DU SERVEUR — revue « sécurité » : depuis PHP 8.1,
+  mysqli lève une exception au lieu de rendre `false` ; non rattrapée, elle
+  s'affichait avec le chemin du fichier, l'hôte et l'utilisateur MySQL. Elle
+  part désormais au journal du serveur, et l'app reçoit une phrase.
+*/
+@ini_set('display_errors', '0');
+set_exception_handler(function (Throwable $e): void {
+  error_log('EchoPlan api.php : ' . $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')');
+  if (!headers_sent()) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+  }
+  echo json_encode(['ok' => false, 'raison' => 'Erreur serveur : réessayez dans un instant.'], JSON_UNESCAPED_UNICODE);
+});
+
 require __DIR__ . '/config-echoplan.php';
+require_once __DIR__ . '/garde-fous.php';
 require __DIR__ . '/preuve-apple.php';
 require __DIR__ . '/diagnostic-depot.php';
 
@@ -48,25 +65,28 @@ function sortir(array $reponse): void {
 }
 
 /**
- * EST-CE UN ADMINISTRATEUR ? — l'e-mail du compte (en base), comparé à la
- * liste `ADMIN_EMAILS` de la config. Jamais l'e-mail reçu de l'app : un
- * compte prend l'e-mail qu'il prouve posséder (`preuveRefusee`), pas celui
- * qu'il déclare. Liste vide ou non définie : personne ne l'est.
+ * EST-CE UN ADMINISTRATEUR ? — l'e-mail PROUVÉ du compte, comparé à la
+ * liste `ADMIN_EMAILS` de la config ; ou son identifiant, s'il figure dans
+ * `ADMIN_IDENTIFIANTS` (facultatif, la porte la plus sûre : `apple:…`).
+ *
+ * Revue « sécurité » : `connecter` enregistrait l'e-mail que l'app
+ * DÉCLARAIT ; un compte e-mail déclarait celui du patron et devenait
+ * administrateur. L'e-mail est maintenant celui de la preuve
+ * (`emailProuve`), et celui d'un compte e-mail se relit dans son
+ * identifiant (`estAdminParmi`). Listes vides : personne ne l'est.
  */
-function estAdmin(?array $compte): bool {
-  if (!defined('ADMIN_EMAILS') || !is_array(ADMIN_EMAILS) || !ADMIN_EMAILS) {
-    return false;
-  }
-  $email = strtolower(trim((string) ($compte['email'] ?? '')));
-  if ($email === '') {
-    return false;
-  }
-  foreach (ADMIN_EMAILS as $admin) {
-    if (hash_equals(strtolower(trim((string) $admin)), $email)) {
-      return true;
-    }
-  }
-  return false;
+function estAdmin(?array $compte, string $identifiant): bool {
+  $emails = defined('ADMIN_EMAILS') && is_array(ADMIN_EMAILS) ? ADMIN_EMAILS : [];
+  $identifiants = defined('ADMIN_IDENTIFIANTS') && is_array(ADMIN_IDENTIFIANTS) ? ADMIN_IDENTIFIANTS : [];
+  return estAdminParmi($compte, $identifiant, $emails, $identifiants);
+}
+
+/*
+  UN ENVOI PLUS LOURD QUE `post_max_size` arrive VIDE : PHP jette tout, et
+  l'on répondait « Requête vide ». On le dit.
+*/
+if (empty($_POST) && requeteTropLourde((int) ($_SERVER['CONTENT_LENGTH'] ?? 0), (string) ini_get('post_max_size'))) {
+  sortir(['ok' => false, 'raison' => 'Envoi trop lourd pour le serveur (réglage post_max_size).']);
 }
 
 /*
@@ -95,7 +115,7 @@ if (($_POST['action'] ?? '') === 'diagnostic') {
   if (!$compte) {
     sortir(['ok' => false, 'raison' => 'Compte inconnu.']);
   }
-  if (!estAdmin($compte)) {
+  if (!estAdmin($compte, $identifiant)) {
     sortir(['ok' => false, 'raison' => 'Réservé à l’administrateur.']);
   }
 
@@ -120,6 +140,11 @@ if (($_POST['action'] ?? '') === 'diagnostic') {
   $fichiers = [];
   $avecVideo = false;
   $video = $_FILES['video'] ?? null;
+  // Une vidéo que PHP a refusée se dit : on répondait « envoyé », sans elle.
+  $refusVideo = is_array($video) ? raisonDuTeleversement((int) ($video['error'] ?? UPLOAD_ERR_NO_FILE)) : null;
+  if ($refusVideo !== null) {
+    sortir(['ok' => false, 'raison' => $refusVideo]);
+  }
   if (is_array($video) && (int) ($video['error'] ?? 1) === UPLOAD_ERR_OK) {
     if ((int) ($video['size'] ?? 0) > 25 * 1024 * 1024) {
       sortir(['ok' => false, 'raison' => 'Vidéo trop lourde.']);
@@ -160,7 +185,7 @@ if (($_POST['action'] ?? '') === 'diagnostic-video') {
     sortir(['ok' => false, 'raison' => 'Jeton invalide.']);
   }
   $compte = compteDe($db, $identifiant);
-  if (!$compte || !estAdmin($compte)) {
+  if (!$compte || !estAdmin($compte, $identifiant)) {
     sortir(['ok' => false, 'raison' => 'Réservé à l’administrateur.']);
   }
   $dossier = (string) ($_POST['dossier'] ?? '');
@@ -169,6 +194,10 @@ if (($_POST['action'] ?? '') === 'diagnostic-video') {
     sortir(['ok' => false, 'raison' => 'Tranche invalide.']);
   }
   $video = $_FILES['video'] ?? null;
+  $refusVideo = is_array($video) ? raisonDuTeleversement((int) ($video['error'] ?? UPLOAD_ERR_NO_FILE)) : null;
+  if ($refusVideo !== null) {
+    sortir(['ok' => false, 'raison' => $refusVideo]);
+  }
   if (!is_array($video) || (int) ($video['error'] ?? 1) !== UPLOAD_ERR_OK) {
     sortir(['ok' => false, 'raison' => 'Vidéo absente.']);
   }
@@ -243,7 +272,13 @@ if ($action === 'tarifs') {
 function base(): mysqli {
   static $db = null;
   if ($db === null) {
-    $db = mysqli_connect(DB_HOTE, DB_UTILISATEUR, DB_MOT_DE_PASSE, DB_BASE);
+    // PHP 8.1 et suivants : un échec lève une exception, PHP 7 rend false.
+    try {
+      $db = mysqli_connect(DB_HOTE, DB_UTILISATEUR, DB_MOT_DE_PASSE, DB_BASE);
+    } catch (Throwable $e) {
+      error_log('EchoPlan api.php : base injoignable (' . $e->getMessage() . ')');
+      $db = false;
+    }
     if (!$db) {
       sortir(['ok' => false, 'raison' => 'Base injoignable.']);
     }
@@ -297,9 +332,13 @@ if ($action === 'code_email') {
   );
   mysqli_stmt_bind_param($req, 'ssiiii', $email, $empreinte, $expire, $maintenant, $envois, $fenetre);
   mysqli_stmt_execute($req);
-  $expediteur = defined('EMAIL_EXPEDITEUR') && EMAIL_EXPEDITEUR !== ''
-    ? EMAIL_EXPEDITEUR
-    : 'no-reply@' . preg_replace('/^www\./', '', (string) ($_SERVER['HTTP_HOST'] ?? 'localhost'));
+  // L'expéditeur vient de la config, jamais de l'en-tête Host : celui-là,
+  // c'est le client qui l'écrit.
+  if (!defined('EMAIL_EXPEDITEUR') || EMAIL_EXPEDITEUR === '') {
+    error_log('EchoPlan api.php : EMAIL_EXPEDITEUR manquant dans config-echoplan.php');
+    sortir(['ok' => false, 'raison' => 'L’envoi des codes n’est pas configuré sur le serveur.']);
+  }
+  $expediteur = EMAIL_EXPEDITEUR;
   $sujet = '=?UTF-8?B?' . base64_encode('Votre code EchoPlan : ' . $code) . '?=';
   $texte = "Bonjour,\r\n\r\nVotre code de connexion EchoPlan : " . $code . "\r\n\r\n" .
     "Il est valable quinze minutes. Si vous n'avez rien demandé, ignorez ce message : " .
@@ -437,17 +476,18 @@ function pemDeJwk(string $n, string $e): string {
 /**
  * LE JETON D'IDENTITÉ D'APPLE — signé RS256 par Apple, émis pour CET
  * utilisateur (`sub`), pas encore expiré ; et pour cette application, si
- * `APPLE_BUNDLE_ID` est renseigné dans la configuration.
+ * `APPLE_BUNDLE_ID` est renseigné dans la configuration. Rend sa charge
+ * (l'e-mail qu'Apple atteste y est), ou null.
  */
-function jetonAppleValide(string $sub, string $jwt): bool {
+function chargeAppleValide(string $sub, string $jwt): ?array {
   $parts = explode('.', $jwt);
   if (count($parts) !== 3) {
-    return false;
+    return null;
   }
   $entete = json_decode(b64url($parts[0]), true);
   $charge = json_decode(b64url($parts[1]), true);
   if (!is_array($entete) || !is_array($charge) || ($entete['alg'] ?? '') !== 'RS256') {
-    return false;
+    return null;
   }
   $cle = null;
   foreach (clesApple() as $k) {
@@ -456,7 +496,7 @@ function jetonAppleValide(string $sub, string $jwt): bool {
     }
   }
   if (!$cle) {
-    return false;
+    return null;
   }
   $signe = openssl_verify(
     $parts[0] . '.' . $parts[1],
@@ -465,48 +505,56 @@ function jetonAppleValide(string $sub, string $jwt): bool {
     OPENSSL_ALGO_SHA256,
   );
   if ($signe !== 1) {
-    return false;
+    return null;
   }
   if (($charge['iss'] ?? '') !== 'https://appleid.apple.com') {
-    return false;
+    return null;
   }
   if ((int) ($charge['exp'] ?? 0) < time()) {
-    return false;
+    return null;
   }
   if ((string) ($charge['sub'] ?? '') !== $sub) {
-    return false;
+    return null;
   }
   if (defined('APPLE_BUNDLE_ID') && APPLE_BUNDLE_ID !== '' && ($charge['aud'] ?? '') !== APPLE_BUNDLE_ID) {
-    return false;
+    return null;
   }
-  return true;
+  return $charge;
 }
 
 /**
  * LA PREUVE DE CHAQUE MÉTHODE — `null` si elle tient, sinon la raison du
  * refus. Rien n'est créé, rien n'est délivré avant elle.
  */
-function preuveRefusee(mysqli $db, string $identifiant, array $corps): ?string {
+function preuveRefusee(mysqli $db, string $identifiant, array $corps, ?array &$chargeApple = null): ?string {
   if (strncmp($identifiant, 'email:', 6) === 0) {
     $email = substr($identifiant, 6);
     $code = preg_replace('/\D/', '', (string) ($corps['code'] ?? ''));
     if (strlen($code) !== 6) {
       return 'Entrez le code reçu par e-mail.';
     }
+    /*
+      L'ESSAI SE COMPTE AVANT LA COMPARAISON, d'un seul coup — revue
+      « sécurité » : lire `essais`, comparer, puis l'incrémenter laissait
+      cent requêtes simultanées lire toutes « moins de cinq » et tester
+      chacune un code. Une seule ligne touchée, ou pas d'essai.
+    */
+    $maintenant = time();
+    $req = mysqli_prepare($db, 'UPDATE codes_email SET essais = essais + 1 WHERE email = ? AND essais < 5 AND expire >= ?');
+    mysqli_stmt_bind_param($req, 'si', $email, $maintenant);
+    mysqli_stmt_execute($req);
+    $compte = mysqli_stmt_affected_rows($req);
     $req = mysqli_prepare($db, 'SELECT empreinte, expire, essais FROM codes_email WHERE email = ?');
     mysqli_stmt_bind_param($req, 's', $email);
     mysqli_stmt_execute($req);
     $ligne = mysqli_fetch_assoc(mysqli_stmt_get_result($req));
-    if (!$ligne || (int) $ligne['expire'] < time()) {
+    if (!$ligne || (int) $ligne['expire'] < $maintenant) {
       return 'Ce code a expiré : demandez-en un nouveau.';
     }
-    if ((int) $ligne['essais'] >= 5) {
+    if ($compte < 1) {
       return 'Trop d’essais : demandez un nouveau code.';
     }
     if (!hash_equals((string) $ligne['empreinte'], empreinteDuCode($email, $code))) {
-      $req = mysqli_prepare($db, 'UPDATE codes_email SET essais = essais + 1 WHERE email = ?');
-      mysqli_stmt_bind_param($req, 's', $email);
-      mysqli_stmt_execute($req);
       return 'Code incorrect.';
     }
     // Un code ne sert qu'une fois.
@@ -525,9 +573,8 @@ function preuveRefusee(mysqli $db, string $identifiant, array $corps): ?string {
     return hash_equals($attendue, (string) ($corps['sig'] ?? '')) ? null : 'Connexion Google non vérifiée : recommencez.';
   }
   if (strncmp($identifiant, 'apple:', 6) === 0) {
-    return jetonAppleValide(substr($identifiant, 6), (string) ($corps['jetonApple'] ?? ''))
-      ? null
-      : 'Connexion Apple non vérifiée : recommencez.';
+    $chargeApple = chargeAppleValide(substr($identifiant, 6), (string) ($corps['jetonApple'] ?? ''));
+    return $chargeApple !== null ? null : 'Connexion Apple non vérifiée : recommencez.';
   }
   return 'Méthode de connexion inconnue.';
 }
@@ -538,10 +585,13 @@ if ($action === 'connecter') {
     sortir(['ok' => false, 'raison' => 'Appareil manquant.']);
   }
   // LA PREUVE AVANT TOUT : aucun compte créé, aucun jeton délivré sans elle.
-  $refus = preuveRefusee($db, $identifiant, $corps);
+  $chargeApple = null;
+  $refus = preuveRefusee($db, $identifiant, $corps, $chargeApple);
   if ($refus !== null) {
     sortir(['ok' => false, 'raison' => $refus]);
   }
+  // L'e-mail que la preuve atteste — jamais celui que l'app déclare.
+  $email = substr(emailProuve($identifiant, $corps, $chargeApple), 0, 191);
 
   // TOUS les comptes sont accueillis. Ce que la base retient, c'est
   // l'ESSAI DU TÉLÉPHONE : le plus grand compteur `plans` porté par cet
@@ -549,7 +599,6 @@ if ($action === 'connecter') {
   $compte = compteDe($db, $identifiant);
   if (!$compte) {
     $prenom = substr(trim((string) ($corps['prenom'] ?? '')), 0, 80);
-    $email = substr(trim((string) ($corps['email'] ?? '')), 0, 191);
     $req = mysqli_prepare(
       $db,
       'INSERT INTO comptes (identifiant, prenom, email) VALUES (?, ?, ?)',
@@ -557,6 +606,13 @@ if ($action === 'connecter') {
     mysqli_stmt_bind_param($req, 'sss', $identifiant, $prenom, $email);
     mysqli_stmt_execute($req);
     $compte = compteDe($db, $identifiant);
+  } elseif ((string) ($compte['email'] ?? '') !== $email) {
+    // Chaque connexion réécrit l'e-mail depuis la preuve : celui qu'un
+    // ancien compte avait déclaré ne survit pas à sa prochaine connexion.
+    $req = mysqli_prepare($db, 'UPDATE comptes SET email = ? WHERE id = ?');
+    mysqli_stmt_bind_param($req, 'si', $email, $compte['id']);
+    mysqli_stmt_execute($req);
+    $compte['email'] = $email;
   }
 
   $req = mysqli_prepare(
@@ -585,7 +641,7 @@ if ($action === 'connecter') {
     // L'app garde ce drapeau pour montrer, au seul administrateur, le réglage
     // du mode diagnostic. Le serveur le revérifie à chaque dépôt : c'est ici
     // un affichage, pas un droit.
-    'admin' => estAdmin($compte),
+    'admin' => estAdmin($compte, $identifiant),
   ]);
 }
 
@@ -613,7 +669,7 @@ if ($compte['pro'] === 'abonnement' && $compte['pro_echeance'] !== null
 }
 
 if ($action === 'etat') {
-  sortir(['ok' => true, 'pro' => $compte['pro'], 'plans' => (int) $compte['plans'], 'codes' => codesInternesOuverts(), 'admin' => estAdmin($compte)]);
+  sortir(['ok' => true, 'pro' => $compte['pro'], 'plans' => (int) $compte['plans'], 'codes' => codesInternesOuverts(), 'admin' => estAdmin($compte, $identifiant)]);
 }
 
 if ($action === 'plan') {
@@ -677,11 +733,12 @@ if ($action === 'code') {
   Nécessite la table `plans` — voir migration-plans.sql.
 */
 if ($action === 'deposer') {
-  $scan = trim((string) ($corps['scan'] ?? ''));
+  // L'identifiant d'un plan tient dans sa colonne (64), son nom dans la sienne (191).
+  $scan = scanRecevable((string) ($corps['scan'] ?? ''));
   $contenu = (string) ($corps['contenu'] ?? '');
-  $nom = trim((string) ($corps['nom'] ?? ''));
+  $nom = nomBorne((string) ($corps['nom'] ?? ''));
   $maj = (int) ($corps['maj'] ?? 0);
-  if ($scan === '' || $contenu === '') {
+  if ($scan === null || $contenu === '') {
     sortir(['ok' => false, 'raison' => 'Plan vide.']);
   }
   // Deux mégaoctets : le relevé d'un logement entier en fait moins de cent
@@ -689,12 +746,29 @@ if ($action === 'deposer') {
   if (strlen($contenu) > 2097152) {
     sortir(['ok' => false, 'raison' => 'Plan trop lourd.']);
   }
+  // Un nombre de plans borné par compte : une boucle ne remplit pas la base.
+  $req = mysqli_prepare($db, 'SELECT COUNT(*) AS n, SUM(scan = ?) AS deja FROM plans WHERE identifiant = ?');
+  mysqli_stmt_bind_param($req, 'ss', $scan, $identifiant);
+  mysqli_stmt_execute($req);
+  $nb = mysqli_fetch_assoc(mysqli_stmt_get_result($req)) ?: ['n' => 0, 'deja' => 0];
+  if ((int) $nb['n'] >= PLANS_PAR_COMPTE_MAX && (int) $nb['deja'] === 0) {
+    sortir(['ok' => false, 'raison' => 'Trop de plans gardés sur ce compte.']);
+  }
+  /*
+    UNE VERSION PLUS ANCIENNE N'ÉCRASE PAS LA PLUS RÉCENTE — revue
+    « données » : un téléphone resté sur une vieille copie, ou une requête
+    abandonnée qui arrive en retard, remplaçait le plan du serveur. Le
+    contenu et le nom ne changent que si `maj` n'est pas plus vieux ; `maj`
+    se met à jour EN DERNIER (MySQL évalue les affectations dans l'ordre :
+    les IF lisent encore l'ancien).
+  */
   $req = mysqli_prepare(
     $db,
     'INSERT INTO plans (identifiant, scan, nom, contenu, maj)
      VALUES (?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE nom = VALUES(nom), contenu = VALUES(contenu),
-       maj = VALUES(maj)',
+     ON DUPLICATE KEY UPDATE nom = IF(VALUES(maj) >= maj, VALUES(nom), nom),
+       contenu = IF(VALUES(maj) >= maj, VALUES(contenu), contenu),
+       maj = GREATEST(maj, VALUES(maj))',
   );
   mysqli_stmt_bind_param($req, 'ssssi', $identifiant, $scan, $nom, $contenu, $maj);
   mysqli_stmt_execute($req);
@@ -802,8 +876,9 @@ if ($action === 'retirer') {
     — aucune clé privée, aucun secret Apple : la vérification n'utilise que
       ce qu'Apple publie.
 
-  Une photo qui n'est pas un plan ne consomme pas l'essai. Rien n'est gardé :
-  ni l'image, ni la lecture — seulement le compte des lectures.
+  Une photo qui n'est pas un plan ne consomme pas l'essai, mais compte dans
+  le plafond du jour. Rien n'est gardé : ni l'image, ni la lecture —
+  seulement le compte des lectures.
 */
 if ($action === 'lire_plan') {
   // Trois lectures en parallèle, et au pire un second essai : voir lecture-plan.php.
@@ -822,14 +897,46 @@ if ($action === 'lire_plan') {
       $estPro = true;
     }
   }
+  $messagePro = 'Votre lecture d’essai est utilisée : la lecture de plans papier est réservée au Pro.';
   if (!$estPro && (int) $l['lectures'] >= 1) {
-    sortir(['ok' => false, 'raison' => 'pro', 'message' => 'Votre lecture d’essai est utilisée : la lecture de plans papier est réservée au Pro.']);
+    sortir(['ok' => false, 'raison' => 'pro', 'message' => $messagePro]);
   }
   $parJour = defined('LECTURES_PAR_JOUR') ? (int) LECTURES_PAR_JOUR : 20;
-  $duJour = ($l['jour_lecture'] ?? '') === date('Y-m-d') ? (int) $l['lectures_jour'] : 0;
-  if ($duJour >= $parJour) {
-    sortir(['ok' => false, 'raison' => 'quota', 'message' => 'Vous avez lu ' . $parJour . ' plans aujourd’hui : la lecture reprend demain.']);
+  $messageQuota = 'Vous avez lu ' . $parJour . ' plans aujourd’hui : la lecture reprend demain.';
+  /*
+    LA LECTURE SE COMPTE AVANT L'APPEL, d'un seul coup — revue « sécurité » :
+    comptée après, et seulement si la photo était un plan, une photo qui
+    n'en était pas un ne consommait rien, et l'on pouvait lancer des appels
+    payants sans fin ; trente requêtes simultanées passaient aussi toutes
+    l'essai. Une seule ligne touchée, ou pas de lecture.
+  */
+  $pro = $estPro ? 1 : 0;
+  $req = mysqli_prepare(
+    $db,
+    'UPDATE comptes SET lectures = lectures + 1, '
+      . 'lectures_jour = IF(jour_lecture = CURDATE(), lectures_jour + 1, 1), '
+      . 'jour_lecture = CURDATE() '
+      . 'WHERE id = ? AND (? = 1 OR lectures < 1) '
+      . 'AND (jour_lecture IS NULL OR jour_lecture <> CURDATE() OR lectures_jour < ?)',
+  );
+  mysqli_stmt_bind_param($req, 'iii', $compte['id'], $pro, $parJour);
+  mysqli_stmt_execute($req);
+  if (mysqli_stmt_affected_rows($req) < 1) {
+    sortir($estPro
+      ? ['ok' => false, 'raison' => 'quota', 'message' => $messageQuota]
+      : ['ok' => false, 'raison' => (int) $l['lectures'] >= 1 ? 'pro' : 'quota', 'message' => (int) $l['lectures'] >= 1 ? $messagePro : $messageQuota]);
   }
+  /** Rend ce qu'on vient de compter : `$jour` aussi, ou l'essai seulement. */
+  $rendre = function (bool $jour) use ($db, $compte): void {
+    $req = mysqli_prepare(
+      $db,
+      'UPDATE comptes SET lectures = GREATEST(lectures - 1, 0)'
+        . ($jour ? ', lectures_jour = GREATEST(lectures_jour - 1, 0)' : '')
+        . ' WHERE id = ?',
+    );
+    mysqli_stmt_bind_param($req, 'i', $compte['id']);
+    mysqli_stmt_execute($req);
+  };
   require __DIR__ . '/lecture-plan.php';
   $r = lirePlanPapier(
     (string) ($corps['image'] ?? ''),
@@ -837,18 +944,14 @@ if ($action === 'lire_plan') {
     is_array($corps['textes'] ?? null) ? $corps['textes'] : [],
   );
   if (!$r['ok']) {
+    // La panne est la nôtre (photo refusée avant l'appel, IA injoignable) : tout est rendu.
+    $rendre(true);
     sortir($r);
   }
-  // Une lecture comptée seulement si c'était un plan.
-  if (!empty($r['lecture']['est_un_plan'])) {
-    $req = mysqli_prepare(
-      $db,
-      'UPDATE comptes SET lectures = lectures + 1, '
-        . 'lectures_jour = IF(jour_lecture = CURDATE(), lectures_jour + 1, 1), '
-        . 'jour_lecture = CURDATE() WHERE id = ?',
-    );
-    mysqli_stmt_bind_param($req, 'i', $compte['id']);
-    mysqli_stmt_execute($req);
+  // Une photo qui n'est pas un plan ne consomme pas l'essai — mais elle
+  // compte dans le plafond du jour : l'appel à l'IA, lui, a bien eu lieu.
+  if (empty($r['lecture']['est_un_plan'])) {
+    $rendre(false);
   }
   sortir(['ok' => true, 'lecture' => $r['lecture'], 'essai' => !$estPro]);
 }

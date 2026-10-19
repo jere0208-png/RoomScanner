@@ -29,7 +29,7 @@ import {
   epaisseurDe,
   pivotsDesBattants,
   planFrameAngle,
-  retraitDuCoin,
+  bornesAuNu,
   roomParts,
   segLength,
   longueurCotee,
@@ -41,7 +41,7 @@ import {
 import { FIXTURES, type Fixture } from '../geometry/electrical';
 import { CEILINGS, type CeilingFixture } from '../geometry/ceiling';
 import { longueurDuRuban } from '../geometry/ruban';
-import { deplierLigatures } from '../ui/mots';
+import { deplierLigatures, frM2 } from '../ui/mots';
 import { nomDeFichier } from './nomDeFichier';
 
 /** Un calque du fichier : son nom, et sa couleur d'index AutoCAD. */
@@ -444,7 +444,7 @@ export function buildDxf(plan: PlanPourDxf): string {
         { x: part.labelAt.x, z: part.labelAt.z + 0.3 },
         150,
         0,
-        `${(Math.round(aire * 100) / 100).toFixed(2).replace('.', ',')} m2`,
+        `${frM2(aire)} m2`,
       );
     }
   }
@@ -546,12 +546,11 @@ export function buildDxf(plan: PlanPourDxf): string {
     // d'un côté (voir `facesDesMurs`).
     const faces = demiFacesDe(plan.walls, w);
     const e = sgn > 0 ? faces.plus : faces.moins;
-    // Centrée sur le nu, entre les demi-murs qui ferment ses deux bouts.
-    const r0 = w.auNu ? retraitDuCoin(plan.walls, w, w.a) : 0;
-    const r1 = w.auNu ? retraitDuCoin(plan.walls, w, w.b) : 0;
-    const sMil = (r0 + lax - r1) / 2;
-    const s0 = sMil - L / 2;
-    const s1 = sMil + L / 2;
+    // De nu à nu : les bornes de la cote elle-même (`bornesAuNu`), comme le
+    // PDF — un refend vu des deux faces ou un pan coupé ne reculent pas d'une
+    // demi-épaisseur forfaitaire.
+    const { s0, s1 } = bornesAuNu(plan.walls, w, decoupage);
+    const sMil = (s0 + s1) / 2;
     const D = e + 0.3;
     const sur = (s: number, k: number): Pt => ({ x: w.a.x + u.x * s + n.x * k, z: w.a.z + u.z * s + n.z * k });
     out += ligne(CALQUE.cotes, sur(s0, D), sur(s1, D));

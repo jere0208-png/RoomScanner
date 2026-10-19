@@ -383,10 +383,14 @@ export function couronnes(
   for (const l of pieces) {
     // Un tronçon plus long qu'une couronne entière ne se tire pas d'un seul
     // tenant : aucune découpe n'y change rien. On le signale plutôt que de
-    // faire semblant.
+    // faire semblant — et on compte les couronnes qu'il mange, toutes : un
+    // départ de quatorze mètres en couronnes de dix en coûte deux, pas une
+    // (revue « chantier »). Le bout de la dernière sert au suivant.
     if (l > taille) {
       horsGabarit++;
-      restes.push(0);
+      const n = Math.ceil(l / taille - 1e-9);
+      for (let k = 1; k < n; k++) restes.push(0);
+      restes.push(n * taille - l);
       continue;
     }
     let i = restes.findIndex((r) => r >= l - 1e-9);
@@ -454,6 +458,23 @@ export function buyingList(
       spec: 'Au tableau, commandé par l’interrupteur général : il coupe l’éclairage',
       quantity: 1,
       unit: 'u',
+    });
+  }
+  /*
+    LE CHAUFFE-EAU EN HEURES CREUSES A SON CONTACTEUR — revue « chantier » :
+    la note de son circuit le dit (« commandé par un contacteur heures
+    creuses ») ; le bordereau ne l'achetait pas. Un par chauffe-eau.
+  */
+  const chauffeEau = fixtures.filter((f) => f.kind === 'sortieCable' && f.usage === 'CU').length;
+  if (chauffeEau > 0) {
+    out.push({
+      family: 'Appareillage',
+      code: 'contacteur-jn',
+      label: 'Contacteur jour/nuit 20 A',
+      spec: 'Au tableau : le chauffe-eau chauffe en heures creuses',
+      quantity: chauffeEau,
+      unit: 'u',
+      note: 'un par chauffe-eau',
     });
   }
   /*
@@ -626,12 +647,21 @@ export function buyingList(
       reconstruit de travers rend une réponse, jamais une erreur.
     */
     const va = r.brins.some((w) => w.role === 'navette');
+    // Le rang de chaque commande sur la ligne, et ses retours (voir `wiresOfRun`).
+    let rang = 0;
     for (const b of bouts) {
+      let commande: { rang?: number; retours?: number } = {};
+      if (b.role === 'commande') {
+        const f = fixtures.find((x) => x.id === b.id);
+        const retours = f ? postsOf(f.kind).filter((k) => k === 'inter' || k === 'variateur').length : 1;
+        commande = { rang: rang++, retours: Math.max(1, retours) };
+      }
       const siens = connu
         ? wiresOfRun(
             { nature: r.nature, section: r.section } as never,
             b.role,
             va,
+            commande,
           )
         : r.brins;
       for (const w of siens) {
@@ -697,12 +727,13 @@ export function buyingList(
     (a, b) => a.section - b.section || ordre[a.wire.role] - ordre[b.wire.role],
   )) {
     if (e.metres <= 0) continue;
+    const paquetDuFil = couronnes(e.bouts, longueurDeCouronne(e.section));
     out.push({
       family: 'Conduits et conducteurs',
       code: `fil-${e.section}-${e.wire.role}`,
       label: `Conducteur H07V-U ${frSection(e.section)} mm² — ${e.wire.label}`,
       spec: 'Rigide cuivre 450/750 V',
-      quantity: couronnes(e.bouts, longueurDeCouronne(e.section)).nombre,
+      quantity: paquetDuFil.nombre,
       // L'unité DIT la longueur qu'on achète : « cour. 100 m » sur du 6 mm²
       // envoyait commander cent mètres d'un fil qui se vend par dix.
       unit: `cour. ${longueurDeCouronne(e.section)} m`,
@@ -716,6 +747,12 @@ export function buyingList(
           ? ' — départs des commandes et des points lumineux'
           : e.wire.role === 'navette'
           ? ' — départs des commandes'
+          : ''
+      }${
+        paquetDuFil.horsGabarit > 0
+          ? ` · ${paquetDuFil.horsGabarit} départ${paquetDuFil.horsGabarit > 1 ? 's' : ''} plus long${
+              paquetDuFil.horsGabarit > 1 ? 's' : ''
+            } que la couronne : compté${paquetDuFil.horsGabarit > 1 ? 's' : ''} en couronnes entières, à rabouter en boîte ou à prendre à la coupe`
           : ''
       }`,
     });

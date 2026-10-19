@@ -48,7 +48,7 @@ import {
   type Offre,
   type OffresPro,
 } from '../store/accountStore';
-import { useScanStore } from '../store/scanStore';
+import { ouvrirConfidentialite } from './ConfidentialiteScreen';
 
 /**
  * LES CONDITIONS D'UTILISATION — le contrat de licence standard d'Apple.
@@ -527,7 +527,7 @@ export function PaywallScreen() {
               hitSlop={8}
               onPress={() => {
                 fermer();
-                useScanStore.getState().setScreen('confidentialite');
+                ouvrirConfidentialite();
               }}>
               <Text style={s.lien}>Confidentialité</Text>
             </Pressable>
