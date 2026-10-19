@@ -3936,7 +3936,12 @@ export interface ScanState {
    */
   remplacerMeuble: (id: string, item: CatalogItem) => void;
   /** Pose en une fois ce que « Normes auto » propose. */
-  poserDAuto: (fixtures: Fixture[], ceiling: CeilingFixture[]) => void;
+  poserDAuto: (
+    fixtures: Fixture[],
+    ceiling: CeilingFixture[],
+    /** Points déjà posés à relier à une commande : voir `LienAuto`. */
+    liens?: { ceilingId: string; commandeId: string }[],
+  ) => void;
   /**
    * Pose le meuble à cet endroit.
    *
@@ -11966,13 +11971,18 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
      * Un seul pas d'historique : c'est UN geste pour l'électricien, même s'il
      * ajoute quinze appareils. Devoir annuler quinze fois serait une punition.
      */
-    poserDAuto: (fixtures, ceiling) => {
-      if (fixtures.length === 0 && ceiling.length === 0) return;
+    poserDAuto: (fixtures, ceiling, liens = []) => {
+      if (fixtures.length === 0 && ceiling.length === 0 && liens.length === 0) return;
       pushHistory('normesAuto');
       const st = get();
+      // Les points déjà posés qu'on relie, dans le même « Annuler » (peaufinage ÉLECTRICITÉ).
+      const relier = (c: CeilingFixture) => {
+        const l = liens.filter((x) => x.ceilingId === c.id).map((x) => x.commandeId);
+        return l.length > 0 ? { ...c, commands: [...new Set([...(c.commands ?? []), ...l])] } : c;
+      };
       set({
         fixtures: [...st.fixtures, ...fixtures],
-        ceiling: [...st.ceiling, ...ceiling],
+        ceiling: [...st.ceiling, ...ceiling].map(relier),
         dirty: true,
       });
     },

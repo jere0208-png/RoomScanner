@@ -28,10 +28,13 @@ import type { CeilingFixture } from './ceiling';
 import type { Pt, WallSeg } from './floorplan';
 import { pointOnSeg, segLength, perpOf, solDesMurs } from './floorplan';
 import { volumeAt, volumeVerdict, wetZones } from './volumes';
+import { battantsDesPortes } from './passage';
+import { CEILINGS } from './ceiling';
 import {
   equipeeEnCuisine,
   estCuisine,
   exigencesDeLaPiece,
+  fixturePlacement,
   roomUse,
   socleFaceAuPlan,
   USE_LABEL,
@@ -50,9 +53,17 @@ const H_INTER = 1.1;
 const BORD = 0.2;
 const ECART = 0.3;
 
+/** Un point lumineux DÉJÀ posé, à relier à une commande posée (ou déjà là). */
+export interface LienAuto {
+  ceilingId: string;
+  commandeId: string;
+}
+
 export interface PoseAuto {
   fixtures: Fixture[];
   ceiling: CeilingFixture[];
+  /** Les points lumineux déjà au plan qu'on relie à l'interrupteur posé. */
+  liens: LienAuto[];
   /** Ce qu'on a posé, pièce par pièce, en clair. */
   rapport: string[];
   /** Rien à faire : tout était déjà conforme. */
@@ -189,6 +200,74 @@ function prendre(places: MurLibre[]): { wall: WallSeg; along: number; side: 1 | 
   return null;
 }
 
+/**
+ * L'INTERRUPTEUR À CÔTÉ DE LA PORTE, CÔTÉ POIGNÉE — peaufinage ÉLECTRICITÉ.
+ *
+ * « Normes auto » et « Corriger » posaient l'interrupteur au milieu du mur
+ * le plus dégagé, souvent au fond de la pièce : on entrait dans le noir.
+ * L'électricien le pose à l'entrée, à 1,10 m, à une main du chambranle, du
+ * côté où l'on pousse la porte (la poignée) — jamais derrière le vantail
+ * quand il s'ouvre dans la pièce. Rend la place, retirée du stock, ou null
+ * (pas de porte, ou aucune place à côté d'elle : la règle d'avant reprend).
+ */
+function aCoteDeLaPorte(
+  room: { id: string; wallIds: string[]; interieur: Pt },
+  openings: WallSeg[],
+  walls: WallSeg[],
+  rooms: { id: string; wallIds: string[] }[],
+  places: MurLibre[],
+): { wall: WallSeg; along: number; side: 1 | -1 } | null {
+  const portes = openings.filter((o) => o.type === 'door' && !o.garage && !o.placard);
+  if (portes.length === 0) return null;
+  const battants = battantsDesPortes(portes, walls, rooms);
+  // Les portes de la pièce, la plus large d'abord : c'est l'entrée.
+  const candidates = portes
+    .map((o) => {
+      for (const m of places) {
+        if (!room.wallIds.includes(m.wall.id)) continue;
+        const L = m.len;
+        const u = { x: (m.wall.b.x - m.wall.a.x) / L, z: (m.wall.b.z - m.wall.a.z) / L };
+        const n = perpOf(u);
+        const perp = (p: Pt) => Math.abs((p.x - m.wall.a.x) * n.x + (p.z - m.wall.a.z) * n.z);
+        if (perp(o.a) > 0.25 || perp(o.b) > 0.25) continue;
+        const proj = (p: Pt) => (p.x - m.wall.a.x) * u.x + (p.z - m.wall.a.z) * u.z;
+        const ta = proj(o.a);
+        const tb = proj(o.b);
+        if (Math.max(ta, tb) < 0 || Math.min(ta, tb) > L) continue;
+        return { o, m, proj, largeur: Math.abs(tb - ta) };
+      }
+      return null;
+    })
+    .filter((x): x is NonNullable<typeof x> => !!x)
+    .sort((a, b) => b.largeur - a.largeur);
+  /** À une main du chambranle : dix centimètres de tableau, quinze de plus. */
+  const RECUL = 0.25;
+  for (const { o, m, proj } of candidates) {
+    const b = battants.find((x) => x.id === o.id);
+    const tPivot = b ? proj(b.pivot) : proj(o.a);
+    const tAutre = b && b.ferme ? proj(b.ferme) : proj(o.b);
+    const t0 = Math.min(proj(o.a), proj(o.b));
+    const t1 = Math.max(proj(o.a), proj(o.b));
+    // Le côté poignée : le tableau opposé au gond (deux vantaux : les deux se valent).
+    const poigneeApres = tAutre > tPivot;
+    const cotePoignee = poigneeApres ? t1 + RECUL : t0 - RECUL;
+    const coteGond = poigneeApres ? t0 - RECUL : t1 + RECUL;
+    // Le vantail qui s'ouvre DANS la pièce cache le côté du gond.
+    const ouvreIci =
+      !!b &&
+      (b.ouvert.x - b.pivot.x) * (room.interieur.x - b.pivot.x) +
+        (b.ouvert.z - b.pivot.z) * (room.interieur.z - b.pivot.z) >
+        0;
+    const essais = o.vantaux === 2 || !ouvreIci ? [cotePoignee, coteGond] : [cotePoignee];
+    for (const along of essais) {
+      if (!m.libres.some(([x0, x1]) => along >= x0 && along <= x1)) continue;
+      m.libres = retirer(m.libres, along - ECART, along + ECART);
+      return { wall: m.wall, along, side: m.side };
+    }
+  }
+  return null;
+}
+
 /** Les plans de travail que longe ce mur, côté pièce, en abscisse depuis `a`. */
 function plansDuMur(
   wall: WallSeg,
@@ -272,6 +351,7 @@ export function poserAuxNormes(input: {
 }): PoseAuto {
   const fixtures: Fixture[] = [];
   const ceiling: CeilingFixture[] = [];
+  const liens: LienAuto[] = [];
   const rapport: string[] = [];
   const sol = solDesMurs(input.walls);
 
@@ -466,8 +546,32 @@ export function poserAuxNormes(input: {
     // Une commande d'éclairage par pièce : sans elle, le point lumineux ne
     // s'allume pas, et c'est le premier réflexe d'un contrôle.
     const avantInter = fixtures.length;
-    if (commandes === 0 && poser('inter', 1, H_INTER) > 0) {
-      pose.push('1 interrupteur');
+    if (commandes === 0) {
+      // À côté de la porte d'abord (voir `aCoteDeLaPorte`), sinon où il y a la place.
+      const places = placesPour(H_INTER);
+      const pres = aCoteDeLaPorte(room, input.openings, input.walls, input.rooms, places);
+      if (pres && pres.wall.height >= H_INTER + 0.1 && permis('inter', pres.wall, pres.along, pres.side, H_INTER)) {
+        fixtures.push({ id: input.id('inter'), kind: 'inter', wallId: pres.wall.id, along: pres.along, height: H_INTER, side: pres.side });
+        pose.push('1 interrupteur à l’entrée');
+      } else if (poser('inter', 1, H_INTER, places) > 0) {
+        pose.push('1 interrupteur');
+      }
+      /*
+        LES POINTS DÉJÀ LÀ S'ALLUMENT AUSSI — peaufinage ÉLECTRICITÉ : un
+        plafonnier posé sans commande restait « sans commande » après
+        « Normes auto », qui venait pourtant de poser l'interrupteur.
+      */
+      const inter = fixtures.slice(avantInter).find((f) => COMMANDES_MURALES.includes(f.kind));
+      if (inter) {
+        const avant = liens.length;
+        for (const c of input.ceiling) {
+          if (c.roomId === room.id && CEILINGS[c.kind].commandable && (c.commands ?? []).length === 0) {
+            liens.push({ ceilingId: c.id, commandeId: inter.id });
+          }
+        }
+        const n = liens.length - avant;
+        if (n > 0) pose.push(`${n} point${n > 1 ? 's' : ''} lumineux relié${n > 1 ? 's' : ''} à l’interrupteur`);
+      }
     }
     // Un point lumineux au centre, s'il n'y en a aucun.
     const dejaLumiere = input.ceiling.some((c) => c.roomId === room.id);
@@ -500,8 +604,9 @@ export function poserAuxNormes(input: {
   return {
     fixtures,
     ceiling,
+    liens,
     rapport,
-    conforme: fixtures.length === 0 && ceiling.length === 0,
+    conforme: fixtures.length === 0 && ceiling.length === 0 && liens.length === 0,
   };
 }
 
@@ -519,7 +624,15 @@ export interface ContexteCorrection {
     category?: string;
   }[];
   fixtures: Fixture[];
+  /** Le plafond : pour relier ce qu'on pose à ce qui l'allume (ou qu'il allume). */
+  ceiling?: CeilingFixture[];
   id: (prefixe: string) => string;
+}
+
+/** Les commandes murales qui donnent dans la pièce : le contrôle les compte ainsi. */
+function commandesDeLaPiece(roomId: string, ctx: ContexteCorrection): Fixture[] {
+  const place = fixturePlacement(ctx.fixtures, ctx.walls, ctx.rooms);
+  return ctx.fixtures.filter((f) => COMMANDES_MURALES.includes(f.kind) && place.get(f.id) === roomId);
 }
 
 /**
@@ -538,7 +651,7 @@ export function corrigerConstat(
   fix: ElecFix,
   roomId: string | undefined,
   ctx: ContexteCorrection,
-): { fixtures: Fixture[]; ceiling: CeilingFixture[] } | null {
+): { fixtures: Fixture[]; ceiling: CeilingFixture[]; liens?: LienAuto[] } | null {
   /*
     Deux gestes ne POSENT rien : la remise à hauteur d'un appareil et la
     remontée d'un linteau. Ils se règlent sur l'élément lui-même, et c'est
@@ -564,6 +677,13 @@ export function corrigerConstat(
           .sort((a, b) => b.area - a.area)[0];
     }
     if (!room) return null;
+    /*
+      LE POINT POSÉ S'ALLUME — peaufinage ÉLECTRICITÉ : « Poser le DCL » le
+      laissait sans commande, et le contrôle enchaînait aussitôt sur « point
+      lumineux sans commande ». Relié à la seule commande de la pièce, comme
+      le fait « Normes auto ».
+    */
+    const commandes = CEILINGS[fix.kind].commandable ? commandesDeLaPiece(room.id, ctx) : [];
     return {
       fixtures: [],
       ceiling: [
@@ -572,6 +692,7 @@ export function corrigerConstat(
           kind: fix.kind,
           roomId: room.id,
           at: { ...room.interieur },
+          ...(commandes.length === 1 ? { commands: [commandes[0].id] } : {}),
         },
       ],
     };
@@ -650,7 +771,13 @@ export function corrigerConstat(
     */
     const zones = wetZones(ctx.objects.filter((o) => !o.roomId || o.roomId === room.id) as never, solDesMurs(ctx.walls));
     let place: ReturnType<typeof prendre> = null;
-    for (let essai = 0; essai < 24; essai++) {
+    const commande = COMMANDES_MURALES.includes(fix.kind);
+    // Une commande se pose à l'entrée, côté poignée (voir `aCoteDeLaPorte`).
+    if (commande) {
+      const pres = aCoteDeLaPorte(room, ctx.openings, ctx.walls, ctx.rooms, places);
+      if (pres && pres.wall.height >= hauteur + 0.1) place = pres;
+    }
+    for (let essai = 0; essai < 24 && !place; essai++) {
       const p = prendre(places);
       if (!p) break;
       if (p.wall.height < hauteur + 0.1) continue;
@@ -669,10 +796,21 @@ export function corrigerConstat(
       break;
     }
     if (!place) continue;
+    const id = ctx.id(fix.kind);
+    /*
+      L'INTERRUPTEUR POSÉ ALLUME LES POINTS QUI ATTENDAIENT — peaufinage
+      ÉLECTRICITÉ : « point lumineux sans commande » se corrige d'un appui,
+      et le point se relie à l'interrupteur qu'on vient de poser.
+    */
+    const liens: LienAuto[] = commande
+      ? (ctx.ceiling ?? [])
+          .filter((c) => c.roomId === room.id && CEILINGS[c.kind].commandable && (c.commands ?? []).length === 0)
+          .map((c) => ({ ceilingId: c.id, commandeId: id }))
+      : [];
     return {
       fixtures: [
         {
-          id: ctx.id(fix.kind),
+          id,
           kind: fix.kind,
           wallId: place.wall.id,
           along: place.along,
@@ -681,6 +819,7 @@ export function corrigerConstat(
         },
       ],
       ceiling: [],
+      ...(liens.length > 0 ? { liens } : {}),
     };
   }
   return null;
@@ -761,14 +900,15 @@ export function completerAuxNormes(
     ceiling: CeilingFixture[],
   ) => { message: string; roomId?: string; fix?: ElecFix }[],
   max = 30,
-): { fixtures: Fixture[]; ceiling: CeilingFixture[]; poses: string[] } {
+): { fixtures: Fixture[]; ceiling: CeilingFixture[]; liens: LienAuto[]; poses: string[] } {
   let fixtures = ctx.fixtures;
   let ceiling = ctx.ceiling;
   const ajoutsF: Fixture[] = [];
   const ajoutsC: CeilingFixture[] = [];
+  const liens: LienAuto[] = [];
   const poses: string[] = [];
   const laisses = new Set<string>();
-  let dernier: { message: string; nf: number; nc: number } | null = null;
+  let dernier: { message: string; nf: number; nc: number; nl: number } | null = null;
   for (let k = 0; k < max; k++) {
     const c = verifier(fixtures, ceiling).find(
       (i) => i.fix && (i.fix.type === 'poser' || i.fix.type === 'plafond') && !laisses.has(i.message),
@@ -780,23 +920,30 @@ export function completerAuxNormes(
       ajoutsC.splice(ajoutsC.length - dernier.nc, dernier.nc);
       fixtures = fixtures.slice(0, fixtures.length - dernier.nf);
       ceiling = ceiling.slice(0, ceiling.length - dernier.nc);
+      liens.splice(liens.length - dernier.nl, dernier.nl);
       poses.pop();
       laisses.add(c.message);
       dernier = null;
       continue;
     }
-    const res = corrigerConstat(c.fix, c.roomId, { ...ctx, fixtures });
+    const res = corrigerConstat(c.fix, c.roomId, { ...ctx, fixtures, ceiling });
     if (!res || res.fixtures.length + res.ceiling.length === 0) {
       laisses.add(c.message);
       dernier = null;
       continue;
     }
     fixtures = [...fixtures, ...res.fixtures];
-    ceiling = [...ceiling, ...res.ceiling];
+    const nouveauxLiens = res.liens ?? [];
+    // Le contrôle suivant voit le point relié : il ne le redemande pas.
+    ceiling = [...ceiling, ...res.ceiling].map((cl) => {
+      const l = nouveauxLiens.filter((x) => x.ceilingId === cl.id);
+      return l.length > 0 ? { ...cl, commands: [...(cl.commands ?? []), ...l.map((x) => x.commandeId)] } : cl;
+    });
     ajoutsF.push(...res.fixtures);
     ajoutsC.push(...res.ceiling);
+    liens.push(...nouveauxLiens);
     poses.push(c.fix.label);
-    dernier = { message: c.message, nf: res.fixtures.length, nc: res.ceiling.length };
+    dernier = { message: c.message, nf: res.fixtures.length, nc: res.ceiling.length, nl: nouveauxLiens.length };
   }
-  return { fixtures: ajoutsF, ceiling: ajoutsC, poses };
+  return { fixtures: ajoutsF, ceiling: ajoutsC, liens, poses };
 }

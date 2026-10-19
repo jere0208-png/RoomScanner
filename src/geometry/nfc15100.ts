@@ -1459,7 +1459,9 @@ export function checkElectrical(
         message: `${label} : point lumineux sans commande`,
         regle:
           'Un point d’éclairage se commande depuis l’accès de la pièce. ' +
-          'Posez un interrupteur, puis reliez-le au point.',
+          'L’interrupteur se pose à l’entrée, côté poignée, et se relie au point.',
+        // D'un appui : posé à l'entrée et relié (peaufinage ÉLECTRICITÉ).
+        fix: { type: 'poser', kind: 'inter', label: 'Poser l’interrupteur' },
       });
     }
   }
