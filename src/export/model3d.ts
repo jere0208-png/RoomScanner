@@ -17,6 +17,7 @@
 import type { ObjectData } from 'react-native-room-scan';
 import { abregerNiveau, type RoomShape, type WallSeg } from '../geometry/floorplan';
 import type { Fixture } from '../geometry/electrical';
+import type { CeilingFixture } from '../geometry/ceiling';
 import { buildScene, type Face3D } from './../geometry/scene3d';
 import { MAQUETTE, matieresDesSols } from '../ui/maquette';
 import { accentsDesPieces, peinturesDesPieces, solsDesPieces } from '../ui/habillage';
@@ -45,6 +46,12 @@ export interface ModelForExport {
   objects: ObjectData[];
   rooms?: RoomShape[];
   fixtures?: Fixture[];
+  /**
+   * LE PLAFOND AUSSI — agent testeur PLAN 3D : le modèle exporté portait les
+   * prises et les inters, pas les points lumineux, les détecteurs ni la VMC
+   * que la vue 3D montrait. Ouvert dans un logiciel de 3D, le plafond était nu.
+   */
+  ceiling?: CeilingFixture[];
 }
 
 /**
@@ -109,6 +116,7 @@ function facesDuModele(model: ModelForExport): Face3D[] {
     showSurfaces: true,
     rooms: model.rooms,
     fixtures: model.fixtures,
+    ceiling: model.ceiling,
     matieres: matieresDesSols(pieces),
     peintures: peinturesDesPieces(pieces),
     sols: solsDesPieces(pieces),
