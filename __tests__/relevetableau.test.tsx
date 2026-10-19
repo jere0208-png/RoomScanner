@@ -51,6 +51,10 @@ beforeEach(() => {
     useScanStore.getState().reset();
   });
 });
+// La feuille qui descend finit son animation avant que Jest ne démonte
+// l'environnement : sans quoi son minuteur tombe dans le vide et le
+// processus de test meurt après coup (« _bezier is not a function »).
+afterAll(() => new Promise((r) => setTimeout(r, 600)));
 
 describe('le menu ouvre un coffret vide', () => {
   it('seul le tableau dessiné sur le plan se pré-remplit', () => {
@@ -94,7 +98,9 @@ describe('le menu ouvre un coffret vide', () => {
   });
 
   it('la feuille PDF d’un tableau projeté ne se présente pas comme un relevé', () => {
-    expect(lire('src/export/pdf.ts')).toMatch(/existant\.projete \? 'Tableau projeté \(non relevé\)' : 'Tableau existant'/);
+    // Une seule formule, partagée par la garde, le sommaire et la feuille (TITRE_TABLEAU_PROJETE).
+    expect(lire('src/export/pdf.ts')).toContain("export const TITRE_TABLEAU_PROJETE = 'Tableau projeté (non relevé)'");
+    expect(lire('src/export/pdf.ts')).toMatch(/existant\.projete \? TITRE_TABLEAU_PROJETE : 'Tableau existant'/);
   });
 });
 
