@@ -155,7 +155,7 @@ import {
 import { GAMMES, type GammeId } from '../geometry/prix';
 import { TAUX_DE_TVA, type LigneLibre } from '../geometry/mainDOeuvre';
 import { equilibrerLaScene, pointInPolygon } from '../geometry/appearance';
-import { ancrerElec } from '../geometry/viseur';
+import { ancrerElec, type AncreElec } from '../geometry/viseur';
 import { poserLibre } from '../geometry/poser';
 import { orienterLesSieges } from '../geometry/sieges';
 import { devinerLesNatures, type NatureMur } from '../geometry/natureMurs';
@@ -409,6 +409,28 @@ export interface ScanPhoto {
 }
 
 /** Ce qu'un brouillon retient : de quoi reprendre là où l'on s'est arrêté. */
+/**
+ * UNE POSE DU VISEUR QU'AUCUN MUR N'A ENCORE REÇUE — manque proposé par
+ * l'agent testeur SCAN : un passage qui ne relevait aucun mur perdait les
+ * prises visées pendant ce passage, faute de mur où les ancrer.
+ *
+ * Elle garde son point du monde, tel que le natif l'a rendu (repère brut de
+ * la session), la SESSION de l'iPhone qui l'a vue — son repère ne vaut que
+ * pour elle — et le niveau où l'on était. Le passage suivant de la même
+ * session, au même niveau, la repose sur ses murs (voir `viseurDuPassage`).
+ */
+export interface PoseEnAttente extends AncreElec {
+  session: string;
+  niveau: number;
+  /** Quand elle a été gardée : passé une demi-heure, on ne reprend plus la session pour elle. */
+  le: number;
+}
+
+/** Passé une demi-heure, une pose gardée ne fait plus reprendre la session de l'iPhone. */
+const REPRISE_DES_POSES_MS = 30 * 60 * 1000;
+/** Un identifiant de session de l'iPhone : unique d'un lancement de l'app à l'autre. */
+const nouvelleSessionNative = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+
 export interface BrouillonScan {
   /** Horodatage de l'écriture : c'est lui qu'on montre à l'utilisateur. */
   at: number;
@@ -454,6 +476,8 @@ export interface BrouillonScan {
   north?: number;
   /** Voir `cleDuReleve` : les passages de l'iPhone se reconnaissent après une reprise. */
   cleDuReleve?: string;
+  /** Les poses du viseur qu'aucun mur n'a encore reçues (voir `PoseEnAttente`). */
+  posesEnAttente?: PoseEnAttente[];
   /**
    * LE DOSSIER DONT CE BROUILLON EST LA RETOUCHE, s'il en a un.
    *
@@ -2818,6 +2842,34 @@ export interface ScanState {
   /** Les passages de l'iPhone sont ceux du plan et du niveau à l'écran. */
   passagesDuPlanOuvert: () => boolean;
   /**
+   * LES POSES DU VISEUR EN ATTENTE DE MUR — voir `PoseEnAttente`. Gardées
+   * dans le brouillon ; un autre plan ouvert les oublie.
+   */
+  posesEnAttente: PoseEnAttente[];
+  /**
+   * LA SESSION DE L'IPHONE, et ce qu'elle a déjà livré du viseur.
+   *
+   * Le natif garde ses poses d'un passage ajouté à l'autre, et les relivre
+   * TOUTES à chaque « Terminer » : sans compte, un passage de plus reposait
+   * celles du passage d'avant, en double. Un relevé qui repart à neuf (scan,
+   * étage) ouvre une session : son repère n'est plus celui d'avant.
+   * Non persistés : un redémarrage efface la session, côté iPhone aussi.
+   */
+  sessionNative: string;
+  ancresLivrees: number;
+  /**
+   * Le passage en cours POURSUIT la session (il a démarré en ajout) : lui
+   * seul relivre les poses d'avant. Un relevé rendu sans démarrage — un
+   * relevé brut rejoué, un test — ne saute rien.
+   */
+  passageAdditif: boolean;
+  /** Le natif vient de démarrer : à neuf (une session de plus), ou en ajout. */
+  ouvrirSessionNative: (additif: boolean) => void;
+  /** Des poses de CETTE session attendent un passage à ce niveau : le prochain doit la poursuivre. */
+  posesAReprendre: (niveau: number) => boolean;
+  /** Jette les poses en attente (toutes, ou celles d'un niveau). */
+  jeterPosesEnAttente: (niveau?: number) => void;
+  /**
    * L'ÉTAGE qu'on regarde. Le plan, le métré et l'établi ne montrent que
    * lui ; le niveau du dessous s'affiche en filigrane, pour se repérer.
    */
@@ -4683,6 +4735,89 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
    *   partir d'un empilement plausible ; le recalage fin se fait ensuite à
    *   la main, sur le filigrane.
    */
+  /**
+   * CE QUE LE VISEUR A POSÉ PENDANT CE PASSAGE — et ce qui attendait un mur.
+   *
+   * Deux corrections de l'agent testeur SCAN, au même endroit :
+   *   — LE NATIF RELIVRE TOUT : ses poses survivent d'un passage ajouté à
+   *     l'autre, et « Terminer » les rend toutes. On ne prend que celles
+   *     qu'on n'a pas encore reçues (`ancresLivrees`) ; un passage de plus
+   *     ne repose plus, en double, les prises du passage d'avant ;
+   *   — UN PASSAGE SANS MUR NE PERD PLUS SES POSES : elles attendent
+   *     (`posesEnAttente`), et le passage suivant de la même session, au
+   *     même niveau, les repose sur ses murs. Celles qui ne trouvent
+   *     toujours pas de mur continuent d'attendre ; l'utilisateur peut les
+   *     jeter.
+   * `placer` mène du repère brut du passage à celui du plan, comme pour le
+   * reste du relevé. Rend de quoi poser, et les deux champs à écrire.
+   */
+  const viseurDuPassage = (
+    r: ScanResult,
+    niveau: number,
+    walls: WallSeg[],
+    rooms: { id: string; outline?: Pt[] }[],
+    placer: (p: Pt) => Pt,
+    id: (prefixe: string, n: number) => string,
+    sansMur = false,
+  ): {
+    fixtures: Fixture[];
+    ceiling: CeilingFixture[];
+    mots: string[];
+    posesEnAttente: PoseEnAttente[];
+    ancresLivrees: number;
+  } => {
+    const st = get();
+    const elec = (r.elec ?? []) as AncreElec[];
+    // Seul un passage qui poursuit la session relivre les poses d'avant.
+    const neuves = elec.slice(st.passageAdditif ? Math.min(st.ancresLivrees, elec.length) : 0);
+    if (st.passageAdditif) set({ passageAdditif: false });
+    const ici = (p: PoseEnAttente) => p.session === st.sessionNative && p.niveau === niveau;
+    const ailleurs = st.posesEnAttente.filter((p) => !ici(p));
+    const attendaient = st.posesEnAttente.filter(ici);
+    if (sansMur) {
+      const le = Date.now();
+      return {
+        fixtures: [],
+        ceiling: [],
+        mots: [],
+        posesEnAttente: [
+          ...ailleurs,
+          ...attendaient,
+          // Le mur qu'avait nommé le natif n'existe pas dans le plan : seul le point du monde compte.
+          ...neuves.map((a) => ({
+            kind: a.kind,
+            x: a.x,
+            y: a.y,
+            z: a.z,
+            ...(a.plafond ? { plafond: true } : {}),
+            session: st.sessionNative,
+            niveau,
+            le,
+          })),
+        ],
+        ancresLivrees: elec.length,
+      };
+    }
+    const poser = (a: AncreElec): AncreElec => ({ ...a, ...placer({ x: a.x, z: a.z }) });
+    const vise = ancrerElec(neuves.map(poser), walls, rooms, id);
+    const fixtures = [...vise.fixtures];
+    const ceiling = [...vise.ceiling];
+    const mots = [...vise.mots];
+    const reste: PoseEnAttente[] = [];
+    attendaient.forEach((p, k) => {
+      const ancre: AncreElec = { kind: p.kind, x: p.x, y: p.y, z: p.z, ...(p.plafond ? { plafond: true } : {}) };
+      const une = ancrerElec([poser(ancre)], walls, rooms, (prefixe, n) => id(`${prefixe}-att${k}`, n));
+      if (une.fixtures.length + une.ceiling.length === 0) {
+        reste.push(p);
+        return;
+      }
+      fixtures.push(...une.fixtures);
+      ceiling.push(...une.ceiling);
+      mots.push(...une.mots);
+    });
+    return { fixtures, ceiling, mots: [...new Set(mots)], posesEnAttente: [...ailleurs, ...reste], ancresLivrees: elec.length };
+  };
+
   const empilerUnReleve = (r: ScanResult, n: number, aCote: boolean) => {
     const st = get();
     const surfaces = r.rooms?.length
@@ -4711,7 +4846,16 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     ).walls;
     if (nettoyes.length === 0) {
       // Rien d'exploitable : on rend le plan tel qu'il était (voir `stop`, qui le dit).
-      set({ processing: false, scanning: false, etageEnCours: null, screen: 'result' });
+      // Les poses du viseur, elles, attendent le passage suivant (voir `viseurDuPassage`).
+      const garde = viseurDuPassage(r, n, [], [], (p) => p, (p, k) => `${p}-${k}`, true);
+      set({
+        processing: false,
+        scanning: false,
+        etageEnCours: null,
+        screen: 'result',
+        posesEnAttente: garde.posesEnAttente,
+        ancresLivrees: garde.ancresLivrees,
+      });
       return;
     }
     // La logique de construction : d'équerre, sur des niveaux communs.
@@ -4851,11 +4995,16 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       };
     });
 
-    /* Ce que le viseur a posé pendant le relevé arrive avec lui. */
-    const vise = ancrerElec(
-      r.elec ?? [],
+    /*
+      Ce que le viseur a posé pendant le relevé arrive avec lui — décalé
+      comme ses murs : un point visé sans mur nommé tombait à côté.
+    */
+    const vise = viseurDuPassage(
+      r,
+      n,
       walls,
       pieces.map((x, i) => ({ id: x.id, outline: shapes[i]?.outline })),
+      (p) => ({ x: p.x + dx, z: p.z + dz }),
       (prefixe, k) => `${prefixe}-${Date.now().toString(36)}-${marque}-${k}`,
     );
 
@@ -4879,6 +5028,8 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       objects: [...st.objects, ...objects, ...caissons.objets],
       fixtures: [...st.fixtures, ...vise.fixtures],
       ceiling: [...st.ceiling, ...vise.ceiling],
+      posesEnAttente: vise.posesEnAttente,
+      ancresLivrees: vise.ancresLivrees,
       photos: [
         ...st.photos,
         ...photosDesMurs(r.photosMurs ?? [], surfaces, walls, { decalage: { dx, dz } }),
@@ -5289,6 +5440,30 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
     cleDuReleve: null,
     passagesNatifs: null,
     piecesEcartees: [],
+    posesEnAttente: [],
+    sessionNative: nouvelleSessionNative(),
+    ancresLivrees: 0,
+    passageAdditif: false,
+    ouvrirSessionNative: (additif) => {
+      if (additif) {
+        set({ passageAdditif: true });
+        return;
+      }
+      set({ sessionNative: nouvelleSessionNative(), ancresLivrees: 0, passageAdditif: false });
+    },
+    posesAReprendre: (niveau) => {
+      const st = get();
+      const maintenant = Date.now();
+      return st.posesEnAttente.some(
+        (p) => p.session === st.sessionNative && p.niveau === niveau && maintenant - p.le < REPRISE_DES_POSES_MS,
+      );
+    },
+    jeterPosesEnAttente: (niveau) => {
+      const st = get();
+      const reste = niveau === undefined ? [] : st.posesEnAttente.filter((p) => p.niveau !== niveau);
+      if (reste.length === st.posesEnAttente.length) return;
+      set({ posesEnAttente: reste, ...(st.walls.length > 0 ? { dirty: true } : {}) });
+    },
     passagesDuPlanOuvert: () => {
       const st = get();
       const p = st.passagesNatifs;
@@ -9095,7 +9270,15 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       ).walls;
       if (nettoyes.length === 0) {
         // Rien d'exploitable : on rend le plan tel qu'il était.
-        set({ processing: false, scanning: false, screen: 'result' });
+        // Les poses du viseur, elles, attendent le passage suivant (voir `viseurDuPassage`).
+        const garde = viseurDuPassage(r, n, [], [], placer, (p, k) => `${p}-${k}`, true);
+        set({
+          processing: false,
+          scanning: false,
+          screen: 'result',
+          posesEnAttente: garde.posesEnAttente,
+          ancresLivrees: garde.ancresLivrees,
+        });
         return;
       }
       // La logique de construction : d'équerre, sur des niveaux communs.
@@ -9270,11 +9453,13 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         roomId: idPiece(roomIndexAt(cl.at, contours)),
       }));
 
-      /* Ce que le viseur a posé PENDANT ce passage vient s'ajouter. */
-      const viseMerge = ancrerElec(
-        (r.elec ?? []).map((v) => ({ ...v, ...placer({ x: v.x, z: v.z }) })),
+      /* Ce que le viseur a posé PENDANT ce passage vient s'ajouter — lui seul (voir `viseurDuPassage`). */
+      const viseMerge = viseurDuPassage(
+        r,
+        n,
         walls,
         kept.map((x, i) => ({ id: x.id, outline: shapes[i]?.outline })),
+        placer,
         (prefixe, k) => `${prefixe}-${Date.now().toString(36)}-${k}`,
       );
 
@@ -9296,6 +9481,8 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
           ...photosDesMurs(r.photosMurs ?? [], surfaces, walls, { decalage: { dx, dz, angle } }),
         ]),
         ceiling: remplacer(st.ceiling, jeu.ceiling, [...ceiling, ...viseMerge.ceiling]),
+        posesEnAttente: viseMerge.posesEnAttente,
+        ancresLivrees: viseMerge.ancresLivrees,
         north: typeof r.north === 'number' ? r.north : st.north,
         processing: false,
         scanning: false,
@@ -9785,6 +9972,11 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
           screen: 'result',
           // Rien d'exploitable : rien à proposer non plus.
           arrivage: null,
+          // Sauf les poses du viseur : elles attendent le passage suivant (voir `viseurDuPassage`).
+          ...(() => {
+            const garde = viseurDuPassage(r, NIVEAU_RDC, [], [], (p) => p, (p, k) => `${p}-${k}`, true);
+            return { posesEnAttente: garde.posesEnAttente, ancresLivrees: garde.ancresLivrees };
+          })(),
         });
         return;
       }
@@ -9798,10 +9990,12 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         points de plafond. Ce qui ne tombe nulle part est jeté plutôt que
         posé au hasard.
       */
-      const vise = ancrerElec(
-        r.elec ?? [],
+      const vise = viseurDuPassage(
+        r,
+        NIVEAU_RDC,
         walls,
         kept.map((x, i) => ({ id: x.id, outline: shapes[i]?.outline })),
+        (p) => p,
         (prefixe, n) => `${prefixe}-${Date.now().toString(36)}-${n}`,
       );
 
@@ -9849,6 +10043,8 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         fixtures: vise.fixtures,
         photos: photosAuto,
         ceiling: vise.ceiling,
+        posesEnAttente: vise.posesEnAttente,
+        ancresLivrees: vise.ancresLivrees,
         north: typeof r.north === 'number' ? r.north : null,
         saves,
         // Les passages que garde l'iPhone sont ceux de CE relevé, au rez-de-chaussée.
@@ -12265,6 +12461,7 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         address: st.address || undefined,
         north: st.north ?? undefined,
         cleDuReleve: st.cleDuReleve ?? undefined,
+        ...(st.posesEnAttente.length > 0 ? { posesEnAttente: st.posesEnAttente } : {}),
       };
       // L'horodatage change à chaque tick : on compare SANS lui, sinon on
       // réécrirait un relevé identique toutes les trente secondes.
@@ -12329,6 +12526,8 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         mesures: b.mesures ?? [],
         existant: b.existant ?? null,
         photos: b.photos ?? [],
+        // Les poses du viseur qui attendaient un mur attendent encore.
+        posesEnAttente: Array.isArray(b.posesEnAttente) ? b.posesEnAttente : [],
         modelPath: b.modelPath ?? null,
         // Le chiffrage aussi : un filet qui retient la moitié de ce qui
         // tombe est un filet qui ment.
@@ -12356,6 +12555,18 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       */
       clearHistory();
       dejaCompte = !!(b.saveId && get().saves.some((s) => s.id === b.saveId && !s.corbeille));
+      /*
+        DES POSES ATTENDAIENT UN MUR — mais l'app a redémarré entre-temps :
+        l'iPhone a perdu le repère du scan, elles ne peuvent plus se placer
+        seules. On le dit, et on propose de les jeter.
+      */
+      const perdues = get().posesEnAttente.filter((p) => p.session !== get().sessionNative).length;
+      if (perdues > 0) {
+        astuce(
+          `${perdues === 1 ? 'Une pose du viseur attendait' : `${perdues} poses du viseur attendaient`} un mur : le repère du scan est perdu, posez-les à la main.`,
+          { icone: 'elec', action: { label: 'Jeter', faire: () => get().jeterPosesEnAttente() } },
+        );
+      }
       // Le filet qui vient de vous sauver se réarme derrière vous.
       armerBrouillon(() => get().ecrireBrouillon());
     },
@@ -12594,6 +12805,8 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         planVierge: false,
         // Le tableau trouvé sur place revient avec son relevé.
         existant: save.existant ?? null,
+        // Les poses en attente étaient celles du plan qu'on quitte.
+        posesEnAttente: [],
         pendingJoin: null,
         // L'arrivage appartient au scan qui vient de finir : ouvert sur un
         // autre dossier, le popup proposerait d'y intégrer les meubles
@@ -12844,10 +13057,17 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
       // Un nouveau relevé se paie, lui : la marque tombe avec l'ancien.
       dejaCompte = false;
       AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
+      /*
+        LES POSES D'UN SCAN SANS MUR SURVIVENT À « REFAIRE UN SCAN » — c'est
+        le passage suivant qui doit les recevoir (voir `PoseEnAttente`). Celles
+        d'un plan qui avait des murs partent avec lui.
+      */
+      const posesGardees = get().walls.length === 0 ? get().posesEnAttente : [];
       set({
         screen: 'home',
         forcerTarifs: false,
         brouillon: null,
+        posesEnAttente: posesGardees,
         scanning: false,
         paused: false,
         processing: false,
