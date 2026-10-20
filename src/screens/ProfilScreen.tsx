@@ -882,7 +882,7 @@ const themed = (c: Palette) =>
     // La date se lit d'un ton en dessous : c'est une précision, pas le
     // titre — mais elle porte la graisse, parce qu'on vient la chercher.
     aboDate: { color: c.blue, fontSize: 12, fontWeight: '700', marginTop: 3 },
-    aboAttente: { color: c.danger, fontSize: 12, fontWeight: '700', marginTop: 3 },
+    aboAttente: { color: c.dangerTexte, fontSize: 12, fontWeight: '700', marginTop: 3 },
     // Le bouton de la carte est PLEIN et sombre, comme dans le design : sur
     // une carte blanche, c'est le seul contraste qui dit « touche ici ».
     boutonAbo: {
