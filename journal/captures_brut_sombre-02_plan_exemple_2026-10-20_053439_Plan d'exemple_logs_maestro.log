@@ -1,0 +1,169 @@
+05:35:21.114 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+05:35:21.119 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+05:35:21.121 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:35:24.684 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:35:24.686 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "${APP_ID}" RUNNING
+05:35:26.219 [ INFO] maestro.Maestro.launchApp$lambda$5: Launching app fr.echoplan.app
+05:35:26.220 [ INFO] maestro.Maestro.launchApp$lambda$5: Stopping fr.echoplan.app app during launch
+05:35:29.343 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "${APP_ID}" COMPLETED
+05:35:29.346 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run commun/vers-accueil.yaml RUNNING
+05:35:29.373 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:35:29.377 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:35:29.380 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run attendre-demarrage.yaml RUNNING
+05:35:29.382 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:35:29.414 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:35:29.417 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple|Profil|Abonnement" is visible RUNNING
+05:35:32.386 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple|Profil|Abonnement" is visible COMPLETED
+05:35:32.387 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run fenetres-systeme.yaml RUNNING
+05:35:32.391 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:35:32.396 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:35:32.442 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow While Using App" is visible RUNNING
+05:35:37.230 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:35:37.231 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow While Using App" is visible SKIPPED
+05:35:37.232 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow" is visible RUNNING
+05:35:37.983 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:35:37.984 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow" is visible SKIPPED
+05:35:37.985 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Compris" is visible RUNNING
+05:35:38.691 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:35:38.692 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Compris" is visible SKIPPED
+05:35:38.692 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run fenetres-systeme.yaml COMPLETED
+05:35:38.692 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run attendre-demarrage.yaml COMPLETED
+05:35:38.695 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Abonnement" is visible RUNNING
+05:35:39.836 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:35:39.836 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Abonnement" is visible SKIPPED
+05:35:39.837 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Profil" is visible RUNNING
+05:35:40.951 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:35:40.951 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Profil" is visible SKIPPED
+05:35:40.963 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Découvrir sans compte" is visible RUNNING
+05:35:41.840 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:35:41.840 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Découvrir sans compte" is visible SKIPPED
+05:35:41.841 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Passer le film" is visible RUNNING
+05:35:42.546 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:35:42.555 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Passer le film" is visible SKIPPED
+05:35:42.565 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Passer la question" is visible RUNNING
+05:35:43.272 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:35:43.277 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Passer la question" is visible SKIPPED
+05:35:43.277 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run fenetres-systeme.yaml RUNNING
+05:35:43.283 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:35:43.290 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:35:43.291 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow While Using App" is visible RUNNING
+05:35:43.931 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:35:43.931 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow While Using App" is visible SKIPPED
+05:35:43.931 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow" is visible RUNNING
+05:35:44.714 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:35:44.714 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow" is visible SKIPPED
+05:35:44.714 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Compris" is visible RUNNING
+05:35:45.511 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:35:45.539 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Compris" is visible SKIPPED
+05:35:45.542 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run fenetres-systeme.yaml COMPLETED
+05:35:45.543 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Voir un exemple" is visible RUNNING
+05:35:46.000 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Voir un exemple" is visible COMPLETED
+05:35:46.000 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 5000 ms RUNNING
+05:35:46.043 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 5000
+05:35:46.083 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:35:46.083 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:35:48.547 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:35:48.549 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:35:55.485 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 5000 ms COMPLETED
+05:35:55.486 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run commun/vers-accueil.yaml COMPLETED
+05:35:55.487 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot ${THEME}-10-accueil RUNNING
+05:35:55.542 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+05:35:55.543 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:35:55.728 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot ${THEME}-10-accueil COMPLETED
+05:35:55.729 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run commun/ouvrir-exemple.yaml RUNNING
+05:35:55.733 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:35:55.737 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:35:55.738 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run vers-accueil.yaml RUNNING
+05:35:55.745 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:35:55.748 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:35:55.748 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run attendre-demarrage.yaml RUNNING
+05:35:55.752 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:35:55.755 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:35:55.755 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple|Profil|Abonnement" is visible RUNNING
+05:35:56.146 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple|Profil|Abonnement" is visible COMPLETED
+05:35:56.146 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run fenetres-systeme.yaml RUNNING
+05:35:56.148 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:35:56.150 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:35:56.150 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow While Using App" is visible RUNNING
+05:36:02.854 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:36:02.857 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow While Using App" is visible SKIPPED
+05:36:02.857 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow" is visible RUNNING
+05:36:03.380 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:36:03.380 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow" is visible SKIPPED
+05:36:03.381 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Compris" is visible RUNNING
+05:36:03.897 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:36:03.898 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Compris" is visible SKIPPED
+05:36:03.898 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run fenetres-systeme.yaml COMPLETED
+05:36:03.898 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run attendre-demarrage.yaml COMPLETED
+05:36:03.898 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Abonnement" is visible RUNNING
+05:36:04.386 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:36:04.386 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Abonnement" is visible SKIPPED
+05:36:04.386 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Profil" is visible RUNNING
+05:36:04.940 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:36:04.940 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Profil" is visible SKIPPED
+05:36:04.941 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Découvrir sans compte" is visible RUNNING
+05:36:05.466 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:36:05.467 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Découvrir sans compte" is visible SKIPPED
+05:36:05.468 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Passer le film" is visible RUNNING
+05:36:06.061 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:36:06.061 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Passer le film" is visible SKIPPED
+05:36:06.061 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Passer la question" is visible RUNNING
+05:36:06.648 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:36:06.649 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Passer la question" is visible SKIPPED
+05:36:06.649 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run fenetres-systeme.yaml RUNNING
+05:36:06.652 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:36:06.655 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:36:06.655 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow While Using App" is visible RUNNING
+05:36:07.109 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:36:07.109 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow While Using App" is visible SKIPPED
+05:36:07.109 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow" is visible RUNNING
+05:36:07.646 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:36:07.646 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow" is visible SKIPPED
+05:36:07.646 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Compris" is visible RUNNING
+05:36:08.204 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:36:08.204 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Compris" is visible SKIPPED
+05:36:08.205 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run fenetres-systeme.yaml COMPLETED
+05:36:08.205 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Voir un exemple" is visible RUNNING
+05:36:08.467 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Voir un exemple" is visible COMPLETED
+05:36:08.467 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 5000 ms RUNNING
+05:36:08.470 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 5000
+05:36:08.471 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:36:08.471 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:36:08.828 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:36:08.829 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:36:11.271 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:36:11.272 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:36:11.665 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:36:11.665 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:36:13.094 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:36:13.094 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:36:13.318 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:36:13.318 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:36:13.972 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 5000 ms COMPLETED
+05:36:13.973 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run vers-accueil.yaml COMPLETED
+05:36:13.976 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Scrolling DOWN until "Voir un exemple" is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled RUNNING
+05:36:14.337 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Scrolling try count: 0, DeviceWidth: 402, DeviceWidth: 874
+05:36:14.340 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Element bounds: Bounds(x=20, y=430, width=175, height=129)
+05:36:14.347 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Visibility Percent: 1.0
+05:36:14.368 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Command centerElement: ScrollUntilVisibleCommand(selector=ElementSelector(textRegex=Voir un exemple, idRegex=null, size=null, below=null, above=null, leftOf=null, rightOf=null, containsChild=null, containsDescendants=null, traits=null, index=null, enabled=null, optional=false, selected=null, checked=null, focused=null, childOf=null, css=null), direction=DOWN, scrollDuration=601, visibilityPercentage=100, timeout=10000, waitToSettleTimeoutMs=null, centerElement=false, originalSpeedValue=40, label=null, optional=true).centerElement
+05:36:14.368 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: visibilityPercentageNormalized: 1.0
+05:36:14.369 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Scrolling DOWN until "Voir un exemple" is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled COMPLETED
+05:36:14.370 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Voir un exemple" RUNNING
+05:36:14.613 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Voir un exemple, title=, value=, text=, hintText=, resource-id=, bounds=[20,430][195,559], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=20, y=430, width=175, height=129))
+05:36:17.994 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+05:36:18.012 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (107, 494) using hierarchy based logic for wait
+05:36:18.021 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:36:18.022 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:36:22.744 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Tapping at (107, 494) using screenshot based logic for wait
+05:36:22.763 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:36:22.764 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:36:24.113 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by screenshot (d=0.007508544). Proceed.
+05:36:24.114 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Voir un exemple" COMPLETED
+05:36:24.114 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Options du plan" is visible RUNNING
+05:36:46.079 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+05:36:46.081 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:36:46.314 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Options du plan" is visible FAILED
+05:36:46.355 [ERROR] maestro.orchestra.Orchestra.executeCommands: [Command execution] CommandFailed: Assertion is false: "Options du plan" is visible
+05:36:46.356 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+05:36:46.361 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:36:46.552 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run commun/ouvrir-exemple.yaml FAILED

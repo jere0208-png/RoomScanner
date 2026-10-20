@@ -1,0 +1,616 @@
+05:25:40.511 [ INFO] maestro.cli.report.TestDebugReporter.logSystemInfo: Debug output path: /Users/runner/work/RoomScanner/RoomScanner/captures/debug/clair-05_mode_electricite/.maestro/tests/2026-10-20_052540
+05:25:40.514 [ INFO] MAESTRO.logSystemInfo: ---- System Info ----
+05:25:40.514 [ INFO] MAESTRO.logSystemInfo: Maestro Version: 2.10.0
+05:25:40.516 [ INFO] MAESTRO.logSystemInfo: CI: github
+05:25:40.517 [ INFO] MAESTRO.logSystemInfo: OS Name: Mac OS X
+05:25:40.517 [ INFO] MAESTRO.logSystemInfo: OS Version: 15.7.9
+05:25:40.517 [ INFO] MAESTRO.logSystemInfo: Architecture: aarch64
+05:25:40.520 [ INFO] MAESTRO.logSystemInfo: Java Version: 17
+05:25:40.723 [ INFO] MAESTRO.logSystemInfo: Xcode Version: 26.3
+05:25:40.767 [ INFO] MAESTRO.logSystemInfo: Flutter Version: Undefined
+05:25:40.824 [ INFO] MAESTRO.logSystemInfo: Flutter Channel: Undefined
+05:25:40.824 [ INFO] MAESTRO.logSystemInfo: ---------------------
+05:25:41.631 [DEBUG] io.micrometer.common.util.internal.logging.InternalLoggerFactory.newDefaultFactory: Using SLF4J as the default logging framework
+05:25:45.298 [ INFO] maestro.cli.command.TestCommand.runShardSuite: [shard 1] Selected device 22970779-4A47-463E-8B6D-CC012359B320 using port 52525 with execution plan ExecutionPlan(flowsToRun=[/Users/runner/work/RoomScanner/RoomScanner/.maestro/05_mode_electricite.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+05:25:47.143 [TRACE] ios.xctest.XCTestIOSDevice.open: Opening a connection
+05:25:47.144 [TRACE] xcuitest.XCTestDriverClient.restartXCTestRunner: Restarting XCTest Runner (uninstalling, installing and starting)
+05:25:47.146 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:47.156 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:47.156 [TRACE] xcuitest.XCTestDriverClient.restartXCTestRunner: XCTest Runner uninstalled, will install and start it
+05:25:47.157 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: start()
+05:25:47.157 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: [Start] Install XCUITest runner on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:47.158 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:47.158 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:47.158 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing build products
+05:25:47.382 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing build products
+05:25:47.383 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing maestro-driver-iosUITests-Runner app
+05:25:47.977 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing maestro-driver-iosUITests-Runner app
+05:25:47.977 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing maestro-driver-ios app
+05:25:48.003 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing maestro-driver-ios app
+05:25:48.004 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: Installing driver with xcodebuild
+05:25:48.006 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: [Start] Running XcUITest with `xcodebuild test-without-building` with 52525 and config: IOSDriverConfig(prebuiltRunner=false, sourceDirectory=driver-iPhoneSimulator, context=CLI, snapshotKeyHonorModalViews=null)
+05:25:48.008 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcodebuild, test-without-building, -xctestrun, /var/folders/nj/vtw8zd2j31d1gdrtntc5y4600000gn/T/22970779-4A47-463E-8B6D-CC012359B3205136555106552202770/maestro-driver-ios-config.xctestrun, -destination, id=22970779-4A47-463E-8B6D-CC012359B320, -derivedDataPath, /var/folders/nj/vtw8zd2j31d1gdrtntc5y4600000gn/T/maestro_xctestrunner_xcodebuild_output16660510462443376317] with {TEST_RUNNER_PORT=52525}
+05:25:48.016 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: [Done] Running XcUITest with `xcodebuild test-without-building`
+05:25:48.016 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: [Done] Install XCUITest runner on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:48.016 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:48.017 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:48.641 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:48.642 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:49.200 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:49.201 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:49.760 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:49.761 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:50.313 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:50.315 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:50.928 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:50.932 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:51.551 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:51.559 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:52.191 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:52.194 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:52.712 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:52.714 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:53.359 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:53.361 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:54.010 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:54.011 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:54.574 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:54.575 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:55.194 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:55.199 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:55.841 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:55.842 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:56.493 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:56.511 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:57.059 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:57.071 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:57.709 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:57.711 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:58.344 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:58.359 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:58.894 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:58.899 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:25:59.546 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:25:59.553 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:00.202 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:00.230 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:00.859 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:00.861 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:01.410 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:01.412 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:01.995 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:02.001 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:02.645 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:02.648 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:03.189 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:03.195 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:03.778 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:03.779 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:04.356 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:04.358 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:04.976 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:04.977 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:05.574 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:05.575 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:06.171 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:06.173 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:06.773 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:06.774 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:07.416 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:07.419 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:07.973 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:07.974 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:08.524 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:08.526 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:09.174 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:09.176 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:09.775 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:09.776 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:10.406 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:10.407 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:11.482 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:11.644 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:12.334 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:12.340 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:12.998 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:12.999 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:13.653 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:13.655 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:14.270 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:14.272 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:14.810 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:14.915 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:15.432 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:15.433 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:15.954 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:15.974 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:16.536 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:16.539 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:17.173 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:17.174 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:17.702 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:17.703 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:18.351 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:18.353 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:18.919 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:18.925 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:52525
+05:26:19.538 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:19.612 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Done] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:26:19.972 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow:  Running flow Mode Électricité
+05:26:20.010 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Getting device info
+05:26:20.267 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Got device info: DeviceInfo(platform=IOS, widthPixels=1206, heightPixels=2622, widthGrid=402, heightGrid=874)
+05:26:20.446 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+05:26:20.454 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+05:26:20.455 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:26:22.512 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:26:22.514 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "${APP_ID}" RUNNING
+05:26:22.534 [ INFO] device.SimctlIOSDevice.setPermissions: [Start] Setting permissions all=allow through applesimutils
+05:26:22.536 [ INFO] util.LocalSimulatorUtils.setAppleSimutilsPermissions: [Start] Setting permissions via pinned applesimutils
+05:26:22.537 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [/Users/runner/.maestro/deps/applesimutils, --byId, 22970779-4A47-463E-8B6D-CC012359B320, --bundle, fr.echoplan.app, --setPermissions, calendar=YES,camera=YES,contacts=YES,faceid=YES,homekit=YES,medialibrary=YES,microphone=YES,motion=YES,photos=YES,reminders=YES,siri=YES,speech=YES,userTracking=YES] with {}
+05:26:23.462 [ INFO] util.LocalSimulatorUtils.setAppleSimutilsPermissions: [Done] Setting permissions pinned applesimutils
+05:26:23.464 [ INFO] device.SimctlIOSDevice.setPermissions: [Done] Setting permissions through applesimutils
+05:26:23.471 [ INFO] device.SimctlIOSDevice.setPermissions: [Start] Setting Permissions all=allow through simctl
+05:26:23.472 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcrun, simctl, privacy, 22970779-4A47-463E-8B6D-CC012359B320, grant, location-always, fr.echoplan.app] with {}
+05:26:23.888 [ INFO] device.SimctlIOSDevice.setPermissions: [Done] Setting Permissions all=allow through simctl
+05:26:23.990 [ INFO] maestro.Maestro.launchApp$lambda$5: Launching app fr.echoplan.app
+05:26:23.991 [ INFO] maestro.Maestro.launchApp$lambda$5: Stopping fr.echoplan.app app during launch
+05:26:25.141 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcrun, simctl, launch, 22970779-4A47-463E-8B6D-CC012359B320, fr.echoplan.app] with {}
+05:26:26.532 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "${APP_ID}" COMPLETED
+05:26:26.539 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run commun/vers-accueil.yaml RUNNING
+05:26:26.682 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:26:26.695 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:26:26.695 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run attendre-demarrage.yaml RUNNING
+05:26:26.701 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:26:26.706 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:26:26.709 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple|Profil|Abonnement" is visible RUNNING
+05:26:29.681 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple|Profil|Abonnement" is visible COMPLETED
+05:26:29.682 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run fenetres-systeme.yaml RUNNING
+05:26:29.688 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:26:29.690 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:26:29.691 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow While Using App" is visible RUNNING
+05:26:33.911 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:26:33.912 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow While Using App" is visible SKIPPED
+05:26:33.912 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow" is visible RUNNING
+05:26:34.356 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:26:34.356 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow" is visible SKIPPED
+05:26:34.356 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Compris" is visible RUNNING
+05:26:34.798 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:26:34.799 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Compris" is visible SKIPPED
+05:26:34.799 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run fenetres-systeme.yaml COMPLETED
+05:26:34.799 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run attendre-demarrage.yaml COMPLETED
+05:26:34.799 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Abonnement" is visible RUNNING
+05:26:35.328 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:26:35.329 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Abonnement" is visible SKIPPED
+05:26:35.329 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Profil" is visible RUNNING
+05:26:35.826 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:26:35.827 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Profil" is visible SKIPPED
+05:26:35.827 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Découvrir sans compte" is visible RUNNING
+05:26:36.264 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:26:36.264 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Découvrir sans compte" is visible SKIPPED
+05:26:36.264 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Passer le film" is visible RUNNING
+05:26:36.665 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:26:36.665 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Passer le film" is visible SKIPPED
+05:26:36.665 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Passer la question" is visible RUNNING
+05:26:37.104 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:26:37.105 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Passer la question" is visible SKIPPED
+05:26:37.105 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run fenetres-systeme.yaml RUNNING
+05:26:37.111 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:26:37.116 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:26:37.117 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow While Using App" is visible RUNNING
+05:26:37.556 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:26:37.556 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow While Using App" is visible SKIPPED
+05:26:37.557 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow" is visible RUNNING
+05:26:38.097 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:26:38.097 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow" is visible SKIPPED
+05:26:38.097 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Compris" is visible RUNNING
+05:26:38.570 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:26:38.571 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Compris" is visible SKIPPED
+05:26:38.571 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run fenetres-systeme.yaml COMPLETED
+05:26:38.571 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Voir un exemple" is visible RUNNING
+05:26:38.799 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Voir un exemple" is visible COMPLETED
+05:26:38.800 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 5000 ms RUNNING
+05:26:38.804 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 5000
+05:26:38.810 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:26:38.810 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:26:39.669 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:26:39.669 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:26:45.619 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 5000 ms COMPLETED
+05:26:45.622 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run commun/vers-accueil.yaml COMPLETED
+05:26:45.623 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Mon compte" RUNNING
+05:26:46.118 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Mon compte, title=, value=, text=, hintText=, resource-id=, bounds=[338,72][382,116], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=338, y=72, width=44, height=44))
+05:26:46.120 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:26:49.343 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+05:26:49.348 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (360, 94) using hierarchy based logic for wait
+05:26:49.349 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:26:49.349 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:26:49.974 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:26:50.873 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+05:26:50.873 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Mon compte" COMPLETED
+05:26:50.874 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 5000 ms RUNNING
+05:26:50.875 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 5000
+05:26:50.875 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:26:50.876 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:26:51.088 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:26:51.088 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:26:51.710 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 5000 ms COMPLETED
+05:26:51.711 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Scrolling DOWN until "Mode Électricité" is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled RUNNING
+05:26:51.975 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Scrolling try count: 0, DeviceWidth: 402, DeviceWidth: 874
+05:26:51.976 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Element bounds: Bounds(x=36, y=514, width=255, height=19)
+05:26:51.976 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Visibility Percent: 1.0
+05:26:52.027 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Command centerElement: ScrollUntilVisibleCommand(selector=ElementSelector(textRegex=Mode Électricité, idRegex=null, size=null, below=null, above=null, leftOf=null, rightOf=null, containsChild=null, containsDescendants=null, traits=null, index=null, enabled=null, optional=false, selected=null, checked=null, focused=null, childOf=null, css=null), direction=DOWN, scrollDuration=601, visibilityPercentage=100, timeout=10000, waitToSettleTimeoutMs=null, centerElement=false, originalSpeedValue=40, label=null, optional=false).centerElement
+05:26:52.027 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: visibilityPercentageNormalized: 1.0
+05:26:52.027 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Scrolling DOWN until "Mode Électricité" is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled COMPLETED
+05:26:52.027 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on id: interrupteur-electricite RUNNING
+05:26:52.215 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Mode Électricité, title=, value=0, text=0, hintText=, resource-id=interrupteur-electricite, bounds=[303,514][366,542], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=303, y=514, width=63, height=28))
+05:26:52.216 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:26:52.476 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via trusted pre-wait hierarchy (null settle, no recent scroll)
+05:26:52.478 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (334, 528) using hierarchy based logic for wait
+05:26:52.479 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:26:52.479 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:26:53.033 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:26:54.714 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+05:26:54.715 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on id: interrupteur-electricite COMPLETED
+05:26:54.715 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 3000 ms RUNNING
+05:26:54.716 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 3000
+05:26:54.716 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:26:54.717 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:26:54.942 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:26:54.942 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:26:55.557 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 3000 ms COMPLETED
+05:26:55.558 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot ${THEME}-40-profil-mode-electricite RUNNING
+05:26:55.626 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+05:26:55.630 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:26:55.777 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot ${THEME}-40-profil-mode-electricite COMPLETED
+05:26:55.777 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run commun/ouvrir-exemple.yaml RUNNING
+05:26:55.780 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:26:55.782 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:26:55.783 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run vers-accueil.yaml RUNNING
+05:26:55.784 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:26:55.785 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:26:55.785 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run attendre-demarrage.yaml RUNNING
+05:26:55.786 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:26:55.788 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:26:55.788 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple|Profil|Abonnement" is visible RUNNING
+05:26:56.090 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple|Profil|Abonnement" is visible COMPLETED
+05:26:56.090 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run fenetres-systeme.yaml RUNNING
+05:26:56.091 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:26:56.093 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:26:56.093 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow While Using App" is visible RUNNING
+05:27:02.877 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:27:02.880 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow While Using App" is visible SKIPPED
+05:27:02.880 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow" is visible RUNNING
+05:27:03.307 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:27:03.307 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow" is visible SKIPPED
+05:27:03.307 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Compris" is visible RUNNING
+05:27:03.811 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:27:03.811 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Compris" is visible SKIPPED
+05:27:03.811 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run fenetres-systeme.yaml COMPLETED
+05:27:03.811 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run attendre-demarrage.yaml COMPLETED
+05:27:03.811 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Abonnement" is visible RUNNING
+05:27:04.095 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on point (10%,10%) RUNNING
+05:27:04.110 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (40, 87) using hierarchy based logic for wait
+05:27:04.369 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:04.369 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:05.061 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:27:08.687 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+05:27:08.689 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on point (10%,10%) COMPLETED
+05:27:08.689 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 3000 ms RUNNING
+05:27:08.690 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 3000
+05:27:08.690 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:08.690 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:08.910 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:08.910 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:09.976 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:09.977 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:10.242 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:10.242 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:10.847 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 3000 ms COMPLETED
+05:27:10.848 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Abonnement" is visible COMPLETED
+05:27:10.848 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Profil" is visible RUNNING
+05:27:18.082 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:27:18.083 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Profil" is visible SKIPPED
+05:27:18.083 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Découvrir sans compte" is visible RUNNING
+05:27:18.488 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:27:18.489 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Découvrir sans compte" is visible SKIPPED
+05:27:18.489 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Passer le film" is visible RUNNING
+05:27:19.017 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:27:19.017 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Passer le film" is visible SKIPPED
+05:27:19.017 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Passer la question" is visible RUNNING
+05:27:19.436 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:27:19.436 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Passer la question" is visible SKIPPED
+05:27:19.436 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run fenetres-systeme.yaml RUNNING
+05:27:19.461 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:27:19.463 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:27:19.463 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow While Using App" is visible RUNNING
+05:27:19.943 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:27:19.943 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow While Using App" is visible SKIPPED
+05:27:19.943 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow" is visible RUNNING
+05:27:20.488 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:27:20.488 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow" is visible SKIPPED
+05:27:20.488 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Compris" is visible RUNNING
+05:27:20.943 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:27:20.943 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Compris" is visible SKIPPED
+05:27:20.943 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run fenetres-systeme.yaml COMPLETED
+05:27:20.943 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Voir un exemple" is visible RUNNING
+05:27:21.153 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Voir un exemple" is visible COMPLETED
+05:27:21.154 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 5000 ms RUNNING
+05:27:21.155 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 5000
+05:27:21.155 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:21.155 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:21.389 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:21.389 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:22.423 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:22.423 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:22.632 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:22.633 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:24.103 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 5000 ms COMPLETED
+05:27:24.105 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run vers-accueil.yaml COMPLETED
+05:27:24.106 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Scrolling DOWN until "Voir un exemple" is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled RUNNING
+05:27:24.513 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Scrolling try count: 0, DeviceWidth: 402, DeviceWidth: 874
+05:27:24.514 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Element bounds: Bounds(x=20, y=430, width=175, height=129)
+05:27:24.514 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Visibility Percent: 1.0
+05:27:24.514 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Command centerElement: ScrollUntilVisibleCommand(selector=ElementSelector(textRegex=Voir un exemple, idRegex=null, size=null, below=null, above=null, leftOf=null, rightOf=null, containsChild=null, containsDescendants=null, traits=null, index=null, enabled=null, optional=false, selected=null, checked=null, focused=null, childOf=null, css=null), direction=DOWN, scrollDuration=601, visibilityPercentage=100, timeout=10000, waitToSettleTimeoutMs=null, centerElement=false, originalSpeedValue=40, label=null, optional=true).centerElement
+05:27:24.514 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: visibilityPercentageNormalized: 1.0
+05:27:24.515 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Scrolling DOWN until "Voir un exemple" is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled COMPLETED
+05:27:24.515 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Voir un exemple" RUNNING
+05:27:24.778 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Voir un exemple, title=, value=, text=, hintText=, resource-id=, bounds=[20,430][195,559], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=20, y=430, width=175, height=129))
+05:27:24.780 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:27:28.138 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+05:27:28.141 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (107, 494) using hierarchy based logic for wait
+05:27:28.142 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:28.142 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:28.685 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:27:30.041 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+05:27:30.042 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Voir un exemple" COMPLETED
+05:27:30.043 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Options du plan" is visible RUNNING
+05:27:31.157 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Options du plan" is visible COMPLETED
+05:27:31.158 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run fenetres-systeme.yaml RUNNING
+05:27:31.201 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:27:31.204 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:27:31.204 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow While Using App" is visible RUNNING
+05:27:37.865 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:27:37.866 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow While Using App" is visible SKIPPED
+05:27:37.866 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow" is visible RUNNING
+05:27:39.557 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:27:39.557 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow" is visible SKIPPED
+05:27:39.558 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Compris" is visible RUNNING
+05:27:41.024 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:27:41.025 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Compris" is visible SKIPPED
+05:27:41.025 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run fenetres-systeme.yaml COMPLETED
+05:27:41.025 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 8000 ms RUNNING
+05:27:41.025 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 8000
+05:27:41.026 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:41.026 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:41.334 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:41.336 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:42.003 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 8000 ms COMPLETED
+05:27:42.005 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run commun/ouvrir-exemple.yaml COMPLETED
+05:27:42.005 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot ${THEME}-41-plan-2d-electricite RUNNING
+05:27:42.009 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+05:27:42.010 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:42.139 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot ${THEME}-41-plan-2d-electricite COMPLETED
+05:27:42.140 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on (Optional) "Édition" RUNNING
+05:27:42.954 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Édition, title=, value=, text=, hintText=, resource-id=, bounds=[338,778][376,816], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=338, y=778, width=38, height=38))
+05:27:42.955 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:27:43.239 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via trusted pre-wait hierarchy (null settle, no recent scroll)
+05:27:43.241 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (357, 797) using hierarchy based logic for wait
+05:27:43.242 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:43.242 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:43.883 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:27:49.904 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+05:27:49.907 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on (Optional) "Édition" COMPLETED
+05:27:49.907 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 5000 ms RUNNING
+05:27:49.914 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 5000
+05:27:49.914 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:49.915 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:50.366 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:50.366 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:54.176 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:54.178 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:54.981 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:27:54.981 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:59.062 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 5000 ms COMPLETED
+05:27:59.071 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot ${THEME}-42-edition-electricite RUNNING
+05:27:59.415 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+05:27:59.416 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:27:59.702 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot ${THEME}-42-edition-electricite COMPLETED
+05:27:59.702 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on (Optional) "Édition" RUNNING
+05:28:01.303 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Édition, title=, value=, text=, hintText=, resource-id=, bounds=[338,778][376,816], enabled=true, focused=false, selected=true, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=true), bounds=Bounds(x=338, y=778, width=38, height=38))
+05:28:01.349 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:28:05.632 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+05:28:05.667 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (357, 797) using hierarchy based logic for wait
+05:28:05.667 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:05.667 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:06.471 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:28:07.077 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+05:28:07.077 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on (Optional) "Édition" COMPLETED
+05:28:07.078 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 5000 ms RUNNING
+05:28:07.105 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 5000
+05:28:07.108 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:07.108 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:07.574 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:07.574 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:10.224 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 5000 ms COMPLETED
+05:28:10.225 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "2D, passer en 3D" RUNNING
+05:28:10.947 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=2D, passer en 3D, title=, value=, text=, hintText=, resource-id=, bounds=[318,171][380,205], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=318, y=171, width=62, height=34))
+05:28:10.950 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:28:11.385 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via trusted pre-wait hierarchy (null settle, no recent scroll)
+05:28:11.434 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (349, 188) using hierarchy based logic for wait
+05:28:11.438 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:11.439 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:13.284 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:28:14.008 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+05:28:14.141 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "2D, passer en 3D" COMPLETED
+05:28:14.141 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 10000 ms RUNNING
+05:28:14.242 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 10000
+05:28:14.243 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:14.243 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:15.992 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:15.992 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:19.772 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:19.773 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:20.340 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:20.340 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:21.499 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 10000 ms COMPLETED
+05:28:21.501 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot ${THEME}-43-vue-3d-electricite RUNNING
+05:28:21.540 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+05:28:21.541 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:21.711 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot ${THEME}-43-vue-3d-electricite COMPLETED
+05:28:21.711 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on (Optional) "3D, passer en 2D" RUNNING
+05:28:22.129 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=3D, passer en 2D, title=, value=, text=, hintText=, resource-id=, bounds=[336,171][380,205], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=336, y=171, width=44, height=34))
+05:28:22.134 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:28:22.427 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via trusted pre-wait hierarchy (null settle, no recent scroll)
+05:28:22.438 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (358, 188) using hierarchy based logic for wait
+05:28:22.466 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:22.468 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:23.266 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:28:23.960 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+05:28:23.961 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on (Optional) "3D, passer en 2D" COMPLETED
+05:28:23.962 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 5000 ms RUNNING
+05:28:23.963 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 5000
+05:28:23.963 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:23.963 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:24.184 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:24.184 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:25.377 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 5000 ms COMPLETED
+05:28:25.378 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Exporter ou imprimer le plan" RUNNING
+05:28:26.130 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Exporter ou imprimer le plan, title=, value=, text=, hintText=, resource-id=, bounds=[306,58][344,96], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=306, y=58, width=38, height=38))
+05:28:26.131 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:28:26.472 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via trusted pre-wait hierarchy (null settle, no recent scroll)
+05:28:26.474 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (325, 77) using hierarchy based logic for wait
+05:28:26.475 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:26.476 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:27.100 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:28:27.848 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+05:28:27.850 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Exporter ou imprimer le plan" COMPLETED
+05:28:27.850 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 5000 ms RUNNING
+05:28:27.852 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 5000
+05:28:27.852 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:27.852 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:28.159 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:28.159 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:29.527 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 5000 ms COMPLETED
+05:28:29.527 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot ${THEME}-44-export-formats-electricite RUNNING
+05:28:29.557 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+05:28:29.558 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:29.803 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot ${THEME}-44-export-formats-electricite COMPLETED
+05:28:29.803 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "${APP_ID}" RUNNING
+05:28:29.835 [ INFO] device.SimctlIOSDevice.setPermissions: [Start] Setting permissions all=allow through applesimutils
+05:28:29.836 [ INFO] util.LocalSimulatorUtils.setAppleSimutilsPermissions: [Start] Setting permissions via pinned applesimutils
+05:28:29.838 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [/Users/runner/.maestro/deps/applesimutils, --byId, 22970779-4A47-463E-8B6D-CC012359B320, --bundle, fr.echoplan.app, --setPermissions, calendar=YES,camera=YES,contacts=YES,faceid=YES,homekit=YES,medialibrary=YES,microphone=YES,motion=YES,photos=YES,reminders=YES,siri=YES,speech=YES,userTracking=YES] with {}
+05:28:34.763 [ INFO] util.LocalSimulatorUtils.setAppleSimutilsPermissions: [Done] Setting permissions pinned applesimutils
+05:28:34.763 [ INFO] device.SimctlIOSDevice.setPermissions: [Done] Setting permissions through applesimutils
+05:28:34.763 [ INFO] device.SimctlIOSDevice.setPermissions: [Start] Setting Permissions all=allow through simctl
+05:28:34.763 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcrun, simctl, privacy, 22970779-4A47-463E-8B6D-CC012359B320, grant, location-always, fr.echoplan.app] with {}
+05:28:35.254 [ INFO] device.SimctlIOSDevice.setPermissions: [Done] Setting Permissions all=allow through simctl
+05:28:35.306 [ INFO] maestro.Maestro.launchApp$lambda$5: Launching app fr.echoplan.app
+05:28:35.306 [ INFO] maestro.Maestro.launchApp$lambda$5: Stopping fr.echoplan.app app during launch
+05:28:37.352 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcrun, simctl, launch, 22970779-4A47-463E-8B6D-CC012359B320, fr.echoplan.app] with {}
+05:28:39.317 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "${APP_ID}" COMPLETED
+05:28:39.332 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run commun/vers-accueil.yaml RUNNING
+05:28:39.521 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:28:39.525 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:28:39.525 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run attendre-demarrage.yaml RUNNING
+05:28:39.580 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:28:39.590 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:28:39.590 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple|Profil|Abonnement" is visible RUNNING
+05:28:42.115 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple|Profil|Abonnement" is visible COMPLETED
+05:28:42.115 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run fenetres-systeme.yaml RUNNING
+05:28:42.327 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:28:42.329 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:28:42.329 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow While Using App" is visible RUNNING
+05:28:46.568 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:28:46.568 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow While Using App" is visible SKIPPED
+05:28:46.568 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow" is visible RUNNING
+05:28:47.004 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:28:47.005 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow" is visible SKIPPED
+05:28:47.005 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Compris" is visible RUNNING
+05:28:47.459 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:28:47.459 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Compris" is visible SKIPPED
+05:28:47.459 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run fenetres-systeme.yaml COMPLETED
+05:28:47.459 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run attendre-demarrage.yaml COMPLETED
+05:28:47.459 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Abonnement" is visible RUNNING
+05:28:47.946 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:28:47.947 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Abonnement" is visible SKIPPED
+05:28:47.947 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Profil" is visible RUNNING
+05:28:48.546 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:28:48.547 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Profil" is visible SKIPPED
+05:28:48.547 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Découvrir sans compte" is visible RUNNING
+05:28:48.949 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:28:48.950 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Découvrir sans compte" is visible SKIPPED
+05:28:48.952 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Passer le film" is visible RUNNING
+05:28:49.386 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:28:49.386 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Passer le film" is visible SKIPPED
+05:28:49.386 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Passer la question" is visible RUNNING
+05:28:49.762 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:28:49.764 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Passer la question" is visible SKIPPED
+05:28:49.767 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run fenetres-systeme.yaml RUNNING
+05:28:49.782 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:28:49.784 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:28:49.784 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow While Using App" is visible RUNNING
+05:28:50.164 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:28:50.165 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow While Using App" is visible SKIPPED
+05:28:50.165 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow" is visible RUNNING
+05:28:50.721 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:28:50.722 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow" is visible SKIPPED
+05:28:50.722 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Compris" is visible RUNNING
+05:28:51.278 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:28:51.279 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Compris" is visible SKIPPED
+05:28:51.279 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run fenetres-systeme.yaml COMPLETED
+05:28:51.279 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Voir un exemple" is visible RUNNING
+05:28:51.537 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Voir un exemple" is visible COMPLETED
+05:28:51.538 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 5000 ms RUNNING
+05:28:51.542 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 5000
+05:28:51.543 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:51.543 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:51.765 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:51.765 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:53.501 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:53.502 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:53.725 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:53.726 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:54.418 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 5000 ms COMPLETED
+05:28:54.418 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run commun/vers-accueil.yaml COMPLETED
+05:28:54.418 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Mon compte" RUNNING
+05:28:54.663 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Mon compte, title=, value=, text=, hintText=, resource-id=, bounds=[338,72][382,116], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=338, y=72, width=44, height=44))
+05:28:54.666 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:28:57.882 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+05:28:57.886 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (360, 94) using hierarchy based logic for wait
+05:28:57.889 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:57.889 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:58.494 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:28:59.578 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+05:28:59.578 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Mon compte" COMPLETED
+05:28:59.578 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 5000 ms RUNNING
+05:28:59.579 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 5000
+05:28:59.579 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:59.579 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:28:59.815 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:28:59.815 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:29:00.368 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 5000 ms COMPLETED
+05:29:00.370 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Scrolling DOWN until "Mode Électricité" is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled RUNNING
+05:29:00.594 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Scrolling try count: 0, DeviceWidth: 402, DeviceWidth: 874
+05:29:00.594 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Element bounds: Bounds(x=36, y=514, width=255, height=19)
+05:29:00.594 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Visibility Percent: 1.0
+05:29:00.594 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: Command centerElement: ScrollUntilVisibleCommand(selector=ElementSelector(textRegex=Mode Électricité, idRegex=null, size=null, below=null, above=null, leftOf=null, rightOf=null, containsChild=null, containsDescendants=null, traits=null, index=null, enabled=null, optional=false, selected=null, checked=null, focused=null, childOf=null, css=null), direction=DOWN, scrollDuration=601, visibilityPercentage=100, timeout=10000, waitToSettleTimeoutMs=null, centerElement=false, originalSpeedValue=40, label=null, optional=false).centerElement
+05:29:00.594 [ INFO] maestro.orchestra.Orchestra.scrollUntilVisible: visibilityPercentageNormalized: 1.0
+05:29:00.594 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Scrolling DOWN until "Mode Électricité" is visible with speed 40, visibility percentage 100%, timeout 10000 ms, with centering disabled COMPLETED
+05:29:00.594 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on id: interrupteur-electricite RUNNING
+05:29:00.830 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Mode Électricité, title=, value=1, text=1, hintText=, resource-id=interrupteur-electricite, bounds=[303,514][366,542], enabled=true, focused=false, selected=false, checked=true}, children=[], clickable=null, enabled=true, focused=false, checked=true, selected=false), bounds=Bounds(x=303, y=514, width=63, height=28))
+05:29:00.831 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:29:01.109 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via trusted pre-wait hierarchy (null settle, no recent scroll)
+05:29:01.110 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (334, 528) using hierarchy based logic for wait
+05:29:01.112 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:29:01.112 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:29:01.651 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:29:03.265 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+05:29:03.265 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on id: interrupteur-electricite COMPLETED
+05:29:03.265 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 3000 ms RUNNING
+05:29:03.266 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 3000
+05:29:03.266 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:29:03.266 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:29:03.456 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:29:03.456 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:29:04.298 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 3000 ms COMPLETED
+05:29:05.382 [ INFO] xcuitest.crash.IOSCrashFileFinder.findCrashFile: Crash detection: crashFile=none, totalForBundle=0, bundleId=${APP_ID}
+05:29:05.588 [ INFO] maestro.cli.report.TestDebugReporter.deleteOldFiles: Performing purge of logs older than 14 days from /Users/runner/work/RoomScanner/RoomScanner/captures/brut/clair-05_mode_electricite

@@ -1,0 +1,243 @@
+05:32:49.499 [ INFO] maestro.cli.report.TestDebugReporter.logSystemInfo: Debug output path: /Users/runner/work/RoomScanner/RoomScanner/captures/debug/clair-07_lecture_plan/.maestro/tests/2026-10-20_053249
+05:32:49.506 [ INFO] MAESTRO.logSystemInfo: ---- System Info ----
+05:32:49.513 [ INFO] MAESTRO.logSystemInfo: Maestro Version: 2.10.0
+05:32:49.535 [ INFO] MAESTRO.logSystemInfo: CI: github
+05:32:49.536 [ INFO] MAESTRO.logSystemInfo: OS Name: Mac OS X
+05:32:49.536 [ INFO] MAESTRO.logSystemInfo: OS Version: 15.7.9
+05:32:49.536 [ INFO] MAESTRO.logSystemInfo: Architecture: aarch64
+05:32:49.538 [ INFO] MAESTRO.logSystemInfo: Java Version: 17
+05:32:50.550 [ INFO] MAESTRO.logSystemInfo: Xcode Version: 26.3
+05:32:50.622 [ INFO] MAESTRO.logSystemInfo: Flutter Version: Undefined
+05:32:50.719 [ INFO] MAESTRO.logSystemInfo: Flutter Channel: Undefined
+05:32:50.719 [ INFO] MAESTRO.logSystemInfo: ---------------------
+05:32:52.859 [DEBUG] io.micrometer.common.util.internal.logging.InternalLoggerFactory.newDefaultFactory: Using SLF4J as the default logging framework
+05:33:00.920 [ INFO] maestro.cli.command.TestCommand.runShardSuite: [shard 1] Selected device 22970779-4A47-463E-8B6D-CC012359B320 using port 59514 with execution plan ExecutionPlan(flowsToRun=[/Users/runner/work/RoomScanner/RoomScanner/.maestro/07_lecture_plan.yaml], sequence=FlowSequence(flows=[], continueOnFailure=true), workspaceConfig=WorkspaceConfig(flows=null, includeTags=null, excludeTags=null, executionOrder=null, baselineBranch=null, notifications=null, disableRetries=false, platform=PlatformConfiguration(android=AndroidConfiguration(disableAnimations=false), ios=IOSConfiguration(disableAnimations=false, snapshotKeyHonorModalViews=null)), testOutputDir=null))
+05:33:03.252 [TRACE] ios.xctest.XCTestIOSDevice.open: Opening a connection
+05:33:03.252 [TRACE] xcuitest.XCTestDriverClient.restartXCTestRunner: Restarting XCTest Runner (uninstalling, installing and starting)
+05:33:03.253 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:03.259 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:03.259 [TRACE] xcuitest.XCTestDriverClient.restartXCTestRunner: XCTest Runner uninstalled, will install and start it
+05:33:03.261 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: start()
+05:33:03.261 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: [Start] Install XCUITest runner on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:03.262 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:03.264 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:03.264 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing build products
+05:33:03.427 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing build products
+05:33:03.428 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing maestro-driver-iosUITests-Runner app
+05:33:04.081 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing maestro-driver-iosUITests-Runner app
+05:33:04.081 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Start] Writing maestro-driver-ios app
+05:33:04.097 [ INFO] xcuitest.installer.IOSBuildProductsExtractor.extract: [Done] Writing maestro-driver-ios app
+05:33:04.098 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: Installing driver with xcodebuild
+05:33:04.125 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: [Start] Running XcUITest with `xcodebuild test-without-building` with 59514 and config: IOSDriverConfig(prebuiltRunner=false, sourceDirectory=driver-iPhoneSimulator, context=CLI, snapshotKeyHonorModalViews=null)
+05:33:04.128 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcodebuild, test-without-building, -xctestrun, /var/folders/nj/vtw8zd2j31d1gdrtntc5y4600000gn/T/22970779-4A47-463E-8B6D-CC012359B32012481413071690376731/maestro-driver-ios-config.xctestrun, -destination, id=22970779-4A47-463E-8B6D-CC012359B320, -derivedDataPath, /var/folders/nj/vtw8zd2j31d1gdrtntc5y4600000gn/T/maestro_xctestrunner_xcodebuild_output11650755607317357996] with {TEST_RUNNER_PORT=59514}
+05:33:04.138 [ INFO] xcuitest.installer.LocalXCTestInstaller.startXCTestRunner: [Done] Running XcUITest with `xcodebuild test-without-building`
+05:33:04.138 [ INFO] xcuitest.installer.LocalXCTestInstaller.start$lambda$3: [Done] Install XCUITest runner on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:04.138 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:04.140 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:04.770 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:04.771 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:05.375 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:05.377 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:06.020 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:06.025 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:06.644 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:06.645 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:07.282 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:07.285 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:07.935 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:07.937 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:08.577 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:08.578 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:09.156 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:09.158 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:09.795 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:09.796 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:10.463 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:10.466 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:10.969 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:10.971 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:11.583 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:11.587 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:12.244 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:12.247 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:12.810 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:12.811 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:13.376 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:13.378 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:14.021 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:14.023 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:14.613 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:14.614 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:15.124 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:15.131 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:15.640 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:15.641 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:16.270 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:16.271 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:16.832 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:16.834 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:17.409 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:17.411 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:18.048 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:18.051 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:18.695 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:18.698 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:19.343 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:19.356 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:19.945 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:19.947 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:20.451 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:20.455 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:21.066 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:21.067 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:21.678 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:21.679 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:22.283 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:22.284 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:22.924 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:22.928 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:23.592 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:23.594 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:24.169 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:24.181 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:24.827 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:24.830 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:25.357 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:25.359 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:25.894 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:25.896 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:26.966 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:26.982 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:27.520 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:27.525 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:28.039 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:28.041 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:28.692 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:28.693 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:29.329 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:29.337 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:29.871 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:29.874 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:30.490 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:30.492 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:31.019 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:31.023 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:31.670 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:31.671 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:32.307 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:32.308 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:32.907 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:32.911 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:33.497 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:33.498 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:34.176 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:34.179 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Failed] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320, exception: java.net.ConnectException: Failed to connect to /127.0.0.1:59514
+05:33:34.684 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Start] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:34.783 [ INFO] xcuitest.installer.LocalXCTestInstaller.xcTestDriverStatusCheck: [Done] Perform XCUITest driver status check on 22970779-4A47-463E-8B6D-CC012359B320
+05:33:35.133 [ INFO] maestro.cli.runner.TestSuiteInteractor.runFlow:  Running flow Lire un plan papier
+05:33:35.182 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Getting device info
+05:33:35.443 [ INFO] maestro.Maestro.cachedDeviceInfo_delegate$lambda$0: Got device info: DeviceInfo(platform=IOS, widthPixels=1206, heightPixels=2622, widthGrid=402, heightGrid=874)
+05:33:35.635 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+05:33:35.638 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+05:33:35.640 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:33:37.136 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:33:37.138 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "${APP_ID}" RUNNING
+05:33:37.151 [ INFO] device.SimctlIOSDevice.setPermissions: [Start] Setting permissions all=allow through applesimutils
+05:33:37.152 [ INFO] util.LocalSimulatorUtils.setAppleSimutilsPermissions: [Start] Setting permissions via pinned applesimutils
+05:33:37.152 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [/Users/runner/.maestro/deps/applesimutils, --byId, 22970779-4A47-463E-8B6D-CC012359B320, --bundle, fr.echoplan.app, --setPermissions, calendar=YES,camera=YES,contacts=YES,faceid=YES,homekit=YES,medialibrary=YES,microphone=YES,motion=YES,photos=YES,reminders=YES,siri=YES,speech=YES,userTracking=YES] with {}
+05:33:37.867 [ INFO] util.LocalSimulatorUtils.setAppleSimutilsPermissions: [Done] Setting permissions pinned applesimutils
+05:33:37.868 [ INFO] device.SimctlIOSDevice.setPermissions: [Done] Setting permissions through applesimutils
+05:33:37.870 [ INFO] device.SimctlIOSDevice.setPermissions: [Start] Setting Permissions all=allow through simctl
+05:33:37.870 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcrun, simctl, privacy, 22970779-4A47-463E-8B6D-CC012359B320, grant, location-always, fr.echoplan.app] with {}
+05:33:38.100 [ INFO] device.SimctlIOSDevice.setPermissions: [Done] Setting Permissions all=allow through simctl
+05:33:38.170 [ INFO] maestro.Maestro.launchApp$lambda$5: Launching app fr.echoplan.app
+05:33:38.170 [ INFO] maestro.Maestro.launchApp$lambda$5: Stopping fr.echoplan.app app during launch
+05:33:39.296 [ INFO] util.CommandLineUtils.runCommand: Running command line operation: [xcrun, simctl, launch, 22970779-4A47-463E-8B6D-CC012359B320, fr.echoplan.app] with {}
+05:33:40.467 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Launch app "${APP_ID}" COMPLETED
+05:33:40.469 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run commun/vers-accueil.yaml RUNNING
+05:33:40.484 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:33:40.486 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:33:40.487 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run attendre-demarrage.yaml RUNNING
+05:33:40.491 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:33:40.501 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:33:40.502 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple|Profil|Abonnement" is visible RUNNING
+05:33:43.039 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Découvrir sans compte|Passer le film|Passer la question|Voir un exemple|Profil|Abonnement" is visible COMPLETED
+05:33:43.042 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run fenetres-systeme.yaml RUNNING
+05:33:43.050 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:33:43.052 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:33:43.053 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow While Using App" is visible RUNNING
+05:33:47.710 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:33:47.711 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow While Using App" is visible SKIPPED
+05:33:47.711 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow" is visible RUNNING
+05:33:48.112 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:33:48.112 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow" is visible SKIPPED
+05:33:48.112 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Compris" is visible RUNNING
+05:33:48.569 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:33:48.570 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Compris" is visible SKIPPED
+05:33:48.570 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run fenetres-systeme.yaml COMPLETED
+05:33:48.570 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run attendre-demarrage.yaml COMPLETED
+05:33:48.570 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Abonnement" is visible RUNNING
+05:33:49.013 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:33:49.013 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Abonnement" is visible SKIPPED
+05:33:49.014 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Profil" is visible RUNNING
+05:33:49.503 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:33:49.503 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Profil" is visible SKIPPED
+05:33:49.504 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Découvrir sans compte" is visible RUNNING
+05:33:49.952 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:33:49.953 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Découvrir sans compte" is visible SKIPPED
+05:33:49.953 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Passer le film" is visible RUNNING
+05:33:50.461 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:33:50.461 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Passer le film" is visible SKIPPED
+05:33:50.461 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Passer la question" is visible RUNNING
+05:33:50.939 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:33:50.939 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Passer la question" is visible SKIPPED
+05:33:50.940 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run fenetres-systeme.yaml RUNNING
+05:33:50.947 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:33:50.949 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:33:50.949 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow While Using App" is visible RUNNING
+05:33:51.419 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:33:51.419 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow While Using App" is visible SKIPPED
+05:33:51.420 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Allow" is visible RUNNING
+05:33:51.887 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:33:51.888 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Allow" is visible SKIPPED
+05:33:51.888 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Run flow when "Compris" is visible RUNNING
+05:33:52.446 [ INFO] maestro.orchestra.Orchestra.executeSubflowCommands: [Command execution subflow] CommandSkipped: null
+05:33:52.446 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run flow when "Compris" is visible SKIPPED
+05:33:52.446 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run fenetres-systeme.yaml COMPLETED
+05:33:52.447 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Assert that "Voir un exemple" is visible RUNNING
+05:33:52.638 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Assert that "Voir un exemple" is visible COMPLETED
+05:33:52.639 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 5000 ms RUNNING
+05:33:52.643 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 5000
+05:33:52.646 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:33:52.646 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:33:53.174 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:33:53.174 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:33:58.428 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 5000 ms COMPLETED
+05:33:58.431 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Run commun/vers-accueil.yaml COMPLETED
+05:33:58.431 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Tap on "Lire un plan papier" RUNNING
+05:33:58.981 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tapping on element:  UiElement(treeNode=TreeNode(attributes={accessibilityText=Lire un plan papier, title=, value=, text=, hintText=, resource-id=, bounds=[207,266][382,410], enabled=true, focused=false, selected=false, checked=false}, children=[], clickable=null, enabled=true, focused=false, checked=false, selected=false), bounds=Bounds(x=207, y=266, width=175, height=144))
+05:33:58.986 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:34:02.969 [ INFO] maestro.Maestro.tap-HgV9Ck0: Tap aimed via settled hierarchy
+05:34:03.001 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Try tapping at (294, 338) using hierarchy based logic for wait
+05:34:03.003 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:34:03.004 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:34:03.718 [ INFO] device.IOSDevice.invoke-F9mIFpk: Waiting for animation to end with timeout 3000
+05:34:12.824 [ INFO] maestro.Maestro.screenshotBasedTap-ogj28Uc: Something have changed in the UI judging by view hierarchy. Proceed.
+05:34:12.827 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Tap on "Lire un plan papier" COMPLETED
+05:34:12.827 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Wait for animation to end within 5000 ms RUNNING
+05:34:12.828 [ INFO] maestro.Maestro.waitForAnimationToEnd$lambda$53: Waiting for animation to end with timeout 5000
+05:34:12.828 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:34:12.828 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:34:13.091 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:34:13.092 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:34:15.447 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:34:15.448 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:34:15.780 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to byte array
+05:34:15.780 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:34:18.433 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Wait for animation to end within 5000 ms COMPLETED
+05:34:18.435 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Take screenshot ${THEME}-70-lecture-invitation RUNNING
+05:34:18.613 [ INFO] maestro.Maestro.takeScreenshot: Taking screenshot
+05:34:18.615 [TRACE] maestro.utils.ScreenshotUtils.takeScreenshot: Taking screenshot to output sink
+05:34:18.801 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Take screenshot ${THEME}-70-lecture-invitation COMPLETED
+05:34:20.901 [ INFO] xcuitest.crash.IOSCrashFileFinder.findCrashFile: Crash detection: crashFile=none, totalForBundle=0, bundleId=${APP_ID}
+05:34:21.436 [ INFO] maestro.cli.report.TestDebugReporter.deleteOldFiles: Performing purge of logs older than 14 days from /Users/runner/work/RoomScanner/RoomScanner/captures/brut/clair-07_lecture_plan

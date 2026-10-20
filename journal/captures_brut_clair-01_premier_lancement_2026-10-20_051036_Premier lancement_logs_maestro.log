@@ -1,0 +1,6 @@
+05:11:26.182 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Define variables RUNNING
+05:11:26.187 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Define variables COMPLETED
+05:11:26.188 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Apply configuration RUNNING
+05:11:28.056 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandFinished: Apply configuration COMPLETED
+05:11:28.058 [ INFO] maestro.cli.runner.CliConsoleListener.onCommandStart: Launch app "${APP_ID}" with clear state RUNNING
+05:11:28.076 [ INFO] maestro.Maestro.clearAppState$lambda$8: Clearing app state fr.echoplan.app

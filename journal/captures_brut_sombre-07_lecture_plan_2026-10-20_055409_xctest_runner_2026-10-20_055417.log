@@ -1,0 +1,1318 @@
+2026-10-20 05:54:24.064 xcodebuild[53404:401511] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+2026-10-20 05:54:24.106 xcodebuild[53404:401511] [MT] IDERunDestination: Supported platforms for the buildables in the current scheme is empty.
+--- xcodebuild: WARNING: Using the first of multiple matching destinations:
+{ platform:iOS Simulator, arch:arm64, id:22970779-4A47-463E-8B6D-CC012359B320, OS:26.2026-10-20 05:54:37.433566+0000 maestro-driver-iosUITests-Runner[54616:404468] [Default] Running tests...
+2026-10-20 05:54:37.687582+0000 maestro-driver-iosUITests-Runner[54616:404468] snapshotKeyHonorModalViews configured to value: (null)
+    t =      nans Interface or** BUILD INTERRUPTED **
+trait
+Test Suite 'Selected tests' started at 2026-10-20 05:54:41.363.
+Test Suite 'maestro-driver-iosUITests.xctest' started at 2026-10-20 05:54:41.365.
+Test Suite 'SwipeRouteHandlerV2ClassificationTests' started at 2026-10-20 05:54:41.365.
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testClassifiedTimeoutPreservesTheRealMessage]' started.
+    t =     0.01s Start Test at 2026-10-20 05:54:41.370
+    t =     0.01s Set Up
+    t =     0.01s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testClassifiedTimeoutPreservesTheRealMessage]' passed (0.009 seconds).
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testMainThreadBusyIsClassifiedAsTimeout]' started.
+    t =     0.00s Start Test at 2026-10-20 05:54:41.379
+    t =     0.00s Set Up
+    t =     0.00s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testMainThreadBusyIsClassifiedAsTimeout]' passed (0.005 seconds).
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testTimeoutMessageWithWrongDomainStaysInternal]' started.
+    t =     0.00s Start Test at 2026-10-20 05:54:41.399
+    t =     0.00s Set Up
+    t =     0.00s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testTimeoutMessageWithWrongDomainStaysInternal]' passed (0.002 seconds).
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testUIQueryTimeoutIsClassifiedAsTimeout]' started.
+    t =     0.00s Start Test at 2026-10-20 05:54:41.402
+    t =     0.00s Set Up
+    t =     0.02s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testUIQueryTimeoutIsClassifiedAsTimeout]' passed (0.017 seconds).
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testUnrelatedXCTFutureErrorStaysInternal]' started.
+    t =     0.00s Start Test at 2026-10-20 05:54:41.420
+    t =     0.00s Set Up
+    t =     0.00s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testUnrelatedXCTFutureErrorStaysInternal]' passed (0.002 seconds).
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testXCTFutureCode1000WithUnrelatedMessageStaysInternal]' started.
+    t =     0.00s Start Test at 2026-10-20 05:54:41.460
+    t =     0.00s Set Up
+    t =     0.00s Tear Down
+Test Case '-[maestro_driver_iosUITests.SwipeRouteHandlerV2ClassificationTests testXCTFutureCode1000WithUnrelatedMessageStaysInternal]' passed (0.002 seconds).
+Test Suite 'SwipeRouteHandlerV2ClassificationTests' passed at 2026-10-20 05:54:41.462.
+	 Executed 6 tests, with 0 failures (0 unexpected) in 0.037 (0.097) seconds
+Test Suite 'maestro_driver_iosUITests' started at 2026-10-20 05:54:41.462.
+    t =      nans Suite Set Up
+Test Case '-[maestro_driver_iosUITests.maestro_driver_iosUITests testHttpServer]' started.
+    t =     0.00s Start Test at 2026-10-20 05:54:41.463
+    t =     0.00s Set Up
+2026-10-20 05:54:41.464693+0000 maestro-driver-iosUITests-Runner[54616:404875] [maestro_driver_iosUITests] Will start HTTP server
+2026-10-20 05:54:41.701395+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] starting server 127.0.0.1:61789
+2026-10-20 05:54:41.949959+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> open connection
+2026-10-20 05:54:41.962868+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: GET /status
+2026-10-20 05:54:42.736166+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> open connection
+2026-10-20 05:54:42.743057+0000 maestro-driver-iosUITests-Runner[54616:404876] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =     1.28s Getting device orientation
+2026-10-20 05:54:42.781940+0000 maestro-driver-iosUITests-Runner[54616:404468] Using singleton test manager
+2026-10-20 05:54:42.788848+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =     1.35s Getting device orientation
+    t =     1.35s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:42.969071+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:48.044314+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /setPermissions
+2026-10-20 05:54:48.101808+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /terminateApp
+2026-10-20 05:54:48.107883+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] Terminating app fr.echoplan.app
+    t =     6.65s Terminate fr.echoplan.app:51513
+2026-10-20 05:54:49.200706+0000 maestro-driver-iosUITests-Runner[54616:404468] [End] Terminating app fr.echoplan.app
+2026-10-20 05:54:51.260906+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =     9.80s Getting device orientation
+2026-10-20 05:54:51.270966+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =     9.81s Getting device orientation
+2026-10-20 05:54:51.272627+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:51.272702+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:51.855601+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:51.867748+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:51.868253+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:51.868344+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    10.41s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:53.152734+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:53.154628+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:53.154715+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    11.69s Checking existence of `StatusBar (First Match)`
+    t =    11.73s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    11.79s Find the StatusBar (Element at index 0)
+    t =    11.84s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:53.383692+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.22502994537353516
+2026-10-20 05:54:53.385018+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:53.397555+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.012502908706665039
+    t =    11.94s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:53.427464+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:53.550777+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    12.09s Getting device orientation
+2026-10-20 05:54:53.559116+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    12.10s Getting device orientation
+2026-10-20 05:54:53.561900+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:53.562008+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:53.671960+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:53.682377+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:53.684011+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:53.684270+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    12.22s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:53.728032+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:53.728492+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:53.728653+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    12.27s Checking existence of `StatusBar (First Match)`
+    t =    12.29s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    12.33s Find the StatusBar (Element at index 0)
+    t =    12.37s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:53.882596+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.1538999080657959
+2026-10-20 05:54:53.882764+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:53.884035+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0012580156326293945
+    t =    12.42s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:53.915910+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:53.957550+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    12.50s Getting device orientation
+2026-10-20 05:54:53.968891+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    12.51s Getting device orientation
+2026-10-20 05:54:53.973130+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:53.973324+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:54.014573+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:54.021366+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:54.021991+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:54.022069+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    12.56s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:54.070134+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:54.070337+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:54.070402+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    12.61s Checking existence of `StatusBar (First Match)`
+    t =    12.62s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    12.66s Find the StatusBar (Element at index 0)
+    t =    12.70s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:54.204810+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.13431596755981445
+2026-10-20 05:54:54.205007+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:54.206330+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0012859106063842773
+    t =    12.74s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:54.236339+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:54.248352+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    12.79s Getting device orientation
+2026-10-20 05:54:54.254750+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    12.79s Getting device orientation
+2026-10-20 05:54:54.256663+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:54.256754+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:54.261213+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:54.269681+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:54.270542+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:54.270617+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    12.81s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:54.318210+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:54.318406+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:54.318490+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    12.86s Checking existence of `StatusBar (First Match)`
+    t =    12.87s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    12.92s Find the StatusBar (Element at index 0)
+    t =    12.96s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:54.467413+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.14889395236968994
+2026-10-20 05:54:54.467556+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:54.468003+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0004420280456542969
+    t =    13.01s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:54.498860+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:54.529617+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    13.07s Getting device orientation
+2026-10-20 05:54:54.535715+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    13.07s Getting device orientation
+2026-10-20 05:54:54.537342+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:54.537427+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:54.543626+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:54.549014+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:54.549779+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:54.549836+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    13.09s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:54.586468+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:54.586664+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:54.586723+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    13.12s Checking existence of `StatusBar (First Match)`
+    t =    13.14s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    13.16s Find the StatusBar (Element at index 0)
+    t =    13.20s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:54.715624+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.12883400917053223
+2026-10-20 05:54:54.715848+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:54.716581+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0007200241088867188
+    t =    13.25s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:54.753308+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:54.771587+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    13.31s Getting device orientation
+2026-10-20 05:54:54.778449+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    13.32s Getting device orientation
+2026-10-20 05:54:54.780800+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:54.781068+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:54.818339+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:54.823583+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:54.824125+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:54.824225+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    13.36s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:54.866337+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:54.866566+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:54.866710+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    13.40s Checking existence of `StatusBar (First Match)`
+    t =    13.42s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    13.47s Find the StatusBar (Element at index 0)
+    t =    13.51s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:55.016054+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.14927196502685547
+2026-10-20 05:54:55.016248+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:55.017536+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0012389421463012695
+    t =    13.56s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:55.059227+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:55.068492+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    13.61s Getting device orientation
+2026-10-20 05:54:55.073606+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    13.61s Getting device orientation
+2026-10-20 05:54:55.075453+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:55.075674+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:55.078770+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:55.082790+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:55.083451+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:55.083513+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    13.62s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:55.121635+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:55.121901+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:55.121962+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    13.66s Checking existence of `StatusBar (First Match)`
+    t =    13.67s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    13.70s Find the StatusBar (Element at index 0)
+    t =    13.74s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:55.244143+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.12213897705078125
+2026-10-20 05:54:55.244233+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:55.244800+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0005578994750976562
+    t =    13.78s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:55.275906+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:55.283948+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    13.82s Getting device orientation
+2026-10-20 05:54:55.290783+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    13.83s Getting device orientation
+2026-10-20 05:54:55.293881+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:55.293982+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:55.296666+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:55.301151+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:55.301659+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:55.301718+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    13.84s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:55.345260+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:55.345776+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:55.345862+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    13.88s Checking existence of `StatusBar (First Match)`
+    t =    13.90s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    13.93s Find the StatusBar (Element at index 0)
+    t =    13.97s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:55.482067+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.1361759901046753
+2026-10-20 05:54:55.482150+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:55.483542+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0013309717178344727
+    t =    14.02s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:55.517043+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:55.553439+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    14.09s Getting device orientation
+2026-10-20 05:54:55.562857+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    14.10s Getting device orientation
+2026-10-20 05:54:55.565484+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:55.565738+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:55.568752+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:55.575326+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:55.576231+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:55.576333+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    14.11s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:55.637305+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:55.637501+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:55.637551+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    14.18s Checking existence of `StatusBar (First Match)`
+    t =    14.19s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    14.23s Find the StatusBar (Element at index 0)
+    t =    14.26s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:55.776255+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.13867497444152832
+2026-10-20 05:54:55.776339+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:55.776821+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.00047397613525390625
+    t =    14.31s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:55.814177+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:55.824186+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    14.36s Getting device orientation
+2026-10-20 05:54:55.830873+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    14.37s Getting device orientation
+2026-10-20 05:54:55.832966+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:55.833052+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:55.838092+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:55.843226+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:55.843710+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:55.843831+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    14.38s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:55.886324+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:55.886685+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:55.886896+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    14.42s Checking existence of `StatusBar (First Match)`
+    t =    14.45s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    14.48s Find the StatusBar (Element at index 0)
+    t =    14.51s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:56.003159+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.11623406410217285
+2026-10-20 05:54:56.003279+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:56.003736+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0004500150680541992
+    t =    14.54s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:56.041009+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:56.081284+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    14.62s Getting device orientation
+2026-10-20 05:54:56.089382+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    14.63s Getting device orientation
+2026-10-20 05:54:56.091389+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:56.091492+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:56.095050+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:56.099974+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:56.100456+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:56.100510+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    14.64s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:56.145738+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:56.147875+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:56.148013+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    14.69s Checking existence of `StatusBar (First Match)`
+    t =    14.70s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    14.73s Find the StatusBar (Element at index 0)
+    t =    14.77s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:56.266833+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.11879801750183105
+2026-10-20 05:54:56.266907+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:56.267345+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0004349946975708008
+    t =    14.80s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:56.289137+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:56.298729+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    14.84s Getting device orientation
+2026-10-20 05:54:56.303265+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    14.84s Getting device orientation
+2026-10-20 05:54:56.304597+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:56.304685+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:56.307055+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:56.311317+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:56.311781+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:56.311834+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    14.85s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:56.340962+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:56.341173+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:56.341246+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    14.88s Checking existence of `StatusBar (First Match)`
+    t =    14.89s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    14.91s Find the StatusBar (Element at index 0)
+    t =    14.95s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:56.450623+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.1093519926071167
+2026-10-20 05:54:56.450923+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:56.451574+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0006400346755981445
+    t =    14.99s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:56.479927+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:56.486829+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    15.02s Getting device orientation
+2026-10-20 05:54:56.494422+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    15.03s Getting device orientation
+2026-10-20 05:54:56.495834+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:56.495911+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:56.498079+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:56.502568+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:56.503036+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:56.503131+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    15.04s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:56.540027+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:56.540517+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:56.540676+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    15.08s Checking existence of `StatusBar (First Match)`
+    t =    15.10s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    15.14s Find the StatusBar (Element at index 0)
+    t =    15.18s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:56.714618+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.17391109466552734
+2026-10-20 05:54:56.714705+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:56.715181+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.00046706199645996094
+    t =    15.25s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:56.749608+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:56.756368+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    15.29s Getting device orientation
+2026-10-20 05:54:56.761199+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    15.30s Getting device orientation
+2026-10-20 05:54:56.762555+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:56.762629+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:56.765142+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:56.770313+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:56.770742+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:56.770798+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    15.31s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:56.837257+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:56.837675+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:56.837772+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    15.38s Checking existence of `StatusBar (First Match)`
+    t =    15.40s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    15.44s Find the StatusBar (Element at index 0)
+    t =    15.49s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:56.996020+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.1582200527191162
+2026-10-20 05:54:56.997010+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:56.997629+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0005980730056762695
+    t =    15.54s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:57.027615+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:57.075532+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    15.61s Getting device orientation
+2026-10-20 05:54:57.081589+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    15.62s Getting device orientation
+2026-10-20 05:54:57.082813+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:57.082906+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:57.086476+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:57.090557+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:57.090975+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:57.091036+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    15.63s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:57.127832+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:57.128244+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:57.128394+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    15.67s Checking existence of `StatusBar (First Match)`
+    t =    15.68s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    15.71s Find the StatusBar (Element at index 0)
+    t =    15.76s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:57.264803+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.13637804985046387
+2026-10-20 05:54:57.264907+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:57.265412+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0004949569702148438
+    t =    15.80s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:57.294546+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:57.302307+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    15.84s Getting device orientation
+2026-10-20 05:54:57.309519+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    15.85s Getting device orientation
+2026-10-20 05:54:57.312115+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:57.312315+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:57.314952+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:57.320654+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:57.321145+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:57.321310+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    15.86s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:57.353394+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:57.353618+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:57.353695+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    15.89s Checking existence of `StatusBar (First Match)`
+    t =    15.90s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    15.93s Find the StatusBar (Element at index 0)
+    t =    15.97s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:57.474716+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.12098896503448486
+2026-10-20 05:54:57.474788+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:57.475312+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0005040168762207031
+    t =    16.01s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:57.501880+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:57.511544+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    16.05s Getting device orientation
+2026-10-20 05:54:57.518479+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    16.06s Getting device orientation
+2026-10-20 05:54:57.520027+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:57.520226+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:57.522840+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:57.529573+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:57.530189+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:57.530255+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    16.07s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:57.570808+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:57.571020+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:57.571140+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    16.11s Checking existence of `StatusBar (First Match)`
+    t =    16.14s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    16.18s Find the StatusBar (Element at index 0)
+    t =    16.24s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:57.749714+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.17853403091430664
+2026-10-20 05:54:57.749894+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:57.750468+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0005710124969482422
+    t =    16.29s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:57.783383+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:57.809931+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    16.35s Getting device orientation
+2026-10-20 05:54:57.815182+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    16.35s Getting device orientation
+2026-10-20 05:54:57.818163+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:57.818323+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:57.820795+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:57.826202+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:57.826866+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:57.826925+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    16.36s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:57.868877+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:57.869070+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:57.869231+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    16.41s Checking existence of `StatusBar (First Match)`
+    t =    16.42s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    16.45s Find the StatusBar (Element at index 0)
+    t =    16.48s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:57.977797+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.10855603218078613
+2026-10-20 05:54:57.977995+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:57.978858+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0008519887924194336
+    t =    16.52s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:58.014111+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:58.021412+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    16.56s Getting device orientation
+2026-10-20 05:54:58.030110+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    16.57s Getting device orientation
+2026-10-20 05:54:58.032850+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:58.032937+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:58.035319+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:58.040188+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:58.041397+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:58.041473+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    16.58s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:58.081714+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:58.081928+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:58.081993+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    16.62s Checking existence of `StatusBar (First Match)`
+    t =    16.63s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    16.66s Find the StatusBar (Element at index 0)
+    t =    16.70s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:58.192174+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.1101459264755249
+2026-10-20 05:54:58.192263+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:58.193117+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0008349418640136719
+    t =    16.73s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:58.227353+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:58.237890+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    16.78s Getting device orientation
+2026-10-20 05:54:58.245409+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    16.78s Getting device orientation
+2026-10-20 05:54:58.247992+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:58.248092+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:58.251196+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:58.258689+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:58.260107+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:58.260205+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    16.80s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:58.308697+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:58.308941+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:58.309135+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    16.85s Checking existence of `StatusBar (First Match)`
+    t =    16.87s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    16.90s Find the StatusBar (Element at index 0)
+    t =    16.95s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:58.465579+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.15648102760314941
+2026-10-20 05:54:58.465678+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:58.466175+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.000491023063659668
+    t =    17.00s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:58.494659+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:58.499688+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    17.04s Getting device orientation
+2026-10-20 05:54:58.505992+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    17.04s Getting device orientation
+2026-10-20 05:54:58.508043+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:58.508195+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:58.512066+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:58.519045+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:58.519566+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:58.519635+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    17.06s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:58.570177+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:58.570380+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:58.570470+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    17.11s Checking existence of `StatusBar (First Match)`
+    t =    17.12s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    17.16s Find the StatusBar (Element at index 0)
+    t =    17.19s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:58.693881+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.12338197231292725
+2026-10-20 05:54:58.693958+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:58.694558+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0005919933319091797
+    t =    17.23s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:58.723653+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:58.766702+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    17.30s Getting device orientation
+2026-10-20 05:54:58.881450+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    17.42s Getting device orientation
+2026-10-20 05:54:58.885231+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:58.885498+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:58.888507+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:58.898084+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:58.899657+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:58.899878+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    17.44s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:58.947206+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:58.947548+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:58.947786+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    17.49s Checking existence of `StatusBar (First Match)`
+    t =    17.51s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    17.54s Find the StatusBar (Element at index 0)
+    t =    17.58s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:59.085220+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.1374119520187378
+2026-10-20 05:54:59.085312+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:59.086459+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.001132965087890625
+    t =    17.62s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:59.126592+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:59.161487+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    17.70s Getting device orientation
+2026-10-20 05:54:59.170087+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    17.71s Getting device orientation
+2026-10-20 05:54:59.171773+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:59.171905+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:59.177271+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:59.183959+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:59.184453+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:59.184516+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    17.72s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:59.230128+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:59.230546+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:59.230857+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    17.77s Checking existence of `StatusBar (First Match)`
+    t =    17.78s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    17.82s Find the StatusBar (Element at index 0)
+    t =    17.86s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:59.366152+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.13526499271392822
+2026-10-20 05:54:59.366245+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:59.367123+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0008689165115356445
+    t =    17.90s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:59.396971+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:59.405704+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    17.94s Getting device orientation
+2026-10-20 05:54:59.414833+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    17.95s Getting device orientation
+2026-10-20 05:54:59.416307+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:59.416402+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:59.420883+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:59.429273+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:59.430541+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:59.430666+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    17.97s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:59.497441+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:59.497722+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:59.497960+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    18.04s Checking existence of `StatusBar (First Match)`
+    t =    18.06s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    18.09s Find the StatusBar (Element at index 0)
+    t =    18.12s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:59.630016+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.13208699226379395
+2026-10-20 05:54:59.630131+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:59.630898+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0007020235061645508
+    t =    18.17s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:59.656211+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:59.672418+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    18.21s Getting device orientation
+2026-10-20 05:54:59.679145+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    18.22s Getting device orientation
+2026-10-20 05:54:59.680844+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:59.681011+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:59.684350+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:59.689370+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:59.690003+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:59.690080+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    18.23s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:59.734364+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:59.734669+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:59.734745+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    18.27s Checking existence of `StatusBar (First Match)`
+    t =    18.29s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    18.34s Find the StatusBar (Element at index 0)
+    t =    18.37s Find the StatusBar (Element at index 1)
+2026-10-20 05:54:59.864860+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.1300370693206787
+2026-10-20 05:54:59.864999+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:54:59.865500+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0005090236663818359
+    t =    18.40s Find the Application 'com.apple.springboard'
+2026-10-20 05:54:59.897110+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:54:59.903732+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    18.44s Getting device orientation
+2026-10-20 05:54:59.912352+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    18.45s Getting device orientation
+2026-10-20 05:54:59.913898+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:54:59.913973+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:54:59.917343+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:54:59.927271+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:54:59.928602+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:54:59.928788+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    18.47s Find the Application 'fr.echoplan.app'
+2026-10-20 05:54:59.978371+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:54:59.978808+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:54:59.979003+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    18.52s Checking existence of `StatusBar (First Match)`
+    t =    18.53s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    18.59s Find the StatusBar (Element at index 0)
+    t =    18.66s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:00.172864+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.19384002685546875
+2026-10-20 05:55:00.173024+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:00.174068+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0010200738906860352
+    t =    18.73s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:00.225625+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:00.238261+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    18.78s Getting device orientation
+2026-10-20 05:55:00.253784+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    18.79s Getting device orientation
+2026-10-20 05:55:00.257637+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:00.257872+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:00.264640+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:00.270896+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:00.271354+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:00.271441+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    18.81s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:00.320781+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:00.321168+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:00.321303+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    18.86s Checking existence of `StatusBar (First Match)`
+    t =    18.89s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    18.92s Find the StatusBar (Element at index 0)
+    t =    18.96s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:00.477310+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.15597200393676758
+2026-10-20 05:55:00.477567+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:00.478798+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0012100934982299805
+    t =    19.06s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:00.549752+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:00.561197+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    19.10s Getting device orientation
+2026-10-20 05:55:00.569546+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    19.11s Getting device orientation
+2026-10-20 05:55:00.571247+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:00.571348+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:00.574843+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:00.584319+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:00.585131+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:00.585210+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    19.12s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:00.641578+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:00.642145+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:00.642306+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    19.18s Checking existence of `StatusBar (First Match)`
+    t =    19.20s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    19.24s Find the StatusBar (Element at index 0)
+    t =    19.27s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:00.776734+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.1343989372253418
+2026-10-20 05:55:00.776979+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:00.777576+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0005879402160644531
+    t =    19.32s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:00.813516+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:00.831104+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    19.37s Getting device orientation
+2026-10-20 05:55:00.839909+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    19.38s Getting device orientation
+2026-10-20 05:55:00.842609+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:00.842872+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:00.848575+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:00.855762+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:00.856201+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:00.856265+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    19.39s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:00.895917+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:00.897096+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:00.897406+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    19.44s Checking existence of `StatusBar (First Match)`
+    t =    19.47s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    19.52s Find the StatusBar (Element at index 0)
+    t =    19.54s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:01.045827+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.14840996265411377
+2026-10-20 05:55:01.045897+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:01.046383+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0004780292510986328
+    t =    19.58s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:01.071648+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:01.079692+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    19.62s Getting device orientation
+2026-10-20 05:55:01.084240+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    19.62s Getting device orientation
+2026-10-20 05:55:01.086746+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:01.086831+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:01.088823+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:01.094064+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:01.094513+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:01.094631+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    19.63s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:01.137677+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:01.137872+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:01.138008+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    19.68s Checking existence of `StatusBar (First Match)`
+    t =    19.69s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    19.73s Find the StatusBar (Element at index 0)
+    t =    19.77s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:01.278527+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.14044511318206787
+2026-10-20 05:55:01.278684+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:01.279343+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0006490945816040039
+    t =    19.82s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:01.308365+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:01.315837+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    19.85s Getting device orientation
+2026-10-20 05:55:01.326082+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    19.86s Getting device orientation
+2026-10-20 05:55:01.327723+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:01.327789+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:01.330095+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:01.335726+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:01.338219+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:01.338575+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    19.88s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:01.378519+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:01.378695+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:01.378760+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    19.92s Checking existence of `StatusBar (First Match)`
+    t =    19.94s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    19.99s Find the StatusBar (Element at index 0)
+    t =    20.02s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:01.532551+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.15376603603363037
+2026-10-20 05:55:01.532721+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:01.533235+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0005230903625488281
+    t =    20.07s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:01.559943+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:01.575180+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    20.11s Getting device orientation
+2026-10-20 05:55:01.581246+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    20.12s Getting device orientation
+2026-10-20 05:55:01.582422+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:01.582502+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:01.585668+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:01.589698+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:01.590252+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:01.590320+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    20.13s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:01.640705+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:01.641024+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:01.641268+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    20.18s Checking existence of `StatusBar (First Match)`
+    t =    20.19s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    20.23s Find the StatusBar (Element at index 0)
+    t =    20.27s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:01.773183+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.13189005851745605
+2026-10-20 05:55:01.773293+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:01.773935+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0006270408630371094
+    t =    20.31s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:01.802889+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:01.810542+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    20.35s Getting device orientation
+2026-10-20 05:55:01.815866+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    20.35s Getting device orientation
+2026-10-20 05:55:01.819888+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:01.820148+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:01.824676+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:01.831597+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:01.833352+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:01.833847+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    20.37s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:01.872981+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:01.873157+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:01.873245+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    20.41s Checking existence of `StatusBar (First Match)`
+    t =    20.43s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    20.45s Find the StatusBar (Element at index 0)
+    t =    20.49s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:01.989268+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.11595594882965088
+2026-10-20 05:55:01.989586+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:01.991034+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.001412034034729004
+    t =    20.53s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:02.028711+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:02.047329+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    20.58s Getting device orientation
+2026-10-20 05:55:02.053012+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    20.59s Getting device orientation
+2026-10-20 05:55:02.055204+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:02.055363+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:02.058638+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:02.063882+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:02.064372+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:02.064432+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    20.60s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:02.107872+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:02.108801+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:02.109243+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    20.65s Checking existence of `StatusBar (First Match)`
+    t =    20.68s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    20.71s Find the StatusBar (Element at index 0)
+    t =    20.74s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:02.255272+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.14600002765655518
+2026-10-20 05:55:02.255367+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:02.256201+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0008169412612915039
+    t =    20.79s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:02.292233+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:02.324386+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    20.86s Getting device orientation
+2026-10-20 05:55:02.333169+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    20.87s Getting device orientation
+2026-10-20 05:55:02.335522+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:02.335619+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:02.339186+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:02.346521+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:02.347300+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:02.347416+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    20.88s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:02.399554+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:02.399776+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:02.399854+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    20.94s Checking existence of `StatusBar (First Match)`
+    t =    20.95s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    20.99s Find the StatusBar (Element at index 0)
+    t =    21.04s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:02.547702+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.14777398109436035
+2026-10-20 05:55:02.547877+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:02.548433+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0005450248718261719
+    t =    21.09s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:02.584460+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:02.592282+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    21.13s Getting device orientation
+2026-10-20 05:55:02.600368+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    21.14s Getting device orientation
+2026-10-20 05:55:02.603699+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:02.603786+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:02.607817+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:02.617378+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:02.618534+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:02.618646+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    21.16s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:02.661625+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:02.661883+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:02.662040+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    21.20s Checking existence of `StatusBar (First Match)`
+    t =    21.22s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    21.24s Find the StatusBar (Element at index 0)
+    t =    21.28s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:02.788243+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.12617409229278564
+2026-10-20 05:55:02.788325+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:02.788889+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0005540847778320312
+    t =    21.33s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:02.815349+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:02.821298+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    21.36s Getting device orientation
+2026-10-20 05:55:02.830288+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    21.37s Getting device orientation
+2026-10-20 05:55:02.831756+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:02.831838+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:02.835123+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:02.839724+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:02.840383+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:02.841240+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    21.38s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:02.886870+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:02.887025+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:02.887077+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    21.43s Checking existence of `StatusBar (First Match)`
+    t =    21.44s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    21.48s Find the StatusBar (Element at index 0)
+    t =    21.51s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:03.023136+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.13598108291625977
+2026-10-20 05:55:03.023329+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:03.023903+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0005600452423095703
+    t =    21.56s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:03.060277+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:03.092835+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    21.63s Getting device orientation
+2026-10-20 05:55:03.100844+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    21.64s Getting device orientation
+2026-10-20 05:55:03.102967+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:03.103107+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:03.106193+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:03.113712+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:03.114210+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:03.114277+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    21.65s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:03.161487+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:03.161644+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:03.161751+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    21.70s Checking existence of `StatusBar (First Match)`
+    t =    21.71s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    21.75s Find the StatusBar (Element at index 0)
+    t =    21.79s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:03.303198+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.14142000675201416
+2026-10-20 05:55:03.303287+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:03.304526+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0011919736862182617
+    t =    21.84s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:03.345146+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:03.352695+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    21.89s Getting device orientation
+2026-10-20 05:55:03.359868+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    21.90s Getting device orientation
+2026-10-20 05:55:03.361755+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:03.361865+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:03.363915+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:03.370226+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:03.370746+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:03.370832+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    21.91s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:03.420797+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:03.421184+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:03.421682+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    21.96s Checking existence of `StatusBar (First Match)`
+    t =    21.99s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    22.03s Find the StatusBar (Element at index 0)
+    t =    22.07s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:03.588266+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.16652703285217285
+2026-10-20 05:55:03.588674+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:03.590140+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0014519691467285156
+    t =    22.13s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:03.623014+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:03.646434+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    22.18s Getting device orientation
+2026-10-20 05:55:03.658975+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    22.20s Getting device orientation
+2026-10-20 05:55:03.678340+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:03.682100+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:03.726701+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:03.730489+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:03.730923+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:03.730975+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    22.27s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:03.771087+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:03.771245+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:03.771291+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    22.31s Checking existence of `StatusBar (First Match)`
+    t =    22.33s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    22.35s Find the StatusBar (Element at index 0)
+    t =    22.41s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:03.915478+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.14416301250457764
+2026-10-20 05:55:03.915548+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:03.916020+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0004649162292480469
+    t =    22.45s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:03.940745+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:03.982391+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: GET /screenshot
+2026-10-20 05:55:04.651866+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: GET /screenshot
+2026-10-20 05:55:09.309622+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    27.85s Getting device orientation
+2026-10-20 05:55:09.341248+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    27.88s Getting device orientation
+2026-10-20 05:55:09.344702+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:09.344838+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:09.352574+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:09.366215+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:09.366737+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:09.366793+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    27.90s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:09.431624+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:09.437735+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:09.437854+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    27.98s Checking existence of `StatusBar (First Match)`
+    t =    28.00s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    28.04s Find the StatusBar (Element at index 0)
+    t =    28.08s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:09.591787+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.15389204025268555
+2026-10-20 05:55:09.592159+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:09.593405+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0012230873107910156
+    t =    28.13s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:09.627691+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:09.696023+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:10.074466+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:10.383774+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:10.690205+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:11.043911+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:11.369440+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:11.705867+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:12.007618+0000 maestro-driver-iosUITests-Runner[54616:404878] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:12.306577+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:12.650161+0000 maestro-driver-iosUITests-Runner[54616:404878] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:13.033247+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    31.57s Getting device orientation
+2026-10-20 05:55:13.040741+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    31.58s Getting device orientation
+2026-10-20 05:55:13.043922+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:13.044142+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:13.047992+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:13.055709+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:13.056362+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:13.056429+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    31.59s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:13.104167+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:13.104385+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:13.104631+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    31.64s Checking existence of `StatusBar (First Match)`
+    t =    31.66s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    31.69s Find the StatusBar (Element at index 0)
+    t =    31.73s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:13.229741+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.12507808208465576
+2026-10-20 05:55:13.229824+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:13.230800+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0009249448776245117
+    t =    31.77s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:13.270907+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:13.286250+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: GET /screenshot
+2026-10-20 05:55:13.604418+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /touch
+2026-10-20 05:55:13.616827+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    32.15s Getting device orientation
+2026-10-20 05:55:13.618518+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+    t =    32.16s Getting device orientation
+2026-10-20 05:55:13.619594+0000 maestro-driver-iosUITests-Runner[54616:404468] Tapping 294.0, 338.0
+    t =    32.16s Getting device orientation
+2026-10-20 05:55:13.999650+0000 maestro-driver-iosUITests-Runner[54616:404468] Tapping took 0.3650810718536377
+2026-10-20 05:55:14.006004+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:14.420197+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:14.814176+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:15.253587+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:15.735084+0000 maestro-driver-iosUITests-Runner[54616:404878] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:16.165489+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:16.572258+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:16.971465+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: GET /isScreenStatic
+2026-10-20 05:55:17.414451+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    35.95s Getting device orientation
+2026-10-20 05:55:17.422073+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    35.96s Getting device orientation
+2026-10-20 05:55:17.423857+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:17.423966+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:17.427859+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:17.432056+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:17.432495+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:17.432549+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    35.97s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:17.505102+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:17.505765+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:17.505828+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    36.04s Checking existence of `StatusBar (First Match)`
+    t =    36.06s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    36.10s Find the StatusBar (Element at index 0)
+    t =    36.14s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:17.646372+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.14051496982574463
+2026-10-20 05:55:17.646526+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:17.647098+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0005689859390258789
+    t =    36.18s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:17.678538+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:17.683372+0000 maestro-driver-iosUITests-Runner[54616:404878] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    36.22s Getting device orientation
+2026-10-20 05:55:17.689531+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    36.23s Getting device orientation
+2026-10-20 05:55:17.691764+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:17.691885+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:17.696079+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:17.700580+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:17.701102+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:17.701241+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    36.24s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:17.750506+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:17.750711+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:17.750766+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    36.29s Checking existence of `StatusBar (First Match)`
+    t =    36.30s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    36.34s Find the StatusBar (Element at index 0)
+    t =    36.37s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:17.873081+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.1222848892211914
+2026-10-20 05:55:17.873142+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:17.873726+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0005739927291870117
+    t =    36.41s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:17.903527+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:18.215078+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    36.75s Getting device orientation
+2026-10-20 05:55:18.223291+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    36.76s Getting device orientation
+2026-10-20 05:55:18.225323+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:18.225429+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:18.230493+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:18.235806+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:18.237121+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:18.237288+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    36.77s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:18.279593+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:18.279763+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:18.279812+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    36.82s Checking existence of `StatusBar (First Match)`
+    t =    36.83s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    36.87s Find the StatusBar (Element at index 0)
+    t =    36.90s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:18.406487+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.12664794921875
+2026-10-20 05:55:18.406586+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:18.407177+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0005609989166259766
+    t =    36.94s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:18.433642+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:18.759873+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    37.30s Getting device orientation
+2026-10-20 05:55:18.766546+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    37.31s Getting device orientation
+2026-10-20 05:55:18.769499+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:18.769637+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:18.772673+0000 maestro-driver-iosUITests-Runner[54616:404878] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:18.781068+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:18.781531+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:18.781585+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    37.32s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:18.848533+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:18.849000+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:18.849137+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    37.39s Checking existence of `StatusBar (First Match)`
+    t =    37.40s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    37.44s Find the StatusBar (Element at index 0)
+    t =    37.48s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:18.978826+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.12966203689575195
+2026-10-20 05:55:18.978920+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:18.979541+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0006099939346313477
+    t =    37.52s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:19.004300+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:19.224249+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    37.76s Getting device orientation
+2026-10-20 05:55:19.233372+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    37.77s Getting device orientation
+2026-10-20 05:55:19.234987+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:19.235219+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:19.237914+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:19.246398+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:19.246973+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:19.247068+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    37.78s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:19.304755+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:19.305171+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:19.305494+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    37.84s Checking existence of `StatusBar (First Match)`
+    t =    37.86s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    37.89s Find the StatusBar (Element at index 0)
+    t =    37.93s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:19.429590+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.12402498722076416
+2026-10-20 05:55:19.430129+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:19.431523+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0013359785079956055
+    t =    37.97s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:19.470109+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:19.853878+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    38.39s Getting device orientation
+2026-10-20 05:55:19.860454+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    38.40s Getting device orientation
+2026-10-20 05:55:19.861667+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:19.861738+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:19.864708+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:19.869330+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:19.869915+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:19.869993+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    38.41s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:19.939614+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:19.940161+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:19.940280+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    38.48s Checking existence of `StatusBar (First Match)`
+    t =    38.49s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    38.53s Find the StatusBar (Element at index 0)
+    t =    38.57s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:20.081701+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.1413649320602417
+2026-10-20 05:55:20.081795+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:20.082303+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0004979372024536133
+    t =    38.62s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:20.114962+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:20.401634+0000 maestro-driver-iosUITests-Runner[54616:405297] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    38.94s Getting device orientation
+2026-10-20 05:55:20.411278+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    38.95s Getting device orientation
+2026-10-20 05:55:20.412711+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:20.412782+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:20.416754+0000 maestro-driver-iosUITests-Runner[54616:404878] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:20.421074+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:20.421914+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:20.422004+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    38.96s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:20.467472+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:20.467791+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:20.467936+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    39.01s Checking existence of `StatusBar (First Match)`
+    t =    39.03s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    39.06s Find the StatusBar (Element at index 0)
+    t =    39.10s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:20.596767+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.12880289554595947
+2026-10-20 05:55:20.596836+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:20.597272+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.00042998790740966797
+    t =    39.13s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:20.631859+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:20.943191+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    39.48s Getting device orientation
+2026-10-20 05:55:20.949673+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    39.49s Getting device orientation
+2026-10-20 05:55:20.951140+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:20.951304+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:20.953458+0000 maestro-driver-iosUITests-Runner[54616:404878] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:20.957988+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:20.959577+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:20.959769+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    39.50s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:21.020701+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:21.021061+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:21.021279+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    39.56s Checking existence of `StatusBar (First Match)`
+    t =    39.59s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    39.62s Find the StatusBar (Element at index 0)
+    t =    39.67s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:21.173080+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.15177595615386963
+2026-10-20 05:55:21.173370+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:21.173986+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0006060600280761719
+    t =    39.71s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:21.200194+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:21.533050+0000 maestro-driver-iosUITests-Runner[54616:404877] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    40.07s Getting device orientation
+2026-10-20 05:55:21.541751+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    40.08s Getting device orientation
+2026-10-20 05:55:21.545094+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:21.545196+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:21.548198+0000 maestro-driver-iosUITests-Runner[54616:404878] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:21.552606+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:21.553961+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:21.554150+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    40.09s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:21.605304+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:21.605915+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:21.605996+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    40.14s Checking existence of `StatusBar (First Match)`
+    t =    40.17s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    40.21s Find the StatusBar (Element at index 0)
+    t =    40.25s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:21.751209+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.14517605304718018
+2026-10-20 05:55:21.751335+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:21.752665+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.001284956932067871
+    t =    40.29s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:21.789073+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:22.055113+0000 maestro-driver-iosUITests-Runner[54616:404881] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    40.59s Getting device orientation
+2026-10-20 05:55:22.063406+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    40.60s Getting device orientation
+2026-10-20 05:55:22.065930+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:22.066216+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:22.071117+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:22.078612+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:22.079146+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:22.079207+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    40.62s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:22.137499+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:22.137755+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:22.137838+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    40.68s Checking existence of `StatusBar (First Match)`
+    t =    40.69s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    40.72s Find the StatusBar (Element at index 0)
+    t =    40.76s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:22.264147+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.12628495693206787
+2026-10-20 05:55:22.264218+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:22.264644+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0004169940948486328
+    t =    40.80s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:22.287901+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:22.611500+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: POST /deviceInfo
+    t =    41.15s Getting device orientation
+2026-10-20 05:55:22.619055+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+    t =    41.16s Getting device orientation
+2026-10-20 05:55:22.622865+0000 maestro-driver-iosUITests-Runner[54616:404468] Returning cached screen size
+2026-10-20 05:55:22.623087+0000 maestro-driver-iosUITests-Runner[54616:404468] Device orientation is 1
+2026-10-20 05:55:22.627950+0000 maestro-driver-iosUITests-Runner[54616:404878] [FlyingFox] <127.0.0.1> request: POST /viewHierarchy
+2026-10-20 05:55:22.635020+0000 maestro-driver-iosUITests-Runner[54616:404468] Detected running apps: ["fr.echoplan.app"]
+2026-10-20 05:55:22.636294+0000 maestro-driver-iosUITests-Runner[54616:404468] [Start] View hierarchy snapshot for Application 'fr.echoplan.app'
+2026-10-20 05:55:22.636441+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Starting getHierarchyWithFallback for element.
+    t =    41.17s Find the Application 'fr.echoplan.app'
+2026-10-20 05:55:22.682010+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Successfully retrieved element hierarchy.
+2026-10-20 05:55:22.682227+0000 maestro-driver-iosUITests-Runner[54616:404468] Foreground app is not springboard skipping auto tapping on permissions
+2026-10-20 05:55:22.682296+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch status bar hierarchy - start
+    t =    41.22s Checking existence of `StatusBar (First Match)`
+    t =    41.24s Get all elements bound by index for: Descendants matching type StatusBar
+    t =    41.28s Find the StatusBar (Element at index 0)
+    t =    41.32s Find the StatusBar (Element at index 1)
+2026-10-20 05:55:22.833690+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch status bar hierarchy - duration 0.15136396884918213
+2026-10-20 05:55:22.833762+0000 maestro-driver-iosUITests-Runner[54616:404468] [ViewHierarchyHandler] Fetch Safari WebView hierarchy - start
+2026-10-20 05:55:22.834234+0000 maestro-driver-iosUITests-Runner[54616:404468] Fetch Safari WebView hierarchy - duration 0.0004639625549316406
+    t =    41.37s Find the Application 'com.apple.springboard'
+2026-10-20 05:55:22.866422+0000 maestro-driver-iosUITests-Runner[54616:404468] [Done] View hierarchy snapshot for Application 'fr.echoplan.app' 
+2026-10-20 05:55:23.203769+0000 maestro-driver-iosUITests-Runner[54616:404875] [FlyingFox] <127.0.0.1> request: GET /screenshot
+2026-10-20 05:55:23.529828+0000 maestro-driver-iosUITests-Runner[54616:404878] [FlyingFox] <127.0.0.1> request: GET /screenshot
+2026-10-20 05:55:25.930266+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: GET /screenshot
+2026-10-20 05:55:26.268935+0000 maestro-driver-iosUITests-Runner[54616:404878] [FlyingFox] <127.0.0.1> request: GET /screenshot
+2026-10-20 05:55:29.519762+0000 maestro-driver-iosUITests-Runner[54616:404882] [FlyingFox] <127.0.0.1> request: GET /screenshot
+2026-10-20 05:55:31.432590+0000 maestro-driver-iosUITests-Runner[54616:404878] [FlyingFox] <127.0.0.1> request: GET /status
