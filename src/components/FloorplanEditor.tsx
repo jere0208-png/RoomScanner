@@ -82,6 +82,8 @@ import {
 } from '../geometry/electrical';
 import { frCategory, furnKind, furnitureStrokes, meridienneDe } from '../geometry/furniture';
 import { estUnCaisson } from '../geometry/caisson';
+import type { Visee } from '../geometry/traceMurs';
+import { CalqueTrace } from './CalqueTrace';
 import { estVerrouille } from '../geometry/alignement';
 
 /** L'ordre du dessin des meubles : le tapis au sol, le caisson au plafond. */
@@ -675,6 +677,14 @@ interface Props {
    */
   tracantPiece?: boolean;
   onTracerPiece?: (a: Pt, b: Pt) => void;
+  /**
+   * ON TRACE DES MURS, COIN APRÈS COIN — relevé du patron : « ajouter un mur
+   * exactement là où on le souhaite ». Le calque `CalqueTrace` capte le
+   * doigt ; un doigt pose un coin, deux doigts déplacent et zooment le plan.
+   */
+  traceMurs?: { coins: Pt[]; aimant: boolean } | null;
+  onTraceCoin?: (v: Visee) => void;
+  onTraceVisee?: (v: Visee | null) => void;
   onPlaceAt?: (at: Pt) => void;
   /**
    * L'appareil de plafond en cours de réglage.
@@ -1052,6 +1062,9 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
   placing,
   tracantPiece,
   onTracerPiece,
+  traceMurs,
+  onTraceCoin,
+  onTraceVisee,
   onPlaceAt,
   notes,
   selectedNoteId,
@@ -1599,13 +1612,19 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
     lecture et evident au doigt.
   */
   const tracantRef = useRef(tracantPiece);
-  tracantRef.current = tracantPiece;
+  tracantRef.current = tracantPiece || !!traceMurs;
+  // Un doigt trace ; deux doigts déplacent et zooment, même pendant le tracé.
+  const traceRef = useRef(!!traceMurs);
+  traceRef.current = !!traceMurs;
 
   const nav = useRef(
     PanResponder.create({
       // Ne prend la main QUE sur un mouvement : les taps (sélection de mur)
       // et les poignées de coin gardent la priorité.
       onStartShouldSetPanResponder: () => false,
+      // Pendant le tracé des murs, le plan reprend la main à DEUX doigts :
+      // on zoome pour viser un coin, sans quitter le tracé.
+      onMoveShouldSetPanResponderCapture: (e) => traceRef.current && doigtsDe(e).length >= 2,
       // Un geste qui COMMENCE sur le meuble sélectionné appartient au
       // meuble, jamais au plan. Sans cette exception, le plan se déplaçait
       // sous le doigt et le meuble ne bougeait pas d'un pouce.
@@ -5255,6 +5274,21 @@ const EditeurDuPlan = React.memo(function FloorplanEditor({
               rectangle sur le plan sans risquer d'attraper un mur ou un
               meuble en chemin. Il ne s'allume que quand on l'a demande.
             */}
+            {traceMurs && mapping && (
+              <CalqueTrace
+                largeur={layout.w}
+                hauteur={layout.h}
+                mapping={mapping}
+                walls={walls}
+                coins={traceMurs.coins}
+                aimant={traceMurs.aimant}
+                cadre={planFrameAngle(walls)}
+                versCadre={pointDuCadre}
+                onCoin={(v) => onTraceCoin?.(v)}
+                onVisee={onTraceVisee}
+                couleurs={{ trait: c.blue, accroche: c.blueDark, texte: c.ink, fond: c.surface }}
+              />
+            )}
             {tracantPiece && (
               <Rect
                 x={0}

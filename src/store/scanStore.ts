@@ -106,6 +106,7 @@ import {
   niveauxPresents,
   niveauDeReference,
   souderLesRecouvrements,
+  contourAuNu,
   filtrerAuNiveau,
   partRecouverte,
   estRecouvert,
@@ -177,6 +178,7 @@ import { ancrerElec, type AncreElec } from '../geometry/viseur';
 import { poserLibre } from '../geometry/poser';
 import { orienterLesSieges } from '../geometry/sieges';
 import { devinerLesNatures, type NatureMur } from '../geometry/natureMurs';
+import { aireSignee, contourCroise } from '../geometry/traceMurs';
 import type { SurfaceTexture } from 'react-native-room-scan';
 import {
   deduceRoomKind, deduireLaPiece,
@@ -3217,6 +3219,30 @@ export interface ScanState {
     b: Pt,
     opts?: { epaisseur?: number; depuis?: string },
   ) => string | undefined;
+  /**
+   * POSE UN TRACÉ DE MURS — relevé du patron : « ajouter un mur exactement
+   * là où on le souhaite ». Les coins posés au doigt ou aux cotes
+   * (`traceMurs.ts`) deviennent :
+   *   — `ferme` : une PIÈCE, en un seul « Annuler ». Tracée seule
+   *     (`accroche` faux), ses coins sont les coins INTÉRIEURS — ce qu'on
+   *     mesure au mètre — et les axes passent une demi-épaisseur dehors ;
+   *     accrochée au plan, ses coins sont des axes et elle partage les murs
+   *     qu'elle longe ;
+   *   — sinon une suite de murs, un « Annuler » par mur (`addWallBetween` :
+   *     soudure aux coins, jonction en T, pièce redécoupée si elle se ferme).
+   * Rend la pièce créée et le nombre de murs posés, ou `null` si le tracé
+   * n'en fait rien (moins de deux coins, contour croisé, pièce minuscule).
+   */
+  poserLeTrace: (
+    coins: Pt[],
+    opts: { ferme: boolean; epaisseur?: number; accroche?: boolean },
+  ) => { roomId: string | null; murs: number } | null;
+  /**
+   * UNE PIÈCE DE N COINS (axes des murs), comme `addRoomRect` en a quatre :
+   * les murs qui existent déjà sur ses côtés sont repris, ce qui dépasse
+   * reste à elle (`souderLesRecouvrements`). Rend son identifiant.
+   */
+  addRoomPolygone: (coins: Pt[], opts?: { nom?: string; epaisseur?: number }) => string | null;
   /**
    * L'ÉPAISSEUR D'UN MUR — cloison, doublage, mur, porteur. Voir
    * `EPAISSEURS` et `WallSeg.epaisseur`.
@@ -7107,6 +7133,116 @@ export const useScanStore = create<ScanState>((setVrai, getVrai) => {
         dirty: true,
       });
       return nouvelId;
+    },
+
+    poserLeTrace: (coins, opts) => {
+      // Deux coins confondus (un double appui) ne font pas un mur.
+      const pts: Pt[] = [];
+      for (const p of coins) {
+        if (!sontFinis(p.x, p.z)) continue;
+        const prec = pts[pts.length - 1];
+        if (prec && Math.hypot(p.x - prec.x, p.z - prec.z) < 0.02) continue;
+        pts.push(p);
+      }
+      if (opts.ferme) {
+        const premier = pts[0];
+        const dernier = pts[pts.length - 1];
+        if (pts.length > 3 && premier && dernier && Math.hypot(premier.x - dernier.x, premier.z - dernier.z) < 0.02) {
+          pts.pop();
+        }
+        if (pts.length < 3 || contourCroise(pts) || Math.abs(aireSignee(pts)) < 0.5) return null;
+        const e = Math.min(Math.max(opts.epaisseur ?? WALL_T, 0.03), 0.6);
+        /*
+          TRACÉE SEULE, ELLE SE COTE À L'INTÉRIEUR — décision du patron
+          (revues « Hugo » et « Lucas ») : un plan dessiné aux cotes se compte
+          au nu des murs. Les coins posés sont donc les coins de la pièce
+          qu'on mesure au mètre, et les axes passent une demi-épaisseur
+          dehors (`contourAuNu`, à demi-épaisseur négative).
+        */
+        const axes = opts.accroche ? pts : contourAuNu(pts, [], () => -e / 2);
+        const roomId = get().addRoomPolygone(axes, { epaisseur: e });
+        return roomId ? { roomId, murs: axes.length } : null;
+      }
+      if (pts.length < 2) return null;
+      let murs = 0;
+      for (let i = 0; i + 1 < pts.length; i++) {
+        if (get().addWallBetween(pts[i], pts[i + 1], { epaisseur: opts.epaisseur })) murs++;
+      }
+      return murs > 0 ? { roomId: null, murs } : null;
+    },
+
+    addRoomPolygone: (coins, opts) => {
+      const st = get();
+      if (coins.length < 3 || coins.some((p) => !sontFinis(p.x, p.z))) return null;
+      if (contourCroise(coins) || Math.abs(aireSignee(coins)) < 0.5) return null;
+      pushHistory('addRoom');
+      const h = hauteurDuNiveau(st.walls, st.niveauCourant);
+      const cle = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const roomId = `piece-${cle}`;
+      const e = opts?.epaisseur;
+      const epaisseur = e && e > 0 && Math.abs(e - WALL_T) > 1e-6 ? { epaisseur: Math.min(Math.max(e, 0.03), 0.6) } : {};
+      // Le mur qui porte déjà ce côté, s'il y en a un : voir `addRoomRect`.
+      const dejaLa = (p: Pt, q: Pt) =>
+        st.walls.find((w) => {
+          if (w.type !== 'wall' || niveauDe(w) !== st.niveauCourant) return false;
+          const memeSens = Math.hypot(w.a.x - p.x, w.a.z - p.z) < 0.12 && Math.hypot(w.b.x - q.x, w.b.z - q.z) < 0.12;
+          const sensInverse = Math.hypot(w.a.x - q.x, w.a.z - q.z) < 0.12 && Math.hypot(w.b.x - p.x, w.b.z - p.z) < 0.12;
+          return memeSens || sensInverse;
+        });
+      const neufs: WallSeg[] = [];
+      const wallIds: string[] = [];
+      coins.forEach((p, i) => {
+        const q = coins[(i + 1) % coins.length];
+        const repris = dejaLa(p, q);
+        if (repris) {
+          wallIds.push(repris.id);
+          return;
+        }
+        const mur: WallSeg = {
+          id: `mur-${cle}-${i}`,
+          type: 'wall',
+          a: { x: p.x, z: p.z },
+          b: { x: q.x, z: q.z },
+          height: h,
+          yCenter: h / 2,
+          roomId,
+          niveau: st.niveauCourant,
+          // Tracé à la main : ses cotes sont intérieures (voir `WallSeg.auNu`).
+          auNu: true,
+          ...epaisseur,
+        };
+        neufs.push(mur);
+        wallIds.push(mur.id);
+      });
+      /*
+        ELLE SE NOMME TOUTE SEULE, comme une pièce détectée (`nameRooms`) :
+        « Couloir » si elle en a la forme, sinon « Pièce N » — on la renomme
+        d'un appui, mais elle n'arrive jamais sans nom.
+      */
+      const auNiveau = st.rooms.filter((r) => niveauDe(r) === st.niveauCourant).length;
+      const nomParDefaut = estUnCouloir(coins) ? 'Couloir' : `Pièce ${auNiveau + 1}`;
+      const piece: RoomEntry = {
+        id: roomId,
+        name: nomDePieceLibre(opts?.nom || nomParDefaut, st.rooms.map((r) => r.name), NOM_PIECE_MAX),
+        floor: null,
+        niveau: st.niveauCourant,
+        wallIds,
+      };
+      // Un côté qui longe en partie un mur existant le partage (`souderLesRecouvrements`).
+      const soude = souderLesRecouvrements([...st.walls, ...neufs], [...st.rooms, piece], new Set(neufs.map((w) => w.id)));
+      const ids = new Set(neufs.map((w) => w.id));
+      set({
+        walls: 'epaisseur' in epaisseur ? devinerLesNatures(soude.walls, ids) : soude.walls,
+        rooms: soude.rooms,
+        dirty: true,
+      });
+      const part = roomParts(get().walls, get().rooms).find((x) => x.roomId === roomId);
+      if (part?.surface) {
+        astuce(`Pièce tracée : ${part.surface.area.toFixed(2).replace('.', ',')} m². Touchez-la pour la nommer.`, {
+          icone: 'rooms',
+        });
+      }
+      return roomId;
     },
 
     addWallBetween: (a, b, opts) => {
